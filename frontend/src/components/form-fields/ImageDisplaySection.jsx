@@ -49,12 +49,12 @@ const ImageDisplaySection = ({
                             )}
                         </div>
 
-                        <div>
-                            <div className="text-sm font-medium text-gray-900">
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">
                                 {displayImages.length} Image{displayImages.length !== 1 ? 's' : ''} Selected
                                 {maxFiles && ` (${displayImages.length}/${maxFiles})`}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 truncate">
                                 Click to manage selection
                             </div>
                         </div>
@@ -104,12 +104,12 @@ const ImageDisplaySection = ({
                                         </button>
 
                                         {/* Image info */}
-                                        <div className="mt-2 text-xs text-gray-500">
+                                        <div className="mt-2 text-xs text-gray-500 min-w-0">
                                             <div className="truncate" title={image.title || image.originalFilename}>
                                                 {image.title || image.originalFilename || 'Untitled'}
                                             </div>
                                             {image.file_size && (
-                                                <div>{formatFileSize(image.file_size)}</div>
+                                                <div className="truncate">{formatFileSize(image.file_size)}</div>
                                             )}
                                         </div>
                                     </div>
@@ -142,11 +142,11 @@ const ImageDisplaySection = ({
                         )}
                     </div>
 
-                    <div>
-                        <div className="text-sm font-medium text-gray-900">
+                    <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate" title={image.title || image.originalFilename || 'Untitled Image'}>
                             {image.title || image.originalFilename || 'Untitled Image'}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 truncate">
                             {image.file_size && formatFileSize(image.file_size)}
                             {image.width && image.height && ` • ${image.width}×${image.height}`}
                         </div>

@@ -25,6 +25,7 @@ const ColorInput = ({
         '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
         '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#ec4899'
     ],
+    fieldName, // Extract fieldName to prevent it from being spread to DOM
     ...props
 }) => {
     const [showPicker, setShowPicker] = useState(false)

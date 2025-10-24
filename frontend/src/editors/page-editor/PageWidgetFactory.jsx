@@ -291,9 +291,9 @@ const PageWidgetFactory = ({
                             webpageData,
                             pageVersionData,
                             widgetPath,
-                            pathVariables: pageContext?.pathVariables || {},
-                            simulatedPath: pageContext?.simulatedPath,
-                            onSimulatedPathChange: pageContext?.onSimulatedPathChange
+                            pathVariables: pathVariables || {},
+                            simulatedPath: simulatedPath,
+                            onSimulatedPathChange: onSimulatedPathChange
                         }}
                     />
                 </div>
