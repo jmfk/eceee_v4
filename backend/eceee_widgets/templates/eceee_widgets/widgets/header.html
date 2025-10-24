@@ -1,8 +1,46 @@
 {% load static imgproxy_tags %}
 
-<header class="bg-black h-[112px]">
+<header class="header-widget" style="
+    --header-height-mobile: {{ config.responsive_header.mobile.height }}px;
+    --header-height-tablet: {{ config.responsive_header.tablet.height }}px;
+    --header-height-desktop: {{ config.responsive_header.desktop.height }}px;
+">
 {% if config.image %}
-    {% imgproxy_img config.image width=1280 height=112 class_name='object-cover object-left-top' lazy=True include_dimensions=False %}
+    <picture>
+        {# Mobile source (<768px) - use mobileImage or fallback to main image #}
+        {% if config.mobile_image %}
+        <source 
+            media="(max-width: 767px)" 
+            srcset="{% imgproxy config.mobile_image width=config.responsive_header.mobile.width height=config.responsive_header.mobile.height resize_type='fill' %}"
+        >
+        {% else %}
+        <source 
+            media="(max-width: 767px)" 
+            srcset="{% imgproxy config.image width=config.responsive_header.mobile.width height=config.responsive_header.mobile.height resize_type='fill' %}"
+        >
+        {% endif %}
+        
+        {# Tablet source (768-1024px) - use tabletImage or fallback to main image #}
+        {% if config.tablet_image %}
+        <source 
+            media="(min-width: 768px) and (max-width: 1024px)" 
+            srcset="{% imgproxy config.tablet_image width=config.responsive_header.tablet.width height=config.responsive_header.tablet.height resize_type='fill' %}"
+        >
+        {% else %}
+        <source 
+            media="(min-width: 768px) and (max-width: 1024px)" 
+            srcset="{% imgproxy config.image width=config.responsive_header.tablet.width height=config.responsive_header.tablet.height resize_type='fill' %}"
+        >
+        {% endif %}
+        
+        {# Default desktop image (>1024px) #}
+        <img 
+            src="{% imgproxy config.image width=config.responsive_header.desktop.width height=config.responsive_header.desktop.height resize_type='fill' %}"
+            alt="Header image"
+            class="align-{{ config.alignment|default:'center' }}"
+            loading="lazy"
+        >
+    </picture>
 {% endif %}
 </header>
 

@@ -19,11 +19,64 @@ class HeaderConfig(BaseModel):
 
     image: Optional[str] = Field(
         None,
-        description="Header image",
+        description="Header image (desktop/main)",
         json_schema_extra={
             "component": "ImageInput",
             "order": 1,
             "mediaTypes": ["image"],
+        },
+    )
+
+    tablet_image: Optional[str] = Field(
+        None,
+        description="Header image for tablet (768-1024px)",
+        json_schema_extra={
+            "component": "ImageInput",
+            "order": 2,
+            "mediaTypes": ["image"],
+        },
+    )
+
+    mobile_image: Optional[str] = Field(
+        None,
+        description="Header image for mobile (<768px)",
+        json_schema_extra={
+            "component": "ImageInput",
+            "order": 3,
+            "mediaTypes": ["image"],
+        },
+    )
+
+    height: Optional[int] = Field(
+        112,
+        description="Desktop header height in pixels",
+        json_schema_extra={
+            "component": "NumberInput",
+            "order": 4,
+            "min": 40,
+            "max": 300,
+        },
+    )
+
+    tablet_height: Optional[int] = Field(
+        112,
+        description="Tablet header height in pixels",
+        json_schema_extra={
+            "component": "NumberInput",
+            "order": 5,
+            "min": 40,
+            "max": 300,
+        },
+    )
+
+    mobile_height: Optional[int] = Field(
+        80,
+        description="Mobile header height in pixels",
+        json_schema_extra={
+            "component": "NumberInput",
+            "order": 6,
+            "min": 40,
+            "max": 300,
         },
     )
 
@@ -32,7 +85,7 @@ class HeaderConfig(BaseModel):
         description="Image alignment/focal point",
         json_schema_extra={
             "component": "SelectInput",
-            "order": 2,
+            "order": 7,
             "options": [
                 {"value": "left", "label": "Left"},
                 {"value": "center", "label": "Center"},
@@ -62,8 +115,7 @@ class HeaderWidget(BaseWidget):
     
     .header-widget img {
         width: 100%;
-        /* Responsive height: scales from 60px at mobile to 132px at desktop */
-        height: clamp(60px, 12vw, 132px) !important;
+        height: var(--header-height-desktop, 112px);
         object-fit: cover;
         display: block;
     }
@@ -81,17 +133,17 @@ class HeaderWidget(BaseWidget):
         object-position: right center;
     }
     
-    /* Ensure minimum height on very small screens */
-    @media (max-width: 375px) {
+    /* Mobile breakpoint (<768px) */
+    @media (max-width: 767px) {
         .header-widget img {
-            height: 60px !important;
+            height: var(--header-height-mobile, 80px);
         }
     }
     
-    /* Cap at max height on large screens */
-    @media (min-width: 1200px) {
+    /* Tablet breakpoint (768-1024px) */
+    @media (min-width: 768px) and (max-width: 1024px) {
         .header-widget img {
-            height: 132px !important;
+            height: var(--header-height-tablet, 112px);
         }
     }
     """
@@ -111,31 +163,29 @@ class HeaderWidget(BaseWidget):
         # Get widget dimensions from slot
         dimensions = self.get_widget_dimensions(context)
 
-        # Define responsive header heights
-        header_heights = {
-            "mobile": 80,  # Shorter header for mobile
-            "tablet": 132,  # Standard header height
-            "desktop": 132,  # Standard header height
-        }
+        # Get configured heights or use defaults
+        mobile_height = config.get("mobile_height") or 80
+        tablet_height = config.get("tablet_height") or 112
+        desktop_height = config.get("height") or 112
 
         # Get widths from slot dimensions or use defaults
-        mobile_width = dimensions.get("mobile", {}).get("width") or 360
-        tablet_width = dimensions.get("tablet", {}).get("width") or 768
-        desktop_width = dimensions.get("desktop", {}).get("width") or 1280
+        mobile_width = dimensions.get("mobile", {}).get("width") or 768
+        tablet_width = dimensions.get("tablet", {}).get("width") or 1024
+        desktop_width = dimensions.get("desktop", {}).get("width") or 1920
 
         # Add responsive image settings to config
         template_config["responsive_header"] = {
             "mobile": {
                 "width": mobile_width,
-                "height": header_heights["mobile"],
+                "height": mobile_height,
             },
             "tablet": {
                 "width": tablet_width,
-                "height": header_heights["tablet"],
+                "height": tablet_height,
             },
             "desktop": {
                 "width": desktop_width,
-                "height": header_heights["desktop"],
+                "height": desktop_height,
             },
         }
 
