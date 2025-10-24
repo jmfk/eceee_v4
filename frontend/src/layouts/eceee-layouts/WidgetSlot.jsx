@@ -224,7 +224,7 @@ const WidgetSlot = ({
 
         try {
             return (
-                <div key={uniqueKey} className="mb-4">
+                <div key={uniqueKey}>
                     <PageWidgetFactory
                         widget={widget}
                         slotName={name}
@@ -272,7 +272,7 @@ const WidgetSlot = ({
             );
         } catch (error) {
             return (
-                <div key={uniqueKey} className="mb-4 p-4 bg-red-50 border border-red-200 rounded">
+                <div key={uniqueKey} className="p-4 bg-red-50 border border-red-200">
                     <p className="text-sm text-red-600">
                         Error rendering widget: {error.message}
                     </p>
@@ -296,11 +296,11 @@ const WidgetSlot = ({
                 {editable && !isSlotPreviewMode && (
                     <div
                         key={name}
-                        className="relative border p-4 transition-colors border-gray-200 "
+                        className="relative border px-4 py-2 transition-colors border-gray-200 "
                         data-slot-name={name}
                         data-slot-title={label}
                     >
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between">
                             <div className="flex-1">
                                 <div className="flex items-center">
                                     <Layout className="h-4 w-4 mr-2 text-gray-400" />
@@ -365,7 +365,7 @@ const WidgetSlot = ({
                         <>
                             {/* Inherited Widgets Section */}
                             {Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && (
-                                <div className="inherited-widgets-section mb-4">
+                                <div className="inherited-widgets-section">
                                     {displayInheritedWidgets.map((widget, index) =>
                                         renderWidget({ ...widget, isInherited: true }, index)
                                     )}
@@ -374,7 +374,7 @@ const WidgetSlot = ({
 
                             {/* Add Widget Section - Show when in merge mode with inherited widgets but no local widgets */}
                             {slotRules.mergeMode && Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && Array.isArray(displayLocalWidgets) && displayLocalWidgets.length === 0 && (
-                                <div className="add-widget-section text-center py-8 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
+                                <div className="add-widget-section text-center py-8 border-2 border-dashed border-blue-300 bg-blue-50">
                                     <button
                                         onClick={handleAddWidget}
                                         className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -397,7 +397,7 @@ const WidgetSlot = ({
 
                             {/* Empty slot handling - only when NO inherited AND NO local widgets */}
                             {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && (!Array.isArray(displayLocalWidgets) || displayLocalWidgets.length === 0) && (
-                                <div className="empty-slot text-center py-12 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+                                <div className="empty-slot text-center py-12 text-gray-500 border-2 border-dashed border-gray-300">
                                     <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                                     <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
                                     <p className="text-sm">{description}</p>
@@ -423,7 +423,7 @@ const WidgetSlot = ({
         );
     } catch (error) {
         return (
-            <div className="widget-slot-error p-6 bg-red-50 border-2 border-red-300 rounded-lg">
+            <div className="widget-slot-error p-6 bg-red-50 border-2 border-red-300">
                 <h4 className="text-lg font-semibold text-red-800 mb-2">Slot Rendering Error</h4>
                 <p className="text-sm text-red-600 mb-2">
                     Failed to render slot: <strong>{label || name}</strong>

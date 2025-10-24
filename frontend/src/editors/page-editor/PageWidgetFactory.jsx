@@ -154,7 +154,7 @@ const PageWidgetFactory = ({
         } catch (error) {
             console.error('Error loading widget preview:', error)
             setPreviewContent({
-                html: `<div class="text-red-600 p-4 border border-red-200 rounded bg-red-50">
+                html: `<div class="text-red-600 p-4 border border-red-200 bg-red-50">
                     <strong>Preview Error:</strong> Could not load widget preview
                     <br><small>${error.message || 'Unknown error'}</small>
                 </div>`,
@@ -180,9 +180,9 @@ const PageWidgetFactory = ({
         // Fallback for unsupported widgets
         return (
             <div className={`widget-item unsupported ${className}`}>
-                <div className="bg-red-50 border border-red-200 rounded p-4">
+                <div className="bg-red-50 border border-red-200 p-4">
                     <div className="flex items-center space-x-3">
-                        <div className="bg-red-100 rounded-lg w-10 h-10 flex items-center justify-center text-red-600 border">
+                        <div className="bg-red-100 w-10 h-10 flex items-center justify-center text-red-600 border">
                             <Layout className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -324,7 +324,7 @@ const PageWidgetFactory = ({
                 />
 
                 {/* Core Widget Content */}
-                <div className="widget-content overflow-hidden border border-gray-200 border-t-0 rounded-b">
+                <div className="widget-content overflow-hidden border border-gray-200 border-t-0">
                     <CoreWidgetComponent
                         config={widget.config || {}}
                         mode="editor"

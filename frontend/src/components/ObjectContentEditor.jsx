@@ -612,7 +612,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                             {slotWidgets.map((widget, index) => renderWidget(widget, slot.name, index, true))}
                         </div>
                     ) : (
-                        <div className="slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500">
+                        <div className="slot-placeholder p-4 border-2 border-dashed border-gray-300 text-center text-gray-500">
                             <div className="text-sm font-medium">{slot.label}</div>
                             {slot.description && (
                                 <div className="text-xs mt-1">{slot.description}</div>

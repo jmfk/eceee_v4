@@ -4,16 +4,16 @@
  * Widget header component specifically designed for PageEditor with
  * version management, publishing controls, layout-specific features, and inheritance support.
  */
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
     Settings,
     Trash2,
     ChevronUp,
     ChevronDown,
-    MoreHorizontal,
     Lock,
     ExternalLink
 } from 'lucide-react'
+import ConfirmationModal from '../../components/ConfirmationModal'
 
 const PageWidgetHeader = ({
     widgetType,
@@ -29,26 +29,7 @@ const PageWidgetHeader = ({
     isInherited = false,
     inheritedFrom = null
 }) => {
-    const [showMenu, setShowMenu] = useState(false)
-    const menuRef = useRef(null)
-
-    // Close menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
-                setShowMenu(false)
-            }
-        }
-
-        if (showMenu) {
-            document.addEventListener('mousedown', handleClickOutside)
-            return () => document.removeEventListener('mousedown', handleClickOutside)
-        }
-    }, [showMenu])
-
-    const handleMenuToggle = () => {
-        setShowMenu(!showMenu)
-    }
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     if (!showControls) {
         return null
@@ -61,8 +42,18 @@ const PageWidgetHeader = ({
         }
     }
 
+    const handleDeleteClick = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const handleConfirmDelete = () => {
+        if (onDelete) {
+            onDelete();
+        }
+    };
+
     return (
-        <div className={`widget-header page-editor-header rounded-t px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${className}`}>
+        <div className={`widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${className}`}>
             {/* Left side - Widget info and status */}
             <div className="flex items-center space-x-2">
                 {/* Inherited indicator */}
@@ -149,41 +140,30 @@ const PageWidgetHeader = ({
                                 <Settings className="h-3 w-3" />
                             </button>
                         )}
-                    </div>
-
-                    {/* More actions menu */}
-                    <div className="relative" ref={menuRef}>
-                        <button
-                            onClick={handleMenuToggle}
-                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
-                            title="More actions"
-                        >
-                            <MoreHorizontal className="h-3 w-3" />
-                        </button>
-
-                        {showMenu && (
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                <div className="py-1">
-
-                                    {/* Destructive actions */}
-                                    {onDelete && (
-                                        <button
-                                            onClick={() => {
-                                                onDelete()
-                                                setShowMenu(false)
-                                            }}
-                                            className="w-full flex items-center px-3 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
-                                        >
-                                            <Trash2 className="h-4 w-4 mr-3" />
-                                            Delete Widget
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                        {onDelete && (
+                            <button
+                                onClick={handleDeleteClick}
+                                className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                                title="Delete widget"
+                            >
+                                <Trash2 className="h-3 w-3" />
+                            </button>
                         )}
                     </div>
                 </div>
             )}
+
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Widget"
+                message={`Are you sure you want to delete this ${widgetType} widget? This action cannot be undone.`}
+                confirmText="Delete Widget"
+                cancelText="Cancel"
+                variant="danger"
+            />
         </div>
     )
 }

@@ -2,12 +2,32 @@ import React from 'react'
 import { Menu } from 'lucide-react'
 
 /**
+ * Extract URL from image object
+ * Handles both plain strings and image objects with metadata
+ */
+const getImageUrl = (image) => {
+    if (!image) return null
+    if (typeof image === 'string') return image
+
+    // Check various URL fields in priority order
+    return image.imgproxyBaseUrl ||
+        image.imgproxy_base_url ||
+        image.fileUrl ||
+        image.file_url ||
+        image.url ||
+        null
+}
+
+/**
  * ECEEE Navbar Widget Component
  * Renders a navigation bar with configurable menu items
  */
 const eceeeNavbarWidget = ({ config = {}, mode = 'preview' }) => {
     const {
         menuItems = [],
+        backgroundImage = null,
+        backgroundPosition = 'center',
+        backgroundColor = null,
     } = config
 
     const renderMenuItems = (items) => {
@@ -37,9 +57,32 @@ const eceeeNavbarWidget = ({ config = {}, mode = 'preview' }) => {
         ))
     }
 
+    // Extract image URL from image object or string
+    const imageUrl = getImageUrl(backgroundImage)
+
+    // Build inline styles for background
+    const navStyles = {
+        ...(imageUrl && {
+            backgroundImage: `url('${imageUrl}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: backgroundPosition,
+            backgroundRepeat: 'no-repeat',
+        }),
+        ...(backgroundColor && { backgroundColor }),
+    }
+
+    // Determine if we should use default background color
+    const shouldUseDefaultBg = !imageUrl && !backgroundColor
+
     return (
-        <nav className="bg-blue-500 shadow-sm h-[28px]">
-            <ul className="flex gap-6 list-none m-0 p-0 pl-[20px] items-center h-full">
+        <nav
+            className={`shadow-sm h-[28px] ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
+            style={navStyles}
+        >
+            <ul
+                className="flex gap-6 m-0 p-0 pl-[20px] items-center h-full"
+                style={{ listStyle: 'none' }}
+            >
                 {renderMenuItems(menuItems)}
             </ul>
         </nav>
@@ -53,6 +96,9 @@ eceeeNavbarWidget.widgetType = 'eceee_widgets.NavbarWidget'
 // Default configuration
 eceeeNavbarWidget.defaultConfig = {
     menuItems: [],
+    backgroundImage: null,
+    backgroundPosition: 'center',
+    backgroundColor: null,
 }
 
 // Display metadata

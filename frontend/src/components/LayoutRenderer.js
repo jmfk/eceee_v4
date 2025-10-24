@@ -2265,7 +2265,7 @@ class LayoutRenderer {
    */
   createWidgetContainer(id, type) {
     const widget = document.createElement('div');
-    widget.className = 'rendered-widget mb-4 p-4 border border-gray-200 rounded-lg bg-white relative';
+    widget.className = 'rendered-widget relative';
     widget.setAttribute('data-widget-id', id);
     widget.setAttribute('data-widget-type', type);
     return widget;
