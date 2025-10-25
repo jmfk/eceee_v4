@@ -198,6 +198,8 @@ export function updateMediaInsertHTML(element, mediaData, config) {
     // Update data attributes
     element.setAttribute('data-width', width);
     element.setAttribute('data-align', align);
+    element.setAttribute('data-media-id', mediaData.id);
+    element.setAttribute('data-media-type', mediaType);
 
     // Update innerHTML
     element.innerHTML = innerContent + captionHtml;

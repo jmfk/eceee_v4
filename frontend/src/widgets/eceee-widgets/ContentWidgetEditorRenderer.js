@@ -1572,6 +1572,10 @@ class ContentWidgetEditorRenderer {
     setupMediaInsertListeners(element) {
         if (!element || !element.hasAttribute('data-media-insert')) return
 
+        // Clean up any orphaned opacity styles or dragging classes
+        element.style.opacity = ''
+        element.classList.remove('dragging')
+
         // Click handler for editing
         element.addEventListener('click', this.handleMediaInsertClick)
 
@@ -1699,7 +1703,7 @@ class ContentWidgetEditorRenderer {
      */
     handleMediaInsertDragStart(e) {
         this.draggedElement = e.currentTarget
-        e.currentTarget.style.opacity = '0.4'
+        e.currentTarget.classList.add('dragging')
         e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer.setData('text/html', e.currentTarget.outerHTML)
     }
@@ -1708,12 +1712,18 @@ class ContentWidgetEditorRenderer {
      * Handle drag end for media insert
      */
     handleMediaInsertDragEnd(e) {
-        e.currentTarget.style.opacity = ''
+        e.currentTarget.classList.remove('dragging')
 
         // Remove any drop indicators
         if (this.dropIndicator && this.dropIndicator.parentNode) {
             this.dropIndicator.parentNode.removeChild(this.dropIndicator)
             this.dropIndicator = null
+        }
+
+        // Clean up any orphaned dragging classes (defensive)
+        if (this.editorElement) {
+            const draggingElements = this.editorElement.querySelectorAll('.media-insert.dragging')
+            draggingElements.forEach(el => el.classList.remove('dragging'))
         }
     }
 
