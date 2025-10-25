@@ -1,6 +1,7 @@
-{% load static imgproxy_tags %}
+{% load static %}
 
-<nav class="navbar-widget" style="{% if config.background_image %}background-image: url('{% imgproxy config.background_image width=1920 height=28 resize_type='fill' %}'); background-size: cover; background-position: {{ config.background_position|default:'center' }}; background-repeat: no-repeat;{% endif %}{% if config.background_color %}background-color: {{ config.background_color }};{% else %}{% if not config.background_image %}background-color: #3b82f6;{% endif %}{% endif %} box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); height: 28px;">
+
+<nav class="navbar-widget" style="{{ navbar_style }}">
     <ul style="display: flex; gap: 1.5rem; list-style: none; margin: 0; padding: 0 0 0 20px; align-items: center; height: 100%;">
         {% for item in config.menu_items %}
             <li>
@@ -16,5 +17,6 @@
             </li>
         {% endfor %}
     </ul>
+    
 </nav>
 

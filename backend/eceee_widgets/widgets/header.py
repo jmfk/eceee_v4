@@ -160,7 +160,7 @@ class HeaderWidget(BaseWidget):
         """Add responsive image dimensions to context"""
         template_config = super().prepare_template_context(config, context)
 
-        # Get widget dimensions from slot
+        # Get widget dimensions from slot (provided by layout's slot configuration)
         dimensions = self.get_widget_dimensions(context)
 
         # Get configured heights or use defaults
@@ -169,7 +169,8 @@ class HeaderWidget(BaseWidget):
         desktop_height = config.get("height") or 112
 
         # Get widths from slot dimensions or use defaults
-        mobile_width = dimensions.get("mobile", {}).get("width") or 768
+        # These defaults match Tailwind breakpoints and common viewport widths
+        mobile_width = dimensions.get("mobile", {}).get("width") or 640
         tablet_width = dimensions.get("tablet", {}).get("width") or 1024
         desktop_width = dimensions.get("desktop", {}).get("width") or 1920
 

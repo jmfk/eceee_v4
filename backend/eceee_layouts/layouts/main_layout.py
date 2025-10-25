@@ -41,6 +41,11 @@ class MainLayoutLayout(BaseLayout):
                     "allows_inheritance": False,
                     "allow_merge": False,  # Main content is page-specific, no merge
                     "collapse_behavior": "never",  # Never collapse - always show in edit mode
+                    "dimensions": {
+                        "mobile": {"width": 640, "height": None},
+                        "tablet": {"width": 1024, "height": None},
+                        "desktop": {"width": 1280, "height": None},
+                    },
                 },
                 {
                     "name": "sidebar",
@@ -52,6 +57,11 @@ class MainLayoutLayout(BaseLayout):
                     "allow_merge": True,  # Enable merge mode for additive widgets
                     "inheritable_types": ["eceee_widgets.NavigationWidget"],
                     "collapse_behavior": "all",  # Collapse only if all widgets are inherited
+                    "dimensions": {
+                        "mobile": {"width": 640, "height": None},
+                        "tablet": {"width": 1024, "height": None},
+                        "desktop": {"width": 1280, "height": None},
+                    },
                 },
                 footer,
             ]

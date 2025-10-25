@@ -30,6 +30,11 @@ class LandingPageLayout(BaseLayout):
                     "max_widgets": None,
                     "css_classes": "slot-main",
                     "required": True,
+                    "dimensions": {
+                        "mobile": {"width": 640, "height": None},
+                        "tablet": {"width": 1024, "height": None},
+                        "desktop": {"width": 1280, "height": None},
+                    },
                 },
                 footer,
             ]

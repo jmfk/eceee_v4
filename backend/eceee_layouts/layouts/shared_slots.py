@@ -17,6 +17,11 @@ header = {
         "eceee_widgets.HeaderWidget"
     ],  # Only inherit navigation widgets
     "allowed_types": ["eceee_widgets.HeaderWidget"],
+    "dimensions": {
+        "mobile": {"width": 640, "height": None},
+        "tablet": {"width": 1024, "height": None},
+        "desktop": {"width": 1280, "height": None},
+    },
 }
 
 navbar = {
@@ -42,6 +47,11 @@ navbar = {
     ],
     "inheritable_types": ["eceee_widgets.NavbarWidget"],
     "allowed_types": ["eceee_widgets.NavbarWidget"],
+    "dimensions": {
+        "mobile": {"width": 640, "height": None},
+        "tablet": {"width": 1024, "height": None},
+        "desktop": {"width": 1280, "height": None},
+    },
 }
 
 footer = {
@@ -62,4 +72,9 @@ footer = {
         "eceee_widgets.FooterWidget"
     ],  # Only inherit navigation widgets
     "allowed_types": ["eceee_widgets.FooterWidget"],
+    "dimensions": {
+        "mobile": {"width": 640, "height": None},
+        "tablet": {"width": 1024, "height": None},
+        "desktop": {"width": 1280, "height": None},
+    },
 }

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from file_manager.imgproxy import imgproxy_service
 
 
 class NavbarItem(BaseModel):
@@ -84,55 +85,9 @@ class NavbarWidget(BaseWidget):
     description = "Navigation bar with configurable menu items"
     template_name = "eceee_widgets/widgets/navbar.html"
 
-    widget_css = """
-    .navbar-widget {
-        background-color: var(--navbar-bg-color, #3b82f6);
-        background-image: var(--navbar-bg-image, none);
-        background-size: var(--navbar-bg-size, cover);
-        background-position: var(--navbar-bg-position, center);
-        background-repeat: var(--navbar-bg-repeat, no-repeat);
-        box-shadow: var(--navbar-shadow, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
-        height: var(--navbar-height, 28px);
-    }
-    
-    .navbar-widget ul {
-        display: flex;
-        gap: var(--navbar-gap, 1.5rem);
-        list-style: none;
-        margin: 0;
-        padding: 0 0 0 var(--navbar-padding-left, 20px);
-        align-items: center;
-        height: 100%;
-    }
-    
-    .navbar-widget a {
-        color: var(--navbar-link-color, #ffffff);
-        font-size: var(--navbar-font-size, 0.875rem);
-        font-weight: var(--navbar-font-weight, 500);
-        text-decoration: none;
-        transition: opacity 0.2s ease-in-out;
-    }
-    
-    .navbar-widget a:hover {
-        opacity: var(--navbar-link-hover-opacity, 0.8);
-    }
-    """
+    widget_css = """"""
 
-    css_variables = {
-        "navbar-bg-color": "#3b82f6",
-        "navbar-bg-image": "none",
-        "navbar-bg-size": "cover",
-        "navbar-bg-position": "center",
-        "navbar-bg-repeat": "no-repeat",
-        "navbar-shadow": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-        "navbar-height": "28px",
-        "navbar-gap": "1.5rem",
-        "navbar-padding-left": "20px",
-        "navbar-link-color": "#ffffff",
-        "navbar-font-size": "0.875rem",
-        "navbar-font-weight": "500",
-        "navbar-link-hover-opacity": "0.8",
-    }
+    css_variables = {}
 
     css_scope = "widget"
 
@@ -143,4 +98,41 @@ class NavbarWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """Prepare navbar menu items and background styling"""
         template_config = super().prepare_template_context(config, context)
+
+        # Build complete inline style string in Python
+        style_parts = []
+
+        # Handle background image
+        background_image = config.get("background_image")
+        if background_image:
+            imgproxy_base_url = background_image.get("imgproxy_base_url")
+            imgproxy_url = imgproxy_service.generate_url(
+                source_url=imgproxy_base_url,
+                width=1920,
+                height=28,
+                resize_type="fill",
+            )
+
+            if imgproxy_url:
+                background_position = config.get("background_position", "center")
+                style_parts.append(f"background-image: url('{imgproxy_url}');")
+                style_parts.append("background-size: cover;")
+                style_parts.append(f"background-position: {background_position};")
+                style_parts.append("background-repeat: no-repeat;")
+
+        # Handle background color with fallback logic
+        background_color = config.get("background_color")
+        if not background_color:
+            background_color = "#3b82f6"
+
+        if background_color:
+            style_parts.append(f"background-color: {background_color};")
+
+        # Add fixed styles
+        style_parts.append("box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);")
+        style_parts.append("height: 28px;")
+
+        # Join all style parts with a space
+        template_config["navbar_style"] = " ".join(style_parts)
+
         return template_config

@@ -106,8 +106,13 @@ class WebPageRenderer:
 
         # Enhanced context with dimensions
         enhanced_context = dict(context or {})
+        # Get slot dimensions from parameter or from context slot config
         if slot_dimensions:
             enhanced_context["_widget_dimensions"] = slot_dimensions
+        elif enhanced_context.get("slot", {}).get("dimensions"):
+            enhanced_context["_widget_dimensions"] = enhanced_context["slot"][
+                "dimensions"
+            ]
 
         # Prepare template context with widget-specific logic (e.g., collection resolution)
         # All widgets now have prepare_template_context (default implementation in BaseWidget)
@@ -292,6 +297,8 @@ class WebPageRenderer:
                 for widget in merged_widgets:
                     context["layout_name"] = context.get("layout", {}).get("name", "")
                     context["slot_name"] = slot_name
+                    # Pass entire slot configuration in context
+                    context["slot"] = slot_config
 
                     # Convert TreeWidget back to dict format for existing renderer
                     widget_data = {
@@ -335,29 +342,29 @@ class WebPageRenderer:
             slot.get("name") for slot in layout_slots if slot.get("name")
         ]
 
-        # Build a map of slot names to their dimension configurations
-        slot_dimensions_map = {}
+        # Build a map of slot names to their configurations
+        slot_config_map = {}
         for slot in layout_slots:
             slot_name = slot.get("name")
-            if slot_name and "dimensions" in slot:
-                slot_dimensions_map[slot_name] = slot.get("dimensions")
+            if slot_name:
+                slot_config_map[slot_name] = slot
 
         # Process each slot from the inheritance info
         for slot_name, slot_info in widgets_info.items():
             rendered_widgets = []
 
-            # Get dimensions for this slot
-            slot_dimensions = slot_dimensions_map.get(slot_name)
+            # Get slot configuration
+            slot_config = slot_config_map.get(slot_name, {})
 
             for widget_info in slot_info.get("widgets", []):
                 widget_data = widget_info["widget"]
                 context["layout_name"] = context["layout"].name
                 context["slot_name"] = slot_name
+                # Pass entire slot configuration in context
+                context["slot"] = slot_config
 
-                # Render the widget with slot dimensions
-                widget_html = self.render_widget_json(
-                    widget_data, context, slot_dimensions=slot_dimensions
-                )
+                # Render the widget with slot config in context
+                widget_html = self.render_widget_json(widget_data, context)
                 rendered_widgets.append(
                     {
                         "html": widget_html,
@@ -376,15 +383,16 @@ class WebPageRenderer:
                 parent_widgets = self._find_parent_slot_widgets(page, slot_name)
                 if parent_widgets:
                     rendered_widgets = []
-                    slot_dimensions = slot_dimensions_map.get(slot_name)
+                    slot_config = slot_config_map.get(slot_name, {})
 
                     for widget_data in parent_widgets:
                         context["layout_name"] = context["layout"].name
                         context["slot_name"] = slot_name
+                        # Pass entire slot configuration in context
+                        context["slot"] = slot_config
                         widget_html = self.render_widget_json(
                             widget_data["widget"],
                             context,
-                            slot_dimensions=slot_dimensions,
                         )
                         rendered_widgets.append(
                             {
