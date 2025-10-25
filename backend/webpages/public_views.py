@@ -110,11 +110,30 @@ class PageDetailView(PublishedPageMixin, DetailView):
             context["widgets_by_slot"] = renderer._render_widgets_by_slot(
                 page, current_version, base_context
             )
+
+            # Add SEO metadata from version
+            page_data = current_version.page_data or {}
+            context["meta_title"] = (
+                page_data.get("meta_title") or page_data.get("metaTitle") or page.title
+            )
+            context["meta_description"] = (
+                page_data.get("meta_description")
+                or page_data.get("metaDescription")
+                or page.description
+            )
+            context["page_data"] = page_data
+            context["content"] = current_version
         else:
             context["widgets_by_slot"] = {}
+            context["meta_title"] = page.title
+            context["meta_description"] = page.description
 
         # Get breadcrumbs
         context["breadcrumbs"] = page.get_breadcrumbs()
+
+        # Get root page for icon inheritance
+        context["root_page"] = page.get_root_page()
+        context["current_page"] = page
 
         # If this is an object page, get object content
         if page.is_object_page():
@@ -557,6 +576,18 @@ class HostnamePageView(View):
             widgets = content.widgets
             page_data = content.page_data
 
+            # Get SEO metadata from page_data
+            meta_title = (
+                page_data.get("meta_title")
+                or page_data.get("metaTitle")
+                or current_page.title
+            )
+            meta_description = (
+                page_data.get("meta_description")
+                or page_data.get("metaDescription")
+                or current_page.description
+            )
+
             context = {
                 "root_page": root_page,
                 "current_page": current_page,
@@ -575,6 +606,10 @@ class HostnamePageView(View):
                 "effective_layout": effective_layout,
                 "effective_theme": current_page.get_effective_theme(),
                 "path_variables": path_variables,  # NEW: Add path variables to context
+                # SEO metadata
+                "meta_title": meta_title,
+                "meta_description": meta_description,
+                "content": content,  # Add version for SEO tag access
             }
 
             # Build widgets_by_slot via renderer (new system)

@@ -213,6 +213,55 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         """Update publishing dates and settings"""
         version = self.get_object()
 
+        # Check if this is a "publish with subpages" request
+        include_subpages = (
+            request.query_params.get("include_subpages", "false").lower() == "true"
+        )
+
+        # Check if this is a publish-now action (effective_date set to now or near-now)
+        effective_date_str = request.data.get("effective_date")
+        is_publish_now = False
+        if effective_date_str:
+            from django.utils import timezone
+            from django.utils.dateparse import parse_datetime
+
+            try:
+                effective_date = parse_datetime(effective_date_str)
+                now = timezone.now()
+                # Consider it "publish now" if the effective date is within 1 minute of now
+                if effective_date and abs((effective_date - now).total_seconds()) < 60:
+                    is_publish_now = True
+            except (ValueError, TypeError):
+                pass
+
+        # If publishing with subpages, use the PublishingService
+        if include_subpages and is_publish_now:
+            from ..publishing import PublishingService
+
+            user = request.user if request.user.is_authenticated else None
+            service = PublishingService(user)
+
+            # Publish the page with all subpages
+            count, errors = service.publish_page_with_subpages(
+                version.page.id, change_summary="Published with subpages via API"
+            )
+
+            # Refresh the version from database to get updated data
+            version.refresh_from_db()
+
+            # Return full version data with additional info
+            full_serializer = PageVersionSerializer(version)
+            response_data = full_serializer.data
+            response_data["subpages_published_count"] = (
+                count - 1
+            )  # Subtract 1 for the main page
+            response_data["total_published_count"] = count
+            if errors:
+                response_data["errors"] = errors
+
+            return Response(response_data)
+
+        # Standard single-page publishing update
         serializer = PublishingUpdateSerializer(
             version, data=request.data, partial=True
         )

@@ -272,6 +272,65 @@ class PublishingService:
 
         return published_count, errors
 
+    def publish_page_with_subpages(
+        self, page_id: int, change_summary: str = "Publish with subpages"
+    ) -> Tuple[int, List[str]]:
+        """
+        Publish a page and all its descendant pages recursively.
+
+        Publishes the latest version of the specified page and all its child pages.
+
+        Args:
+            page_id: ID of the parent page to publish
+            change_summary: Description of the publishing action
+
+        Returns:
+            Tuple of (count_published, error_messages)
+        """
+        # Import here to avoid circular imports
+        from .models import WebPage, PageVersion
+
+        try:
+            page = WebPage.objects.get(id=page_id)
+        except WebPage.DoesNotExist:
+            return 0, [f"Page with ID {page_id} does not exist"]
+
+        # Collect all pages to publish: the parent and all descendants
+        pages_to_publish = [page]
+        descendants = page.get_all_descendants(include_deleted=False)
+        pages_to_publish.extend(descendants)
+
+        published_count = 0
+        errors = []
+
+        for page_item in pages_to_publish:
+            try:
+                # Get the latest version for this page
+                latest_version = page_item.versions.order_by("-version_number").first()
+
+                if not latest_version:
+                    # Create a new version if none exists
+                    latest_version = page_item.create_version(
+                        self.user, change_summary, status="draft"  # Legacy field
+                    )
+
+                # Set effective_date to now to publish immediately
+                latest_version.effective_date = timezone.now()
+                # Don't set expiry_date - let it remain null for indefinite publishing
+                latest_version.save(update_fields=["effective_date"])
+
+                published_count += 1
+                self.logger.info(
+                    f"Published page with subpages: {page_item.title} (version {latest_version.version_number})"
+                )
+
+            except Exception as e:
+                error_msg = f"Failed to publish {page_item.title}: {str(e)}"
+                errors.append(error_msg)
+                self.logger.error(error_msg)
+
+        return published_count, errors
+
     def bulk_publish_pages_legacy(
         self, page_ids: List[int], change_summary: str = "Bulk publish operation"
     ) -> Tuple[int, List[str]]:
