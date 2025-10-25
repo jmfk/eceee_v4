@@ -80,8 +80,8 @@ const ImageUploadSection = ({
                 namespace: namespace
             }
 
-            // Add replace decisions if provided
-            if (replaceDecisions) {
+            // Add replace decisions if provided (and ensure it's a plain object, not an event)
+            if (replaceDecisions && typeof replaceDecisions === 'object' && !replaceDecisions.nativeEvent) {
                 uploadData.replaceFiles = replaceDecisions
             }
 
@@ -592,7 +592,7 @@ const ImageUploadSection = ({
                     )}
 
                     <button
-                        onClick={handleUploadAndApprove}
+                        onClick={() => handleUploadAndApprove()}
                         disabled={uploading || uploadTags.length === 0}
                         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                     >

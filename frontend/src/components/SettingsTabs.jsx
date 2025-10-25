@@ -11,7 +11,6 @@ const tabs = [
     { id: 'layouts', label: 'Layouts', icon: Grid3X3, href: '/settings/layouts' },
     { id: 'themes', label: 'Themes', icon: Palette, href: '/settings/themes' },
     { id: 'widgets', label: 'Widgets', icon: Package, href: '/settings/widgets' },
-    { id: 'tags', label: 'Tags', icon: Hash, href: '/settings/tags' },
     { id: 'value-lists', label: 'Value Lists', icon: List, href: '/settings/value-lists' },
     { id: 'object-types', label: 'Object Types', icon: Database, href: '/settings/object-types' },
     { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
@@ -127,9 +126,7 @@ export default function SettingsTabs() {
 
     // Organized navigation structure with submenus
     const navigationStructure = {
-        core: [
-            { id: 'tags', label: 'Tags', icon: Hash, href: '/settings/tags', description: 'Manage content tags' },
-        ],
+        core: [],
         layouts: {
             id: 'layouts',
             label: 'Layouts',
@@ -328,33 +325,8 @@ export default function SettingsTabs() {
                     {showDropdown && (
                         <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
                             <div className="py-2">
-                                {/* Core Settings Items (no submenu) */}
-                                {navigationStructure.core.map((item) => {
-                                    const Icon = item.icon
-                                    const active = isActive(item)
-                                    return (
-                                        <Link
-                                            key={item.id}
-                                            to={item.href}
-                                            onClick={() => setShowDropdown(false)}
-                                            className={`flex items-center px-4 py-3 text-sm transition-colors ${active
-                                                ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                                                }`}
-                                        >
-                                            <Icon className={`w-5 h-5 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                                            <div className="min-w-0">
-                                                <p className="font-medium truncate">{item.label}</p>
-                                                <p className="text-xs text-gray-500 truncate">
-                                                    {getTabDescription(item.id)}
-                                                </p>
-                                            </div>
-                                        </Link>
-                                    )
-                                })}
-
                                 {/* Layouts Submenu */}
-                                <div className="border-t border-gray-100 mt-1">
+                                <div>
                                     <button
                                         onClick={() => toggleSubmenu('layouts')}
                                         className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

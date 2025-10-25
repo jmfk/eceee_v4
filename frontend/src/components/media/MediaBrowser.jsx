@@ -45,7 +45,8 @@ const MediaBrowser = ({
     fileTypes = [], // Filter by file types
     namespace,
     showUploader = true,
-    refreshTrigger = 0 // External trigger to force refresh
+    refreshTrigger = 0, // External trigger to force refresh
+    prefilterTags = [] // Initial tag filter (array of tag IDs)
 }) => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -54,7 +55,7 @@ const MediaBrowser = ({
     const [searchTerms, setSearchTerms] = useState([]);
     const [filters, setFilters] = useState({
         fileType: '',
-        tags: [],
+        tags: prefilterTags,
         collections: [],
         showDeleted: false
     });

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Code, Settings, Grid3X3, ChevronDown, FolderOpen, Database } from 'lucide-react'
+import { Menu, X, Code, Settings, Grid3X3, ChevronDown, FolderOpen, Database, Hash } from 'lucide-react'
 import { useState } from 'react'
 
 const Navbar = () => {
@@ -12,6 +12,7 @@ const Navbar = () => {
     { name: 'Pages', href: '/pages', icon: Grid3X3 },
     { name: 'Objects', href: '/objects', icon: Database },
     { name: 'Media', href: '/media', icon: FolderOpen },
+    { name: 'Tags', href: '/tags', icon: Hash },
     { name: 'Settings', href: '/settings', icon: Settings },
   ]
 
@@ -32,7 +33,6 @@ const Navbar = () => {
         'layouts': 'Layouts',
         'themes': 'Themes',
         'widgets': 'Widgets',
-        'tags': 'Tags',
         'object-types': 'Object Types',
         'versions': 'Versions',
         'publishing': 'Publishing',
@@ -51,6 +51,7 @@ const Navbar = () => {
     if (path.startsWith('/pages')) return 'Pages'
     if (path.startsWith('/objects')) return 'Objects'
     if (path.startsWith('/media')) return 'Media'
+    if (path.startsWith('/tags')) return 'Tags'
     return ''
   }
 

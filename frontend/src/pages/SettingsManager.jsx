@@ -39,7 +39,6 @@ import PublicationStatusDashboard from '../components/PublicationStatusDashboard
 import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
-import TagManager from '../components/TagManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
 import WidgetManager from '../components/WidgetManager'
 import ValueListEditor from '../components/ValueListEditor'
@@ -56,7 +55,6 @@ const SettingsManager = () => {
         const path = location.pathname
         if (path === '/settings/themes') return 'themes'
         if (path === '/settings/widgets') return 'widgets'
-        if (path === '/settings/tags') return 'tags'
         if (path === '/settings/value-lists') return 'value-lists'
         if (path === '/settings/object-types') return 'object-types'
         if (path === '/settings/versions') return 'versions'
@@ -358,8 +356,6 @@ const SettingsManager = () => {
                 return <ThemeEditor />
             case 'widgets':
                 return <WidgetManager />
-            case 'tags':
-                return <TagManager />
             case 'value-lists':
                 return <ValueListEditor />
             case 'object-types':

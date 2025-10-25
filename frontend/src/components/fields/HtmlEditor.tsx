@@ -1,12 +1,14 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { html } from '@codemirror/lang-html';
 import { dracula } from '@uiw/codemirror-theme-dracula';
+import { EditorView } from '@codemirror/view';
 import { useDraggable } from '../../hooks/useDraggable';
 import { useResizable } from '../../hooks/useResizable';
 import { IconX } from '../icons/IconX';
 import { formatHtml } from '../../utils/htmlFormatter';
+import { cleanHTMLStrict } from '../../utils/htmlCleanup';
 import '../../styles/components/HtmlEditor.css';
 
 interface HtmlEditorProps {
@@ -67,6 +69,43 @@ export const HtmlEditor: React.FC<HtmlEditorProps> = ({
     const handleEditorBlur = () => {
         onBlur?.();
     };
+
+    // Create paste handler extension for CodeMirror
+    const pasteExtension = useMemo(() => {
+        return EditorView.domEventHandlers({
+            paste(event, view) {
+                // Get pasted content
+                const clipboardData = event.clipboardData;
+                if (!clipboardData) return false;
+
+                const htmlData = clipboardData.getData('text/html');
+                const textData = clipboardData.getData('text/plain');
+
+                // If there's HTML content, clean it
+                if (htmlData) {
+                    event.preventDefault();
+                    const cleaned = cleanHTMLStrict(htmlData);
+
+                    // Insert cleaned HTML at cursor position
+                    const selection = view.state.selection.main;
+                    view.dispatch({
+                        changes: {
+                            from: selection.from,
+                            to: selection.to,
+                            insert: cleaned
+                        }
+                    });
+
+                    return true;
+                } else if (textData) {
+                    // Plain text - let CodeMirror handle it normally
+                    return false;
+                }
+
+                return false;
+            }
+        });
+    }, []);
 
     return createPortal(
         <div
@@ -132,7 +171,7 @@ export const HtmlEditor: React.FC<HtmlEditorProps> = ({
                     height={`${size.height - 45}px`}
                     width="100%"
                     theme={dracula}
-                    extensions={[html()]}
+                    extensions={[html(), pasteExtension]}
                     onChange={handleChange}
                     onFocus={handleEditorFocus}
                     onBlur={handleEditorBlur}

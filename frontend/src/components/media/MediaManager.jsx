@@ -3,6 +3,8 @@
  * 
  * Main media management interface with tabs for:
  * - Media Library (approved files) - uses MediaBrowser
+ * - Collections - uses MediaCollectionManager
+ * - Tags - uses MediaTagManager
  * - Pending Files (awaiting approval) - uses PendingMediaManager
  * 
  * Provides unified navigation and pending file count notifications.
@@ -13,11 +15,13 @@ import {
     Files,
     Clock,
     Bell,
-    Folder
+    Folder,
+    Hash
 } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import PendingMediaManager from './PendingMediaManager';
 import MediaCollectionManager from './MediaCollectionManager';
+import MediaTagManager from './MediaTagManager';
 import { mediaApi } from '../../api';
 
 const MediaManager = ({
@@ -96,6 +100,12 @@ const MediaManager = ({
             description: 'Organize files into collections'
         },
         {
+            id: 'tags',
+            label: 'Tags',
+            icon: Hash,
+            description: 'Manage media tags'
+        },
+        {
             id: 'pending',
             label: 'Pending Files',
             icon: Clock,
@@ -163,6 +173,17 @@ const MediaManager = ({
                     <MediaCollectionManager
                         namespace={namespace}
                         onCollectionSelect={onFileSelect} // Allow selecting collections if needed
+                    />
+                )}
+
+                {activeTab === 'tags' && (
+                    <MediaTagManager
+                        namespace={namespace}
+                        onTagSelect={(tag) => {
+                            // When a tag is selected, switch to library view
+                            // Note: This would require MediaBrowser to support tag filtering
+                            // For now, just keep the user on the tags view
+                        }}
                     />
                 )}
 

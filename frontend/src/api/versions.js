@@ -326,6 +326,20 @@ export const versionsApi = {
     }, 'versions.publishVersionNow'),
 
     /**
+     * Publish a version immediately with all subpages
+     * @param {number} versionId - Version ID
+     * @param {boolean} includeSubpages - Whether to include subpages (default: true)
+     * @returns {Promise<Object>} Published version with subpage count
+     */
+    publishVersionNowWithSubpages: wrapApiCall(async (versionId, includeSubpages = true) => {
+        const url = `${endpoints.versions.updatePublishing(versionId)}?include_subpages=${includeSubpages}`
+        return api.patch(url, {
+            effective_date: new Date().toISOString(),
+            expiry_date: null
+        })
+    }, 'versions.publishVersionNowWithSubpages'),
+
+    /**
      * Unpublish a version (clear dates)
      * @param {number} versionId - Version ID
      * @returns {Promise<Object>} Unpublished version
@@ -388,6 +402,7 @@ export const compareVersions = versionsApi.compare
 export const getVersionsFiltered = versionsApi.getFiltered
 export const updateVersionPublishing = versionsApi.updateVersionPublishing
 export const publishVersionNow = versionsApi.publishVersionNow
+export const publishVersionNowWithSubpages = versionsApi.publishVersionNowWithSubpages
 export const unpublishVersion = versionsApi.unpublishVersion
 export const scheduleVersion = versionsApi.scheduleVersion
 

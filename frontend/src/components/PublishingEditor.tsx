@@ -29,6 +29,10 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
     const [effectiveDate, setEffectiveDate] = useState('')
     const [expiryDate, setExpiryDate] = useState('')
 
+    // Publish with subpages state
+    const [includeSubpagesMap, setIncludeSubpagesMap] = useState<Record<number, boolean>>({})
+    const [showConfirmPublishAll, setShowConfirmPublishAll] = useState(false)
+
     // Load versions when component mounts
     useEffect(() => {
         loadVersions()
@@ -50,9 +54,28 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
 
     // Publishing mutations
     const publishMutation = useMutation({
-        mutationFn: (versionId: number) => versionsApi.publishVersionNow(versionId),
-        onSuccess: () => {
-            addNotification('Version published successfully', 'success')
+        mutationFn: ({ versionId, includeSubpages }: { versionId: number, includeSubpages?: boolean }) => {
+            if (includeSubpages) {
+                return versionsApi.publishVersionNowWithSubpages(versionId, true)
+            }
+            return versionsApi.publishVersionNow(versionId)
+        },
+        onSuccess: (data) => {
+            // Check if we got subpage publishing results
+            if (data.subpages_published_count !== undefined) {
+                const totalCount = data.total_published_count || 0
+                const subpageCount = data.subpages_published_count || 0
+                if (subpageCount > 0) {
+                    addNotification(
+                        `Page and ${subpageCount} subpage${subpageCount !== 1 ? 's' : ''} published successfully (${totalCount} total)`,
+                        'success'
+                    )
+                } else {
+                    addNotification('Page published successfully (no subpages found)', 'success')
+                }
+            } else {
+                addNotification('Version published successfully', 'success')
+            }
             loadVersions()
             // Invalidate to update the current version if needed
             queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
@@ -96,7 +119,24 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
 
     // Handler functions
     const handlePublishNow = (version: PageVersionSummary) => {
-        publishMutation.mutate(version.id)
+        const includeSubpages = includeSubpagesMap[version.id] || false
+        publishMutation.mutate({ versionId: version.id, includeSubpages })
+    }
+
+    const handlePublishAllNow = () => {
+        // Get the latest version
+        const latestVersion = versions[0]
+        if (latestVersion) {
+            publishMutation.mutate({ versionId: latestVersion.id, includeSubpages: true })
+            setShowConfirmPublishAll(false)
+        }
+    }
+
+    const toggleIncludeSubpages = (versionId: number) => {
+        setIncludeSubpagesMap(prev => ({
+            ...prev,
+            [versionId]: !prev[versionId]
+        }))
     }
 
     const handleUnpublish = (version: PageVersionSummary) => {
@@ -150,10 +190,22 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                 <div className="max-w-4xl mx-auto space-y-6">
                     {/* Header */}
                     <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-2">Version Timeline & Publishing</h2>
-                        <p className="text-gray-600">
-                            Manage page versions, scheduling, and publishing workflow
-                        </p>
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <h2 className="text-lg font-semibold text-gray-900 mb-2">Version Timeline & Publishing</h2>
+                                <p className="text-gray-600">
+                                    Manage page versions, scheduling, and publishing workflow
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowConfirmPublishAll(true)}
+                                className="ml-4 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors flex items-center space-x-2 whitespace-nowrap"
+                                disabled={versions.length === 0}
+                            >
+                                <CheckCircle className="w-4 h-4" />
+                                <span>Publish Page + All Subpages</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Version List */}
@@ -210,12 +262,23 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                                     <div className="flex flex-col space-y-2 ml-4">
                                                         {status === 'draft' && (
                                                             <>
-                                                                <button
-                                                                    onClick={() => handlePublishNow(version)}
-                                                                    className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Publish Now
-                                                                </button>
+                                                                <div className="flex flex-col space-y-1">
+                                                                    <button
+                                                                        onClick={() => handlePublishNow(version)}
+                                                                        className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
+                                                                    >
+                                                                        Publish Now
+                                                                    </button>
+                                                                    <label className="flex items-center space-x-1 text-xs text-gray-600 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={includeSubpagesMap[version.id] || false}
+                                                                            onChange={() => toggleIncludeSubpages(version.id)}
+                                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                        />
+                                                                        <span>Include subpages</span>
+                                                                    </label>
+                                                                </div>
                                                                 <button
                                                                     onClick={() => handleSchedule(version)}
                                                                     className="px-3 py-1 text-sm bg-yellow-600 text-white hover:bg-yellow-700 rounded transition-colors whitespace-nowrap"
@@ -226,12 +289,23 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                                         )}
                                                         {status === 'scheduled' && (
                                                             <>
-                                                                <button
-                                                                    onClick={() => handlePublishNow(version)}
-                                                                    className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Publish Now
-                                                                </button>
+                                                                <div className="flex flex-col space-y-1">
+                                                                    <button
+                                                                        onClick={() => handlePublishNow(version)}
+                                                                        className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
+                                                                    >
+                                                                        Publish Now
+                                                                    </button>
+                                                                    <label className="flex items-center space-x-1 text-xs text-gray-600 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={includeSubpagesMap[version.id] || false}
+                                                                            onChange={() => toggleIncludeSubpages(version.id)}
+                                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                        />
+                                                                        <span>Include subpages</span>
+                                                                    </label>
+                                                                </div>
                                                                 <button
                                                                     onClick={() => handleSchedule(version)}
                                                                     className="px-3 py-1 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded transition-colors whitespace-nowrap"
@@ -263,12 +337,23 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                                             </>
                                                         )}
                                                         {status === 'expired' && (
-                                                            <button
-                                                                onClick={() => handlePublishNow(version)}
-                                                                className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
-                                                            >
-                                                                Re-publish
-                                                            </button>
+                                                            <div className="flex flex-col space-y-1">
+                                                                <button
+                                                                    onClick={() => handlePublishNow(version)}
+                                                                    className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
+                                                                >
+                                                                    Re-publish
+                                                                </button>
+                                                                <label className="flex items-center space-x-1 text-xs text-gray-600 cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={includeSubpagesMap[version.id] || false}
+                                                                        onChange={() => toggleIncludeSubpages(version.id)}
+                                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                    <span>Include subpages</span>
+                                                                </label>
+                                                            </div>
                                                         )}
                                                         <button
                                                             onClick={() => onVersionChange(version.id)}
@@ -347,6 +432,52 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {scheduleMutation.isPending ? 'Saving...' : 'Save Schedule'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirm Publish All Modal */}
+            {showConfirmPublishAll && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h2 className="text-xl font-semibold text-gray-900">Publish Page + All Subpages</h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {webpageData?.title || 'Current Page'}
+                            </p>
+                        </div>
+
+                        <div className="px-6 py-4">
+                            <div className="flex items-start space-x-3">
+                                <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        This will publish the latest version of this page and <strong>all of its subpages</strong> immediately.
+                                    </p>
+                                    <p className="text-sm text-gray-500 mt-2">
+                                        Are you sure you want to continue?
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPublishAll(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handlePublishAllNow}
+                                disabled={publishMutation.isPending}
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {publishMutation.isPending ? 'Publishing...' : 'Publish All'}
                             </button>
                         </div>
                     </div>
