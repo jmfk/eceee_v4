@@ -4,7 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ECEEE v4 - AI-Integrated CMS{% endblock %}</title>
+    
+    <!-- Page Title -->
+    <title>{% block page_title %}ECEEE v4 - AI-Integrated CMS{% endblock %}</title>
+    
+    <!-- SEO Meta Tags -->
+    {% block meta_tags %}{% endblock %}
+    
+    <!-- Site Icons/Favicons -->
+    {% block icon_tags %}{% endblock %}
+    
+    <!-- Google Fonts - Source Sans 3 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS -->
     <link href="{% static 'css/tailwind.output.css' %}" rel="stylesheet">

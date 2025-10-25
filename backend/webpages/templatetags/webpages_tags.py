@@ -262,3 +262,163 @@ def render_page_with_css(context, page, version=None):
                 "debug_info": {"error": str(e)},
             }
         return {"html": "", "css": "", "meta": "", "debug_info": {}}
+
+
+@register.simple_tag(takes_context=True)
+def render_page_seo(context, page=None, version=None, page_data=None):
+    """
+    Generate SEO meta tags (title, description, OG tags, Twitter cards) from page/version data.
+    Usage: {% render_page_seo page=current_page version=content page_data=page_data %}
+    """
+    from django.utils.safestring import mark_safe
+    from django.utils.html import escape
+
+    meta_tags = []
+
+    # Get page from context if not provided
+    if page is None:
+        page = context.get("current_page") or context.get("page")
+
+    # Get page_data from context if not provided
+    if page_data is None:
+        page_data = context.get("page_data", {})
+
+    if not page:
+        return mark_safe("")
+
+    # Get meta title and description
+    meta_title = None
+    meta_description = None
+
+    # Priority: page_data > version > page
+    if page_data:
+        meta_title = page_data.get("meta_title") or page_data.get("metaTitle")
+        meta_description = page_data.get("meta_description") or page_data.get(
+            "metaDescription"
+        )
+
+    if not meta_title and version and hasattr(version, "meta_title"):
+        meta_title = version.meta_title
+
+    if not meta_description and version and hasattr(version, "meta_description"):
+        meta_description = version.meta_description
+
+    # Fallback to page title
+    if not meta_title:
+        meta_title = page.title
+
+    if not meta_description and hasattr(page, "description"):
+        meta_description = page.description
+
+    # Escape for HTML safety
+    meta_title = escape(meta_title) if meta_title else ""
+    meta_description = escape(meta_description) if meta_description else ""
+
+    # Meta description
+    if meta_description:
+        meta_tags.append(f'<meta name="description" content="{meta_description}">')
+
+    # Open Graph tags
+    if meta_title:
+        meta_tags.append(f'<meta property="og:title" content="{meta_title}">')
+
+    if meta_description:
+        meta_tags.append(
+            f'<meta property="og:description" content="{meta_description}">'
+        )
+
+    meta_tags.append('<meta property="og:type" content="website">')
+
+    # Get full URL for og:url
+    request = context.get("request")
+    if request:
+        full_url = request.build_absolute_uri()
+        meta_tags.append(f'<meta property="og:url" content="{escape(full_url)}">')
+
+    # Twitter Card tags
+    meta_tags.append('<meta name="twitter:card" content="summary">')
+    if meta_title:
+        meta_tags.append(f'<meta name="twitter:title" content="{meta_title}">')
+    if meta_description:
+        meta_tags.append(
+            f'<meta name="twitter:description" content="{meta_description}">'
+        )
+
+    return mark_safe("\n    ".join(meta_tags))
+
+
+@register.simple_tag
+def render_site_icons(root_page=None):
+    """
+    Generate favicon and app icon tags using imgproxy to resize site_icon.
+    Usage: {% render_site_icons root_page=root_page %}
+    """
+    from django.utils.safestring import mark_safe
+    from file_manager.imgproxy import imgproxy_service
+
+    if not root_page or not root_page.site_icon:
+        return mark_safe("")
+
+    icon_tags = []
+
+    try:
+        # Get the source URL
+        source_url = root_page.site_icon.url
+
+        # Generate multiple icon sizes
+        icon_sizes = [
+            # Standard favicons
+            {"size": 16, "format": "png", "rel": "icon", "type": "image/png"},
+            {"size": 32, "format": "png", "rel": "icon", "type": "image/png"},
+            {"size": 48, "format": "png", "rel": "icon", "type": "image/png"},
+            # Apple touch icons
+            {"size": 180, "format": "png", "rel": "apple-touch-icon"},
+            {"size": 152, "format": "png", "rel": "apple-touch-icon"},
+            {"size": 120, "format": "png", "rel": "apple-touch-icon"},
+            # Android/Chrome
+            {"size": 192, "format": "png", "rel": "icon", "type": "image/png"},
+            {"size": 512, "format": "png", "rel": "icon", "type": "image/png"},
+        ]
+
+        for icon_spec in icon_sizes:
+            size = icon_spec["size"]
+            icon_url = imgproxy_service.generate_url(
+                source_url=source_url,
+                width=size,
+                height=size,
+                resize_type="fill",
+                gravity="sm",
+                format=icon_spec["format"],
+            )
+
+            if icon_spec["rel"] == "apple-touch-icon":
+                icon_tags.append(
+                    f'<link rel="apple-touch-icon" sizes="{size}x{size}" href="{icon_url}">'
+                )
+            else:
+                type_attr = (
+                    f' type="{icon_spec["type"]}"' if "type" in icon_spec else ""
+                )
+                icon_tags.append(
+                    f'<link rel="icon"{type_attr} sizes="{size}x{size}" href="{icon_url}">'
+                )
+
+        # Add favicon.ico (32x32)
+        favicon_url = imgproxy_service.generate_url(
+            source_url=source_url,
+            width=32,
+            height=32,
+            resize_type="fill",
+            gravity="sm",
+            format="ico",
+        )
+        icon_tags.append(f'<link rel="shortcut icon" href="{favicon_url}">')
+
+    except Exception as e:
+        # Silently fail in production
+        from django.conf import settings
+
+        if settings.DEBUG:
+            return mark_safe(f"<!-- Error generating icon tags: {e} -->")
+
+    return mark_safe("\n    ".join(icon_tags))

@@ -2,7 +2,15 @@
 {% load static %}
 {% load webpages_tags %}
 
-{% block title %}{{ meta_title }} - {{ block.super }}{% endblock %}
+{% block page_title %}{% if meta_title %}{{ meta_title }}{% else %}{{ page.title }}{% endif %}{% if root_page %} - {{ root_page.title }}{% endif %}{% endblock %}
+
+{% block meta_tags %}
+  {% render_page_seo page=current_page version=content page_data=page_data %}
+{% endblock %}
+
+{% block icon_tags %}
+  {% render_site_icons root_page=root_page %}
+{% endblock %}
 
 {% block extra_head %}
     <meta name="description" content="{{ meta_description }}">
@@ -130,8 +138,6 @@
     <script>
         // Page-specific JavaScript can go here
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Page loaded: {{ page.title }}');
-            
             // Add any interactive features for widgets
             const widgets = document.querySelectorAll('[data-widget-id]');
             widgets.forEach(widget => {
