@@ -26,6 +26,34 @@ class NavbarItem(BaseModel):
     )
 
 
+class SecondaryMenuItem(BaseModel):
+    """Secondary navbar menu item with custom styling"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    label: str = Field(..., description="Menu item label")
+    url: str = Field(..., description="Menu item URL")
+    target_blank: bool = Field(
+        False, description="Whether the link opens in a new window"
+    )
+    background_color: Optional[str] = Field(
+        None,
+        description="Individual background color (hex or CSS color)",
+        json_schema_extra={"component": "ColorInput"},
+    )
+    background_image: Optional[str] = Field(
+        None,
+        description="Individual background image URL",
+        json_schema_extra={
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+        },
+    )
+
+
 class NavbarConfig(BaseModel):
     """Configuration for Navbar widget"""
 
@@ -36,12 +64,22 @@ class NavbarConfig(BaseModel):
 
     menu_items: List[NavbarItem] = Field(
         default_factory=list,
-        description="Navbar menu items",
+        description="Primary navbar menu items (left-aligned)",
         json_schema_extra={
             "component": "ItemsListField",
             "addButtonText": "Add Menu Item",
             "emptyText": "No menu items added yet",
             "itemLabelTemplate": "label",  # Use the label field for item display
+        },
+    )
+    secondary_menu_items: List[SecondaryMenuItem] = Field(
+        default_factory=list,
+        description="Secondary navbar menu items (right-aligned, with custom colors)",
+        json_schema_extra={
+            "component": "ItemsListField",
+            "addButtonText": "Add Secondary Menu Item",
+            "emptyText": "No secondary menu items added yet",
+            "itemLabelTemplate": "label",
         },
     )
     background_image: Optional[str] = Field(
@@ -72,6 +110,20 @@ class NavbarConfig(BaseModel):
         json_schema_extra={
             "component": "ColorInput",
             "order": 4,
+        },
+    )
+    hamburger_breakpoint: int = Field(
+        768,
+        ge=320,
+        le=2560,
+        description="Screen width (px) below which to show hamburger menu",
+        json_schema_extra={
+            "component": "NumberInput",
+            "order": 5,
+            "min": 320,
+            "max": 2560,
+            "step": 1,
+            "suffix": "px",
         },
     )
 

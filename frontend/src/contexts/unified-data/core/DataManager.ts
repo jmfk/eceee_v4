@@ -753,7 +753,7 @@ export class DataManager {
                                     payload.widgetPath,
                                     (widget) => ({
                                         ...widget,
-                                        ...(payload.config && { config: payload.config }),
+                                        ...(payload.config && { config: { ...widget.config, ...payload.config } }),
                                         ...(payload.widgetUpdates || {}),
                                         updated_at: now
                                     })
@@ -793,9 +793,10 @@ export class DataManager {
                                 
                                 // Update the nested widget
                                 const updatedNestedWidgets = [...nestedWidgets];
+                                const existingNestedWidget = updatedNestedWidgets[nestedIndex];
                                 updatedNestedWidgets[nestedIndex] = {
-                                    ...updatedNestedWidgets[nestedIndex],
-                                    ...(payload.config && { config: payload.config }),
+                                    ...existingNestedWidget,
+                                    ...(payload.config && { config: { ...existingNestedWidget.config, ...payload.config } }),
                                     ...(payload.widgetUpdates || {}),
                                     updated_at: now
                                 };
@@ -839,13 +840,14 @@ export class DataManager {
                                 throw new Error(`Widget ${widgetId} not found in slot ${slotName} of version ${target.versionId}`);
                             }
                             const updatedWidgets = [...slotWidgets];
+                            const existingWidget = updatedWidgets[widgetIndex];
                             const widgetUpdate: any = {
-                                ...updatedWidgets[widgetIndex],
+                                ...existingWidget,
                                 ...(payload.widgetUpdates || {}),
                                 updated_at: now
                             };
                             if (payload.config !== undefined) {
-                                widgetUpdate.config = payload.config;
+                                widgetUpdate.config = { ...existingWidget.config, ...payload.config };
                             }
                             updatedWidgets[widgetIndex] = widgetUpdate;
                             return {
@@ -872,9 +874,10 @@ export class DataManager {
                                 throw new Error(`Widget ${widgetId} not found in slot ${slotName} of object version ${objectId}`);
                             }
                             const updatedWidgets = [...slotWidgets];
+                            const existingObjectWidget = updatedWidgets[widgetIndex];
                             updatedWidgets[widgetIndex] = {
-                                ...updatedWidgets[widgetIndex],
-                                config: payload.config, // Replace config entirely instead of merging
+                                ...existingObjectWidget,
+                                config: { ...existingObjectWidget.config, ...payload.config }, // Merge config instead of replacing
                                 updated_at: now
                             };
                             return {
