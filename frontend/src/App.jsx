@@ -4,6 +4,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
 // import './utils/rerenderInvestigation' // Initialize render investigation - DISABLED
 import Navbar from '@components/Navbar'
+import GlobalWysiwygToolbar from '@components/wysiwyg/GlobalWysiwygToolbar'
 
 import SettingsManager from '@pages/SettingsManager'
 import SystemSchemaPage from '@pages/SystemSchemaPage'
@@ -87,6 +88,7 @@ function App() {
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
                         <Navbar />
+                        <GlobalWysiwygToolbar />
                         <main className="flex-1 overflow-hidden">
                           <div className="h-full overflow-y-auto">
                             <div className="container mx-auto px-4 py-8">
@@ -102,6 +104,7 @@ function App() {
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
                         <Navbar />
+                        <GlobalWysiwygToolbar />
                         <main className="flex-1 overflow-hidden">
                           <div className="h-full overflow-y-auto">
                             <MediaManagerPage />
@@ -252,6 +255,7 @@ function App() {
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
                         <Navbar />
+                        <GlobalWysiwygToolbar />
                         <main className="flex-1 overflow-hidden">
                           <div className="h-full overflow-y-auto">
                             <ObjectBrowser />
@@ -265,6 +269,7 @@ function App() {
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
                         <Navbar />
+                        <GlobalWysiwygToolbar />
                         <main className="flex-1 overflow-hidden">
                           <div className="h-full overflow-y-auto">
                             <ObjectBrowser />

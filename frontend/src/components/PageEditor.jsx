@@ -40,6 +40,7 @@ import SettingsEditor from './SettingsEditor'
 import PublishingEditor from './PublishingEditor'
 import { getWidgetDisplayName } from '../hooks/useWidgets'
 import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
+import GlobalWysiwygToolbar from './wysiwyg/GlobalWysiwygToolbar'
 
 import { logValidationSync } from '../utils/stateVerification'
 import { buildPathVariablesContext, getDefaultSimulatedPath } from '../utils/pathParser'
@@ -1582,6 +1583,9 @@ const PageEditor = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Global WYSIWYG Toolbar - appears when editor is active */}
+            <GlobalWysiwygToolbar />
 
             {/* Main Content Area with right error To-Do sidebar and widget editor panel */}
             <div className="flex-1 overflow-hidden">
