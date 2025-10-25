@@ -3,6 +3,7 @@ ViewSets for managing media tags and collections.
 """
 
 from django.db import models
+from django.db.models import Count
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -55,6 +56,202 @@ class MediaTagViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set created_by when creating tag."""
         serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=["get"])
+    def files(self, request, pk=None):
+        """Get all files using this tag with pagination."""
+        tag = self.get_object()
+
+        # Get files with this tag
+        files = (
+            MediaFile.objects.filter(tags=tag, namespace=tag.namespace)
+            .select_related("namespace", "created_by", "last_modified_by")
+            .prefetch_related("tags", "collections")
+        )
+
+        # Apply user permissions (same logic as MediaFileViewSet)
+        user = request.user
+        if not user.is_staff:
+            from content.models import Namespace
+
+            # Get namespaces the user can access
+            accessible_namespaces = Namespace.objects.filter(
+                models.Q(created_by=user) | models.Q(is_active=True)
+            )
+            files = files.filter(namespace__in=accessible_namespaces)
+
+            # Further filter by access level
+            from django.db.models import Q
+
+            files = files.filter(
+                Q(access_level="public")
+                | Q(access_level="members")
+                | Q(access_level="private", created_by=user)
+            )
+
+        # Apply search if provided
+        search = request.query_params.get("search")
+        if search:
+            files = files.filter(
+                models.Q(title__icontains=search)
+                | models.Q(description__icontains=search)
+                | models.Q(original_filename__icontains=search)
+            )
+
+        # Apply ordering
+        ordering = request.query_params.get("ordering", "-created_at")
+        files = files.order_by(ordering)
+
+        # Paginate
+        page = self.paginate_queryset(files)
+        if page is not None:
+            serializer = MediaFileListSerializer(
+                page, many=True, context={"request": request}
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = MediaFileListSerializer(
+            files, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def usage_stats(self, request):
+        """Get usage statistics for all tags."""
+        queryset = self.get_queryset()
+
+        # Annotate with file count
+        queryset = queryset.annotate(file_count=Count("mediafile"))
+
+        # Apply ordering by usage if requested
+        ordering = request.query_params.get("ordering", "-file_count")
+        queryset = queryset.order_by(ordering)
+
+        # Paginate
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"])
+    def merge_tags(self, request):
+        """Merge multiple tags into one target tag."""
+        target_tag_id = request.data.get("target_tag_id")
+        source_tag_ids = request.data.get("source_tag_ids", [])
+
+        if not target_tag_id:
+            return Response(
+                {"error": "target_tag_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not source_tag_ids or len(source_tag_ids) == 0:
+            return Response(
+                {
+                    "error": "source_tag_ids is required and must contain at least one tag"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get target tag
+        try:
+            target_tag = MediaTag.objects.get(id=target_tag_id)
+        except MediaTag.DoesNotExist:
+            return Response(
+                {"error": "Target tag not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get source tags
+        source_tags = MediaTag.objects.filter(id__in=source_tag_ids)
+        if source_tags.count() != len(source_tag_ids):
+            return Response(
+                {"error": "One or more source tags not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Ensure all tags are in the same namespace
+        namespaces = set(
+            [target_tag.namespace_id]
+            + list(source_tags.values_list("namespace_id", flat=True))
+        )
+        if len(namespaces) > 1:
+            return Response(
+                {"error": "All tags must be in the same namespace"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Transfer all file associations from source tags to target tag
+        files_transferred = 0
+        for source_tag in source_tags:
+            files = MediaFile.objects.filter(tags=source_tag)
+            for file in files:
+                # Add target tag if not already present
+                if not file.tags.filter(id=target_tag.id).exists():
+                    file.tags.add(target_tag)
+                    files_transferred += 1
+                # Remove source tag
+                file.tags.remove(source_tag)
+
+        # Delete source tags
+        source_tags_count = source_tags.count()
+        source_tags.delete()
+
+        return Response(
+            {
+                "message": f"Successfully merged {source_tags_count} tags into '{target_tag.name}'",
+                "target_tag": MediaTagSerializer(target_tag).data,
+                "files_transferred": files_transferred,
+                "tags_deleted": source_tags_count,
+            }
+        )
+
+    @action(detail=False, methods=["post"])
+    def bulk_delete(self, request):
+        """Delete multiple tags at once."""
+        tag_ids = request.data.get("tag_ids", [])
+
+        if not tag_ids or len(tag_ids) == 0:
+            return Response(
+                {"error": "tag_ids is required and must contain at least one tag"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get tags
+        tags = MediaTag.objects.filter(id__in=tag_ids)
+        if tags.count() != len(tag_ids):
+            return Response(
+                {"error": "One or more tags not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Verify user has permission to delete these tags (same namespace check from get_queryset)
+        user_tags = self.get_queryset().filter(id__in=tag_ids)
+        if user_tags.count() != len(tag_ids):
+            return Response(
+                {
+                    "error": "You don't have permission to delete one or more of these tags"
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Remove all file associations and delete tags
+        tags_count = tags.count()
+        for tag in tags:
+            # Remove from all files
+            tag.mediafile_set.clear()
+
+        # Delete tags
+        tags.delete()
+
+        return Response(
+            {
+                "message": f"Successfully deleted {tags_count} tags",
+                "deleted_count": tags_count,
+            }
+        )
 
 
 class MediaCollectionViewSet(viewsets.ModelViewSet):

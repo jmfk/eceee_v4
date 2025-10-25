@@ -168,8 +168,8 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
         )
 
         if (existingTag) {
-            // Tag exists, add it directly
-            const newTags = [...tags, existingTag.name]
+            // Tag exists, add the full tag object (with ID)
+            const newTags = [...tags, existingTag]
             onChange(newTags)
             setInputValue('')
             setShowSuggestions(false)
@@ -177,23 +177,37 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
             return
         }
 
-        // For media tags, we'll just add the tag name directly
-        // The backend will handle creation during approval
-        const newTags = [...tags, normalizedTagName]
-        onChange(newTags)
-        setInputValue('')
-        setShowSuggestions(false)
-        setSelectedIndex(-1)
+        // Create the tag on backend immediately to get an ID
+        try {
+            const slug = normalizedTagName.toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+
+            const newTag = await mediaApi.tags.create({
+                name: normalizedTagName,
+                slug: slug,
+                namespace: namespace,
+                description: `User-created tag: ${normalizedTagName}`
+            })();
+
+            // Add the newly created tag object to available tags
+            setAvailableTags(prev => [...prev, newTag]);
+
+            // Add the full tag object (with ID)
+            const newTags = [...tags, newTag]
+            onChange(newTags)
+            setInputValue('')
+            setShowSuggestions(false)
+            setSelectedIndex(-1)
+        } catch (error) {
+            console.error('Failed to create tag:', error);
+            // You could show a notification here if you have access to notification context
+        }
     }
 
     const removeTag = (tagToRemove) => {
-        const newTags = tags.filter(tag => {
-            // Handle both tag objects and tag name strings
-            if (typeof tag === 'string') {
-                return tag !== tagToRemove.name;
-            }
-            return tag?.id !== tagToRemove?.id && tag?.name !== tagToRemove?.name;
-        });
+        // Filter out the tag by comparing IDs
+        const newTags = tags.filter(tag => tag?.id !== tagToRemove?.id);
         onChange(newTags);
     }
 
@@ -225,13 +239,13 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
             {/* Selected Tags Display */}
             {tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 items-start">
-                    {tags.filter(tag => tag && (typeof tag === 'string' || tag.name)).map((tag, index) => (
+                    {tags.filter(tag => tag && tag.id && tag.name).map((tag) => (
                         <span
-                            key={tag.id || index}
+                            key={tag.id}
                             className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
                         >
                             <Hash className="w-3 h-3 mr-1" />
-                            {typeof tag === 'string' ? tag : tag.name}
+                            {tag.name}
                             {!disabled && (
                                 <button
                                     onClick={() => removeTag(tag)}

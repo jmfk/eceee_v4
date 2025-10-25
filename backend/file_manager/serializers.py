@@ -65,6 +65,15 @@ class MediaTagSerializer(serializers.ModelSerializer):
         source="created_by.username", read_only=True
     )
     namespace = serializers.CharField(source="namespace.slug", required=False)
+    usage_count = serializers.SerializerMethodField()
+
+    def get_usage_count(self, obj):
+        """Get the number of files using this tag."""
+        # Check if file_count is already annotated (from usage_stats endpoint)
+        if hasattr(obj, "file_count"):
+            return obj.file_count
+        # Otherwise, count manually
+        return obj.mediafile_set.count()
 
     class Meta:
         model = MediaTag
@@ -78,12 +87,14 @@ class MediaTagSerializer(serializers.ModelSerializer):
             "created_at",
             "created_by",
             "created_by_name",
+            "usage_count",
         ]
         read_only_fields = [
             "id",
             "created_at",
             "created_by",
             "created_by_name",
+            "usage_count",
         ]
 
     def create(self, validated_data):

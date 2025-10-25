@@ -310,6 +310,51 @@ export const mediaTagsApi = {
     delete: (id) => wrapApiCall(() =>
         apiClient.delete(endpoints.media.tag(id))
     ),
+
+    /**
+     * Get files associated with a specific tag
+     * @param {string} tagId - Tag ID
+     * @param {Object} params - Query parameters (pagination, search, etc.)
+     * @returns {Promise} API response with files
+     */
+    getFiles: (tagId, params = {}) => wrapApiCall(() => {
+        const queryString = buildQueryParams(params);
+        return apiClient.get(`${endpoints.media.tag(tagId)}files/${queryString}`);
+    }),
+
+    /**
+     * Get usage statistics for all tags
+     * @param {Object} params - Query parameters
+     * @returns {Promise} API response with tags and usage stats
+     */
+    getUsageStats: (params = {}) => wrapApiCall(() => {
+        const queryString = buildQueryParams(params);
+        return apiClient.get(`${endpoints.media.tags}usage_stats/${queryString}`);
+    }),
+
+    /**
+     * Merge multiple tags into one target tag
+     * @param {string} targetTagId - Target tag ID to merge into
+     * @param {string[]} sourceTagIds - Source tag IDs to merge from
+     * @returns {Promise} API response with merge results
+     */
+    mergeTags: (targetTagId, sourceTagIds) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.tags}merge_tags/`, {
+            target_tag_id: targetTagId,
+            source_tag_ids: sourceTagIds
+        })
+    ),
+
+    /**
+     * Delete multiple tags at once
+     * @param {string[]} tagIds - Array of tag IDs to delete
+     * @returns {Promise} API response with deletion results
+     */
+    bulkDelete: (tagIds) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.tags}bulk_delete/`, {
+            tag_ids: tagIds
+        })
+    ),
 };
 
 /**

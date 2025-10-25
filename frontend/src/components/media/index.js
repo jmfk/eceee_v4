@@ -8,6 +8,8 @@
 export { default as MediaManager } from './MediaManager';
 export { default as MediaBrowser } from './MediaBrowser';
 export { default as PendingMediaManager } from './PendingMediaManager';
+export { default as MediaTagManager } from './MediaTagManager';
+export { default as MediaCollectionManager } from './MediaCollectionManager';
 
 // Upload and approval components
 export { default as MediaUploader } from './MediaUploader';

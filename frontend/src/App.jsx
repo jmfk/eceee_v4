@@ -10,6 +10,7 @@ import SystemSchemaPage from '@pages/SystemSchemaPage'
 import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import LayoutSchemaEditorPage from '@pages/LayoutSchemaEditorPage'
 import MediaManagerPage from '@pages/MediaManagerPage'
+import TagsPage from '@pages/TagsPage'
 import ObjectBrowser from '@components/ObjectBrowser'
 import ObjectTypeEditorPage from '@pages/ObjectTypeEditorPage'
 import ObjectInstanceEditPage from '@pages/ObjectInstanceEditPage'
@@ -110,8 +111,23 @@ function App() {
                       </div>
                     </PrivateRoute>
                   } />
+                  <Route path="/tags" element={
+                    <PrivateRoute>
+                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                        <Navbar />
+                        <main className="flex-1 overflow-hidden">
+                          <div className="h-full overflow-y-auto">
+                            <TagsPage />
+                          </div>
+                        </main>
+                        <StatusBar customStatusContent={<span>Tags - Ready</span>} />
+                      </div>
+                    </PrivateRoute>
+                  } />
                   {/* Settings routes with distinct paths */}
                   <Route path="/settings" element={<Navigate to="/settings/layouts" replace />} />
+                  {/* Redirect old tags route to new top-level route */}
+                  <Route path="/settings/tags" element={<Navigate to="/tags" replace />} />
                   <Route path="/settings/layouts" element={
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
@@ -154,21 +170,6 @@ function App() {
                           </div>
                         </main>
                         <StatusBar customStatusContent={<span>Settings - Widgets</span>} />
-                      </div>
-                    </PrivateRoute>
-                  } />
-                  <Route path="/settings/tags" element={
-                    <PrivateRoute>
-                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                        <Navbar />
-                        <main className="flex-1 overflow-hidden">
-                          <div className="h-full overflow-y-auto">
-                            <div className="container mx-auto px-4 py-8">
-                              <SettingsManager />
-                            </div>
-                          </div>
-                        </main>
-                        <StatusBar customStatusContent={<span>Settings - Tags</span>} />
                       </div>
                     </PrivateRoute>
                   } />
