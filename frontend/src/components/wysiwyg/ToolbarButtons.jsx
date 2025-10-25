@@ -65,6 +65,13 @@ const ICONS = {
             <path d="M9 18v3M15 18v3M12 18v3" />
         </svg>
     ),
+    image: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+        </svg>
+    ),
 };
 
 /**
@@ -80,8 +87,8 @@ const ToolbarButton = ({ command, title, icon, isActive, onClick }) => {
         <button
             type="button"
             className={`p-1 rounded transition-colors ${isActive
-                    ? 'bg-blue-500 text-white'
-                    : 'hover:bg-gray-200'
+                ? 'bg-blue-500 text-white'
+                : 'hover:bg-gray-200'
                 }`}
             title={title}
             onClick={handleClick}
@@ -225,6 +232,16 @@ const ToolbarButtons = ({ state, onCommand }) => {
                 title="Numbered List"
                 icon={ICONS.listOrdered}
                 isActive={state.insertOrderedList}
+                onClick={onCommand}
+            />
+
+            <ToolbarSeparator />
+
+            <ToolbarButton
+                command="insertImage"
+                title="Insert Image or Collection"
+                icon={ICONS.image}
+                isActive={false}
                 onClick={onCommand}
             />
 

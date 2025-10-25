@@ -21,3 +21,7 @@ export { default as MediaPicker } from './MediaPicker';
 export { default as OptimizedImage } from './OptimizedImage';
 export { default as BulkOperations } from './BulkOperations';
 export { default as UploadQueue } from './UploadQueue';
+
+// WYSIWYG editor components
+export { default as MediaInsertModal } from './MediaInsertModal';
+export { default as MediaEditModal } from './MediaEditModal';

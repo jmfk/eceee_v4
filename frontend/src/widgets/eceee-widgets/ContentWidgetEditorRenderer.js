@@ -17,8 +17,15 @@ const cleanHTML = (html) => {
     // Define allowed HTML tags (whitelist approach)
     const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li']
     const inlineTags = ['strong', 'b', 'em', 'i', 'a', 'br']
-    const allowedTags = [...blockTags, ...inlineTags]
+    const mediaInsertTags = ['div', 'img'] // For media inserts
+    const allowedTags = [...blockTags, ...inlineTags, ...mediaInsertTags]
     const allowedAttributes = ['href', 'target']
+    const mediaInsertAttributes = [
+        'class', 'data-media-insert', 'data-media-type', 'data-media-id',
+        'data-width', 'data-align', 'contenteditable', 'draggable',
+        'src', 'alt', 'width', 'height', 'loading'
+    ]
+    const allAllowedAttributes = [...allowedAttributes, ...mediaInsertAttributes]
 
     // Convert tables to paragraphs before cleaning
     convertTablesToParagraphs(tempDiv)
@@ -29,6 +36,16 @@ const cleanHTML = (html) => {
 
     elementsToProcess.forEach(el => {
         const tagName = el.tagName.toLowerCase()
+
+        // Check if this is a media-insert element - preserve it completely
+        if (el.hasAttribute('data-media-insert') && tagName === 'div') {
+            return // Skip processing for media inserts
+        }
+
+        // Check if this is inside a media-insert - preserve it
+        if (el.closest('[data-media-insert]')) {
+            return // Skip processing for elements inside media inserts
+        }
 
         if (!allowedTags.includes(tagName)) {
             // Convert disallowed elements to their text content or appropriate replacement
@@ -55,9 +72,14 @@ const cleanHTML = (html) => {
     // Clean attributes on remaining elements
     const finalElements = tempDiv.querySelectorAll('*')
     finalElements.forEach(el => {
+        // Skip attribute cleaning for media inserts and their children
+        if (el.hasAttribute('data-media-insert') || el.closest('[data-media-insert]')) {
+            return
+        }
+
         const attrs = Array.from(el.attributes)
         attrs.forEach(attr => {
-            if (!allowedAttributes.includes(attr.name)) {
+            if (!allAllowedAttributes.includes(attr.name)) {
                 el.removeAttribute(attr.name)
             }
         })
@@ -330,10 +352,167 @@ const ICONS = {
     paragraph: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4h6"/><path d="M12 6v14"/><path d="M10 20h4"/><path d="M6 16c0 1.1.9 2 2 2h2V10H8a2 2 0 0 0-2 2z"/></svg>`,
     list: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>`,
     listOrdered: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1.5S2 14 2 15"/></svg>`,
+    image: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
     undo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="m21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>`,
     redo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="m3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3-2.3"/></svg>`,
     cleanup: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M7 14h10v2c0 1.1-.9 2-2 2H9c-1.1 0-2-.9-2-2v-2z"/><path d="M9 18v3M15 18v3M12 18v3"/></svg>`
 }
+
+/**
+ * Inject CSS styles for media inserts
+ */
+const injectMediaInsertStyles = () => {
+    const styleId = 'media-insert-styles'
+
+    // Check if styles are already injected
+    if (document.getElementById(styleId)) {
+        return
+    }
+
+    const style = document.createElement('style')
+    style.id = styleId
+    style.textContent = `
+        /* Media Insert Base Styles */
+        .media-insert {
+            display: block;
+            margin: 16px 0;
+            padding: 8px;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            position: relative;
+            clear: both;
+        }
+        
+        .media-insert:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .media-insert:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        /* Width Variants */
+        .media-width-full {
+            width: 100%;
+            max-width: 100%;
+        }
+        
+        .media-width-half {
+            width: 50%;
+            max-width: 50%;
+        }
+        
+        .media-width-third {
+            width: 33.333%;
+            max-width: 33.333%;
+        }
+        
+        /* Alignment Variants */
+        .media-align-left {
+            float: left;
+            margin-right: 16px;
+            margin-left: 0;
+        }
+        
+        .media-align-center {
+            margin-left: auto;
+            margin-right: auto;
+            float: none;
+            clear: both;
+        }
+        
+        .media-align-right {
+            float: right;
+            margin-left: 16px;
+            margin-right: 0;
+        }
+        
+        /* Media Insert Images */
+        .media-insert img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 4px;
+        }
+        
+        /* Media Caption */
+        .media-caption {
+            margin-top: 8px;
+            padding: 4px 8px;
+            font-size: 14px;
+            color: #6b7280;
+            font-style: italic;
+            text-align: center;
+            background: #f9fafb;
+            border-radius: 4px;
+        }
+        
+        /* Media Gallery */
+        .media-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            padding: 8px;
+        }
+        
+        .media-gallery-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        
+        .media-gallery-empty {
+            padding: 32px;
+            text-align: center;
+            color: #9ca3af;
+            font-style: italic;
+        }
+        
+        /* Drag and Drop States */
+        .media-insert[draggable="true"] {
+            cursor: move;
+        }
+        
+        .media-insert.dragging {
+            opacity: 0.4;
+        }
+        
+        .media-drop-indicator {
+            height: 2px;
+            background: #3b82f6;
+            margin: 4px 0;
+            border-radius: 1px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .media-width-half,
+            .media-width-third {
+                width: 100%;
+                max-width: 100%;
+                float: none;
+                margin-left: 0;
+                margin-right: 0;
+            }
+            
+            .media-gallery {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 8px;
+            }
+        }
+    `
+
+    document.head.appendChild(style)
+}
+
+// Inject styles when the script loads
+injectMediaInsertStyles()
 
 class ContentWidgetEditorRenderer {
     constructor(container, options = {}) {
@@ -341,6 +520,7 @@ class ContentWidgetEditorRenderer {
         this.content = options.content || ''
         this.className = options.className || ''
         this.onChange = options.onChange || (() => { })
+        this.namespace = options.namespace || null // Namespace for media browser
 
         // Theme configuration
         this.maxHeaderLevel = options.maxHeaderLevel || this.getThemeHeaderLevel() || 3
@@ -362,11 +542,22 @@ class ContentWidgetEditorRenderer {
         this.toolbarButtons = new Map()
         this.formatSelect = null
 
+        // Media insert state
+        this.mediaInsertModal = null
+        this.mediaEditModal = null
+        this.draggedElement = null
+        this.dropIndicator = null
+
         // Bind methods to maintain 'this' context
         this.handleContentChange = this.handleContentChange.bind(this)
         this.handlePaste = this.handlePaste.bind(this)
         this.handleKeyDown = this.handleKeyDown.bind(this)
         this.execCommand = this.execCommand.bind(this)
+        this.handleMediaInsertClick = this.handleMediaInsertClick.bind(this)
+        this.handleMediaInsertDragStart = this.handleMediaInsertDragStart.bind(this)
+        this.handleMediaInsertDragEnd = this.handleMediaInsertDragEnd.bind(this)
+        this.handleMediaInsertDragOver = this.handleMediaInsertDragOver.bind(this)
+        this.handleMediaInsertDrop = this.handleMediaInsertDrop.bind(this)
     }
 
     /**
@@ -456,6 +647,14 @@ class ContentWidgetEditorRenderer {
         const olButton = this.createToolbarButton('insertOrderedList', 'Numbered List', ICONS.listOrdered)
         this.toolbarButtons.set('insertOrderedList', olButton)
         this.toolbarElement.appendChild(olButton)
+
+        // Separator
+        this.toolbarElement.appendChild(this.createSeparator())
+
+        // Insert Image button
+        const imageButton = this.createImageInsertButton()
+        this.toolbarButtons.set('insertImage', imageButton)
+        this.toolbarElement.appendChild(imageButton)
 
         // Separator
         this.toolbarElement.appendChild(this.createSeparator())
@@ -682,6 +881,10 @@ class ContentWidgetEditorRenderer {
         this.editorElement.addEventListener('mouseup', this.updateButtonStates.bind(this))
         this.editorElement.addEventListener('keyup', this.updateButtonStates.bind(this))
 
+        // Add drag-and-drop listeners for media inserts
+        this.editorElement.addEventListener('dragover', this.handleMediaInsertDragOver)
+        this.editorElement.addEventListener('drop', this.handleMediaInsertDrop)
+
         // Track event listeners for cleanup
         this.eventListeners.set(this.editorElement, () => {
             this.editorElement.removeEventListener('input', this.handleContentChange)
@@ -689,6 +892,8 @@ class ContentWidgetEditorRenderer {
             this.editorElement.removeEventListener('keydown', this.handleKeyDown)
             this.editorElement.removeEventListener('mouseup', this.updateButtonStates.bind(this))
             this.editorElement.removeEventListener('keyup', this.updateButtonStates.bind(this))
+            this.editorElement.removeEventListener('dragover', this.handleMediaInsertDragOver)
+            this.editorElement.removeEventListener('drop', this.handleMediaInsertDrop)
         })
 
         // Set up command listener for detached toolbar mode
@@ -1151,6 +1356,336 @@ class ContentWidgetEditorRenderer {
     }
 
     /**
+     * Create Insert Image button
+     */
+    createImageInsertButton() {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'p-1 hover:bg-gray-200 rounded'
+        button.title = 'Insert Image or Collection'
+        button.innerHTML = ICONS.image
+
+        const clickHandler = (e) => {
+            e.preventDefault()
+            this.openMediaInsertModal()
+        }
+
+        button.addEventListener('click', clickHandler)
+        this.eventListeners.set(button, () => {
+            button.removeEventListener('click', clickHandler)
+        })
+
+        return button
+    }
+
+    /**
+     * Open media insert modal
+     */
+    async openMediaInsertModal() {
+        // Dynamically import React and the modal component
+        const React = await import('react')
+        const ReactDOM = await import('react-dom/client')
+        const { default: MediaInsertModal } = await import('@/components/media/MediaInsertModal.jsx')
+        const { GlobalNotificationProvider } = await import('@/contexts/GlobalNotificationContext.jsx')
+        const { namespacesApi } = await import('@/api')
+
+        // Get namespace - use provided one or fetch default
+        let namespace = this.namespace
+        if (!namespace) {
+            try {
+                const defaultNamespace = await namespacesApi.getDefault()
+                namespace = defaultNamespace?.slug || 'default'
+            } catch (error) {
+                console.error('Failed to load default namespace:', error)
+                namespace = 'default' // Fallback
+            }
+        }
+
+        // Create modal container
+        const modalContainer = document.createElement('div')
+        document.body.appendChild(modalContainer)
+
+        // Create root and render modal
+        const root = ReactDOM.createRoot(modalContainer)
+
+        const handleInsert = async (config) => {
+            await this.insertMediaAtCursor(config)
+            root.unmount()
+            modalContainer.remove()
+        }
+
+        const handleClose = () => {
+            root.unmount()
+            modalContainer.remove()
+        }
+
+        // Wrap modal with required providers
+        root.render(
+            React.createElement(GlobalNotificationProvider, {},
+                React.createElement(MediaInsertModal, {
+                    isOpen: true,
+                    onClose: handleClose,
+                    onInsert: handleInsert,
+                    namespace: namespace
+                })
+            )
+        )
+    }
+
+    /**
+     * Insert media at cursor position
+     */
+    async insertMediaAtCursor(config) {
+        if (!this.editorElement) return
+
+        const { createMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js')
+
+        try {
+            // Generate HTML for media insert
+            const html = await createMediaInsertHTML(config.mediaData, config)
+
+            // Get selection and insert at cursor
+            const selection = window.getSelection()
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0)
+                range.deleteContents()
+
+                // Create temporary div to parse HTML
+                const tempDiv = document.createElement('div')
+                tempDiv.innerHTML = html
+                const mediaElement = tempDiv.firstChild
+
+                // Insert the media element
+                range.insertNode(mediaElement)
+
+                // Set up event listeners for the new media insert
+                this.setupMediaInsertListeners(mediaElement)
+
+                // Move cursor after the inserted element
+                range.setStartAfter(mediaElement)
+                range.setEndAfter(mediaElement)
+                selection.removeAllRanges()
+                selection.addRange(range)
+            } else {
+                // No selection, append to end
+                const tempDiv = document.createElement('div')
+                tempDiv.innerHTML = html
+                const mediaElement = tempDiv.firstChild
+
+                this.editorElement.appendChild(mediaElement)
+                this.setupMediaInsertListeners(mediaElement)
+            }
+
+            this.handleContentChange()
+        } catch (error) {
+            console.error('Failed to insert media:', error)
+            alert('Failed to insert media. Please try again.')
+        }
+    }
+
+    /**
+     * Setup event listeners for a media insert element
+     */
+    setupMediaInsertListeners(element) {
+        if (!element || !element.hasAttribute('data-media-insert')) return
+
+        // Click handler for editing
+        element.addEventListener('click', this.handleMediaInsertClick)
+
+        // Drag handlers
+        element.addEventListener('dragstart', this.handleMediaInsertDragStart)
+        element.addEventListener('dragend', this.handleMediaInsertDragEnd)
+    }
+
+    /**
+     * Handle click on media insert (open edit modal)
+     */
+    async handleMediaInsertClick(e) {
+        const mediaElement = e.currentTarget
+        if (!mediaElement || !mediaElement.hasAttribute('data-media-insert')) return
+
+        e.preventDefault()
+        e.stopPropagation()
+
+        // Extract current config
+        const { extractMediaConfig, fetchMediaData } = await import('@/utils/mediaInsertRenderer.js')
+        const config = extractMediaConfig(mediaElement)
+
+        try {
+            // Fetch media data
+            const mediaData = await fetchMediaData(config.mediaId, config.mediaType)
+
+            // Open edit modal
+            this.openMediaEditModal(mediaElement, config, mediaData)
+        } catch (error) {
+            console.error('Failed to load media data:', error)
+            alert('Failed to load media data. Please try again.')
+        }
+    }
+
+    /**
+     * Open media edit modal
+     */
+    async openMediaEditModal(mediaElement, initialConfig, mediaData) {
+        const React = await import('react')
+        const ReactDOM = await import('react-dom/client')
+        const { default: MediaEditModal } = await import('@/components/media/MediaEditModal.jsx')
+        const { GlobalNotificationProvider } = await import('@/contexts/GlobalNotificationContext.jsx')
+
+        // Create modal container
+        const modalContainer = document.createElement('div')
+        document.body.appendChild(modalContainer)
+
+        // Create root and render modal
+        const root = ReactDOM.createRoot(modalContainer)
+
+        const handleSave = async (updatedConfig) => {
+            await this.updateMediaInsert(mediaElement, mediaData, updatedConfig)
+            root.unmount()
+            modalContainer.remove()
+        }
+
+        const handleDelete = () => {
+            this.deleteMediaInsert(mediaElement)
+            root.unmount()
+            modalContainer.remove()
+        }
+
+        const handleClose = () => {
+            root.unmount()
+            modalContainer.remove()
+        }
+
+        // Wrap modal with required providers
+        root.render(
+            React.createElement(GlobalNotificationProvider, {},
+                React.createElement(MediaEditModal, {
+                    isOpen: true,
+                    onClose: handleClose,
+                    onSave: handleSave,
+                    onDelete: handleDelete,
+                    initialConfig: { ...initialConfig, mediaType: initialConfig.mediaType },
+                    mediaData: mediaData
+                })
+            )
+        )
+    }
+
+    /**
+     * Update media insert with new configuration
+     */
+    async updateMediaInsert(element, mediaData, config) {
+        const { updateMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js')
+
+        try {
+            updateMediaInsertHTML(element, mediaData, config)
+            this.handleContentChange()
+        } catch (error) {
+            console.error('Failed to update media insert:', error)
+            alert('Failed to update media. Please try again.')
+        }
+    }
+
+    /**
+     * Delete media insert
+     */
+    deleteMediaInsert(element) {
+        if (element && element.parentNode) {
+            element.parentNode.removeChild(element)
+            this.handleContentChange()
+        }
+    }
+
+    /**
+     * Handle drag start for media insert
+     */
+    handleMediaInsertDragStart(e) {
+        this.draggedElement = e.currentTarget
+        e.currentTarget.style.opacity = '0.4'
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/html', e.currentTarget.outerHTML)
+    }
+
+    /**
+     * Handle drag end for media insert
+     */
+    handleMediaInsertDragEnd(e) {
+        e.currentTarget.style.opacity = ''
+
+        // Remove any drop indicators
+        if (this.dropIndicator && this.dropIndicator.parentNode) {
+            this.dropIndicator.parentNode.removeChild(this.dropIndicator)
+            this.dropIndicator = null
+        }
+    }
+
+    /**
+     * Handle drag over for repositioning
+     */
+    handleMediaInsertDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault()
+        }
+
+        e.dataTransfer.dropEffect = 'move'
+
+        // Show drop indicator
+        const target = e.target
+        if (target && target !== this.draggedElement) {
+            // Find the nearest block element or media insert
+            let blockElement = target
+            while (blockElement && blockElement !== this.editorElement) {
+                if (blockElement.hasAttribute('data-media-insert') ||
+                    ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI'].includes(blockElement.tagName)) {
+                    break
+                }
+                blockElement = blockElement.parentElement
+            }
+
+            if (blockElement && blockElement !== this.editorElement && blockElement !== this.draggedElement) {
+                // Create or update drop indicator
+                if (!this.dropIndicator) {
+                    this.dropIndicator = document.createElement('div')
+                    this.dropIndicator.className = 'media-drop-indicator'
+                    this.dropIndicator.style.cssText = 'height: 2px; background: #3b82f6; margin: 4px 0;'
+                }
+
+                // Determine if we should insert before or after
+                const rect = blockElement.getBoundingClientRect()
+                const midpoint = rect.top + rect.height / 2
+
+                if (e.clientY < midpoint) {
+                    blockElement.parentNode.insertBefore(this.dropIndicator, blockElement)
+                } else {
+                    blockElement.parentNode.insertBefore(this.dropIndicator, blockElement.nextSibling)
+                }
+            }
+        }
+
+        return false
+    }
+
+    /**
+     * Handle drop for repositioning
+     */
+    handleMediaInsertDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation()
+        }
+
+        if (this.draggedElement && this.dropIndicator && this.dropIndicator.parentNode) {
+            // Move the dragged element to the drop location
+            this.dropIndicator.parentNode.insertBefore(this.draggedElement, this.dropIndicator)
+            this.dropIndicator.parentNode.removeChild(this.dropIndicator)
+            this.dropIndicator = null
+
+            this.handleContentChange()
+        }
+
+        return false
+    }
+
+    /**
      * Clean HTML strictly - only allow specific tags and attributes
      * Converts b → strong and i → em
      * Only allows h1-h6, strong, em, p, li, ul, ol, a, br
@@ -1276,7 +1811,22 @@ class ContentWidgetEditorRenderer {
                     selection.addRange(range);
                 }
             }
+
+            // Setup listeners for any media inserts in the content
+            this.setupExistingMediaInserts();
         }, 0);
+    }
+
+    /**
+     * Setup listeners for existing media inserts in the content
+     */
+    setupExistingMediaInserts() {
+        if (!this.editorElement) return;
+
+        const mediaInserts = this.editorElement.querySelectorAll('[data-media-insert]');
+        mediaInserts.forEach(element => {
+            this.setupMediaInsertListeners(element);
+        });
     }
 
     /**
@@ -1294,6 +1844,9 @@ class ContentWidgetEditorRenderer {
             if (this.rootElement) {
                 this.rootElement.className = `content-editor ${this.className}`
             }
+        }
+        if (options.namespace !== undefined) {
+            this.namespace = options.namespace
         }
     }
 
@@ -1345,6 +1898,8 @@ class ContentWidgetEditorRenderer {
                 this.handleLinkAction();
             } else if (command === 'cleanup') {
                 this.cleanupHTML();
+            } else if (command === 'insertImage') {
+                this.openMediaInsertModal();
             } else {
                 this.execCommand(command, value);
             }

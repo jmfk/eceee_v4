@@ -52,7 +52,7 @@ const cleanHTML = (html) => {
  * Vanilla JS Editor Wrapper Component
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidgetEditor = memo(({ content, onChange, className }) => {
+const ContentWidgetEditor = memo(({ content, onChange, className, namespace }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -66,6 +66,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className }) => {
                 content,
                 onChange,
                 className,
+                namespace,  // Pass namespace for media browser
                 detachedToolbar: true  // Enable global toolbar mode
             })
             rendererRef.current.render()
@@ -110,12 +111,12 @@ const ContentWidgetEditor = memo(({ content, onChange, className }) => {
         }
     }, [content])
 
-    // Separate effect for onChange and className updates
+    // Separate effect for onChange, className, and namespace updates
     useEffect(() => {
         if (rendererRef.current) {
-            rendererRef.current.updateConfig({ onChange, className })
+            rendererRef.current.updateConfig({ onChange, className, namespace })
         }
-    }, [onChange, className])
+    }, [onChange, className, namespace])
 
     useEffect(() => {
         return () => {
@@ -158,6 +159,8 @@ const eceeeContentWidget = memo(({
     // Legacy nested widget context (deprecated)
     nestedParentWidgetId = null,
     nestedParentSlotName = null,
+    // Namespace for media browser (optional, defaults to current site)
+    namespace = null,
     //context = {}
 }) => {
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
@@ -222,6 +225,7 @@ const eceeeContentWidget = memo(({
                 content={configRef.current.content}
                 onChange={handleContentChange}
                 className=""
+                namespace={namespace}
             />
         )
     }
