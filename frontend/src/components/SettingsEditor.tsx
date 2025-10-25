@@ -296,6 +296,57 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                 Enter hostnames separated by commas
                             </p>
                         </div>
+
+                        {/* Site Icon - Only for root pages */}
+                        {!webpageData?.parent && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Site Icon (Favicon)
+                                </label>
+                                <div className="space-y-3">
+                                    {webpageData?.siteIcon && (
+                                        <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                                            <img
+                                                src={webpageData.siteIcon}
+                                                alt="Site icon preview"
+                                                className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                            />
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-gray-900">Current Icon</p>
+                                                <p className="text-xs text-gray-500">Will be resized to multiple sizes automatically</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePageFieldChange('siteIcon', null)}
+                                                className="text-red-600 hover:text-red-700 text-sm font-medium"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) {
+                                                handlePageFieldChange('siteIcon', file)
+                                            }
+                                        }}
+                                        className="block w-full text-sm text-gray-500
+                                            file:mr-4 file:py-2 file:px-4
+                                            file:rounded-md file:border-0
+                                            file:text-sm file:font-semibold
+                                            file:bg-blue-50 file:text-blue-700
+                                            hover:file:bg-blue-100
+                                            cursor-pointer"
+                                    />
+                                    <p className="text-sm text-gray-500">
+                                        Upload a square image (PNG, JPG, SVG, or WebP). Will be automatically resized to favicon sizes (16x16, 32x32, etc.) and app icons (180x180, 192x192, etc.)
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

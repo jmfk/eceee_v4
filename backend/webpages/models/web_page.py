@@ -62,6 +62,14 @@ class WebPage(models.Model):
         help_text="List of hostnames this root page serves (only for pages without parent)",
     )
 
+    # Site branding (for root pages)
+    site_icon = models.ImageField(
+        upload_to="site_icons/",
+        null=True,
+        blank=True,
+        help_text="Site icon/favicon for this root page. Will be resized to multiple sizes using imgproxy. Only available for root pages (pages without parent).",
+    )
+
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -125,6 +133,16 @@ class WebPage(models.Model):
     def is_root_page(self):
         """Check if this is a root page (no parent)"""
         return self.parent is None
+
+    def get_root_page(self):
+        """Get the root page for this page (traverses up the hierarchy)"""
+        if self.is_root_page():
+            return self
+
+        current = self.parent
+        while current and current.parent:
+            current = current.parent
+        return current
 
     def has_silent_slug(self):
         """Check if this page's slug should be silent (not appear in URLs)"""
@@ -546,6 +564,12 @@ class WebPage(models.Model):
         if self.hostnames and self.parent is not None:
             raise ValidationError(
                 "Only root pages (pages without a parent) can have hostnames."
+            )
+
+        # Validate site_icon assignment
+        if self.site_icon and self.parent is not None:
+            raise ValidationError(
+                "Only root pages (pages without a parent) can have a site icon."
             )
 
         # Validate hostname format

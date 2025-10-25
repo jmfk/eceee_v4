@@ -300,6 +300,7 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
             "parent",
             "sort_order",
             "hostnames",
+            "site_icon",  # Site icon for root pages
             "path_pattern_key",  # Registry-based path pattern key
             "publication_status",
             "effective_date",
@@ -383,6 +384,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "parent_id",
             "sort_order",
             "hostnames",
+            "site_icon",  # Site icon for root pages
             "path_pattern_key",  # Registry-based path pattern key
             "created_at",
             "updated_at",
@@ -525,6 +527,28 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         if deleted_by:
             return UserSerializer(deleted_by).data
         return None
+
+    def validate(self, attrs):
+        """Validate WebPage data including site_icon restrictions"""
+        # Validate site_icon is only used for root pages
+        if "site_icon" in attrs and attrs["site_icon"]:
+            # Check if this is an update or create
+            parent_id = attrs.get("parent_id")
+            if parent_id is not None:  # Has a parent, not a root page
+                raise serializers.ValidationError(
+                    {
+                        "site_icon": "Only root pages (pages without a parent) can have a site icon."
+                    }
+                )
+            # For updates, check if the instance has a parent
+            if self.instance and self.instance.parent_id is not None:
+                raise serializers.ValidationError(
+                    {
+                        "site_icon": "Only root pages (pages without a parent) can have a site icon."
+                    }
+                )
+
+        return super().validate(attrs)
 
 
 class PageVersionSerializer(serializers.ModelSerializer):
