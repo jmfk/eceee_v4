@@ -268,6 +268,53 @@ const cleanupEmptyElements = (container) => {
 }
 
 /**
+ * Fix invalid HTML nesting after paste
+ * Block tags (h1-h6, p, ul, ol, li) cannot be nested inside:
+ * - Inline tags (strong, em, a)
+ * - Certain other block tags (h1-h6, p)
+ */
+const fixInvalidNesting = (container) => {
+    const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li']
+    const inlineTags = ['strong', 'em', 'a']
+    const noNestedBlocksTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'] // These cannot contain block elements
+
+    // Find all block elements
+    const allBlocks = container.querySelectorAll(blockTags.join(','))
+
+    Array.from(allBlocks).forEach(blockEl => {
+        let parent = blockEl.parentNode
+        let invalidParent = null
+
+        // Walk up to find if we're inside an invalid parent
+        while (parent && parent !== container) {
+            const parentTag = parent.tagName ? parent.tagName.toLowerCase() : null
+
+            // Check if block is inside an inline tag
+            if (parentTag && inlineTags.includes(parentTag)) {
+                invalidParent = parent
+                break
+            }
+
+            // Check if block is inside a tag that can't contain blocks
+            if (parentTag && noNestedBlocksTags.includes(parentTag)) {
+                invalidParent = parent
+                break
+            }
+
+            parent = parent.parentNode
+        }
+
+        // If we found an invalid parent, unwrap the block element
+        if (invalidParent) {
+            // Insert the block element after the invalid parent
+            invalidParent.parentNode.insertBefore(blockEl, invalidParent.nextSibling)
+        }
+    })
+
+    return container
+}
+
+/**
  * SVG Icons (replacing Lucide React icons)
  */
 const ICONS = {
@@ -284,7 +331,8 @@ const ICONS = {
     list: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>`,
     listOrdered: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1.5S2 14 2 15"/></svg>`,
     undo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="m21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>`,
-    redo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="m3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3-2.3"/></svg>`
+    redo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="m3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3-2.3"/></svg>`,
+    cleanup: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M7 14h10v2c0 1.1-.9 2-2 2H9c-1.1 0-2-.9-2-2v-2z"/><path d="M9 18v3M15 18v3M12 18v3"/></svg>`
 }
 
 class ContentWidgetEditorRenderer {
@@ -410,6 +458,13 @@ class ContentWidgetEditorRenderer {
         // Redo button
         const redoButton = this.createToolbarButton('redo', 'Redo', ICONS.redo)
         this.toolbarElement.appendChild(redoButton)
+
+        // Separator
+        this.toolbarElement.appendChild(this.createSeparator())
+
+        // Cleanup button
+        const cleanupButton = this.createCleanupButton()
+        this.toolbarElement.appendChild(cleanupButton)
 
         this.rootElement.appendChild(this.toolbarElement)
     }
@@ -571,6 +626,29 @@ class ContentWidgetEditorRenderer {
     }
 
     /**
+     * Create cleanup button
+     */
+    createCleanupButton() {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'p-1 hover:bg-gray-200 rounded'
+        button.title = 'Clean HTML (removes unwanted tags and attributes)'
+        button.innerHTML = ICONS.cleanup
+
+        const clickHandler = (e) => {
+            e.preventDefault()
+            this.cleanupHTML()
+        }
+
+        button.addEventListener('click', clickHandler)
+        this.eventListeners.set(button, () => {
+            button.removeEventListener('click', clickHandler)
+        })
+
+        return button
+    }
+
+    /**
      * Create separator element
      */
     createSeparator() {
@@ -628,15 +706,24 @@ class ContentWidgetEditorRenderer {
     }
 
     /**
-     * Handle paste events
+     * Handle paste events - automatically clean pasted HTML and fix invalid nesting
      */
     handlePaste(e) {
         e.preventDefault()
         const paste = (e.clipboardData || window.clipboardData).getData('text/html') ||
             (e.clipboardData || window.clipboardData).getData('text/plain')
-        const cleanedPaste = cleanHTML(paste)
+        const cleanedPaste = this.cleanHTMLStrict(paste)
+
+        // Insert the cleaned HTML
         document.execCommand('insertHTML', false, cleanedPaste)
-        this.handleContentChange()
+
+        // Fix any invalid nesting that resulted from the paste
+        setTimeout(() => {
+            if (this.editorElement) {
+                fixInvalidNesting(this.editorElement)
+                this.handleContentChange()
+            }
+        }, 0)
     }
 
     /**
@@ -1047,6 +1134,82 @@ class ContentWidgetEditorRenderer {
         }
         parent.removeChild(linkElement)
         this.handleContentChange()
+    }
+
+    /**
+     * Clean HTML strictly - only allow specific tags and attributes
+     * Converts b → strong and i → em
+     * Only allows h1-h6, strong, em, p, li, ul, ol, a, br
+     * For links, only allows href, target, and name attributes
+     */
+    cleanHTMLStrict(html) {
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = html
+
+        // Process all elements bottom-up (from innermost to outermost)
+        const allElements = Array.from(tempDiv.querySelectorAll('*')).reverse()
+
+        allElements.forEach(el => {
+            const tagName = el.tagName.toLowerCase()
+
+            // Convert b → strong, i → em
+            if (tagName === 'b') {
+                const strong = document.createElement('strong')
+                strong.innerHTML = el.innerHTML
+                el.parentNode.replaceChild(strong, el)
+            } else if (tagName === 'i') {
+                const em = document.createElement('em')
+                em.innerHTML = el.innerHTML
+                el.parentNode.replaceChild(em, el)
+            } else if (!['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'p', 'li', 'ul', 'ol', 'a', 'br'].includes(tagName)) {
+                // Remove disallowed tags, keep content
+                while (el.firstChild) {
+                    el.parentNode.insertBefore(el.firstChild, el)
+                }
+                el.remove()
+            } else if (tagName === 'a') {
+                // Clean attributes on links - only allow href, target, and name
+                const allowedAttrs = ['href', 'target', 'name']
+                Array.from(el.attributes).forEach(attr => {
+                    if (!allowedAttrs.includes(attr.name)) {
+                        el.removeAttribute(attr.name)
+                    }
+                })
+            } else {
+                // For all other allowed tags, remove all attributes
+                Array.from(el.attributes).forEach(attr => {
+                    el.removeAttribute(attr.name)
+                })
+            }
+        })
+
+        return tempDiv.innerHTML
+    }
+
+    /**
+     * Cleanup HTML in selection or entire content
+     * If there's a selection, cleans only the selection
+     * Otherwise, cleans the entire editor content
+     */
+    cleanupHTML() {
+        const selection = window.getSelection()
+
+        if (selection.rangeCount > 0 && !selection.isCollapsed) {
+            // Clean selection only
+            const range = selection.getRangeAt(0)
+            const fragment = range.cloneContents()
+            const tempDiv = document.createElement('div')
+            tempDiv.appendChild(fragment)
+
+            const cleaned = this.cleanHTMLStrict(tempDiv.innerHTML)
+            document.execCommand('insertHTML', false, cleaned)
+            this.handleContentChange()
+        } else {
+            // Clean entire content
+            const cleaned = this.cleanHTMLStrict(this.editorElement.innerHTML)
+            this.editorElement.innerHTML = cleaned
+            this.handleContentChange()
+        }
     }
 
     /**
