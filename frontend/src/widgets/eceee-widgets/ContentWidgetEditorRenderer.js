@@ -6,6 +6,8 @@
  * to avoid conflicts between React and document.execCommand() operations.
  */
 
+import { WysiwygContextMenu } from '../../components/wysiwyg/WysiwygContextMenu.js'
+
 /**
  * Clean up HTML content by only allowing basic HTML elements and attributes
  * Converts complex structures like tables to simple paragraphs
@@ -548,11 +550,15 @@ class ContentWidgetEditorRenderer {
         this.draggedElement = null
         this.dropIndicator = null
 
+        // Context menu
+        this.contextMenu = null
+
         // Bind methods to maintain 'this' context
         this.handleContentChange = this.handleContentChange.bind(this)
         this.handlePaste = this.handlePaste.bind(this)
         this.handleKeyDown = this.handleKeyDown.bind(this)
         this.execCommand = this.execCommand.bind(this)
+        this.handleContextMenu = this.handleContextMenu.bind(this)
         this.handleMediaInsertClick = this.handleMediaInsertClick.bind(this)
         this.handleMediaInsertDragStart = this.handleMediaInsertDragStart.bind(this)
         this.handleMediaInsertDragEnd = this.handleMediaInsertDragEnd.bind(this)
@@ -885,6 +891,9 @@ class ContentWidgetEditorRenderer {
         this.editorElement.addEventListener('dragover', this.handleMediaInsertDragOver)
         this.editorElement.addEventListener('drop', this.handleMediaInsertDrop)
 
+        // Add context menu listener
+        this.editorElement.addEventListener('contextmenu', this.handleContextMenu)
+
         // Track event listeners for cleanup
         this.eventListeners.set(this.editorElement, () => {
             this.editorElement.removeEventListener('input', this.handleContentChange)
@@ -894,12 +903,16 @@ class ContentWidgetEditorRenderer {
             this.editorElement.removeEventListener('keyup', this.updateButtonStates.bind(this))
             this.editorElement.removeEventListener('dragover', this.handleMediaInsertDragOver)
             this.editorElement.removeEventListener('drop', this.handleMediaInsertDrop)
+            this.editorElement.removeEventListener('contextmenu', this.handleContextMenu)
         })
 
         // Set up command listener for detached toolbar mode
         if (this.detachedToolbar) {
             this.setupCommandListener();
         }
+
+        // Initialize context menu
+        this.contextMenu = new WysiwygContextMenu(this)
 
         this.rootElement.appendChild(this.editorElement)
     }
@@ -962,6 +975,76 @@ class ContentWidgetEditorRenderer {
         else if (e.key === 'Enter') {
             setTimeout(this.handleContentChange, 0)
         }
+    }
+
+    /**
+     * Handle context menu
+     */
+    handleContextMenu(e) {
+        e.preventDefault()
+
+        if (!this.contextMenu || this.isDestroyed) {
+            return
+        }
+
+        const selection = window.getSelection()
+        const hasTextSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0
+
+        // Get current state
+        const state = this.getToolbarState()
+
+        // Check if cursor is on a link
+        let isOnLink = false
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0)
+            let element = range.commonAncestorContainer
+            if (element.nodeType === Node.TEXT_NODE) {
+                element = element.parentElement
+            }
+            while (element && element !== this.editorElement) {
+                if (element.tagName === 'A') {
+                    isOnLink = true
+                    break
+                }
+                element = element.parentElement
+            }
+        }
+
+        // Check if cursor is on a media insert
+        let isOnMedia = false
+        let mediaElement = null
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0)
+            let element = range.commonAncestorContainer
+            if (element.nodeType === Node.TEXT_NODE) {
+                element = element.parentElement
+            }
+            while (element && element !== this.editorElement) {
+                if (element.hasAttribute && element.hasAttribute('data-media-insert')) {
+                    isOnMedia = true
+                    mediaElement = element
+                    break
+                }
+                element = element.parentElement
+            }
+        }
+
+        // Build context object
+        const context = {
+            hasTextSelection,
+            isOnLink,
+            isOnMedia,
+            mediaElement,
+            bold: state.bold,
+            italic: state.italic,
+            insertUnorderedList: state.insertUnorderedList,
+            insertOrderedList: state.insertOrderedList,
+            format: state.format,
+            maxHeaderLevel: state.maxHeaderLevel
+        }
+
+        // Show context menu
+        this.contextMenu.show(e, context)
     }
 
     /**
@@ -1531,6 +1614,19 @@ class ContentWidgetEditorRenderer {
         const ReactDOM = await import('react-dom/client')
         const { default: MediaEditModal } = await import('@/components/media/MediaEditModal.jsx')
         const { GlobalNotificationProvider } = await import('@/contexts/GlobalNotificationContext.jsx')
+        const { namespacesApi } = await import('@/api')
+
+        // Get namespace - use provided one or fetch default
+        let namespace = this.namespace
+        if (!namespace) {
+            try {
+                const defaultNamespace = await namespacesApi.getDefault()
+                namespace = defaultNamespace?.slug || 'default'
+            } catch (error) {
+                console.error('Failed to load default namespace:', error)
+                namespace = 'default' // Fallback
+            }
+        }
 
         // Create modal container
         const modalContainer = document.createElement('div')
@@ -1540,7 +1636,8 @@ class ContentWidgetEditorRenderer {
         const root = ReactDOM.createRoot(modalContainer)
 
         const handleSave = async (updatedConfig) => {
-            await this.updateMediaInsert(mediaElement, mediaData, updatedConfig)
+            // updatedConfig now includes the new mediaData if it was changed
+            await this.updateMediaInsert(mediaElement, updatedConfig.mediaData, updatedConfig)
             root.unmount()
             modalContainer.remove()
         }
@@ -1565,7 +1662,8 @@ class ContentWidgetEditorRenderer {
                     onSave: handleSave,
                     onDelete: handleDelete,
                     initialConfig: { ...initialConfig, mediaType: initialConfig.mediaType },
-                    mediaData: mediaData
+                    mediaData: mediaData,
+                    namespace: namespace
                 })
             )
         )
@@ -1765,6 +1863,33 @@ class ContentWidgetEditorRenderer {
      * Execute editor commands
      */
     execCommand(command, value = null) {
+        // Handle special commands
+        if (command === 'addImage') {
+            this.openMediaInsertModal()
+            return
+        }
+
+        if (command === 'editImage') {
+            // Find the media element in the current selection or context
+            const selection = window.getSelection()
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0)
+                let element = range.commonAncestorContainer
+                if (element.nodeType === Node.TEXT_NODE) {
+                    element = element.parentElement
+                }
+                while (element && element !== this.editorElement) {
+                    if (element.hasAttribute && element.hasAttribute('data-media-insert')) {
+                        this.handleMediaInsertClick({ currentTarget: element })
+                        return
+                    }
+                    element = element.parentElement
+                }
+            }
+            return
+        }
+
+        // Handle standard document commands
         document.execCommand(command, false, value)
         this.handleContentChange()
     }
@@ -1881,6 +2006,13 @@ class ContentWidgetEditorRenderer {
         if (this.isActive) {
             this.deactivate();
         }
+
+        // Destroy context menu
+        if (this.contextMenu) {
+            this.contextMenu.destroy()
+            this.contextMenu = null
+        }
+
         this.cleanup()
         this.isDestroyed = true
     }

@@ -515,3 +515,54 @@ input[type="color"] {
     animation: slideUp 0.2s ease-out;
 }
 
+/* WYSIWYG Context Menu */
+.wysiwyg-context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    padding: 4px 0;
+}
+
+.wysiwyg-context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    transition: background-color 0.15s ease;
+    user-select: none;
+}
+
+.wysiwyg-context-menu-item:hover {
+    background: #f3f4f6;
+}
+
+.wysiwyg-context-menu-item .menu-item-icon {
+    font-size: 12px;
+    font-weight: bold;
+    width: 16px;
+    text-align: center;
+}
+
+.wysiwyg-context-menu-item .menu-item-checkmark {
+    font-size: 14px;
+    color: #3b82f6;
+    width: 16px;
+    text-align: center;
+}
+
+.wysiwyg-context-menu-item .menu-item-spacer {
+    width: 16px;
+}
+
+.wysiwyg-context-menu-separator {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 4px 0;
+}
+
