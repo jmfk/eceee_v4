@@ -1681,7 +1681,16 @@ class ContentWidgetEditorRenderer {
 
         try {
             updateMediaInsertHTML(element, mediaData, config)
-            this.handleContentChange()
+
+            // Force content update - get fresh innerHTML after DOM modification
+            if (this.editorElement) {
+                const currentContent = this.editorElement.innerHTML
+                this.content = currentContent
+                this.onChange(currentContent)
+            }
+
+            // Update button states
+            setTimeout(() => this.updateButtonStates(), 0)
         } catch (error) {
             console.error('Failed to update media insert:', error)
             alert('Failed to update media. Please try again.')
