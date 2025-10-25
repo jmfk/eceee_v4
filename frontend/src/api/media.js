@@ -127,6 +127,16 @@ export const mediaUploadApi = {
         if (uploadData.forceUpload) {
             formData.append('force_upload', 'true');
         }
+        if (uploadData.replaceFiles && typeof uploadData.replaceFiles === 'object') {
+            try {
+                // Ensure we have a plain object without circular references
+                const cleanReplaceFiles = JSON.parse(JSON.stringify(uploadData.replaceFiles));
+                formData.append('replace_files', JSON.stringify(cleanReplaceFiles));
+            } catch (error) {
+                console.error('Failed to stringify replaceFiles:', error, uploadData.replaceFiles);
+                // Continue without replaceFiles if serialization fails
+            }
+        }
 
         try {
             const wrappedCall = wrapApiCall(() =>

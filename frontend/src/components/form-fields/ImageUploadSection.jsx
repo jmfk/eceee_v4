@@ -1,8 +1,9 @@
-import React, { useRef, useCallback } from 'react'
+import React, { useRef, useCallback, useState } from 'react'
 import { X, AlertCircle, Tag, FolderOpen } from 'lucide-react'
 import { mediaApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import MediaTagWidget from '../media/MediaTagWidget'
+import DuplicateResolveDialog from '../media/DuplicateResolveDialog'
 import { validateImageFile, formatFileSize, getImageTypeInfo, getImageAcceptAttribute } from './ImageValidationUtils'
 
 const ImageUploadSection = ({
@@ -37,6 +38,8 @@ const ImageUploadSection = ({
 }) => {
     const fileInputRef = useRef(null)
     const { addNotification } = useGlobalNotifications()
+    const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
+    const [duplicateFiles, setDuplicateFiles] = useState([])
 
     // Remove a file from upload queue
     const removeUploadFile = useCallback((index) => {
@@ -63,7 +66,7 @@ const ImageUploadSection = ({
     }, [setUploadFiles, setUploadTags, setUploadErrors, setShowForceUpload, addNotification])
 
     // Handle upload and approve
-    const handleUploadAndApprove = useCallback(async () => {
+    const handleUploadAndApprove = useCallback(async (replaceDecisions = null) => {
         if (uploadFiles.length === 0 || !namespace) return
 
         setUploading(true)
@@ -77,15 +80,33 @@ const ImageUploadSection = ({
                 namespace: namespace
             }
 
+            // Add replace decisions if provided
+            if (replaceDecisions) {
+                uploadData.replaceFiles = replaceDecisions
+            }
+
             const onProgress = (percentCompleted, progressEvent) => {
                 // Progress tracking could be added here if needed
             }
 
             const uploadResult = await mediaApi.upload.upload(uploadData, onProgress)
 
-            // Check if the result contains validation errors
+            // Check if the result contains validation errors or duplicates needing action
             if (uploadResult.hasErrors && uploadResult.errors?.length > 0) {
-                // Store errors for detailed display
+                // Check if any errors need user action (duplicates)
+                const duplicatesNeedingAction = uploadResult.errors.filter(
+                    err => err.status === 'needs_action'
+                )
+
+                if (duplicatesNeedingAction.length > 0) {
+                    // Show duplicate resolution dialog
+                    setDuplicateFiles(duplicatesNeedingAction)
+                    setDuplicateDialogOpen(true)
+                    setUploading(false)
+                    return
+                }
+
+                // Other errors - show error display
                 setUploadErrors(uploadResult.errors)
                 setShowForceUpload(true)
                 setUploading(false)
@@ -226,6 +247,32 @@ const ImageUploadSection = ({
             setUploading(false)
         }
     }, [uploadFiles, namespace, setUploading, setUploadErrors, setShowForceUpload, multiple, value, maxFiles, uploadTags, defaultCollection, setUploadFiles, setUploadTags, onChange, onUploadComplete, addNotification])
+
+    // Handle duplicate resolution
+    const handleDuplicateResolve = useCallback((decisions) => {
+        setDuplicateDialogOpen(false)
+        setDuplicateFiles([])
+
+        // Create a clean copy of decisions to avoid circular references
+        const cleanDecisions = {}
+        Object.keys(decisions).forEach(filename => {
+            const decision = decisions[filename]
+            cleanDecisions[filename] = {
+                action: decision.action,
+                existing_file_id: decision.existing_file_id,
+                pending_file_id: decision.pending_file_id
+            }
+        })
+
+        // Retry upload with user's decisions
+        handleUploadAndApprove(cleanDecisions)
+    }, [handleUploadAndApprove])
+
+    const handleDuplicateCancel = useCallback(() => {
+        setDuplicateDialogOpen(false)
+        setDuplicateFiles([])
+        setUploading(false)
+    }, [])
 
     // Handle force upload (bypass validation)
     const handleForceUpload = useCallback(async () => {
@@ -560,6 +607,15 @@ const ImageUploadSection = ({
                     </button>
                 </div>
             </div>
+
+            {/* Duplicate Resolution Dialog */}
+            {duplicateDialogOpen && (
+                <DuplicateResolveDialog
+                    duplicates={duplicateFiles}
+                    onResolve={handleDuplicateResolve}
+                    onCancel={handleDuplicateCancel}
+                />
+            )}
         </div>
     )
 }

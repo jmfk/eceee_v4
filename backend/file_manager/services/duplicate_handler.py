@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 from django.utils import timezone
 from datetime import timedelta
+from django.db import IntegrityError
 
 from ..models import MediaFile, PendingMediaFile
 from ..security import SecurityAuditLogger
@@ -77,7 +78,65 @@ class DuplicateFileHandler:
             )
 
         except Exception as e:
-            logger.error(f"Error checking duplicates for {file.name}: {e}")
+            logger.error(
+                f"Error checking duplicates for {file.name}: {e}", exc_info=True
+            )
+
+            # Try filename-based fallback matching
+            try:
+                # Check MediaFile by filename
+                existing_by_name = (
+                    MediaFile.objects.with_deleted()
+                    .filter(original_filename=file.name)
+                    .first()
+                )
+
+                # Check PendingMediaFile by filename
+                pending_by_name = PendingMediaFile.objects.filter(
+                    original_filename=file.name,
+                    status__in=["pending", "approved"],
+                ).first()
+
+                if existing_by_name or pending_by_name:
+                    # Found potential duplicate by filename - let user decide
+                    duplicate_info = {
+                        "filename": file.name,
+                        "error": (
+                            f"A file with the name '{file.name}' already exists. "
+                            "Would you like to replace it or keep both?"
+                        ),
+                        "status": "needs_action",
+                        "reason": "duplicate_name",
+                        "existing_file": None,
+                    }
+
+                    if existing_by_name:
+                        duplicate_info["existing_file"] = {
+                            "id": str(existing_by_name.id),
+                            "title": existing_by_name.title,
+                            "slug": existing_by_name.slug,
+                            "original_filename": existing_by_name.original_filename,
+                            "created_at": existing_by_name.created_at.isoformat(),
+                            "is_deleted": existing_by_name.is_deleted,
+                        }
+                    elif pending_by_name:
+                        duplicate_info["existing_file"] = {
+                            "id": str(pending_by_name.id),
+                            "original_filename": pending_by_name.original_filename,
+                            "status": pending_by_name.status,
+                            "created_at": pending_by_name.created_at.isoformat(),
+                            "is_pending": True,
+                        }
+
+                    return DuplicateCheckResult(
+                        has_duplicates=True,
+                        errors=[duplicate_info],
+                        pending_files=[],
+                    )
+            except Exception as fallback_error:
+                logger.error(f"Fallback filename check also failed: {fallback_error}")
+
+            # If all else fails, still don't block - return error but allow force upload
             return DuplicateCheckResult(
                 has_duplicates=True,
                 errors=[
@@ -105,18 +164,30 @@ class DuplicateFileHandler:
 
             return DuplicateCheckResult(
                 has_duplicates=True,
-                errors=[],
-                pending_files=[
+                errors=[
                     {
-                        "id": pending_file.id,
-                        "original_filename": pending_file.original_filename,
-                        "file_type": pending_file.file_type,
-                        "file_size": pending_file.file_size,
-                        "width": pending_file.width,
-                        "height": pending_file.height,
-                        "status": "pending_approval",
+                        "filename": uploaded_file.name,
+                        "error": (
+                            f"This file was previously deleted ('{existing_file.title}'). "
+                            "Would you like to restore and replace it or upload as new?"
+                        ),
+                        "status": "needs_action",
+                        "reason": "duplicate_deleted",
+                        "existing_file": {
+                            "id": str(existing_file.id),
+                            "title": existing_file.title,
+                            "slug": existing_file.slug,
+                            "original_filename": existing_file.original_filename,
+                            "created_at": existing_file.created_at.isoformat(),
+                            "is_deleted": True,
+                        },
+                        "pending_file": {
+                            "id": str(pending_file.id),
+                            "original_filename": pending_file.original_filename,
+                        },
                     }
                 ],
+                pending_files=[],
                 existing_file=existing_file,
             )
         else:
@@ -156,17 +227,18 @@ class DuplicateFileHandler:
                     {
                         "filename": uploaded_file.name,
                         "error": (
-                            f"This file already exists in the system as '{existing_file.title}'. "
-                            "Any new tags you've added will be merged with the existing file. "
-                            "You can find the file in the media browser."
+                            f"A file with the same content already exists as '{existing_file.title}'. "
+                            "Would you like to replace it or keep both?"
                         ),
-                        "status": "rejected",
+                        "status": "needs_action",
                         "reason": "duplicate",
                         "existing_file": {
                             "id": str(existing_file.id),
                             "title": existing_file.title,
                             "slug": existing_file.slug,
+                            "original_filename": existing_file.original_filename,
                             "created_at": existing_file.created_at.isoformat(),
+                            "is_deleted": False,
                         },
                         "pending_file": {
                             "id": str(pending_file.id),
@@ -198,16 +270,16 @@ class DuplicateFileHandler:
                     "filename": uploaded_file.name,
                     "error": (
                         f"This file is already awaiting approval (uploaded {existing_pending.created_at.strftime('%Y-%m-%d %H:%M')}). "
-                        "Any new tags you've added will be merged with the pending file. "
-                        "You can check its status in the pending media section."
+                        "Would you like to replace it or keep both?"
                     ),
-                    "status": "rejected",
+                    "status": "needs_action",
                     "reason": "duplicate_pending",
                     "existing_file": {
                         "id": str(updated_pending.id),
                         "original_filename": updated_pending.original_filename,
                         "status": updated_pending.status,
                         "created_at": updated_pending.created_at.isoformat(),
+                        "is_pending": True,
                     },
                 }
             ],
@@ -252,5 +324,22 @@ class DuplicateFileHandler:
             existing_pending.save()
             return existing_pending
         else:
-            # Create new pending file
-            return PendingMediaFile.objects.create(**pending_data)
+            # Create new pending file with IntegrityError handling for race conditions
+            try:
+                return PendingMediaFile.objects.create(**pending_data)
+            except IntegrityError as e:
+                # Hash already exists in pending, fetch and update instead
+                if "file_hash" in str(e) and pending_data.get("file_hash"):
+                    logger.info(
+                        f"Pending file with hash {pending_data.get('file_hash')} already exists, updating instead"
+                    )
+                    existing = PendingMediaFile.objects.filter(
+                        file_hash=pending_data.get("file_hash")
+                    ).first()
+                    if existing:
+                        for key, value in pending_data.items():
+                            setattr(existing, key, value)
+                        existing.save()
+                        return existing
+                # Re-raise if not a hash constraint or couldn't recover
+                raise

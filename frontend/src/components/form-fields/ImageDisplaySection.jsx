@@ -20,50 +20,48 @@ const ImageDisplaySection = ({
         return (
             <div className="bg-white rounded-lg">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                    <div className="flex items-center gap-3">
-                        <div className="flex -space-x-2">
-                            {displayImages.slice(0, 3).map((image, index) => {
-                                const thumbnailUrl = getThumbnailUrl
-                                    ? getThumbnailUrl(image, 40)
-                                    : (image.thumbnailUrl || getImageUrl(image))
-                                return (
-                                    <div
-                                        key={image.id || index}
-                                        className="w-10 h-10 rounded-lg border-2 border-white bg-gray-100 overflow-hidden"
-                                    >
-                                        {thumbnailUrl && (
-                                            <img
-                                                src={thumbnailUrl}
-                                                alt={image.title || image.originalFilename || 'Image'}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        )}
-                                    </div>
-                                )
-                            })}
-                            {displayImages.length > 3 && (
-                                <div className="w-10 h-10 rounded-lg border-2 border-white bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
-                                    +{displayImages.length - 3}
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-4 border-b border-gray-200">
+                    <div className="flex -space-x-2">
+                        {displayImages.slice(0, 3).map((image, index) => {
+                            const thumbnailUrl = getThumbnailUrl
+                                ? getThumbnailUrl(image, 40)
+                                : (image.thumbnailUrl || getImageUrl(image))
+                            return (
+                                <div
+                                    key={image.id || index}
+                                    className="w-10 h-10 rounded-lg border-2 border-white bg-gray-100 overflow-hidden"
+                                >
+                                    {thumbnailUrl && (
+                                        <img
+                                            src={thumbnailUrl}
+                                            alt={image.title || image.originalFilename || 'Image'}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    )}
                                 </div>
-                            )}
-                        </div>
+                            )
+                        })}
+                        {displayImages.length > 3 && (
+                            <div className="w-10 h-10 rounded-lg border-2 border-white bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+                                +{displayImages.length - 3}
+                            </div>
+                        )}
+                    </div>
 
-                        <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate">
-                                {displayImages.length} Image{displayImages.length !== 1 ? 's' : ''} Selected
-                                {maxFiles && ` (${displayImages.length}/${maxFiles})`}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate">
-                                Click to manage selection
-                            </div>
+                    <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                            {displayImages.length} Image{displayImages.length !== 1 ? 's' : ''} Selected
+                            {maxFiles && ` (${displayImages.length}/${maxFiles})`}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                            Click to manage selection
                         </div>
                     </div>
 
                     <button
                         type="button"
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
                     >
                         Manage Images
                         {isExpanded ? (
@@ -130,65 +128,71 @@ const ImageDisplaySection = ({
 
     return (
         <div className="bg-white rounded-lg">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
-                        {thumbnailUrl && (
-                            <img
-                                src={thumbnailUrl}
-                                alt={image.title || image.originalFilename || 'Image'}
-                                className="w-full h-full object-cover"
-                            />
-                        )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate" title={image.title || image.originalFilename || 'Untitled Image'}>
-                            {image.title || image.originalFilename || 'Untitled Image'}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                            {image.file_size && formatFileSize(image.file_size)}
-                            {image.width && image.height && ` • ${image.width}×${image.height}`}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Preview button */}
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-4 border-b border-gray-200">
+                <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                     {thumbnailUrl && (
-                        <button
-                            type="button"
-                            onClick={() => window.open(getImageUrl(image), '_blank')}
-                            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="View full size"
-                        >
-                            <Eye className="w-4 h-4" />
-                        </button>
+                        <img
+                            src={thumbnailUrl}
+                            alt={image.title || image.originalFilename || 'Image'}
+                            className="w-full h-full object-cover"
+                        />
                     )}
-
-                    {/* Remove button */}
-                    <button
-                        onClick={(event) => onRemoveImage(image.id, event)}
-                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Remove image"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-
-                    {/* Expand button */}
-                    <button
-                        type="button"
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                        {isExpanded ? (
-                            <ChevronUp className="w-4 h-4" />
-                        ) : (
-                            <ChevronDown className="w-4 h-4" />
-                        )}
-                    </button>
                 </div>
+
+                <div className="min-w-0 overflow-hidden">
+                    <div className="text-sm font-medium text-gray-900 truncate" title={image.title || image.originalFilename || 'Untitled Image'}>
+                        {image.title || image.originalFilename || 'Untitled Image'}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                        {image.file_size && formatFileSize(image.file_size)}
+                        {image.width && image.height && ` • ${image.width}×${image.height}`}
+                    </div>
+                </div>
+
+                {/* Only show expand/collapse button */}
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title={isExpanded ? 'Collapse' : 'Expand'}
+                >
+                    {isExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                    ) : (
+                        <ChevronDown className="w-4 h-4" />
+                    )}
+                </button>
             </div>
+
+            {/* Expanded actions section */}
+            {isExpanded && (
+                <div className="p-4 bg-gray-50 border-t border-gray-200">
+                    <div className="flex items-center justify-end gap-2">
+                        {/* Preview button */}
+                        {thumbnailUrl && (
+                            <button
+                                type="button"
+                                onClick={() => window.open(getImageUrl(image), '_blank')}
+                                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 bg-white border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                                title="View full size"
+                            >
+                                <Eye className="w-4 h-4" />
+                                View
+                            </button>
+                        )}
+
+                        {/* Remove button */}
+                        <button
+                            onClick={(event) => onRemoveImage(image.id, event)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 bg-white border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                            title="Remove image"
+                        >
+                            <X className="w-4 h-4" />
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

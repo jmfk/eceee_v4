@@ -61,6 +61,7 @@ class MediaUploadView(APIView):
 
         uploaded_files = []
         errors = []
+        replace_files = serializer.validated_data.get("replace_files", {})
 
         # Process each file
         for uploaded_file in serializer.validated_data["files"]:
@@ -75,7 +76,67 @@ class MediaUploadView(APIView):
                     errors.extend(validation_result.errors)
                     continue
 
-                # Check for duplicates
+                # Check if user has made a decision about this file
+                file_action = replace_files.get(uploaded_file.name, {})
+                action = (
+                    file_action.get("action") if isinstance(file_action, dict) else None
+                )
+
+                if action == "replace":
+                    # User wants to replace existing file
+                    existing_file_id = file_action.get("existing_file_id")
+                    if existing_file_id:
+                        try:
+                            # Delete or archive the existing file
+                            existing_file = (
+                                MediaFile.objects.with_deleted()
+                                .filter(id=existing_file_id)
+                                .first()
+                            )
+                            if existing_file:
+                                existing_file.delete(request.user)
+                                logger.info(
+                                    f"Deleted existing file {existing_file_id} for replacement"
+                                )
+
+                            # Also check for pending file with same hash and delete it
+                            existing_pending = PendingMediaFile.objects.filter(
+                                id=file_action.get("pending_file_id")
+                            ).first()
+                            if existing_pending:
+                                existing_pending.delete()
+                                logger.info(
+                                    f"Deleted existing pending file for replacement"
+                                )
+                        except Exception as e:
+                            logger.error(f"Error deleting file for replacement: {e}")
+
+                    # Upload the new file (skip duplicate check)
+                    upload_result = self.upload_service.upload(
+                        uploaded_file,
+                        serializer.validated_data.get("folder_path", ""),
+                        namespace,
+                        request.user,
+                    )
+                    uploaded_files.extend(upload_result.files)
+                    if upload_result.errors:
+                        errors.extend(upload_result.errors)
+                    continue
+
+                elif action == "keep":
+                    # User wants to keep both - upload with unique name (skip duplicate check)
+                    upload_result = self.upload_service.upload(
+                        uploaded_file,
+                        serializer.validated_data.get("folder_path", ""),
+                        namespace,
+                        request.user,
+                    )
+                    uploaded_files.extend(upload_result.files)
+                    if upload_result.errors:
+                        errors.extend(upload_result.errors)
+                    continue
+
+                # Normal flow: Check for duplicates
                 duplicate_result = self.duplicate_handler.check_duplicates(
                     uploaded_file, namespace, request.user
                 )

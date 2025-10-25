@@ -29,6 +29,7 @@ const MediaManager = ({
 }) => {
     const [activeTab, setActiveTab] = useState('library');
     const [pendingCount, setPendingCount] = useState(0);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
     // Load pending files count for badge
     const loadPendingCount = async () => {
         if (!namespace) return;
@@ -60,6 +61,7 @@ const MediaManager = ({
     // Handle files processed (from pending manager)
     const handleFilesProcessed = () => {
         loadPendingCount(); // Refresh pending count
+        setRefreshTrigger(prev => prev + 1); // Trigger MediaBrowser refresh
     };
 
     // Handle tab change
@@ -153,6 +155,7 @@ const MediaManager = ({
                         fileTypes={fileTypes}
                         namespace={namespace}
                         showUploader={true} // MediaBrowser handles its own upload
+                        refreshTrigger={refreshTrigger} // Trigger refresh when files are processed
                     />
                 )}
 

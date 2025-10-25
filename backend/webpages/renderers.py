@@ -74,15 +74,13 @@ class WebPageRenderer:
             ),
         }
 
-    def render_widget_json(self, widget_data, context=None, slot_dimensions=None):
+    def render_widget_json(self, widget_data, context=None):
         """
         Render a widget from JSON data (as stored in PageVersion.widgets).
 
         Args:
             widget_data: Widget JSON data from PageVersion
             context: Optional template context
-            slot_dimensions: Optional dimensions for the slot this widget is in
-                Format: {"mobile": {"width": 360, "height": None}, ...}
 
         Returns:
             str: Rendered widget HTML
@@ -104,15 +102,8 @@ class WebPageRenderer:
         # Get base configuration
         base_config = widget_data.get("config", {})
 
-        # Enhanced context with dimensions
+        # Enhanced context
         enhanced_context = dict(context or {})
-        # Get slot dimensions from parameter or from context slot config
-        if slot_dimensions:
-            enhanced_context["_widget_dimensions"] = slot_dimensions
-        elif enhanced_context.get("slot", {}).get("dimensions"):
-            enhanced_context["_widget_dimensions"] = enhanced_context["slot"][
-                "dimensions"
-            ]
 
         # Prepare template context with widget-specific logic (e.g., collection resolution)
         # All widgets now have prepare_template_context (default implementation in BaseWidget)

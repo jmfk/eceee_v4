@@ -18,9 +18,9 @@ header = {
     ],  # Only inherit navigation widgets
     "allowed_types": ["eceee_widgets.HeaderWidget"],
     "dimensions": {
-        "mobile": {"width": 640, "height": None},
-        "tablet": {"width": 1024, "height": None},
-        "desktop": {"width": 1280, "height": None},
+        "mobile": {"width": 640, "height": 112},
+        "tablet": {"width": 1024, "height": 112},
+        "desktop": {"width": 1280, "height": 112},
     },
 }
 
@@ -48,9 +48,9 @@ navbar = {
     "inheritable_types": ["eceee_widgets.NavbarWidget"],
     "allowed_types": ["eceee_widgets.NavbarWidget"],
     "dimensions": {
-        "mobile": {"width": 640, "height": None},
-        "tablet": {"width": 1024, "height": None},
-        "desktop": {"width": 1280, "height": None},
+        "mobile": {"width": 640, "height": 28},
+        "tablet": {"width": 1024, "height": 28},
+        "desktop": {"width": 1280, "height": 28},
     },
 }
 

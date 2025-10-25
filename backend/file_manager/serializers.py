@@ -523,6 +523,11 @@ class MediaUploadSerializer(serializers.Serializer):
     )
     namespace = serializers.CharField(required=True)
     force_upload = serializers.BooleanField(required=False, default=False)
+    replace_files = serializers.JSONField(
+        required=False,
+        default=dict,
+        help_text="Map of filename to action: 'replace' or 'keep'. For replace, also include existing file ID.",
+    )
 
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""

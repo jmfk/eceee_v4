@@ -30,6 +30,7 @@ import {
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import MediaApprovalForm from './MediaApprovalForm';
+import DuplicateResolveDialog from './DuplicateResolveDialog';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
 const MediaUploader = ({
@@ -45,7 +46,8 @@ const MediaUploader = ({
     const [uploadResults, setUploadResults] = useState([]);
     const [errors, setErrors] = useState([]);
     const [isDragOver, setIsDragOver] = useState(false);
-
+    const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+    const [duplicateFiles, setDuplicateFiles] = useState([]);
 
     const fileInputRef = useRef(null);
     const { addNotification } = useGlobalNotifications();
@@ -94,7 +96,7 @@ const MediaUploader = ({
     }, []);
 
     // Upload process
-    const startUpload = async () => {
+    const startUpload = async (replaceDecisions = null) => {
         if (!selectedFiles.length || !namespace) {
             addNotification('Please select files and namespace', 'error');
             return;
@@ -111,6 +113,11 @@ const MediaUploader = ({
                 folderPath: folderPath
             };
 
+            // Add replace decisions if provided
+            if (replaceDecisions) {
+                uploadData.replaceFiles = replaceDecisions;
+            }
+
             const onProgress = (percentCompleted, progressEvent) => {
                 setUploadProgress(prev => ({
                     ...prev,
@@ -119,6 +126,21 @@ const MediaUploader = ({
             };
 
             const result = await mediaApi.upload.upload(uploadData, onProgress);
+
+            // Check for duplicates needing action first
+            if (result.hasErrors && result.errors?.length > 0) {
+                const duplicatesNeedingAction = result.errors.filter(
+                    err => err.status === 'needs_action'
+                );
+
+                if (duplicatesNeedingAction.length > 0) {
+                    // Show duplicate resolution dialog
+                    setDuplicateFiles(duplicatesNeedingAction);
+                    setDuplicateDialogOpen(true);
+                    setUploadState('idle');
+                    return;
+                }
+            }
 
             // Handle direct API response - now these are pending files
             setUploadResults(result.uploadedFiles || result.uploaded_files || []);
@@ -217,6 +239,32 @@ const MediaUploader = ({
             fileInputRef.current.value = '';
         }
     };
+
+    // Handle duplicate resolution
+    const handleDuplicateResolve = useCallback((decisions) => {
+        setDuplicateDialogOpen(false);
+        setDuplicateFiles([]);
+
+        // Create a clean copy of decisions to avoid circular references
+        const cleanDecisions = {};
+        Object.keys(decisions).forEach(filename => {
+            const decision = decisions[filename];
+            cleanDecisions[filename] = {
+                action: decision.action,
+                existing_file_id: decision.existing_file_id,
+                pending_file_id: decision.pending_file_id
+            };
+        });
+
+        // Retry upload with user's decisions
+        startUpload(cleanDecisions);
+    }, []);
+
+    const handleDuplicateCancel = useCallback(() => {
+        setDuplicateDialogOpen(false);
+        setDuplicateFiles([]);
+        setUploadState('idle');
+    }, []);
 
     // File size formatter
     const formatFileSize = (bytes) => {
@@ -379,6 +427,15 @@ const MediaUploader = ({
                         Please select a namespace before uploading files.
                     </p>
                 </div>
+            )}
+
+            {/* Duplicate Resolution Dialog */}
+            {duplicateDialogOpen && (
+                <DuplicateResolveDialog
+                    duplicates={duplicateFiles}
+                    onResolve={handleDuplicateResolve}
+                    onCancel={handleDuplicateCancel}
+                />
             )}
         </div>
     );

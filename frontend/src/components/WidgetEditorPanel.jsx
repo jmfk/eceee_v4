@@ -48,10 +48,10 @@ const WidgetEditorPanel = forwardRef(({
 
     const panelRef = useRef(null)
     const resizeRef = useRef(null)
-    const startXRef = useRef(0)
-    const startWidthRef = useRef(0)
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
+    const isResizingRef = useRef(false)
+    const resizeHandlersRef = useRef(null)
 
     // Get contextType from widget context or parent context
     const contextType = widgetData?.context?.contextType || context?.contextType
@@ -179,80 +179,128 @@ const WidgetEditorPanel = forwardRef(({
     }, [widgetData, schema, widgetTypeValidation])
 
 
-    // Handle resize drag with useCallback and RAF for smooth performance
-    const handleResizeMove = useCallback((e) => {
-        if (!isResizing) return
-
-        e.preventDefault()
-
-        // Cancel any pending animation frame
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current)
-        }
-
-        // Use requestAnimationFrame for smooth updates
-        rafRef.current = requestAnimationFrame(() => {
-            const currentX = e.clientX
-            const containerRect = panelRef.current?.parentElement?.getBoundingClientRect()
-
-            if (containerRect) {
-                // Calculate width based on distance from right edge of container
-                const distanceFromRight = containerRect.right - currentX
-                const newWidth = Math.max(300, Math.min(800, distanceFromRight))
-                setPanelWidth(newWidth)
-            }
-        })
-    }, [isResizing])
-
-    const handleResizeEnd = useCallback(() => {
-        setIsResizing(false)
-
-        // Cancel any pending animation frame
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current)
-            rafRef.current = null
-        }
-
-        document.removeEventListener('mousemove', handleResizeMove)
-        document.removeEventListener('mouseup', handleResizeEnd)
-        document.body.style.cursor = ''
-        document.body.style.userSelect = ''
-    }, [handleResizeMove])
-
-    const handleResizeStart = useCallback((e) => {
-        setIsResizing(true)
-
-        // Prevent text selection and set cursor globally
-        document.body.style.cursor = 'col-resize'
-        document.body.style.userSelect = 'none'
-
-        document.addEventListener('mousemove', handleResizeMove, { passive: false })
-        document.addEventListener('mouseup', handleResizeEnd, { passive: false })
-        e.preventDefault()
-        e.stopPropagation()
-    }, [handleResizeMove, handleResizeEnd])
-
-    // Cleanup resize listeners, animation frames, and timeouts on unmount
+    // Setup vanilla JS resize handlers (no React state, pure DOM manipulation)
     useEffect(() => {
+        if (!resizeHandlersRef.current) {
+            // Create handlers once and reuse them (no recreations, no React dependencies)
+            const handleResizeMove = (e) => {
+                if (!isResizingRef.current) return
+                e.preventDefault()
+
+                // Cancel any pending animation frame
+                if (rafRef.current) {
+                    cancelAnimationFrame(rafRef.current)
+                }
+
+                // Use RAF for smooth 60fps updates
+                rafRef.current = requestAnimationFrame(() => {
+                    const containerRect = panelRef.current?.parentElement?.getBoundingClientRect()
+                    if (containerRect && panelRef.current) {
+                        const distanceFromRight = containerRect.right - e.clientX
+                        const newWidth = Math.max(300, Math.min(800, distanceFromRight))
+
+                        // Direct DOM manipulation - zero React involvement
+                        panelRef.current.style.width = `${newWidth}px`
+                    }
+                })
+            }
+
+            const handleResizeEnd = () => {
+                isResizingRef.current = false
+
+                // Cancel any pending RAF
+                if (rafRef.current) {
+                    cancelAnimationFrame(rafRef.current)
+                    rafRef.current = null
+                }
+
+                // Re-enable transitions
+                if (panelRef.current) {
+                    panelRef.current.style.transition = ''
+                    // Update React state with final width (optional - only for persistence)
+                    const finalWidth = parseInt(panelRef.current.style.width, 10)
+                    if (!isNaN(finalWidth)) {
+                        setPanelWidth(finalWidth)
+                    }
+                }
+
+                // Visual feedback - update state to change handle color
+                setIsResizing(false)
+
+                // Cleanup
+                document.removeEventListener('mousemove', handleResizeMove)
+                document.removeEventListener('mouseup', handleResizeEnd)
+                document.body.style.cursor = ''
+                document.body.style.userSelect = ''
+            }
+
+            const handleResizeStart = (e) => {
+                isResizingRef.current = true
+
+                // Read current actual width from DOM to prevent jumping
+                if (panelRef.current) {
+                    const currentWidth = panelRef.current.getBoundingClientRect().width
+                    panelRef.current.style.width = `${currentWidth}px`
+
+                    // Disable transitions during resize for instant feedback
+                    panelRef.current.style.transition = 'none'
+                }
+
+                // Visual feedback - update state to change handle color
+                setIsResizing(true)
+
+                // Prevent text selection and set cursor globally
+                document.body.style.cursor = 'col-resize'
+                document.body.style.userSelect = 'none'
+
+                document.addEventListener('mousemove', handleResizeMove, { passive: false })
+                document.addEventListener('mouseup', handleResizeEnd, { passive: false })
+                e.preventDefault()
+                e.stopPropagation()
+            }
+
+            // Store handlers in ref so they're stable across renders
+            resizeHandlersRef.current = {
+                handleResizeMove,
+                handleResizeEnd,
+                handleResizeStart
+            }
+        }
+
         return () => {
-            // Cancel any pending animation frame
+            // Cleanup on unmount
+            if (resizeHandlersRef.current) {
+                document.removeEventListener('mousemove', resizeHandlersRef.current.handleResizeMove)
+                document.removeEventListener('mouseup', resizeHandlersRef.current.handleResizeEnd)
+                document.body.style.cursor = ''
+                document.body.style.userSelect = ''
+            }
             if (rafRef.current) {
                 cancelAnimationFrame(rafRef.current)
             }
+        }
+    }, []) // Empty deps - handlers created once and never recreated
 
-            // Cancel any pending real-time update
+    // Set initial width when panel opens
+    useEffect(() => {
+        if (isOpen && panelRef.current) {
+            if (showSpecialEditor) {
+                panelRef.current.style.width = '100vw'
+            } else {
+                // Set to saved width or default
+                panelRef.current.style.width = `${panelWidth}px`
+            }
+        }
+    }, [isOpen, showSpecialEditor, panelWidth])
+
+    // Cleanup timeouts on unmount
+    useEffect(() => {
+        return () => {
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current)
             }
-
-            document.removeEventListener('mousemove', handleResizeMove)
-            document.removeEventListener('mouseup', handleResizeEnd)
-
-            // Reset body styles
-            document.body.style.cursor = ''
-            document.body.style.userSelect = ''
         }
-    }, [handleResizeMove, handleResizeEnd])
+    }, [])
 
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
@@ -337,7 +385,7 @@ const WidgetEditorPanel = forwardRef(({
                     } ${showSpecialEditor ? 'left-0' : ''
                     }`}
                 style={{
-                    width: showSpecialEditor ? '100vw' : `${panelWidth}px`,
+                    // Width controlled purely via DOM manipulation (see useEffect below)
                     boxShadow: '-4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06)'
                 }}
             >
@@ -345,7 +393,7 @@ const WidgetEditorPanel = forwardRef(({
                 {!showSpecialEditor && (
                     <div
                         ref={resizeRef}
-                        onMouseDown={handleResizeStart}
+                        onMouseDown={resizeHandlersRef.current?.handleResizeStart}
                         className={`w-2 bg-gray-300 hover:bg-blue-400 cursor-col-resize flex-shrink-0 relative group transition-colors duration-150 ${isResizing ? 'bg-blue-500' : ''
                             }`}
                     >

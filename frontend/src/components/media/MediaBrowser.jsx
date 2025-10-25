@@ -44,7 +44,8 @@ const MediaBrowser = ({
     selectionMode = 'single', // 'single', 'multiple', 'none'
     fileTypes = [], // Filter by file types
     namespace,
-    showUploader = true
+    showUploader = true,
+    refreshTrigger = 0 // External trigger to force refresh
 }) => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -142,6 +143,13 @@ const MediaBrowser = ({
             loadFiles(true);
         }
     }, [namespace, searchTerms]);
+
+    // Reload files when refreshTrigger changes (from external source like file approval)
+    useEffect(() => {
+        if (refreshTrigger > 0 && namespace) {
+            loadFiles(false); // Don't reset page, just refresh current view
+        }
+    }, [refreshTrigger]);
 
     // File selection handlers
     const handleFileClick = (file) => {

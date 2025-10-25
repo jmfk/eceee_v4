@@ -5,6 +5,7 @@ Header widget implementation.
 from typing import Type, Optional
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
+from utils.dict_utils import DictToObj
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
@@ -29,7 +30,7 @@ class HeaderConfig(BaseModel):
 
     tablet_image: Optional[str] = Field(
         None,
-        description="Header image for tablet (768-1024px)",
+        description="Header image for tablet (640-1024px)",
         json_schema_extra={
             "component": "ImageInput",
             "order": 2,
@@ -39,7 +40,7 @@ class HeaderConfig(BaseModel):
 
     mobile_image: Optional[str] = Field(
         None,
-        description="Header image for mobile (<768px)",
+        description="Header image for mobile (<640px)",
         json_schema_extra={
             "component": "ImageInput",
             "order": 3,
@@ -81,7 +82,7 @@ class HeaderConfig(BaseModel):
     )
 
     alignment: Optional[str] = Field(
-        "center",
+        "left",
         description="Image alignment/focal point",
         json_schema_extra={
             "component": "SelectInput",
@@ -106,46 +107,6 @@ class HeaderWidget(BaseWidget):
     template_name = "eceee_widgets/widgets/header.html"
 
     widget_css = """
-    .header-widget {
-        width: 100%;
-        display: block;
-        overflow: hidden;
-        position: relative;
-    }
-    
-    .header-widget img {
-        width: 100%;
-        height: var(--header-height-desktop, 112px);
-        object-fit: cover;
-        display: block;
-    }
-    
-    /* Alignment classes for object-position */
-    .header-widget img.align-left {
-        object-position: left center;
-    }
-    
-    .header-widget img.align-center {
-        object-position: center center;
-    }
-    
-    .header-widget img.align-right {
-        object-position: right center;
-    }
-    
-    /* Mobile breakpoint (<768px) */
-    @media (max-width: 767px) {
-        .header-widget img {
-            height: var(--header-height-mobile, 80px);
-        }
-    }
-    
-    /* Tablet breakpoint (768-1024px) */
-    @media (min-width: 768px) and (max-width: 1024px) {
-        .header-widget img {
-            height: var(--header-height-tablet, 112px);
-        }
-    }
     """
 
     css_variables = {}
@@ -157,37 +118,103 @@ class HeaderWidget(BaseWidget):
         return HeaderConfig
 
     def prepare_template_context(self, config, context=None):
-        """Add responsive image dimensions to context"""
+        """Build header background styling"""
+        from file_manager.imgproxy import imgproxy_service
+
         template_config = super().prepare_template_context(config, context)
+        context = DictToObj(context)
 
-        # Get widget dimensions from slot (provided by layout's slot configuration)
-        dimensions = self.get_widget_dimensions(context)
+        # Build complete inline style string
+        style_parts = []
 
-        # Get configured heights or use defaults
-        mobile_height = config.get("mobile_height") or 80
-        tablet_height = config.get("tablet_height") or 112
-        desktop_height = config.get("height") or 112
+        # Get responsive heights - can be None for auto-height behavior
+        mobile_height = config.get("mobile_height")  # Can be None
+        tablet_height = config.get("tablet_height")  # Can be None
+        desktop_height = config.get("height", 112)  # Always has default
 
-        # Get widths from slot dimensions or use defaults
-        # These defaults match Tailwind breakpoints and common viewport widths
-        mobile_width = dimensions.get("mobile", {}).get("width") or 640
-        tablet_width = dimensions.get("tablet", {}).get("width") or 1024
-        desktop_width = dimensions.get("desktop", {}).get("width") or 1920
+        # Generate image URLs for each breakpoint
+        image = config.get("image")
+        mobile_image = config.get("mobile_image")
+        tablet_image = config.get("tablet_image")
+        alignment = config.get("alignment", "left")
 
-        # Add responsive image settings to config
-        template_config["responsive_header"] = {
-            "mobile": {
-                "width": mobile_width,
-                "height": mobile_height,
-            },
-            "tablet": {
-                "width": tablet_width,
-                "height": tablet_height,
-            },
-            "desktop": {
-                "width": desktop_width,
-                "height": desktop_height,
-            },
-        }
+        # Desktop image (main image)
+        desktop_url = None
+        if image:
+            imgproxy_base_url = image.get("imgproxy_base_url")
+            desktop_url = imgproxy_service.generate_url(
+                source_url=imgproxy_base_url,
+                width=context.slot.dimensions.desktop.width,
+                height=desktop_height,
+                resize_type="fill",
+            )
+            if desktop_url:
+                style_parts.append(f"--desktop-bg-image: url('{desktop_url}');")
+
+        # Tablet image (use tablet_image if available, else fallback to main image)
+        tablet_url = None
+        if tablet_image:
+            imgproxy_base_url = tablet_image.get("imgproxy_base_url")
+            if tablet_height:
+                # Fixed height behavior
+                tablet_url = imgproxy_service.generate_url(
+                    source_url=imgproxy_base_url,
+                    width=context.slot.dimensions.tablet.width,
+                    height=tablet_height,
+                    resize_type="fill",
+                )
+            else:
+                # Cover/auto-height behavior - only specify width
+                tablet_url = imgproxy_service.generate_url(
+                    source_url=imgproxy_base_url,
+                    width=context.slot.dimensions.tablet.width,
+                    resize_type="fit",  # Preserve aspect ratio
+                )
+        if tablet_url:
+            style_parts.append(f"--tablet-bg-image: url('{tablet_url}');")
+        elif desktop_url:
+            style_parts.append(f"--tablet-bg-image: url('{desktop_url}');")
+
+        # Mobile image (use mobile_image if available, else fallback to tablet/desktop)
+        mobile_url = None
+        if mobile_image:
+            imgproxy_base_url = mobile_image.get("imgproxy_base_url")
+            if mobile_height:
+                # Fixed height behavior
+                mobile_url = imgproxy_service.generate_url(
+                    source_url=imgproxy_base_url,
+                    width=context.slot.dimensions.mobile.width,
+                    height=mobile_height,
+                    resize_type="fill",
+                )
+            else:
+                # Cover/auto-height behavior - only specify width
+                mobile_url = imgproxy_service.generate_url(
+                    source_url=imgproxy_base_url,
+                    width=context.slot.dimensions.mobile.width,
+                    resize_type="fit",  # Preserve aspect ratio
+                )
+        if mobile_url:
+            style_parts.append(f"--mobile-bg-image: url('{mobile_url}');")
+        elif tablet_url:
+            style_parts.append(f"--mobile-bg-image: url('{tablet_url}');")
+        elif desktop_url:
+            style_parts.append(f"--mobile-bg-image: url('{desktop_url}');")
+
+        # Add responsive heights and alignment as CSS variables
+        if mobile_height:
+            style_parts.append(f"--mobile-height: {mobile_height}px;")
+        if tablet_height:
+            style_parts.append(f"--tablet-height: {tablet_height}px;")
+        style_parts.append(f"--desktop-height: {desktop_height}px;")
+        # Use two-value syntax for background-position (horizontal vertical)
+        style_parts.append(f"--bg-alignment: {alignment} center;")
+
+        # Join all style parts
+        template_config["header_style"] = " ".join(style_parts)
+
+        # Pass height values to template for conditional classes
+        template_config["mobile_height"] = mobile_height
+        template_config["tablet_height"] = tablet_height
 
         return template_config

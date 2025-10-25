@@ -8,6 +8,7 @@ from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 from file_manager.imgproxy import imgproxy_service
+from utils.dict_utils import DictToObj
 
 
 class NavbarItem(BaseModel):
@@ -52,17 +53,15 @@ class NavbarConfig(BaseModel):
             "mediaTypes": ["image"],
         },
     )
-    background_position: Literal["center", "top", "bottom", "left", "right"] = Field(
+    alignment: Literal["left", "center", "right"] = Field(
         "center",
-        description="Background image position/alignment",
+        description="Background image alignment/focal point",
         json_schema_extra={
             "component": "SelectInput",
             "order": 3,
             "options": [
-                {"value": "center", "label": "Center"},
-                {"value": "top", "label": "Top"},
-                {"value": "bottom", "label": "Bottom"},
                 {"value": "left", "label": "Left"},
+                {"value": "center", "label": "Center"},
                 {"value": "right", "label": "Right"},
             ],
         },
@@ -98,6 +97,7 @@ class NavbarWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """Prepare navbar menu items and background styling"""
         template_config = super().prepare_template_context(config, context)
+        context = DictToObj(context)
 
         # Build complete inline style string in Python
         style_parts = []
@@ -108,16 +108,17 @@ class NavbarWidget(BaseWidget):
             imgproxy_base_url = background_image.get("imgproxy_base_url")
             imgproxy_url = imgproxy_service.generate_url(
                 source_url=imgproxy_base_url,
-                width=1920,
-                height=28,
+                width=context.slot.dimensions.desktop.width,
+                height=context.slot.dimensions.desktop.height or 28,
                 resize_type="fill",
             )
 
             if imgproxy_url:
-                background_position = config.get("background_position", "center")
+                alignment = config.get("alignment", "left")
                 style_parts.append(f"background-image: url('{imgproxy_url}');")
                 style_parts.append("background-size: cover;")
-                style_parts.append(f"background-position: {background_position};")
+                # Use two-value syntax for background-position (horizontal vertical)
+                style_parts.append(f"background-position: {alignment} center;")
                 style_parts.append("background-repeat: no-repeat;")
 
         # Handle background color with fallback logic
