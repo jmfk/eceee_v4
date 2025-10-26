@@ -115,7 +115,7 @@ const CarouselStylesTab = ({ carouselStyles, onChange }) => {
             </div>
 
             <div className="text-sm text-gray-600">
-                Carousel styles use Mustache templates with Alpine.js for interactivity. Available variables: 
+                Carousel styles use Mustache templates with Alpine.js for interactivity. Available variables:
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">images</code>,
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">imageCount</code>,
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">multipleImages</code>
@@ -155,9 +155,8 @@ const CarouselStylesTab = ({ carouselStyles, onChange }) => {
                         {styleEntries.map(([key, style]) => (
                             <div
                                 key={key}
-                                className={`flex items-center border rounded-lg overflow-hidden transition-colors ${
-                                    editingStyle === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                                }`}
+                                className={`flex items-center border rounded-lg overflow-hidden transition-colors ${editingStyle === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                                    }`}
                             >
                                 <button
                                     type="button"

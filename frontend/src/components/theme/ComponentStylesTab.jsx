@@ -7,6 +7,7 @@
 import React, { useState, useRef } from 'react';
 import { Plus, Trash2, Code, Eye } from 'lucide-react';
 import { createEmptyComponentStyle } from '../../utils/themeUtils';
+import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 
 const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
     const [editingStyle, setEditingStyle] = useState(null);
@@ -77,8 +78,8 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
             </div>
 
             <div className="text-sm text-gray-600">
-                Component styles are HTML templates with optional CSS. They can be used for widgets
-                and inline objects (like images in WYSIWYG content). Use <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">{'{{content}}'}</code> as a placeholder in templates.
+                Component styles use Mustache templates with optional CSS. They can be used for widgets
+                and inline objects (like images in WYSIWYG content). Available variable: <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">{'{{content}}'}</code>
             </div>
 
             {/* Add Style Form */}
@@ -182,9 +183,10 @@ const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, temp
 
     const updatePreview = () => {
         const template = templateRef ? document.querySelector(`[data-template-key="${styleKey}"]`)?.value : style.template;
-        const html = template?.replace('{{content}}',
+        const context = prepareComponentContext(
             '<div style="padding: 1rem; background: #f3f4f6; border: 2px dashed #d1d5db; text-align: center;">Content Placeholder</div>'
-        ) || '';
+        );
+        const html = renderMustache(template || '', context);
         setPreviewHTML(html);
     };
 

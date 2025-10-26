@@ -17,6 +17,7 @@ import MediaSearchWidget from '../media/MediaSearchWidget'
 import { ImageWidget } from '../../widgets'
 import { useTheme } from '../../hooks/useTheme'
 import FloatingMessage from '../common/FloatingMessage'
+import ImageStyleSelect from '../form-fields/ImageStyleSelect'
 
 const MediaSpecialEditor = ({
     widgetData,
@@ -1000,6 +1001,25 @@ const MediaSpecialEditor = ({
                                 />
                             </div>
 
+                            {/* Image Style Selector */}
+                            <div className="p-3 border border-gray-200 rounded-lg bg-white space-y-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                    {currentConfig.displayType === 'carousel' ? 'Carousel' : 'Gallery'} Style
+                                </label>
+                                <ImageStyleSelect
+                                    value={currentConfig.imageStyle}
+                                    onChange={(style) => {
+                                        const updatedConfig = {
+                                            ...currentConfig,
+                                            imageStyle: style
+                                        }
+                                        setLocalConfig(updatedConfig)
+                                        onConfigChange(updatedConfig)
+                                    }}
+                                    displayType={currentConfig.displayType || 'gallery'}
+                                />
+                            </div>
+
                             {/* Warning about global collection modifications */}
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                                 <div className="flex items-start gap-2">
@@ -1112,6 +1132,25 @@ const MediaSpecialEditor = ({
                                         onConfigChange(updatedConfig)
                                     }}
                                     className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            {/* Image Style Selector */}
+                            <div className="p-3 border border-gray-200 rounded-lg bg-white space-y-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                    {currentConfig.displayType === 'carousel' ? 'Carousel' : 'Gallery'} Style
+                                </label>
+                                <ImageStyleSelect
+                                    value={currentConfig.imageStyle}
+                                    onChange={(style) => {
+                                        const updatedConfig = {
+                                            ...currentConfig,
+                                            imageStyle: style
+                                        }
+                                        setLocalConfig(updatedConfig)
+                                        onConfigChange(updatedConfig)
+                                    }}
+                                    displayType={currentConfig.displayType || 'gallery'}
                                 />
                             </div>
 

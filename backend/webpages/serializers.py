@@ -66,6 +66,22 @@ class PageThemeSerializer(serializers.ModelSerializer):
 
     created_by = UserSerializer(read_only=True)
 
+    def to_representation(self, instance):
+        """Custom representation to return full image URL"""
+        data = super().to_representation(instance)
+
+        # Convert image field to full URL
+        if instance.image:
+            request = self.context.get("request")
+            if request:
+                data["image"] = request.build_absolute_uri(instance.image.url)
+            else:
+                data["image"] = instance.image.url
+        else:
+            data["image"] = None
+
+        return data
+
     class Meta:
         model = PageTheme
         fields = [
@@ -77,6 +93,8 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "colors",
             "typography",
             "component_styles",
+            "gallery_styles",
+            "carousel_styles",
             "table_templates",
             # Legacy fields (deprecated)
             "css_variables",
@@ -90,7 +108,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "updated_at",
             "created_by",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "created_by"]
+        read_only_fields = ["id", "created_at", "updated_at", "created_by", "image"]
 
     def validate_fonts(self, value):
         """Validate fonts configuration"""

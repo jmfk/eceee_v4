@@ -112,7 +112,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
             </div>
 
             <div className="text-sm text-gray-600">
-                Gallery styles use Mustache templates to render image galleries. Available variables: 
+                Gallery styles use Mustache templates to render image galleries. Available variables:
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">images</code>,
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">imageCount</code>,
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">showCaptions</code>
@@ -152,9 +152,8 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
                         {styleEntries.map(([key, style]) => (
                             <div
                                 key={key}
-                                className={`flex items-center border rounded-lg overflow-hidden transition-colors ${
-                                    editingStyle === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                                }`}
+                                className={`flex items-center border rounded-lg overflow-hidden transition-colors ${editingStyle === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                                    }`}
                             >
                                 <button
                                     type="button"

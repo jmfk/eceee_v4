@@ -30,6 +30,7 @@ export { default as TagInput } from './TagInput'
 export { default as ColorInput } from './ColorInput'
 export { default as SliderInput } from './SliderInput'
 export { default as DateRangeInput } from './DateRangeInput'
+export { default as ImageStyleSelect } from './ImageStyleSelect'
 
 // Special Interactive Components
 export { default as CommandPaletteInput } from './CommandPaletteInput'

@@ -129,7 +129,7 @@ const ColorsTab = ({ colors, onChange }) => {
               />
               <input
                 type="text"
-                value={name}
+                defaultValue={name}
                 onBlur={(e) => handleRenameColor(name, e.target.value)}
                 className="flex-1 px-2 py-1 font-medium text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
