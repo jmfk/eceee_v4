@@ -329,7 +329,7 @@ const VersionTimelinePage = () => {
         const hostname = getEffectiveHostname(pageData);
 
         // Build the full URL
-        const protocol = hostname.includes('localhost') ? 'http://' : 'https://';
+        const protocol = import.meta.env.DEV ? 'http://' : 'https://';
         const slug = buildFullSlugPath(pageData);
 
         return `${protocol}${hostname}${slug}`;

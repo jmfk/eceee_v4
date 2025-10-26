@@ -153,10 +153,8 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         );
     }
 
-    // Determine protocol
-    const protocol = hostname && (hostname.startsWith('localhost') || hostname.startsWith('127.0.0.1'))
-        ? 'http'
-        : 'https';
+    // Determine protocol based on environment
+    const protocol = import.meta.env.DEV ? 'http' : 'https';
 
     // Build full preview URL with hostname
     const previewPath = previewSizesApi.getPreviewUrl(
