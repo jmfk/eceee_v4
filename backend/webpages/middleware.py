@@ -160,6 +160,14 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
                 logger.info(
                     f"Host '{host}' denied despite wildcard presence due to security settings"
                 )
+            else:
+                # Log detailed denial information for debugging
+                logger.warning(
+                    f"Host '{host}' (normalized: '{normalized_host}') denied. "
+                    f"Available database hostnames: {allowed_hosts}. "
+                    f"Static allowed hosts: {getattr(settings, 'STATIC_ALLOWED_HOSTS', [])}. "
+                    f"Hint: If this should be allowed, ensure it's configured in a ROOT page's hostnames field."
+                )
 
             return False
 
@@ -173,7 +181,11 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
         try:
             from webpages.models import WebPage
 
-            return WebPage.get_all_hostnames()
+            hostnames = WebPage.get_all_hostnames()
+            logger.debug(
+                f"Loaded {len(hostnames)} hostname(s) from database: {hostnames}"
+            )
+            return hostnames
         except Exception as e:
             logger.error(f"Error loading hostnames from database: {e}")
             return "_DATABASE_ERROR_"  # Special marker to indicate database error

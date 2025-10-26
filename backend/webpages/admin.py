@@ -201,6 +201,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         "get_breadcrumbs_display",
         "get_hostnames_display",
         "is_root_page_display",
+        "get_all_active_hostnames_display",
     ]
 
     inlines = [PageVersionInline]
@@ -225,6 +226,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
                 "fields": (
                     "is_root_page_display",
                     "get_hostnames_display",
+                    "get_all_active_hostnames_display",
                 ),
                 "description": "Hostname configuration (only available for root pages without parent)",
                 "classes": ("wide",),
@@ -301,7 +303,14 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     current_version_status_display.short_description = "Current Version"
 
     def get_hostnames_display(self, obj):
-        """Display hostnames with styling"""
+        """Display hostnames with styling and validation warnings"""
+        # Check for invalid configuration: non-root page with hostnames
+        if not obj.is_root_page() and obj.hostnames:
+            return format_html(
+                '<span style="color: red; font-weight: bold;">⚠ ERROR: '
+                "Child page has hostnames (only root pages can have hostnames)</span>"
+            )
+
         if not obj.is_root_page():
             return format_html(
                 '<span style="color: gray; font-style: italic;">Child page</span>'
@@ -345,6 +354,30 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
             return format_html('<span style="color: gray;">Child Page</span>')
 
     is_root_page_display.short_description = "Page Type"
+
+    def get_all_active_hostnames_display(self, obj):
+        """Display all currently active hostnames across the system"""
+        try:
+            all_hostnames = WebPage.get_all_hostnames()
+            if all_hostnames:
+                hostnames_list = ", ".join(all_hostnames)
+                return format_html(
+                    '<div style="background: #f0f8ff; padding: 10px; border-radius: 4px;">'
+                    "<strong>Currently Active Hostnames:</strong><br>{}<br>"
+                    '<small style="color: #666;">These are recognized by the middleware</small>'
+                    "</div>",
+                    hostnames_list,
+                )
+            else:
+                return format_html(
+                    '<span style="color: orange;">No hostnames configured in any root page</span>'
+                )
+        except Exception as e:
+            return format_html(
+                '<span style="color: red;">Error loading hostnames: {}</span>', str(e)
+            )
+
+    get_all_active_hostnames_display.short_description = "System-wide Active Hostnames"
 
     def get_breadcrumbs_display(self, obj):
         """Display page breadcrumbs"""
