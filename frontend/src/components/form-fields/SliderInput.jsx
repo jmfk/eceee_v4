@@ -30,6 +30,10 @@ const SliderInput = React.memo(({
     formatValue = (val) => String(val),
     unit = '',
     marks = [], // Array of {value, label} for tick marks
+    // Filter out non-DOM props
+    fieldName,
+    context,
+    formData,
     ...props
 }) => {
     const isControlled = value !== undefined

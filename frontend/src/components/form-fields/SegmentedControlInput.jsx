@@ -27,6 +27,7 @@ const SegmentedControlInput = React.memo(({
     fullWidth = false,
     allowDeselect = false, // Allow deselecting in single mode
     showValue = false, // Show selected value below the control
+    fieldName, // Extract to prevent spreading to DOM
     ...props
 }) => {
     // Memoize normalized options to prevent recalculation

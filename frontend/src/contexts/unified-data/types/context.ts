@@ -28,6 +28,7 @@ export interface UnifiedDataContextValue {
     
     // Persistence
     saveCurrentVersion: () => Promise<any>;
+    saveCurrentTheme: () => Promise<any>;
     
     // Subscriptions
     subscribe: <T>(
@@ -56,6 +57,13 @@ export interface UnifiedDataContextValue {
     clearErrors: () => void;
     clearWarnings: () => void;
     resetState: () => void;
+    
+    // Theme operations
+    initTheme: (id: string, data: any) => void;
+    switchTheme: (id: string) => void;
+    updateTheme: (updates: any, id?: string) => void;
+    updateThemeField: (field: string, value: any, id?: string) => void;
+    setThemeDirty: (isDirty: boolean) => void;
 }
 
 /**

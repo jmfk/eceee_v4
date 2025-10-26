@@ -1,0 +1,297 @@
+/**
+ * Component Styles Tab Component
+ * 
+ * HTML template + CSS editor for component styles (renamed from Image Styles).
+ */
+
+import React, { useState, useRef } from 'react';
+import { Plus, Trash2, Code, Eye } from 'lucide-react';
+import { createEmptyComponentStyle } from '../../utils/themeUtils';
+
+const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
+    const [editingStyle, setEditingStyle] = useState(null);
+    const [newStyleKey, setNewStyleKey] = useState('');
+    const templateRefs = useRef({});
+    const cssRefs = useRef({});
+
+    const styles = componentStyles || {};
+    const styleEntries = Object.entries(styles);
+
+    const handleAddStyle = () => {
+        if (!newStyleKey.trim()) return;
+
+        const styleKey = newStyleKey.trim().toLowerCase().replace(/\s+/g, '-');
+
+        if (styles[styleKey]) {
+            alert('A style with this name already exists');
+            return;
+        }
+
+        const newStyle = createEmptyComponentStyle(styleKey);
+        const updatedStyles = {
+            ...styles,
+            [styleKey]: newStyle,
+        };
+
+        onChange(updatedStyles);
+        setNewStyleKey('');
+        setEditingStyle(styleKey);
+    };
+
+    const handleUpdateStyle = (key, updates) => {
+        const updatedStyles = {
+            ...styles,
+            [key]: {
+                ...styles[key],
+                ...updates,
+            },
+        };
+        onChange(updatedStyles);
+    };
+
+    const handleSaveFromRefs = (key) => {
+        const templateRef = templateRefs.current[key];
+        const cssRef = cssRefs.current[key];
+
+        if (templateRef || cssRef) {
+            const updates = {};
+            if (templateRef) updates.template = templateRef.value;
+            if (cssRef) updates.css = cssRef.value;
+            handleUpdateStyle(key, updates);
+        }
+    };
+
+    const handleRemoveStyle = (key) => {
+        const updatedStyles = { ...styles };
+        delete updatedStyles[key];
+        onChange(updatedStyles);
+        if (editingStyle === key) {
+            setEditingStyle(null);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Component Styles</h3>
+            </div>
+
+            <div className="text-sm text-gray-600">
+                Component styles are HTML templates with optional CSS. They can be used for widgets
+                and inline objects (like images in WYSIWYG content). Use <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">{'{{content}}'}</code> as a placeholder in templates.
+            </div>
+
+            {/* Add Style Form */}
+            <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Add Component Style</h4>
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        value={newStyleKey}
+                        onChange={(e) => setNewStyleKey(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddStyle();
+                        }}
+                        placeholder="e.g., card-style, rounded-image"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                        type="button"
+                        onClick={handleAddStyle}
+                        disabled={!newStyleKey.trim()}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add
+                    </button>
+                </div>
+            </div>
+
+            {/* Styles List */}
+            {styleEntries.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Styles sidebar */}
+                    <div className="space-y-2">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Your Styles</h4>
+                        {styleEntries.map(([key, style]) => (
+                            <div
+                                key={key}
+                                className={`relative flex items-stretch border rounded-lg transition-colors ${editingStyle === key
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 bg-white hover:border-gray-300'
+                                    }`}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingStyle(key)}
+                                    className="flex-1 text-left px-3 py-2 min-w-0"
+                                >
+                                    <div className="font-medium text-gray-900 truncate">{key}</div>
+                                    {style.description && (
+                                        <div className="text-xs text-gray-500 truncate">{style.description}</div>
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveStyle(key);
+                                    }}
+                                    className="px-3 py-2 text-red-600 hover:text-red-700 border-l border-gray-200"
+                                    title="Remove style"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Editor panel */}
+                    {editingStyle && styles[editingStyle] && (
+                        <ComponentStyleEditor
+                            styleKey={editingStyle}
+                            style={styles[editingStyle]}
+                            onUpdate={(updates) => handleUpdateStyle(editingStyle, updates)}
+                            onSave={() => handleSaveFromRefs(editingStyle)}
+                            onDirty={onDirty}
+                            templateRef={(el) => {
+                                if (el) templateRefs.current[editingStyle] = el;
+                            }}
+                            cssRef={(el) => {
+                                if (el) cssRefs.current[editingStyle] = el;
+                            }}
+                        />
+                    )}
+                </div>
+            ) : (
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                    <Code className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                    <p className="text-gray-500">
+                        No component styles defined. Add a style to get started.
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Component Style Editor
+const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, templateRef, cssRef }) => {
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewHTML, setPreviewHTML] = useState('');
+
+    const updatePreview = () => {
+        const template = templateRef ? document.querySelector(`[data-template-key="${styleKey}"]`)?.value : style.template;
+        const html = template?.replace('{{content}}',
+            '<div style="padding: 1rem; background: #f3f4f6; border: 2px dashed #d1d5db; text-align: center;">Content Placeholder</div>'
+        ) || '';
+        setPreviewHTML(html);
+    };
+
+    const handleShowPreview = () => {
+        updatePreview();
+        setShowPreview(!showPreview);
+    };
+
+    const handleTextareaChange = () => {
+        if (onDirty) {
+            onDirty();
+        }
+    };
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-gray-900">{styleKey}</h4>
+                <button
+                    type="button"
+                    onClick={handleShowPreview}
+                    className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                >
+                    <Eye className="w-3 h-3 mr-1" />
+                    {showPreview ? 'Hide' : 'Show'} Preview
+                </button>
+            </div>
+
+            {/* Name */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Display Name
+                </label>
+                <input
+                    type="text"
+                    value={style.name || ''}
+                    onChange={(e) => onUpdate({ name: e.target.value })}
+                    placeholder="Friendly name for this style"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+
+            {/* Description */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                </label>
+                <input
+                    type="text"
+                    value={style.description || ''}
+                    onChange={(e) => onUpdate({ description: e.target.value })}
+                    placeholder="Brief description of this style"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+
+            {/* Template - Uncontrolled with ref */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    HTML Template
+                    <span className="ml-2 text-xs text-gray-500">
+                        Use <code className="px-1 py-0.5 bg-gray-100 rounded">{'{{content}}'}</code> for content placeholder
+                    </span>
+                </label>
+                <textarea
+                    ref={templateRef}
+                    data-template-key={styleKey}
+                    defaultValue={style.template || ''}
+                    onChange={handleTextareaChange}
+                    onBlur={onSave}
+                    placeholder='<div class="rounded-lg shadow-lg p-4">{{content}}</div>'
+                    rows={6}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-50"
+                />
+            </div>
+
+            {/* CSS - Uncontrolled with ref */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Additional CSS (Optional)
+                </label>
+                <textarea
+                    ref={cssRef}
+                    defaultValue={style.css || ''}
+                    onChange={handleTextareaChange}
+                    onBlur={onSave}
+                    placeholder=".my-style:hover { box-shadow: 0 10px 15px rgba(0,0,0,0.1); }"
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-50"
+                />
+            </div>
+
+            {/* Preview */}
+            {showPreview && (
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Preview
+                    </label>
+                    <div className="border border-gray-300 rounded-lg p-4 bg-white">
+                        <style>{style.css || ''}</style>
+                        <div dangerouslySetInnerHTML={{ __html: previewHTML }} />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default ComponentStylesTab;
+

@@ -1,55 +1,28 @@
-import React, { useState, useMemo } from 'react'
-import { X, AlertTriangle, RefreshCw, Copy, Calendar, FileText } from 'lucide-react'
+import React from 'react'
+import { X, AlertTriangle, Copy, Calendar, FileText } from 'lucide-react'
 
 /**
  * DuplicateResolveDialog
  * 
- * Shows duplicate files and allows user to choose: Replace or Keep Both
+ * Shows duplicate files and allows user to upload them with new names (Keep Both)
  * 
  * Props:
  * - duplicates: Array of duplicate file objects with { filename, error, status, reason, existing_file }
- * - onResolve: Callback with decisions object { filename: { action: 'replace'|'keep', existing_file_id, pending_file_id } }
+ * - onResolve: Callback with decisions object { filename: { action: 'keep', existing_file_id, pending_file_id } }
  * - onCancel: Callback when user cancels
  */
 const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
-    // Track individual decisions for each file
-    const [decisions, setDecisions] = useState(() => {
-        const initial = {}
-        duplicates.forEach(dup => {
-            // Default to 'replace' for deleted files, otherwise null (undecided)
-            initial[dup.filename] = dup.reason === 'duplicate_deleted' ? 'replace' : null
-        })
-        return initial
-    })
-
-    // Check if all files have decisions
-    const allDecided = useMemo(() => {
-        return duplicates.every(dup => decisions[dup.filename] !== null)
-    }, [duplicates, decisions])
-
-    const setDecision = (filename, action) => {
-        setDecisions(prev => ({ ...prev, [filename]: action }))
-    }
-
-    const setAllDecisions = (action) => {
-        const newDecisions = {}
-        duplicates.forEach(dup => {
-            newDecisions[dup.filename] = action
-        })
-        setDecisions(newDecisions)
-    }
+    // All files will be set to 'keep' action (upload with new name)
+    // No need for user decisions since replace is disabled
 
     const handleResolve = () => {
-        // Build the resolve object with file actions
+        // Build the resolve object with 'keep' action for all files
         const resolveData = {}
         duplicates.forEach(dup => {
-            const action = decisions[dup.filename]
-            if (action) {
-                resolveData[dup.filename] = {
-                    action,
-                    existing_file_id: dup.existing_file?.id,
-                    pending_file_id: dup.pending_file?.id
-                }
+            resolveData[dup.filename] = {
+                action: 'keep', // Always keep both files
+                existing_file_id: dup.existing_file?.id,
+                pending_file_id: dup.pending_file?.id
             }
         })
         onResolve(resolveData)
@@ -85,41 +58,29 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    <p className="text-sm text-gray-600 mb-6">
-                        The following files already exist in the system. Choose whether to replace the existing files or keep both.
-                    </p>
-
-                    {/* Bulk Actions */}
-                    <div className="flex gap-2 mb-4">
-                        <button
-                            onClick={() => setAllDecisions('replace')}
-                            className="px-3 py-1.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 transition-colors"
-                        >
-                            <RefreshCw className="w-4 h-4 inline mr-1" />
-                            Replace All
-                        </button>
-                        <button
-                            onClick={() => setAllDecisions('keep')}
-                            className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
-                        >
-                            <Copy className="w-4 h-4 inline mr-1" />
-                            Keep All (Upload as New)
-                        </button>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div className="flex items-start">
+                            <Copy className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <p className="text-sm font-medium text-blue-900 mb-1">
+                                    Files will be uploaded with new names
+                                </p>
+                                <p className="text-sm text-blue-700">
+                                    The following files already exist. They will be uploaded as new files with unique names, preserving the existing files.
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Duplicate Files List */}
                     <div className="space-y-4">
                         {duplicates.map((duplicate, index) => {
                             const existingFile = duplicate.existing_file || {}
-                            const decision = decisions[duplicate.filename]
 
                             return (
                                 <div
                                     key={index}
-                                    className={`border rounded-lg p-4 ${decision === 'replace' ? 'border-orange-300 bg-orange-50' :
-                                            decision === 'keep' ? 'border-blue-300 bg-blue-50' :
-                                                'border-gray-200 bg-white'
-                                        }`}
+                                    className="border border-gray-200 rounded-lg p-4 bg-white"
                                 >
                                     {/* File Info */}
                                     <div className="flex items-start justify-between mb-3">
@@ -174,30 +135,6 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
                                             </div>
                                         </div>
                                     )}
-
-                                    {/* Decision Buttons */}
-                                    <div className="flex gap-2 ml-6">
-                                        <button
-                                            onClick={() => setDecision(duplicate.filename, 'replace')}
-                                            className={`flex-1 px-4 py-2 text-sm font-medium rounded transition-colors ${decision === 'replace'
-                                                    ? 'bg-orange-600 text-white'
-                                                    : 'bg-white text-orange-700 border border-orange-300 hover:bg-orange-50'
-                                                }`}
-                                        >
-                                            <RefreshCw className="w-4 h-4 inline mr-1" />
-                                            Replace
-                                        </button>
-                                        <button
-                                            onClick={() => setDecision(duplicate.filename, 'keep')}
-                                            className={`flex-1 px-4 py-2 text-sm font-medium rounded transition-colors ${decision === 'keep'
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-white text-blue-700 border border-blue-300 hover:bg-blue-50'
-                                                }`}
-                                        >
-                                            <Copy className="w-4 h-4 inline mr-1" />
-                                            Keep Both
-                                        </button>
-                                    </div>
                                 </div>
                             )
                         })}
@@ -207,25 +144,23 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
                 {/* Footer */}
                 <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
                     <div className="text-sm text-gray-600">
-                        {allDecided ? (
-                            <span className="text-green-600 font-medium">✓ All files have decisions</span>
-                        ) : (
-                            <span>Choose an action for each file to continue</span>
-                        )}
+                        <span className="flex items-center">
+                            <Copy className="w-4 h-4 mr-2 text-blue-600" />
+                            {duplicates.length} file{duplicates.length > 1 ? 's' : ''} will be uploaded with unique names
+                        </span>
                     </div>
                     <div className="flex gap-3">
                         <button
                             onClick={onCancel}
                             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                         >
-                            Cancel
+                            Cancel Upload
                         </button>
                         <button
                             onClick={handleResolve}
-                            disabled={!allDecided}
-                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
                         >
-                            Continue Upload
+                            Upload as New Files
                         </button>
                     </div>
                 </div>

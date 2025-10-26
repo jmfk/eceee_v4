@@ -36,6 +36,7 @@ import BulkOperations from './BulkOperations';
 import OptimizedImage from './OptimizedImage';
 import MediaEditForm from './MediaEditForm';
 import MediaSearchWidget from './MediaSearchWidget';
+import DuplicateResolveDialog from './DuplicateResolveDialog';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
 const MediaBrowser = ({
@@ -67,6 +68,9 @@ const MediaBrowser = ({
     });
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadState, setUploadState] = useState('idle'); // idle, uploading, complete
+    const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+    const [duplicateFiles, setDuplicateFiles] = useState([]);
+    const [pendingUploadFiles, setPendingUploadFiles] = useState([]);
 
     const [editingFile, setEditingFile] = useState(null);
     const [currentView, setCurrentView] = useState('library'); // 'library' | 'edit'
@@ -296,7 +300,7 @@ const MediaBrowser = ({
         }
     };
 
-    const handleUpload = async (files) => {
+    const handleUpload = async (files, replaceDecisions = null) => {
         if (!namespace) {
             addNotification('Please select a namespace before uploading', 'error');
             return;
@@ -310,7 +314,29 @@ const MediaBrowser = ({
                 namespace: namespace
             };
 
+            // Add replace decisions if provided
+            if (replaceDecisions) {
+                uploadData.replaceFiles = replaceDecisions;
+            }
+
             const result = await mediaApi.upload.upload(uploadData);
+
+            // Check for duplicates needing action first
+            if (result.hasErrors && result.errors?.length > 0) {
+                const duplicatesNeedingAction = result.errors.filter(
+                    err => err.status === 'needs_action'
+                );
+
+                if (duplicatesNeedingAction.length > 0) {
+                    // Store the files for retry after user decision
+                    setPendingUploadFiles(files);
+                    // Show duplicate resolution dialog
+                    setDuplicateFiles(duplicatesNeedingAction);
+                    setDuplicateDialogOpen(true);
+                    setUploadState('idle');
+                    return;
+                }
+            }
 
             // Handle direct API response
             const uploadedCount = result.uploadedFiles?.length || result.successCount || 0;
@@ -351,6 +377,23 @@ const MediaBrowser = ({
             if (error.context?.data) {
                 const responseData = error.context.data;
 
+                // Check for duplicates needing action in error response too
+                if (responseData.errors?.length > 0) {
+                    const duplicatesNeedingAction = responseData.errors.filter(
+                        err => err.status === 'needs_action'
+                    );
+
+                    if (duplicatesNeedingAction.length > 0) {
+                        // Store the files for retry after user decision
+                        setPendingUploadFiles(files);
+                        // Show duplicate resolution dialog
+                        setDuplicateFiles(duplicatesNeedingAction);
+                        setDuplicateDialogOpen(true);
+                        setUploadState('idle');
+                        return;
+                    }
+                }
+
                 // Show rejected file messages
                 if (responseData.rejectedFiles?.length > 0) {
                     responseData.rejectedFiles.forEach(rejection => {
@@ -376,6 +419,33 @@ const MediaBrowser = ({
             setUploadState('idle');
         }
     };
+
+    // Handle duplicate resolution
+    const handleDuplicateResolve = useCallback((decisions) => {
+        setDuplicateDialogOpen(false);
+        setDuplicateFiles([]);
+
+        // Create a clean copy of decisions to avoid circular references
+        const cleanDecisions = {};
+        Object.keys(decisions).forEach(filename => {
+            const decision = decisions[filename];
+            cleanDecisions[filename] = {
+                action: decision.action,
+                existing_file_id: decision.existing_file_id,
+                pending_file_id: decision.pending_file_id
+            };
+        });
+
+        // Retry upload with user's decisions
+        handleUpload(pendingUploadFiles, cleanDecisions);
+    }, [pendingUploadFiles]);
+
+    const handleDuplicateCancel = useCallback(() => {
+        setDuplicateDialogOpen(false);
+        setDuplicateFiles([]);
+        setPendingUploadFiles([]);
+        setUploadState('idle');
+    }, []);
 
     // File size formatter
     const formatFileSize = (bytes) => {
@@ -829,7 +899,14 @@ const MediaBrowser = ({
                 </div>
             )}
 
-
+            {/* Duplicate Resolution Dialog */}
+            {duplicateDialogOpen && (
+                <DuplicateResolveDialog
+                    duplicates={duplicateFiles}
+                    onResolve={handleDuplicateResolve}
+                    onCancel={handleDuplicateCancel}
+                />
+            )}
 
         </div>
     );

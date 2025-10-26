@@ -14,6 +14,119 @@ from .models import PageTheme, WebPage
 from webpages.layout_registry import layout_registry
 
 
+class ThemeFallbackService:
+    """Service providing fallback values when theme elements are missing"""
+
+    DEFAULT_SYSTEM_FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif"
+
+    FALLBACK_COLORS = {
+        "primary": "#3b82f6",
+        "secondary": "#64748b",
+        "accent": "#f59e0b",
+        "text-dark": "#1f2937",
+        "text-light": "#6b7280",
+        "background": "#ffffff",
+        "border": "#e5e7eb",
+    }
+
+    FALLBACK_TYPOGRAPHY = {
+        "groups": [
+            {
+                "name": "System Default",
+                "widget_type": None,
+                "slot": None,
+                "elements": {
+                    "h1": {
+                        "font": DEFAULT_SYSTEM_FONTS,
+                        "size": "2rem",
+                        "lineHeight": "1.2",
+                        "fontWeight": "700",
+                        "marginBottom": "1rem",
+                        "color": "text-dark",
+                    },
+                    "h2": {
+                        "font": DEFAULT_SYSTEM_FONTS,
+                        "size": "1.5rem",
+                        "lineHeight": "1.3",
+                        "fontWeight": "600",
+                        "marginBottom": "0.75rem",
+                        "color": "text-dark",
+                    },
+                    "p": {
+                        "font": DEFAULT_SYSTEM_FONTS,
+                        "size": "1rem",
+                        "lineHeight": "1.6",
+                        "marginBottom": "1rem",
+                        "color": "text-dark",
+                    },
+                    "a": {"color": "primary", "textDecoration": "underline"},
+                    "ul": {
+                        "bulletType": "disc",
+                        "paddingLeft": "1.5rem",
+                        "marginBottom": "1rem",
+                    },
+                    "ol": {
+                        "bulletType": "decimal",
+                        "paddingLeft": "1.5rem",
+                        "marginBottom": "1rem",
+                    },
+                },
+            }
+        ]
+    }
+
+    FALLBACK_COMPONENT_STYLE = {
+        "name": "Default",
+        "description": "Basic wrapper",
+        "template": "<div>{{content}}</div>",
+        "css": "",
+    }
+
+    FALLBACK_TABLE_TEMPLATE = {
+        "name": "Simple Table",
+        "rows": [
+            {
+                "cells": [
+                    {"content": "Header 1", "font_style": "normal"},
+                    {"content": "Header 2", "font_style": "normal"},
+                ]
+            },
+            {
+                "cells": [
+                    {"content": "Cell 1", "font_style": "normal"},
+                    {"content": "Cell 2", "font_style": "normal"},
+                ]
+            },
+        ],
+        "column_widths": ["auto", "auto"],
+    }
+
+    @classmethod
+    def get_fallback_font(cls) -> str:
+        """Get fallback system font stack"""
+        return cls.DEFAULT_SYSTEM_FONTS
+
+    @classmethod
+    def get_fallback_color(cls, color_name: str) -> str:
+        """Get fallback color value"""
+        return cls.FALLBACK_COLORS.get(color_name, "#000000")
+
+    @classmethod
+    def get_fallback_typography(cls) -> Dict[str, Any]:
+        """Get fallback typography configuration"""
+        return cls.FALLBACK_TYPOGRAPHY.copy()
+
+    @classmethod
+    def get_fallback_component_style(cls) -> Dict[str, Any]:
+        """Get fallback component style"""
+        return cls.FALLBACK_COMPONENT_STYLE.copy()
+
+    @classmethod
+    def get_fallback_table_template(cls) -> Dict[str, Any]:
+        """Get fallback table template"""
+        return cls.FALLBACK_TABLE_TEMPLATE.copy()
+
+
 class ThemeService:
     """Service for theme resolution and CSS generation"""
 
@@ -57,11 +170,25 @@ class ThemeService:
         return PageTheme.get_default_theme()
 
     @classmethod
-    def generate_css_for_page(cls, page_id: int, scope: str = ".theme-content") -> str:
+    def generate_css_for_page(
+        cls,
+        page_id: int,
+        scope: str = ".theme-content",
+        widget_type: Optional[str] = None,
+        slot: Optional[str] = None,
+    ) -> str:
         """
         Generate CSS for a specific page using its effective theme.
+
+        Args:
+            page_id: The page ID
+            scope: CSS scope selector
+            widget_type: Optional widget type for targeted typography
+            slot: Optional slot name for targeted typography
         """
-        cache_key = f"{cls.CACHE_PREFIX}:css:page:{page_id}:{scope}"
+        cache_key = (
+            f"{cls.CACHE_PREFIX}:css:page:{page_id}:{scope}:{widget_type}:{slot}"
+        )
         cached_css = cache.get(cache_key)
 
         if cached_css is not None:
@@ -70,7 +197,7 @@ class ThemeService:
         try:
             page = WebPage.objects.get(id=page_id)
             theme = cls.resolve_theme_for_page(page)
-            css = theme.generate_css(scope) if theme else ""
+            css = theme.generate_css(scope, widget_type, slot) if theme else ""
         except WebPage.DoesNotExist:
             css = ""
 
@@ -110,6 +237,56 @@ class ThemeService:
         themes = [theme.to_dict() for theme in queryset.order_by("name")]
         cache.set(cache_key, themes, cls.CACHE_TIMEOUT)
         return themes
+
+    @classmethod
+    def get_google_fonts_url_for_page(cls, page_id: int) -> Optional[str]:
+        """Get Google Fonts URL for a specific page's theme"""
+        try:
+            page = WebPage.objects.get(id=page_id)
+            theme = cls.resolve_theme_for_page(page)
+            return theme.get_google_fonts_url() if theme else None
+        except WebPage.DoesNotExist:
+            return None
+
+    @classmethod
+    def get_google_fonts_url_for_theme(cls, theme_id: int) -> Optional[str]:
+        """Get Google Fonts URL for a specific theme"""
+        try:
+            theme = PageTheme.objects.get(id=theme_id)
+            return theme.get_google_fonts_url()
+        except PageTheme.DoesNotExist:
+            return None
+
+    @classmethod
+    def get_component_style(
+        cls, theme_id: int, style_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get a component style from a theme with fallback"""
+        try:
+            theme = PageTheme.objects.get(id=theme_id)
+            return theme.get_component_style(style_name)
+        except PageTheme.DoesNotExist:
+            return None
+
+    @classmethod
+    def get_table_template(
+        cls, theme_id: int, template_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get a table template from a theme"""
+        try:
+            theme = PageTheme.objects.get(id=theme_id)
+            return theme.get_table_template(template_name)
+        except PageTheme.DoesNotExist:
+            return None
+
+    @classmethod
+    def get_theme_colors(cls, theme_id: int) -> Dict[str, str]:
+        """Get named colors from a theme"""
+        try:
+            theme = PageTheme.objects.get(id=theme_id)
+            return theme.colors or theme.css_variables or {}
+        except PageTheme.DoesNotExist:
+            return {}
 
     @classmethod
     def invalidate_cache(cls, theme_id: Optional[int] = None):

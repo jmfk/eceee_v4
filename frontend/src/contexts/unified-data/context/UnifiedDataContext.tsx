@@ -283,6 +283,78 @@ export function UnifiedDataProvider({
         }
     }, [manager]);
 
+    // Theme operations
+    const initTheme = useCallback((id: string, data: any) => {
+        manager.dispatch({
+            type: OperationTypes.INIT_THEME,
+            sourceId: undefined, // No sourceId so all components receive the update
+            payload: { id, data }
+        });
+    }, [manager]);
+
+    const switchTheme = useCallback((id: string) => {
+        manager.dispatch({
+            type: OperationTypes.SWITCH_THEME,
+            sourceId: 'theme-editor',
+            payload: { id }
+        });
+    }, [manager]);
+
+    const updateTheme = useCallback((updates: any, id?: string) => {
+        manager.dispatch({
+            type: OperationTypes.UPDATE_THEME,
+            sourceId: undefined,
+            payload: { id, updates }
+        });
+    }, [manager]);
+
+    const updateThemeField = useCallback((field: string, value: any, id?: string) => {
+        manager.dispatch({
+            type: OperationTypes.UPDATE_THEME_FIELD,
+            sourceId: undefined,
+            payload: { id, field, value }
+        });
+    }, [manager]);
+
+    const setThemeDirty = useCallback((isDirty: boolean) => {
+        manager.dispatch({
+            type: OperationTypes.SET_THEME_DIRTY,
+            sourceId: undefined,
+            payload: { isDirty }
+        });
+    }, [manager]);
+
+    const saveCurrentTheme = useCallback(async () => {
+        const state = manager.getState();
+        const currentThemeId = state.metadata.currentThemeId;
+
+        if (!currentThemeId) {
+            throw new Error('No current theme selected in UDC');
+        }
+
+        const themeData = state.themes[currentThemeId];
+        if (!themeData) {
+            throw new Error(`Theme ${currentThemeId} not found in UDC state`);
+        }
+
+        // Import themesApi dynamically to avoid circular dependencies
+        const { themesApi } = await import('../../../api/themes');
+
+        // Save theme data
+        const result = await themesApi.update(currentThemeId, themeData);
+
+        // Update dirty state
+        if (result) {
+            manager.dispatch({
+                type: OperationTypes.SET_THEME_DIRTY,
+                sourceId: 'udc-save-current-theme',
+                payload: { isDirty: false }
+            });
+        }
+
+        return result;
+    }, [manager]);
+
     // Create context value
     const contextValue: UnifiedDataContextValue = {
         state: manager.getState(),
@@ -310,7 +382,14 @@ export function UnifiedDataProvider({
         resetState,
         resetErrors,
         publishUpdate,
-        saveCurrentVersion
+        saveCurrentVersion,
+        // Theme operations
+        initTheme,
+        switchTheme,
+        updateTheme,
+        updateThemeField,
+        setThemeDirty,
+        saveCurrentTheme
     };
 
     // Set up dev tools if enabled

@@ -29,9 +29,11 @@ import { api } from '../api/client.js'
 import { layoutsApi } from '../api/layouts'
 import { useNotificationContext } from '../components/NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import LayoutEditor from '../components/LayoutEditor'
 import SettingsTabs from '../components/SettingsTabs'
 import ThemeEditor from '../components/ThemeEditor'
+import StatusBar from '../components/StatusBar'
 
 import VersionManager from '../components/VersionManager'
 
@@ -53,7 +55,7 @@ const SettingsManager = () => {
     // Get tab from URL path, default to 'layouts'
     const getActiveTabFromPath = () => {
         const path = location.pathname
-        if (path === '/settings/themes') return 'themes'
+        if (path.startsWith('/settings/themes')) return 'themes'
         if (path === '/settings/widgets') return 'widgets'
         if (path === '/settings/value-lists') return 'value-lists'
         if (path === '/settings/object-types') return 'object-types'
@@ -77,6 +79,16 @@ const SettingsManager = () => {
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
+
+    // UDC integration for theme editing
+    const { state, useExternalChanges } = useUnifiedData()
+    const [themeSaveHandler, setThemeSaveHandler] = useState(null)
+    const [isThemeDirty, setIsThemeDirty] = useState(false)
+
+    // Subscribe to UDC changes for theme dirty state
+    useExternalChanges('settings-manager', (udcState) => {
+        setIsThemeDirty(udcState.metadata.isThemeDirty || false);
+    });
 
     // Fetch pages
     const { data: pagesResponse, isLoading: pagesLoading } = useQuery({
@@ -348,12 +360,18 @@ const SettingsManager = () => {
         )
     }
 
+    const handleThemeSave = async () => {
+        if (themeSaveHandler) {
+            await themeSaveHandler()
+        }
+    }
+
     const renderTabContent = () => {
         switch (activeTab) {
             case 'layouts':
                 return <LayoutEditor />
             case 'themes':
-                return <ThemeEditor />
+                return <ThemeEditor onSave={setThemeSaveHandler} />
             case 'widgets':
                 return <WidgetManager />
             case 'value-lists':
@@ -393,6 +411,24 @@ const SettingsManager = () => {
                     pageId={selectedPage.id}
                     onClose={() => setShowVersionManager(false)}
                 />
+            )}
+
+            {/* StatusBar for theme editing */}
+            {activeTab === 'themes' && (
+                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999 }}>
+                    <StatusBar
+                        isDirty={isThemeDirty}
+                        onSaveClick={handleThemeSave}
+                        isSaving={false}
+                        customStatusContent={
+                            <div className="flex items-center space-x-4">
+                                <span className="text-sm text-gray-600">
+                                    Editing theme
+                                </span>
+                            </div>
+                        }
+                    />
+                </div>
             )}
         </div>
     )

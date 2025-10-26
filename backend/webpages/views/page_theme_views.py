@@ -32,7 +32,16 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         data = request.data.copy()
 
         # Parse JSON fields that might be sent as strings in FormData
-        json_fields = ["css_variables", "html_elements", "image_styles"]
+        json_fields = [
+            "fonts",
+            "colors",
+            "typography",
+            "component_styles",
+            "table_templates",
+            "css_variables",
+            "html_elements",
+            "image_styles",
+        ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
                 try:
@@ -56,7 +65,16 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         data = request.data.copy()
 
         # Parse JSON fields that might be sent as strings in FormData
-        json_fields = ["css_variables", "html_elements", "image_styles"]
+        json_fields = [
+            "fonts",
+            "colors",
+            "typography",
+            "component_styles",
+            "table_templates",
+            "css_variables",
+            "html_elements",
+            "image_styles",
+        ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
                 try:
@@ -306,4 +324,26 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": "Failed to create default theme"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def clone(self, request, pk=None):
+        """Clone a theme with all its configuration"""
+        theme = self.get_object()
+        new_name = request.data.get("name")
+
+        try:
+            cloned_theme = theme.clone(new_name=new_name, created_by=request.user)
+            serializer = PageThemeSerializer(cloned_theme)
+            return Response(
+                {
+                    "message": f"Theme '{theme.name}' cloned as '{cloned_theme.name}'",
+                    "theme": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to clone theme: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )

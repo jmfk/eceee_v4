@@ -55,7 +55,7 @@ module.exports = {
                 'h3': {
                     'font-size': '22px',
                     'line-height': '26px',
-                    'font-weight': '700', // bold
+                    'font-weight': '600', // bold
                     'margin-top': '22px',
                     'margin-bottom': '11px',
                 },

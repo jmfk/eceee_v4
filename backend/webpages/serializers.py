@@ -62,7 +62,7 @@ class PreviewSizeSerializer(serializers.ModelSerializer):
 
 
 class PageThemeSerializer(serializers.ModelSerializer):
-    """Serializer for page themes"""
+    """Serializer for page themes with new 5-part structure"""
 
     created_by = UserSerializer(read_only=True)
 
@@ -72,6 +72,13 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            # New fields
+            "fonts",
+            "colors",
+            "typography",
+            "component_styles",
+            "table_templates",
+            # Legacy fields (deprecated)
             "css_variables",
             "html_elements",
             "image_styles",
@@ -85,14 +92,92 @@ class PageThemeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at", "created_by"]
 
+    def validate_fonts(self, value):
+        """Validate fonts configuration"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Fonts must be a JSON object")
+
+        if "google_fonts" in value and not isinstance(value["google_fonts"], list):
+            raise serializers.ValidationError("google_fonts must be a list")
+
+        return value
+
+    def validate_colors(self, value):
+        """Validate colors configuration"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Colors must be a JSON object")
+
+        # Validate color values (hex, rgb, hsl, or CSS color names)
+        import re
+
+        hex_pattern = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
+        rgb_pattern = re.compile(r"^rgb\(")
+        hsl_pattern = re.compile(r"^hsl\(")
+
+        for color_name, color_value in value.items():
+            if not isinstance(color_value, str):
+                raise serializers.ValidationError(
+                    f"Color '{color_name}' must be a string"
+                )
+
+            # Allow hex, rgb, hsl formats
+            if not (
+                hex_pattern.match(color_value)
+                or rgb_pattern.match(color_value)
+                or hsl_pattern.match(color_value)
+            ):
+                # Allow CSS named colors
+                if not color_value.isalpha():
+                    raise serializers.ValidationError(
+                        f"Color '{color_name}' has invalid format: {color_value}"
+                    )
+
+        return value
+
+    def validate_typography(self, value):
+        """Validate typography configuration"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Typography must be a JSON object")
+
+        if "groups" in value and not isinstance(value["groups"], list):
+            raise serializers.ValidationError("Typography groups must be a list")
+
+        return value
+
+    def validate_component_styles(self, value):
+        """Validate component styles configuration"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Component styles must be a JSON object")
+
+        # Validate each style has required fields
+        for style_name, style_config in value.items():
+            if not isinstance(style_config, dict):
+                raise serializers.ValidationError(
+                    f"Component style '{style_name}' must be an object"
+                )
+
+            if "template" not in style_config:
+                raise serializers.ValidationError(
+                    f"Component style '{style_name}' must have a 'template' field"
+                )
+
+        return value
+
+    def validate_table_templates(self, value):
+        """Validate table templates configuration"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Table templates must be a JSON object")
+
+        return value
+
     def validate_css_variables(self, value):
-        """Validate that css_variables is a valid JSON object"""
+        """Validate that css_variables is a valid JSON object (deprecated)"""
         if not isinstance(value, dict):
             raise serializers.ValidationError("CSS variables must be a JSON object")
         return value
 
     def validate_image_styles(self, value):
-        """Validate that image_styles is a valid JSON object with proper structure"""
+        """Validate that image_styles is a valid JSON object with proper structure (deprecated)"""
         if not isinstance(value, dict):
             raise serializers.ValidationError("Image styles must be a JSON object")
 

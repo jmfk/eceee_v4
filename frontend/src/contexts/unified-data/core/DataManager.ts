@@ -32,7 +32,9 @@ export class DataManager {
                 isDirty: false,
                 isObjectLoading: false,
                 isObjectDirty: false,
+                isThemeDirty: false,
                 currentObjectId: undefined,
+                currentThemeId: undefined,
                 errors: [],
                 warnings: [],
                 widgetStates: {
@@ -1108,6 +1110,138 @@ export class DataManager {
                             }
                         } as any;
                     });
+                    break;
+
+                // Theme operations
+                case OperationTypes.INIT_THEME:
+                    this.setState(operation, state => {
+                        const { id, data } = operation.payload;
+                        if (!id || !data) {
+                            throw new ValidationError(operation,
+                                'ID and data are required for INIT_THEME',
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        return {
+                            themes: {
+                                ...state.themes,
+                                [id]: {
+                                    ...data,
+                                    id: id,
+                                    updated_at: data.updated_at || new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                currentThemeId: id,
+                                isThemeDirty: false
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.SWITCH_THEME:
+                    this.setState(operation, state => {
+                        const { id } = operation.payload;
+                        if (!state.themes[id]) {
+                            throw new ValidationError(operation,
+                                `Theme ${id} not found`,
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        return {
+                            metadata: {
+                                ...state.metadata,
+                                currentThemeId: id,
+                                isThemeDirty: false
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_THEME:
+                    this.setState(operation, state => {
+                        const { id, updates } = operation.payload;
+                        const currentThemeId = id || state.metadata.currentThemeId;
+                        
+                        if (!currentThemeId) {
+                            throw new ValidationError(operation,
+                                'No theme ID provided and no current theme set',
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        const theme = state.themes[currentThemeId];
+                        if (!theme) {
+                            throw new ValidationError(operation,
+                                `Theme ${currentThemeId} not found`,
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        return {
+                            themes: {
+                                ...state.themes,
+                                [currentThemeId]: {
+                                    ...theme,
+                                    ...updates,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isThemeDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_THEME_FIELD:
+                    this.setState(operation, state => {
+                        const { id, field, value } = operation.payload;
+                        const currentThemeId = id || state.metadata.currentThemeId;
+                        
+                        if (!currentThemeId) {
+                            throw new ValidationError(operation,
+                                'No theme ID provided and no current theme set',
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        const theme = state.themes[currentThemeId];
+                        if (!theme) {
+                            throw new ValidationError(operation,
+                                `Theme ${currentThemeId} not found`,
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        return {
+                            themes: {
+                                ...state.themes,
+                                [currentThemeId]: {
+                                    ...theme,
+                                    [field]: value,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isThemeDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.SET_THEME_DIRTY:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            isThemeDirty: operation.payload.isDirty
+                        }
+                    }));
                     break;
 
                 // Metadata operations

@@ -52,8 +52,23 @@ export interface ThemeData {
   id: string;
   name: string;
   description?: string;
-  variables: Record<string, string>;  // CSS variables/tokens
-  styles: Record<string, any>;        // Component-specific styles
+  // New 5-part structure
+  fonts?: Record<string, any>;         // Google Fonts configuration
+  colors?: Record<string, string>;     // Named color palette
+  typography?: Record<string, any>;    // Grouped HTML element styles
+  component_styles?: Record<string, any>;  // HTML templates + CSS
+  table_templates?: Record<string, any>;   // Table widget templates
+  // Legacy fields (deprecated)
+  variables?: Record<string, string>;  // DEPRECATED: Use colors
+  styles?: Record<string, any>;        // DEPRECATED: Component-specific styles
+  css_variables?: Record<string, string>;
+  html_elements?: Record<string, any>;
+  image_styles?: Record<string, any>;
+  custom_css?: string;
+  // Metadata
+  image?: string;
+  is_active?: boolean;
+  is_default?: boolean;
   parentTheme?: string;               // For theme inheritance
   metadata?: Record<string, any>;
   created_at: string;
@@ -145,12 +160,15 @@ export interface AppState {
     // Object editing flags (parallel to page/version flags)
     isObjectLoading: boolean;
     isObjectDirty: boolean;
+    // Theme editing flags
+    isThemeDirty: boolean;
     
     // Current editing context
     currentPageId?: string;
     currentVersionId?: string;
     currentObjectId?: string;
     currentObjectVersionId?: string;
+    currentThemeId?: string;
     
     // Session-wide version tracking per page (persists across tab switches)
     lastViewedVersions?: Record<string, string>; // pageId -> versionId

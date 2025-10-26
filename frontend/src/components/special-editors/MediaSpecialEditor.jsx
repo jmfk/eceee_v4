@@ -107,6 +107,8 @@ const MediaSpecialEditor = ({
 
     // Enhanced config for preview - includes collection images when in collection mode
     const previewConfig = useMemo(() => {
+        let config = { ...currentConfig }
+
         if (isCollectionMode && collectionImages.length > 0) {
             // In collection mode: use collection images for preview
             const collectionMediaItems = collectionImages.map(image => ({
@@ -123,14 +125,15 @@ const MediaSpecialEditor = ({
                 thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
             }))
 
-            return {
-                ...currentConfig,
-                mediaItems: collectionMediaItems
-            }
-        } else {
-            // In free images mode or empty: use current config as-is
-            return currentConfig
+            config.mediaItems = collectionMediaItems
         }
+
+        // Apply randomization for preview if enabled
+        if (config.randomize && config.mediaItems?.length > 0) {
+            config.mediaItems = [...config.mediaItems].sort(() => Math.random() - 0.5)
+        }
+
+        return config
     }, [currentConfig, isCollectionMode, collectionImages])
 
     // Reset local config when widgetData changes
@@ -976,6 +979,27 @@ const MediaSpecialEditor = ({
 
                         {/* Collection Management Actions */}
                         <div className="pt-2 space-y-3">
+                            {/* Randomize toggle for collection */}
+                            <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white">
+                                <div className="flex items-center gap-2">
+                                    <Shuffle className="w-4 h-4 text-gray-600" />
+                                    <span className="text-sm font-medium text-gray-700">Randomize Order</span>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    checked={currentConfig.randomize || false}
+                                    onChange={(e) => {
+                                        const updatedConfig = {
+                                            ...currentConfig,
+                                            randomize: e.target.checked
+                                        }
+                                        setLocalConfig(updatedConfig)
+                                        onConfigChange(updatedConfig)
+                                    }}
+                                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
                             {/* Warning about global collection modifications */}
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                                 <div className="flex items-start gap-2">
@@ -1069,7 +1093,29 @@ const MediaSpecialEditor = ({
                         </div>
 
                         {/* Free Images Actions */}
-                        <div className="pt-2">
+                        <div className="pt-2 space-y-3">
+                            {/* Randomize toggle for free images */}
+                            <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white">
+                                <div className="flex items-center gap-2">
+                                    <Shuffle className="w-4 h-4 text-gray-600" />
+                                    <span className="text-sm font-medium text-gray-700">Randomize Order</span>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    checked={currentConfig.randomize || false}
+                                    onChange={(e) => {
+                                        const updatedConfig = {
+                                            ...currentConfig,
+                                            randomize: e.target.checked
+                                        }
+                                        setLocalConfig(updatedConfig)
+                                        onConfigChange(updatedConfig)
+                                    }}
+                                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            {/* Create Collection Form */}
                             {showCreateCollectionForm ? (
                                 <div className="space-y-3 p-3 border border-gray-200 rounded-lg bg-white">
                                     <div>

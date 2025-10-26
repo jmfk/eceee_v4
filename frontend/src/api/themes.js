@@ -170,7 +170,17 @@ export const themesApi = {
      */
     ensureDefault: wrapApiCall(async () => {
         return api.post(`${endpoints.themes.list}ensure_default/`)
-    }, 'themes.ensureDefault')
+    }, 'themes.ensureDefault'),
+
+    /**
+     * Clone a theme with all its configuration
+     * @param {number} themeId - Theme ID to clone
+     * @param {Object} data - Optional data (e.g., new name)
+     * @returns {Promise<Object>} Cloned theme data
+     */
+    clone: wrapApiCall(async (themeId, data = {}) => {
+        return api.post(`${endpoints.themes.detail(themeId)}/clone/`, data)
+    }, 'themes.clone')
 }
 
 export default themesApi
