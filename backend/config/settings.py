@@ -420,14 +420,14 @@ LOGGING = {
             "formatter": "verbose",
         },
         "console": {
-            "level": "DEBUG",
+            "level": "DEBUG" if DEBUG else "WARNING",
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
     },
     "root": {
         "handlers": ["console"],
-        "level": "INFO",
+        "level": "INFO" if DEBUG else "WARNING",
     },
     "loggers": {
         "django": {
@@ -438,6 +438,11 @@ LOGGING = {
         "django.request": {
             "handlers": ["file"],
             "level": "ERROR",
+            "propagate": False,
+        },
+        "webpages": {
+            "handlers": ["file", "console"],
+            "level": "INFO" if DEBUG else "WARNING",
             "propagate": False,
         },
     },
