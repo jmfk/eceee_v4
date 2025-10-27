@@ -248,8 +248,10 @@ class PendingMediaFile(models.Model):
         logger.info(f"Approving pending file: {self.original_filename} (ID: {self.id})")
 
         try:
-            # Create the MediaFile
-            media_file = MediaFile.objects.create(
+            # Create the MediaFile using atomic helper
+            # This will handle any soft-deleted files with the same hash
+            media_file = MediaFile.create_with_hash_cleanup(
+                file_hash=self.file_hash,
                 title=title,
                 slug=slug,
                 description=description,
@@ -257,7 +259,6 @@ class PendingMediaFile(models.Model):
                 file_path=self.file_path,
                 file_size=self.file_size,
                 content_type=self.content_type,
-                file_hash=self.file_hash,
                 file_type=self.file_type,
                 width=self.width,
                 height=self.height,
@@ -554,6 +555,71 @@ class MediaFile(models.Model):
     def __str__(self):
         return f"{self.title} ({self.original_filename})"
 
+    @classmethod
+    def create_with_hash_cleanup(cls, file_hash: str, **kwargs):
+        """
+        Create a new MediaFile, atomically handling any soft-deleted records with the same hash.
+
+        This method ensures that:
+        1. Any soft-deleted MediaFile with the same hash is hard-deleted first
+        2. The object in object storage is preserved (not deleted if referenced elsewhere)
+        3. A new MediaFile record is created with fresh metadata
+        4. All operations happen atomically in a single transaction
+
+        Args:
+            file_hash: The SHA-256 hash of the file
+            **kwargs: All other fields needed to create a MediaFile
+
+        Returns:
+            MediaFile: The newly created MediaFile instance
+
+        Raises:
+            ValidationError: If an active (non-deleted) file with the same hash already exists
+            IntegrityError: If the creation fails due to other database constraints
+        """
+        from django.db import transaction
+        from django.core.exceptions import ValidationError
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        with transaction.atomic():
+            # Check for existing active file with same hash (true duplicate)
+            existing_active = cls.objects.filter(file_hash=file_hash).first()
+            if existing_active:
+                logger.warning(
+                    f"Cannot create MediaFile: active file with hash {file_hash} already exists (ID: {existing_active.id})"
+                )
+                raise ValidationError(
+                    f"An active file with this content already exists: {existing_active.title}"
+                )
+
+            # Find and hard delete any soft-deleted records with same hash
+            existing_deleted = (
+                cls.objects.with_deleted()
+                .filter(file_hash=file_hash, is_deleted=True)
+                .first()
+            )
+
+            if existing_deleted:
+                logger.info(
+                    f"Found soft-deleted MediaFile with hash {file_hash} (ID: {existing_deleted.id}). "
+                    f"Performing hard delete before creating new record."
+                )
+                # Hard delete the soft-deleted record
+                # The delete method will preserve the S3 object if other files reference it
+                existing_deleted.delete(force=True)
+                logger.info(
+                    f"Successfully hard-deleted soft-deleted MediaFile {existing_deleted.id}"
+                )
+
+            # Create the new MediaFile
+            kwargs["file_hash"] = file_hash
+            new_file = cls.objects.create(**kwargs)
+            logger.info(f"Created new MediaFile {new_file.id} with hash {file_hash}")
+
+            return new_file
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = self._generate_unique_slug()
@@ -653,8 +719,10 @@ class MediaFile(models.Model):
             )
 
             # Check if other files reference the same S3 object (same file_hash)
+            # Need to check both active and soft-deleted MediaFile records
             other_media_files = (
-                MediaFile.objects.filter(file_hash=self.file_hash)
+                MediaFile.objects.with_deleted()
+                .filter(file_hash=self.file_hash)
                 .exclude(id=self.id)
                 .exists()
             )

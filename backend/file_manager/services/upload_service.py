@@ -131,48 +131,63 @@ class FileUploadService:
         folder_path: str,
         user,
     ) -> PendingMediaFile:
-        """Create a pending file record in the database."""
-        try:
-            return PendingMediaFile.objects.create(
-                original_filename=file.name,
-                file_path=upload_result["file_path"],
-                file_size=upload_result["file_size"],
-                content_type=upload_result["content_type"],
-                file_hash=upload_result["file_hash"],
-                file_type=file_type,
-                width=upload_result.get("width"),
-                height=upload_result.get("height"),
-                ai_generated_tags=ai_analysis.get("suggested_tags", []),
-                ai_suggested_title=ai_analysis.get("suggested_title", ""),
-                ai_extracted_text=ai_analysis.get("extracted_text", ""),
-                ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
-                namespace=namespace,
-                folder_path=folder_path,
-                uploaded_by=user,
-                expires_at=timezone.now() + timedelta(hours=24),
-            )
-        except IntegrityError as e:
-            # Handle duplicate file hash constraint
-            if "file_hash" in str(e) and "uniq" in str(e):
-                existing_pending = PendingMediaFile.objects.filter(
-                    file_hash=upload_result["file_hash"]
-                ).first()
+        """
+        Create a pending file record in the database.
 
-                if existing_pending:
-                    # Update existing pending file
-                    self._update_existing_pending_file(
-                        existing_pending,
-                        file,
-                        upload_result,
-                        file_type,
-                        ai_analysis,
-                        namespace,
-                        folder_path,
-                        user,
+        If a PendingMediaFile with the same file_hash already exists,
+        it will be updated with new metadata instead of creating a duplicate.
+        This ensures we can reuse the same object in object storage.
+        """
+        from django.db import transaction
+
+        with transaction.atomic():
+            try:
+                return PendingMediaFile.objects.create(
+                    original_filename=file.name,
+                    file_path=upload_result["file_path"],
+                    file_size=upload_result["file_size"],
+                    content_type=upload_result["content_type"],
+                    file_hash=upload_result["file_hash"],
+                    file_type=file_type,
+                    width=upload_result.get("width"),
+                    height=upload_result.get("height"),
+                    ai_generated_tags=ai_analysis.get("suggested_tags", []),
+                    ai_suggested_title=ai_analysis.get("suggested_title", ""),
+                    ai_extracted_text=ai_analysis.get("extracted_text", ""),
+                    ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
+                    namespace=namespace,
+                    folder_path=folder_path,
+                    uploaded_by=user,
+                    expires_at=timezone.now() + timedelta(hours=24),
+                )
+            except IntegrityError as e:
+                # Handle duplicate file hash constraint
+                # This happens when the same file (same hash) is uploaded again
+                if "file_hash" in str(e) and "uniq" in str(e):
+                    logger.info(
+                        f"PendingMediaFile with hash {upload_result['file_hash']} already exists. "
+                        f"Updating existing record instead of creating new one."
                     )
-                    return existing_pending
+                    existing_pending = PendingMediaFile.objects.filter(
+                        file_hash=upload_result["file_hash"]
+                    ).first()
 
-            raise e
+                    if existing_pending:
+                        # Update existing pending file with new metadata
+                        # This preserves the S3 object reference
+                        self._update_existing_pending_file(
+                            existing_pending,
+                            file,
+                            upload_result,
+                            file_type,
+                            ai_analysis,
+                            namespace,
+                            folder_path,
+                            user,
+                        )
+                        return existing_pending
+
+                raise e
 
     def _update_existing_pending_file(
         self,
