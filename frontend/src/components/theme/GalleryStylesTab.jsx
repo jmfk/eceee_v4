@@ -86,6 +86,16 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
         }
     };
 
+    const handlePreviewImageUpload = (file) => {
+        if (!file || !editingStyle) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            handleUpdateStyle(editingStyle, { previewImage: reader.result });
+        };
+        reader.readAsDataURL(file);
+    };
+
     const renderPreview = (style) => {
         try {
             const context = prepareGalleryContext(
@@ -241,6 +251,43 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
                                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                                     rows={6}
                                 />
+                            </div>
+
+                            {/* Preview Image Upload */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Preview Image (for selector)
+                                </label>
+                                {styles[editingStyle].previewImage ? (
+                                    <div className="relative inline-block">
+                                        <img
+                                            src={styles[editingStyle].previewImage}
+                                            alt="Style preview"
+                                            className="w-32 h-20 object-cover rounded border"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUpdateStyle(editingStyle, { previewImage: null })}
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors text-sm">
+                                        <Grid3X3 className="w-4 h-4" />
+                                        Upload Preview
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => handlePreviewImageUpload(e.target.files[0])}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                )}
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Optional: Upload a custom preview thumbnail for the style selector
+                                </p>
                             </div>
 
                             {/* Preview */}

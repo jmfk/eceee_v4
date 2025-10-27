@@ -9,6 +9,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { themesApi } from '../api'
+import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 
 /**
  * Hook for applying themes to content areas
@@ -26,14 +27,56 @@ export const useTheme = ({
     const injectedStyleRef = useRef(null)
     const currentThemeIdRef = useRef(null)
 
+    // Try to get theme from UDC if no themeId provided
+    let udcTheme = null
+    try {
+        const { state } = useUnifiedData()
+
+        // Try to get theme from current page version
+        const currentVersionId = state.metadata.currentVersionId
+        if (currentVersionId && state.versions[currentVersionId]?.theme) {
+            const pageThemeId = state.versions[currentVersionId].theme
+            // Try to find theme in UDC themes cache
+            udcTheme = state.themes[pageThemeId]
+        }
+
+        // Fallback to default theme from state
+        if (!udcTheme) {
+            const defaultThemeId = Object.keys(state.themes).find(id =>
+                state.themes[id]?.isDefault === true
+            )
+            if (defaultThemeId) {
+                udcTheme = state.themes[defaultThemeId]
+            }
+        }
+    } catch (e) {
+        // UDC not available (outside of provider context), continue without it
+    }
+
     // Fetch theme data when themeId changes
-    const { data: theme, isLoading, error } = useQuery({
+    const { data: fetchedTheme, isLoading: fetchingTheme, error } = useQuery({
         queryKey: ['theme', themeId],
         queryFn: () => themesApi.get(themeId),
         enabled: enabled && !!themeId,
         staleTime: 5 * 60 * 1000, // 5 minutes
         cacheTime: 10 * 60 * 1000, // 10 minutes
     })
+
+    // Fetch default theme when no themeId provided
+    const { data: defaultTheme, isLoading: fetchingDefault } = useQuery({
+        queryKey: ['default-theme'],
+        queryFn: async () => {
+            const response = await themesApi.list();
+            const themes = Array.isArray(response) ? response : response.results || [];
+            return themes.find(t => t.isDefault === true);
+        },
+        enabled: !themeId && enabled,
+        staleTime: 5 * 60 * 1000
+    });
+
+    // Use fetched theme if available, otherwise use UDC theme, otherwise use default theme
+    const theme = fetchedTheme || udcTheme || defaultTheme
+    const isLoading = fetchingTheme || fetchingDefault
 
     /**
      * Generate CSS content from theme data
@@ -188,6 +231,7 @@ ${Object.entries(cssVariables)
 
     return {
         theme,
+        currentTheme: theme,  // Alias for backward compatibility
         isLoading: isLoading && enabled,
         error: error && enabled ? error : null,
         applyTheme,

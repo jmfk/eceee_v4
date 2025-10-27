@@ -96,6 +96,7 @@ export const FIELD_COMPONENTS = {
     ColorInput: () => import('./ColorInput'),
     SliderInput: () => import('./SliderInput'),
     DateRangeInput: () => import('./DateRangeInput'),
+    ImageStyleSelect: () => import('./ImageStyleSelect'),
     CommandPaletteInput: () => import('./CommandPaletteInput'),
     ComboboxInput: () => import('./ComboboxInput'),
     MentionsInput: () => import('./MentionsInput'),
