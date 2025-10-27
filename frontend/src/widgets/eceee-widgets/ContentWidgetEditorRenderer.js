@@ -19,7 +19,7 @@ const cleanHTML = (html) => {
     // Define allowed HTML tags (whitelist approach)
     const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'blockquote']
     const inlineTags = ['strong', 'b', 'em', 'i', 'a', 'br', 'code']
-    const mediaInsertTags = ['div', 'img'] // For media inserts
+    const mediaInsertTags = ['img'] // For media inserts (div is only allowed for media-insert containers)
     const allowedTags = [...blockTags, ...inlineTags, ...mediaInsertTags]
     const allowedAttributes = ['href', 'target']
     const mediaInsertAttributes = [
@@ -50,9 +50,26 @@ const cleanHTML = (html) => {
         }
 
         if (!allowedTags.includes(tagName)) {
-            // Convert disallowed elements to their text content or appropriate replacement
-            if (['div', 'span', 'section', 'article', 'header', 'footer', 'main', 'aside'].includes(tagName)) {
-                // Convert block/inline containers to paragraphs if they contain substantial content
+            // Special handling for div - only allowed if it's a media insert
+            if (tagName === 'div') {
+                // Already handled above - this branch won't be reached for media inserts
+                // Convert non-media-insert divs to paragraphs or unwrap
+                if (el.textContent.trim().length > 0) {
+                    const p = document.createElement('p')
+                    p.innerHTML = el.innerHTML
+                    el.parentNode.replaceChild(p, el)
+                } else {
+                    el.remove()
+                }
+            } else if (tagName === 'span') {
+                // Always remove spans (except in media inserts, already checked above)
+                // Unwrap span, keep content
+                while (el.firstChild) {
+                    el.parentNode.insertBefore(el.firstChild, el)
+                }
+                el.remove()
+            } else if (['section', 'article', 'header', 'footer', 'main', 'aside'].includes(tagName)) {
+                // Convert block containers to paragraphs if they contain substantial content
                 if (el.textContent.trim().length > 0) {
                     const p = document.createElement('p')
                     p.innerHTML = el.innerHTML
@@ -81,7 +98,9 @@ const cleanHTML = (html) => {
 
         const attrs = Array.from(el.attributes)
         attrs.forEach(attr => {
-            if (!allAllowedAttributes.includes(attr.name)) {
+            // Remove class and style attributes always (except media inserts)
+            // Also remove any attributes not in allowed list
+            if (attr.name === 'class' || attr.name === 'style' || !allAllowedAttributes.includes(attr.name)) {
                 el.removeAttribute(attr.name)
             }
         })
@@ -89,6 +108,9 @@ const cleanHTML = (html) => {
 
     // Clean up empty paragraphs and normalize whitespace
     cleanupEmptyElements(tempDiv)
+
+    // Fix any invalid nesting before processing text nodes
+    fixInvalidNesting(tempDiv)
 
     // Second pass: Ensure all text nodes that aren't inside block elements are wrapped in <p> tags
     const wrapTextNodesInParagraphs = (node) => {
@@ -293,46 +315,41 @@ const cleanupEmptyElements = (container) => {
 
 /**
  * Fix invalid HTML nesting after paste
- * Block tags (h1-h6, p, ul, ol, li) cannot be nested inside:
- * - Inline tags (strong, em, a)
- * - Certain other block tags (h1-h6, p)
+ * Block tags (h1-h6, p, ul, ol, li, blockquote) cannot be nested inside:
+ * - Inline tags (strong, em, a, code)
+ * - Certain other block tags (h1-h6, p, blockquote)
+ * 
+ * Strategy: Remove inner block tags completely, keeping only their text content
  */
 const fixInvalidNesting = (container) => {
-    const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li']
-    const inlineTags = ['strong', 'em', 'a']
-    const noNestedBlocksTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'] // These cannot contain block elements
+    const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'blockquote']
+    const inlineTags = ['strong', 'em', 'a', 'code']
+    const noNestedBlocksTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'blockquote']
 
-    // Find all block elements
-    const allBlocks = container.querySelectorAll(blockTags.join(','))
+    // Find all block elements nested inside tags that can't contain blocks
+    const invalidNests = []
 
-    Array.from(allBlocks).forEach(blockEl => {
+    container.querySelectorAll(blockTags.join(',')).forEach(blockEl => {
         let parent = blockEl.parentNode
-        let invalidParent = null
-
-        // Walk up to find if we're inside an invalid parent
         while (parent && parent !== container) {
             const parentTag = parent.tagName ? parent.tagName.toLowerCase() : null
 
-            // Check if block is inside an inline tag
-            if (parentTag && inlineTags.includes(parentTag)) {
-                invalidParent = parent
+            // Check if block is inside an inline tag or a no-nested-blocks tag
+            if ((parentTag && inlineTags.includes(parentTag)) ||
+                (parentTag && noNestedBlocksTags.includes(parentTag))) {
+                invalidNests.push({ block: blockEl, parent })
                 break
             }
-
-            // Check if block is inside a tag that can't contain blocks
-            if (parentTag && noNestedBlocksTags.includes(parentTag)) {
-                invalidParent = parent
-                break
-            }
-
             parent = parent.parentNode
         }
+    })
 
-        // If we found an invalid parent, unwrap the block element
-        if (invalidParent) {
-            // Insert the block element after the invalid parent
-            invalidParent.parentNode.insertBefore(blockEl, invalidParent.nextSibling)
-        }
+    // Fix invalid nesting by removing inner block tags, keeping only text
+    invalidNests.forEach(({ block }) => {
+        // Extract text content and replace block with text nodes
+        const textContent = block.textContent
+        const textNode = document.createTextNode(textContent)
+        block.parentNode.replaceChild(textNode, block)
     })
 
     return container
@@ -910,6 +927,19 @@ class ContentWidgetEditorRenderer {
         // Add context menu listener
         this.editorElement.addEventListener('contextmenu', this.handleContextMenu)
 
+        // Add blur listener for cleanup
+        const blurHandler = () => {
+            // Clean up on blur
+            setTimeout(() => {
+                if (this.editorElement) {
+                    fixInvalidNesting(this.editorElement)
+                    this.removeDisallowedTags()
+                    this.handleContentChange()
+                }
+            }, 100)
+        }
+        this.editorElement.addEventListener('blur', blurHandler)
+
         // Track event listeners for cleanup
         this.eventListeners.set(this.editorElement, () => {
             this.editorElement.removeEventListener('input', this.handleContentChange)
@@ -920,6 +950,7 @@ class ContentWidgetEditorRenderer {
             this.editorElement.removeEventListener('dragover', this.handleMediaInsertDragOver)
             this.editorElement.removeEventListener('drop', this.handleMediaInsertDrop)
             this.editorElement.removeEventListener('contextmenu', this.handleContextMenu)
+            this.editorElement.removeEventListener('blur', blurHandler)
         })
 
         // Set up command listener for detached toolbar mode
@@ -955,20 +986,145 @@ class ContentWidgetEditorRenderer {
 
     /**
      * Handle paste events - automatically clean pasted HTML and fix invalid nesting
+     * Inserts content at root level, breaking up block elements if needed
      */
     handlePaste(e) {
         e.preventDefault()
+
+        // Get pasted content
         const paste = (e.clipboardData || window.clipboardData).getData('text/html') ||
             (e.clipboardData || window.clipboardData).getData('text/plain')
+
+        if (!paste) return
+
+        // Clean the pasted HTML
         const cleanedPaste = this.cleanHTMLStrict(paste)
 
-        // Insert the cleaned HTML
-        document.execCommand('insertHTML', false, cleanedPaste)
+        // Get current selection
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
 
-        // Fix any invalid nesting that resulted from the paste
+        const range = selection.getRangeAt(0)
+
+        // Delete the current selection if any
+        if (!selection.isCollapsed) {
+            range.deleteContents()
+        }
+
+        // Parse the cleaned HTML into DOM elements
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = cleanedPaste
+
+        // Get the elements to insert
+        const elementsToInsert = Array.from(tempDiv.childNodes)
+
+        if (elementsToInsert.length === 0) return
+
+        // Find the block element we're currently in
+        let currentBlock = range.startContainer
+        if (currentBlock.nodeType === Node.TEXT_NODE) {
+            currentBlock = currentBlock.parentNode
+        }
+
+        // Walk up to find a block-level element
+        const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'blockquote']
+        while (currentBlock && currentBlock !== this.editorElement) {
+            if (blockTags.includes(currentBlock.tagName?.toLowerCase())) {
+                break
+            }
+            currentBlock = currentBlock.parentNode
+        }
+
+        // If we're at the root level, just insert normally
+        if (currentBlock === this.editorElement) {
+            elementsToInsert.forEach(element => {
+                range.insertNode(element)
+                range.setStartAfter(element)
+                range.setEndAfter(element)
+            })
+        } else {
+            // We're inside a block element - need to split it
+            const blockTagName = currentBlock.tagName?.toLowerCase()
+
+            // Check if we're pasting block-level content
+            const hasBlockContent = elementsToInsert.some(el =>
+                el.nodeType === Node.ELEMENT_NODE &&
+                blockTags.includes(el.tagName?.toLowerCase())
+            )
+
+            if (hasBlockContent) {
+                // Split the current block at the cursor position
+                // Get content before cursor
+                const beforeRange = document.createRange()
+                beforeRange.setStart(currentBlock, 0)
+                beforeRange.setEnd(range.startContainer, range.startOffset)
+                const beforeContent = beforeRange.cloneContents()
+
+                // Get content after cursor
+                const afterRange = document.createRange()
+                afterRange.setStart(range.startContainer, range.startOffset)
+                afterRange.setEnd(currentBlock, currentBlock.childNodes.length)
+                const afterContent = afterRange.cloneContents()
+
+                // Create before block if it has content
+                let beforeBlock = null
+                if (beforeContent.textContent.trim()) {
+                    beforeBlock = document.createElement(blockTagName)
+                    beforeBlock.appendChild(beforeContent)
+                }
+
+                // Create after block if it has content
+                let afterBlock = null
+                if (afterContent.textContent.trim()) {
+                    afterBlock = document.createElement(blockTagName)
+                    afterBlock.appendChild(afterContent)
+                }
+
+                // Insert all the new elements in order
+                const insertionPoint = currentBlock
+                const parent = currentBlock.parentNode
+
+                // Insert before block if exists
+                if (beforeBlock) {
+                    parent.insertBefore(beforeBlock, insertionPoint)
+                }
+
+                // Insert pasted elements
+                elementsToInsert.forEach(element => {
+                    parent.insertBefore(element, insertionPoint)
+                })
+
+                // Insert after block if exists
+                if (afterBlock) {
+                    parent.insertBefore(afterBlock, insertionPoint)
+                }
+
+                // Remove the original block
+                parent.removeChild(insertionPoint)
+
+                // Set cursor after the last inserted element
+                const lastInserted = elementsToInsert[elementsToInsert.length - 1]
+                range.setStartAfter(lastInserted)
+                range.setEndAfter(lastInserted)
+                selection.removeAllRanges()
+                selection.addRange(range)
+            } else {
+                // Pasting inline content - just insert normally
+                elementsToInsert.forEach(element => {
+                    range.insertNode(element)
+                    range.setStartAfter(element)
+                    range.setEndAfter(element)
+                })
+                selection.removeAllRanges()
+                selection.addRange(range)
+            }
+        }
+
+        // Fix invalid nesting and remove disallowed tags
         setTimeout(() => {
             if (this.editorElement) {
                 fixInvalidNesting(this.editorElement)
+                this.removeDisallowedTags()
                 this.handleContentChange()
             }
         }, 0)
@@ -2103,6 +2259,47 @@ class ContentWidgetEditorRenderer {
     }
 
     /**
+     * Remove disallowed tags (span, div) and attributes (class, style)
+     * Preserves media inserts and their special attributes
+     */
+    removeDisallowedTags() {
+        if (!this.editorElement) return
+
+        // Remove all spans (except in media inserts)
+        const spans = Array.from(this.editorElement.querySelectorAll('span'))
+        spans.forEach(span => {
+            if (!span.closest('[data-media-insert]')) {
+                // Unwrap span, keep content
+                while (span.firstChild) {
+                    span.parentNode.insertBefore(span.firstChild, span)
+                }
+                span.remove()
+            }
+        })
+
+        // Remove all divs (except media inserts themselves)
+        const divs = Array.from(this.editorElement.querySelectorAll('div'))
+        divs.forEach(div => {
+            if (!div.hasAttribute('data-media-insert') && !div.closest('[data-media-insert]')) {
+                // Unwrap div, keep content
+                while (div.firstChild) {
+                    div.parentNode.insertBefore(div.firstChild, div)
+                }
+                div.remove()
+            }
+        })
+
+        // Remove class and style attributes (except on media inserts)
+        const allElements = this.editorElement.querySelectorAll('*')
+        allElements.forEach(el => {
+            if (!el.hasAttribute('data-media-insert') && !el.closest('[data-media-insert]')) {
+                el.removeAttribute('class')
+                el.removeAttribute('style')
+            }
+        })
+    }
+
+    /**
      * Execute editor commands
      */
     execCommand(command, value = null) {
@@ -2144,7 +2341,20 @@ class ContentWidgetEditorRenderer {
 
         // Handle standard document commands
         document.execCommand(command, false, value)
-        this.handleContentChange()
+
+        // Apply strict cleanup after formatBlock to fix nesting
+        if (command === 'formatBlock') {
+            setTimeout(() => {
+                if (this.editorElement) {
+                    fixInvalidNesting(this.editorElement)
+                    // Also remove any spans/divs that might have been created
+                    this.removeDisallowedTags()
+                    this.handleContentChange()
+                }
+            }, 0)
+        } else {
+            this.handleContentChange()
+        }
     }
 
     /**

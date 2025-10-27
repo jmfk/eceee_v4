@@ -41,6 +41,7 @@ import PublishingEditor from './PublishingEditor'
 import { getWidgetDisplayName } from '../hooks/useWidgets'
 import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
 import GlobalWysiwygToolbar from './wysiwyg/GlobalWysiwygToolbar'
+import GlobalTableToolbar from './table-toolbar/GlobalTableToolbar'
 import { useAutoSave } from '../hooks/useAutoSave'
 
 import { logValidationSync } from '../utils/stateVerification'
@@ -1599,6 +1600,9 @@ const PageEditor = () => {
 
             {/* Global WYSIWYG Toolbar - appears when editor is active */}
             <GlobalWysiwygToolbar />
+
+            {/* Global Table Toolbar - appears when table editor is active */}
+            <GlobalTableToolbar />
 
             {/* Main Content Area with right error To-Do sidebar and widget editor panel */}
             <div className="flex-1 overflow-hidden">

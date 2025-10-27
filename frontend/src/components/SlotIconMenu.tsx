@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { MoreHorizontal, Plus, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Plus, Trash2, Download } from 'lucide-react'
 
 // SlotIconMenu component that replicates the PageEditor three-dot menu
-const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, onAddWidget, onClearSlot, onShowWidgetModal, context }) => {
+const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, onAddWidget, onClearSlot, onShowWidgetModal, onImportContent, context }) => {
     const menuRef = useRef<HTMLDivElement | null>(null)
     const [isOpen, setIsOpen] = useState(false)
 
@@ -35,6 +35,13 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
         setIsOpen(false)
     }
 
+    const handleImportContentClick = () => {
+        if (onImportContent) {
+            onImportContent(slotName)
+        }
+        setIsOpen(false)
+    }
+
     return (
         <div className="absolute top-2 right-2 z-20 opacity-80 hover:opacity-100 transition-opacity" ref={menuRef}>
             {/* Menu Button (3 dots icon) */}
@@ -58,6 +65,20 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
                             >
                                 <Plus className="h-4 w-4 mr-3 text-gray-600" />
                                 <span className="text-gray-900">Add Widget</span>
+                            </button>
+                            <div className="border-t border-gray-200 my-1"></div>
+                        </>
+                    )}
+
+                    {/* Import Content */}
+                    {onImportContent && (
+                        <>
+                            <button
+                                onClick={handleImportContentClick}
+                                className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-gray-100 transition-colors text-blue-700 hover:bg-blue-50"
+                            >
+                                <Download className="h-4 w-4 mr-3 text-gray-600" />
+                                <span className="text-gray-900">Import Content</span>
                             </button>
                             <div className="border-t border-gray-200 my-1"></div>
                         </>

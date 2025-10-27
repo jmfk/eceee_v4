@@ -20,6 +20,11 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Grid visibility toggle - light borders for better cell visibility */
+.table-editor-table.show-grid .table-editor-cell {
+    border: 1px solid #e5e7eb !important;
+}
+
 /* Cell Styles */
 .table-editor-cell {
     border: none;
@@ -175,6 +180,28 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+}
+
+/* Inline Editor Activation States */
+.table-editor-container {
+    position: relative;
+    width: 100%;
+    min-height: 100px;
+    transition: all 0.2s ease;
+}
+
+.table-editor-container.table-editor-active {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-radius: 4px;
+    background-color: #f8fafc;
+}
+
+.table-editor-container:not(.table-editor-active):hover {
+    outline: 1px solid #d1d5db;
+    outline-offset: 2px;
+    border-radius: 4px;
+    cursor: pointer;
 }
 
 /* Toolbar Styles */

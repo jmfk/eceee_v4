@@ -399,6 +399,185 @@ def render_website(url: str, config: Optional[Dict[str, Any]] = None) -> bytes:
                 pass
 
 
+async def extract_element_at_coordinates_async(
+    url: str, x: int, y: int, timeout: int = 30000
+) -> Dict[str, Any]:
+    """
+    Extract HTML element at specific coordinates on a webpage.
+    
+    Args:
+        url: The URL of the website
+        x: X coordinate in pixels
+        y: Y coordinate in pixels
+        timeout: Maximum time to wait for page load in milliseconds
+    
+    Returns:
+        Dictionary containing:
+            - html: The outer HTML of the element
+            - inner_html: The inner HTML of the element
+            - tag_name: The tag name of the element
+            - text_content: The text content of the element
+            - attributes: Dictionary of element attributes
+    
+    Raises:
+        WebsiteRenderingError: If extraction fails
+    """
+    # Validate URL first
+    validate_url(url)
+    
+    browser = None
+    context = None
+    
+    try:
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-web-security",
+                "--disable-features=VizDisplayCompositor",
+            ],
+        )
+        context = await browser.new_context(
+            viewport={
+                "width": DEFAULT_CONFIG["viewport_width"],
+                "height": DEFAULT_CONFIG["viewport_height"],
+            },
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
+        
+        if not context:
+            raise WebsiteRenderingError("Failed to initialize browser context")
+        
+        page: Page = await context.new_page()
+        
+        logger.info(f"Navigating to URL: {url}")
+        
+        # Navigate to the page
+        await page.goto(url, wait_until="networkidle", timeout=timeout)
+        
+        # Wait for dynamic content
+        await page.wait_for_timeout(2000)
+        
+        # Handle cookie consent dialogs
+        try:
+            await handle_cookie_consent(page)
+            await page.wait_for_timeout(1000)
+        except Exception as e:
+            logger.warning(f"Failed to handle cookie consent: {e}")
+        
+        # Find element at coordinates using elementFromPoint
+        element_info = await page.evaluate(
+            """
+            ({x, y}) => {
+                const element = document.elementFromPoint(x, y);
+                if (!element) {
+                    return null;
+                }
+                
+                // Get attributes
+                const attributes = {};
+                for (const attr of element.attributes) {
+                    attributes[attr.name] = attr.value;
+                }
+                
+                return {
+                    html: element.outerHTML,
+                    innerHtml: element.innerHTML,
+                    tagName: element.tagName.toLowerCase(),
+                    textContent: element.textContent,
+                    className: element.className,
+                    id: element.id,
+                    attributes: attributes
+                };
+            }
+            """,
+            {"x": x, "y": y}
+        )
+        
+        if not element_info:
+            raise WebsiteRenderingError(f"No element found at coordinates ({x}, {y})")
+        
+        await page.close()
+        
+        logger.info(f"Successfully extracted element from {url} at ({x}, {y})")
+        
+        return {
+            "html": element_info["html"],
+            "inner_html": element_info["innerHtml"],
+            "tag_name": element_info["tagName"],
+            "text_content": element_info["textContent"],
+            "class_name": element_info["className"],
+            "id": element_info["id"],
+            "attributes": element_info["attributes"],
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to extract element from {url}: {str(e)}")
+        if isinstance(e, WebsiteRenderingError):
+            raise
+        raise WebsiteRenderingError(f"Failed to extract element: {str(e)}")
+    
+    finally:
+        if context:
+            await context.close()
+        if browser:
+            await browser.close()
+
+
+def extract_element_at_coordinates(
+    url: str, x: int, y: int, timeout: int = 30000
+) -> Dict[str, Any]:
+    """
+    Synchronous wrapper for element extraction.
+    
+    Args:
+        url: The URL of the website
+        x: X coordinate in pixels
+        y: Y coordinate in pixels
+        timeout: Maximum time to wait for page load in milliseconds
+    
+    Returns:
+        Dictionary with element information
+    
+    Raises:
+        WebsiteRenderingError: If extraction fails
+    """
+    # Always create a new event loop for each request
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        return loop.run_until_complete(
+            extract_element_at_coordinates_async(url, x, y, timeout)
+        )
+    finally:
+        # Always close the loop we created
+        try:
+            # Cancel all pending tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            
+            # Wait for all tasks to complete cancellation
+            if pending:
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+            
+            # Close the loop
+            loop.close()
+        except Exception as e:
+            logger.debug(f"Error cleaning up event loop: {e}")
+            # Force close if normal close fails
+            try:
+                loop.close()
+            except Exception:
+                pass
+
+
 @app.route("/health", methods=["GET"])
 def health_check():
     """Health check endpoint."""
@@ -557,6 +736,59 @@ def validate_website_endpoint():
         )
 
 
+@app.route("/extract-element", methods=["POST"])
+def extract_element_endpoint():
+    """
+    Extract HTML content at specific click coordinates on a webpage.
+    
+    POST /extract-element
+    
+    Request body:
+    {
+        "url": "https://example.com",
+        "x": 500,  // X coordinate in pixels
+        "y": 300,  // Y coordinate in pixels
+        "timeout": 30000  // optional, in milliseconds
+    }
+    
+    Returns:
+        JSON with extracted HTML and metadata
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "JSON request body required"}), 400
+        
+        # Get required parameters
+        url = data.get("url")
+        x = data.get("x")
+        y = data.get("y")
+        
+        if not url:
+            return jsonify({"error": "URL is required"}), 400
+        if x is None or y is None:
+            return jsonify({"error": "Both x and y coordinates are required"}), 400
+        
+        # Get optional timeout
+        timeout = data.get("timeout", DEFAULT_CONFIG["timeout"])
+        
+        logger.info(f"Extracting element from {url} at coordinates ({x}, {y})")
+        
+        # Extract element
+        result = extract_element_at_coordinates(url, int(x), int(y), int(timeout))
+        
+        return jsonify(result)
+        
+    except WebsiteRenderingError as e:
+        logger.warning(f"Element extraction failed for {url}: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+    except ValueError as e:
+        return jsonify({"error": f"Invalid parameter value: {str(e)}"}), 400
+    except Exception as e:
+        logger.error(f"Unexpected error extracting element: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred during element extraction"}), 500
+
+
 @app.route("/", methods=["GET"])
 def index():
     """API documentation endpoint."""
@@ -569,6 +801,7 @@ def index():
                 "GET /health": "Health check",
                 "POST /render": "Render website to PNG",
                 "POST /validate": "Validate URL without rendering",
+                "POST /extract-element": "Extract HTML at click coordinates",
             },
             "example_render_request": {
                 "url": "https://example.com",
@@ -579,6 +812,12 @@ def index():
                 "remove_cookie_warnings": True,
             },
             "example_validate_request": {"url": "https://example.com"},
+            "example_extract_request": {
+                "url": "https://example.com",
+                "x": 500,
+                "y": 300,
+                "timeout": 30000,
+            },
         }
     )
 

@@ -161,6 +161,7 @@ LOCAL_APPS = [
     "htmx",
     "webpages",  # Core CMS system (required)
     "content",
+    "content_import",  # Content import from external websites
     "eceee_layouts",  # ECEEE layout definitions
     "eceee_widgets",  # ECEEE widget definitions
     "file_manager",  # Comprehensive media file management system
@@ -504,6 +505,12 @@ AWS_S3_OBJECT_PARAMETERS = {
 }
 # Note: Production deployment adds Linode-specific settings via settings_production_override.py
 # including STORAGES configuration, public-read ACL, and s3:// URL protocol
+
+# OpenAI Configuration for Content Import
+OPENAI_API_KEY = config("OPENAI_API_KEY", default=None)
+
+# Playwright Service Configuration for Content Import
+PLAYWRIGHT_SERVICE_URL = config("PLAYWRIGHT_SERVICE_URL", default="http://localhost:5000")
 
 # Media File Handling Configuration
 MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB

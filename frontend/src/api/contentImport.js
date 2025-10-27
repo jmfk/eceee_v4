@@ -1,0 +1,62 @@
+/**
+ * API client for Content Import functionality
+ */
+
+import apiClient from './client';
+
+/**
+ * Capture screenshot of external website
+ * @param {string} url - URL to capture
+ * @param {Object} options - Optional viewport settings
+ * @returns {Promise<Object>} Screenshot data
+ */
+export const captureScreenshot = async (url, options = {}) => {
+    const response = await apiClient.post('/content-import/capture/', {
+        url,
+        viewport_width: options.viewportWidth || 1920,
+        viewport_height: options.viewportHeight || 1080,
+        full_page: options.fullPage || false,
+    });
+    return response.data;
+};
+
+/**
+ * Extract HTML content at specific coordinates
+ * @param {string} url - URL to extract from
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @returns {Promise<Object>} Extracted element data
+ */
+export const extractContent = async (url, x, y) => {
+    const response = await apiClient.post('/content-import/extract/', {
+        url,
+        x,
+        y,
+        timeout: 30000,
+    });
+    return response.data;
+};
+
+/**
+ * Process imported content and create widgets
+ * @param {Object} importData - Import configuration
+ * @returns {Promise<Object>} Import results
+ */
+export const processImport = async (importData) => {
+    const response = await apiClient.post('/content-import/process/', {
+        html: importData.html,
+        slot_name: importData.slotName,
+        page_id: importData.pageId,
+        mode: importData.mode || 'append',
+        namespace: importData.namespace || 'default',
+        source_url: importData.sourceUrl || '',
+    });
+    return response.data;
+};
+
+export default {
+    captureScreenshot,
+    extractContent,
+    processImport,
+};
+

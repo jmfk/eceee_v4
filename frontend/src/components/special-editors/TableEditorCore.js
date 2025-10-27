@@ -8,6 +8,7 @@
 import { FloatingToolbar } from './FloatingToolbar'
 import { LinkModal } from './LinkModal'
 import { TableContextMenu } from './TableContextMenu'
+import { tableToolbarManager } from '../../utils/tableToolbarManager.js'
 
 export class TableEditorCore {
     constructor(initialData, options = {}) {
@@ -15,6 +16,7 @@ export class TableEditorCore {
         this.options = {
             onChange: options.onChange || (() => { }),
             onSelectionChange: options.onSelectionChange || (() => { }),
+            detachedToolbar: options.detachedToolbar || false,
             ...options
         }
 
@@ -44,6 +46,13 @@ export class TableEditorCore {
         // Clipboard for copy/paste
         this.clipboard = null
         this.clipboardMode = null // 'copy' or 'cut'
+
+        // Activation state for detached toolbar mode
+        this.isActive = false
+        this.handleCommandBound = null
+
+        // Grid visibility state
+        this.showGrid = false
 
         // Bound handlers for event listeners
         this.handleSelectionChangeBound = this.handleSelectionChange.bind(this)
@@ -1031,6 +1040,69 @@ export class TableEditorCore {
     }
 
     /**
+     * Grow cell by increasing colspan by 1
+     */
+    growCell(cell) {
+        const rowIndex = parseInt(cell.dataset.rowIndex)
+        const cellIndex = parseInt(cell.dataset.cellIndex)
+        const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+        // Check if we can grow (not at edge of table)
+        const currentColspan = cellData.colspan || 1
+        const currentCellIndex = cellIndex
+        const rowCells = this.data.rows[rowIndex].cells
+
+        // Find the actual number of columns by looking at the first row
+        const totalColumns = this.data.rows[0].cells.reduce((sum, c) => sum + (c.colspan || 1), 0)
+
+        // Check if growing would exceed table bounds
+        if (currentCellIndex + currentColspan >= totalColumns) {
+            return // Can't grow beyond table edge
+        }
+
+        // Increase colspan
+        cellData.colspan = currentColspan + 1
+
+        // Mark the next cell as merged
+        const nextCellIndex = currentCellIndex + currentColspan
+        if (nextCellIndex < rowCells.length) {
+            rowCells[nextCellIndex]._merged = true
+        }
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Shrink cell by decreasing colspan by 1 (minimum 1)
+     */
+    shrinkCell(cell) {
+        const rowIndex = parseInt(cell.dataset.rowIndex)
+        const cellIndex = parseInt(cell.dataset.cellIndex)
+        const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+        const currentColspan = cellData.colspan || 1
+
+        // Can't shrink below 1
+        if (currentColspan <= 1) {
+            return
+        }
+
+        // Decrease colspan
+        cellData.colspan = currentColspan - 1
+
+        // Unmark the previously merged cell
+        const rowCells = this.data.rows[rowIndex].cells
+        const lastMergedIndex = cellIndex + currentColspan - 1
+        if (lastMergedIndex < rowCells.length && rowCells[lastMergedIndex]._merged) {
+            delete rowCells[lastMergedIndex]._merged
+        }
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
      * Apply formatting to text (bold, italic, link)
      * This works when editing a cell with text selected (used by floating toolbar)
      */
@@ -1809,7 +1881,282 @@ export class TableEditorCore {
     /**
      * Destroy the editor and clean up
      */
+    /**
+     * Activate the table editor (for detached toolbar mode)
+     * Registers with the global toolbar manager
+     */
+    activate() {
+        if (this.isActive) return;
+
+        this.isActive = true;
+
+        // Register with toolbar manager if in detached toolbar mode
+        if (this.options.detachedToolbar) {
+            tableToolbarManager.registerEditor(this);
+
+            // Set up command listener
+            this.setupCommandListener();
+        }
+
+        // Add visual indication of active state
+        if (this.container) {
+            this.container.classList.add('table-editor-active');
+        }
+    }
+
+    /**
+     * Deactivate the table editor
+     * Unregisters from the global toolbar manager
+     */
+    deactivate() {
+        if (!this.isActive) return;
+
+        this.isActive = false;
+
+        // Unregister from toolbar manager if in detached toolbar mode
+        if (this.options.detachedToolbar) {
+            tableToolbarManager.unregisterEditor(this);
+
+            // Remove command listener
+            if (this.handleCommandBound && this.container) {
+                this.container.removeEventListener('table-command', this.handleCommandBound);
+                this.handleCommandBound = null;
+            }
+        }
+
+        // Remove visual indication
+        if (this.container) {
+            this.container.classList.remove('table-editor-active');
+        }
+
+        // Clear selection
+        this.clearSelection();
+    }
+
+    /**
+     * Set up listener for commands from detached toolbar
+     */
+    setupCommandListener() {
+        if (!this.container) return;
+
+        // Remove existing listener if any
+        if (this.handleCommandBound) {
+            this.container.removeEventListener('table-command', this.handleCommandBound);
+        }
+
+        // Create bound handler
+        this.handleCommandBound = (event) => {
+            const { command, value } = event.detail;
+            this.handleToolbarCommand(command, value);
+        };
+
+        // Add listener
+        this.container.addEventListener('table-command', this.handleCommandBound);
+    }
+
+    /**
+     * Handle commands from the global toolbar
+     */
+    handleToolbarCommand(command, value) {
+        const selectedCells = this.getSelectedCells();
+
+        switch (command) {
+            // Structure commands
+            case 'addRow':
+                this.addRow(value || 'end');
+                break;
+            case 'removeRow':
+                if (selectedCells.length > 0) {
+                    const rowIndex = parseInt(selectedCells[0].dataset.rowIndex);
+                    this.removeRow(rowIndex);
+                }
+                break;
+            case 'addColumn':
+                this.addColumn(value || 'end');
+                break;
+            case 'removeColumn':
+                if (selectedCells.length > 0) {
+                    const colIndex = parseInt(selectedCells[0].dataset.cellIndex);
+                    this.removeColumn(colIndex);
+                }
+                break;
+
+            // Cell operations
+            case 'mergeCells':
+                this.mergeCells();
+                break;
+            case 'splitCell':
+                if (selectedCells.length === 1) {
+                    this.splitCell(selectedCells[0]);
+                }
+                break;
+            case 'growCell':
+                if (selectedCells.length === 1) {
+                    this.growCell(selectedCells[0]);
+                }
+                break;
+            case 'shrinkCell':
+                if (selectedCells.length === 1) {
+                    this.shrinkCell(selectedCells[0]);
+                }
+                break;
+
+            // Content type
+            case 'setCellType':
+                this.setCellType(selectedCells, value);
+                break;
+
+            // Formatting
+            case 'bold':
+                if (selectedCells.length > 0) {
+                    this.applyCellBold(selectedCells);
+                }
+                break;
+            case 'italic':
+                if (selectedCells.length > 0) {
+                    this.applyCellItalic(selectedCells);
+                }
+                break;
+
+            // Alignment
+            case 'alignLeft':
+            case 'alignCenter':
+            case 'alignRight':
+                this.setAlignment(selectedCells, value || command.replace('align', '').toLowerCase());
+                break;
+            case 'alignTop':
+            case 'alignMiddle':
+            case 'alignBottom':
+                this.setVerticalAlignment(selectedCells, value || command.replace('align', '').toLowerCase());
+                break;
+
+            // Font style
+            case 'fontStyle':
+                this.applyFontStyle(selectedCells, value);
+                break;
+
+            // Borders
+            case 'setBorders':
+                this.setBorders(selectedCells, value.sides, value.style);
+                break;
+
+            // Colors
+            case 'setColor':
+                this.setColors(selectedCells, value.type, value.color);
+                break;
+
+            // Import
+            case 'openImport':
+                // Trigger import modal (handled by React wrapper)
+                if (this.container) {
+                    const event = new CustomEvent('open-import-modal');
+                    this.container.dispatchEvent(event);
+                }
+                break;
+
+            // Toggle grid
+            case 'toggleGrid':
+                this.toggleGrid();
+                break;
+        }
+    }
+
+    /**
+     * Toggle grid visibility for better cell visibility
+     */
+    toggleGrid() {
+        this.showGrid = !this.showGrid;
+
+        if (this.tableElement) {
+            if (this.showGrid) {
+                this.tableElement.classList.add('show-grid');
+            } else {
+                this.tableElement.classList.remove('show-grid');
+            }
+        }
+    }
+
+    /**
+     * Get current toolbar state for the global toolbar UI
+     */
+    getToolbarState() {
+        const selectedCells = this.getSelectedCells();
+
+        // Check if the selected cell can be split, grown, or shrunk
+        let canSplit = false;
+        let canGrow = false;
+        let canShrink = false;
+
+        if (selectedCells.length === 1) {
+            canSplit = this.canSplit(selectedCells[0]);
+
+            // Check if cell can grow
+            const cell = selectedCells[0];
+            const rowIndex = parseInt(cell.dataset.rowIndex);
+            const cellIndex = parseInt(cell.dataset.cellIndex);
+            const cellData = this.data.rows[rowIndex]?.cells[cellIndex];
+
+            if (cellData) {
+                const currentColspan = cellData.colspan || 1;
+                const totalColumns = this.data.rows[0].cells.reduce((sum, c) => sum + (c.colspan || 1), 0);
+
+                // Can grow if not at edge of table
+                canGrow = (cellIndex + currentColspan < totalColumns);
+
+                // Can shrink if colspan > 1
+                canShrink = currentColspan > 1;
+            }
+        }
+
+        const state = {
+            selectedCellsCount: selectedCells.length,
+            canMerge: selectedCells.length > 1,
+            canSplit: canSplit,
+            canGrow: canGrow,
+            canShrink: canShrink,
+            hasSelection: selectedCells.length > 0,
+            showGrid: this.showGrid,
+            borders: null,
+            colors: null,
+            alignment: null,
+            verticalAlignment: null,
+            fontStyle: null
+        };
+
+        // Get border state from first selected cell
+        if (selectedCells.length > 0 && this.data.rows) {
+            try {
+                const firstCell = selectedCells[0];
+                const rowIndex = parseInt(firstCell.dataset.rowIndex);
+                const cellIndex = parseInt(firstCell.dataset.cellIndex);
+                const cellData = this.data.rows[rowIndex]?.cells[cellIndex];
+
+                if (cellData) {
+                    state.borders = cellData.borders || null;
+                    state.colors = {
+                        background: cellData.backgroundColor || '#ffffff',
+                        text: cellData.textColor || '#000000',
+                        hoverBackground: cellData.hoverBackgroundColor || '#f3f4f6',
+                        hoverText: cellData.hoverTextColor || '#000000'
+                    };
+                    state.alignment = cellData.alignment || 'left';
+                    state.verticalAlignment = cellData.verticalAlignment || 'top';
+                    state.fontStyle = cellData.fontStyle || 'normal';
+                }
+            } catch (error) {
+                // Ignore errors in state retrieval
+            }
+        }
+
+        return state;
+    }
+
     destroy() {
+        // Deactivate if active
+        if (this.isActive) {
+            this.deactivate();
+        }
+
         // Exit edit mode if active
         if (this.isEditMode) {
             this.exitEditMode()
