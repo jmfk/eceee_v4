@@ -133,6 +133,24 @@ class WebPageRenderer:
 
         mock_widget = MockWidget(widget_type, template_config, widget_data)
 
+        # Check if widget supports custom style rendering (ImageWidget)
+        custom_style_html = None
+        custom_style_css = None
+        if hasattr(widget_type, "render_with_style"):
+            theme_obj = enhanced_context.get("theme")
+            if theme_obj:
+                try:
+                    style_result = widget_type.render_with_style(
+                        template_config, theme_obj
+                    )
+                    if style_result:
+                        custom_style_html, custom_style_css = style_result
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error rendering widget with custom style: {e}")
+
         slot_name = context.get("slot_name", "")
         layout_name = context.get("layout_name", "")
         theme = context.get("theme", "") or context.get("theme_name", "")
@@ -176,6 +194,8 @@ class WebPageRenderer:
             "widget_id": widget_data.get("id", "unknown"),
             "widget_type": widget_type,
             "widget_data": widget_data,  # Full widget data access
+            "custom_style_html": custom_style_html,  # Mustache-rendered custom style
+            "custom_style_css": custom_style_css,  # CSS for custom style
             **enhanced_context,
         }
         try:
