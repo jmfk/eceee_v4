@@ -20,8 +20,7 @@ const tabs = [
 
 export default function SettingsTabs() {
     const location = useLocation()
-    const [showDropdown, setShowDropdown] = useState(false)
-    const [expandedMenus, setExpandedMenus] = useState(new Set())
+    const [openSubmenu, setOpenSubmenu] = useState(null)
 
     const isSettingsPath = location.pathname.startsWith('/settings')
     const isSchemasPath = location.pathname.startsWith('/schemas')
@@ -154,7 +153,7 @@ export default function SettingsTabs() {
                     id: `theme-${theme.id}`,
                     label: theme.name,
                     icon: Palette,
-                    href: `/settings/themes?edit=${theme.id}`,
+                    href: `/settings/themes/${theme.id}`,
                     description: theme.description || 'Edit this theme',
                     isTheme: true,
                     themeData: theme
@@ -256,33 +255,14 @@ export default function SettingsTabs() {
     }
 
     const toggleSubmenu = (menuId) => {
-        const newExpanded = new Set(expandedMenus)
-        if (newExpanded.has(menuId)) {
-            newExpanded.delete(menuId)
-        } else {
-            newExpanded.add(menuId)
-        }
-        setExpandedMenus(newExpanded)
+        setOpenSubmenu(prev => prev === menuId ? null : menuId)
     }
 
-    // Auto-expand submenu if current page is in it
-    useEffect(() => {
-        const currentItem = getCurrentItem()
-        if (currentItem) {
-            // Check which submenu contains the current item
-            Object.entries(navigationStructure).forEach(([key, section]) => {
-                if (section.items && section.items.some(item => item.href === currentItem.href || location.pathname.startsWith(item.href.split('?')[0]))) {
-                    setExpandedMenus(prev => new Set([...prev, section.id]))
-                }
-            })
-        }
-    }, [location.pathname])
-
-    // Close dropdown when clicking outside
+    // Close submenu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (!event.target.closest('.settings-dropdown')) {
-                setShowDropdown(false)
+            if (!event.target.closest('.settings-menubar')) {
+                setOpenSubmenu(null)
             }
         }
 
@@ -290,136 +270,80 @@ export default function SettingsTabs() {
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    // Close dropdown when route changes
+    // Close submenu when route changes
     useEffect(() => {
-        setShowDropdown(false)
+        setOpenSubmenu(null)
     }, [location.pathname])
 
-    const currentItem = getCurrentItem()
+    const menuSections = [
+        { ...navigationStructure.layouts, id: 'layouts' },
+        { ...navigationStructure.themes, id: 'themes' },
+        { ...navigationStructure.valueLists, id: 'valueLists' },
+        { ...navigationStructure.widgets, id: 'widgets' },
+        { ...navigationStructure.objectTypes, id: 'objectTypes' },
+        { ...navigationStructure.system, id: 'system' },
+        { ...navigationStructure.schemas, id: 'schemas' }
+    ]
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-4">
-                {/* Context Label */}
-                <div className="mb-3">
-                    <h1 className="text-lg font-semibold text-gray-900 flex items-center">
-                        {currentItem.icon && (
-                            <currentItem.icon className="w-5 h-5 mr-2 text-gray-600" />
-                        )}
-                        {currentItem.label}
-                    </h1>
-                    <p className="text-sm text-gray-500">
-                        {currentItem.parent === 'schemas' ? 'Schema Management' : 'Settings Management'}
-                    </p>
-                </div>
+        <div className="bg-white rounded-lg shadow settings-menubar">
+            {/* Horizontal Menubar */}
+            <nav className="border-b border-gray-200">
+                <div className="flex">
+                    {menuSections.map((section) => {
+                        const Icon = section.icon
+                        const isOpen = openSubmenu === section.id
 
-                <div className="relative settings-dropdown">
-                    <button
-                        onClick={() => setShowDropdown(!showDropdown)}
-                        className="w-full flex items-center justify-between py-2 px-3 text-left bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                    >
-                        <span className="text-sm text-gray-700">Navigate to...</span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-                    </button>
+                        return (
+                            <div key={section.id} className="relative">
+                                <button
+                                    onClick={() => toggleSubmenu(section.id)}
+                                    className={`flex items-center px-4 py-3 text-sm font-medium transition-colors border-b-2 ${isOpen
+                                        ? 'text-blue-600 bg-blue-50 border-blue-600'
+                                        : 'text-gray-700 hover:bg-gray-50 border-transparent hover:border-gray-300'
+                                        }`}
+                                >
+                                    <Icon className="w-4 h-4 mr-2" />
+                                    {section.label}
+                                    <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                </button>
 
-                    {showDropdown && (
-                        <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                            <div className="py-2">
-                                {/* Layouts Submenu */}
-                                <div>
-                                    <button
-                                        onClick={() => toggleSubmenu('layouts')}
-                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-center">
-                                            <Grid3X3 className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
-                                            <span className="font-medium">Layouts</span>
-                                        </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('layouts') ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {expandedMenus.has('layouts') && (
-                                        <div className="bg-gray-50">
-                                            {navigationStructure.layouts.items.map((item) => {
-                                                const Icon = item.icon
+                                {isOpen && (
+                                    <div className="absolute top-full left-0 mt-0 bg-white border border-gray-200 rounded-b-lg shadow-lg z-50 min-w-[280px] max-h-[500px] overflow-y-auto">
+                                        <div className="py-2">
+                                            {section.items.map((item) => {
+                                                const ItemIcon = item.icon
                                                 const active = isActive(item)
+
                                                 return (
                                                     <Link
                                                         key={item.id}
                                                         to={item.href}
-                                                        onClick={() => setShowDropdown(false)}
-                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
+                                                        className={`flex items-center px-4 py-2 text-sm transition-colors ${active
                                                             ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                                                            : 'text-gray-700 hover:bg-gray-50'
                                                             }`}
                                                     >
-                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
+                                                        <ItemIcon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0">
                                                                     <p className="font-medium truncate">{item.label}</p>
-                                                                    <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                                                                    {item.description && (
+                                                                        <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                                                                    )}
                                                                 </div>
-                                                                {item.isLayout && (
-                                                                    <div className="flex items-center space-x-1 ml-2">
-                                                                        <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
-                                                                            {item.layoutData?.slotCount || 'Layout'}
-                                                                        </span>
-                                                                    </div>
+                                                                {/* Badges for specific item types */}
+                                                                {item.isLayout && item.layoutData?.slotCount && (
+                                                                    <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded ml-2">
+                                                                        {item.layoutData.slotCount}
+                                                                    </span>
                                                                 )}
-                                                            </div>
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Themes Submenu */}
-                                <div className="border-t border-gray-100">
-                                    <button
-                                        onClick={() => toggleSubmenu('themes')}
-                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-center">
-                                            <Palette className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
-                                            <span className="font-medium">Themes</span>
-                                        </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('themes') ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {expandedMenus.has('themes') && (
-                                        <div className="bg-gray-50">
-                                            {navigationStructure.themes.items.map((item) => {
-                                                const Icon = item.icon
-                                                const active = isActive(item)
-                                                return (
-                                                    <Link
-                                                        key={item.id}
-                                                        to={item.href}
-                                                        onClick={() => setShowDropdown(false)}
-                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
-                                                            ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="min-w-0">
-                                                                    <p className="font-medium truncate">{item.label}</p>
-                                                                    <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                                                                </div>
                                                                 {item.isTheme && (
                                                                     <div className="flex items-center space-x-1 ml-2">
-                                                                        {(item.themeData?.isActive ?? item.themeData?.is_active) ? (
+                                                                        {(item.themeData?.isActive ?? item.themeData?.is_active) && (
                                                                             <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded">
                                                                                 Active
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
-                                                                                Inactive
                                                                             </span>
                                                                         )}
                                                                         {(item.themeData?.isDefault ?? item.themeData?.is_default) && (
@@ -429,50 +353,6 @@ export default function SettingsTabs() {
                                                                         )}
                                                                     </div>
                                                                 )}
-                                                            </div>
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Value Lists Submenu */}
-                                <div className="border-t border-gray-100">
-                                    <button
-                                        onClick={() => toggleSubmenu('valueLists')}
-                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-center">
-                                            <List className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
-                                            <span className="font-medium">Value Lists</span>
-                                        </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('valueLists') ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {expandedMenus.has('valueLists') && (
-                                        <div className="bg-gray-50">
-                                            {navigationStructure.valueLists.items.map((item) => {
-                                                const Icon = item.icon
-                                                const active = isActive(item)
-                                                return (
-                                                    <Link
-                                                        key={item.id}
-                                                        to={item.href}
-                                                        onClick={() => setShowDropdown(false)}
-                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
-                                                            ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="min-w-0">
-                                                                    <p className="font-medium truncate">{item.label}</p>
-                                                                    <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                                                                </div>
                                                                 {item.isValueList && (
                                                                     <div className="flex items-center space-x-1 ml-2">
                                                                         <span className={`px-1.5 py-0.5 text-xs rounded ${item.valueListData?.is_active
@@ -486,96 +366,10 @@ export default function SettingsTabs() {
                                                                         </span>
                                                                     </div>
                                                                 )}
-                                                            </div>
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Widgets Submenu */}
-                                <div className="border-t border-gray-100">
-                                    <button
-                                        onClick={() => toggleSubmenu('widgets')}
-                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-center">
-                                            <Package className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
-                                            <span className="font-medium">Widgets</span>
-                                        </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('widgets') ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {expandedMenus.has('widgets') && (
-                                        <div className="bg-gray-50">
-                                            {navigationStructure.widgets.items.map((item) => {
-                                                const Icon = item.icon
-                                                const active = isActive(item)
-                                                return (
-                                                    <Link
-                                                        key={item.id}
-                                                        to={item.href}
-                                                        onClick={() => setShowDropdown(false)}
-                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
-                                                            ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0">
-                                                            <p className="font-medium truncate">{item.label}</p>
-                                                            <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Object Types Submenu */}
-                                <div className="border-t border-gray-100">
-                                    <button
-                                        onClick={() => toggleSubmenu('objectTypes')}
-                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-center">
-                                            <Database className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
-                                            <span className="font-medium">Object Types</span>
-                                        </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('objectTypes') ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {expandedMenus.has('objectTypes') && (
-                                        <div className="bg-gray-50">
-                                            {navigationStructure.objectTypes.items.map((item) => {
-                                                const Icon = item.icon
-                                                const active = isActive(item)
-                                                return (
-                                                    <Link
-                                                        key={item.id}
-                                                        to={item.href}
-                                                        onClick={() => setShowDropdown(false)}
-                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
-                                                            ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="min-w-0">
-                                                                    <p className="font-medium truncate">{item.label}</p>
-                                                                    <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                                                                </div>
                                                                 {item.isObjectType && (
-                                                                    <div className="flex items-center space-x-1 ml-2">
-                                                                        <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
-                                                                            {item.objectTypeData?.instancesCount || 0} items
-                                                                        </span>
-                                                                    </div>
+                                                                    <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded ml-2">
+                                                                        {item.objectTypeData?.instancesCount || 0} items
+                                                                    </span>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -583,93 +377,13 @@ export default function SettingsTabs() {
                                                 )
                                             })}
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* System Submenu */}
-                                <div className="border-t border-gray-100">
-                                    <button
-                                        onClick={() => toggleSubmenu('system')}
-                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-center">
-                                            <Cog className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
-                                            <span className="font-medium">System</span>
-                                        </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('system') ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {expandedMenus.has('system') && (
-                                        <div className="bg-gray-50">
-                                            {navigationStructure.system.items.map((item) => {
-                                                const Icon = item.icon
-                                                const active = isActive(item)
-                                                return (
-                                                    <Link
-                                                        key={item.id}
-                                                        to={item.href}
-                                                        onClick={() => setShowDropdown(false)}
-                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
-                                                            ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0">
-                                                            <p className="font-medium truncate">{item.label}</p>
-                                                            <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Schemas Submenu */}
-                                <div className="border-t border-gray-100">
-                                    <button
-                                        onClick={() => toggleSubmenu('schemas')}
-                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-center">
-                                            <Code className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
-                                            <span className="font-medium">Schemas</span>
-                                        </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('schemas') ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {expandedMenus.has('schemas') && (
-                                        <div className="bg-gray-50">
-                                            {navigationStructure.schemas.items.map((item) => {
-                                                const Icon = item.icon
-                                                const active = isActive(item)
-                                                return (
-                                                    <Link
-                                                        key={item.id}
-                                                        to={item.href}
-                                                        onClick={() => setShowDropdown(false)}
-                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
-                                                            ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0">
-                                                            <p className="font-medium truncate">{item.label}</p>
-                                                            <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
+                        )
+                    })}
                 </div>
-            </div>
+            </nav>
         </div>
     )
 
