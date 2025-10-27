@@ -1700,6 +1700,8 @@ const PageEditor = () => {
                             <ThemeSelector
                                 key={`theme-${pageVersionData?.versionId || 'new'}`}
                                 selectedThemeId={pageVersionData?.theme}
+                                effectiveThemeId={pageVersionData?.effectiveTheme?.id}
+                                themeInheritanceInfo={pageVersionData?.themeInheritanceInfo}
                                 onThemeChange={(themeId) => updatePageData({ theme: themeId })}
                             />
                         )}

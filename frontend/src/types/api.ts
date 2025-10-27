@@ -38,6 +38,16 @@ export interface ThemeResponse {
   isActive: boolean;
 }
 
+export interface ThemeInheritanceInfo {
+  source: 'explicit' | 'inherited' | 'default' | 'none';
+  inheritedFrom?: {
+    pageId: number;
+    pageTitle: string;
+    themeId: number;
+    themeName: string;
+  } | null;
+}
+
 export interface LayoutResponse {
   name: string;
   description?: string;

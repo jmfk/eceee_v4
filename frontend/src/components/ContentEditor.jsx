@@ -141,13 +141,18 @@ const ContentEditor = forwardRef(({
 
   // Apply theme to layout renderer when pageVersionData theme changes
   useEffect(() => {
-    if (!layoutRenderer || !pageVersionData?.theme) return;
+    if (!layoutRenderer) return;
+
+    // Use effective theme (explicit or inherited)
+    const themeId = pageVersionData?.theme || pageVersionData?.effectiveTheme?.id;
+
+    if (!themeId) return;
 
     // Fetch and apply theme
     const applyTheme = async () => {
       try {
         const { themesApi } = await import('../api');
-        const theme = await themesApi.get(pageVersionData.theme);
+        const theme = await themesApi.get(themeId);
         layoutRenderer.applyTheme(theme);
       } catch (error) {
         console.error('ContentEditor: Error applying theme', error);
@@ -155,7 +160,7 @@ const ContentEditor = forwardRef(({
     };
 
     applyTheme();
-  }, [layoutRenderer, pageVersionData?.theme]);
+  }, [layoutRenderer, pageVersionData?.theme, pageVersionData?.effectiveTheme?.id]);
 
   // Set up dirty state communication with LayoutRenderer
   useEffect(() => {

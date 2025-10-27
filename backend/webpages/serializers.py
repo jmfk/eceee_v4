@@ -663,6 +663,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
     publication_status = serializers.SerializerMethodField()
     version_id = serializers.SerializerMethodField()
     page_id = serializers.SerializerMethodField()
+    effective_theme = serializers.SerializerMethodField()
+    theme_inheritance_info = serializers.SerializerMethodField()
 
     # Writable page field for creation
     page = serializers.PrimaryKeyRelatedField(
@@ -698,6 +700,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "tags",
             # Styling/config fields previously only in detail serializer
             "theme",
+            "effective_theme",
+            "theme_inheritance_info",
             "page_css_variables",
             "page_custom_css",
             "enable_css_injection",
@@ -741,6 +745,43 @@ class PageVersionSerializer(serializers.ModelSerializer):
     def get_publication_status(self, obj):
         """Get human-readable publication status based on dates"""
         return obj.get_publication_status()
+
+    def get_effective_theme(self, obj):
+        """Get effective theme (explicit or inherited from parent)"""
+        # First check if version has explicit theme
+        if obj.theme:
+            return PageThemeSerializer(obj.theme).data
+
+        # Fall back to page's inheritance resolution
+        theme = obj.page.get_effective_theme()
+        return PageThemeSerializer(theme).data if theme else None
+
+    def get_theme_inheritance_info(self, obj):
+        """Get metadata about where theme comes from"""
+        if obj.theme:
+            return {"source": "explicit", "inherited_from": None}
+
+        theme = obj.page.get_effective_theme()
+        if not theme:
+            return {"source": "none", "inherited_from": None}
+
+        # Find which parent it came from
+        current = obj.page.parent
+        while current:
+            current_version = current.get_current_published_version()
+            if current_version and current_version.theme:
+                return {
+                    "source": "inherited",
+                    "inherited_from": {
+                        "page_id": current.id,
+                        "page_title": current.title,
+                        "theme_id": theme.id,
+                        "theme_name": theme.name,
+                    },
+                }
+            current = current.parent
+
+        return {"source": "default", "inherited_from": None}
 
     def validate(self, attrs):
         # Strip forbidden keys from page_data on write
