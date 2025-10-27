@@ -12,6 +12,7 @@ import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
+import ImportDialog from '../../components/ImportDialog';
 
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'main_layout',  // Default to main_layout (available layout)
@@ -68,6 +69,10 @@ const ReactLayoutRenderer = forwardRef(({
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null);
     const [selectedSlotMetadata, setSelectedSlotMetadata] = useState(null);
     const [replacementContext, setReplacementContext] = useState(null); // { isReplacement: true, position: number }
+    
+    // Import dialog state
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [importSlotName, setImportSlotName] = useState(null);
 
     // Page context for widgets - includes all necessary context data
     const pageContext = useMemo(() => ({
@@ -327,6 +332,42 @@ const ReactLayoutRenderer = forwardRef(({
             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id });
         }
     }, [widgets, onWidgetChange, publishUpdate, componentId, versionId, isPublished]);
+    
+    // Import content handler
+    const handleImportContent = useCallback((slotName) => {
+        setImportSlotName(slotName);
+        setImportDialogOpen(true);
+    }, []);
+    
+    // Import completion handler
+    const handleImportComplete = useCallback(async (importedWidgets) => {
+        if (!importSlotName || !importedWidgets || importedWidgets.length === 0) {
+            return;
+        }
+        
+        // Add imported widgets to the slot
+        const currentSlotWidgets = widgets[importSlotName] || [];
+        const updatedWidgets = {
+            ...widgets,
+            [importSlotName]: [...currentSlotWidgets, ...importedWidgets]
+        };
+        
+        if (onWidgetChange) {
+            onWidgetChange(updatedWidgets, { sourceId: `import-${importSlotName}` });
+        }
+        
+        // Publish each widget to UDC
+        for (const widget of importedWidgets) {
+            await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                id: widget.id,
+                type: widget.type,
+                config: widget.config,
+                slot: importSlotName,
+                contextType: contextType,
+                order: currentSlotWidgets.length + importedWidgets.indexOf(widget)
+            });
+        }
+    }, [importSlotName, widgets, onWidgetChange, publishUpdate, componentId]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -391,6 +432,7 @@ const ReactLayoutRenderer = forwardRef(({
                 editable={editable}
                 pageContext={pageContext}
                 onShowWidgetModal={handleShowWidgetModal}
+                onImportContent={handleImportContent}
                 onClearSlot={handleClearSlot}
                 widgetPath={[]} // Initialize empty path for top-level
                 // Widget inheritance
@@ -406,6 +448,17 @@ const ReactLayoutRenderer = forwardRef(({
                 slotName={selectedSlotForModal}
                 slotLabel={selectedSlotMetadata?.label || selectedSlotForModal}
                 allowedWidgetTypes={selectedSlotMetadata?.allowedWidgetTypes}
+            />
+            
+            <ImportDialog
+                isOpen={importDialogOpen}
+                onClose={() => {
+                    setImportDialogOpen(false);
+                    setImportSlotName(null);
+                }}
+                slotName={importSlotName}
+                pageId={webpageData?.id}
+                onImportComplete={handleImportComplete}
             />
         </div>
     );

@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, XCircle } from 'lucide-react';
+import { Plus, XCircle, Download } from 'lucide-react';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const PageSlotIconMenu = ({
@@ -16,7 +16,8 @@ const PageSlotIconMenu = ({
     maxWidgets = 10,
     onAddWidget,
     onClearSlot,
-    onShowWidgetModal
+    onShowWidgetModal,
+    onImportContent
 }) => {
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -38,6 +39,12 @@ const PageSlotIconMenu = ({
             onClearSlot(slotName);
         }
     };
+    
+    const handleImportContentClick = () => {
+        if (onImportContent) {
+            onImportContent(slotName);
+        }
+    };
 
     const canAddWidget = widgets.length < maxWidgets;
     const hasWidgets = widgets.length > 0;
@@ -45,11 +52,22 @@ const PageSlotIconMenu = ({
     return (
         <>
             <div className="flex items-center space-x-1">
+                {/* Import Content Button */}
+                {onImportContent && (
+                    <button
+                        onClick={handleImportContentClick}
+                        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors rounded"
+                        title="Import content from web"
+                    >
+                        <Download className="h-4 w-4" />
+                    </button>
+                )}
+                
                 {/* Add Widget Button */}
                 {canAddWidget && (
                     <button
                         onClick={handleAddWidgetClick}
-                        className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                        className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 transition-colors rounded"
                         title="Add widget to slot"
                     >
                         <Plus className="h-4 w-4" />
@@ -60,7 +78,7 @@ const PageSlotIconMenu = ({
                 {hasWidgets && (
                     <button
                         onClick={handleClearSlotClick}
-                        className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                        className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 transition-colors rounded"
                         title="Clear all widgets from slot"
                     >
                         <XCircle className="h-4 w-4" />
