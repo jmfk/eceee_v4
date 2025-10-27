@@ -8,13 +8,16 @@ import React, { useState, useRef } from 'react';
 import { Plus, Trash2, Grid3X3, Eye, Code, X } from 'lucide-react';
 import { renderMustache, prepareGalleryContext } from '../../utils/mustacheRenderer';
 import CodeEditorPanel from './CodeEditorPanel';
+import CopyButton from './CopyButton';
+import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
-const GalleryStylesTab = ({ galleryStyles, onChange }) => {
+const GalleryStylesTab = ({ galleryStyles, onChange, onDirty }) => {
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
     const [showPreview, setShowPreview] = useState(false);
     const templateRefs = useRef({});
     const cssRefs = useRef({});
+    const { addNotification } = useGlobalNotifications();
 
     const styles = galleryStyles || {};
     const styleEntries = Object.entries(styles);
@@ -50,6 +53,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
         };
 
         onChange(updatedStyles);
+        if (onDirty) onDirty();
         setNewStyleKey('');
         setEditingStyle(styleKey);
     };
@@ -63,6 +67,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
             },
         };
         onChange(updatedStyles);
+        if (onDirty) onDirty();
     };
 
     const handleSaveFromRefs = (key) => {
@@ -81,6 +86,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
         const updatedStyles = { ...styles };
         delete updatedStyles[key];
         onChange(updatedStyles);
+        if (onDirty) onDirty();
         if (editingStyle === key) {
             setEditingStyle(null);
         }
@@ -119,6 +125,14 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Gallery Styles</h3>
+                <CopyButton
+                    data={galleryStyles}
+                    level="section"
+                    section="galleryStyles"
+                    label="Copy All Gallery Styles"
+                    onSuccess={() => addNotification({ type: 'success', message: 'Gallery styles copied to clipboard' })}
+                    onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                />
             </div>
 
             <div className="text-sm text-gray-600">
@@ -175,17 +189,29 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
                                         <div className="text-xs text-gray-500 truncate">{style.description}</div>
                                     )}
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveStyle(key);
-                                    }}
-                                    className="px-3 py-2 text-red-600 hover:text-red-700 border-l border-gray-200"
-                                    title="Remove style"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center border-l border-gray-200">
+                                    <CopyButton
+                                        data={{ [key]: style }}
+                                        level="item"
+                                        section="galleryStyles"
+                                        itemKey={key}
+                                        iconOnly
+                                        size="default"
+                                        className="px-3 py-2"
+                                        onSuccess={() => addNotification({ type: 'success', message: `Gallery style "${key}" copied` })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveStyle(key);
+                                        }}
+                                        className="px-3 py-2 text-red-600 hover:text-red-700 border-l border-gray-200"
+                                        title="Remove style"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -233,6 +259,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
                                         if (el) templateRefs.current[editingStyle] = el;
                                     }}
                                     defaultValue={styles[editingStyle].template}
+                                    onChange={() => { if (onDirty) onDirty(); }}
                                     onBlur={() => handleSaveFromRefs(editingStyle)}
                                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                                     rows={8}
@@ -247,6 +274,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange }) => {
                                         if (el) cssRefs.current[editingStyle] = el;
                                     }}
                                     defaultValue={styles[editingStyle].css}
+                                    onChange={() => { if (onDirty) onDirty(); }}
                                     onBlur={() => handleSaveFromRefs(editingStyle)}
                                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                                     rows={6}

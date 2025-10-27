@@ -8,12 +8,15 @@ import React, { useState, useRef } from 'react';
 import { Plus, Trash2, Code, Eye } from 'lucide-react';
 import { createEmptyComponentStyle } from '../../utils/themeUtils';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
+import CopyButton from './CopyButton';
+import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
 const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
     const templateRefs = useRef({});
     const cssRefs = useRef({});
+    const { addNotification } = useGlobalNotifications();
 
     const styles = componentStyles || {};
     const styleEntries = Object.entries(styles);
@@ -35,6 +38,7 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
         };
 
         onChange(updatedStyles);
+        if (onDirty) onDirty();
         setNewStyleKey('');
         setEditingStyle(styleKey);
     };
@@ -48,6 +52,7 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
             },
         };
         onChange(updatedStyles);
+        if (onDirty) onDirty();
     };
 
     const handleSaveFromRefs = (key) => {
@@ -66,6 +71,7 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
         const updatedStyles = { ...styles };
         delete updatedStyles[key];
         onChange(updatedStyles);
+        if (onDirty) onDirty();
         if (editingStyle === key) {
             setEditingStyle(null);
         }
@@ -75,6 +81,14 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Component Styles</h3>
+                <CopyButton
+                    data={componentStyles}
+                    level="section"
+                    section="componentStyles"
+                    label="Copy All Component Styles"
+                    onSuccess={() => addNotification({ type: 'success', message: 'Component styles copied to clipboard' })}
+                    onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                />
             </div>
 
             <div className="text-sm text-gray-600">
@@ -132,17 +146,29 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
                                         <div className="text-xs text-gray-500 truncate">{style.description}</div>
                                     )}
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveStyle(key);
-                                    }}
-                                    className="px-3 py-2 text-red-600 hover:text-red-700 border-l border-gray-200"
-                                    title="Remove style"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center border-l border-gray-200">
+                                    <CopyButton
+                                        data={{ [key]: style }}
+                                        level="item"
+                                        section="componentStyles"
+                                        itemKey={key}
+                                        iconOnly
+                                        size="default"
+                                        className="px-3 py-2"
+                                        onSuccess={() => addNotification({ type: 'success', message: `Component style "${key}" copied` })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveStyle(key);
+                                        }}
+                                        className="px-3 py-2 text-red-600 hover:text-red-700 border-l border-gray-200"
+                                        title="Remove style"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

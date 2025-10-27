@@ -4,10 +4,13 @@
 
 import React, { useState } from 'react';
 import { Plus, Trash2, Palette } from 'lucide-react';
+import CopyButton from './CopyButton';
+import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
-const ColorsTab = ({ colors, onChange }) => {
+const ColorsTab = ({ colors, onChange, onDirty }) => {
   const [newColorName, setNewColorName] = useState('');
   const [newColorValue, setNewColorValue] = useState('#000000');
+  const { addNotification } = useGlobalNotifications();
 
   const colorEntries = Object.entries(colors || {});
 
@@ -22,6 +25,7 @@ const ColorsTab = ({ colors, onChange }) => {
     };
 
     onChange(updatedColors);
+    if (onDirty) onDirty();
     setNewColorName('');
     setNewColorValue('#000000');
   };
@@ -32,6 +36,7 @@ const ColorsTab = ({ colors, onChange }) => {
       [name]: value,
     };
     onChange(updatedColors);
+    if (onDirty) onDirty();
   };
 
   const handleRenameColor = (oldName, newName) => {
@@ -51,18 +56,28 @@ const ColorsTab = ({ colors, onChange }) => {
     updatedColors[colorKey] = colorValue;
 
     onChange(updatedColors);
+    if (onDirty) onDirty();
   };
 
   const handleRemoveColor = (name) => {
     const updatedColors = { ...colors };
     delete updatedColors[name];
     onChange(updatedColors);
+    if (onDirty) onDirty();
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900">Named Colors</h3>
+        <CopyButton
+          data={colors}
+          level="section"
+          section="colors"
+          label="Copy All Colors"
+          onSuccess={() => addNotification({ type: 'success', message: 'Colors copied to clipboard' })}
+          onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+        />
       </div>
 
       {/* Add Color Form */}
@@ -149,6 +164,15 @@ const ColorsTab = ({ colors, onChange }) => {
                   placeholder="#000000"
                 />
               </div>
+              <CopyButton
+                data={{ [name]: value }}
+                level="item"
+                section="colors"
+                itemKey={name}
+                iconOnly
+                size="default"
+                onSuccess={() => addNotification({ type: 'success', message: `Color "${name}" copied` })}
+              />
               <button
                 type="button"
                 onClick={() => handleRemoveColor(name)}

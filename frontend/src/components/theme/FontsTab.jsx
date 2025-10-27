@@ -5,8 +5,10 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Search, Edit3, ChevronDown, ChevronRight } from 'lucide-react';
 import { POPULAR_GOOGLE_FONTS, searchFonts, getFontCategories } from '../../utils/googleFonts';
+import CopyButton from './CopyButton';
+import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
-const FontsTab = ({ fonts, onChange }) => {
+const FontsTab = ({ fonts, onChange, onDirty }) => {
     const [showAddFont, setShowAddFont] = useState(false);
     const [showManualAdd, setShowManualAdd] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -15,6 +17,7 @@ const FontsTab = ({ fonts, onChange }) => {
     const [selectedVariants, setSelectedVariants] = useState(['400']);
     const [editingFont, setEditingFont] = useState(null);
     const [expandedFonts, setExpandedFonts] = useState({});
+    const { addNotification } = useGlobalNotifications();
 
     // Manual font addition
     const [manualFontFamily, setManualFontFamily] = useState('');
@@ -43,6 +46,7 @@ const FontsTab = ({ fonts, onChange }) => {
         };
 
         onChange(updatedFonts);
+        if (onDirty) onDirty();
 
         setShowAddFont(false);
         setSelectedFont(null);
@@ -68,6 +72,7 @@ const FontsTab = ({ fonts, onChange }) => {
         };
 
         onChange(updatedFonts);
+        if (onDirty) onDirty();
 
         setManualFontFamily('');
         setManualVariants('400');
@@ -79,6 +84,7 @@ const FontsTab = ({ fonts, onChange }) => {
             ...fonts,
             googleFonts: googleFonts.filter((_, i) => i !== index),
         });
+        if (onDirty) onDirty();
     };
 
     const handleVariantToggle = (variant) => {
@@ -119,6 +125,14 @@ const FontsTab = ({ fonts, onChange }) => {
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Google Fonts</h3>
                 <div className="flex gap-2">
+                    <CopyButton
+                        data={fonts}
+                        level="section"
+                        section="fonts"
+                        label="Copy All Fonts"
+                        onSuccess={() => addNotification({ type: 'success', message: 'Fonts copied to clipboard' })}
+                        onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                    />
                     <button
                         type="button"
                         onClick={() => {
@@ -175,6 +189,15 @@ const FontsTab = ({ fonts, onChange }) => {
                                         </div>
                                     </div>
 
+                                    <CopyButton
+                                        data={font}
+                                        level="item"
+                                        section="fonts"
+                                        itemKey={font.family}
+                                        iconOnly
+                                        size="default"
+                                        onSuccess={() => addNotification({ type: 'success', message: `Font "${font.family}" copied` })}
+                                    />
                                     <button
                                         type="button"
                                         onClick={() => handleRemoveFont(index)}
@@ -208,8 +231,8 @@ const FontsTab = ({ fonts, onChange }) => {
                                                             type="button"
                                                             onClick={() => handleToggleFontVariant(index, variant)}
                                                             className={`px-3 py-1.5 text-sm rounded border transition-colors ${isSelected
-                                                                    ? 'bg-blue-600 text-white border-blue-600'
-                                                                    : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                                                                ? 'bg-blue-600 text-white border-blue-600'
+                                                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
                                                                 }`}
                                                         >
                                                             {variant}

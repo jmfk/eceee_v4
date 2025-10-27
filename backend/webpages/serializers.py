@@ -125,12 +125,12 @@ class PageThemeSerializer(serializers.ModelSerializer):
         if not isinstance(value, dict):
             raise serializers.ValidationError("Colors must be a JSON object")
 
-        # Validate color values (hex, rgb, hsl, or CSS color names)
+        # Validate color values (hex, rgb, rgba, hsl, hsla, or CSS color names)
         import re
 
         hex_pattern = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
-        rgb_pattern = re.compile(r"^rgb\(")
-        hsl_pattern = re.compile(r"^hsl\(")
+        rgb_pattern = re.compile(r"^rgba?\(")  # Matches both rgb() and rgba()
+        hsl_pattern = re.compile(r"^hsla?\(")  # Matches both hsl() and hsla()
 
         for color_name, color_value in value.items():
             if not isinstance(color_value, str):
@@ -138,7 +138,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
                     f"Color '{color_name}' must be a string"
                 )
 
-            # Allow hex, rgb, hsl formats
+            # Allow hex, rgb, rgba, hsl, hsla formats
             if not (
                 hex_pattern.match(color_value)
                 or rgb_pattern.match(color_value)

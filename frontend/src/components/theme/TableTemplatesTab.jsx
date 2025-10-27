@@ -8,11 +8,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Code, Table as TableIcon, Edit } from 'lucide-react';
 import { TableEditorCore } from '../special-editors/TableEditorCore';
+import CopyButton from './CopyButton';
+import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
-const TableTemplatesTab = ({ tableTemplates, onChange }) => {
+const TableTemplatesTab = ({ tableTemplates, onChange, onDirty }) => {
     const [editingTemplate, setEditingTemplate] = useState(null);
     const [newTemplateKey, setNewTemplateKey] = useState('');
     const [editMode, setEditMode] = useState('visual'); // 'visual' or 'json'
+    const { addNotification } = useGlobalNotifications();
 
     const templates = tableTemplates || {};
     const templateEntries = Object.entries(templates);
@@ -52,6 +55,7 @@ const TableTemplatesTab = ({ tableTemplates, onChange }) => {
         };
 
         onChange(updatedTemplates);
+        if (onDirty) onDirty();
         setNewTemplateKey('');
         setEditingTemplate(templateKey);
     };
@@ -65,12 +69,14 @@ const TableTemplatesTab = ({ tableTemplates, onChange }) => {
             },
         };
         onChange(updatedTemplates);
+        if (onDirty) onDirty();
     };
 
     const handleRemoveTemplate = (key) => {
         const updatedTemplates = { ...templates };
         delete updatedTemplates[key];
         onChange(updatedTemplates);
+        if (onDirty) onDirty();
         if (editingTemplate === key) {
             setEditingTemplate(null);
         }
@@ -80,6 +86,14 @@ const TableTemplatesTab = ({ tableTemplates, onChange }) => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Table Templates</h3>
+                <CopyButton
+                    data={tableTemplates}
+                    level="section"
+                    section="tableTemplates"
+                    label="Copy All Table Templates"
+                    onSuccess={() => addNotification({ type: 'success', message: 'Table templates copied to clipboard' })}
+                    onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                />
             </div>
 
             <div className="text-sm text-gray-600">
@@ -123,8 +137,8 @@ const TableTemplatesTab = ({ tableTemplates, onChange }) => {
                             <div
                                 key={key}
                                 className={`relative flex items-stretch border rounded-lg transition-colors ${editingTemplate === key
-                                        ? 'border-blue-500 bg-blue-50'
-                                        : 'border-gray-200 bg-white hover:border-gray-300'
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 bg-white hover:border-gray-300'
                                     }`}
                             >
                                 <button
@@ -137,17 +151,29 @@ const TableTemplatesTab = ({ tableTemplates, onChange }) => {
                                         {template.rows?.length || 0} rows
                                     </div>
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveTemplate(key);
-                                    }}
-                                    className="px-3 py-2 text-red-600 hover:text-red-700 border-l border-gray-200"
-                                    title="Remove template"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center border-l border-gray-200">
+                                    <CopyButton
+                                        data={{ [key]: template }}
+                                        level="item"
+                                        section="tableTemplates"
+                                        itemKey={key}
+                                        iconOnly
+                                        size="default"
+                                        className="px-3 py-2"
+                                        onSuccess={() => addNotification({ type: 'success', message: `Table template "${key}" copied` })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveTemplate(key);
+                                        }}
+                                        className="px-3 py-2 text-red-600 hover:text-red-700 border-l border-gray-200"
+                                        title="Remove template"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -161,6 +187,7 @@ const TableTemplatesTab = ({ tableTemplates, onChange }) => {
                                 editMode={editMode}
                                 onEditModeChange={setEditMode}
                                 onUpdate={(updates) => handleUpdateTemplate(editingTemplate, updates)}
+                                onDirty={onDirty}
                             />
                         </div>
                     )}
@@ -178,7 +205,7 @@ const TableTemplatesTab = ({ tableTemplates, onChange }) => {
 };
 
 // Table Template Editor
-const TableTemplateEditor = ({ templateKey, template, editMode, onEditModeChange, onUpdate }) => {
+const TableTemplateEditor = ({ templateKey, template, editMode, onEditModeChange, onUpdate, onDirty }) => {
     const containerRef = useRef(null);
     const coreRef = useRef(null);
     const [jsonValue, setJsonValue] = useState('');
@@ -190,6 +217,7 @@ const TableTemplateEditor = ({ templateKey, template, editMode, onEditModeChange
             coreRef.current = new TableEditorCore(template, {
                 onChange: (newData) => {
                     onUpdate(newData);
+                    if (onDirty) onDirty();
                 },
             });
             coreRef.current.render(containerRef.current);
@@ -200,7 +228,7 @@ const TableTemplateEditor = ({ templateKey, template, editMode, onEditModeChange
                 coreRef.current = null;
             }
         };
-    }, [editMode]);
+    }, [editMode, onUpdate, onDirty]);
 
     // Update core when template changes externally
     useEffect(() => {
@@ -219,6 +247,7 @@ const TableTemplateEditor = ({ templateKey, template, editMode, onEditModeChange
 
     const handleJsonChange = (value) => {
         setJsonValue(value);
+        if (onDirty) onDirty();
         try {
             const parsed = JSON.parse(value);
             setJsonError(null);

@@ -31,6 +31,8 @@ import GalleryStylesTab from './theme/GalleryStylesTab';
 import CarouselStylesTab from './theme/CarouselStylesTab';
 import TableTemplatesTab from './theme/TableTemplatesTab';
 import ImageUpload from './theme/ImageUpload';
+import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
+import CopyButton from './theme/CopyButton';
 
 const ThemeEditor = ({ onSave }) => {
     const { themeId, tab } = useParams();
@@ -570,6 +572,22 @@ const ThemeEditor = ({ onSave }) => {
                                             <Edit3 className="w-4 h-4 mr-1" />
                                             Edit
                                         </button>
+                                        <CopyButton
+                                            data={{
+                                                fonts: theme.fonts || {},
+                                                colors: theme.colors || {},
+                                                typography: theme.typography || { groups: [] },
+                                                componentStyles: theme.componentStyles || {},
+                                                galleryStyles: theme.galleryStyles || {},
+                                                carouselStyles: theme.carouselStyles || {},
+                                                tableTemplates: theme.tableTemplates || {},
+                                            }}
+                                            level="full"
+                                            iconOnly
+                                            className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                            onSuccess={() => addNotification({ type: 'success', message: `Theme "${theme.name}" copied to clipboard` })}
+                                            onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                                        />
                                         <button
                                             onClick={() => handleClone(theme)}
                                             className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -624,17 +642,31 @@ const ThemeEditor = ({ onSave }) => {
                                 </div>
                             </div>
 
-                            {/* Clear Cache Button - only show when editing existing theme */}
-                            {!isCreating && (
-                                <button
-                                    onClick={handleClearCache}
-                                    className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                    title="Clear cached CSS for this theme"
-                                >
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                    Clear CSS Cache
-                                </button>
-                            )}
+                            <div className="flex items-center gap-2">
+                                <ThemeCopyPasteManager
+                                    themeData={themeData}
+                                    currentTab={activeTab}
+                                    onUpdate={(updatedData) => {
+                                        // Update all theme fields that were pasted
+                                        Object.keys(updatedData).forEach(key => {
+                                            if (updatedData[key] !== undefined) {
+                                                updateThemeField(key, updatedData[key]);
+                                            }
+                                        });
+                                    }}
+                                />
+                                {/* Clear Cache Button - only show when editing existing theme */}
+                                {!isCreating && (
+                                    <button
+                                        onClick={handleClearCache}
+                                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        title="Clear cached CSS for this theme"
+                                    >
+                                        <RefreshCw className="w-4 h-4 mr-2" />
+                                        Clear CSS Cache
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

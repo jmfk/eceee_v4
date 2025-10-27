@@ -16,6 +16,8 @@ import TypographyPreview from './TypographyPreview';
 import ColorSelector from './form-fields/ColorSelector';
 import FontSelector from './form-fields/FontSelector';
 import NumericInput from './form-fields/NumericInput';
+import CopyButton from './CopyButton';
+import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
 // Convert camelCase CSS properties to kebab-case
 const cssPropertyToKebab = (prop) => {
@@ -85,6 +87,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
   const [clipboard, setClipboard] = useState(null); // { type: 'tag' | 'group', data: {...} }
   const [copiedIndicator, setCopiedIndicator] = useState(null);
   const [editMode, setEditMode] = useState({}); // { groupIndex-tagBase-variant: 'form' | 'css' }
+  const { addNotification } = useGlobalNotifications();
 
   // Refs for CSS textarea to prevent re-rendering
   const cssTextareaRefs = useRef({});
@@ -395,14 +398,24 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900">Typography Groups</h3>
-        <button
-          type="button"
-          onClick={handleAddGroup}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Group
-        </button>
+        <div className="flex gap-2">
+          <CopyButton
+            data={typography}
+            level="section"
+            section="typography"
+            label="Copy Typography"
+            onSuccess={() => addNotification({ type: 'success', message: 'Typography settings copied to clipboard' })}
+            onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+          />
+          <button
+            type="button"
+            onClick={handleAddGroup}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Group
+          </button>
+        </div>
       </div>
 
       {/* Split layout */}
