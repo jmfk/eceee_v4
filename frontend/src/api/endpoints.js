@@ -184,6 +184,16 @@ export const endpoints = {
         detail: (id) => `${BASE_PATH}/objects/api/objects/${id}/`,
         publish: (id) => `${BASE_PATH}/objects/api/objects/${id}/publish/`,
         unpublish: (id) => `${BASE_PATH}/objects/api/objects/${id}/unpublish/`
+    },
+
+    // Content Import endpoints
+    contentImport: {
+        base: `${BASE_PATH}/content-import`,
+        proxyPage: `${BASE_PATH}/content-import/proxy-page/`,
+        proxyAsset: `${BASE_PATH}/content-import/proxy-asset/`,
+        capture: `${BASE_PATH}/content-import/capture/`,
+        extract: `${BASE_PATH}/content-import/extract/`,
+        process: `${BASE_PATH}/content-import/process/`
     }
 }
 

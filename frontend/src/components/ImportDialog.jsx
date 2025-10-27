@@ -1,23 +1,23 @@
 /**
- * ImportDialog - Multi-step wizard for importing content from external websites
+ * ImportDialog - Proxy-based import with iframe
  * 
  * Steps:
  * 1. Enter URL
- * 2. Click screenshot to select content
- * 3. Preview content
+ * 2. Display proxied page in iframe with click detection
+ * 3. Preview selected content
  * 4. Choose import options
  * 5. Show progress and results
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, ArrowLeft, ArrowRight, Download, Loader } from 'lucide-react';
 import ContentPreview from './import/ContentPreview';
-import { captureScreenshot, extractContent, processImport } from '../api/contentImport';
+import { proxyPage, processImport } from '../api/contentImport';
 import { useNotificationContext } from './NotificationManager';
 
 const STEPS = {
     URL_INPUT: 1,
-    SCREENSHOT_SELECT: 2,
+    IFRAME_SELECT: 2,
     CONTENT_PREVIEW: 3,
     IMPORT_OPTIONS: 4,
     PROCESSING: 5,
@@ -26,22 +26,36 @@ const STEPS = {
 const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) => {
     const [currentStep, setCurrentStep] = useState(STEPS.URL_INPUT);
     const [url, setUrl] = useState('');
-    const [screenshotData, setScreenshotData] = useState(null);
+    const [proxiedHtml, setProxiedHtml] = useState(null);
     const [selectedElement, setSelectedElement] = useState(null);
     const [importMode, setImportMode] = useState('append');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [importResults, setImportResults] = useState(null);
     const [progress, setProgress] = useState({ step: '', percent: 0 });
-
-    const screenshotRef = useRef(null);
+    
+    const iframeRef = useRef(null);
     const { showNotification } = useNotificationContext();
+
+    // Listen for messages from iframe (content selection)
+    useEffect(() => {
+        const handleMessage = (event) => {
+            if (event.data.type === 'CONTENT_SELECTED') {
+                setSelectedElement(event.data.data);
+                // Auto-advance to preview step
+                setCurrentStep(STEPS.CONTENT_PREVIEW);
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
 
     const handleClose = () => {
         // Reset state
         setCurrentStep(STEPS.URL_INPUT);
         setUrl('');
-        setScreenshotData(null);
+        setProxiedHtml(null);
         setSelectedElement(null);
         setImportMode('append');
         setError(null);
@@ -60,20 +74,21 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 return;
             }
 
-            // Capture screenshot
+            // Fetch proxied page
             setIsLoading(true);
             try {
-                const data = await captureScreenshot(url);
-                setScreenshotData(data);
-                setCurrentStep(STEPS.SCREENSHOT_SELECT);
+                const data = await proxyPage(url);
+                setProxiedHtml(data.html);
+                setCurrentStep(STEPS.IFRAME_SELECT);
             } catch (err) {
-                setError(err.message || 'Failed to capture screenshot');
+                console.error('Proxy page error:', err);
+                setError(err.response?.data?.error || err.message || 'Failed to load page');
             } finally {
                 setIsLoading(false);
             }
-        } else if (currentStep === STEPS.SCREENSHOT_SELECT) {
+        } else if (currentStep === STEPS.IFRAME_SELECT) {
             if (!selectedElement) {
-                setError('Please click on the screenshot to select content');
+                setError('Please click on the content you want to import');
                 return;
             }
             setCurrentStep(STEPS.CONTENT_PREVIEW);
@@ -87,40 +102,14 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
     const handleBack = () => {
         setError(null);
-        if (currentStep === STEPS.SCREENSHOT_SELECT) {
+        if (currentStep === STEPS.IFRAME_SELECT) {
             setCurrentStep(STEPS.URL_INPUT);
-            setScreenshotData(null);
+            setProxiedHtml(null);
         } else if (currentStep === STEPS.CONTENT_PREVIEW) {
-            setCurrentStep(STEPS.SCREENSHOT_SELECT);
+            setCurrentStep(STEPS.IFRAME_SELECT);
             setSelectedElement(null);
         } else if (currentStep === STEPS.IMPORT_OPTIONS) {
             setCurrentStep(STEPS.CONTENT_PREVIEW);
-        }
-    };
-
-    const handleScreenshotClick = async (event) => {
-        if (!screenshotRef.current) return;
-
-        const rect = screenshotRef.current.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        // Scale coordinates to match original viewport
-        const scaleX = screenshotData.width / rect.width;
-        const scaleY = screenshotData.height / rect.height;
-        const scaledX = Math.round(x * scaleX);
-        const scaledY = Math.round(y * scaleY);
-
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            const elementData = await extractContent(url, scaledX, scaledY);
-            setSelectedElement(elementData);
-        } catch (err) {
-            setError(err.message || 'Failed to extract content');
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -150,7 +139,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             }
 
             showNotification(
-                `Successfully imported ${results.widgets.length} widgets and ${results.media_files.length} media files`,
+                `Successfully imported ${results.widgets.length} widgets`,
                 'success'
             );
 
@@ -167,7 +156,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <h2 className="text-xl font-semibold text-gray-900">
@@ -186,10 +175,10 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     <div className="text-sm font-medium text-gray-700">
                         Step {currentStep}/5: {
                             currentStep === STEPS.URL_INPUT ? 'Enter URL' :
-                                currentStep === STEPS.SCREENSHOT_SELECT ? 'Select Content Block' :
-                                    currentStep === STEPS.CONTENT_PREVIEW ? 'Preview Content' :
-                                        currentStep === STEPS.IMPORT_OPTIONS ? 'Import Options' :
-                                            'Importing...'
+                            currentStep === STEPS.IFRAME_SELECT ? 'Select Content' :
+                            currentStep === STEPS.CONTENT_PREVIEW ? 'Preview Content' :
+                            currentStep === STEPS.IMPORT_OPTIONS ? 'Import Options' :
+                            'Importing...'
                         }
                     </div>
                 </div>
@@ -217,29 +206,29 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                 onKeyPress={(e) => e.key === 'Enter' && handleNext()}
                             />
                             <p className="mt-2 text-sm text-gray-500">
-                                We'll capture a screenshot of this page so you can select the content to import.
+                                The page will be displayed live so you can click on the content you want.
                             </p>
                         </div>
                     )}
 
-                    {/* Step 2: Screenshot Selection */}
-                    {currentStep === STEPS.SCREENSHOT_SELECT && screenshotData && (
+                    {/* Step 2: Iframe Content Selection */}
+                    {currentStep === STEPS.IFRAME_SELECT && proxiedHtml && (
                         <div>
                             <p className="text-sm text-gray-700 mb-3">
-                                Click on the content block you want to import:
+                                Click on the content block you want to import. Hover over elements to see them highlighted.
                             </p>
-                            <div className="border border-gray-300 rounded-lg overflow-hidden cursor-crosshair">
-                                <img
-                                    ref={screenshotRef}
-                                    src={`data:image/png;base64,${screenshotData.screenshot_data}`}
-                                    alt="Website screenshot"
-                                    onClick={handleScreenshotClick}
-                                    className="w-full"
+                            <div className="border border-gray-300 rounded-lg overflow-hidden" style={{ height: '600px' }}>
+                                <iframe
+                                    ref={iframeRef}
+                                    srcDoc={proxiedHtml}
+                                    className="w-full h-full"
+                                    sandbox="allow-same-origin allow-scripts"
+                                    title="Content preview"
                                 />
                             </div>
                             {selectedElement && (
                                 <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                                    ✓ Selected: {selectedElement.tag_name} element
+                                    ✓ Selected: {selectedElement.tagName} element
                                 </div>
                             )}
                         </div>
@@ -261,7 +250,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">
                                 Import Options
                             </h3>
-
+                            
                             <div className="space-y-3 mb-6">
                                 <label className="flex items-center">
                                     <input
@@ -277,7 +266,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                         <div className="text-sm text-gray-600">Add imported content after current widgets in the slot</div>
                                     </div>
                                 </label>
-
+                                
                                 <label className="flex items-center">
                                     <input
                                         type="radio"
@@ -320,8 +309,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             </div>
                             {importResults && (
                                 <div className="mt-4 text-sm text-gray-600">
-                                    Created {importResults.widgets.length} widgets,
-                                    imported {importResults.media_files.length} media files
+                                    Created {importResults.widgets.length} widgets
                                 </div>
                             )}
                         </div>
@@ -341,7 +329,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             </button>
                         )}
                     </div>
-
+                    
                     <div className="flex items-center space-x-3">
                         <button
                             onClick={handleClose}
@@ -349,8 +337,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         >
                             Cancel
                         </button>
-
-                        {currentStep < STEPS.PROCESSING && (
+                        
+                        {currentStep < STEPS.PROCESSING && currentStep !== STEPS.IFRAME_SELECT && (
                             <button
                                 onClick={handleNext}
                                 disabled={isLoading}
@@ -382,4 +370,3 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 };
 
 export default ImportDialog;
-

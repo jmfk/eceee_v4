@@ -5,6 +5,18 @@
 import apiClient from './client';
 
 /**
+ * Proxy an external webpage with URL rewriting (for iframe display)
+ * @param {string} url - URL to proxy
+ * @returns {Promise<Object>} Proxied page data
+ */
+export const proxyPage = async (url) => {
+    const response = await apiClient.post('/api/v1/content-import/proxy-page/', {
+        url,
+    });
+    return response.data;
+};
+
+/**
  * Capture screenshot of external website
  * @param {string} url - URL to capture
  * @param {Object} options - Optional viewport settings
@@ -55,6 +67,7 @@ export const processImport = async (importData) => {
 };
 
 export default {
+    proxyPage,
     captureScreenshot,
     extractContent,
     processImport,
