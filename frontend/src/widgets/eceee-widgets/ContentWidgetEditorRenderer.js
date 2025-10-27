@@ -525,6 +525,7 @@ class ContentWidgetEditorRenderer {
         this.className = options.className || ''
         this.onChange = options.onChange || (() => { })
         this.namespace = options.namespace || null // Namespace for media browser
+        this.slotDimensions = options.slotDimensions || null // Slot dimensions for imgproxy sizing
 
         // Theme configuration
         this.maxHeaderLevel = options.maxHeaderLevel || this.getThemeHeaderLevel() || 3
@@ -1715,7 +1716,7 @@ class ContentWidgetEditorRenderer {
         const root = ReactDOM.createRoot(modalContainer)
 
         const handleInsert = async (config) => {
-            await this.insertMediaAtCursor(config)
+            await this.insertMediaAtCursor(config, this.slotDimensions)
             root.unmount()
             modalContainer.remove()
         }
@@ -1741,14 +1742,14 @@ class ContentWidgetEditorRenderer {
     /**
      * Insert media at cursor position
      */
-    async insertMediaAtCursor(config) {
+    async insertMediaAtCursor(config, slotDimensions = null) {
         if (!this.editorElement) return
 
         const { createMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js')
 
         try {
             // Generate HTML for media insert
-            const html = await createMediaInsertHTML(config.mediaData, config)
+            const html = await createMediaInsertHTML(config.mediaData, config, slotDimensions)
 
             // Get selection and insert at cursor
             const selection = window.getSelection()
@@ -1864,7 +1865,7 @@ class ContentWidgetEditorRenderer {
 
         const handleSave = async (updatedConfig) => {
             // updatedConfig now includes the new mediaData if it was changed
-            await this.updateMediaInsert(mediaElement, updatedConfig.mediaData, updatedConfig)
+            await this.updateMediaInsert(mediaElement, updatedConfig.mediaData, updatedConfig, this.slotDimensions)
             root.unmount()
             modalContainer.remove()
         }
@@ -1899,11 +1900,11 @@ class ContentWidgetEditorRenderer {
     /**
      * Update media insert with new configuration
      */
-    async updateMediaInsert(element, mediaData, config) {
+    async updateMediaInsert(element, mediaData, config, slotDimensions = null) {
         const { updateMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js')
 
         try {
-            updateMediaInsertHTML(element, mediaData, config)
+            updateMediaInsertHTML(element, mediaData, config, slotDimensions)
 
             // Force content update - get fresh innerHTML after DOM modification
             if (this.editorElement) {
@@ -2224,6 +2225,9 @@ class ContentWidgetEditorRenderer {
         }
         if (options.namespace !== undefined) {
             this.namespace = options.namespace
+        }
+        if (options.slotDimensions !== undefined) {
+            this.slotDimensions = options.slotDimensions
         }
     }
 

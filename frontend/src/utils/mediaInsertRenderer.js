@@ -30,10 +30,10 @@ export async function fetchMediaData(mediaId, mediaType) {
  * Generate imgproxy URL for an image
  * @param {string} baseUrl - Base URL or imgproxy base URL
  * @param {number} width - Desired width
- * @param {number} height - Desired height
+ * @param {number} height - Desired height (optional, will maintain aspect ratio if null/0)
  * @returns {string} Optimized image URL
  */
-export function generateImgproxyUrl(baseUrl, width, height) {
+export function generateImgproxyUrl(baseUrl, width, height = null) {
     if (!baseUrl) return '';
 
     // If it's already an imgproxy URL or full URL, use it directly
@@ -41,31 +41,42 @@ export function generateImgproxyUrl(baseUrl, width, height) {
         return baseUrl;
     }
 
-    // Build imgproxy URL
+    // Build imgproxy URL with width and optional height
     // Format: /insecure/resize:fit:WIDTH:HEIGHT:0/plain/BASE_URL
+    const h = height || 0; // 0 means maintain aspect ratio
     const encodedUrl = btoa(baseUrl).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    return `/imgproxy/insecure/resize:fit:${width}:${height}:0/plain/${encodedUrl}`;
+    return `/imgproxy/insecure/resize:fit:${width}:${h}:0/plain/${encodedUrl}`;
 }
 
 /**
  * Render a single image with imgproxy optimization
  * @param {Object} mediaData - Media file data
  * @param {Object} config - Configuration (width, align, caption)
+ * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
  * @returns {string} HTML string for image element
  */
-export function renderMediaImage(mediaData, config) {
+export function renderMediaImage(mediaData, config, slotDimensions = null) {
     const { width = 'full', align = 'center' } = config;
 
-    // Determine image dimensions based on width setting
-    const widthMap = {
-        'full': 1200,
-        'half': 600,
-        'third': 400
-    };
-    const imgWidth = widthMap[width] || 1200;
-    const imgHeight = Math.round(imgWidth * 0.75); // 4:3 aspect ratio default
+    // Get desktop slot width (default to 896px if not available)
+    const slotWidth = slotDimensions?.desktop?.width || 896;
 
-    // Generate optimized image URL
+    // Calculate imgproxy width based on width setting
+    const widthMultipliers = {
+        'full': 1.0,
+        'half': 0.5,
+        'third': 0.33
+    };
+    const imgWidth = Math.round(slotWidth * widthMultipliers[width]);
+
+    // Calculate height based on original image aspect ratio
+    const originalWidth = mediaData.width || mediaData.originalWidth;
+    const originalHeight = mediaData.height || mediaData.originalHeight;
+    const imgHeight = (originalWidth && originalHeight)
+        ? Math.round((originalHeight / originalWidth) * imgWidth)
+        : null; // Let imgproxy maintain aspect ratio if we don't know it
+
+    // Generate optimized image URL with calculated dimensions
     const imageUrl = generateImgproxyUrl(
         mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url,
         imgWidth,
@@ -74,33 +85,55 @@ export function renderMediaImage(mediaData, config) {
 
     const alt = mediaData.alt || mediaData.title || mediaData.original_filename || 'Image';
 
-    return `<img src="${imageUrl}" alt="${escapeHtml(alt)}" width="${imgWidth}" height="${imgHeight}" loading="lazy" />`;
+    // Add CSS class for responsive width (full/half/third)
+    // These will be defined to use percentages: 100%, 50%, ~33%
+    const widthClass = `img-width-${width}`;
+
+    return `<img 
+        src="${imageUrl}" 
+        alt="${escapeHtml(alt)}" 
+        class="${widthClass}"
+        loading="lazy" 
+    />`;
 }
 
 /**
  * Render a collection as a gallery
  * @param {Object} collectionData - Collection data with files
  * @param {Object} config - Configuration (width, align, caption)
+ * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
  * @returns {string} HTML string for gallery
  */
-export function renderMediaCollection(collectionData, config) {
+export function renderMediaCollection(collectionData, config, slotDimensions = null) {
     const files = collectionData.files || [];
 
     if (files.length === 0) {
         return '<div class="media-gallery-empty">No images in this collection</div>';
     }
 
+    // Get desktop slot width for thumbnail calculation
+    const slotWidth = slotDimensions?.desktop?.width || 896;
+    // Use 1/3 of slot width for gallery thumbnails
+    const thumbnailWidth = Math.round(slotWidth * 0.33);
+
     // Render as a simple grid gallery
     const imageElements = files.map(file => {
+        // Calculate height based on original aspect ratio if available
+        const originalWidth = file.width || file.originalWidth;
+        const originalHeight = file.height || file.originalHeight;
+        const thumbnailHeight = (originalWidth && originalHeight)
+            ? Math.round((originalHeight / originalWidth) * thumbnailWidth)
+            : null;
+
         const imageUrl = generateImgproxyUrl(
             file.imgproxyBaseUrl || file.fileUrl || file.file_url,
-            400,
-            300
+            thumbnailWidth,
+            thumbnailHeight
         );
         const alt = file.alt || file.title || file.original_filename || 'Image';
 
         return `<div class="media-gallery-item">
-            <img src="${imageUrl}" alt="${escapeHtml(alt)}" width="400" height="300" loading="lazy" />
+            <img src="${imageUrl}" alt="${escapeHtml(alt)}" loading="lazy" />
         </div>`;
     }).join('');
 
@@ -111,9 +144,10 @@ export function renderMediaCollection(collectionData, config) {
  * Create complete media insert HTML
  * @param {Object} mediaData - Media or collection data
  * @param {Object} config - Configuration
+ * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
  * @returns {string} Complete HTML string for media insert
  */
-export async function createMediaInsertHTML(mediaData, config) {
+export async function createMediaInsertHTML(mediaData, config, slotDimensions = null) {
     const {
         mediaType = 'image',
         mediaId,
@@ -125,9 +159,9 @@ export async function createMediaInsertHTML(mediaData, config) {
     // Generate inner content based on media type
     let innerContent;
     if (mediaType === 'collection') {
-        innerContent = renderMediaCollection(mediaData, config);
+        innerContent = renderMediaCollection(mediaData, config, slotDimensions);
     } else {
-        innerContent = renderMediaImage(mediaData, config);
+        innerContent = renderMediaImage(mediaData, config, slotDimensions);
     }
 
     // Build caption HTML if provided
@@ -159,9 +193,10 @@ export async function createMediaInsertHTML(mediaData, config) {
  * @param {HTMLElement} element - The media insert element
  * @param {Object} mediaData - Media or collection data
  * @param {Object} config - Updated configuration
+ * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
  * @returns {string} Updated HTML string
  */
-export function updateMediaInsertHTML(element, mediaData, config) {
+export function updateMediaInsertHTML(element, mediaData, config, slotDimensions = null) {
     const {
         mediaType,
         width = 'full',
@@ -172,9 +207,9 @@ export function updateMediaInsertHTML(element, mediaData, config) {
     // Generate updated inner content
     let innerContent;
     if (mediaType === 'collection') {
-        innerContent = renderMediaCollection(mediaData, config);
+        innerContent = renderMediaCollection(mediaData, config, slotDimensions);
     } else {
-        innerContent = renderMediaImage(mediaData, config);
+        innerContent = renderMediaImage(mediaData, config, slotDimensions);
     }
 
     // Build caption HTML if provided

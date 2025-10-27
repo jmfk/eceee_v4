@@ -9,6 +9,22 @@ module.exports = {
         './object_storage/templates/**/*.html',
         './webpages/templates/**/*.html',
     ],
+    safelist: [
+        // WYSIWYG editor media insert classes (used in dynamic content)
+        'media-insert',
+        'img-width-full',
+        'img-width-half',
+        'img-width-third',
+        'media-width-full',
+        'media-width-half',
+        'media-width-third',
+        'media-align-left',
+        'media-align-center',
+        'media-align-right',
+        'media-caption',
+        'media-gallery',
+        'media-gallery-item',
+    ],
     theme: {
         extend: {
             fontFamily: {

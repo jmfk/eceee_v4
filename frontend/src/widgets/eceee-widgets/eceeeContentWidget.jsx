@@ -52,7 +52,7 @@ const cleanHTML = (html) => {
  * Vanilla JS Editor Wrapper Component
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidgetEditor = memo(({ content, onChange, className, namespace }) => {
+const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -67,6 +67,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace }) =
                 onChange,
                 className,
                 namespace,  // Pass namespace for media browser
+                slotDimensions,  // Pass slot dimensions for imgproxy sizing
                 detachedToolbar: true  // Enable global toolbar mode
             })
             rendererRef.current.render()
@@ -111,12 +112,12 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace }) =
         }
     }, [content])
 
-    // Separate effect for onChange, className, and namespace updates
+    // Separate effect for onChange, className, namespace, and slotDimensions updates
     useEffect(() => {
         if (rendererRef.current) {
-            rendererRef.current.updateConfig({ onChange, className, namespace })
+            rendererRef.current.updateConfig({ onChange, className, namespace, slotDimensions })
         }
-    }, [onChange, className, namespace])
+    }, [onChange, className, namespace, slotDimensions])
 
     useEffect(() => {
         return () => {
@@ -161,6 +162,8 @@ const eceeeContentWidget = memo(({
     nestedParentSlotName = null,
     // Namespace for media browser (optional, defaults to current site)
     namespace = null,
+    // Slot configuration (for dimensions)
+    slotConfig = null,
     //context = {}
 }) => {
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
@@ -226,6 +229,7 @@ const eceeeContentWidget = memo(({
                 onChange={handleContentChange}
                 className=""
                 namespace={namespace}
+                slotDimensions={slotConfig?.dimensions}
             />
         )
     }
