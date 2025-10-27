@@ -17,8 +17,8 @@ const cleanHTML = (html) => {
     tempDiv.innerHTML = html
 
     // Define allowed HTML tags (whitelist approach)
-    const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li']
-    const inlineTags = ['strong', 'b', 'em', 'i', 'a', 'br']
+    const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'blockquote']
+    const inlineTags = ['strong', 'b', 'em', 'i', 'a', 'br', 'code']
     const mediaInsertTags = ['div', 'img'] // For media inserts
     const allowedTags = [...blockTags, ...inlineTags, ...mediaInsertTags]
     const allowedAttributes = ['href', 'target']
@@ -355,6 +355,8 @@ const ICONS = {
     list: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>`,
     listOrdered: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1.5S2 14 2 15"/></svg>`,
     image: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
+    code: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
+    quote: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>`,
     undo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="m21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>`,
     redo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="m3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3-2.3"/></svg>`,
     cleanup: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M7 14h10v2c0 1.1-.9 2-2 2H9c-1.1 0-2-.9-2-2v-2z"/><path d="M9 18v3M15 18v3M12 18v3"/></svg>`
@@ -653,6 +655,19 @@ class ContentWidgetEditorRenderer {
         const olButton = this.createToolbarButton('insertOrderedList', 'Numbered List', ICONS.listOrdered)
         this.toolbarButtons.set('insertOrderedList', olButton)
         this.toolbarElement.appendChild(olButton)
+
+        // Separator
+        this.toolbarElement.appendChild(this.createSeparator())
+
+        // Code button
+        const codeButton = this.createToolbarButton('formatCode', 'Code', ICONS.code)
+        this.toolbarButtons.set('formatCode', codeButton)
+        this.toolbarElement.appendChild(codeButton)
+
+        // Quote button
+        const quoteButton = this.createToolbarButton('formatBlockquote', 'Quote', ICONS.quote)
+        this.toolbarButtons.set('formatBlockquote', quoteButton)
+        this.toolbarElement.appendChild(quoteButton)
 
         // Separator
         this.toolbarElement.appendChild(this.createSeparator())
@@ -962,6 +977,8 @@ class ContentWidgetEditorRenderer {
      * Handle key down events
      */
     handleKeyDown(e) {
+        const isMod = e.metaKey || e.ctrlKey // Cmd on Mac, Ctrl on Windows/Linux
+
         // Tab handling for indentation
         if (e.key === 'Tab') {
             e.preventDefault()
@@ -970,11 +987,181 @@ class ContentWidgetEditorRenderer {
             } else {
                 this.execCommand('indent')
             }
+            return
         }
+
+        // Keyboard shortcuts with Cmd/Ctrl
+        if (isMod) {
+            // Cmd/Ctrl + 0: Paragraph
+            if (e.key === '0') {
+                e.preventDefault()
+                this.execCommand('formatBlock', '<p>')
+                return
+            }
+
+            // Cmd/Ctrl + 1-6: Headings
+            if (e.key >= '1' && e.key <= '6') {
+                const level = parseInt(e.key)
+                if (level <= this.maxHeaderLevel) {
+                    e.preventDefault()
+                    this.execCommand('formatBlock', `<h${level}>`)
+                }
+                return
+            }
+
+            // Cmd/Ctrl + 7: Bullet list
+            if (e.key === '7') {
+                e.preventDefault()
+                this.execCommand('insertUnorderedList')
+                return
+            }
+
+            // Cmd/Ctrl + 8: Numbered list
+            if (e.key === '8') {
+                e.preventDefault()
+                this.execCommand('insertOrderedList')
+                return
+            }
+
+            // Cmd/Ctrl + L: Link
+            if (e.key === 'l' || e.key === 'L') {
+                e.preventDefault()
+                this.handleLinkAction()
+                return
+            }
+
+            // Cmd/Ctrl + ,: Outdent
+            if (e.key === ',') {
+                e.preventDefault()
+                this.execCommand('outdent')
+                return
+            }
+
+            // Cmd/Ctrl + .: Indent
+            if (e.key === '.') {
+                e.preventDefault()
+                this.execCommand('indent')
+                return
+            }
+
+            // Cmd/Ctrl + K: Code
+            if (e.key === 'k' || e.key === 'K') {
+                e.preventDefault()
+                this.formatAsCode()
+                return
+            }
+
+            // Cmd/Ctrl + J: Blockquote
+            if (e.key === 'j' || e.key === 'J') {
+                e.preventDefault()
+                this.formatAsBlockquote()
+                return
+            }
+        }
+
         // Enter key handling for lists
-        else if (e.key === 'Enter') {
+        if (e.key === 'Enter') {
             setTimeout(this.handleContentChange, 0)
         }
+    }
+
+    /**
+     * Format selection as inline code
+     */
+    formatAsCode() {
+        const selection = window.getSelection()
+        if (!selection.rangeCount || selection.isCollapsed) return
+
+        const range = selection.getRangeAt(0)
+        const selectedText = selection.toString()
+
+        // Check if already inside a code tag
+        let element = range.commonAncestorContainer
+        if (element.nodeType === Node.TEXT_NODE) {
+            element = element.parentElement
+        }
+
+        // Walk up to find if we're inside a code tag
+        let insideCode = false
+        let codeElement = null
+        let tempElement = element
+        while (tempElement && tempElement !== this.editorElement) {
+            if (tempElement.tagName === 'CODE') {
+                insideCode = true
+                codeElement = tempElement
+                break
+            }
+            tempElement = tempElement.parentElement
+        }
+
+        if (insideCode && codeElement) {
+            // Remove code formatting
+            const parent = codeElement.parentNode
+            while (codeElement.firstChild) {
+                parent.insertBefore(codeElement.firstChild, codeElement)
+            }
+            parent.removeChild(codeElement)
+        } else {
+            // Add code formatting
+            const codeTag = document.createElement('code')
+            codeTag.textContent = selectedText
+            range.deleteContents()
+            range.insertNode(codeTag)
+
+            // Move cursor after the code element
+            range.setStartAfter(codeTag)
+            range.setEndAfter(codeTag)
+            selection.removeAllRanges()
+            selection.addRange(range)
+        }
+
+        this.handleContentChange()
+    }
+
+    /**
+     * Format current block as blockquote
+     */
+    formatAsBlockquote() {
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
+
+        const range = selection.getRangeAt(0)
+        let element = range.commonAncestorContainer
+        if (element.nodeType === Node.TEXT_NODE) {
+            element = element.parentElement
+        }
+
+        // Find the block element
+        while (element && element !== this.editorElement) {
+            const tagName = element.tagName?.toLowerCase()
+            if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote'].includes(tagName)) {
+                break
+            }
+            element = element.parentElement
+        }
+
+        if (!element || element === this.editorElement) return
+
+        // Toggle blockquote
+        if (element.tagName === 'BLOCKQUOTE') {
+            // Remove blockquote - convert to paragraph
+            const p = document.createElement('p')
+            p.innerHTML = element.innerHTML
+            element.parentNode.replaceChild(p, element)
+        } else if (element.parentElement.tagName === 'BLOCKQUOTE') {
+            // Already inside blockquote, remove it
+            const blockquote = element.parentElement
+            const p = document.createElement('p')
+            p.innerHTML = element.innerHTML
+            blockquote.parentNode.replaceChild(p, blockquote)
+        } else {
+            // Wrap in blockquote
+            const blockquote = document.createElement('blockquote')
+            element.parentNode.insertBefore(blockquote, element)
+            blockquote.appendChild(element)
+        }
+
+        this.handleContentChange()
     }
 
     /**
@@ -1375,6 +1562,42 @@ class ContentWidgetEditorRenderer {
 
         // Get range for format and link checking
         const range = selection.getRangeAt(0)
+
+        // Check for code
+        let codeElement = range.commonAncestorContainer
+        if (codeElement.nodeType === Node.TEXT_NODE) {
+            codeElement = codeElement.parentElement
+        }
+
+        while (codeElement && codeElement !== this.editorElement) {
+            if (codeElement.tagName === 'CODE') {
+                const codeButton = this.toolbarButtons.get('formatCode')
+                if (codeButton) {
+                    codeButton.classList.add('bg-blue-500', 'text-white')
+                    codeButton.classList.remove('hover:bg-gray-200')
+                }
+                break
+            }
+            codeElement = codeElement.parentElement
+        }
+
+        // Check for blockquote
+        let quoteElement = range.commonAncestorContainer
+        if (quoteElement.nodeType === Node.TEXT_NODE) {
+            quoteElement = quoteElement.parentElement
+        }
+
+        while (quoteElement && quoteElement !== this.editorElement) {
+            if (quoteElement.tagName === 'BLOCKQUOTE') {
+                const quoteButton = this.toolbarButtons.get('formatBlockquote')
+                if (quoteButton) {
+                    quoteButton.classList.add('bg-blue-500', 'text-white')
+                    quoteButton.classList.remove('hover:bg-gray-200')
+                }
+                break
+            }
+            quoteElement = quoteElement.parentElement
+        }
 
         // Update format dropdown label based on current element
         if (this.formatDropdown) {
@@ -1827,7 +2050,7 @@ class ContentWidgetEditorRenderer {
                 const em = document.createElement('em')
                 em.innerHTML = el.innerHTML
                 el.parentNode.replaceChild(em, el)
-            } else if (!['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'p', 'li', 'ul', 'ol', 'a', 'br'].includes(tagName)) {
+            } else if (!['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'p', 'li', 'ul', 'ol', 'a', 'br', 'code', 'blockquote'].includes(tagName)) {
                 // Remove disallowed tags, keep content
                 while (el.firstChild) {
                     el.parentNode.insertBefore(el.firstChild, el)
@@ -1905,6 +2128,16 @@ class ContentWidgetEditorRenderer {
                     element = element.parentElement
                 }
             }
+            return
+        }
+
+        if (command === 'formatCode') {
+            this.formatAsCode()
+            return
+        }
+
+        if (command === 'formatBlockquote') {
+            this.formatAsBlockquote()
             return
         }
 
@@ -2051,6 +2284,10 @@ class ContentWidgetEditorRenderer {
                 this.cleanupHTML();
             } else if (command === 'insertImage') {
                 this.openMediaInsertModal();
+            } else if (command === 'formatCode') {
+                this.formatAsCode();
+            } else if (command === 'formatBlockquote') {
+                this.formatAsBlockquote();
             } else {
                 this.execCommand(command, value);
             }
@@ -2112,6 +2349,8 @@ class ContentWidgetEditorRenderer {
             insertUnorderedList: false,
             insertOrderedList: false,
             link: false,
+            code: false,
+            blockquote: false,
             format: 'Format',
             maxHeaderLevel: this.maxHeaderLevel
         };
@@ -2161,6 +2400,34 @@ class ContentWidgetEditorRenderer {
                 break;
             }
             linkElement = linkElement.parentElement;
+        }
+
+        // Check for code
+        let codeElement = range.commonAncestorContainer;
+        if (codeElement.nodeType === Node.TEXT_NODE) {
+            codeElement = codeElement.parentElement;
+        }
+
+        while (codeElement && codeElement !== this.editorElement) {
+            if (codeElement.tagName === 'CODE') {
+                state.code = true;
+                break;
+            }
+            codeElement = codeElement.parentElement;
+        }
+
+        // Check for blockquote
+        let quoteElement = range.commonAncestorContainer;
+        if (quoteElement.nodeType === Node.TEXT_NODE) {
+            quoteElement = quoteElement.parentElement;
+        }
+
+        while (quoteElement && quoteElement !== this.editorElement) {
+            if (quoteElement.tagName === 'BLOCKQUOTE') {
+                state.blockquote = true;
+                break;
+            }
+            quoteElement = quoteElement.parentElement;
         }
 
         return state;

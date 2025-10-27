@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { X, RefreshCw } from 'lucide-react'
+import { X, RefreshCw, Save } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
+import { useAutoSave } from '../hooks/useAutoSave'
 
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
@@ -437,6 +438,12 @@ const WidgetEditorPanel = forwardRef(({
                         }`}>
                         <div className="flex items-center space-x-3">
                             <h3 className="text-md font-medium text-gray-900">{title}</h3>
+                            {hasChanges && (
+                                <span className="flex items-center text-xs text-blue-600">
+                                    <Save className="w-3 h-3 mr-1" />
+                                    Changes will auto-save
+                                </span>
+                            )}
                         </div>
                         <button
                             onClick={handleClose}

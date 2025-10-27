@@ -41,6 +41,7 @@ import PublishingEditor from './PublishingEditor'
 import { getWidgetDisplayName } from '../hooks/useWidgets'
 import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
 import GlobalWysiwygToolbar from './wysiwyg/GlobalWysiwygToolbar'
+import { useAutoSave } from '../hooks/useAutoSave'
 
 import { logValidationSync } from '../utils/stateVerification'
 import { buildPathVariablesContext, getDefaultSimulatedPath } from '../utils/pathParser'
@@ -310,6 +311,14 @@ const PageEditor = () => {
 
     // Save mutation state
     const [isSaving, setIsSaving] = useState(false)
+
+    // Auto-save hook
+    const { countdown: autoSaveCountdown, saveStatus: autoSaveStatus, cancelAutoSave } = useAutoSave({
+        onSave: saveCurrentVersion,
+        delay: 3000,
+        isDirty: isDirty && !isNewPage, // Don't auto-save new pages
+        enabled: true
+    })
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
@@ -1211,6 +1220,8 @@ const PageEditor = () => {
 
     // Simple save handlers - no modal confirmation
     const handleSave = useCallback(async () => {
+        // Cancel auto-save countdown when manually saving
+        cancelAutoSave();
         setIsSaving(true);
         try {
             await saveCurrentVersion();
@@ -1228,9 +1239,11 @@ const PageEditor = () => {
         } finally {
             setIsSaving(false);
         }
-    }, [saveCurrentVersion, setIsDirty, addNotification]);
+    }, [saveCurrentVersion, setIsDirty, addNotification, cancelAutoSave]);
 
     const handleSaveNew = useCallback(async () => {
+        // Cancel auto-save countdown when manually saving
+        cancelAutoSave();
         setIsSaving(true);
         try {
             await handleActualSave({ description: 'New version created', option: 'new' });
@@ -1239,7 +1252,7 @@ const PageEditor = () => {
         } finally {
             setIsSaving(false);
         }
-    }, [handleActualSave]);
+    }, [handleActualSave, cancelAutoSave]);
 
 
     // Widget editor handlers
@@ -1770,6 +1783,8 @@ const PageEditor = () => {
                 webpageData={webpageData}
                 pageVersionData={pageVersionData}
                 validationState={schemaValidationState}
+                autoSaveCountdown={autoSaveCountdown}
+                autoSaveStatus={autoSaveStatus}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>

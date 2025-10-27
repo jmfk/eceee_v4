@@ -28,6 +28,7 @@ import { UnifiedDataProvider } from './contexts/unified-data'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
 import StatusBar from './components/StatusBar'
+import SessionExpiredOverlay from './components/SessionExpiredOverlay'
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -47,6 +48,7 @@ function App() {
         <GlobalNotificationProvider>
           <UnifiedDataProvider enableDevTools={true}>
             <AuthProvider>
+              <SessionExpiredOverlay />
               <Router>
                 <Routes>
                   {/* Login route - no authentication required */}

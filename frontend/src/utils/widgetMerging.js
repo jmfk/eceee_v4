@@ -90,7 +90,7 @@ export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets 
  * 
  * Collapse Behavior Options:
  * - "never": Never collapse (always show in edit mode)
- * - "any": Collapse if any visible widgets are inherited (default legacy behavior)
+ * - "any": Collapse if any widgets are present (local OR inherited)
  * - "all": Collapse only if all visible widgets are inherited
  * 
  * @param {string} slotName - Name of the slot
@@ -109,12 +109,7 @@ export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inherite
         return false
     }
 
-    // If no inherited widgets, default to edit mode
-    if (safeInheritedWidgets.length === 0) {
-        return false
-    }
-
-    // NEW: Respect collapseBehavior setting if provided
+    // NEW: Respect collapseBehavior setting if provided (checked BEFORE inherited widgets check)
     if (slotRules.collapseBehavior) {
         switch (slotRules.collapseBehavior) {
             case 'never':
@@ -124,14 +119,23 @@ export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inherite
             case 'all':
                 // Collapse only if ALL visible widgets are inherited
                 // If any local widgets exist, don't collapse
-                return safeLocalWidgets.length === 0
+                // Must have inherited widgets to collapse
+                return safeLocalWidgets.length === 0 && safeInheritedWidgets.length > 0
 
             case 'any':
+                // Collapse if ANY widgets are present (local OR inherited)
+                // This allows root pages with local widgets to auto-close
+                return (safeLocalWidgets.length > 0 || safeInheritedWidgets.length > 0)
+
             default:
-                // Collapse if ANY inherited widgets are present (default legacy behavior)
-                // Continue to legacy logic below
+                // Unknown collapse behavior - fall through to legacy logic
                 break
         }
+    }
+
+    // If no inherited widgets, default to edit mode (for slots without collapseBehavior)
+    if (safeInheritedWidgets.length === 0) {
+        return false
     }
 
     // LEGACY BEHAVIOR (when collapseBehavior not specified):

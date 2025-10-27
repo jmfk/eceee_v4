@@ -119,20 +119,57 @@ apiClient.interceptors.response.use(
                         originalRequest.headers['Authorization'] = `Bearer ${data.access}`;
                         return apiClient.request(originalRequest);
                     } else {
-                        // Refresh failed, clear tokens and redirect to login
+                        // Refresh failed, clear tokens and show session expired overlay
                         localStorage.removeItem('access_token');
                         localStorage.removeItem('refresh_token');
-                        window.location.href = '/login';
+
+                        // Return a promise that will be resolved when user re-authenticates
+                        return new Promise((resolve, reject) => {
+                            // Dispatch custom event to trigger session expired overlay
+                            const event = new CustomEvent('session-expired', {
+                                detail: {
+                                    config: originalRequest,
+                                    resolve,
+                                    reject,
+                                    timestamp: Date.now()
+                                }
+                            });
+                            window.dispatchEvent(event);
+                        });
                     }
                 } catch (refreshError) {
                     console.error('Token refresh failed:', refreshError);
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
-                    window.location.href = '/login';
+
+                    // Return a promise that will be resolved when user re-authenticates
+                    return new Promise((resolve, reject) => {
+                        // Dispatch custom event to trigger session expired overlay
+                        const event = new CustomEvent('session-expired', {
+                            detail: {
+                                config: originalRequest,
+                                resolve,
+                                reject,
+                                timestamp: Date.now()
+                            }
+                        });
+                        window.dispatchEvent(event);
+                    });
                 }
             } else {
-                // No refresh token, redirect to login
-                window.location.href = '/login';
+                // No refresh token, show session expired overlay
+                return new Promise((resolve, reject) => {
+                    // Dispatch custom event to trigger session expired overlay
+                    const event = new CustomEvent('session-expired', {
+                        detail: {
+                            config: originalRequest,
+                            resolve,
+                            reject,
+                            timestamp: Date.now()
+                        }
+                    });
+                    window.dispatchEvent(event);
+                });
             }
         }
 

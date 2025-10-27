@@ -9,7 +9,7 @@
  * 5. Table Templates - Predefined table templates
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { themesApi } from '../api';
@@ -17,6 +17,7 @@ import { extractErrorMessage } from '../utils/errorHandling.js';
 import { useNotificationContext } from './NotificationManager';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
+import { useAutoSave } from '../hooks/useAutoSave';
 import {
     Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X
 } from 'lucide-react';
@@ -70,6 +71,9 @@ const ThemeEditor = ({ onSave }) => {
     // Also get current state for dirty flag
     const isThemeDirty = state.metadata.isThemeDirty;
     const themeData = currentThemeData;
+
+    // Ref to store auto-save cancel function
+    const cancelAutoSaveRef = useRef(null);
 
     // Fetch themes list
     const { data: themes = [], isLoading } = useQuery({
@@ -262,6 +266,11 @@ const ThemeEditor = ({ onSave }) => {
 
     // Expose save handler for external use (SettingsManager)
     const handleSaveTheme = useCallback(async () => {
+        // Cancel auto-save countdown when manually saving
+        if (cancelAutoSaveRef.current) {
+            cancelAutoSaveRef.current();
+        }
+
         try {
             if (isCreating) {
                 // For new themes, use direct API since UDC ID is temporary
@@ -305,16 +314,29 @@ const ThemeEditor = ({ onSave }) => {
         }
     }, [isCreating, themeData, saveCurrentTheme, addNotification, queryClient, setThemeDirty, navigate, activeTab]);
 
+    // Auto-save hook for theme editing
+    const { countdown: autoSaveCountdown, saveStatus: autoSaveStatus, cancelAutoSave } = useAutoSave({
+        onSave: handleSaveTheme,
+        delay: 3000,
+        isDirty: isThemeDirty && isEditing, // Only auto-save when editing existing themes
+        enabled: true
+    });
+
+    // Store cancel function in ref for use in handleSaveTheme
+    useEffect(() => {
+        cancelAutoSaveRef.current = cancelAutoSave;
+    }, [cancelAutoSave]);
+
     // Provide save handler to SettingsManager when editing
     useEffect(() => {
         if (onSave && currentView === 'edit') {
-            // Pass the save function to SettingsManager
-            onSave(() => handleSaveTheme);
+            // Pass the save function, auto-save status to SettingsManager
+            onSave(() => handleSaveTheme, autoSaveCountdown, autoSaveStatus);
         } else if (onSave && currentView === 'list') {
             // Clear the save handler when not editing
-            onSave(null);
+            onSave(null, null, 'idle');
         }
-    }, [onSave, handleSaveTheme, currentView]);
+    }, [onSave, handleSaveTheme, currentView, autoSaveCountdown, autoSaveStatus]);
 
     const handleDelete = async (theme) => {
         const confirmed = await showConfirm(
