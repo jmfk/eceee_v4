@@ -724,10 +724,28 @@ class LayoutRenderer {
     // Remove existing UI if present
     this.removeSlotUI(slotName);
 
-    // Create icon menu container
+    // Create icon menu container with flex layout for buttons
     const menuContainer = document.createElement('div');
-    menuContainer.className = 'slot-icon-menu absolute top-2 right-2 z-20 opacity-80 hover:opacity-100 transition-opacity';
+    menuContainer.className = 'slot-icon-menu absolute top-2 right-2 z-20 opacity-80 hover:opacity-100 transition-opacity flex items-center gap-2';
     menuContainer.setAttribute('data-slot-menu', slotName);
+
+    // Add Import Content button (if callback is set)
+    if (this.openImportDialog && typeof this.openImportDialog === 'function') {
+      const importButton = this.createIconButton('svg:download', 'bg-blue-600 hover:bg-blue-700 text-white', () => {
+        this.openImportDialog(slotName);
+      });
+      importButton.title = 'Import Content';
+      menuContainer.appendChild(importButton);
+    }
+
+    // Add Widget button (if enabled)
+    if (this.uiConfig.showAddWidget || options.showAddWidget) {
+      const addWidgetButton = this.createIconButton('svg:plus', 'bg-green-600 hover:bg-green-700 text-white', () => {
+        this.showWidgetSelectionModal(slotName);
+      });
+      addWidgetButton.title = 'Add Widget';
+      menuContainer.appendChild(addWidgetButton);
+    }
 
     // Create menu button (3 dots icon)
     const menuButton = this.createIconButton('svg:menu', 'bg-gray-700 hover:bg-gray-800 text-white', () => {
@@ -907,29 +925,6 @@ class LayoutRenderer {
    */
   getMenuItems(slotName, options = {}) {
     const items = [];
-
-    // Add Widget item
-    if (this.uiConfig.showAddWidget || options.showAddWidget) {
-      items.push({
-        icon: 'svg:plus',
-        label: 'Add Widget',
-        action: () => this.showWidgetSelectionModal(slotName),
-        className: 'text-green-700 hover:bg-green-50'
-      });
-    }
-
-    // Import Content item
-    if (this.openImportDialog && typeof this.openImportDialog === 'function') {
-      items.push({
-        type: 'separator'
-      });
-      items.push({
-        icon: 'svg:download',
-        label: 'Import Content',
-        action: () => this.openImportDialog(slotName),
-        className: 'text-blue-700 hover:bg-blue-50'
-      });
-    }
 
     // Add separator before destructive/info actions
     if (items.length > 0 && (options.showClearSlot || options.showSlotInfo)) {
