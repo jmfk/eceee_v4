@@ -116,7 +116,7 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace }) => {
                                 selectionMode="single"
                                 fileTypes={[]}
                                 namespace={namespace}
-                                showUploader={false}
+                                showUploader={true}
                             />
                         </div>
                     ) : (

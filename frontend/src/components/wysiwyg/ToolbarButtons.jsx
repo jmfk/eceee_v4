@@ -72,6 +72,18 @@ const ICONS = {
             <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
         </svg>
     ),
+    code: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6" />
+            <polyline points="8 6 2 12 8 18" />
+        </svg>
+    ),
+    quote: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z" />
+            <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
+        </svg>
+    ),
 };
 
 /**
@@ -232,6 +244,24 @@ const ToolbarButtons = ({ state, onCommand }) => {
                 title="Numbered List"
                 icon={ICONS.listOrdered}
                 isActive={state.insertOrderedList}
+                onClick={onCommand}
+            />
+
+            <ToolbarSeparator />
+
+            <ToolbarButton
+                command="formatCode"
+                title="Code (Cmd+K)"
+                icon={ICONS.code}
+                isActive={state.code}
+                onClick={onCommand}
+            />
+
+            <ToolbarButton
+                command="formatBlockquote"
+                title="Quote (Cmd+J)"
+                icon={ICONS.quote}
+                isActive={state.blockquote}
                 onClick={onCommand}
             />
 
