@@ -1,0 +1,7 @@
+Country	Capital	Population	Area (km²)
+United States	Washington, D.C.	331,000,000	9,833,517
+United Kingdom	London	67,000,000	242,495
+Germany	Berlin	83,000,000	357,022
+France	Paris	65,000,000	551,695
+Japan	Tokyo	126,000,000	377,975
+

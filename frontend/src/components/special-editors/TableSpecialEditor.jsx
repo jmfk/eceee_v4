@@ -6,9 +6,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
-    Plus, Minus, Grid3X3, Split, Type, Palette, Square
+    Plus, Minus, Grid3X3, Split, Type, Palette, Square, Import
 } from 'lucide-react'
 import { TableEditorCore } from './TableEditorCore'
+import TableImportModal from './TableImportModal'
 import '../../styles/table-editor.css'
 
 const TableSpecialEditor = ({
@@ -26,6 +27,7 @@ const TableSpecialEditor = ({
     const [selectedCells, setSelectedCells] = useState([])
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [showBorderPicker, setShowBorderPicker] = useState(false)
+    const [showImportModal, setShowImportModal] = useState(false)
 
     // Color state for each type
     const [backgroundColor, setBackgroundColor] = useState('#ffffff')
@@ -399,6 +401,15 @@ const TableSpecialEditor = ({
         applyColor('hoverText', color)
     }
 
+    /**
+     * Handle table import
+     */
+    const handleImportTable = (tableData) => {
+        if (onConfigChange && tableData) {
+            onConfigChange(tableData)
+        }
+    }
+
     return (
         <div className="table-special-editor h-full flex flex-col bg-white">
             {/* Toolbar */}
@@ -406,6 +417,13 @@ const TableSpecialEditor = ({
                 <div className="flex flex-wrap gap-2">
                     {/* Structure Section */}
                     <div className="flex items-center gap-1 border-r pr-2">
+                        <button
+                            onClick={() => setShowImportModal(true)}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Import Table"
+                        >
+                            <Import size={16} />
+                        </button>
                         <button
                             onClick={() => handleAddRow('end')}
                             className="p-2 hover:bg-gray-200 rounded flex items-center gap-1"
@@ -661,6 +679,13 @@ const TableSpecialEditor = ({
             <div
                 ref={containerRef}
                 className="flex-1 overflow-auto p-4"
+            />
+
+            {/* Import Modal */}
+            <TableImportModal
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                onImport={handleImportTable}
             />
         </div>
     )
