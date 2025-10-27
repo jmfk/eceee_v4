@@ -41,9 +41,14 @@ export class TableEditorCore {
         this.editingCell = null // Currently editing cell
         this.isEditMode = false
 
+        // Clipboard for copy/paste
+        this.clipboard = null
+        this.clipboardMode = null // 'copy' or 'cut'
+
         // Bound handlers for event listeners
         this.handleSelectionChangeBound = this.handleSelectionChange.bind(this)
         this.handleClickOutsideBound = this.handleClickOutside.bind(this)
+        this.handleKeyDownBound = this.handleKeyDown.bind(this)
     }
 
     /**
@@ -319,6 +324,9 @@ export class TableEditorCore {
 
         // Click outside to exit edit mode
         document.addEventListener('mousedown', this.handleClickOutsideBound)
+
+        // Keyboard shortcuts (copy/cut/paste)
+        document.addEventListener('keydown', this.handleKeyDownBound)
     }
 
     /**
@@ -450,6 +458,230 @@ export class TableEditorCore {
         if (!this.tableElement.contains(e.target)) {
             this.exitEditMode()
         }
+    }
+
+    /**
+     * Handle keyboard shortcuts
+     */
+    handleKeyDown(e) {
+        // Only handle shortcuts when not in edit mode
+        if (this.isEditMode) return
+
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+        const modKey = isMac ? e.metaKey : e.ctrlKey
+
+        // Copy: Ctrl/Cmd + C
+        if (modKey && e.key === 'c' && !e.shiftKey) {
+            if (this.selection.cells.length > 0) {
+                e.preventDefault()
+                this.copyCells()
+            }
+        }
+
+        // Cut: Ctrl/Cmd + X
+        if (modKey && e.key === 'x' && !e.shiftKey) {
+            if (this.selection.cells.length > 0) {
+                e.preventDefault()
+                this.cutCells()
+            }
+        }
+
+        // Paste: Ctrl/Cmd + V
+        if (modKey && e.key === 'v' && !e.shiftKey) {
+            if (this.clipboard && this.selection.cells.length > 0) {
+                e.preventDefault()
+                this.pasteCells()
+            }
+        }
+
+        // Delete: Delete or Backspace
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (this.selection.cells.length > 0 && !this.isEditMode) {
+                e.preventDefault()
+                this.clearSelectedCells()
+            }
+        }
+    }
+
+    /**
+     * Copy selected cells to clipboard
+     */
+    copyCells() {
+        if (this.selection.cells.length === 0) return
+
+        // Store cell data with positions
+        const clipboardData = this.selection.cells.map(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+            return {
+                rowIndex,
+                cellIndex,
+                data: JSON.parse(JSON.stringify(cellData)) // Deep clone
+            }
+        })
+
+        this.clipboard = clipboardData
+        this.clipboardMode = 'copy'
+
+        // Visual feedback
+        this.showClipboardFeedback('Copied')
+    }
+
+    /**
+     * Cut selected cells to clipboard
+     */
+    cutCells() {
+        if (this.selection.cells.length === 0) return
+
+        // Copy first
+        this.copyCells()
+        this.clipboardMode = 'cut'
+
+        // Visual feedback for cut cells
+        this.selection.cells.forEach(cell => {
+            cell.style.opacity = '0.5'
+        })
+
+        this.showClipboardFeedback('Cut')
+    }
+
+    /**
+     * Paste cells from clipboard
+     */
+    pasteCells() {
+        if (!this.clipboard || this.selection.cells.length === 0) return
+
+        // Only allow paste if exactly one cell is selected (target cell)
+        if (this.selection.cells.length !== 1) {
+            this.showClipboardFeedback('Select only one cell to paste')
+            return
+        }
+
+        const targetCell = this.selection.cells[0]
+        const targetRowIndex = parseInt(targetCell.dataset.rowIndex)
+        const targetCellIndex = parseInt(targetCell.dataset.cellIndex)
+
+        // Calculate the bounding box of copied cells
+        const minRow = Math.min(...this.clipboard.map(c => c.rowIndex))
+        const maxRow = Math.max(...this.clipboard.map(c => c.rowIndex))
+        const minCol = Math.min(...this.clipboard.map(c => c.cellIndex))
+        const maxCol = Math.max(...this.clipboard.map(c => c.cellIndex))
+
+        const copyWidth = maxCol - minCol + 1
+        const copyHeight = maxRow - minRow + 1
+
+        // Check if there's enough space to paste
+        const neededRows = targetRowIndex + copyHeight
+        const neededCols = targetCellIndex + copyWidth
+
+        if (neededRows > this.data.rows.length) {
+            this.showClipboardFeedback(`Not enough rows (need ${copyHeight}, have ${this.data.rows.length - targetRowIndex})`)
+            return
+        }
+
+        // Check if all rows have enough columns
+        for (let i = 0; i < copyHeight; i++) {
+            const rowIndex = targetRowIndex + i
+            if (this.data.rows[rowIndex].cells.length < neededCols) {
+                this.showClipboardFeedback(`Not enough columns in row ${rowIndex + 1} (need ${copyWidth})`)
+                return
+            }
+        }
+
+        // Calculate the offset from the first copied cell
+        const rowOffset = targetRowIndex - minRow
+        const cellOffset = targetCellIndex - minCol
+
+        // Save state for undo
+        this.saveState()
+
+        // Paste each cell with offset
+        this.clipboard.forEach(clipCell => {
+            const newRowIndex = clipCell.rowIndex + rowOffset
+            const newCellIndex = clipCell.cellIndex + cellOffset
+
+            // Paste the cell data (we already validated bounds above)
+            this.data.rows[newRowIndex].cells[newCellIndex] = JSON.parse(JSON.stringify(clipCell.data))
+        })
+
+        // If it was a cut operation, clear the original cells
+        if (this.clipboardMode === 'cut') {
+            this.clipboard.forEach(clipCell => {
+                const cell = this.data.rows[clipCell.rowIndex].cells[clipCell.cellIndex]
+                cell.content = ''
+                cell.contentType = 'text'
+            })
+
+            // Remove visual feedback from cut cells
+            document.querySelectorAll('td[style*="opacity"]').forEach(cell => {
+                cell.style.opacity = ''
+            })
+
+            this.clipboardMode = 'copy' // Reset to copy mode
+        }
+
+        // Re-render and notify
+        this.render()
+        this.notifyChange()
+
+        this.showClipboardFeedback('Pasted')
+    }
+
+    /**
+     * Clear content of selected cells
+     */
+    clearSelectedCells() {
+        if (this.selection.cells.length === 0) return
+
+        this.saveState()
+
+        this.selection.cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            this.data.rows[rowIndex].cells[cellIndex].content = ''
+        })
+
+        this.render()
+        this.notifyChange()
+    }
+
+    /**
+     * Show visual feedback for clipboard operations
+     */
+    showClipboardFeedback(message) {
+        // Create or get feedback element
+        let feedback = this.container.querySelector('.clipboard-feedback')
+
+        if (!feedback) {
+            feedback = document.createElement('div')
+            feedback.className = 'clipboard-feedback'
+            feedback.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                padding: 8px 16px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                border-radius: 4px;
+                font-size: 14px;
+                z-index: 1000;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.2s;
+            `
+            this.container.style.position = 'relative'
+            this.container.appendChild(feedback)
+        }
+
+        feedback.textContent = message
+        feedback.style.opacity = '1'
+
+        // Fade out after 1 second
+        setTimeout(() => {
+            feedback.style.opacity = '0'
+        }, 1000)
     }
 
     /**
@@ -800,6 +1032,7 @@ export class TableEditorCore {
 
     /**
      * Apply formatting to text (bold, italic, link)
+     * This works when editing a cell with text selected (used by floating toolbar)
      */
     applyFormatting(type) {
         const selection = window.getSelection()
@@ -815,6 +1048,68 @@ export class TableEditorCore {
             this.data.rows[rowIndex].cells[cellIndex].content = cell.innerHTML
             this.notifyChange()
         }
+    }
+
+    /**
+     * Apply bold to entire content of selected cells
+     */
+    applyCellBold(cells) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+            // Skip image cells
+            if (cellData.contentType === 'image') return
+
+            // Use DOM parsing for robust toggle
+            const temp = document.createElement('div')
+            temp.innerHTML = cellData.content
+
+            // Check if outermost element is strong/b
+            const firstChild = temp.firstElementChild
+            if (firstChild && (firstChild.tagName === 'STRONG' || firstChild.tagName === 'B')) {
+                // Remove bold wrapper, keep inner content
+                cellData.content = firstChild.innerHTML
+            } else {
+                // Wrap entire content in strong
+                cellData.content = `<strong>${cellData.content}</strong>`
+            }
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Apply italic to entire content of selected cells
+     */
+    applyCellItalic(cells) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+            // Skip image cells
+            if (cellData.contentType === 'image') return
+
+            // Use DOM parsing for robust toggle
+            const temp = document.createElement('div')
+            temp.innerHTML = cellData.content
+
+            // Check if outermost element is em/i
+            const firstChild = temp.firstElementChild
+            if (firstChild && (firstChild.tagName === 'EM' || firstChild.tagName === 'I')) {
+                // Remove italic wrapper, keep inner content
+                cellData.content = firstChild.innerHTML
+            } else {
+                // Wrap entire content in em
+                cellData.content = `<em>${cellData.content}</em>`
+            }
+        })
+
+        this.rerender()
+        this.notifyChange()
     }
 
     /**
@@ -1523,6 +1818,7 @@ export class TableEditorCore {
         // Clean up event listeners
         document.removeEventListener('selectionchange', this.handleSelectionChangeBound)
         document.removeEventListener('mousedown', this.handleClickOutsideBound)
+        document.removeEventListener('keydown', this.handleKeyDownBound)
 
         // Destroy components
         if (this.floatingToolbar) {

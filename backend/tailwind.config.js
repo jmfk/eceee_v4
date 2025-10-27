@@ -24,6 +24,16 @@ module.exports = {
         'media-caption',
         'media-gallery',
         'media-gallery-item',
+        // Table widget classes (used in table cells)
+        'cell-left',
+        'cell-center',
+        'cell-right',
+        'cell-v-top',
+        'cell-v-middle',
+        'cell-v-bottom',
+        'table-cell-quote',
+        'table-cell-caption',
+        'cell-image',
     ],
     theme: {
         extend: {

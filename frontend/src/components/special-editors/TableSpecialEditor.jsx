@@ -6,7 +6,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
-    Plus, Minus, Grid3X3, Split, Type, Palette, Square, Import
+    Plus, Minus, Grid3X3, Split, Type, Palette, Square, Import,
+    Bold, Italic, AlignLeft, AlignCenter, AlignRight,
+    AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd
 } from 'lucide-react'
 import { TableEditorCore } from './TableEditorCore'
 import TableImportModal from './TableImportModal'
@@ -191,6 +193,34 @@ const TableSpecialEditor = ({
             return
         }
         coreRef.current?.applyFontStyle(selectedCells, fontStyle)
+    }
+
+    const handleBold = () => {
+        if (selectedCells.length === 0) {
+            return
+        }
+        coreRef.current?.applyCellBold(selectedCells)
+    }
+
+    const handleItalic = () => {
+        if (selectedCells.length === 0) {
+            return
+        }
+        coreRef.current?.applyCellItalic(selectedCells)
+    }
+
+    const handleSetAlignment = (alignment) => {
+        if (selectedCells.length === 0) {
+            return
+        }
+        coreRef.current?.setAlignment(selectedCells, alignment)
+    }
+
+    const handleSetVerticalAlignment = (alignment) => {
+        if (selectedCells.length === 0) {
+            return
+        }
+        coreRef.current?.setVerticalAlignment(selectedCells, alignment)
     }
 
 
@@ -407,6 +437,11 @@ const TableSpecialEditor = ({
     const handleImportTable = (tableData) => {
         if (onConfigChange && tableData) {
             onConfigChange(tableData)
+
+            // Force immediate reload of the table editor
+            if (coreRef.current) {
+                coreRef.current.updateTable(tableData)
+            }
         }
     }
 
@@ -485,6 +520,82 @@ const TableSpecialEditor = ({
                             disabled={selectedCells.length === 0}
                         >
                             <Type size={16} />
+                        </button>
+                    </div>
+
+                    {/* Text Formatting */}
+                    <div className="flex items-center gap-1 border-r pr-2">
+                        <button
+                            onClick={handleBold}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Bold (applies to entire cell)"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <Bold size={16} />
+                        </button>
+                        <button
+                            onClick={handleItalic}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Italic (applies to entire cell)"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <Italic size={16} />
+                        </button>
+                    </div>
+
+                    {/* Horizontal Alignment */}
+                    <div className="flex items-center gap-1 border-r pr-2">
+                        <button
+                            onClick={() => handleSetAlignment('left')}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Align Left"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <AlignLeft size={16} />
+                        </button>
+                        <button
+                            onClick={() => handleSetAlignment('center')}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Align Center"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <AlignCenter size={16} />
+                        </button>
+                        <button
+                            onClick={() => handleSetAlignment('right')}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Align Right"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <AlignRight size={16} />
+                        </button>
+                    </div>
+
+                    {/* Vertical Alignment */}
+                    <div className="flex items-center gap-1 border-r pr-2">
+                        <button
+                            onClick={() => handleSetVerticalAlignment('top')}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Align Top"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <AlignVerticalJustifyStart size={16} />
+                        </button>
+                        <button
+                            onClick={() => handleSetVerticalAlignment('middle')}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Align Middle"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <AlignVerticalJustifyCenter size={16} />
+                        </button>
+                        <button
+                            onClick={() => handleSetVerticalAlignment('bottom')}
+                            className="p-2 hover:bg-gray-200 rounded"
+                            title="Align Bottom"
+                            disabled={selectedCells.length === 0}
+                        >
+                            <AlignVerticalJustifyEnd size={16} />
                         </button>
                     </div>
 
@@ -686,6 +797,7 @@ const TableSpecialEditor = ({
                 isOpen={showImportModal}
                 onClose={() => setShowImportModal(false)}
                 onImport={handleImportTable}
+                existingData={config}
             />
         </div>
     )

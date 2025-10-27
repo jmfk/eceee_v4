@@ -75,3 +75,54 @@
     margin-right: auto;
 }
 
+/* Table Cell Alignment Classes */
+/* Horizontal Alignment */
+.cell-left {
+    text-align: left;
+}
+
+.cell-center {
+    text-align: center;
+}
+
+.cell-right {
+    text-align: right;
+}
+
+/* Vertical Alignment */
+.cell-v-top {
+    vertical-align: top;
+}
+
+.cell-v-middle {
+    vertical-align: middle;
+}
+
+.cell-v-bottom {
+    vertical-align: bottom;
+}
+
+/* Table Cell Font Styles */
+.table-cell-quote {
+    font-style: italic;
+    color: #6b7280;
+    font-weight: 400;
+}
+
+.table-cell-caption {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 400;
+}
+
+/* Table Cell Image Styles */
+.cell-image {
+    padding: 0.25rem;
+}
+
+.cell-image img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+

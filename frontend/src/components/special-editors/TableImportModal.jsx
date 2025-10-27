@@ -8,36 +8,182 @@
  */
 
 import React, { useState, useRef } from 'react'
-import { X, Upload, ClipboardPaste, Code, AlertCircle, CheckCircle } from 'lucide-react'
+import { X, Upload, ClipboardPaste, Code, AlertCircle, CheckCircle, Trash2 } from 'lucide-react'
 import { parseAuto, parseHTMLTable, detectPasteFormat } from '@/utils/tableImport'
 import { importTableFromFile } from '@/api/fileManager'
 
-const TableImportModal = ({ isOpen, onClose, onImport }) => {
+const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
     const [activeTab, setActiveTab] = useState('paste')
     const [pasteContent, setPasteContent] = useState('')
-    const [htmlContent, setHtmlContent] = useState('')
     const [selectedFile, setSelectedFile] = useState(null)
     const [preview, setPreview] = useState(null)
     const [error, setError] = useState(null)
     const [loading, setLoading] = useState(false)
     const [detectedFormat, setDetectedFormat] = useState(null)
+    const [showCodeView, setShowCodeView] = useState(false)
+    const [showMergeDialog, setShowMergeDialog] = useState(false)
     const fileInputRef = useRef(null)
+    const contentEditableRef = useRef(null)
 
     if (!isOpen) return null
 
     // Reset state when modal opens
     const handleReset = () => {
         setPasteContent('')
-        setHtmlContent('')
         setSelectedFile(null)
         setPreview(null)
         setError(null)
         setDetectedFormat(null)
         setLoading(false)
+        setShowCodeView(false)
+        if (contentEditableRef.current) {
+            contentEditableRef.current.innerHTML = ''
+        }
     }
 
-    // Handle paste content change with auto-detection
-    const handlePasteChange = (e) => {
+    // Handle contenteditable paste event
+    const handleContentEditablePaste = (e) => {
+        e.preventDefault()
+        setError(null)
+
+        // Try to get HTML from clipboard first
+        const htmlData = e.clipboardData.getData('text/html')
+        const textData = e.clipboardData.getData('text/plain')
+
+        let content = htmlData || textData
+
+        if (content.trim()) {
+            const format = detectPasteFormat(content)
+            setDetectedFormat(format)
+
+            try {
+                const parsed = parseAuto(content)
+                setPreview(parsed)
+                setPasteContent(content)
+
+                // Insert the pasted content into contenteditable so user can see it
+                if (contentEditableRef.current) {
+                    // For HTML, show the table; for other formats, show as text
+                    if (format === 'html' && htmlData) {
+                        contentEditableRef.current.innerHTML = htmlData
+                    } else {
+                        contentEditableRef.current.textContent = textData
+                    }
+                }
+            } catch (err) {
+                setError(err.message)
+                setPreview(null)
+
+                // Still show the pasted content even if parsing failed
+                if (contentEditableRef.current) {
+                    contentEditableRef.current.textContent = content
+                }
+            }
+        } else {
+            setDetectedFormat(null)
+            setPreview(null)
+        }
+    }
+
+    // Handle contenteditable keyboard input - switch to code view when typing
+    const handleContentEditableKeyDown = (e) => {
+        // Ignore modifier keys and shortcuts
+        if (e.ctrlKey || e.metaKey || e.altKey) {
+            return
+        }
+
+        // Ignore navigation keys
+        const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', 'Tab', 'Escape', 'Shift']
+        if (navigationKeys.includes(e.key)) {
+            return
+        }
+
+        // If user is typing text or pressing Enter, switch to code view
+        if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') {
+            e.preventDefault()
+
+            // Get current content from contenteditable
+            let currentContent = contentEditableRef.current?.innerHTML || ''
+
+            // Convert to plain text for textarea
+            const tempDiv = document.createElement('div')
+            tempDiv.innerHTML = currentContent
+            let textContent = tempDiv.textContent || ''
+
+            // Handle the keystroke
+            if (e.key === 'Enter') {
+                textContent += '\n'
+            } else if (e.key === 'Backspace') {
+                textContent = textContent.slice(0, -1)
+            } else if (e.key === 'Delete') {
+                // For delete, don't modify (cursor position matters)
+            } else if (e.key.length === 1) {
+                textContent += e.key
+            }
+
+            // Update state with the new content and parse it
+            setPasteContent(textContent)
+
+            // Parse and update preview
+            if (textContent.trim()) {
+                const format = detectPasteFormat(textContent)
+                setDetectedFormat(format)
+
+                try {
+                    const parsed = parseAuto(textContent)
+                    setPreview(parsed)
+                    setError(null)
+                } catch (err) {
+                    setError(err.message)
+                    setPreview(null)
+                }
+            } else {
+                setDetectedFormat(null)
+                setPreview(null)
+            }
+
+            // Switch to code view
+            setShowCodeView(true)
+
+            // Focus textarea and position cursor at end
+            requestAnimationFrame(() => {
+                const textarea = document.querySelector('textarea[placeholder*="table"]')
+                if (textarea) {
+                    textarea.focus()
+                    textarea.selectionStart = textContent.length
+                    textarea.selectionEnd = textContent.length
+                }
+            })
+        }
+    }
+
+    // Handle contenteditable input changes (for paste events)
+    const handleContentEditableInput = (e) => {
+        const content = e.target.innerHTML
+        setPasteContent(content)
+
+        if (!content.trim() || content === '<br>') {
+            setDetectedFormat(null)
+            setPreview(null)
+            setError(null)
+        } else {
+            // Re-parse when content changes
+            const format = detectPasteFormat(content)
+            setDetectedFormat(format)
+
+            try {
+                const parsed = parseAuto(content)
+                setPreview(parsed)
+                setError(null)
+            } catch (err) {
+                setError(err.message)
+                setPreview(null)
+            }
+        }
+    }
+
+    // Handle code textarea change
+    const handleCodeChange = (e) => {
         const content = e.target.value
         setPasteContent(content)
         setError(null)
@@ -59,22 +205,58 @@ const TableImportModal = ({ isOpen, onClose, onImport }) => {
         }
     }
 
-    // Handle HTML content change
-    const handleHtmlChange = (e) => {
-        const content = e.target.value
-        setHtmlContent(content)
+    // Toggle between contenteditable and code view
+    const handleToggleView = () => {
         setError(null)
 
-        if (content.trim()) {
-            try {
-                const parsed = parseHTMLTable(content)
-                setPreview(parsed)
-            } catch (err) {
-                setError(err.message)
-                setPreview(null)
+        // Sync content between views
+        if (!showCodeView && contentEditableRef.current) {
+            // Switching to code view - get HTML from contenteditable
+            const content = contentEditableRef.current.innerHTML
+            setPasteContent(content)
+
+            // Re-parse to update preview
+            if (content.trim() && content !== '<br>') {
+                const format = detectPasteFormat(content)
+                setDetectedFormat(format)
+
+                try {
+                    const parsed = parseAuto(content)
+                    setPreview(parsed)
+                } catch (err) {
+                    setError(err.message)
+                    setPreview(null)
+                }
             }
-        } else {
-            setPreview(null)
+        } else if (showCodeView && contentEditableRef.current) {
+            // Switching to visual view - set contenteditable HTML
+            contentEditableRef.current.innerHTML = pasteContent
+
+            // Re-parse to update preview
+            if (pasteContent.trim()) {
+                const format = detectPasteFormat(pasteContent)
+                setDetectedFormat(format)
+
+                try {
+                    const parsed = parseAuto(pasteContent)
+                    setPreview(parsed)
+                } catch (err) {
+                    setError(err.message)
+                    setPreview(null)
+                }
+            }
+        }
+        setShowCodeView(!showCodeView)
+    }
+
+    // Clear paste content and reset state
+    const handleClearPaste = () => {
+        setPasteContent('')
+        setPreview(null)
+        setError(null)
+        setDetectedFormat(null)
+        if (contentEditableRef.current) {
+            contentEditableRef.current.innerHTML = ''
         }
     }
 
@@ -139,11 +321,51 @@ const TableImportModal = ({ isOpen, onClose, onImport }) => {
 
     // Handle import button click
     const handleImportClick = () => {
-        if (preview) {
+        if (!preview) return
+
+        // Check if there's existing table data
+        const hasExistingData = existingData && existingData.rows && existingData.rows.length > 0
+
+        if (hasExistingData) {
+            // Show merge dialog
+            setShowMergeDialog(true)
+        } else {
+            // No existing data, just import
             onImport(preview)
             handleReset()
             onClose()
         }
+    }
+
+    // Handle replace - use only new data
+    const handleReplace = () => {
+        onImport(preview)
+        setShowMergeDialog(false)
+        handleReset()
+        onClose()
+    }
+
+    // Handle append - merge new rows with existing data
+    const handleAppend = () => {
+        if (!existingData || !preview) return
+
+        const mergedData = {
+            ...existingData,
+            rows: [
+                ...existingData.rows,
+                ...preview.rows
+            ]
+        }
+
+        onImport(mergedData)
+        setShowMergeDialog(false)
+        handleReset()
+        onClose()
+    }
+
+    // Handle cancel merge dialog
+    const handleCancelMerge = () => {
+        setShowMergeDialog(false)
     }
 
     // Handle close
@@ -210,8 +432,8 @@ const TableImportModal = ({ isOpen, onClose, onImport }) => {
                     <button
                         onClick={() => setActiveTab('paste')}
                         className={`px-4 py-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'paste'
-                                ? 'border-b-2 border-blue-500 text-blue-600'
-                                : 'text-gray-600 hover:text-gray-800'
+                            ? 'border-b-2 border-blue-500 text-blue-600'
+                            : 'text-gray-600 hover:text-gray-800'
                             }`}
                     >
                         <ClipboardPaste size={16} />
@@ -220,22 +442,12 @@ const TableImportModal = ({ isOpen, onClose, onImport }) => {
                     <button
                         onClick={() => setActiveTab('upload')}
                         className={`px-4 py-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'upload'
-                                ? 'border-b-2 border-blue-500 text-blue-600'
-                                : 'text-gray-600 hover:text-gray-800'
+                            ? 'border-b-2 border-blue-500 text-blue-600'
+                            : 'text-gray-600 hover:text-gray-800'
                             }`}
                     >
                         <Upload size={16} />
                         Upload File
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('html')}
-                        className={`px-4 py-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'html'
-                                ? 'border-b-2 border-blue-500 text-blue-600'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
-                    >
-                        <Code size={16} />
-                        HTML Code
                     </button>
                 </div>
 
@@ -244,16 +456,54 @@ const TableImportModal = ({ isOpen, onClose, onImport }) => {
                     {/* Paste Tab */}
                     {activeTab === 'paste' && (
                         <div className="space-y-4">
-                            <p className="text-sm text-gray-600">
-                                Paste content from a spreadsheet (Google Sheets, Excel) or HTML table.
-                                Format will be auto-detected.
-                            </p>
-                            <textarea
-                                value={pasteContent}
-                                onChange={handlePasteChange}
-                                placeholder="Paste your table data here..."
-                                className="w-full h-48 p-3 border rounded font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-gray-600">
+                                    {showCodeView
+                                        ? 'Paste or edit table data. Supports: HTML, CSV, TSV (Google Sheets/Excel), JSON.'
+                                        : 'Paste from webpage, spreadsheet, or data file. Auto-detects: HTML, CSV, TSV, JSON.'
+                                    }
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleClearPaste}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded border"
+                                        title="Clear content"
+                                        disabled={!pasteContent}
+                                    >
+                                        <Trash2 size={14} />
+                                        Clear
+                                    </button>
+                                    <button
+                                        onClick={handleToggleView}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded border"
+                                        title={showCodeView ? "Switch to visual view" : "Switch to code view"}
+                                    >
+                                        <Code size={14} />
+                                        {showCodeView ? 'Visual' : 'Code'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {!showCodeView ? (
+                                <div
+                                    ref={contentEditableRef}
+                                    contentEditable
+                                    onPaste={handleContentEditablePaste}
+                                    onInput={handleContentEditableInput}
+                                    onKeyDown={handleContentEditableKeyDown}
+                                    className="w-full h-48 p-3 border rounded font-mono text-sm overflow-auto focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400"
+                                    data-placeholder="Paste your table here from a webpage or spreadsheet..."
+                                    suppressContentEditableWarning={true}
+                                />
+                            ) : (
+                                <textarea
+                                    value={pasteContent}
+                                    onChange={handleCodeChange}
+                                    placeholder="<table>&#10;  <tr>&#10;    <td>Cell 1</td>&#10;    <td>Cell 2</td>&#10;  </tr>&#10;</table>"
+                                    className="w-full h-48 p-3 border rounded font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            )}
+
                             {detectedFormat && (
                                 <div className="flex items-center gap-2 text-sm">
                                     <CheckCircle size={16} className="text-green-600" />
@@ -315,21 +565,6 @@ const TableImportModal = ({ isOpen, onClose, onImport }) => {
                         </div>
                     )}
 
-                    {/* HTML Tab */}
-                    {activeTab === 'html' && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-gray-600">
-                                Paste HTML table markup. Must include &lt;table&gt; element with &lt;tr&gt; and &lt;td&gt; tags.
-                            </p>
-                            <textarea
-                                value={htmlContent}
-                                onChange={handleHtmlChange}
-                                placeholder="<table>&#10;  <tr>&#10;    <td>Cell 1</td>&#10;    <td>Cell 2</td>&#10;  </tr>&#10;</table>"
-                                className="w-full h-48 p-3 border rounded font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                    )}
-
                     {/* Error Message */}
                     {error && (
                         <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded mt-4">
@@ -367,6 +602,42 @@ const TableImportModal = ({ isOpen, onClose, onImport }) => {
                     </button>
                 </div>
             </div>
+
+            {/* Merge Dialog Overlay */}
+            {showMergeDialog && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+                        <h3 className="text-lg font-semibold mb-4">Table Already Has Data</h3>
+                        <p className="text-sm text-gray-600 mb-6">
+                            This table already contains data. Would you like to replace it or append the new rows?
+                        </p>
+                        <div className="space-y-4">
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={handleReplace}
+                                    className="w-full px-4 py-3 text-left bg-red-50 hover:bg-red-100 border border-red-200 rounded"
+                                >
+                                    <div className="font-medium text-red-900">Replace</div>
+                                    <div className="text-sm text-red-700">Delete existing data and use only the new table</div>
+                                </button>
+                                <button
+                                    onClick={handleAppend}
+                                    className="w-full px-4 py-3 text-left bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded"
+                                >
+                                    <div className="font-medium text-blue-900">Append</div>
+                                    <div className="text-sm text-blue-700">Add new rows to the end of the existing table</div>
+                                </button>
+                            </div>
+                            <button
+                                onClick={handleCancelMerge}
+                                className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded border"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
