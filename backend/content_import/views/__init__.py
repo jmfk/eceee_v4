@@ -6,8 +6,7 @@ from .process import ProcessImportView
 
 
 __all__ = [
-    'CaptureScreenshotView',
-    'ExtractContentView',
-    'ProcessImportView',
+    "CaptureScreenshotView",
+    "ExtractContentView",
+    "ProcessImportView",
 ]
-

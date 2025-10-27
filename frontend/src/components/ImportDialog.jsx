@@ -33,7 +33,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     const [error, setError] = useState(null);
     const [importResults, setImportResults] = useState(null);
     const [progress, setProgress] = useState({ step: '', percent: 0 });
-    
+
     const screenshotRef = useRef(null);
     const { showNotification } = useNotificationContext();
 
@@ -186,10 +186,10 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     <div className="text-sm font-medium text-gray-700">
                         Step {currentStep}/5: {
                             currentStep === STEPS.URL_INPUT ? 'Enter URL' :
-                            currentStep === STEPS.SCREENSHOT_SELECT ? 'Select Content Block' :
-                            currentStep === STEPS.CONTENT_PREVIEW ? 'Preview Content' :
-                            currentStep === STEPS.IMPORT_OPTIONS ? 'Import Options' :
-                            'Importing...'
+                                currentStep === STEPS.SCREENSHOT_SELECT ? 'Select Content Block' :
+                                    currentStep === STEPS.CONTENT_PREVIEW ? 'Preview Content' :
+                                        currentStep === STEPS.IMPORT_OPTIONS ? 'Import Options' :
+                                            'Importing...'
                         }
                     </div>
                 </div>
@@ -261,7 +261,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">
                                 Import Options
                             </h3>
-                            
+
                             <div className="space-y-3 mb-6">
                                 <label className="flex items-center">
                                     <input
@@ -277,7 +277,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                         <div className="text-sm text-gray-600">Add imported content after current widgets in the slot</div>
                                     </div>
                                 </label>
-                                
+
                                 <label className="flex items-center">
                                     <input
                                         type="radio"
@@ -320,7 +320,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             </div>
                             {importResults && (
                                 <div className="mt-4 text-sm text-gray-600">
-                                    Created {importResults.widgets.length} widgets, 
+                                    Created {importResults.widgets.length} widgets,
                                     imported {importResults.media_files.length} media files
                                 </div>
                             )}
@@ -341,7 +341,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             </button>
                         )}
                     </div>
-                    
+
                     <div className="flex items-center space-x-3">
                         <button
                             onClick={handleClose}
@@ -349,7 +349,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         >
                             Cancel
                         </button>
-                        
+
                         {currentStep < STEPS.PROCESSING && (
                             <button
                                 onClick={handleNext}

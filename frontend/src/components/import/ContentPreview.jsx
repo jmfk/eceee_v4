@@ -76,11 +76,11 @@ const ContentPreview = ({ html, onContentChange }) => {
             wrapper.className = 'border-2 border-blue-500 bg-blue-50 p-2 my-2 relative';
             wrapper.dataset.type = 'table';
             wrapper.dataset.index = index;
-            
+
             const label = doc.createElement('div');
             label.className = 'text-xs font-semibold text-blue-700 mb-1';
             label.textContent = '📊 Table';
-            
+
             table.parentNode.insertBefore(wrapper, table);
             wrapper.appendChild(label);
             wrapper.appendChild(table);
@@ -92,11 +92,11 @@ const ContentPreview = ({ html, onContentChange }) => {
             wrapper.className = 'border-2 border-yellow-500 bg-yellow-50 p-2 my-2 inline-block';
             wrapper.dataset.type = 'image';
             wrapper.dataset.index = index;
-            
+
             const label = doc.createElement('div');
             label.className = 'text-xs font-semibold text-yellow-700 mb-1';
             label.textContent = '🖼️ Image';
-            
+
             img.parentNode.insertBefore(wrapper, img);
             wrapper.appendChild(label);
             wrapper.appendChild(img);
@@ -143,7 +143,7 @@ const ContentPreview = ({ html, onContentChange }) => {
 
             {/* Preview */}
             <div className="border border-gray-300 rounded-lg p-4 max-h-96 overflow-y-auto bg-white">
-                <div 
+                <div
                     className="prose max-w-none"
                     dangerouslySetInnerHTML={{ __html: highlightHtml() }}
                 />

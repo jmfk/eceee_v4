@@ -404,13 +404,13 @@ async def extract_element_at_coordinates_async(
 ) -> Dict[str, Any]:
     """
     Extract HTML element at specific coordinates on a webpage.
-    
+
     Args:
         url: The URL of the website
         x: X coordinate in pixels
         y: Y coordinate in pixels
         timeout: Maximum time to wait for page load in milliseconds
-    
+
     Returns:
         Dictionary containing:
             - html: The outer HTML of the element
@@ -418,16 +418,16 @@ async def extract_element_at_coordinates_async(
             - tag_name: The tag name of the element
             - text_content: The text content of the element
             - attributes: Dictionary of element attributes
-    
+
     Raises:
         WebsiteRenderingError: If extraction fails
     """
     # Validate URL first
     validate_url(url)
-    
+
     browser = None
     context = None
-    
+
     try:
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(
@@ -447,27 +447,27 @@ async def extract_element_at_coordinates_async(
             },
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         )
-        
+
         if not context:
             raise WebsiteRenderingError("Failed to initialize browser context")
-        
+
         page: Page = await context.new_page()
-        
+
         logger.info(f"Navigating to URL: {url}")
-        
+
         # Navigate to the page
         await page.goto(url, wait_until="networkidle", timeout=timeout)
-        
+
         # Wait for dynamic content
         await page.wait_for_timeout(2000)
-        
+
         # Handle cookie consent dialogs
         try:
             await handle_cookie_consent(page)
             await page.wait_for_timeout(1000)
         except Exception as e:
             logger.warning(f"Failed to handle cookie consent: {e}")
-        
+
         # Find element at coordinates using elementFromPoint
         element_info = await page.evaluate(
             """
@@ -494,16 +494,16 @@ async def extract_element_at_coordinates_async(
                 };
             }
             """,
-            {"x": x, "y": y}
+            {"x": x, "y": y},
         )
-        
+
         if not element_info:
             raise WebsiteRenderingError(f"No element found at coordinates ({x}, {y})")
-        
+
         await page.close()
-        
+
         logger.info(f"Successfully extracted element from {url} at ({x}, {y})")
-        
+
         return {
             "html": element_info["html"],
             "inner_html": element_info["innerHtml"],
@@ -513,13 +513,13 @@ async def extract_element_at_coordinates_async(
             "id": element_info["id"],
             "attributes": element_info["attributes"],
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to extract element from {url}: {str(e)}")
         if isinstance(e, WebsiteRenderingError):
             raise
         raise WebsiteRenderingError(f"Failed to extract element: {str(e)}")
-    
+
     finally:
         if context:
             await context.close()
@@ -532,23 +532,23 @@ def extract_element_at_coordinates(
 ) -> Dict[str, Any]:
     """
     Synchronous wrapper for element extraction.
-    
+
     Args:
         url: The URL of the website
         x: X coordinate in pixels
         y: Y coordinate in pixels
         timeout: Maximum time to wait for page load in milliseconds
-    
+
     Returns:
         Dictionary with element information
-    
+
     Raises:
         WebsiteRenderingError: If extraction fails
     """
     # Always create a new event loop for each request
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
+
     try:
         return loop.run_until_complete(
             extract_element_at_coordinates_async(url, x, y, timeout)
@@ -560,13 +560,13 @@ def extract_element_at_coordinates(
             pending = asyncio.all_tasks(loop)
             for task in pending:
                 task.cancel()
-            
+
             # Wait for all tasks to complete cancellation
             if pending:
                 loop.run_until_complete(
                     asyncio.gather(*pending, return_exceptions=True)
                 )
-            
+
             # Close the loop
             loop.close()
         except Exception as e:
@@ -740,9 +740,9 @@ def validate_website_endpoint():
 def extract_element_endpoint():
     """
     Extract HTML content at specific click coordinates on a webpage.
-    
+
     POST /extract-element
-    
+
     Request body:
     {
         "url": "https://example.com",
@@ -750,7 +750,7 @@ def extract_element_endpoint():
         "y": 300,  // Y coordinate in pixels
         "timeout": 30000  // optional, in milliseconds
     }
-    
+
     Returns:
         JSON with extracted HTML and metadata
     """
@@ -758,27 +758,27 @@ def extract_element_endpoint():
         data = request.get_json()
         if not data:
             return jsonify({"error": "JSON request body required"}), 400
-        
+
         # Get required parameters
         url = data.get("url")
         x = data.get("x")
         y = data.get("y")
-        
+
         if not url:
             return jsonify({"error": "URL is required"}), 400
         if x is None or y is None:
             return jsonify({"error": "Both x and y coordinates are required"}), 400
-        
+
         # Get optional timeout
         timeout = data.get("timeout", DEFAULT_CONFIG["timeout"])
-        
+
         logger.info(f"Extracting element from {url} at coordinates ({x}, {y})")
-        
+
         # Extract element
         result = extract_element_at_coordinates(url, int(x), int(y), int(timeout))
-        
+
         return jsonify(result)
-        
+
     except WebsiteRenderingError as e:
         logger.warning(f"Element extraction failed for {url}: {str(e)}")
         return jsonify({"error": str(e)}), 400
@@ -786,7 +786,12 @@ def extract_element_endpoint():
         return jsonify({"error": f"Invalid parameter value: {str(e)}"}), 400
     except Exception as e:
         logger.error(f"Unexpected error extracting element: {str(e)}")
-        return jsonify({"error": "An unexpected error occurred during element extraction"}), 500
+        return (
+            jsonify(
+                {"error": "An unexpected error occurred during element extraction"}
+            ),
+            500,
+        )
 
 
 @app.route("/", methods=["GET"])

@@ -10,6 +10,7 @@ import LayoutRenderer from './LayoutRenderer';
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import { useNotificationContext } from './NotificationManager';
 import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
+import ImportDialog from './ImportDialog';
 
 const ContentEditor = forwardRef(({
   layoutJson,
@@ -39,6 +40,8 @@ const ContentEditor = forwardRef(({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importSlotName, setImportSlotName] = useState(null);
 
   // Get notification context for confirmation dialogs
   const { showConfirm } = useNotificationContext();
@@ -80,6 +83,12 @@ const ContentEditor = forwardRef(({
       if (onOpenWidgetEditor) {
         rendererRef.current.openWidgetEditor = onOpenWidgetEditor;
       }
+
+      // Set up import dialog callback
+      rendererRef.current.openImportDialog = (slotName) => {
+        setImportSlotName(slotName);
+        setIsImportDialogOpen(true);
+      };
     }
     return rendererRef.current;
   }, [createWidgetElement, editable, onOpenWidgetEditor]);
@@ -597,6 +606,32 @@ const ContentEditor = forwardRef(({
 
 
 
+  // Handle import completion - add imported widgets to slot
+  const handleImportComplete = useCallback((importedWidgets) => {
+    if (!importSlotName || !importedWidgets || importedWidgets.length === 0) {
+      return;
+    }
+
+    try {
+      // Add widgets to the slot
+      const currentSlotWidgets = currentWidgets[importSlotName] || [];
+      const updatedWidgets = {
+        ...currentWidgets,
+        [importSlotName]: [...currentSlotWidgets, ...importedWidgets]
+      };
+
+      // Update the layout renderer
+      layoutRenderer.updateSlot(importSlotName, updatedWidgets[importSlotName]);
+
+      // Mark as dirty to trigger save
+      layoutRenderer.markAsDirty(`Imported ${importedWidgets.length} widgets to ${importSlotName}`);
+
+      console.log(`ContentEditor: Imported ${importedWidgets.length} widgets to ${importSlotName}`);
+    } catch (error) {
+      console.error('ContentEditor: Failed to import widgets', error);
+    }
+  }, [importSlotName, currentWidgets, layoutRenderer]);
+
   // Expose methods for external use
   const api = useMemo(() => ({
     updateSlot,
@@ -662,6 +697,17 @@ const ContentEditor = forwardRef(({
         }}
       />
 
+      {/* Import Dialog */}
+      <ImportDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => {
+          setIsImportDialogOpen(false);
+          setImportSlotName(null);
+        }}
+        slotName={importSlotName}
+        pageId={pageId}
+        onImportComplete={handleImportComplete}
+      />
 
     </div>
   );

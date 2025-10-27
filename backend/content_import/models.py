@@ -18,9 +18,11 @@ class ImportLog(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
+
     # Import metadata
-    source_url = models.URLField(max_length=2000, help_text="URL of the imported content")
+    source_url = models.URLField(
+        max_length=2000, help_text="URL of the imported content"
+    )
     slot_name = models.CharField(max_length=100, help_text="Target slot name")
     page_id = models.IntegerField(help_text="Target page ID")
     namespace = models.ForeignKey(
@@ -28,21 +30,21 @@ class ImportLog(models.Model):
         on_delete=models.CASCADE,
         help_text="Namespace for imported media files",
     )
-    
+
     # Import mode
     mode = models.CharField(
         max_length=20,
         choices=[("append", "Append"), ("replace", "Replace")],
         default="append",
     )
-    
+
     # Status tracking
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending",
     )
-    
+
     # Results
     widgets_created = models.IntegerField(default=0)
     media_files_imported = models.IntegerField(default=0)
@@ -52,7 +54,7 @@ class ImportLog(models.Model):
         blank=True,
         help_text="Statistics about imported content (blocks, tables, images, files)",
     )
-    
+
     # Processing details
     html_content = models.TextField(
         blank=True, help_text="Original HTML content that was imported"
@@ -62,7 +64,7 @@ class ImportLog(models.Model):
         blank=True,
         help_text="Information about the extracted element",
     )
-    
+
     # Timestamps and user
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -72,10 +74,10 @@ class ImportLog(models.Model):
         related_name="content_imports",
     )
     completed_at = models.DateTimeField(null=True, blank=True)
-    
+
     # Rate limiting support
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    
+
     class Meta:
         ordering = ["-created_at"]
         indexes = [
