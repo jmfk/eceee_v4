@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const AuthContext = createContext();
 
@@ -14,11 +14,34 @@ export const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState(null);
+    const [sessionExpired, setSessionExpired] = useState(false);
+    const requestQueueRef = useRef([]);
 
     // Check authentication status on mount
     useEffect(() => {
         checkAuthStatus();
     }, []);
+
+    // Listen for session expired events from API client
+    useEffect(() => {
+        const handleSessionExpired = (event) => {
+            const requestData = event.detail;
+
+            // Queue the failed request
+            queueRequest(requestData);
+
+            // Show the session expired overlay (only if not already shown)
+            if (!sessionExpired) {
+                setSessionExpired(true);
+            }
+        };
+
+        window.addEventListener('session-expired', handleSessionExpired);
+
+        return () => {
+            window.removeEventListener('session-expired', handleSessionExpired);
+        };
+    }, [sessionExpired]);
 
     const checkAuthStatus = async () => {
         try {
@@ -103,11 +126,62 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const queueRequest = (request) => {
+        // Create a unique key for deduplication
+        const requestKey = `${request.config.method}-${request.config.url}-${JSON.stringify(request.config.data)}`;
+
+        // Check if this request is already queued
+        const isDuplicate = requestQueueRef.current.some(
+            queuedRequest => {
+                const queuedKey = `${queuedRequest.config.method}-${queuedRequest.config.url}-${JSON.stringify(queuedRequest.config.data)}`;
+                return queuedKey === requestKey;
+            }
+        );
+
+        if (!isDuplicate) {
+            requestQueueRef.current.push(request);
+        }
+    };
+
+    const retryQueuedRequests = async () => {
+        const queue = [...requestQueueRef.current];
+        requestQueueRef.current = []; // Clear the queue
+
+        // Import apiClient dynamically to avoid circular dependency
+        const { default: apiClient } = await import('../api/client');
+
+        // Retry all queued requests
+        for (const queuedRequest of queue) {
+            try {
+                // Add the new access token to the request
+                const accessToken = localStorage.getItem('access_token');
+                if (accessToken) {
+                    queuedRequest.config.headers['Authorization'] = `Bearer ${accessToken}`;
+                }
+
+                const response = await apiClient.request(queuedRequest.config);
+                queuedRequest.resolve(response);
+            } catch (error) {
+                queuedRequest.reject(error);
+            }
+        }
+    };
+
+    const clearRequestQueue = () => {
+        // Reject all queued requests
+        requestQueueRef.current.forEach(queuedRequest => {
+            queuedRequest.reject(new Error('Authentication cancelled'));
+        });
+        requestQueueRef.current = [];
+    };
+
     const login = async (credentials) => {
         // Update authentication state after successful login
         setIsAuthenticated(true);
         // Refresh auth state to get user details
         await checkAuthStatus();
+        // Retry all queued requests after successful login
+        await retryQueuedRequests();
     };
 
     const logout = async () => {
@@ -115,11 +189,14 @@ export const AuthProvider = ({ children }) => {
             // Clear JWT tokens from localStorage
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
+            // Clear any queued requests
+            clearRequestQueue();
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
             setIsAuthenticated(false);
             setUser(null);
+            setSessionExpired(false);
         }
     };
 
@@ -127,6 +204,9 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         isLoading,
         user,
+        sessionExpired,
+        setSessionExpired,
+        queueRequest,
         login,
         logout,
         checkAuthStatus

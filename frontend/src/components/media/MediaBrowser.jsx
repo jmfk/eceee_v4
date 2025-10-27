@@ -37,6 +37,7 @@ import OptimizedImage from './OptimizedImage';
 import MediaEditForm from './MediaEditForm';
 import MediaSearchWidget from './MediaSearchWidget';
 import DuplicateResolveDialog from './DuplicateResolveDialog';
+import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
 const MediaBrowser = ({
@@ -71,6 +72,8 @@ const MediaBrowser = ({
     const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
     const [duplicateFiles, setDuplicateFiles] = useState([]);
     const [pendingUploadFiles, setPendingUploadFiles] = useState([]);
+    const [pendingApprovalFiles, setPendingApprovalFiles] = useState([]);
+    const [showApprovalForm, setShowApprovalForm] = useState(false);
 
     const [editingFile, setEditingFile] = useState(null);
     const [currentView, setCurrentView] = useState('library'); // 'library' | 'edit'
@@ -339,13 +342,26 @@ const MediaBrowser = ({
             }
 
             // Handle direct API response
-            const uploadedCount = result.uploadedFiles?.length || result.successCount || 0;
+            const uploadedFiles = result.uploadedFiles || result.uploaded_files || [];
+            const uploadedCount = uploadedFiles.length || result.successCount || 0;
             const rejectedCount = result.rejectedFiles?.length || result.rejectedCount || 0;
             const errorCount = result.errors?.length || result.errorCount || 0;
 
-            if (uploadedCount > 0) {
+            // Check if uploaded files are pending (need approval)
+            if (uploadedCount > 0 && uploadedFiles.length > 0) {
+                // Files were uploaded to pending state - show approval form
+                setPendingApprovalFiles(uploadedFiles);
+                setShowApprovalForm(true);
+                setUploadState('idle');
+                // Don't show success notification yet - wait for approval
+            } else if (uploadedCount > 0) {
+                // Files were directly approved (shouldn't happen with current backend)
                 addNotification(`${uploadedCount} files uploaded successfully`, 'success');
                 loadFiles(true); // Refresh file list
+                setUploadState('complete');
+                setTimeout(() => {
+                    setUploadState('idle');
+                }, 2000);
             }
 
             if (rejectedCount > 0) {
@@ -365,10 +381,10 @@ const MediaBrowser = ({
                 });
             }
 
-            setUploadState('complete');
-            setTimeout(() => {
+            // If no files were uploaded (all rejected or errored), reset state
+            if (uploadedCount === 0) {
                 setUploadState('idle');
-            }, 2000);
+            }
 
         } catch (error) {
             console.error('Upload error:', error);
@@ -446,6 +462,28 @@ const MediaBrowser = ({
         setPendingUploadFiles([]);
         setUploadState('idle');
     }, []);
+
+    // Handle approval completion
+    const handleApprovalComplete = useCallback(async (approvedFiles) => {
+        setShowApprovalForm(false);
+        setPendingApprovalFiles([]);
+
+        // Refresh the file list to show newly approved files
+        await loadFiles(true);
+
+        const count = approvedFiles?.length || 0;
+        addNotification(
+            `${count} file${count !== 1 ? 's' : ''} approved and ready to use`,
+            'success'
+        );
+    }, [loadFiles, addNotification]);
+
+    // Handle approval cancellation
+    const handleApprovalCancel = useCallback(() => {
+        setShowApprovalForm(false);
+        setPendingApprovalFiles([]);
+        addNotification('Upload cancelled. Files remain pending approval.', 'info');
+    }, [addNotification]);
 
     // File size formatter
     const formatFileSize = (bytes) => {
@@ -846,6 +884,18 @@ const MediaBrowser = ({
                         compact={true}
                         showSelectionHeader={true}
                     />
+                )}
+
+                {/* Simplified Approval Form */}
+                {showApprovalForm && pendingApprovalFiles.length > 0 && (
+                    <div className="border-t border-gray-200 bg-blue-50 p-4 m-4 rounded-lg">
+                        <SimplifiedApprovalForm
+                            pendingFiles={pendingApprovalFiles}
+                            namespace={namespace}
+                            onComplete={handleApprovalComplete}
+                            onCancel={handleApprovalCancel}
+                        />
+                    </div>
                 )}
             </div>
 
