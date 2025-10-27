@@ -13,6 +13,7 @@ import json
 from ..models import PageTheme
 from ..serializers import PageThemeSerializer
 from ..theme_service import ThemeService
+from ..services import ThemeCSSGenerator
 
 
 class PageThemeViewSet(viewsets.ModelViewSet):
@@ -347,3 +348,17 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 {"error": f"Failed to clone theme: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    @action(detail=True, methods=["post"])
+    def clear_cache(self, request, pk=None):
+        """Manually clear CSS cache for this theme"""
+        theme = self.get_object()
+        generator = ThemeCSSGenerator()
+        generator.invalidate_cache(theme.id)
+
+        return Response(
+            {
+                "message": f"CSS cache cleared for theme '{theme.name}'",
+                "status": "cache_cleared",
+            }
+        )

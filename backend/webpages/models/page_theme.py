@@ -111,13 +111,20 @@ class PageTheme(models.Model):
         }
 
     def save(self, *args, **kwargs):
-        """Override save to ensure only one default theme exists"""
+        """Override save to ensure only one default theme exists and invalidate CSS cache"""
         if self.is_default:
             # Clear any existing default themes
             PageTheme.objects.filter(is_default=True).exclude(id=self.id).update(
                 is_default=False
             )
         super().save(*args, **kwargs)
+
+        # Invalidate CSS cache for this theme
+        if self.id:
+            from webpages.services import ThemeCSSGenerator
+
+            generator = ThemeCSSGenerator()
+            generator.invalidate_cache(self.id)
 
     @classmethod
     def get_default_theme(cls):
@@ -219,9 +226,9 @@ class PageTheme(models.Model):
                         }
                     ]
                 },
-                component_styles={},
-                gallery_styles={},
-                carousel_styles={},
+                component_styles=cls.get_default_component_styles(),
+                gallery_styles=cls.get_default_gallery_styles(),
+                carousel_styles=cls.get_default_carousel_styles(),
                 table_templates={},
                 is_active=True,
                 is_default=True,
@@ -231,92 +238,231 @@ class PageTheme(models.Model):
 
     @staticmethod
     def get_default_gallery_styles():
-        """Default gallery style templates"""
+        """Default gallery style templates extracted from widget templates"""
         return {
-            "default": {
-                "name": "Default Gallery",
-                "description": "Simple grid gallery with hover effects",
-                "template": """<div class="image-gallery" data-columns="{{columns}}">
-  {{#images}}
-    <div class="gallery-item">
-      <img src="{{url}}" alt="{{alt}}" width="{{width}}" height="{{height}}" loading="lazy">
-      {{#showCaptions}}
-        {{#caption}}<p class="caption">{{caption}}</p>{{/caption}}
-      {{/showCaptions}}
-    </div>
-  {{/images}}
+            "grid-gallery": {
+                "name": "Grid Gallery",
+                "description": "Responsive grid gallery with hover effects and captions",
+                "template": """<div class="gallery-widget">
+  <div class="gallery-grid" style="grid-template-columns: repeat({{columns}}, 1fr);">
+    {{#images}}
+      <div class="gallery-item" data-index="{{index}}">
+        <div class="image-container">
+          <img src="{{url}}" alt="{{alt}}" class="gallery-image" loading="lazy">
+        </div>
+        {{#showCaptions}}
+          {{#caption}}
+            <div class="image-caption">
+              <h4 class="caption-title">{{caption}}</h4>
+              {{#description}}<p class="caption-description">{{description}}</p>{{/description}}
+            </div>
+          {{/caption}}
+        {{/showCaptions}}
+      </div>
+    {{/images}}
+  </div>
 </div>""",
-                "css": """.image-gallery {
+                "css": """.gallery-widget {
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.gallery-grid {
   display: grid;
-  grid-template-columns: repeat(var(--columns, 3), 1fr);
   gap: 1rem;
 }
 .gallery-item {
-  position: relative;
-  overflow: hidden;
   border-radius: 8px;
+  overflow: hidden;
   background: white;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: transform 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 .gallery-item:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
-.gallery-item img {
+.image-container {
+  position: relative;
+  overflow: hidden;
+}
+.gallery-image {
   width: 100%;
   height: auto;
   display: block;
+  transition: transform 0.3s;
 }
-.caption {
-  padding: 0.75rem;
+.gallery-item:hover .gallery-image {
+  transform: scale(1.05);
+}
+.image-caption {
+  padding: 1rem;
+}
+.caption-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0 0 0.5rem 0;
+}
+.caption-description {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #718096;
+  margin: 0;
+  line-height: 1.4;
+}
+@media (max-width: 768px) {
+  .gallery-widget {
+    padding: 1rem;
+  }
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
+  }
+}
+@media (max-width: 480px) {
+  .gallery-grid {
+    grid-template-columns: 1fr !important;
+  }
 }""",
                 "variables": {
                     "columns": {"type": "number", "default": 3, "min": 1, "max": 6}
                 },
-            }
+            },
+            "grid-with-overlay": {
+                "name": "Grid with Overlay",
+                "description": "Grid gallery with hover overlay and expand icon",
+                "template": """<div class="gallery-widget">
+  <div class="gallery-grid" style="grid-template-columns: repeat({{columns}}, 1fr);">
+    {{#images}}
+      <div class="gallery-item" data-index="{{index}}">
+        <div class="image-container">
+          <img src="{{url}}" alt="{{alt}}" class="gallery-image" loading="lazy">
+          <div class="image-overlay">
+            <span class="expand-icon">🔍</span>
+          </div>
+        </div>
+        {{#showCaptions}}
+          {{#caption}}
+            <div class="image-caption">{{caption}}</div>
+          {{/caption}}
+        {{/showCaptions}}
+      </div>
+    {{/images}}
+  </div>
+</div>""",
+                "css": """.gallery-widget {
+  border-radius: 8px;
+  padding: 1rem;
+}
+.gallery-grid {
+  display: grid;
+  gap: 1rem;
+}
+.gallery-item {
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.gallery-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.image-container {
+  position: relative;
+  overflow: hidden;
+}
+.gallery-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.3s;
+}
+.gallery-item:hover .gallery-image {
+  transform: scale(1.05);
+}
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.gallery-item:hover .image-overlay {
+  opacity: 1;
+}
+.expand-icon {
+  font-size: 1.5rem;
+  color: white;
+}
+.image-caption {
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+}
+@media (max-width: 768px) {
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
+  }
+}
+@media (max-width: 480px) {
+  .gallery-grid {
+    grid-template-columns: 1fr !important;
+  }
+}""",
+                "variables": {
+                    "columns": {"type": "number", "default": 3, "min": 1, "max": 6}
+                },
+            },
         }
 
     @staticmethod
     def get_default_carousel_styles():
-        """Default carousel style templates with Alpine.js"""
+        """Default carousel style templates with Alpine.js, extracted from widget templates"""
         return {
-            "default": {
+            "default-carousel": {
                 "name": "Default Carousel",
-                "description": "Clean carousel with Alpine.js interactions",
-                "template": """<div class="image-carousel" x-data="{ current: 0, total: {{imageCount}} }">
+                "description": "Clean carousel with prev/next buttons",
+                "template": """<div class="gallery-carousel">
   <div class="carousel-container">
-    <div class="carousel-track" :style="'transform: translateX(-' + (current * 100) + '%)'">
+    <div class="carousel-track" id="carousel-track">
       {{#images}}
-        <div class="carousel-slide">
-          <img src="{{url}}" alt="{{alt}}" loading="lazy">
-          {{#showCaptions}}
-            {{#caption}}<div class="carousel-caption">{{caption}}</div>{{/caption}}
-          {{/showCaptions}}
+        <div class="carousel-slide" data-index="{{index}}">
+          <img src="{{url}}" alt="{{alt}}" class="carousel-image" loading="lazy">
         </div>
       {{/images}}
     </div>
     {{#multipleImages}}
-    <button @click="current = (current - 1 + total) % total" class="carousel-btn carousel-prev" aria-label="Previous">‹</button>
-    <button @click="current = (current + 1) % total" class="carousel-btn carousel-next" aria-label="Next">›</button>
-    <div class="carousel-dots">
-      {{#images}}
-        <button @click="current = {{index}}" :class="current === {{index}} ? 'active' : ''" class="dot"></button>
-      {{/images}}
-    </div>
+    <button class="carousel-btn carousel-prev" data-direction="-1" aria-label="Previous">
+      <span class="icon-prev"></span>
+    </button>
+    <button class="carousel-btn carousel-next" data-direction="1" aria-label="Next">
+      <span class="icon-next"></span>
+    </button>
     {{/multipleImages}}
   </div>
 </div>""",
-                "css": """.image-carousel {
+                "css": """.gallery-carousel {
   position: relative;
   border-radius: 8px;
   overflow: hidden;
+  background: #000;
 }
 .carousel-container {
   position: relative;
-  background: #000;
+  width: 100%;
+  overflow: hidden;
 }
 .carousel-track {
   display: flex;
@@ -326,20 +472,11 @@ class PageTheme(models.Model):
   min-width: 100%;
   position: relative;
 }
-.carousel-slide img {
+.carousel-image {
   width: 100%;
   height: 400px;
   object-fit: cover;
-}
-.carousel-caption {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 2rem 1.5rem 1rem;
-  background: linear-gradient(transparent, rgba(0,0,0,0.8));
-  color: white;
-  font-size: 1.125rem;
+  display: block;
 }
 .carousel-btn {
   position: absolute;
@@ -347,11 +484,16 @@ class PageTheme(models.Model):
   transform: translateY(-50%);
   background: rgba(255,255,255,0.9);
   border: none;
+  border-radius: 50%;
   width: 3rem;
   height: 3rem;
-  border-radius: 50%;
-  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  font-size: 1.25rem;
+  color: #2d3748;
+  transition: background-color 0.2s;
   z-index: 2;
 }
 .carousel-btn:hover {
@@ -359,7 +501,106 @@ class PageTheme(models.Model):
 }
 .carousel-prev { left: 1rem; }
 .carousel-next { right: 1rem; }
-.carousel-dots {
+.icon-prev::before { content: "◀"; }
+.icon-next::before { content: "▶"; }
+@media (max-width: 768px) {
+  .carousel-image {
+    height: 250px;
+  }
+  .carousel-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+}
+@media (max-width: 480px) {
+  .carousel-btn {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.875rem;
+  }
+  .carousel-prev { left: 0.5rem; }
+  .carousel-next { right: 0.5rem; }
+}""",
+                "alpine": False,
+                "variables": {},
+            },
+            "carousel-with-indicators": {
+                "name": "Carousel with Indicators",
+                "description": "Carousel with dot navigation indicators",
+                "template": """<div class="gallery-carousel">
+  <div class="carousel-container">
+    <div class="carousel-track" id="carousel-track">
+      {{#images}}
+        <div class="carousel-slide" data-index="{{index}}">
+          <img src="{{url}}" alt="{{alt}}" class="carousel-image" loading="lazy">
+        </div>
+      {{/images}}
+    </div>
+    {{#multipleImages}}
+    <button class="carousel-btn carousel-prev" data-direction="-1" aria-label="Previous">
+      <span class="icon-prev"></span>
+    </button>
+    <button class="carousel-btn carousel-next" data-direction="1" aria-label="Next">
+      <span class="icon-next"></span>
+    </button>
+    <div class="carousel-indicators">
+      {{#images}}
+        <button class="indicator-dot{{#first}} active{{/first}}" data-slide-index="{{index}}"></button>
+      {{/images}}
+    </div>
+    {{/multipleImages}}
+  </div>
+</div>""",
+                "css": """.gallery-carousel {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+.carousel-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.carousel-track {
+  display: flex;
+  transition: transform 0.5s ease;
+}
+.carousel-slide {
+  min-width: 100%;
+  position: relative;
+}
+.carousel-image {
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  display: block;
+}
+.carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.9);
+  border: none;
+  border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: #2d3748;
+  transition: background-color 0.2s;
+  z-index: 2;
+}
+.carousel-btn:hover {
+  background: white;
+}
+.carousel-prev { left: 1rem; }
+.carousel-next { right: 1rem; }
+.carousel-indicators {
   position: absolute;
   bottom: 1rem;
   left: 50%;
@@ -368,20 +609,355 @@ class PageTheme(models.Model):
   gap: 0.5rem;
   z-index: 2;
 }
-.dot {
+.indicator-dot {
   width: 0.75rem;
   height: 0.75rem;
   border: none;
   border-radius: 50%;
   background: rgba(255,255,255,0.5);
   cursor: pointer;
+  transition: background-color 0.2s;
 }
-.dot.active {
+.indicator-dot.active {
   background: white;
+}
+.icon-prev::before { content: "◀"; }
+.icon-next::before { content: "▶"; }
+@media (max-width: 768px) {
+  .carousel-image {
+    height: 250px;
+  }
+  .carousel-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+}
+@media (max-width: 480px) {
+  .carousel-btn {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.875rem;
+  }
+  .carousel-prev { left: 0.5rem; }
+  .carousel-next { right: 0.5rem; }
 }""",
-                "alpine": True,
+                "alpine": False,
                 "variables": {},
-            }
+            },
+            "carousel-with-captions": {
+                "name": "Carousel with Captions",
+                "description": "Carousel with gradient caption overlay",
+                "template": """<div class="gallery-carousel">
+  <div class="carousel-container">
+    <div class="carousel-track" id="carousel-track">
+      {{#images}}
+        <div class="carousel-slide" data-index="{{index}}">
+          <img src="{{url}}" alt="{{alt}}" class="carousel-image" loading="lazy">
+          {{#showCaptions}}
+            {{#caption}}
+              <div class="carousel-caption">{{caption}}</div>
+            {{/caption}}
+          {{/showCaptions}}
+        </div>
+      {{/images}}
+    </div>
+    {{#multipleImages}}
+    <button class="carousel-btn carousel-prev" data-direction="-1" aria-label="Previous">
+      <span class="icon-prev"></span>
+    </button>
+    <button class="carousel-btn carousel-next" data-direction="1" aria-label="Next">
+      <span class="icon-next"></span>
+    </button>
+    <div class="carousel-indicators">
+      {{#images}}
+        <button class="indicator-dot{{#first}} active{{/first}}" data-slide-index="{{index}}"></button>
+      {{/images}}
+    </div>
+    {{/multipleImages}}
+  </div>
+</div>""",
+                "css": """.gallery-carousel {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+.carousel-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.carousel-track {
+  display: flex;
+  transition: transform 0.5s ease;
+}
+.carousel-slide {
+  min-width: 100%;
+  position: relative;
+}
+.carousel-image {
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  display: block;
+}
+.carousel-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  color: white;
+  padding: 2rem 1.5rem 1rem;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+.carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.9);
+  border: none;
+  border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: #2d3748;
+  transition: background-color 0.2s;
+  z-index: 2;
+}
+.carousel-btn:hover {
+  background: white;
+}
+.carousel-prev { left: 1rem; }
+.carousel-next { right: 1rem; }
+.carousel-indicators {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  z-index: 2;
+}
+.indicator-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.indicator-dot.active {
+  background: white;
+}
+.icon-prev::before { content: "◀"; }
+.icon-next::before { content: "▶"; }
+@media (max-width: 768px) {
+  .carousel-image {
+    height: 250px;
+  }
+  .carousel-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+}
+@media (max-width: 480px) {
+  .carousel-btn {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.875rem;
+  }
+  .carousel-prev { left: 0.5rem; }
+  .carousel-next { right: 0.5rem; }
+}""",
+                "alpine": False,
+                "variables": {},
+            },
+        }
+
+    @staticmethod
+    def get_default_component_styles():
+        """Default component styles for reusable elements, extracted from widget templates"""
+        return {
+            "image-simple": {
+                "name": "Simple Image",
+                "description": "Basic image with size and alignment options",
+                "template": """<div class="image-widget image-size-{{size}} image-align-{{alignment}}">
+  <div class="image-container">
+    {{content}}
+  </div>
+  {{#caption}}
+    <div class="image-caption">{{caption}}</div>
+  {{/caption}}
+</div>""",
+                "css": """.image-widget {
+  margin: 1rem 0;
+}
+.image-widget.image-align-left {
+  text-align: left;
+}
+.image-widget.image-align-center {
+  text-align: center;
+}
+.image-widget.image-align-right {
+  text-align: right;
+}
+.image-widget.image-size-small .widget-image {
+  max-width: 200px;
+  width: 100%;
+}
+.image-widget.image-size-medium .widget-image {
+  max-width: 400px;
+  width: 100%;
+}
+.image-widget.image-size-large .widget-image {
+  max-width: 600px;
+  width: 100%;
+}
+.image-widget.image-size-full .widget-image {
+  width: 100%;
+}
+.widget-image {
+  height: auto;
+  border-radius: 4px;
+}
+.image-caption {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-style: italic;
+}""",
+                "variables": {},
+            },
+            "lightbox-modal": {
+                "name": "Lightbox Modal",
+                "description": "Full-screen lightbox for image viewing",
+                "template": """<div class="lightbox-modal" id="lightbox-modal" style="display: none;">
+  <div class="lightbox-content">
+    <button class="lightbox-close">&times;</button>
+    <div class="lightbox-image-container">
+      <img id="lightbox-image" src="" alt="" class="lightbox-image">
+      <button class="lightbox-btn lightbox-prev">◀</button>
+      <button class="lightbox-btn lightbox-next">▶</button>
+    </div>
+    <div class="lightbox-info" id="lightbox-info">
+      <h3 id="lightbox-caption"></h3>
+      <p id="lightbox-description"></p>
+    </div>
+    <div class="lightbox-counter" id="lightbox-counter"></div>
+  </div>
+</div>""",
+                "css": """.lightbox-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+.lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox-image-container {
+  position: relative;
+}
+.lightbox-image {
+  max-width: 100%;
+  max-height: 70vh;
+  width: auto;
+  height: auto;
+  display: block;
+}
+.lightbox-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.lightbox-btn:hover {
+  background: rgba(0,0,0,0.9);
+}
+.lightbox-prev { left: 1rem; }
+.lightbox-next { right: 1rem; }
+.lightbox-info {
+  padding: 1.5rem;
+}
+.lightbox-info h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  color: #2d3748;
+}
+.lightbox-info p {
+  margin: 0;
+  color: #718096;
+  line-height: 1.5;
+}
+.lightbox-counter {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+@media (max-width: 768px) {
+  .lightbox-modal {
+    padding: 1rem;
+  }
+  .lightbox-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+}""",
+                "variables": {},
+            },
         }
 
     def generate_css(self, scope=".theme-content", widget_type=None, slot=None):

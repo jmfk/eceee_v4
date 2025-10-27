@@ -19,7 +19,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
 import { useAutoSave } from '../hooks/useAutoSave';
 import {
-    Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X
+    Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw
 } from 'lucide-react';
 
 // Import tab components
@@ -331,12 +331,12 @@ const ThemeEditor = ({ onSave }) => {
     useEffect(() => {
         if (onSave && currentView === 'edit') {
             // Pass the save function, auto-save status to SettingsManager
-            onSave(() => handleSaveTheme, autoSaveCountdown, autoSaveStatus);
+            onSave(handleSaveTheme, autoSaveCountdown, autoSaveStatus);
         } else if (onSave && currentView === 'list') {
             // Clear the save handler when not editing
             onSave(null, null, 'idle');
         }
-    }, [onSave, handleSaveTheme, currentView, autoSaveCountdown, autoSaveStatus]);
+    }, [onSave, handleSaveTheme, currentView, autoSaveCountdown, autoSaveStatus, isThemeDirty]);
 
     const handleDelete = async (theme) => {
         const confirmed = await showConfirm(
@@ -352,6 +352,23 @@ const ThemeEditor = ({ onSave }) => {
         const newName = prompt('Enter a name for the cloned theme:', `${theme.name} (Copy)`);
         if (newName) {
             cloneMutation.mutate({ id: theme.id, name: newName });
+        }
+    };
+
+    const handleClearCache = async () => {
+        if (!themeId || themeId === 'new') return;
+
+        try {
+            await themesApi.clearCache(themeId);
+            addNotification({
+                type: 'success',
+                message: 'CSS cache cleared successfully',
+            });
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: extractErrorMessage(error, 'Failed to clear cache'),
+            });
         }
     };
 
@@ -590,20 +607,34 @@ const ThemeEditor = ({ onSave }) => {
             <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
                 <div className="px-6 py-4">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={handleBackToList}
-                                className="inline-flex items-center text-gray-600 hover:text-gray-900"
-                            >
-                                <ArrowLeft className="w-5 h-5 mr-1" />
-                                Back
-                            </button>
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900">
-                                    {isCreating ? 'Create Theme' : `Edit: ${selectedThemeData?.name || 'Theme'}`}
-                                    {isThemeDirty && <span className="ml-2 text-sm text-orange-600">• Unsaved changes</span>}
-                                </h1>
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={handleBackToList}
+                                    className="inline-flex items-center text-gray-600 hover:text-gray-900"
+                                >
+                                    <ArrowLeft className="w-5 h-5 mr-1" />
+                                    Back
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-bold text-gray-900">
+                                        {isCreating ? 'Create Theme' : `Edit: ${selectedThemeData?.name || 'Theme'}`}
+                                        {isThemeDirty && <span className="ml-2 text-sm text-orange-600">• Unsaved changes</span>}
+                                    </h1>
+                                </div>
                             </div>
+
+                            {/* Clear Cache Button - only show when editing existing theme */}
+                            {!isCreating && (
+                                <button
+                                    onClick={handleClearCache}
+                                    className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    title="Clear cached CSS for this theme"
+                                >
+                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                    Clear CSS Cache
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -701,6 +732,7 @@ const ThemeEditor = ({ onSave }) => {
                         <FontsTab
                             fonts={themeData?.fonts || {}}
                             onChange={(fonts) => updateThemeField('fonts', fonts)}
+                            onDirty={() => setThemeDirty(true)}
                         />
                     )}
 
@@ -708,6 +740,7 @@ const ThemeEditor = ({ onSave }) => {
                         <ColorsTab
                             colors={themeData?.colors || {}}
                             onChange={(colors) => updateThemeField('colors', colors)}
+                            onDirty={() => setThemeDirty(true)}
                         />
                     )}
 
@@ -733,6 +766,7 @@ const ThemeEditor = ({ onSave }) => {
                         <GalleryStylesTab
                             galleryStyles={themeData?.galleryStyles || {}}
                             onChange={(galleryStyles) => updateThemeField('galleryStyles', galleryStyles)}
+                            onDirty={() => setThemeDirty(true)}
                         />
                     )}
 
@@ -740,6 +774,7 @@ const ThemeEditor = ({ onSave }) => {
                         <CarouselStylesTab
                             carouselStyles={themeData?.carouselStyles || {}}
                             onChange={(carouselStyles) => updateThemeField('carouselStyles', carouselStyles)}
+                            onDirty={() => setThemeDirty(true)}
                         />
                     )}
 
@@ -747,6 +782,7 @@ const ThemeEditor = ({ onSave }) => {
                         <TableTemplatesTab
                             tableTemplates={themeData?.tableTemplates || {}}
                             onChange={(tableTemplates) => updateThemeField('tableTemplates', tableTemplates)}
+                            onDirty={() => setThemeDirty(true)}
                         />
                     )}
                 </div>

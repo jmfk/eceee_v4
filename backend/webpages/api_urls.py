@@ -19,6 +19,7 @@ from .views import (
     render_page_backend,
     render_page_preview,
 )
+from .views.theme_css_views import ThemeCSSView
 from .views.path_pattern_views import PathPatternViewSet
 from .views.widget_type_views import pydantic_model_schema
 from .views.preview_views import PreviewSizeViewSet, render_version_preview
@@ -102,6 +103,8 @@ widget_type_patterns = [
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
+    # Theme CSS endpoint
+    path("themes/<int:theme_id>/styles.css", ThemeCSSView.as_view(), name="theme-css"),
     # Legacy layout JSON (Django template-based)
     path("layouts/<str:layout_name>/json/", layout_json, name="layout-json"),
     # New simplified layout JSON (React-optimized)

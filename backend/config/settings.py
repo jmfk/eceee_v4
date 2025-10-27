@@ -32,6 +32,14 @@ else:
     SIMPLIFIED_LAYOUT_CACHE_TIMEOUT = 3600  # 1 hour
     LAYOUT_CACHE_ENABLED = True
 
+# Theme CSS caching configuration
+if DEBUG:
+    # Disable theme CSS caching in development for immediate updates
+    THEME_CSS_CACHE_TIMEOUT = 0  # No caching
+else:
+    # Enable caching in production (24 hours)
+    THEME_CSS_CACHE_TIMEOUT = 3600 * 24  # 24 hours
+
 # Security check for production secret key
 if not DEBUG and SECRET_KEY == "dev-secret-key-change-in-production-12345":
     raise ValueError(
@@ -191,6 +199,19 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+# ASGI Application for WebSocket support
+ASGI_APPLICATION = "config.asgi.application"
+
+# Channel Layers for WebSocket support
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [config("REDIS_URL", default="redis://redis:6379/0")],
+        },
+    },
+}
 
 TEMPLATES = [
     {

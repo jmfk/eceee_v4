@@ -180,7 +180,16 @@ export const themesApi = {
      */
     clone: wrapApiCall(async (themeId, data = {}) => {
         return api.post(`${endpoints.themes.detail(themeId)}/clone/`, data)
-    }, 'themes.clone')
+    }, 'themes.clone'),
+
+    /**
+     * Clear CSS cache for a theme
+     * @param {number} themeId - Theme ID
+     * @returns {Promise<Object>} Success response
+     */
+    clearCache: wrapApiCall(async (themeId) => {
+        return api.post(`${endpoints.themes.detail(themeId)}/clear_cache/`)
+    }, 'themes.clearCache')
 }
 
 export default themesApi

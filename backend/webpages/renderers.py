@@ -210,6 +210,14 @@ class WebPageRenderer:
 
     def _build_base_context(self, page, page_version, extra_context=None):
         """Build the base template context for page rendering."""
+        # Get effective theme
+        effective_theme = page.get_effective_theme()
+
+        # Build theme CSS URL if theme exists
+        theme_css_url = None
+        if effective_theme:
+            theme_css_url = f"/api/webpages/themes/{effective_theme.id}/styles.css"
+
         context = {
             "page": page,
             "current_page": page,
@@ -222,7 +230,8 @@ class WebPageRenderer:
             "effective_date": page_version.effective_date,
             "created_by": page_version.created_by,
             "layout": page.get_effective_layout(),
-            "theme": page.get_effective_theme(),
+            "theme": effective_theme,
+            "theme_css_url": theme_css_url,
             "parent": page.parent,
             "request": self.request,
         }
