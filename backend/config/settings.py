@@ -19,7 +19,10 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Security Settings
-SECRET_KEY = config("SECRET_KEY", default="dev-secret-key-change-in-production-12345")
+SECRET_KEY = config(
+    "SECRET_KEY",
+    default="django-insecure-2e2!o&yhu%_-v)&9rydo7&rt7f!^m$tr244w18lmk2p=r9(_kr",
+)
 DEBUG = config("DEBUG", default=True, cast=bool)
 
 # Layout caching configuration
