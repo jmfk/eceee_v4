@@ -202,7 +202,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         setError(null);
         setImportResults(null);
         setProgress({ step: '', percent: 0 });
-        setModifiedHtml(''); // Clear modified HTML
         setUploadedMediaMapping([]); // Clear media mapping
         setMediaUploadComplete(false); // Reset upload status
         setImageMetadataList([]); // Clear image metadata
