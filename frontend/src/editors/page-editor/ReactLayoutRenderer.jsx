@@ -113,7 +113,7 @@ const ReactLayoutRenderer = forwardRef(({
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {
         switch (action) {
             case 'add': {
-                const widgetType = args[0] || 'default_widgets.ContentWidget';
+                const widgetType = args[0] || 'eceee_widgets.ContentWidget';
                 const insertPosition = args[1]; // Optional position parameter
 
                 const widgetConfig = createDefaultWidgetConfig(widgetType);

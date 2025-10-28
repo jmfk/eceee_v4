@@ -187,7 +187,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
         const slot = objectType.slotConfiguration.slots.find(s => s.name === slotName)
         if (!slot) return
 
-        let widgetType = 'default_widgets.ContentWidget'
+        let widgetType = 'eceee_widgets.ContentWidget'
         let widgetConfig = {}
 
         if (widgetTypeToAdd) {

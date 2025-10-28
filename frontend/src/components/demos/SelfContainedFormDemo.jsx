@@ -13,7 +13,7 @@ import SelfContainedWidgetEditor from '../forms/SelfContainedWidgetEditor.jsx'
 const mockWidgets = {
     textWidget: {
         id: 'demo-text-widget',
-        type: 'default_widgets.TextWidget',
+        type: 'eceee_widgets.TextWidget',
         name: 'Text Widget',
         slotName: 'demo-slot',
         config: {
@@ -27,7 +27,7 @@ const mockWidgets = {
     },
     imageWidget: {
         id: 'demo-image-widget',
-        type: 'default_widgets.ImageWidget',
+        type: 'eceee_widgets.ImageWidget',
         name: 'Image Widget',
         slotName: 'demo-slot',
         config: {
@@ -40,7 +40,7 @@ const mockWidgets = {
     },
     buttonWidget: {
         id: 'demo-button-widget',
-        type: 'default_widgets.ButtonWidget',
+        type: 'eceee_widgets.ButtonWidget',
         name: 'Button Widget',
         slotName: 'demo-slot',
         config: {

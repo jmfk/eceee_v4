@@ -23,7 +23,6 @@ const SPECIAL_EDITOR_COMPONENTS = {
 
 // Legacy registry for backward compatibility (deprecated - use widget metadata instead)
 const LEGACY_SPECIAL_EDITORS = {
-    'default_widgets.ImageWidget': 'MediaSpecialEditor',
     'eceee_widgets.ImageWidget': 'MediaSpecialEditor',
 }
 

@@ -65,7 +65,7 @@ export const renderWidgetToHTML = (widget) => {
   }
 
   switch (widget.type) {
-    case 'default_widgets.ContentWidget':
+    case 'eceee_widgetsContentWidget':
       const content = config.content || '<div class="text-gray-500 italic">Content will appear here...</div>'
       return `
         <div class="content-widget theme-content widget-content">
@@ -73,7 +73,7 @@ export const renderWidgetToHTML = (widget) => {
         </div>
       `
 
-    case 'default_widgets.ImageWidget':
+    case 'eceee_widgetsImageWidget':
       // Note: This HTML fallback renderer only shows the first image in a simplified format
       // Full gallery/carousel functionality requires the React component
       const imgSrc = config.image_url || config.imageUrl || (config.mediaItems && config.mediaItems[0] ? config.mediaItems[0].url : '')
@@ -89,7 +89,7 @@ export const renderWidgetToHTML = (widget) => {
         </div>
       `
 
-    case 'default_widgets.TableWidget':
+    case 'eceee_widgetsTableWidget':
       return `
         <div class="table-widget theme-content widget-content">
           <div class="bg-gray-50 border border-gray-200 rounded p-4 text-center">
@@ -98,35 +98,35 @@ export const renderWidgetToHTML = (widget) => {
         </div>
       `
 
-    case 'default_widgets.FooterWidget':
+    case 'eceee_widgetsFooterWidget':
       return `
         <footer class="footer-widget bg-gray-800 text-white p-4 text-center rounded theme-content widget-content">
           <div class="text-sm">Footer content will appear here...</div>
         </footer>
       `
 
-    case 'default_widgets.HeaderWidget':
+    case 'eceee_widgetsHeaderWidget':
       return `
         <header class="header-widget bg-white p-6 text-center border border-gray-200 rounded theme-content widget-content">
           <div class="text-lg font-semibold">Header content will appear here...</div>
         </header>
       `
 
-    case 'default_widgets.NavigationWidget':
+    case 'eceee_widgetsNavigationWidget':
       return `
         <nav class="navigation-widget bg-white border border-gray-200 rounded p-4 theme-content widget-content">
           <div class="text-center text-gray-600">Navigation content will appear here...</div>
         </nav>
       `
 
-    case 'default_widgets.SidebarWidget':
+    case 'eceee_widgetsSidebarWidget':
       return `
         <aside class="sidebar-widget bg-gray-50 border border-gray-200 rounded p-4 theme-content widget-content">
           <div class="text-gray-600">Sidebar content will appear here...</div>
         </aside>
       `
 
-    case 'default_widgets.FormsWidget':
+    case 'eceee_widgetsFormsWidget':
       return `
         <div class="forms-widget bg-white border border-gray-200 rounded p-6 theme-content widget-content">
           <h3 class="text-lg font-semibold mb-4 text-center">Contact Form</h3>

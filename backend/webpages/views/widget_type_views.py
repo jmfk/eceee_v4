@@ -310,7 +310,7 @@ def find_pydantic_model(model_name: str):
     Find a Pydantic model by name across all widget modules.
 
     Searches through:
-    - default_widgets.widgets
+    - eceee_widgets.widgets
     - eceee_widgets.widgets
     - Any other registered widget modules
 
@@ -327,7 +327,7 @@ def find_pydantic_model(model_name: str):
     for widget_type in widget_type_registry.list_widget_types(active_only=False):
         # Get the module where the widget is defined
         widget_module = widget_type.__class__.__module__
-        # Extract the app and widgets path (e.g., "default_widgets.widgets")
+        # Extract the app and widgets path (e.g., "eceee_widgets.widgets")
         if ".widgets." in widget_module:
             base_module = widget_module.rsplit(".", 1)[0]
             widget_modules.add(base_module)
@@ -335,7 +335,6 @@ def find_pydantic_model(model_name: str):
     # Also add common widget module paths
     widget_modules.update(
         [
-            # "default_widgets.widgets",
             "eceee_widgets.widgets",
         ]
     )
