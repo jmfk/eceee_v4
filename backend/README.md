@@ -302,6 +302,7 @@ docker-compose exec backend coverage report --show-missing
 - **[Core Widgets README](core_widgets/README.md)** - Built-in widget types and usage
 - **[API Version Management](docs/api/version_management.md)** - Version control API reference
 - **[Publishing Workflow](docs/PHASE_8_PUBLISHING_WORKFLOW_SUMMARY.md)** - CMS publishing system
+- **[Email Configuration](docs/email-configuration.md)** - Postmark transactional email setup
 
 ### Implementation Guides
 - **[Widget Template JSON Feature](docs/WIDGET_TEMPLATE_JSON_FEATURE.md)** - Template system integration

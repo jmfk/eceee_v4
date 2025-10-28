@@ -1,0 +1,14 @@
+{% load account %}{% user_display user as user_display %}{% load i18n %}{% autoescape off %}{% blocktrans with site_name=current_site.name site_domain=current_site.domain %}Hello from {{ site_name }}!
+
+You're receiving this email because user {{ user_display }} has given your email address to register an account on {{ site_domain }}.
+
+To confirm this is correct, please click the following link:
+{% endblocktrans %}
+{{ activate_url }}
+{% blocktrans with site_name=current_site.name site_domain=current_site.domain %}If you did not sign up for an account, please ignore this email.
+
+Thank you,
+The {{ site_name }} Team
+{% endblocktrans %}
+{% endautoescape %}
+
