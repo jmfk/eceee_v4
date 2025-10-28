@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Lock, AlertCircle } from 'lucide-react';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
@@ -17,7 +17,7 @@ const LoginPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { addNotification } = useGlobalNotifications();
-    const { login, checkAuthStatus } = useAuth();
+    const { login, checkAuthStatus, isAuthenticated, isLoading: authLoading } = useAuth();
 
     const [credentials, setCredentials] = useState({
         username: '',
@@ -28,6 +28,13 @@ const LoginPage = () => {
 
     // Get the intended destination from location state
     const from = location.state?.from?.pathname || '/';
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            navigate(from, { replace: true });
+        }
+    }, [isAuthenticated, authLoading, navigate, from]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
