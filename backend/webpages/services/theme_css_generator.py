@@ -157,7 +157,7 @@ class ThemeCSSGenerator:
         return css
 
     def _generate_typography_css(self, typography):
-        """Generate CSS from typography groups"""
+        """Generate CSS from typography groups with optional class scoping"""
         if not typography or not typography.get("groups"):
             return ""
 
@@ -165,39 +165,60 @@ class ThemeCSSGenerator:
 
         for group in typography["groups"]:
             group_name = group.get("name", "")
+            class_name = group.get("className", None)
             elements = group.get("elements", {})
 
             if elements:
-                css_parts.append(f"/* Typography: {group_name} */")
+                scope_info = f" (scoped: .{class_name})" if class_name else " (global)"
+                css_parts.append(f"/* Typography: {group_name}{scope_info} */")
 
                 for element, styles in elements.items():
                     if not styles:
                         continue
 
-                    css = f"{element} {{\n"
+                    # Build selector with optional class scope
+                    if class_name:
+                        selector = f".{class_name} {element}"
+                    else:
+                        selector = element
+
+                    css = f"{selector} {{\n"
 
                     # Handle font
                     if "font" in styles:
                         css += f"  font-family: '{styles['font']}', sans-serif;\n"
 
-                    # Handle other properties
+                    # Handle other properties with expanded property map
                     property_map = {
                         "size": "font-size",
+                        "fontSize": "font-size",
                         "lineHeight": "line-height",
                         "fontWeight": "font-weight",
+                        "fontStyle": "font-style",
                         "marginBottom": "margin-bottom",
                         "marginTop": "margin-top",
+                        "marginLeft": "margin-left",
+                        "marginRight": "margin-right",
+                        "paddingTop": "padding-top",
+                        "paddingBottom": "padding-bottom",
+                        "paddingLeft": "padding-left",
+                        "paddingRight": "padding-right",
                         "color": "color",
+                        "backgroundColor": "background-color",
                         "textDecoration": "text-decoration",
+                        "textTransform": "text-transform",
+                        "letterSpacing": "letter-spacing",
+                        "bulletType": "list-style-type",
                     }
 
                     for style_key, css_prop in property_map.items():
                         if style_key in styles:
                             value = styles[style_key]
                             # If it's a color variable reference, use var()
-                            if style_key == "color" and not value.startswith(
-                                ("#", "rgb", "var")
-                            ):
+                            if style_key in (
+                                "color",
+                                "backgroundColor",
+                            ) and not value.startswith(("#", "rgb", "var")):
                                 value = f"var(--{value})"
                             css += f"  {css_prop}: {value};\n"
 
