@@ -44,7 +44,13 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty }) => {
             description: '',
             template: '<div class="image-gallery">\n  {{#images}}\n    <div class="gallery-item">\n      <img src="{{url}}" alt="{{alt}}" loading="lazy">\n    </div>\n  {{/images}}\n</div>',
             css: '.image-gallery {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 1rem;\n}\n.gallery-item img {\n  width: 100%;\n  height: auto;\n}',
-            variables: {}
+            variables: {},
+            imgproxy_config: {
+                width: 800,
+                height: 600,
+                resize_type: 'fill',
+                gravity: 'sm'
+            }
         };
 
         const updatedStyles = {
@@ -249,6 +255,89 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty }) => {
                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Imgproxy Configuration */}
+                            <div className="bg-blue-50 border border-blue-200 rounded p-3 space-y-3">
+                                <h5 className="text-xs font-semibold text-gray-700">Image Processing (imgproxy)</h5>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Width (px)</label>
+                                        <input
+                                            type="number"
+                                            value={styles[editingStyle].imgproxy_config?.width || styles[editingStyle].imgproxyConfig?.width || ''}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    width: parseInt(e.target.value) || null
+                                                }
+                                            })}
+                                            placeholder="800"
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Height (px)</label>
+                                        <input
+                                            type="number"
+                                            value={styles[editingStyle].imgproxy_config?.height || styles[editingStyle].imgproxyConfig?.height || ''}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    height: parseInt(e.target.value) || null
+                                                }
+                                            })}
+                                            placeholder="600"
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Resize Type</label>
+                                        <select
+                                            value={styles[editingStyle].imgproxy_config?.resize_type || styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    resize_type: e.target.value
+                                                }
+                                            })}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="fit">Fit</option>
+                                            <option value="fill">Fill</option>
+                                            <option value="crop">Crop</option>
+                                            <option value="force">Force</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Gravity</label>
+                                        <select
+                                            value={styles[editingStyle].imgproxy_config?.gravity || styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    gravity: e.target.value
+                                                }
+                                            })}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="sm">Smart</option>
+                                            <option value="face">Face</option>
+                                            <option value="ce">Center</option>
+                                            <option value="no">North (Top)</option>
+                                            <option value="so">South (Bottom)</option>
+                                            <option value="ea">East (Right)</option>
+                                            <option value="we">West (Left)</option>
+                                            <option value="noea">North-East</option>
+                                            <option value="nowe">North-West</option>
+                                            <option value="soea">South-East</option>
+                                            <option value="sowe">South-West</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-gray-600">
+                                    Controls how images are processed and cropped. Widget instances can override these settings.
+                                </p>
                             </div>
 
                             {/* Template Editor */}

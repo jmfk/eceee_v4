@@ -27,7 +27,7 @@ def render_mustache(template, context):
         return f"<!-- Template render error: {str(e)} -->"
 
 
-def prepare_gallery_context(images, config, style_vars=None):
+def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=None):
     """
     Prepare context for gallery template rendering.
 
@@ -35,17 +35,46 @@ def prepare_gallery_context(images, config, style_vars=None):
         images: List of image dicts (url, width, height, alt, caption, etc.)
         config: Widget configuration
         style_vars: Style-specific variables
+        imgproxy_config: Imgproxy configuration from style (can be overridden by widget config)
 
     Returns:
         Dictionary ready for Mustache rendering
     """
-    # Add index to each image (make a copy to avoid mutating input)
+    from file_manager.imgproxy import imgproxy_service
+
+    # Merge style imgproxy config with widget overrides
+    final_imgproxy_config = {**(imgproxy_config or {})}
+    if config.get("imgproxy_override"):
+        final_imgproxy_config.update(config["imgproxy_override"])
+
+    print("final_imgproxy_config", final_imgproxy_config)
+    print("images", images)
+
+    # Add index to each image and process with imgproxy (make a copy to avoid mutating input)
     indexed_images = []
     for i, img in enumerate(images):
         img_copy = img.copy() if isinstance(img, dict) else {}
         img_copy["index"] = i
-        indexed_images.append(img_copy)
 
+        # Generate imgproxy URL if config provided and image has URL
+        if final_imgproxy_config and img_copy.get("url"):
+            try:
+                imgproxy_url = imgproxy_service.generate_url(
+                    source_url=img_copy["url"], **final_imgproxy_config
+                )
+                # Replace the original URL with the imgproxy URL
+                img_copy["url"] = imgproxy_url
+            except Exception as e:
+                # Log error but continue with original URL
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Failed to generate imgproxy URL for gallery image: {e}"
+                )
+
+        indexed_images.append(img_copy)
+    print("indexed_images", indexed_images)
     return {
         "images": indexed_images,
         "imageCount": len(images),
@@ -57,7 +86,7 @@ def prepare_gallery_context(images, config, style_vars=None):
     }
 
 
-def prepare_carousel_context(images, config, style_vars=None):
+def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=None):
     """
     Prepare context for carousel template rendering.
 
@@ -65,15 +94,41 @@ def prepare_carousel_context(images, config, style_vars=None):
         images: List of image dicts (url, width, height, alt, caption, etc.)
         config: Widget configuration
         style_vars: Style-specific variables
+        imgproxy_config: Imgproxy configuration from style (can be overridden by widget config)
 
     Returns:
         Dictionary ready for Mustache rendering
     """
-    # Add index to each image (make a copy to avoid mutating input)
+    from file_manager.imgproxy import imgproxy_service
+
+    # Merge style imgproxy config with widget overrides
+    final_imgproxy_config = {**(imgproxy_config or {})}
+    if config.get("imgproxy_override"):
+        final_imgproxy_config.update(config["imgproxy_override"])
+
+    # Add index to each image and process with imgproxy (make a copy to avoid mutating input)
     indexed_images = []
     for i, img in enumerate(images):
         img_copy = img.copy() if isinstance(img, dict) else {}
         img_copy["index"] = i
+
+        # Generate imgproxy URL if config provided and image has URL
+        if final_imgproxy_config and img_copy.get("url"):
+            try:
+                imgproxy_url = imgproxy_service.generate_url(
+                    source_url=img_copy["url"], **final_imgproxy_config
+                )
+                # Replace the original URL with the imgproxy URL
+                img_copy["url"] = imgproxy_url
+            except Exception as e:
+                # Log error but continue with original URL
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Failed to generate imgproxy URL for carousel image: {e}"
+                )
+
         indexed_images.append(img_copy)
 
     return {

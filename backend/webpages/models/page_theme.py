@@ -330,6 +330,12 @@ class PageTheme(models.Model):
                 "variables": {
                     "columns": {"type": "number", "default": 3, "min": 1, "max": 6}
                 },
+                "imgproxy_config": {
+                    "width": 800,
+                    "height": 600,
+                    "resize_type": "fill",
+                    "gravity": "sm",
+                },
             },
             "grid-with-overlay": {
                 "name": "Grid with Overlay",
@@ -423,6 +429,12 @@ class PageTheme(models.Model):
 }""",
                 "variables": {
                     "columns": {"type": "number", "default": 3, "min": 1, "max": 6}
+                },
+                "imgproxy_config": {
+                    "width": 800,
+                    "height": 600,
+                    "resize_type": "fill",
+                    "gravity": "sm",
                 },
             },
         }
@@ -524,6 +536,12 @@ class PageTheme(models.Model):
 }""",
                 "alpine": False,
                 "variables": {},
+                "imgproxy_config": {
+                    "width": 1200,
+                    "height": 400,
+                    "resize_type": "fill",
+                    "gravity": "sm",
+                },
             },
             "carousel-with-indicators": {
                 "name": "Carousel with Indicators",
@@ -644,6 +662,12 @@ class PageTheme(models.Model):
 }""",
                 "alpine": False,
                 "variables": {},
+                "imgproxy_config": {
+                    "width": 1200,
+                    "height": 400,
+                    "resize_type": "fill",
+                    "gravity": "sm",
+                },
             },
             "carousel-with-captions": {
                 "name": "Carousel with Captions",
@@ -780,6 +804,12 @@ class PageTheme(models.Model):
 }""",
                 "alpine": False,
                 "variables": {},
+                "imgproxy_config": {
+                    "width": 1200,
+                    "height": 400,
+                    "resize_type": "fill",
+                    "gravity": "sm",
+                },
             },
         }
 

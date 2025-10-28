@@ -44,7 +44,13 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty }) => {
             template: '<div class="image-carousel" x-data="{ current: 0, total: {{imageCount}} }">\n  <div class="carousel-track" :style="\'transform: translateX(-\' + (current * 100) + \'%)\'">  \n    {{#images}}\n      <div class="carousel-slide">\n        <img src="{{url}}" alt="{{alt}}" loading="lazy">\n      </div>\n    {{/images}}\n  </div>\n  {{#multipleImages}}\n  <button @click="current = (current - 1 + total) % total" class="carousel-prev">‹</button>\n  <button @click="current = (current + 1) % total" class="carousel-next">›</button>\n  {{/multipleImages}}\n</div>',
             css: '.image-carousel {\n  position: relative;\n  overflow: hidden;\n}\n.carousel-track {\n  display: flex;\n  transition: transform 0.5s ease;\n}\n.carousel-slide {\n  min-width: 100%;\n}\n.carousel-slide img {\n  width: 100%;\n  height: auto;\n}\n.carousel-prev, .carousel-next {\n  position: absolute;\n  top: 50%;\n  transform: translateY(-50%);\n  background: rgba(255,255,255,0.9);\n  border: none;\n  padding: 1rem;\n  cursor: pointer;\n}\n.carousel-prev { left: 1rem; }\n.carousel-next { right: 1rem; }',
             variables: {},
-            alpine: true
+            alpine: true,
+            imgproxy_config: {
+                width: 1200,
+                height: 400,
+                resize_type: 'fill',
+                gravity: 'sm'
+            }
         };
 
         const updatedStyles = {
@@ -252,6 +258,89 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty }) => {
                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Imgproxy Configuration */}
+                            <div className="bg-blue-50 border border-blue-200 rounded p-3 space-y-3">
+                                <h5 className="text-xs font-semibold text-gray-700">Image Processing (imgproxy)</h5>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Width (px)</label>
+                                        <input
+                                            type="number"
+                                            value={styles[editingStyle].imgproxy_config?.width || styles[editingStyle].imgproxyConfig?.width || ''}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    width: parseInt(e.target.value) || null
+                                                }
+                                            })}
+                                            placeholder="1200"
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Height (px)</label>
+                                        <input
+                                            type="number"
+                                            value={styles[editingStyle].imgproxy_config?.height || styles[editingStyle].imgproxyConfig?.height || ''}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    height: parseInt(e.target.value) || null
+                                                }
+                                            })}
+                                            placeholder="400"
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Resize Type</label>
+                                        <select
+                                            value={styles[editingStyle].imgproxy_config?.resize_type || styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    resize_type: e.target.value
+                                                }
+                                            })}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="fit">Fit</option>
+                                            <option value="fill">Fill</option>
+                                            <option value="crop">Crop</option>
+                                            <option value="force">Force</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Gravity</label>
+                                        <select
+                                            value={styles[editingStyle].imgproxy_config?.gravity || styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    gravity: e.target.value
+                                                }
+                                            })}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="sm">Smart</option>
+                                            <option value="face">Face</option>
+                                            <option value="ce">Center</option>
+                                            <option value="no">North (Top)</option>
+                                            <option value="so">South (Bottom)</option>
+                                            <option value="ea">East (Right)</option>
+                                            <option value="we">West (Left)</option>
+                                            <option value="noea">North-East</option>
+                                            <option value="nowe">North-West</option>
+                                            <option value="soea">South-East</option>
+                                            <option value="sowe">South-West</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-gray-600">
+                                    Controls how carousel images are processed and cropped. Widget instances can override these settings.
+                                </p>
                             </div>
 
                             {/* Template Editor */}
