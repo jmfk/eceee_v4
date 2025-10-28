@@ -29,12 +29,12 @@ const MediaTagReviewStep = ({
         return initial;
     });
 
-    // Sync initial state to parent on mount
+    // Sync changes to parent whenever mediaReviews changes
     useEffect(() => {
         if (onTagReviewsChange) {
             onTagReviewsChange(mediaReviews);
         }
-    }, []); // Empty deps - only run on mount
+    }, [mediaReviews, onTagReviewsChange]);
 
     const handleToggleTag = (mediaIndex, tagName) => {
         setMediaReviews(prev => {
@@ -50,11 +50,6 @@ const MediaTagReviewStep = ({
 
             mediaReview.approvedTags = approved;
             updated[mediaIndex] = mediaReview;
-
-            // Notify parent
-            if (onTagReviewsChange) {
-                onTagReviewsChange(updated);
-            }
 
             return updated;
         });
@@ -75,11 +70,6 @@ const MediaTagReviewStep = ({
             mediaReview.customTagInput = '';
             updated[mediaIndex] = mediaReview;
 
-            // Notify parent
-            if (onTagReviewsChange) {
-                onTagReviewsChange(updated);
-            }
-
             return updated;
         });
     };
@@ -90,11 +80,6 @@ const MediaTagReviewStep = ({
             const mediaReview = { ...updated[mediaIndex] };
             mediaReview.customTags = mediaReview.customTags.filter(t => t !== tagName);
             updated[mediaIndex] = mediaReview;
-
-            // Notify parent
-            if (onTagReviewsChange) {
-                onTagReviewsChange(updated);
-            }
 
             return updated;
         });
@@ -163,11 +148,6 @@ const MediaTagReviewStep = ({
 
                 updated[idx] = mediaReview;
             });
-
-            // Notify parent
-            if (onTagReviewsChange) {
-                onTagReviewsChange(updated);
-            }
 
             return updated;
         });
