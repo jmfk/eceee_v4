@@ -57,6 +57,7 @@ PyPDF2>=3.0.0
 # Monitoring and logging
 django-prometheus>=2.3.0
 structlog>=23.1.0
+python-json-logger>=2.0.7
 psutil>=5.9.0
 
 # Utilities

@@ -80,4 +80,4 @@ storage/
 backend/eceee_layouts/
 backend/eceee_widgets/
 frontend/src/layouts/eceee-layouts/
-frontend/src/widgets/eceee-widgets/docker-compose.production.yml
+frontend/src/widgets/eceee-widgets/
