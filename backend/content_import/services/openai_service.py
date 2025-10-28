@@ -60,12 +60,15 @@ class OpenAIService:
         )
 
         try:
+            # Extract store_full_data from kwargs to avoid duplicate parameter
+            store_full_data = kwargs.pop("store_full_data", False)
+
             # Make tracked AI call
             result = ai_client.call(
                 prompt=prompt,
                 task_description=task_description,
                 content_object=self.content_object,
-                store_full_data=False,  # Don't store prompts/responses by default
+                store_full_data=store_full_data,
                 **kwargs,
             )
 
@@ -288,28 +291,6 @@ EXAMPLES of good tag combinations:
 
 Confidence should be 0.0-1.0 based on how clear the content is."""
 
-        logger.info("=" * 80)
-        logger.info("📝 EXTRACT PAGE METADATA - PROMPT")
-        logger.info("=" * 80)
-        logger.info(f"HEAD HTML Length: {len(head_html)} chars")
-        logger.info(f"Selected Content Length: {len(html)} chars")
-        logger.info(f"Preview Sent to AI: {len(html_preview)} chars (truncated)")
-        logger.info(f"Existing Tags Count: {len(existing_tags)}")
-        logger.info(f"\n🏷️  EXTRACTED HEAD METADATA:")
-        for key, value in head_metadata.items():
-            if isinstance(value, list):
-                logger.info(f"  {key}: {', '.join(value)}")
-            else:
-                logger.info(
-                    f"  {key}: {value[:100] if len(str(value)) > 100 else value}"
-                )
-        logger.info(f"\n📄 Token Efficiency:")
-        logger.info(
-            f"  Sending ~{len(html_preview) + len(head_metadata_text)} chars instead of full page"
-        )
-        logger.info(f"\nFull Prompt:\n{prompt}")
-        logger.info("=" * 80)
-
         try:
             messages = [
                 {
@@ -332,17 +313,6 @@ Confidence should be 0.0-1.0 based on how clear the content is."""
 
             metadata = json.loads(content)
 
-            logger.info("=" * 80)
-            logger.info("✅ EXTRACT PAGE METADATA - RESPONSE")
-            logger.info("=" * 80)
-            logger.info(f"Raw Response:\n{content}")
-            logger.info(f"\nParsed Metadata:")
-            logger.info(f"  Title: {metadata.get('title', 'N/A')}")
-            logger.info(f"  Suggested Tags: {metadata.get('suggested_tags', [])}")
-            logger.info(f"  Confidence: {metadata.get('confidence', 'N/A')}")
-            logger.info(f"  Reasoning: {metadata.get('reasoning', 'N/A')}")
-            logger.info("=" * 80)
-
             # Validate structure
             required_keys = ["title", "suggested_tags"]
             if not all(key in metadata for key in required_keys):
@@ -353,9 +323,6 @@ Confidence should be 0.0-1.0 based on how clear the content is."""
             if not isinstance(metadata["suggested_tags"], list):
                 metadata["suggested_tags"] = []
 
-            logger.info(
-                f"Extracted page metadata: {metadata['title']} with {len(metadata['suggested_tags'])} tags"
-            )
             return metadata
 
         except Exception as e:
@@ -366,19 +333,25 @@ Confidence should be 0.0-1.0 based on how clear the content is."""
         self,
         alt_text: str = "",
         filename: str = "",
+        filepath: str = "",
         context: str = "",
         page_title: str = "",
         page_tags: List[str] = None,
+        image_url: str = "",
+        text: str = "",
     ) -> Optional[Dict[str, any]]:
         """
         Generate metadata for an image using AI with page context.
 
         Args:
-            alt_text: Image alt text
-            filename: Image filename
+            alt_text: Image alt text (may be poor quality)
+            filename: Actual image filename
+            filepath: Directory path containing the image
             context: Surrounding text context (nearby headings, paragraphs)
             page_title: Title of the page being imported
             page_tags: Tags associated with the page
+            image_url: Full URL/path of the image
+            text: Display text (may be poor quality like "Image 1")
 
         Returns:
             Dictionary with title, description, and tags, or None if generation fails
@@ -389,58 +362,68 @@ Confidence should be 0.0-1.0 based on how clear the content is."""
 
         page_tags = page_tags or []
 
-        # Build context with page information
-        page_context = ""
-        if page_title:
-            page_context += f'\n- Page title: "{page_title}"'
-        if page_tags:
-            page_context += f"\n- Page tags: {', '.join(page_tags)}"
+        # Detect poor quality alt text / text
+        generic_patterns = ["image ", "img", "photo", "picture", "untitled", "unnamed"]
+        alt_is_generic = any(
+            pattern in (alt_text or "").lower() for pattern in generic_patterns
+        )
+        text_is_generic = any(
+            pattern in (text or "").lower() for pattern in generic_patterns
+        )
 
-        prompt = f"""Given an image with the following attributes:
-- Alt text: "{alt_text}"
-- Filename: "{filename}"
-- Surrounding text: "{context[:300]}"
-{page_context}
+        prompt = f"""Generate metadata for an image with the following information:
 
-Generate metadata for this image.
+IMAGE DETAILS:
+- Filename: "{filename}" ⭐ PRIMARY SOURCE - extract all keywords here
+- File path: "{filepath}" (folder structure often has context like year, event name, category)
+- Full URL: "{image_url if image_url else 'Not provided'}"
+- Alt text: "{alt_text if alt_text else 'Not provided'}" {'⚠️ GENERIC/USELESS - ignore this' if alt_is_generic else ''}
+- Display text: "{text if text else 'Not provided'}" {'⚠️ GENERIC/USELESS - ignore this' if text_is_generic else ''}
 
-CRITICAL GUIDELINES:
-1. EXTRACT SPECIFICS FROM FILENAME:
-   - Filenames often encode valuable info (e.g., "centerparcs2026.jpg" → location, year)
-   - Look for: names, places, years, abbreviations
-   - Example: "summit_speakers_2024.jpg" → ["speakers", "2024", "summit"]
+⚠️ WARNING: The original content creator may not have written good metadata.
+- If alt/text contains "Image 1", "Image 2", "photo", etc. → IGNORE IT completely
+- PRIORITIZE: Filename and filepath (most reliable sources)
 
-2. USE SURROUNDING TEXT CONTEXT:
-   - Section headings are gold (e.g., "Partners", "Sponsors", "Venue")
-   - Event names mentioned nearby
+CONTEXT:
+- Surrounding text: "{context[:400] if context else 'Not available'}"
+
+PAGE CONTEXT (CRITICAL):
+- Page title: "{page_title if page_title else 'NOT PROVIDED'}"
+- Page tags: {', '.join(f'"{tag}"' for tag in page_tags) if page_tags else 'NONE'}
+
+CRITICAL GUIDELINES FOR METADATA GENERATION:
+
+1. FILENAME IS KEY:
+   - Extract ALL useful info from filename (names, places, years, keywords)
+   - Example: "centerparcs2026venue.jpg" → ["Center Parcs", "venue", "2026"]
+   - Example: "speakers_summitstudy_2024.jpg" → ["speakers", "summit study", "2024"]
+
+2. USE SURROUNDING TEXT:
+   - Headings near the image (e.g., "Partners", "Venue", "Speakers")
+   - Event/organization names mentioned
    - Descriptive text around the image
 
-3. INHERIT PAGE CONTEXT:
-   - If page is about "Summer Study 2026" → include in image tags
-   - Use page tags when relevant to this specific image
-   - Balance inherited tags with image-specific tags
+3. INHERIT FROM PAGE:
+   - If page is about "Summer Study 2026", images likely relate to this
+   - Include relevant page tags in image tags
+   - Balance: specific image details + general page context
 
-4. TAG STRATEGY:
-   - 3-5 tags mixing specific (names, dates, places) + general (type, category)
-   - Example: ["Center Parcs", "venue", "2026", "conference location"]
+4. TITLE STRATEGY:
+   - Combine filename insights + context
+   - Example: "Center Parcs Venue for Summer Study 2026"
+   - Be specific and descriptive
+
+5. TAG STRATEGY:
+   - 4-7 tags mixing: filename keywords + page context + content type
+   - Example: ["Center Parcs", "venue", "Summer Study", "2026", "conference"]
+   - Always include relevant page tags when applicable
 
 Respond with ONLY valid JSON (no markdown, no code blocks):
 {{
-  "title": "descriptive title (max 100 chars)",
+  "title": "descriptive title based on filename and context (max 100 chars)",
   "description": "brief description (max 200 chars)",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
 }}"""
-
-        logger.info("=" * 80)
-        logger.info("🖼️  GENERATE IMAGE METADATA - PROMPT")
-        logger.info("=" * 80)
-        logger.info(f"Alt Text: {alt_text[:100] if alt_text else 'None'}")
-        logger.info(f"Filename: {filename}")
-        logger.info(f"Context: {context[:200] if context else 'None'}")
-        logger.info(f"Page Title: {page_title if page_title else 'None'}")
-        logger.info(f"Page Tags: {page_tags if page_tags else 'None'}")
-        logger.info(f"\nFull Prompt:\n{prompt}")
-        logger.info("=" * 80)
 
         try:
             messages = [
@@ -465,16 +448,6 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
             # Parse JSON response
             metadata = json.loads(content)
 
-            logger.info("=" * 80)
-            logger.info("✅ GENERATE IMAGE METADATA - RESPONSE")
-            logger.info("=" * 80)
-            logger.info(f"Raw Response:\n{content}")
-            logger.info(f"\nParsed Metadata:")
-            logger.info(f"  Title: {metadata.get('title', 'N/A')}")
-            logger.info(f"  Description: {metadata.get('description', 'N/A')}")
-            logger.info(f"  Tags: {metadata.get('tags', [])}")
-            logger.info("=" * 80)
-
             # Validate structure
             if not all(key in metadata for key in ["title", "description", "tags"]):
                 logger.error("Invalid metadata structure from OpenAI")
@@ -484,9 +457,6 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
             if not isinstance(metadata["tags"], list):
                 metadata["tags"] = []
 
-            logger.info(
-                f"Generated image metadata: {metadata['title']} (tags: {', '.join(metadata['tags'][:3])})"
-            )
             return metadata
 
         except Exception as e:
@@ -556,7 +526,6 @@ Generate 3-5 relevant keywords for tags. Keep title and description concise."""
             if not isinstance(metadata["tags"], list):
                 metadata["tags"] = []
 
-            logger.info(f"Generated file metadata: {metadata['title']}")
             return metadata
 
         except Exception as e:
@@ -632,7 +601,6 @@ Respond with ONLY valid JSON (no markdown) in this format:
             selected_tags = result.get("selected_tags", [])
             reasoning = result.get("reasoning", "")
 
-            logger.info(f"AI tag selection: {selected_tags} - {reasoning}")
 
             return (
                 selected_tags[:max_tags] if selected_tags else potential_tags[:max_tags]

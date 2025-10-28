@@ -330,9 +330,6 @@ class DuplicateFileHandler:
             except IntegrityError as e:
                 # Hash already exists in pending, fetch and update instead
                 if "file_hash" in str(e) and pending_data.get("file_hash"):
-                    logger.info(
-                        f"Pending file with hash {pending_data.get('file_hash')} already exists, updating instead"
-                    )
                     existing = PendingMediaFile.objects.filter(
                         file_hash=pending_data.get("file_hash")
                     ).first()

@@ -34,7 +34,6 @@ class BaseMigrator:
         try:
             namespace = Namespace.get_default()
             if namespace:
-                logger.info(f"Using default namespace: {namespace.name}")
                 return namespace
 
             # Create default namespace if it doesn't exist
@@ -45,7 +44,6 @@ class BaseMigrator:
                 is_default=True,
                 description="Default namespace for migrated content",
             )
-            logger.info(f"Created default namespace: {namespace.name}")
             return namespace
         except Exception as e:
             logger.error(f"Error getting/creating default namespace: {e}")
@@ -114,13 +112,9 @@ class BaseMigrator:
             if len(tag_list) > 1:
                 # Keep the one with highest usage_count
                 keeper = max(tag_list, key=lambda t: (t.usage_count, t.id))
-                logger.info(f"Merging {len(tag_list)} tags into '{keeper.name}':")
 
                 for tag in tag_list:
                     if tag.id != keeper.id:
-                        logger.info(
-                            f"  - Merging '{tag.name}' (usage: {tag.usage_count})"
-                        )
                         # Update keeper's usage count
                         keeper.usage_count += tag.usage_count
                         keeper.save()
@@ -136,9 +130,6 @@ class BaseMigrator:
 
                 merged_stats["groups"] += 1
 
-        logger.info(
-            f"Merged {merged_stats['total_merged']} tags into {merged_stats['groups']} groups"
-        )
         return merged_stats
 
     def get_migration_user(self):
@@ -159,14 +150,11 @@ class BaseMigrator:
             },
         )
         if created:
-            logger.info(f"Created migration system user: {username}")
         return user
 
     def log_stats(self):
         """Log current migration statistics"""
-        logger.info("Migration Statistics:")
         for key, value in self.stats.items():
-            logger.info(f"  {key.capitalize()}: {value}")
 
     def run(self):
         """

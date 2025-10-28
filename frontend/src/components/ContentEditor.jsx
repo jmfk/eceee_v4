@@ -607,12 +607,18 @@ const ContentEditor = forwardRef(({
 
 
   // Handle import completion - add imported widgets to slot
-  const handleImportComplete = useCallback((importedWidgets) => {
+  const handleImportComplete = useCallback((importedWidgets, metadata = {}) => {
     if (!importSlotName || !importedWidgets || importedWidgets.length === 0) {
       return;
     }
 
     try {
+      // If page was updated with title/tags, trigger parent reload via onUpdate
+      if (metadata.pageWasUpdated && onUpdate) {
+        // Calling onUpdate will trigger PageEditor to reload the page data
+        onUpdate({ action: 'metadata_updated', title: metadata.savedTitle, tags: metadata.savedTags });
+      }
+
       // Add widgets to the slot
       const currentSlotWidgets = currentWidgets[importSlotName] || [];
       const updatedWidgets = {
@@ -625,8 +631,6 @@ const ContentEditor = forwardRef(({
 
       // Mark as dirty to trigger save
       layoutRenderer.markAsDirty(`Imported ${importedWidgets.length} widgets to ${importSlotName}`);
-
-      console.log(`ContentEditor: Imported ${importedWidgets.length} widgets to ${importSlotName}`);
     } catch (error) {
       console.error('ContentEditor: Failed to import widgets', error);
     }

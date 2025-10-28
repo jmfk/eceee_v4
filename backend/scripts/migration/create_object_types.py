@@ -135,7 +135,6 @@ class ObjectTypeCreator(BaseMigrator):
         try:
             with open(schema_path, "r") as f:
                 schema = json.load(f)
-            logger.info(f"Loaded schema from {filename}")
             return schema
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in {filename}: {e}")
@@ -187,11 +186,7 @@ class ObjectTypeCreator(BaseMigrator):
 
             if not self.dry_run:
                 obj_type.save()
-                logger.info(
-                    f"✅ Created ObjectTypeDefinition: {config['label']} (ID: {obj_type.id})"
-                )
             else:
-                logger.info(f"✅ [DRY RUN] Would create: {config['label']}")
 
             self.stats["created"] += 1
             return obj_type
@@ -203,9 +198,6 @@ class ObjectTypeCreator(BaseMigrator):
 
     def setup_parent_child_relationships(self):
         """Set up allowed_child_types relationships"""
-        logger.info("\n" + "-" * 60)
-        logger.info("Setting up parent-child relationships")
-        logger.info("-" * 60)
 
         relationships = [
             ("conference", ["conference_panel"]),  # Conference can have panels
@@ -221,13 +213,7 @@ class ObjectTypeCreator(BaseMigrator):
 
                     if not self.dry_run:
                         parent.allowed_child_types.add(child)
-                        logger.info(
-                            f"✅ Added relationship: {parent.label} → {child.label}"
-                        )
                     else:
-                        logger.info(
-                            f"✅ [DRY RUN] Would add: {parent.label} → {child.label}"
-                        )
 
             except ObjectTypeDefinition.DoesNotExist as e:
                 logger.error(f"Failed to set up relationship: {e}")
@@ -235,10 +221,6 @@ class ObjectTypeCreator(BaseMigrator):
 
     def run(self):
         """Create all ObjectTypeDefinitions"""
-        logger.info("=" * 60)
-        logger.info("Creating ObjectTypeDefinitions from Schemas")
-        logger.info(f"Dry run mode: {self.dry_run}")
-        logger.info("=" * 60)
 
         try:
             with transaction.atomic():
@@ -262,27 +244,17 @@ class ObjectTypeCreator(BaseMigrator):
                     logger.warning("\nDRY RUN - Rolling back all changes")
                     raise Exception("Dry run - rolling back")
 
-                logger.info("\n" + "=" * 60)
-                logger.info("✅ ObjectTypeDefinitions created successfully!")
-                logger.info("=" * 60)
 
         except Exception as e:
             if not self.dry_run or str(e) != "Dry run - rolling back":
                 logger.error(f"Failed to create ObjectTypeDefinitions: {e}")
                 raise
             else:
-                logger.info("\n✅ Dry run completed - transaction rolled back")
 
     def list_created_types(self):
         """List all created ObjectTypeDefinitions"""
-        logger.info("\n" + "=" * 60)
-        logger.info("Created ObjectTypeDefinitions")
-        logger.info("=" * 60)
 
         for name, obj_type in self.created_types.items():
-            logger.info(
-                f"  {obj_type.label:25} (name: {name}, id: {obj_type.id if obj_type.id else 'N/A'})"
-            )
 
 
 def create_all_object_types(dry_run=True, schemas_dir=None):
@@ -312,14 +284,10 @@ def create_all_object_types(dry_run=True, schemas_dir=None):
 
 def verify_object_types():
     """Verify all object types were created correctly"""
-    logger.info("\n" + "=" * 60)
-    logger.info("Verifying ObjectTypeDefinitions")
-    logger.info("=" * 60)
 
     for config in SCHEMA_CONFIGS:
         try:
             obj_type = ObjectTypeDefinition.objects.get(name=config["name"])
-            logger.info(f"✅ {obj_type.label:25} (ID: {obj_type.id})")
 
             # Check schema is valid JSON
             if not isinstance(obj_type.schema, dict):
@@ -332,9 +300,6 @@ def verify_object_types():
         except ObjectTypeDefinition.DoesNotExist:
             logger.error(f"❌ {config['label']:25} - NOT FOUND")
 
-    logger.info(
-        "\nTotal ObjectTypeDefinitions: " + str(ObjectTypeDefinition.objects.count())
-    )
 
 
 if __name__ == "__main__":

@@ -9,7 +9,6 @@ import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronR
 import { getWidgetComponent, getWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import PageWidgetHeader from './PageWidgetHeader'
-import DeleteConfirmationModal from '../../components/DeleteConfirmationModal'
 
 /**
  * PageEditor Widget Factory - Layout-based widget rendering
@@ -69,8 +68,6 @@ const PageWidgetFactory = ({
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-    const [isDeleting, setIsDeleting] = useState(false)
     const previewContainerRef = useRef(null)
 
     // Create a stable config change handler that integrates with LayoutRenderer
@@ -93,29 +90,15 @@ const PageWidgetFactory = ({
     }
 
     // PageEditor-specific delete handler
-    const handleDelete = () => {
-        setShowDeleteConfirm(true)
-    }
-
-    // Handle confirmed deletion
-    const handleConfirmDelete = async () => {
+    // Note: Confirmation is handled by PageWidgetHeader, so this directly executes deletion
+    const handleDelete = async () => {
         if (onDelete) {
-            setIsDeleting(true)
             try {
                 await onDelete(slotName, index, widget)
-                setShowDeleteConfirm(false)
             } catch (error) {
                 console.error('Failed to delete widget:', error)
-                // Keep modal open on error
-            } finally {
-                setIsDeleting(false)
             }
         }
-    }
-
-    // Handle delete cancellation
-    const handleCancelDelete = () => {
-        setShowDeleteConfirm(false)
     }
 
     const handleMoveUp = () => {
@@ -206,18 +189,6 @@ const PageWidgetFactory = ({
                         </div>
                     </div>
                 </div>
-
-                {/* Delete Confirmation Modal */}
-                <DeleteConfirmationModal
-                    isOpen={showDeleteConfirm}
-                    onClose={handleCancelDelete}
-                    onConfirm={handleConfirmDelete}
-                    title="Delete Unsupported Widget"
-                    message={`Are you sure you want to delete this unsupported widget of type "${widget.type}"? This action cannot be undone.`}
-                    itemName={`Unsupported Widget (${widget.type})`}
-                    isDeleting={isDeleting}
-                    deleteButtonText="Delete Broken Widget"
-                />
             </div>
         )
     }
@@ -414,18 +385,6 @@ const PageWidgetFactory = ({
                         </div>
                     </div>
                 )}
-
-                {/* Delete Confirmation Modal */}
-                <DeleteConfirmationModal
-                    isOpen={showDeleteConfirm}
-                    onClose={handleCancelDelete}
-                    onConfirm={handleConfirmDelete}
-                    title="Delete Widget"
-                    message={`Are you sure you want to delete this ${getWidgetDisplayName(widget.type)} widget? This action cannot be undone.`}
-                    itemName={getWidgetDisplayName(widget.type)}
-                    isDeleting={isDeleting}
-                    deleteButtonText="Delete Widget"
-                />
             </div>
         )
     }

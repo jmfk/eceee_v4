@@ -54,6 +54,10 @@ services:
       - IMGPROXY_URL=http://imgproxy:8080
       - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
       - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - FM_PASSWORD=${FM_PASSWORD}
+      - POSTMARK_API_KEY=${POSTMARK_API_KEY}
     volumes:
       - ./backend:/app
       - backend_static:/app/staticfiles

@@ -95,9 +95,6 @@ class MediaUploadView(APIView):
                             )
                             if existing_file:
                                 existing_file.delete(request.user)
-                                logger.info(
-                                    f"Deleted existing file {existing_file_id} for replacement"
-                                )
 
                             # Also check for pending file with same hash and delete it
                             existing_pending = PendingMediaFile.objects.filter(
@@ -105,9 +102,6 @@ class MediaUploadView(APIView):
                             ).first()
                             if existing_pending:
                                 existing_pending.delete()
-                                logger.info(
-                                    f"Deleted existing pending file for replacement"
-                                )
                         except Exception as e:
                             logger.error(f"Error deleting file for replacement: {e}")
 

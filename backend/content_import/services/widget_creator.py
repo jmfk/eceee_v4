@@ -1,202 +1,176 @@
 """Widget creator service for generating widgets from content segments."""
 
 import logging
+import re
 import uuid
+from html import unescape
 from typing import List, Dict, Any
-from bs4 import BeautifulSoup
 
 from .content_parser import ContentSegment
+from ..utils.html_sanitizer import deep_clean_html
 
 
 logger = logging.getLogger(__name__)
 
 
-class WidgetCreator:
-    """Create widgets from parsed content segments."""
+def create_widgets(
+    segments: List[ContentSegment], url_mapping: Dict[str, str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Create widgets from content segments.
 
-    def __init__(self):
-        """Initialize widget creator."""
-        pass
+    Args:
+        segments: List of ContentSegment objects
+        url_mapping: Mapping of original URLs to media manager URLs
 
-    def create_widgets(
-        self, segments: List[ContentSegment], url_mapping: Dict[str, str] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Create widgets from content segments.
+    Returns:
+        List of widget configurations
+    """
+    widgets = []
+    url_mapping = url_mapping or {}
 
-        Args:
-            segments: List of ContentSegment objects
-            url_mapping: Mapping of original URLs to media manager URLs
+    for segment in segments:
+        widget = None
 
-        Returns:
-            List of widget configurations
-        """
-        widgets = []
-        url_mapping = url_mapping or {}
+        if segment.type == "content":
+            widget = _create_content_widget(segment, url_mapping)
+        elif segment.type == "table":
+            widget = _create_table_widget(segment)
+        elif segment.type == "file":
+            # Skip standalone file links - they're handled inline in content
+            continue
 
-        for segment in segments:
-            widget = None
+        if widget:
+            widgets.append(widget)
 
-            if segment.type == "content":
-                widget = self._create_content_widget(segment, url_mapping)
-            elif segment.type == "table":
-                widget = self._create_table_widget(segment)
-            elif segment.type == "image":
-                # Images are handled inline in content widgets
-                # But if they appear standalone, create a content widget with the image
-                widget = self._create_image_content_widget(segment, url_mapping)
-            elif segment.type == "file":
-                # File links are handled inline in content widgets
-                # But if standalone, create a content widget with the link
-                widget = self._create_file_content_widget(segment, url_mapping)
+    return widgets
 
-            if widget:
-                widgets.append(widget)
 
-        logger.info(f"Created {len(widgets)} widgets from {len(segments)} segments")
+def _create_content_widget(
+    segment: ContentSegment, url_mapping: Dict[str, str]
+) -> Dict[str, Any]:
+    """
+    Create a content widget from HTML content.
 
-        return widgets
+    Args:
+        segment: ContentSegment with HTML content
+        url_mapping: URL mapping for media files
 
-    def _create_content_widget(
-        self, segment: ContentSegment, url_mapping: Dict[str, str]
-    ) -> Dict[str, Any]:
-        """
-        Create a content widget from HTML content.
+    Returns:
+        Widget configuration or None if content is empty
+    """
+    content = segment.content
 
-        Args:
-            segment: ContentSegment with HTML content
-            url_mapping: URL mapping for media files
+    # Skip if content is empty
+    if not content or not content.strip():
+        return None
 
-        Returns:
-            Widget configuration
-        """
-        content = segment.content
+    # Replace image URLs with media manager URLs
+    if url_mapping:
+        content = _replace_urls(content, url_mapping)
+    else:
+        logger.warning("No url_mapping provided, images won't be replaced")
 
-        # Replace image URLs with media manager URLs
-        if url_mapping:
-            content = self._replace_urls(content, url_mapping)
+    return {
+        "id": f"widget-{uuid.uuid4()}",
+        "type": "eceee_widgets.ContentWidget",
+        "name": "Imported Content",
+        "config": {
+            "content": content,
+        },
+    }
 
-        return {
-            "id": f"widget-{uuid.uuid4()}",
-            "type": "default_widgets.ContentWidget",
-            "name": "Imported Content",
-            "config": {
-                "content": content,
-            },
-        }
 
-    def _create_table_widget(self, segment: ContentSegment) -> Dict[str, Any]:
-        """
-        Create a table widget.
+def _create_table_widget(segment: ContentSegment) -> Dict[str, Any]:
+    """
+    Create a table widget.
 
-        Args:
-            segment: ContentSegment with table HTML
+    Args:
+        segment: ContentSegment with table HTML
 
-        Returns:
-            Widget configuration
-        """
-        return {
-            "id": f"widget-{uuid.uuid4()}",
-            "type": "default_widgets.TableWidget",
-            "name": "Imported Table",
-            "config": {
-                "tableHtml": segment.content,
-                "responsive": True,
-                "striped": False,
-                "bordered": True,
-            },
-        }
+    Returns:
+        Widget configuration
+    """
+    return {
+        "id": f"widget-{uuid.uuid4()}",
+        "type": "eceee_widgets.TableWidget",
+        "name": "Imported Table",
+        "config": {
+            "tableHtml": segment.content,
+            "responsive": True,
+            "striped": False,
+            "bordered": True,
+        },
+    }
 
-    def _create_image_content_widget(
-        self, segment: ContentSegment, url_mapping: Dict[str, str]
-    ) -> Dict[str, Any]:
-        """
-        Create a content widget with an image.
 
-        Args:
-            segment: ContentSegment with image data
-            url_mapping: URL mapping for media files
+def _replace_urls(html: str, url_mapping: Dict[str, str]) -> str:
+    """
+    Replace images and file links with configured HTML/URLs.
 
-        Returns:
-            Widget configuration
-        """
-        image_data = segment.content
-        original_src = image_data.get("src", "")
+    Two-pass approach:
+    1. Replace <img> tags with media-insert containers or new URLs
+    2. Apply deep_clean_html to handle file links and final cleanup
 
-        # Get mapped URL if available
-        src = url_mapping.get(original_src, original_src)
-        alt = image_data.get("alt", "")
+    Args:
+        html: HTML content
+        url_mapping: Mapping of original URLs to configured HTML or new URLs
 
-        # Create simple image HTML
-        img_html = f'<img src="{src}" alt="{alt}" />'
+    Returns:
+        HTML with replaced images and links
+    """
 
-        return {
-            "id": f"widget-{uuid.uuid4()}",
-            "type": "default_widgets.ContentWidget",
-            "name": "Imported Image",
-            "config": {
-                "content": img_html,
-            },
-        }
+    if not url_mapping:
+        return deep_clean_html(html, url_mapping={})
 
-    def _create_file_content_widget(
-        self, segment: ContentSegment, url_mapping: Dict[str, str]
-    ) -> Dict[str, Any]:
-        """
-        Create a content widget with a file link.
+    # Step 1: Replace images with media-insert containers
+    # Pattern matches img tags and extracts src attribute
+    img_pattern = re.compile(
+        r'<img\s+[^>]*?src=["\']([^"\']+)["\'][^>]*?/?>', re.IGNORECASE | re.DOTALL
+    )
 
-        Args:
-            segment: ContentSegment with file data
-            url_mapping: URL mapping for file URLs
+    replaced_count = 0
 
-        Returns:
-            Widget configuration
-        """
-        file_data = segment.content
-        original_url = file_data.get("url", "")
-        text = file_data.get("text", "Download File")
+    def replace_img(match):
+        nonlocal replaced_count
+        full_img_tag = match.group(0)
+        src = unescape(match.group(1))  # Unescape HTML entities (e.g., &amp; -> &)
 
-        # Get mapped URL if available
-        url = url_mapping.get(original_url, original_url)
+        if src in url_mapping:
+            replacement = url_mapping[src]
 
-        # Create link HTML
-        link_html = f'<p><a href="{url}" target="_blank">{text}</a></p>'
+            if not replacement:
+                return full_img_tag
 
-        return {
-            "id": f"widget-{uuid.uuid4()}",
-            "type": "default_widgets.ContentWidget",
-            "name": "Imported File Link",
-            "config": {
-                "content": link_html,
-            },
-        }
+            # If replacement is HTML (media-insert container), use it directly
+            if "<" in replacement and ">" in replacement:
+                replaced_count += 1
+                return replacement
 
-    def _replace_urls(self, html: str, url_mapping: Dict[str, str]) -> str:
-        """
-        Replace URLs in HTML with mapped URLs.
+            # Otherwise it's a simple URL - replace just the src attribute
+            replaced_count += 1
+            return re.sub(
+                r'src=["\'][^"\']+["\']', f'src="{replacement}"', full_img_tag
+            )
+        else:
+            logger.warning(f"Image not in URL mapping: {src[:120]}")
+            return full_img_tag
 
-        Args:
-            html: HTML content
-            url_mapping: URL mapping dictionary
+    html = img_pattern.sub(replace_img, html)
 
-        Returns:
-            HTML with replaced URLs
-        """
-        if not url_mapping:
-            return html
+    # Step 2: Collect file URLs for deep cleaning (exclude HTML replacements)
+    file_url_mapping = {
+        original: new
+        for original, new in url_mapping.items()
+        if new and not ("<" in new and ">" in new)
+    }
 
-        soup = BeautifulSoup(html, "html.parser")
+    # Step 3: Apply deep_clean_html to handle file links and final cleanup
+    cleaned_html = deep_clean_html(html, url_mapping=file_url_mapping)
 
-        # Replace image sources
-        for img in soup.find_all("img"):
-            src = img.get("src", "")
-            if src in url_mapping:
-                img["src"] = url_mapping[src]
+    # Check for any remaining unreplaced images
+    remaining_imgs = re.findall(r'<img\s+[^>]*?src=["\']([^"\']+)["\']', cleaned_html)
+    if remaining_imgs:
+        logger.warning(f"{len(remaining_imgs)} images remain unreplaced")
 
-        # Replace link hrefs
-        for link in soup.find_all("a", href=True):
-            href = link["href"]
-            if href in url_mapping:
-                link["href"] = url_mapping[href]
-
-        return str(soup)
+    return cleaned_html

@@ -66,9 +66,6 @@ def update_schema(object_type_name, dry_run=False):
     Returns:
         ObjectTypeDefinition instance or None
     """
-    logger.info(f"\n{'='*60}")
-    logger.info(f"Updating schema for: {object_type_name}")
-    logger.info(f"{'='*60}")
 
     # Get the object type
     try:
@@ -77,7 +74,6 @@ def update_schema(object_type_name, dry_run=False):
         logger.error(
             f"❌ ObjectTypeDefinition '{object_type_name}' not found in database"
         )
-        logger.info(f"   Create it first using create_object_types.py")
         return None
 
     # Load new schema
@@ -91,10 +87,6 @@ def update_schema(object_type_name, dry_run=False):
         return None
 
     # Show changes
-    logger.info(
-        f"\nCurrent schema properties: {len(obj_type.schema.get('properties', {}))}"
-    )
-    logger.info(f"New schema properties: {len(new_schema.get('properties', {}))}")
 
     old_fields = set(obj_type.schema.get("properties", {}).keys())
     new_fields = set(new_schema.get("properties", {}).keys())
@@ -103,20 +95,15 @@ def update_schema(object_type_name, dry_run=False):
     removed = old_fields - new_fields
 
     if added:
-        logger.info(f"✅ Fields to be added: {', '.join(added)}")
     if removed:
         logger.warning(f"⚠️  Fields to be removed: {', '.join(removed)}")
     if not added and not removed:
-        logger.info("ℹ️  No field changes (properties are the same)")
 
     # Update the schema
     if dry_run:
-        logger.info("\n🔍 DRY RUN - No changes saved")
-        logger.info(f"Would update {obj_type.label} ({obj_type.name})")
     else:
         obj_type.schema = new_schema
         obj_type.save(update_fields=["schema"])
-        logger.info(f"\n✅ Updated {obj_type.label} ({obj_type.name})")
 
     return obj_type
 
@@ -132,10 +119,6 @@ def update_all_schemas(dry_run=True, schema_names=None):
     Returns:
         dict: Statistics about the update
     """
-    logger.info("\n" + "=" * 60)
-    logger.info("Updating ObjectTypeDefinition Schemas from JSON")
-    logger.info("=" * 60)
-    logger.info(f"Mode: {'DRY RUN' if dry_run else 'LIVE UPDATE'}")
 
     # Default to all schema files
     if schema_names is None:
@@ -162,19 +145,9 @@ def update_all_schemas(dry_run=True, schema_names=None):
             stats["errors"] += 1
 
     # Print summary
-    logger.info("\n" + "=" * 60)
-    logger.info("Summary")
-    logger.info("=" * 60)
-    logger.info(f"Total schemas: {stats['total']}")
-    logger.info(f"Updated: {stats['updated']}")
-    logger.info(f"Skipped: {stats['skipped']}")
-    logger.info(f"Errors: {stats['errors']}")
 
     if dry_run:
-        logger.info("\n🔍 This was a DRY RUN - no changes were saved")
-        logger.info("Run with dry_run=False to apply changes")
     else:
-        logger.info("\n✅ All updates complete!")
 
     return stats
 

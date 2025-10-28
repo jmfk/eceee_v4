@@ -13,7 +13,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, ArrowLeft, ArrowRight, Download, Loader } from 'lucide-react';
 import ContentPreview from './import/ContentPreview';
 import MetadataConfirmationStep from './import/MetadataConfirmationStep';
-import ImageTagReviewStep from './import/ImageTagReviewStep';
+import MediaTagReviewStep from './import/MediaTagReviewStep';
 import HierarchySelector from './import/HierarchySelector';
 import { proxyPage, extractMetadata, analyzeHierarchy, generateMediaMetadata, uploadMediaFile, processImport } from '../api/contentImport';
 import { useNotificationContext } from './NotificationManager';
@@ -22,7 +22,7 @@ const STEPS = {
     URL_INPUT: 1,
     IFRAME_SELECT: 2,
     METADATA_CONFIRM: 3,
-    IMAGE_TAG_REVIEW: 4,
+    MEDIA_TAG_REVIEW: 4,
     MEDIA_UPLOAD: 5,
     CONTENT_PREVIEW: 6,
     IMPORT_OPTIONS: 7,
@@ -58,12 +58,41 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     const [mediaUploadComplete, setMediaUploadComplete] = useState(false);
     const [uploadedMediaMapping, setUploadedMediaMapping] = useState([]);
     const [aiAvailable, setAiAvailable] = useState(true);
-    const [imageMetadataList, setImageMetadataList] = useState([]); // AI-generated metadata for each image
-    const [imageTagReviews, setImageTagReviews] = useState({}); // Per-image tag approval state
+    const [mediaMetadataList, setMediaMetadataList] = useState([]); // AI-generated metadata for images and files
+    const [mediaTagReviews, setMediaTagReviews] = useState({}); // Per-media tag approval state
 
     const iframeRef = useRef(null);
     const resizeRef = useRef(null);
     const { showNotification } = useNotificationContext();
+
+    // Reset all state when dialog opens (isOpen changes from false to true)
+    useEffect(() => {
+        if (isOpen) {
+            // Force reset ALL state to ensure no stale data from previous sessions
+            setCurrentStep(STEPS.URL_INPUT);
+            setUrl('');
+            setProxiedHtml(null);
+            setSelectedElement(null);
+            setSelectedHierarchy(null);
+            setSelectedHierarchyIndex(null);
+            setHierarchyStats([]);
+            setPageMetadata(null);
+            setConfirmedTitle('');
+            setConfirmedTags([]);
+            setSaveToPage(false);
+            setImportMode('append');
+            setStripDesign(true);
+            setError(null);
+            setImportResults(null);
+            setProgress({ step: '', percent: 0, current: 0, total: 0, item: '' });
+            setMediaUploadStatus([]);
+            setMediaUploadComplete(false);
+            setUploadedMediaMapping([]);
+            setMediaMetadataList([]);
+            setMediaTagReviews({});
+            setAiAvailable(true);
+        }
+    }, [isOpen]); // Only run when isOpen changes
 
     // Listen for messages from iframe (content selection)
     useEffect(() => {
@@ -90,12 +119,31 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         return () => window.removeEventListener('message', handleMessage);
     }, []);
 
+    // Clear media metadata when selectedElement changes (new selection)
+    useEffect(() => {
+        if (selectedElement && currentStep >= STEPS.METADATA_CONFIRM && currentStep < STEPS.MEDIA_TAG_REVIEW) {
+            // If we have a new selectedElement but we're before the MEDIA_TAG_REVIEW step,
+            // clear any stale media metadata
+            if (mediaMetadataList.length > 0) {
+                setMediaMetadataList([]);
+                setMediaTagReviews({});
+                setMediaUploadStatus([]);
+                setMediaUploadComplete(false);
+            }
+        }
+    }, [selectedElement?.html]); // Track by HTML content to detect actual changes
+
     // Auto-start media upload when entering that step
     useEffect(() => {
         if (currentStep === STEPS.MEDIA_UPLOAD && !mediaUploadComplete && mediaUploadStatus.length === 0) {
+            // Defensive check: only run if we have valid media metadata
+            if (mediaMetadataList.length === 0 && selectedElement) {
+                console.warn('[Import Debug] mediaMetadataList is empty but selectedElement exists. This indicates stale state.');
+            }
+
             handleMediaUpload();
         }
-    }, [currentStep]);
+    }, [currentStep, mediaMetadataList, selectedElement, mediaUploadComplete, mediaUploadStatus.length]);
 
     // Handle resize of hierarchy panel
     useEffect(() => {
@@ -204,8 +252,14 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         setProgress({ step: '', percent: 0 });
         setUploadedMediaMapping([]); // Clear media mapping
         setMediaUploadComplete(false); // Reset upload status
-        setImageMetadataList([]); // Clear image metadata
-        setImageTagReviews({}); // Clear tag reviews
+        setMediaMetadataList([]); // Clear media metadata
+        setMediaTagReviews({}); // Clear tag reviews
+        setPageMetadata(null);
+        setConfirmedTitle('');
+        setConfirmedTags([]);
+        setSaveToPage(false);
+        setMediaUploadStatus([]);
+
         onClose();
     };
 
@@ -320,10 +374,30 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 setIsLoading(false);
             }
         } else if (currentStep === STEPS.METADATA_CONFIRM) {
-            // User has confirmed metadata - proceed to image tag review
-            await handleGenerateImageTags();
-        } else if (currentStep === STEPS.IMAGE_TAG_REVIEW) {
+            // User has confirmed metadata - proceed to media tag review
+            await handleGenerateMediaTags();
+        } else if (currentStep === STEPS.MEDIA_TAG_REVIEW) {
             // User has reviewed tags - proceed to media upload
+            // Defensive check: verify mediaMetadataList is valid before proceeding
+            if (mediaMetadataList.length === 0 && selectedElement) {
+                // Re-parse to verify if there should be media
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(selectedElement.html, 'text/html');
+                const imgElements = Array.from(doc.querySelectorAll('img'));
+                const fileExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip'];
+                const fileLinks = Array.from(doc.querySelectorAll('a[href]'))
+                    .filter(link => {
+                        const href = link.href.toLowerCase();
+                        return fileExtensions.some(ext => href.endsWith(ext));
+                    });
+
+                if (imgElements.length > 0 || fileLinks.length > 0) {
+                    console.error('[Import Debug] State mismatch: Found media in selectedElement but mediaMetadataList is empty!');
+                    setError('Media data was lost. Please go back and try again.');
+                    return;
+                }
+            }
+
             setCurrentStep(STEPS.MEDIA_UPLOAD);
         } else if (currentStep === STEPS.MEDIA_UPLOAD) {
             if (!mediaUploadComplete) {
@@ -344,15 +418,29 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         if (currentStep === STEPS.IFRAME_SELECT) {
             setCurrentStep(STEPS.URL_INPUT);
             setProxiedHtml(null);
+            // Clear all downstream state when going back to URL input
+            setSelectedElement(null);
+            setMediaMetadataList([]);
+            setMediaTagReviews({});
+            setMediaUploadStatus([]);
+            setMediaUploadComplete(false);
         } else if (currentStep === STEPS.METADATA_CONFIRM) {
             setCurrentStep(STEPS.IFRAME_SELECT);
             setPageMetadata(null);
-        } else if (currentStep === STEPS.IMAGE_TAG_REVIEW) {
+            // Clear downstream state
+            setMediaMetadataList([]);
+            setMediaTagReviews({});
+            setMediaUploadStatus([]);
+            setMediaUploadComplete(false);
+        } else if (currentStep === STEPS.MEDIA_TAG_REVIEW) {
             setCurrentStep(STEPS.METADATA_CONFIRM);
-            setImageMetadataList([]);
-            setImageTagReviews({});
+            setMediaMetadataList([]);
+            setMediaTagReviews({});
+            // Also clear media upload state
+            setMediaUploadStatus([]);
+            setMediaUploadComplete(false);
         } else if (currentStep === STEPS.MEDIA_UPLOAD) {
-            setCurrentStep(STEPS.IMAGE_TAG_REVIEW);
+            setCurrentStep(STEPS.MEDIA_TAG_REVIEW);
             setMediaUploadStatus([]);
             setMediaUploadComplete(false);
         } else if (currentStep === STEPS.CONTENT_PREVIEW) {
@@ -391,26 +479,34 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         }
     };
 
-    const handleGenerateImageTags = async () => {
+    const handleGenerateMediaTags = async () => {
         setIsLoading(true);
         setError(null);
 
         try {
-            // Parse selected HTML to find all images
+            // Parse selected HTML to find all images and files
             const parser = new DOMParser();
             const doc = parser.parseFromString(selectedElement.html, 'text/html');
             const imgElements = Array.from(doc.querySelectorAll('img'));
+            
+            // Find file links
+            const fileExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip'];
+            const fileLinks = Array.from(doc.querySelectorAll('a[href]'))
+                .filter(link => {
+                    const href = link.href.toLowerCase();
+                    return fileExtensions.some(ext => href.endsWith(ext));
+                });
 
-            if (imgElements.length === 0) {
-                // No images, skip to media upload
-                setImageMetadataList([]);
-                setImageTagReviews({});
+            if (imgElements.length === 0 && fileLinks.length === 0) {
+                // No media, skip to media upload
+                setMediaMetadataList([]);
+                setMediaTagReviews({});
                 setCurrentStep(STEPS.MEDIA_UPLOAD);
                 return;
             }
 
             // Generate metadata for each image
-            const metadataPromises = imgElements.map(async (img, idx) => {
+            const imagePromises = imgElements.map(async (img, idx) => {
                 // Use getAttribute to get original src (may be relative)
                 // AND normalized src for API call
                 const srcAttr = img.getAttribute('src') || img.src;
@@ -430,6 +526,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
                     return {
                         index: idx,
+                        type: 'image',
                         src: srcAttr,  // Original src attribute for matching
                         normalizedSrc: normalizedSrc,  // For display/debugging
                         alt: img.alt || '',
@@ -444,6 +541,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     // Fallback to basic metadata
                     return {
                         index: idx,
+                        type: 'image',
                         src: srcAttr,
                         normalizedSrc: normalizedSrc,
                         alt: img.alt || '',
@@ -456,25 +554,77 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 }
             });
 
-            const metadataList = await Promise.all(metadataPromises);
-            setImageMetadataList(metadataList);
+            // Generate metadata for each file
+            const filePromises = fileLinks.map(async (link, idx) => {
+                const url = link.href;
+                const linkText = link.textContent.trim();
+                const { filename, filepath } = extractFilenameAndPath(url);
+
+                try {
+                    const metadata = await generateMediaMetadata({
+                        type: 'file',
+                        url: url,
+                        filename: filename,
+                        filepath: filepath,
+                        text: linkText || filename,
+                        context: '',
+                    });
+
+                    return {
+                        index: imgElements.length + idx,  // Offset by image count
+                        type: 'file',
+                        url: url,
+                        filename: filename,
+                        linkText: linkText,
+                        title: metadata.title || linkText || filename,
+                        description: metadata.description || '',
+                        aiTags: metadata.tags || [],
+                        aiGenerated: metadata.ai_generated !== false,
+                    };
+                } catch (err) {
+                    console.error(`Failed to generate metadata for file ${idx}:`, err);
+                    // Fallback to basic metadata
+                    return {
+                        index: imgElements.length + idx,
+                        type: 'file',
+                        url: url,
+                        filename: filename,
+                        linkText: linkText,
+                        title: linkText || filename,
+                        description: '',
+                        aiTags: [],
+                        aiGenerated: false,
+                    };
+                }
+            });
+
+            // Wait for all metadata generation to complete
+            const [imageMetadata, fileMetadata] = await Promise.all([
+                Promise.all(imagePromises),
+                Promise.all(filePromises)
+            ]);
+
+            // Combine images and files into one list
+            const allMediaMetadata = [...imageMetadata, ...fileMetadata];
+
+            setMediaMetadataList(allMediaMetadata);
 
             // Initialize tag reviews (all AI tags approved by default)
             const initialReviews = {};
-            metadataList.forEach((img, idx) => {
+            allMediaMetadata.forEach((item, idx) => {
                 initialReviews[idx] = {
-                    approvedTags: new Set(img.aiTags || []),
+                    approvedTags: new Set(item.aiTags || []),
                     customTags: [],
                 };
             });
-            setImageTagReviews(initialReviews);
+            setMediaTagReviews(initialReviews);
 
-            // Move to image tag review step
-            setCurrentStep(STEPS.IMAGE_TAG_REVIEW);
+            // Move to media tag review step
+            setCurrentStep(STEPS.MEDIA_TAG_REVIEW);
         } catch (err) {
-            console.error('Failed to generate image tags:', err);
-            setError('Failed to generate image tags. You can proceed without tag review.');
-            showNotification('Failed to generate image tags', 'error');
+            console.error('Failed to generate media tags:', err);
+            setError('Failed to generate media tags. You can proceed without tag review.');
+            showNotification('Failed to generate media tags', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -522,43 +672,42 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     };
 
     const handleMediaUpload = async () => {
-        // Use pre-generated metadata from image tag review
-        // Map imageMetadataList to the format expected by upload UI
-        const images = imageMetadataList.map((imgMeta) => ({
-            id: `img_${imgMeta.index}`,
-            index: imgMeta.index,
-            filename: imgMeta.filename,
-            filepath: imgMeta.filepath || '/',
-            displayName: imgMeta.title || imgMeta.alt || imgMeta.filename || `Image ${imgMeta.index + 1}`,
-            type: 'image',
-            status: 'pending',
-            currentStep: 'Waiting...',
-            src: imgMeta.src,
-            alt: imgMeta.alt || '',
-            title: imgMeta.title,
-            description: imgMeta.description,
-        }));
-
-        // Find all file links (still need to parse for files)
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(selectedElement.html, 'text/html');
-        const fileExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip'];
-        const files = Array.from(doc.querySelectorAll('a[href]'))
-            .filter(link => {
-                const href = link.href.toLowerCase();
-                return fileExtensions.some(ext => href.endsWith(ext));
-            })
-            .map((link, idx) => ({
-                id: link.href || `file-${idx}`,
-                filename: link.textContent.trim() || `File ${idx + 1}`,
-                type: 'file',
-                status: 'pending',
-                currentStep: 'Waiting...',
-                url: link.href,
-            }));
+        // Use pre-generated metadata from media tag review
+        // Map mediaMetadataList to the format expected by upload UI
+        const allMedia = mediaMetadataList.map((mediaMeta) => {
+            if (mediaMeta.type === 'image') {
+                return {
+                    id: `img_${mediaMeta.index}`,
+                    index: mediaMeta.index,
+                    filename: mediaMeta.filename,
+                    filepath: mediaMeta.filepath || '/',
+                    displayName: mediaMeta.title || mediaMeta.alt || mediaMeta.filename || `Image ${mediaMeta.index + 1}`,
+                    type: 'image',
+                    status: 'pending',
+                    currentStep: 'Waiting...',
+                    src: mediaMeta.src,
+                    alt: mediaMeta.alt || '',
+                    title: mediaMeta.title,
+                    description: mediaMeta.description,
+                };
+            } else {
+                // file
+                return {
+                    id: `file_${mediaMeta.index}`,
+                    index: mediaMeta.index,
+                    filename: mediaMeta.filename,
+                    displayName: mediaMeta.title || mediaMeta.linkText || mediaMeta.filename || `File ${mediaMeta.index + 1}`,
+                    type: 'file',
+                    status: 'pending',
+                    currentStep: 'Waiting...',
+                    url: mediaMeta.url,
+                    title: mediaMeta.title,
+                    description: mediaMeta.description,
+                };
+            }
+        });
 
         // Set initial media status - show list first
-        const allMedia = [...images, ...files];
         setMediaUploadStatus(allMedia);
 
         if (allMedia.length === 0) {
@@ -585,12 +734,12 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     } : m
                 ));
 
-                // Get approved tags from imageTagReviews
+                // Get approved tags from mediaTagReviews
                 let approvedTags = [];
                 let customTags = [];
 
-                if (item.type === 'image' && imageTagReviews[item.index]) {
-                    const review = imageTagReviews[item.index];
+                if (mediaTagReviews[item.index]) {
+                    const review = mediaTagReviews[item.index];
                     approvedTags = Array.from(review.approvedTags || []);
                     customTags = review.customTags || [];
                 }
@@ -684,6 +833,26 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         setMediaUploadComplete(true);
     };
 
+    const handleResyncUploadStatus = () => {
+        // Check if all media items are complete
+        const allComplete = mediaUploadStatus.length > 0 &&
+            mediaUploadStatus.every(item =>
+                item.status === 'success' ||
+                item.status === 'reused' ||
+                item.status === 'error'
+            );
+
+        if (allComplete) {
+            setMediaUploadComplete(true);
+            showNotification('All media uploads verified as complete', 'success');
+        } else {
+            const pending = mediaUploadStatus.filter(item =>
+                item.status === 'pending' || item.status === 'uploading' || item.status === 'processing'
+            ).length;
+            showNotification(`${pending} upload(s) still in progress`, 'info');
+        }
+    };
+
     const handleImport = async () => {
         setCurrentStep(STEPS.PROCESSING);
         setIsLoading(true);
@@ -775,7 +944,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             currentStep === STEPS.URL_INPUT ? 'Enter URL' :
                                 currentStep === STEPS.IFRAME_SELECT ? 'Select Content (Live Preview)' :
                                     currentStep === STEPS.METADATA_CONFIRM ? 'Confirm Page Metadata' :
-                                        currentStep === STEPS.IMAGE_TAG_REVIEW ? 'Review Image Tags' :
+                                        currentStep === STEPS.MEDIA_TAG_REVIEW ? 'Review Media Tags' :
                                             currentStep === STEPS.MEDIA_UPLOAD ? 'Upload Media Files' :
                                                 currentStep === STEPS.CONTENT_PREVIEW ? 'Preview Content' :
                                                     currentStep === STEPS.IMPORT_OPTIONS ? 'Import Options' :
@@ -892,12 +1061,12 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         />
                     )}
 
-                    {/* Step 4: Image Tag Review */}
-                    {currentStep === STEPS.IMAGE_TAG_REVIEW && (
-                        <ImageTagReviewStep
-                            images={imageMetadataList}
+                    {/* Step 4: Media Tag Review */}
+                    {currentStep === STEPS.MEDIA_TAG_REVIEW && (
+                        <MediaTagReviewStep
+                            mediaItems={mediaMetadataList}
                             pageTags={confirmedTags}
-                            onTagReviewsChange={setImageTagReviews}
+                            onTagReviewsChange={setMediaTagReviews}
                         />
                     )}
 
@@ -978,16 +1147,25 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             )}
 
                             {mediaUploadComplete && (
-                                <div className="mt-4">
-                                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 mb-3">
-                                        ✓ All media files uploaded successfully!
+                                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                                    ✓ All media files uploaded successfully!
+                                </div>
+                            )}
+
+                            {mediaUploadStatus.length > 0 && (
+                                <div className="mt-4 flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                    <div className="text-sm text-gray-600">
+                                        {mediaUploadComplete ? (
+                                            <span className="text-green-700 font-medium">✓ All uploads verified</span>
+                                        ) : (
+                                            <span>Check if uploads are complete</span>
+                                        )}
                                     </div>
                                     <button
-                                        onClick={() => setCurrentStep(STEPS.CONTENT_PREVIEW)}
-                                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                                        onClick={handleResyncUploadStatus}
+                                        className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded hover:bg-blue-100 transition-colors"
                                     >
-                                        Continue to Preview
-                                        <ArrowRight className="h-4 w-4 ml-2" />
+                                        🔄 Refresh Status
                                     </button>
                                 </div>
                             )}
@@ -1103,10 +1281,10 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             Cancel
                         </button>
 
-                        {currentStep < STEPS.PROCESSING && currentStep !== STEPS.MEDIA_UPLOAD && (
+                        {currentStep < STEPS.PROCESSING && (
                             <button
                                 onClick={handleNext}
-                                disabled={isLoading || (currentStep === STEPS.IFRAME_SELECT && !selectedElement)}
+                                disabled={isLoading || (currentStep === STEPS.IFRAME_SELECT && !selectedElement) || (currentStep === STEPS.MEDIA_UPLOAD && !mediaUploadComplete)}
                                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? (

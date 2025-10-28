@@ -79,8 +79,6 @@ class ProxyService:
 
             rewritten_html = str(soup)
 
-            logger.info(f"Successfully fetched and rewrote {url}")
-
             return {
                 "html": rewritten_html,
                 "base_url": url,
@@ -370,12 +368,12 @@ class ProxyService:
             function buildHierarchy(clickedElement) {
                 const hierarchy = [];
                 let current = clickedElement;
-                const SKIP_TAGS = ['html'];
+                const SKIP_TAGS = ['html', 'p', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'strong', 'em', 'b', 'i', 'u', 'li', 'blockquote', 'code', 'pre', 'img'];
                 
                 while (current && current !== document.documentElement) {
                     const tagName = current.tagName.toLowerCase();
                     
-                    // Skip html tag
+                    // Skip content-level elements, only show containers
                     if (SKIP_TAGS.includes(tagName)) {
                         current = current.parentElement;
                         continue;

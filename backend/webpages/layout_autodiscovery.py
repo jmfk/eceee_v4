@@ -26,7 +26,6 @@ def autodiscover_layouts() -> None:
     allowing layouts to be registered via the @register_layout decorator or
     manual registration calls.
     """
-    logger.info("Starting layout autodiscovery...")
 
     discovered_count = 0
 
@@ -51,10 +50,6 @@ def autodiscover_layouts() -> None:
             continue
 
     total_layouts = len(layout_registry.list_layouts(active_only=False))
-    logger.info(
-        f"Layout autodiscovery complete. Found {discovered_count} layout modules, "
-        f"{total_layouts} total layouts registered."
-    )
 
 
 def discover_layouts_in_app(app_name: str) -> List[str]:
@@ -92,7 +87,6 @@ def validate_layout_configuration() -> None:
 
     This is useful for checking layouts during app startup or in management commands.
     """
-    logger.info("Validating layout configurations...")
 
     invalid_layouts = []
 
@@ -109,9 +103,6 @@ def validate_layout_configuration() -> None:
             f"Invalid layout configurations found: {', '.join(invalid_layouts)}"
         )
 
-    logger.info(
-        f"All {len(layout_registry._instances)} layouts have valid configurations"
-    )
 
 
 def get_layout_summary() -> dict:
@@ -142,7 +133,6 @@ def reload_layouts() -> None:
     This clears the registry and rediscovers all layouts. Useful for development
     or when layouts might have changed.
     """
-    logger.info("Reloading all layouts...")
 
     # Clear existing registrations
     layout_registry.clear()
@@ -153,7 +143,6 @@ def reload_layouts() -> None:
     # Validate configurations
     validate_layout_configuration()
 
-    logger.info("Layout reload complete")
 
 
 # Settings for layout discovery behavior

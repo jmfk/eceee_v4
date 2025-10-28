@@ -74,7 +74,6 @@ class AIAgentTaskManager:
             },
         )
 
-        logger.info(f"Task {self.task_id} progress: {progress}% - {message}")
 
     def update_status(self, status: str, message: str = None):
         """Update task status."""
@@ -105,7 +104,6 @@ class AIAgentTaskManager:
             },
         )
 
-        logger.info(f"Task {self.task_id} status changed to {status}")
 
     def add_result(
         self, result_data: Dict[str, Any], message: str = "Result generated"
@@ -139,7 +137,6 @@ class AIAgentTaskManager:
             },
         )
 
-        logger.info(f"Task {self.task_id} result added: {message}")
 
     def log_error(self, error: str, data: Dict[str, Any] = None):
         """Log an error or warning."""
@@ -223,7 +220,6 @@ def execute_ai_agent_task(self, task_id: str):
 
         # Retry if we haven't exceeded max retries
         if self.request.retries < self.max_retries:
-            logger.info(f"Retrying task {task_id} (attempt {self.request.retries + 1})")
             raise self.retry(countdown=60 * (2**self.request.retries))
 
         raise
@@ -546,7 +542,6 @@ def cleanup_old_tasks():
     task_count = old_tasks.count()
     old_tasks.delete()
 
-    logger.info(f"Cleaned up {task_count} old AI agent tasks")
 
     return f"Cleaned up {task_count} tasks"
 
@@ -581,6 +576,5 @@ def cancel_stuck_tasks():
         )
 
     count = stuck_tasks.count()
-    logger.info(f"Cancelled {count} stuck AI agent tasks")
 
     return f"Cancelled {count} stuck tasks"

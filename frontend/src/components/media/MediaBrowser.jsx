@@ -22,6 +22,8 @@ import {
     FolderOpen,
     Loader2,
     CheckCircle,
+    CheckSquare,
+    Square,
     X,
     ChevronLeft,
     ChevronRight,
@@ -180,6 +182,24 @@ const MediaBrowser = ({
                 }
                 return newSelection;
             });
+        }
+    };
+
+    // Select all filtered files (on current page)
+    const handleSelectAll = () => {
+        if (selectionMode !== 'multiple') return;
+
+        setSelectedFiles(files);
+        if (onFileSelect) {
+            onFileSelect(files);
+        }
+    };
+
+    // Deselect all files
+    const handleDeselectAll = () => {
+        setSelectedFiles([]);
+        if (onFileSelect) {
+            onFileSelect([]);
         }
     };
 
@@ -786,6 +806,27 @@ const MediaBrowser = ({
                             <Trash2 className="w-4 h-4" />
                             Show Deleted
                         </button>
+
+                        {/* Select All / Deselect All Button */}
+                        {selectionMode === 'multiple' && files.length > 0 && (
+                            <button
+                                onClick={selectedFiles.length === files.length ? handleDeselectAll : handleSelectAll}
+                                className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+                                title={selectedFiles.length === files.length ? 'Deselect all filtered files' : 'Select all filtered files on this page'}
+                            >
+                                {selectedFiles.length === files.length ? (
+                                    <>
+                                        <Square className="w-4 h-4" />
+                                        Deselect All
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckSquare className="w-4 h-4" />
+                                        Select All
+                                    </>
+                                )}
+                            </button>
+                        )}
 
                         <div className="flex rounded-md border border-gray-300 overflow-hidden">
                             <button

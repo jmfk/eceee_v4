@@ -245,7 +245,6 @@ class PendingMediaFile(models.Model):
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.info(f"Approving pending file: {self.original_filename} (ID: {self.id})")
 
         try:
             # Create the MediaFile using atomic helper
@@ -272,22 +271,14 @@ class PendingMediaFile(models.Model):
                 last_modified_by=self.uploaded_by,
             )
 
-            logger.info(
-                f"Created MediaFile: {media_file.id} for file: {self.original_filename}"
-            )
-
             # Associate tags if provided
             if tags:
                 media_file.tags.set(tags)
-                logger.info(
-                    f"Associated {len(tags)} tags with MediaFile: {media_file.id}"
-                )
 
             # Update status
             self.status = "approved"
             self.save()
 
-            logger.info(f"Successfully approved pending file: {self.original_filename}")
             return media_file
 
         except Exception as e:
@@ -310,9 +301,7 @@ class PendingMediaFile(models.Model):
         existing_media_file = MediaFile.objects.filter(file_hash=self.file_hash).first()
 
         if existing_media_file:
-            logger.info(
-                f"Not deleting S3 file {self.file_path} - same file exists in MediaFile: {existing_media_file.title}"
-            )
+            pass
         else:
             # Check if other pending files with same hash exist
             other_pending_files = (
@@ -324,15 +313,12 @@ class PendingMediaFile(models.Model):
             )
 
             if other_pending_files:
-                logger.info(
-                    f"Not deleting S3 file {self.file_path} - other pending files with same hash exist"
-                )
+                pass
             else:
                 # Safe to delete from S3 - no other references to this file
                 try:
                     storage = S3MediaStorage()
                     storage.delete_file(self.file_path)
-                    logger.info(f"Deleted rejected file from S3: {self.file_path}")
                 except Exception as e:
                     logger.error(
                         f"Failed to delete rejected file {self.file_path}: {e}"
@@ -371,9 +357,7 @@ class PendingMediaFile(models.Model):
                 ).first()
 
                 if existing_media_file:
-                    logger.info(
-                        f"Not deleting S3 file {pending_file.file_path} - same file exists in MediaFile: {existing_media_file.title}"
-                    )
+                    pass
                 else:
                     # Check if other pending files with same hash exist
                     other_pending_files = (
@@ -386,15 +370,10 @@ class PendingMediaFile(models.Model):
                     )
 
                     if other_pending_files:
-                        logger.info(
-                            f"Not deleting S3 file {pending_file.file_path} - other pending files with same hash exist"
-                        )
+                        pass
                     else:
                         # Safe to delete from S3 - no other references to this file
                         storage.delete_file(pending_file.file_path)
-                        logger.info(
-                            f"Deleted expired file from S3: {pending_file.file_path}"
-                        )
 
                 # Mark as expired
                 pending_file.status = "expired"
@@ -602,21 +581,13 @@ class MediaFile(models.Model):
             )
 
             if existing_deleted:
-                logger.info(
-                    f"Found soft-deleted MediaFile with hash {file_hash} (ID: {existing_deleted.id}). "
-                    f"Performing hard delete before creating new record."
-                )
                 # Hard delete the soft-deleted record
                 # The delete method will preserve the S3 object if other files reference it
                 existing_deleted.delete(force=True)
-                logger.info(
-                    f"Successfully hard-deleted soft-deleted MediaFile {existing_deleted.id}"
-                )
 
             # Create the new MediaFile
             kwargs["file_hash"] = file_hash
             new_file = cls.objects.create(**kwargs)
-            logger.info(f"Created new MediaFile {new_file.id} with hash {file_hash}")
 
             return new_file
 
@@ -714,9 +685,6 @@ class MediaFile(models.Model):
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(
-                f"Deleting MediaFile: {self.title} (ID: {self.id}, File: {self.original_filename})"
-            )
 
             # Check if other files reference the same S3 object (same file_hash)
             # Need to check both active and soft-deleted MediaFile records
@@ -736,23 +704,15 @@ class MediaFile(models.Model):
                 try:
                     storage = S3MediaStorage()
                     storage.delete_file(self.file_path)
-                    logger.info(f"Deleted S3 file: {self.file_path}")
                 except Exception as e:
                     logger.error(f"Failed to delete S3 file {self.file_path}: {e}")
                     # Don't fail the database deletion if S3 cleanup fails
-            else:
-                logger.info(
-                    f"Not deleting S3 file {self.file_path} - other files reference it"
-                )
 
             # Delete any related PendingMediaFile records with same hash that are approved
             related_pending = PendingMediaFile.objects.filter(
                 file_hash=self.file_hash, status="approved"
             )
             if related_pending.exists():
-                logger.info(
-                    f"Deleting {related_pending.count()} related approved pending files"
-                )
                 related_pending.delete()
 
             # Call parent delete to remove from database

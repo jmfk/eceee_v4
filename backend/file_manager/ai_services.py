@@ -279,6 +279,21 @@ class MediaAIService:
         NOTE: This is a fallback implementation that works without external AI services.
         It generates basic metadata from filename and file properties.
 
+        TODO: This method needs refactoring to use the improved OpenAI-based approach
+              from content_import.services.openai_service.OpenAIService which:
+              - Uses structured JSON output (more reliable)
+              - Supports page context (title, tags) for better metadata
+              - Detects and ignores generic alt text
+              - Provides better filename/filepath parsing
+              - Has comprehensive AI usage tracking
+
+              Currently still used by:
+              - FileUploadService._get_ai_analysis (when skip_ai_analysis=False)
+              - MediaAISuggestionsView (on-demand AI suggestions)
+              - Celery tasks for batch AI analysis
+
+              For content import, we now skip this and use OpenAIService directly.
+
         Args:
             file_content: File content as bytes
             filename: Original filename

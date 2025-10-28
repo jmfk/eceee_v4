@@ -21,7 +21,6 @@ def autodiscover_path_patterns():
     Looks for a 'path_patterns' module in each app and imports it to trigger
     path pattern registration.
     """
-    logger.info("Starting path pattern autodiscovery...")
 
     for app_config in apps.get_app_configs():
         app_name = app_config.name
@@ -29,7 +28,6 @@ def autodiscover_path_patterns():
         try:
             # Try to import the path_patterns module from the app
             import_module(f"{app_name}.path_patterns")
-            logger.info(f"Loaded path patterns from {app_name}")
 
         except ImportError as e:
             # Check if it's a "No module named" error for the path_patterns module
@@ -48,9 +46,6 @@ def autodiscover_path_patterns():
 
     # Log summary
     pattern_count = len(path_pattern_registry.list_patterns())
-    logger.info(
-        f"Path pattern autodiscovery completed. Registered {pattern_count} path patterns."
-    )
 
 
 def validate_path_patterns():

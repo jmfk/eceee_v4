@@ -103,14 +103,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         File access is secured by UUID (hard to guess).
         """
         try:
-            logger.info(
-                f"Preview request for pk={pk}, user={request.user}, authenticated={request.user.is_authenticated}"
-            )
 
             pending_file = self.get_object()
-            logger.info(
-                f"Got pending file: {pending_file.id}, status={pending_file.status}"
-            )
 
             # For images, serve the actual file
             if pending_file.file_type == "image":
@@ -123,9 +117,6 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     )
                     response["Content-Disposition"] = (
                         f'inline; filename="{pending_file.original_filename}"'
-                    )
-                    logger.info(
-                        f"Successfully served preview for {pending_file.original_filename}"
                     )
                     return response
 
@@ -214,9 +205,6 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            logger.info(
-                f"Starting approval process for pending file: {pending_file.id}"
-            )
             # Create the approved media file
             media_file = pending_file.approve_and_create_media_file(
                 title=serializer.validated_data["title"],
@@ -224,9 +212,6 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 description=serializer.validated_data.get("description", ""),
                 tags=serializer.validated_data.get("tag_ids", []),
                 access_level=serializer.validated_data.get("access_level", "public"),
-            )
-            logger.info(
-                f"Successfully created MediaFile: {media_file.id} from pending file: {pending_file.id}"
             )
 
             # Handle collection assignment

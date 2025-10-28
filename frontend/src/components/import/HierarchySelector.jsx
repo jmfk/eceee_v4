@@ -160,7 +160,7 @@ const HierarchySelector = ({
                                     {/* Element label */}
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className={`
-                                            font-mono text-sm font-medium
+                                            font-mono text-sm font-medium truncate
                                             ${isSelected ? 'text-green-700' : 'text-gray-900'}
                                         `}>
                                             {formatElementLabel(element)}

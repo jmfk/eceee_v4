@@ -193,7 +193,9 @@ export const endpoints = {
         proxyAsset: `${BASE_PATH}/content-import/proxy-asset/`,
         capture: `${BASE_PATH}/content-import/capture/`,
         extract: `${BASE_PATH}/content-import/extract/`,
-        process: `${BASE_PATH}/content-import/process/`
+        process: `${BASE_PATH}/content-import/process/`,
+        generateMetadata: `${BASE_PATH}/content-import/generate-metadata/`,
+        uploadMedia: `${BASE_PATH}/content-import/upload-media/`
     }
 }
 

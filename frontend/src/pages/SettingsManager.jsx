@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -88,9 +88,9 @@ const SettingsManager = () => {
     const [themeAutoSaveStatus, setThemeAutoSaveStatus] = useState('idle')
 
     // Subscribe to UDC changes for theme dirty state
-    useExternalChanges('settings-manager', (udcState) => {
+    useExternalChanges('settings-manager', useCallback((udcState) => {
         setIsThemeDirty(udcState.metadata.isThemeDirty || false);
-    });
+    }, []));
 
     // Fetch pages
     const { data: pagesResponse, isLoading: pagesLoading } = useQuery({
@@ -368,11 +368,11 @@ const SettingsManager = () => {
         }
     }
 
-    const handleThemeEditorCallback = (saveHandler, countdown, status) => {
+    const handleThemeEditorCallback = useCallback((saveHandler, countdown, status) => {
         setThemeSaveHandler(() => saveHandler);
         setThemeAutoSaveCountdown(countdown);
         setThemeAutoSaveStatus(status);
-    };
+    }, []);
 
     const renderTabContent = () => {
         switch (activeTab) {

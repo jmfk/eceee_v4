@@ -32,16 +32,11 @@ class TagMigrator(BaseMigrator):
 
     def run(self):
         """Run the complete tag migration"""
-        logger.info("=" * 60)
-        logger.info("Starting Tag Migration")
-        logger.info(f"Dry run mode: {self.dry_run}")
-        logger.info("=" * 60)
 
         try:
             with transaction.atomic():
                 # Step 1: Get or create default namespace
                 self.namespace = self.get_or_create_default_namespace()
-                logger.info(f"Using namespace: {self.namespace.name}")
 
                 # Step 2: Migrate normal tags (eceee_category, keywords)
                 self.migrate_normal_tags()
@@ -57,22 +52,17 @@ class TagMigrator(BaseMigrator):
 
                 # Step 6: Log final statistics
                 self.log_stats()
-                logger.info(f"Tag merge statistics: {merge_stats}")
 
                 if self.dry_run:
                     logger.warning("DRY RUN - Rolling back all changes")
                     raise Exception("Dry run - rolling back")
 
-                logger.info("=" * 60)
-                logger.info("Tag Migration Completed Successfully!")
-                logger.info("=" * 60)
 
         except Exception as e:
             if not self.dry_run or str(e) != "Dry run - rolling back":
                 logger.error(f"Migration failed: {e}")
                 raise
             else:
-                logger.info("Dry run completed - transaction rolled back")
 
     def migrate_normal_tags(self):
         """
@@ -85,9 +75,6 @@ class TagMigrator(BaseMigrator):
         - eceeeCategory
         - AssignedeceeeCategory
         """
-        logger.info("\n" + "-" * 60)
-        logger.info("Migrating Normal Tags (eceee_category, keywords)")
-        logger.info("-" * 60)
 
         # TODO: Implement based on your actual legacy schema
         # Example structure:
@@ -97,7 +84,6 @@ class TagMigrator(BaseMigrator):
         #     from your_legacy_app.models import eceeeKeyword
         #
         #     keywords = eceeeKeyword.objects.all()
-        #     logger.info(f"Found {keywords.count()} legacy keywords")
         #
         #     for keyword in keywords:
         #         tag, created = self.get_or_create_tag(
@@ -121,10 +107,6 @@ class TagMigrator(BaseMigrator):
         #     self.stats['errors'] += 1
 
         # For now, log a placeholder message
-        logger.info(
-            "⚠️  Normal tag migration needs to be customized for your legacy schema"
-        )
-        logger.info("   See comments in migrate_normal_tags() for example structure")
 
     def migrate_news_tags(self):
         """
@@ -136,9 +118,6 @@ class TagMigrator(BaseMigrator):
         - eceeeNewsCategory
         - eceeeNewsSource
         """
-        logger.info("\n" + "-" * 60)
-        logger.info("Migrating News Tags (NewsType, NewsCategory, NewsSource)")
-        logger.info("-" * 60)
 
         # TODO: Implement based on your actual legacy schema
         # Example structure:
@@ -148,7 +127,6 @@ class TagMigrator(BaseMigrator):
         #     from your_legacy_app.models import eceeeNewsType
         #
         #     news_types = eceeeNewsType.objects.all()
-        #     logger.info(f"Found {news_types.count()} news types")
         #
         #     for news_type in news_types:
         #         tag, created = self.get_or_create_tag(
@@ -177,10 +155,6 @@ class TagMigrator(BaseMigrator):
         # Similar structure for eceeeNewsSource
 
         # For now, log a placeholder message
-        logger.info(
-            "⚠️  News tag migration needs to be customized for your legacy schema"
-        )
-        logger.info("   See comments in migrate_news_tags() for example structure")
 
     def migrate_related_news(self):
         """
@@ -189,9 +163,6 @@ class TagMigrator(BaseMigrator):
         This function should be customized based on your legacy schema.
         Related news will be stored in ObjectInstance metadata
         """
-        logger.info("\n" + "-" * 60)
-        logger.info("Migrating Related News Relationships")
-        logger.info("-" * 60)
 
         # TODO: Implement based on your actual legacy schema
         # Example structure:
@@ -200,7 +171,6 @@ class TagMigrator(BaseMigrator):
         #     from your_legacy_app.models import RelatedNews
         #
         #     relationships = RelatedNews.objects.all()
-        #     logger.info(f"Found {relationships.count()} related news relationships")
         #
         #     # Store relationships for later use in news migration
         #     # These will be added to ObjectInstance.metadata['related_news']
@@ -220,10 +190,6 @@ class TagMigrator(BaseMigrator):
         #     self.stats['errors'] += 1
 
         # For now, log a placeholder message
-        logger.info(
-            "⚠️  Related news migration needs to be customized for your legacy schema"
-        )
-        logger.info("   See comments in migrate_related_news() for example structure")
 
     def save_tag_mapping(self, filepath="tag_mapping.json"):
         """
@@ -249,7 +215,6 @@ class TagMigrator(BaseMigrator):
         with open(filepath, "w") as f:
             json.dump(serializable_mapping, f, indent=2)
 
-        logger.info(f"Tag mapping saved to {filepath}")
 
 
 def run_migration(dry_run=True):

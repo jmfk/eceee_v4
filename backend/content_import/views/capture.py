@@ -72,7 +72,6 @@ class CaptureScreenshotView(APIView):
             # Convert to base64 for JSON response
             screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
 
-            logger.info(f"Successfully captured screenshot for {url}")
 
             return Response(
                 {

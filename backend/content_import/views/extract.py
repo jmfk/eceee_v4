@@ -63,7 +63,6 @@ class ExtractContentView(APIView):
                 url=url, x=x, y=y, timeout=timeout
             )
 
-            logger.info(f"Successfully extracted element from {url} at ({x}, {y})")
 
             return Response(element_data)
 

@@ -29,7 +29,6 @@ class TagMigratorExample(BaseMigrator):
 
     def migrate_normal_tags(self):
         """Example: Migrate eceee_category and keywords"""
-        logger.info("\nMigrating Normal Tags")
 
         # EXAMPLE 1: Migrate eceeeCategory
         try:
@@ -37,7 +36,6 @@ class TagMigratorExample(BaseMigrator):
             from eceeebase.models import eceeeCategory
 
             categories = eceeeCategory.objects.all()
-            logger.info(f"Found {categories.count()} eceeeCategory items")
 
             for category in categories:
                 # Get the tag name - UPDATE FIELD NAME if different
@@ -63,7 +61,6 @@ class TagMigratorExample(BaseMigrator):
                 else:
                     self.stats["errors"] += 1
 
-            logger.info(f"Migrated {categories.count()} categories")
 
         except ImportError as e:
             logger.warning(f"Could not import eceeeCategory: {e}")
@@ -76,7 +73,6 @@ class TagMigratorExample(BaseMigrator):
             from generic.models import Keyword  # or wherever Mezzanine keywords are
 
             keywords = Keyword.objects.all()
-            logger.info(f"Found {keywords.count()} keywords")
 
             for keyword in keywords:
                 tag, created = self.get_or_create_tag(
@@ -92,7 +88,6 @@ class TagMigratorExample(BaseMigrator):
                     else:
                         self.stats["skipped"] += 1
 
-            logger.info(f"Migrated {keywords.count()} keywords")
 
         except ImportError as e:
             logger.warning(f"Could not import Keyword: {e}")
@@ -101,14 +96,12 @@ class TagMigratorExample(BaseMigrator):
 
     def migrate_news_tags(self):
         """Example: Migrate news-specific tags"""
-        logger.info("\nMigrating News Tags")
 
         # EXAMPLE 1: NewsType
         try:
             from eceeenews.models import eceeeNewsType
 
             news_types = eceeeNewsType.objects.all()
-            logger.info(f"Found {news_types.count()} news types")
 
             for news_type in news_types:
                 tag, created = self.get_or_create_tag(
@@ -132,7 +125,6 @@ class TagMigratorExample(BaseMigrator):
             from eceeenews.models import eceeeNewsCategory
 
             news_categories = eceeeNewsCategory.objects.all()
-            logger.info(f"Found {news_categories.count()} news categories")
 
             for news_cat in news_categories:
                 tag, created = self.get_or_create_tag(
@@ -156,7 +148,6 @@ class TagMigratorExample(BaseMigrator):
             from eceeenews.models import eceeeNewsSource
 
             news_sources = eceeeNewsSource.objects.all()
-            logger.info(f"Found {news_sources.count()} news sources")
 
             for source in news_sources:
                 tag, created = self.get_or_create_tag(
@@ -177,7 +168,6 @@ class TagMigratorExample(BaseMigrator):
 
     def migrate_related_news(self):
         """Example: Migrate RelatedNews relationships"""
-        logger.info("\nMigrating Related News Relationships")
 
         try:
             from eceeenews.models import eceeeNews
@@ -197,9 +187,6 @@ class TagMigratorExample(BaseMigrator):
                     relationship_count += len(related_ids)
                     self.stats["created"] += 1
 
-            logger.info(
-                f"Stored {relationship_count} related news relationships for {self.stats['created']} news items"
-            )
 
         except ImportError as e:
             logger.warning(f"Could not import eceeeNews: {e}")
@@ -210,7 +197,6 @@ class TagMigratorExample(BaseMigrator):
 
     def migrate_event_tags(self):
         """Example: Migrate event-specific tags"""
-        logger.info("\nMigrating Event Tags")
 
         try:
             from eceeecalendar.models import EceeeCalenderEvent
@@ -224,7 +210,6 @@ class TagMigratorExample(BaseMigrator):
                 if hasattr(event, "event_type") and event.event_type:
                     event_types.add(event.event_type)
 
-            logger.info(f"Found {len(event_types)} unique event types")
 
             for event_type in event_types:
                 tag, created = self.get_or_create_tag(
@@ -243,13 +228,11 @@ class TagMigratorExample(BaseMigrator):
 
     def migrate_library_tags(self):
         """Example: Migrate library category tags"""
-        logger.info("\nMigrating Library Tags")
 
         try:
             from eceeelibrary.models import LibraryCategory
 
             categories = LibraryCategory.objects.all()
-            logger.info(f"Found {categories.count()} library categories")
 
             for category in categories:
                 tag, created = self.get_or_create_tag(
@@ -270,13 +253,11 @@ class TagMigratorExample(BaseMigrator):
 
     def migrate_proceedings_tags(self):
         """Example: Migrate proceedings keyword tags"""
-        logger.info("\nMigrating Proceedings Tags")
 
         try:
             from eceeeproceedings.models import ProceedingsKeyword
 
             keywords = ProceedingsKeyword.objects.all()
-            logger.info(f"Found {keywords.count()} proceedings keywords")
 
             for keyword in keywords:
                 tag, created = self.get_or_create_tag(

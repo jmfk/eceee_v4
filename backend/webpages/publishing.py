@@ -163,10 +163,6 @@ class PublishingService:
                     # This version should become the current published version
                     # We don't need complex publishing logic - just update effective_date if needed
 
-                    self.logger.info(
-                        f"Version {version.version_number} of page '{version.page.title}' "
-                        f"is now published (effective: {version.effective_date})"
-                    )
                     published_count += 1
 
                     # Note: In the new system, versions become published automatically
@@ -210,10 +206,6 @@ class PublishingService:
                 if not version.is_published(now) and version.expiry_date:
                     # This version has expired
 
-                    self.logger.info(
-                        f"Version {version.version_number} of page '{version.page.title}' "
-                        f"has expired (expiry: {version.expiry_date})"
-                    )
                     expired_count += 1
 
                     # Note: In the new system, versions expire automatically
@@ -261,9 +253,6 @@ class PublishingService:
                 latest_version.save(update_fields=["effective_date"])
 
                 published_count += 1
-                self.logger.info(
-                    f"Bulk published page: {page.title} (version {latest_version.version_number})"
-                )
 
             except Exception as e:
                 error_msg = f"Failed to bulk publish {page.title}: {str(e)}"
@@ -320,9 +309,6 @@ class PublishingService:
                 latest_version.save(update_fields=["effective_date"])
 
                 published_count += 1
-                self.logger.info(
-                    f"Published page with subpages: {page_item.title} (version {latest_version.version_number})"
-                )
 
             except Exception as e:
                 error_msg = f"Failed to publish {page_item.title}: {str(e)}"
@@ -348,7 +334,6 @@ class PublishingService:
             try:
                 if page.publish(self.user, change_summary):
                     published_count += 1
-                    self.logger.info(f"Bulk published page: {page.title}")
             except Exception as e:
                 error_msg = f"Failed to bulk publish {page.title}: {str(e)}"
                 errors.append(error_msg)
@@ -397,10 +382,6 @@ class PublishingService:
                 latest_version.save(update_fields=["effective_date", "expiry_date"])
 
                 scheduled_count += 1
-                self.logger.info(
-                    f"Bulk scheduled page: {page.title} (version {latest_version.version_number}) "
-                    f"from {schedule.effective_date} to {schedule.expiry_date or 'indefinite'}"
-                )
 
             except Exception as e:
                 error_msg = f"Failed to bulk schedule {page.title}: {str(e)}"
@@ -429,7 +410,6 @@ class PublishingService:
             try:
                 if page.schedule(schedule, self.user, change_summary):
                     scheduled_count += 1
-                    self.logger.info(f"Bulk scheduled page: {page.title}")
             except Exception as e:
                 error_msg = f"Failed to bulk schedule {page.title}: {str(e)}"
                 errors.append(error_msg)

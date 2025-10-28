@@ -158,7 +158,6 @@ class LayoutRegistry:
         self._layouts[name] = layout_class
         self._instances[name] = instance
 
-        logger.info(f"Registered layout: {name}")
 
         # Invalidate caches when layout changes
         self._invalidate_layout_caches(name)
@@ -168,7 +167,6 @@ class LayoutRegistry:
         if name in self._layouts:
             del self._layouts[name]
             del self._instances[name]
-            logger.info(f"Unregistered layout: {name}")
 
             # Invalidate caches when layout is removed
             self._invalidate_layout_caches(name)
@@ -206,7 +204,6 @@ class LayoutRegistry:
         """Clear all registered layouts."""
         self._layouts.clear()
         self._instances.clear()
-        logger.info("Cleared all registered layouts")
 
         # Invalidate all layout caches
         self._invalidate_all_layout_caches()
@@ -244,7 +241,6 @@ class LayoutRegistry:
                 cache.delete(cache_key)
                 logger.debug(f"Cleared list cache key: {cache_key}")
 
-            logger.info(f"Invalidated caches for layout: {layout_name}")
 
         except Exception as e:
             logger.warning(f"Failed to invalidate caches for layout {layout_name}: {e}")
@@ -272,7 +268,6 @@ class LayoutRegistry:
 
             # Django's cache doesn't support pattern deletion by default,
             # so we clear the entire cache as a fallback
-            logger.info("Clearing entire cache due to layout registry changes")
             cache.clear()
 
         except Exception as e:

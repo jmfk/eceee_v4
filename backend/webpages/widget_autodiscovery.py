@@ -24,7 +24,6 @@ def autodiscover_widgets():
     widget type registration.
     """
 
-    logger.info("Starting widget type autodiscovery...")
 
     for app_config in apps.get_app_configs():
         app_name = app_config.name
@@ -32,7 +31,6 @@ def autodiscover_widgets():
         try:
             # Try to import the widgets module from the app
             import_module(f"{app_name}.widgets")
-            logger.info(f"Loaded widgets from {app_name}")
 
         except ImportError as e:
             # Check if it's a "No module named" error for the widgets module
@@ -51,9 +49,6 @@ def autodiscover_widgets():
 
     # Log summary
     widget_count = len(widget_type_registry.list_widget_types())
-    logger.info(
-        f"Widget type autodiscovery completed. Registered {widget_count} widget types."
-    )
 
 
 def validate_widget_types():

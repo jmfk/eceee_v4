@@ -150,14 +150,12 @@ class PathPatternRegistry:
         self._patterns[key] = pattern_class
         self._instances[key] = instance
 
-        logger.info(f"Registered path pattern: {key}")
 
     def unregister(self, key: str) -> None:
         """Unregister a path pattern by key."""
         if key in self._patterns:
             del self._patterns[key]
             del self._instances[key]
-            logger.info(f"Unregistered path pattern: {key}")
 
     def get_pattern(self, key: str) -> Optional[BasePathPattern]:
         """Get a path pattern instance by key."""
@@ -220,7 +218,6 @@ class PathPatternRegistry:
         """Clear all registered patterns. Primarily for testing."""
         self._patterns.clear()
         self._instances.clear()
-        logger.info("Cleared all path patterns from registry")
 
 
 # Global registry instance

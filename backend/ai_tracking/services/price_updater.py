@@ -84,7 +84,6 @@ class PriceUpdater:
         elif provider == "anthropic":
             return self._update_anthropic_price(model_name)
         else:
-            logger.info(f"No API available for {provider}, skipping auto-update")
             return False
 
     def _update_openai_price(self, model_name):
@@ -181,7 +180,6 @@ class PriceUpdater:
                 current_price.last_verified = timezone.now()
                 current_price.is_stale = False
                 current_price.save()
-                logger.info(f"Verified price for {provider}/{model_name} - no changes")
                 return False
 
         # Create new price entry
@@ -196,7 +194,6 @@ class PriceUpdater:
             is_stale=False,
         )
 
-        logger.info(f"Updated price for {provider}/{model_name}")
         return True
 
     def send_price_update_email(self, results):
@@ -247,7 +244,6 @@ class PriceUpdater:
                 recipient_list=[self.admin_email],
                 fail_silently=False,
             )
-            logger.info(f"Sent price update email to {self.admin_email}")
         except Exception as e:
             logger.error(f"Failed to send price update email: {e}")
 
@@ -291,7 +287,6 @@ class PriceUpdater:
                 recipient_list=[self.admin_email],
                 fail_silently=False,
             )
-            logger.info(f"Sent stale price reminder to {self.admin_email}")
         except Exception as e:
             logger.error(f"Failed to send stale price reminder: {e}")
 
@@ -353,6 +348,5 @@ class PriceUpdater:
                 recipient_list=alert.email_recipients,
                 fail_silently=False,
             )
-            logger.info(f"Sent budget alert email for '{alert.name}'")
         except Exception as e:
             logger.error(f"Failed to send budget alert email: {e}")

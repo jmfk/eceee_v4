@@ -269,9 +269,6 @@ class DatabaseOptimizer:
                     # These are pre-defined static SQL strings with no user input
                     # Safe to execute directly as they contain no dynamic content
                     cursor.execute(optimization)
-                    logger.info(
-                        f"Applied database optimization: {optimization[:50]}..."
-                    )
                 except Exception as e:
                     logger.error(f"Failed to apply optimization: {e}")
 
@@ -312,7 +309,6 @@ class DatabaseOptimizer:
                     # Use parameterized queries to prevent SQL injection
                     cursor.execute(query, params)
                     results = cursor.fetchall()
-                    logger.info(f"Query performance analysis: {results}")
                 except Exception as e:
                     logger.error(f"Failed to analyze query performance: {e}")
 
@@ -335,7 +331,6 @@ class FileProcessingOptimizer:
             from PIL import features
 
             if features.check("libjpeg_turbo"):
-                logger.info("JPEG Turbo optimization enabled")
 
         except ImportError:
             logger.warning("PIL not available for image optimization")
@@ -458,10 +453,6 @@ class PerformanceContext:
         execution_time = end_time - self.start_time
         query_count = queries_after - self.queries_before
 
-        logger.info(
-            f"Performance: {self.operation_name} completed in {execution_time:.2f}s "
-            f"with {query_count} queries"
-        )
 
         # Log performance warnings
         if execution_time > 5.0:

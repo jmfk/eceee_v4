@@ -89,7 +89,6 @@ class SimplifiedLayoutSerializer:
                 )
             else:
                 logger.debug(f"Caching disabled for simplified layout: {layout_name}")
-            logger.info(f"Generated simplified layout JSON for {layout_name}")
 
             return simplified_layout
 

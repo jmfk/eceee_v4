@@ -195,7 +195,7 @@ const BulkOperations = ({
             const newCollection = await mediaCollectionsApi.create({
                 title: newCollectionName.trim(),
                 namespace: namespace
-            });
+            })();
 
             setAvailableCollections(prev => [...prev, newCollection]);
             setOperationData(prev => ({
@@ -487,12 +487,12 @@ const BulkOperations = ({
                                 }}
                                 className="px-3 py-2 text-sm bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all duration-200"
                             >
-                                <option value="">Bulk Actions</option>
-                                <option value="add_tags">Add Tags</option>
-                                <option value="remove_tags">Remove Tags</option>
-                                <option value="add_to_collection">Add to Collection</option>
-                                <option value="remove_from_collection">Remove from Collection</option>
-                                <option value="delete">Delete Files</option>
+                                <option key="bulk-actions-default" value="">Bulk Actions</option>
+                                <option key="add_tags" value="add_tags">Add Tags</option>
+                                <option key="remove_tags" value="remove_tags">Remove Tags</option>
+                                <option key="add_to_collection" value="add_to_collection">Add to Collection</option>
+                                <option key="remove_from_collection" value="remove_from_collection">Remove from Collection</option>
+                                <option key="delete" value="delete">Delete Files</option>
                             </select>
                             <button
                                 onClick={() => {

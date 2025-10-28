@@ -22,7 +22,6 @@ def check_ai_prices():
     - Sends email digest to admins
     - Logs any price changes detected
     """
-    logger.info("Starting AI price check task")
 
     updater = PriceUpdater()
     results = updater.check_all_prices()
@@ -30,12 +29,6 @@ def check_ai_prices():
     # Send email report if there are updates or issues
     updater.send_price_update_email(results)
 
-    logger.info(
-        f"AI price check complete. "
-        f"Updated: {len(results['updated'])}, "
-        f"Stale: {len(results['stale'])}, "
-        f"Errors: {len(results['errors'])}"
-    )
 
     return results
 
@@ -45,12 +38,10 @@ def send_stale_price_reminders():
     """
     Weekly task to remind admins about stale prices.
     """
-    logger.info("Sending stale price reminders")
 
     updater = PriceUpdater()
     updater.send_stale_price_reminder()
 
-    logger.info("Stale price reminders sent")
 
 
 @shared_task
@@ -58,12 +49,10 @@ def check_budget_alerts():
     """
     Hourly task to check budget alerts and send notifications.
     """
-    logger.info("Checking budget alerts")
 
     updater = PriceUpdater()
     triggered = updater.check_budget_alerts()
 
-    logger.info(f"Budget alert check complete. Triggered: {len(triggered)}")
 
     return {
         "checked_at": str(timezone.now()),
@@ -91,6 +80,5 @@ def cleanup_old_usage_logs(days=90):
         created_at__lt=cutoff_date, store_full_data=False
     ).delete()[0]
 
-    logger.info(f"Cleaned up {deleted_count} old usage logs (older than {days} days)")
 
     return {"deleted_count": deleted_count, "cutoff_date": str(cutoff_date)}

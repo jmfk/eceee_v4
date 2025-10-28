@@ -30,7 +30,9 @@ class UploadResult:
 class FileUploadService:
     """Service class to handle the core file upload logic."""
 
-    def upload(self, file, folder_path: str, namespace, user) -> UploadResult:
+    def upload(
+        self, file, folder_path: str, namespace, user, skip_ai_analysis: bool = False
+    ) -> UploadResult:
         """
         Handle the upload of a single file, including storage and pending file creation.
 
@@ -39,6 +41,7 @@ class FileUploadService:
             folder_path: The target folder path for the file
             namespace: The namespace object for the upload
             user: The user performing the upload
+            skip_ai_analysis: Skip AI analysis (use when AI metadata already generated elsewhere)
 
         Returns:
             UploadResult object containing the upload results and any errors
@@ -50,8 +53,10 @@ class FileUploadService:
             # Determine file type
             file_type = self._determine_file_type(upload_result["content_type"])
 
-            # Get AI analysis
-            ai_analysis = self._get_ai_analysis(file, upload_result)
+            # Get AI analysis (skip if already done elsewhere, e.g., content import)
+            ai_analysis = (
+                {} if skip_ai_analysis else self._get_ai_analysis(file, upload_result)
+            )
 
             # Create pending file
             pending_file = self._create_pending_file(
@@ -140,8 +145,8 @@ class FileUploadService:
         """
         from django.db import transaction
 
-        with transaction.atomic():
-            try:
+        try:
+            with transaction.atomic():
                 return PendingMediaFile.objects.create(
                     original_filename=file.name,
                     file_path=upload_result["file_path"],
@@ -160,34 +165,30 @@ class FileUploadService:
                     uploaded_by=user,
                     expires_at=timezone.now() + timedelta(hours=24),
                 )
-            except IntegrityError as e:
-                # Handle duplicate file hash constraint
-                # This happens when the same file (same hash) is uploaded again
-                if "file_hash" in str(e) and "uniq" in str(e):
-                    logger.info(
-                        f"PendingMediaFile with hash {upload_result['file_hash']} already exists. "
-                        f"Updating existing record instead of creating new one."
+        except IntegrityError as e:
+            # Handle duplicate file hash constraint OUTSIDE atomic block
+            # This happens when the same file (same hash) is uploaded again
+            if "file_hash" in str(e) and "uniq" in str(e):
+                existing_pending = PendingMediaFile.objects.filter(
+                    file_hash=upload_result["file_hash"]
+                ).first()
+
+                if existing_pending:
+                    # Update existing pending file with new metadata
+                    # This preserves the S3 object reference
+                    self._update_existing_pending_file(
+                        existing_pending,
+                        file,
+                        upload_result,
+                        file_type,
+                        ai_analysis,
+                        namespace,
+                        folder_path,
+                        user,
                     )
-                    existing_pending = PendingMediaFile.objects.filter(
-                        file_hash=upload_result["file_hash"]
-                    ).first()
+                    return existing_pending
 
-                    if existing_pending:
-                        # Update existing pending file with new metadata
-                        # This preserves the S3 object reference
-                        self._update_existing_pending_file(
-                            existing_pending,
-                            file,
-                            upload_result,
-                            file_type,
-                            ai_analysis,
-                            namespace,
-                            folder_path,
-                            user,
-                        )
-                        return existing_pending
-
-                raise e
+            raise e
 
     def _update_existing_pending_file(
         self,

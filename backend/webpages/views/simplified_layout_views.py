@@ -50,7 +50,6 @@ def simplified_layout_json(request, layout_name):
 
             if layout_name in predefined_layouts:
                 layout_data = predefined_layouts[layout_name]
-                logger.info(f"Serving predefined simplified layout: {layout_name}")
 
                 return Response(
                     {
@@ -68,7 +67,6 @@ def simplified_layout_json(request, layout_name):
         serializer = SimplifiedLayoutSerializer()
         layout_data = serializer.serialize_layout(layout_name)
 
-        logger.info(f"Serving parsed simplified layout: {layout_name}")
 
         return Response(
             {

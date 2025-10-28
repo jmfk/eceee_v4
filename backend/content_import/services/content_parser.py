@@ -3,7 +3,7 @@
 import logging
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup, NavigableString, Tag
-from ..utils.html_sanitizer import sanitize_html
+from ..utils.html_sanitizer import sanitize_html, deep_clean_html
 from ..utils.content_analyzer import is_file_link, extract_file_extension
 
 
@@ -46,21 +46,50 @@ class ContentParser:
         Returns:
             List of ContentSegment objects in document order
         """
-        # Sanitize HTML first
+        # Step 1: Sanitize HTML (remove dangerous tags/scripts)
         clean_html = sanitize_html(html)
+
+        # Step 2: Deep clean (remove spans/fonts/attributes/nested blocks)
+        clean_html = deep_clean_html(clean_html)
 
         # Parse with BeautifulSoup
         soup = BeautifulSoup(clean_html, "html.parser")
 
+        # Step 3: Remove all wrapper divs before processing
+        # Divs are just containers - unwrap them to get to actual content
+        div_count = 0
+        for wrapper in soup.find_all(["div", "section", "article", "main", "aside"]):
+            wrapper.unwrap()
+            div_count += 1
+
+        # Show first 10 elements after unwrapping
+        content_elements = soup.find_all(
+            [
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "h6",
+                "p",
+                "blockquote",
+                "ul",
+                "ol",
+                "table",
+                "img",
+            ]
+        )[:10]
+        for i, tag in enumerate(content_elements, 1):
+            tag_str = str(tag)[:150].replace("\n", " ")
+
         segments = []
 
-        # Process top-level children
+        # Process content (keeping images inline)
         self._process_element(soup, segments)
 
         # Merge consecutive text content segments
         segments = self._merge_text_segments(segments)
 
-        logger.info(f"Parsed {len(segments)} content segments")
 
         return segments
 
@@ -87,8 +116,6 @@ class ContentParser:
                 # Handle different tag types
                 if child.name == "table":
                     self._extract_table(child, segments)
-                elif child.name == "img":
-                    self._extract_image(child, segments)
                 elif child.name == "a" and child.get("href"):
                     # Check if it's a file link
                     href = child.get("href", "")
@@ -97,9 +124,6 @@ class ContentParser:
                     else:
                         # Regular link - include in text content
                         self._process_element(child, segments, depth + 1)
-                elif child.name in ["div", "section", "article", "main", "aside"]:
-                    # Container elements - process children
-                    self._process_element(child, segments, depth + 1)
                 elif child.name in [
                     "h1",
                     "h2",
@@ -143,34 +167,6 @@ class ContentParser:
             )
         )
 
-    def _extract_image(self, img_element, segments: List[ContentSegment]):
-        """Extract image as a segment."""
-        src = img_element.get("src", "")
-        alt = img_element.get("alt", "")
-        title = img_element.get("title", "")
-
-        # Get surrounding context
-        context = ""
-        if img_element.parent:
-            context = img_element.parent.get_text(separator=" ", strip=True)[:200]
-
-        segments.append(
-            ContentSegment(
-                "image",
-                {
-                    "src": src,
-                    "alt": alt,
-                    "title": title,
-                    "context": context,
-                    "html": str(img_element),
-                },
-                {
-                    "alt": alt,
-                    "title": title,
-                },
-            )
-        )
-
     def _extract_file_link(self, link_element, segments: List[ContentSegment]):
         """Extract file link as a segment."""
         href = link_element.get("href", "")
@@ -206,13 +202,13 @@ class ContentParser:
         self, segments: List[ContentSegment]
     ) -> List[ContentSegment]:
         """
-        Merge consecutive text and content segments.
+        Merge only consecutive text segments, preserving order with tables/images.
 
         Args:
             segments: List of segments
 
         Returns:
-            List with merged segments
+            List with consecutive text merged, but tables/images preserved in order
         """
         if not segments:
             return []
@@ -221,20 +217,28 @@ class ContentParser:
         current_content = []
 
         for segment in segments:
-            if segment.type in ["text", "content"]:
+            if segment.type == "text":
+                # Accumulate plain text
+                current_content.append(segment.content)
+            elif segment.type == "content":
+                # Accumulate HTML content
                 current_content.append(segment.content)
             else:
-                # Different segment type - flush current content
+                # Hit a table/image/file - flush accumulated text first
                 if current_content:
-                    merged.append(ContentSegment("content", "\n".join(current_content)))
+                    merged_content = "\n".join(current_content).strip()
+                    if merged_content:  # Only add if there's actual content
+                        merged.append(ContentSegment("content", merged_content))
                     current_content = []
 
-                # Add the non-content segment
+                # Add the non-text segment (preserves order)
                 merged.append(segment)
 
-        # Flush remaining content
+        # Flush remaining content at end
         if current_content:
-            merged.append(ContentSegment("content", "\n".join(current_content)))
+            merged_content = "\n".join(current_content).strip()
+            if merged_content:
+                merged.append(ContentSegment("content", merged_content))
 
         return merged
 

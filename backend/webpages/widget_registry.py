@@ -377,14 +377,12 @@ class WidgetTypeRegistry:
         self._widgets[name] = widget_class
         self._instances[name] = instance
 
-        logger.info(f"Registered widget type: {name}")
 
     def unregister(self, name: str) -> None:
         """Unregister a widget type by name."""
         if name in self._widgets:
             del self._widgets[name]
             del self._instances[name]
-            logger.info(f"Unregistered widget type: {name}")
 
     def get_widget_type(self, name: str) -> Optional[BaseWidget]:
         """Get a widget type instance by name."""

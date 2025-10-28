@@ -365,9 +365,6 @@ class FileUploadValidator:
             "text/plain",
         ]:
             content_type = cls._get_content_type_from_extension(filename)
-            logger.info(
-                f"Using extension-based content_type: {content_type} for file: {filename}"
-            )
             # Update both locations with the corrected content type
             results["content_type"] = content_type
             results["metadata"]["content_type"] = content_type
@@ -608,21 +605,10 @@ class SecurityAuditLogger:
     @staticmethod
     def log_file_upload(user, file_info: Dict, success: bool = True):
         """Log file upload events."""
-        logger.info(
-            f"File upload - User: {user.username if user.is_authenticated else 'Anonymous'}, "
-            f"File: {file_info.get('filename', 'Unknown')}, "
-            f"Size: {file_info.get('size', 0)}, "
-            f"Success: {success}"
-        )
 
     @staticmethod
     def log_file_access(user, media_file, access_type: str = "view"):
         """Log file access events."""
-        logger.info(
-            f"File access - User: {user.username}, "
-            f"File: {media_file.title} ({media_file.id}), "
-            f"Type: {access_type}"
-        )
 
     @staticmethod
     def log_security_violation(user, violation_type: str, details: str):
@@ -637,12 +623,6 @@ class SecurityAuditLogger:
     def log_file_deletion(user, file_obj, context: Dict = None):
         """Log file deletion events."""
         context_info = f", Context: {context}" if context else ""
-        logger.info(
-            f"File deletion - User: {user.username}, "
-            f"File: {file_obj.title} ({file_obj.id}), "
-            f"Filename: {file_obj.original_filename}"
-            f"{context_info}"
-        )
 
     @staticmethod
     def _has_namespace_access(user, namespace):

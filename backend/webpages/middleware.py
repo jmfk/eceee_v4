@@ -157,9 +157,7 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
 
             # Additional logging if wildcard was found but blocked
             if wildcard_found:
-                logger.info(
-                    f"Host '{host}' denied despite wildcard presence due to security settings"
-                )
+                pass  # Wildcard was blocked, already logged above
             else:
                 # Log detailed denial information for debugging
                 logger.warning(
@@ -249,7 +247,6 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
         """Clear the hostname cache. Call this when hostnames are updated."""
         cache_key = cls._generate_cache_key()
         cache.delete(cache_key)
-        logger.info("Cleared hostname cache")
 
 
 def get_dynamic_allowed_hosts():

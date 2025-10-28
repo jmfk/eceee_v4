@@ -2,8 +2,6 @@
 
 import logging
 from datetime import datetime
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,44 +13,17 @@ from ..models import ImportLog
 from ..serializers import ProcessImportSerializer
 from ..services.content_parser import ContentParser
 from ..services.content_analyzer import ContentAnalyzer
-from ..services.widget_creator import WidgetCreator
+from ..services.widget_creator import create_widgets
 from ..utils.content_analyzer import identify_content_types
 
 
 logger = logging.getLogger(__name__)
-channel_layer = get_channel_layer()
 
 
 class ProcessImportView(APIView):
     """Process imported content and create widgets."""
 
     permission_classes = [IsAuthenticated]
-
-    def _send_progress(
-        self,
-        import_id: str,
-        message: str,
-        percent: int = 0,
-        current: int = 0,
-        total: int = 0,
-        item: str = "",
-    ):
-        """Send progress update via WebSocket."""
-        if channel_layer:
-            try:
-                async_to_sync(channel_layer.group_send)(
-                    f"import_{import_id}",
-                    {
-                        "type": "import_progress",
-                        "message": message,
-                        "percent": percent,
-                        "current": current,
-                        "total": total,
-                        "item": item,
-                    },
-                )
-            except Exception as e:
-                logger.warning(f"Failed to send progress update: {e}")
 
     def post(self, request):
         """
@@ -122,23 +93,17 @@ class ProcessImportView(APIView):
         )
 
         try:
-            ws_id = import_id or str(import_log.id)
-            
             # Analyze content
             content_stats = identify_content_types(html)
             import_log.stats = content_stats
             import_log.save()
-            
-            self._send_progress(ws_id, "Building media mapping...", 20)
 
             # 4. Build URL mapping from uploaded_media_urls
             from file_manager.models import MediaFile
-            
+
             url_mapping = {}
             media_files_info = []
-            
-            logger.info(f"📦 Processing {len(uploaded_media)} pre-uploaded media items")
-            
+
             for item in uploaded_media:
                 original_url = item.get("url", "")
                 media_id = item.get("media_manager_id", "")
@@ -152,72 +117,74 @@ class ProcessImportView(APIView):
                 # Get MediaFile and create proper media-insert HTML
                 try:
                     media_file = MediaFile.objects.get(id=media_id)
-                    
+
                     # Use the _create_image_html helper for proper WYSIWYG format
                     media_insert_html = self._create_image_html(
                         media_file.get_file_url(),
                         alt_text,
                         layout,
-                        media_id=str(media_id)
+                        media_id=str(media_id),
                     )
-                    
+
                     url_mapping[original_url] = media_insert_html
-                    
+
                     # Collect media info for response
                     tags = [tag.name for tag in media_file.tags.all()[:5]]
-                    media_files_info.append({
-                        "id": str(media_file.id),
-                        "title": media_file.title,
-                        "type": "image",
-                        "url": media_file.file_url,
-                        "originalSrc": original_url,
-                        "tags": tags,
-                        "description": media_file.description,
-                    })
-                    
-                    logger.info(f"✓ Mapped {original_url[:80]} -> MediaFile {media_id}")
-                    
+                    media_files_info.append(
+                        {
+                            "id": str(media_file.id),
+                            "title": media_file.title,
+                            "type": "image",
+                            "url": media_file.file_url,
+                            "originalSrc": original_url,
+                            "tags": tags,
+                            "description": media_file.description,
+                        }
+                    )
+
                 except MediaFile.DoesNotExist:
                     logger.warning(f"⚠️  MediaFile {media_id} not found")
                     continue
 
-            logger.info(f"📦 Built URL mapping with {len(url_mapping)} entries")
-
             # 5. Parse content into segments
-            self._send_progress(ws_id, "Parsing content...", 50)
             parser = ContentParser()
             segments = parser.parse(html)
-            
-            logger.info(f"📄 Parsed {len(segments)} content segments")
 
             # 6. Create widgets from segments with URL replacements
-            self._send_progress(ws_id, "Creating widgets...", 70)
-            widget_creator = WidgetCreator()
-            widgets = widget_creator.create_widgets(segments, url_mapping)
-            
-            logger.info(f"🎨 Created {len(widgets)} widgets")
+            widgets = create_widgets(segments, url_mapping)
 
             # 7. Update page metadata (optional)
             page_was_updated = False
-            save_to_page = page_metadata.get("saveToPage", False) if page_metadata else False
+            save_to_page = (
+                page_metadata.get("saveToPage", False) if page_metadata else False
+            )
 
-            if save_to_page and page_metadata and (page_metadata.get("title") or page_metadata.get("tags")):
+            if (
+                save_to_page
+                and page_metadata
+                and (page_metadata.get("title") or page_metadata.get("tags"))
+            ):
                 try:
                     page = WebPage.objects.get(id=page_id)
                     page_version = page.get_latest_version()
 
                     if page_version:
+                        # Get current page_data or initialize empty dict
+                        page_data = page_version.page_data or {}
+
                         # Update title if provided
                         title = page_metadata.get("title", "").strip()
                         if title:
                             page_version.version_title = title
                             page.title = title
+                            # Update page_data with title
+                            page_data["title"] = title
 
                         # Update tags if provided
                         tag_names = page_metadata.get("tags", [])
                         if tag_names:
                             page_version.tags = tag_names
-                            
+
                             # Create/update Tag objects for consistency
                             for tag_name in tag_names:
                                 tag, created = Tag.get_or_create_tag(
@@ -226,18 +193,20 @@ class ProcessImportView(APIView):
                                 if not created:
                                     tag.increment_usage()
 
+                        # Save updated page_data back to page_version
+                        page_version.page_data = page_data
                         page_version.save()
                         page.save()
                         page_was_updated = True
-                        logger.info(f"✓ Updated page metadata for page #{page_id}")
-                        
+
                 except WebPage.DoesNotExist:
                     logger.warning(f"⚠️  Page #{page_id} not found")
                 except Exception as e:
-                    logger.error(f"❌ Failed to update page metadata: {e}", exc_info=True)
+                    logger.error(
+                        f"❌ Failed to update page metadata: {e}", exc_info=True
+                    )
 
             # 8. Update import log
-            self._send_progress(ws_id, "Finalizing import...", 90)
             import_log.status = "completed"
             import_log.widgets_created = len(widgets)
             import_log.media_files_imported = len(media_files_info)
@@ -246,16 +215,17 @@ class ProcessImportView(APIView):
             import_log.save()
 
             # 9. Return response
-            self._send_progress(ws_id, "Import complete!", 100)
-            
-            return Response({
-                "widgets": widgets,
-                "media_files": media_files_info,
-                "errors": [],
-                "stats": content_stats,
-                "import_log_id": str(import_log.id),
-                "page_was_updated": page_was_updated,
-            })
+
+            return Response(
+                {
+                    "widgets": widgets,
+                    "media_files": media_files_info,
+                    "errors": [],
+                    "stats": content_stats,
+                    "import_log_id": str(import_log.id),
+                    "page_was_updated": page_was_updated,
+                }
+            )
 
         except Exception as e:
             logger.error(f"Failed to process import: {e}", exc_info=True)

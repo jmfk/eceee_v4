@@ -69,7 +69,7 @@ const ReactLayoutRenderer = forwardRef(({
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null);
     const [selectedSlotMetadata, setSelectedSlotMetadata] = useState(null);
     const [replacementContext, setReplacementContext] = useState(null); // { isReplacement: true, position: number }
-    
+
     // Import dialog state
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [importSlotName, setImportSlotName] = useState(null);
@@ -332,30 +332,30 @@ const ReactLayoutRenderer = forwardRef(({
             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id });
         }
     }, [widgets, onWidgetChange, publishUpdate, componentId, versionId, isPublished]);
-    
+
     // Import content handler
     const handleImportContent = useCallback((slotName) => {
         setImportSlotName(slotName);
         setImportDialogOpen(true);
     }, []);
-    
+
     // Import completion handler
-    const handleImportComplete = useCallback(async (importedWidgets) => {
+    const handleImportComplete = useCallback(async (importedWidgets, metadata = {}) => {
         if (!importSlotName || !importedWidgets || importedWidgets.length === 0) {
             return;
         }
-        
+
         // Add imported widgets to the slot
         const currentSlotWidgets = widgets[importSlotName] || [];
         const updatedWidgets = {
             ...widgets,
             [importSlotName]: [...currentSlotWidgets, ...importedWidgets]
         };
-        
+
         if (onWidgetChange) {
             onWidgetChange(updatedWidgets, { sourceId: `import-${importSlotName}` });
         }
-        
+
         // Publish each widget to UDC
         for (const widget of importedWidgets) {
             await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
@@ -367,7 +367,17 @@ const ReactLayoutRenderer = forwardRef(({
                 order: currentSlotWidgets.length + importedWidgets.indexOf(widget)
             });
         }
-    }, [importSlotName, widgets, onWidgetChange, publishUpdate, componentId]);
+
+        // If page was updated with title/tags, reload page data from backend via UDC
+        if (metadata.pageWasUpdated) {
+            // Trigger UDC to reload page data - this will refresh title/tags in the page editor
+            // The RELOAD_DATA operation tells UDC to fetch fresh data from backend
+            await publishUpdate(componentId, OperationTypes.RELOAD_DATA, {
+                reason: 'Page metadata updated during import',
+                updatedFields: ['title', 'tags'],
+            });
+        }
+    }, [importSlotName, widgets, onWidgetChange, publishUpdate, componentId, contextType]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -449,7 +459,7 @@ const ReactLayoutRenderer = forwardRef(({
                 slotLabel={selectedSlotMetadata?.label || selectedSlotForModal}
                 allowedWidgetTypes={selectedSlotMetadata?.allowedWidgetTypes}
             />
-            
+
             <ImportDialog
                 isOpen={importDialogOpen}
                 onClose={() => {

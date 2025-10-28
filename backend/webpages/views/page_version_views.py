@@ -426,9 +426,6 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(
-                f"Auto-created initial version for page {page_id} (no versions existed)"
-            )
 
         serializer = self.get_serializer(current_version)
         return Response(serializer.data)
