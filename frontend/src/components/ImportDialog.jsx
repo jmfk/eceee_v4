@@ -137,10 +137,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     useEffect(() => {
         if (currentStep === STEPS.MEDIA_UPLOAD && !mediaUploadComplete && mediaUploadStatus.length === 0) {
             // Defensive check: only run if we have valid media metadata
-            if (mediaMetadataList.length === 0 && selectedElement) {
-                console.warn('[Import Debug] mediaMetadataList is empty but selectedElement exists. This indicates stale state.');
-            }
-
             handleMediaUpload();
         }
     }, [currentStep, mediaMetadataList, selectedElement, mediaUploadComplete, mediaUploadStatus.length]);
@@ -277,7 +273,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             const response = await analyzeHierarchy({ elements });
             setHierarchyStats(response.results || []);
         } catch (err) {
-            console.error('Failed to analyze hierarchy:', err);
             // Not critical - quick stats are available as fallback
         } finally {
             setIsLoadingStats(false);
@@ -335,7 +330,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 setProxiedHtml(data.html);
                 setCurrentStep(STEPS.IFRAME_SELECT);
             } catch (err) {
-                console.error('Proxy page error:', err);
                 setError(err.response?.data?.error || err.message || 'Failed to load page');
             } finally {
                 setIsLoading(false);
@@ -363,8 +357,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 setPageMetadata(metadata);
                 setCurrentStep(STEPS.METADATA_CONFIRM);
             } catch (err) {
-                console.error('Metadata extraction error:', err);
-                console.error('Error details:', err.response?.data);
                 // Critical error - STOP and show error (don't skip step)
                 const errorMsg = err.response?.data?.error || err.message || 'AI metadata extraction failed. Please try again.';
                 setError(errorMsg);
@@ -392,7 +384,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     });
 
                 if (imgElements.length > 0 || fileLinks.length > 0) {
-                    console.error('[Import Debug] State mismatch: Found media in selectedElement but mediaMetadataList is empty!');
                     setError('Media data was lost. Please go back and try again.');
                     return;
                 }
@@ -474,7 +465,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
             return { filename, filepath };
         } catch (e) {
-            console.warn('Failed to parse URL:', url, e);
             return { filename: 'unknown', filepath: '/' };
         }
     };
@@ -488,7 +478,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             const parser = new DOMParser();
             const doc = parser.parseFromString(selectedElement.html, 'text/html');
             const imgElements = Array.from(doc.querySelectorAll('img'));
-            
+
             // Find file links
             const fileExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip'];
             const fileLinks = Array.from(doc.querySelectorAll('a[href]'))
@@ -537,7 +527,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         aiGenerated: metadata.ai_generated !== false,
                     };
                 } catch (err) {
-                    console.error(`Failed to generate metadata for image ${idx}:`, err);
                     // Fallback to basic metadata
                     return {
                         index: idx,
@@ -582,7 +571,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         aiGenerated: metadata.ai_generated !== false,
                     };
                 } catch (err) {
-                    console.error(`Failed to generate metadata for file ${idx}:`, err);
                     // Fallback to basic metadata
                     return {
                         index: imgElements.length + idx,
@@ -622,7 +610,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             // Move to media tag review step
             setCurrentStep(STEPS.MEDIA_TAG_REVIEW);
         } catch (err) {
-            console.error('Failed to generate media tags:', err);
             setError('Failed to generate media tags. You can proceed without tag review.');
             showNotification('Failed to generate media tags', 'error');
         } finally {
@@ -816,7 +803,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 }
 
             } catch (err) {
-                console.error(`Failed to upload ${item.type}:`, err);
                 setMediaUploadStatus(prev => prev.map(m =>
                     m.id === item.id ? {
                         ...m,
@@ -898,7 +884,6 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             setTimeout(handleClose, 1500);
 
         } catch (err) {
-            console.error('Final import error:', err);
             setError(err.response?.data?.error || err.message || 'Import failed');
             setProgress({ step: 'Failed', percent: 0, current: 0, total: 0, item: '' });
         } finally {
@@ -1004,7 +989,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                                     const data = await proxyPage(url, newValue);
                                                     setProxiedHtml(data.html);
                                                 } catch (err) {
-                                                    console.error('Failed to reload with design change:', err);
+                                                    // Silently fail - user can retry
                                                 } finally {
                                                     setIsLoading(false);
                                                 }
