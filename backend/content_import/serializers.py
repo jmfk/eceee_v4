@@ -37,6 +37,10 @@ class ProcessImportSerializer(serializers.Serializer):
     mode = serializers.ChoiceField(choices=["append", "replace"], default="append")
     namespace = serializers.CharField(required=True)
     source_url = serializers.URLField(required=False, allow_blank=True, max_length=2000)
+    import_id = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    # Array of pre-uploaded media with mappings (required)
+    uploaded_media_urls = serializers.JSONField(required=True)
+    page_metadata = serializers.DictField(required=False, default=dict)
 
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""
