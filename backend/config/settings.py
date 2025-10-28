@@ -376,6 +376,10 @@ MEDIA_ALLOWED_TYPES = [
     "audio/wav",
 ]
 
+# Content Import Configuration
+# Proxy asset token expiration time (in seconds)
+CONTENT_IMPORT_PROXY_TOKEN_MAX_AGE = 3600  # 1 hour
+
 # API Documentation with drf-spectacular
 SPECTACULAR_SETTINGS = {
     "TITLE": "ECEEE v4 API",

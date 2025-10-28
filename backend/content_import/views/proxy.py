@@ -6,10 +6,13 @@ from urllib.parse import unquote
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.http import HttpResponse
+from django.core.signing import SignatureExpired, BadSignature
+from django.conf import settings
 
 from ..services.proxy_service import ProxyService
+from ..utils.token_signing import verify_proxy_token
 
 
 logger = logging.getLogger(__name__)
@@ -62,26 +65,58 @@ class ProxyPageView(APIView):
 
 
 class ProxyAssetView(APIView):
-    """Proxy individual assets (images, CSS, JS) from external sites."""
+    """
+    Proxy individual assets (images, CSS, JS) from external sites.
 
-    permission_classes = [IsAuthenticated]
+    Uses signed time-limited tokens for secure anonymous access.
+    This allows browser-initiated requests (img, link, script tags)
+    to load assets without requiring authentication headers.
+    """
+
+    permission_classes = [AllowAny]
 
     def get(self, request):
         """
-        Fetch an asset from external URL.
+        Fetch an asset from external URL with token validation.
 
-        GET /api/content-import/proxy-asset/?url=https://example.com/image.jpg
+        GET /api/content-import/proxy-asset/?url=https://example.com/image.jpg&token=signed_token
 
         Returns the asset with appropriate content type
         """
         url = request.GET.get("url")
+        token = request.GET.get("token")
 
         if not url:
             return HttpResponse("URL parameter required", status=400)
 
+        if not token:
+            return HttpResponse(
+                "Authentication token required", status=401, content_type="text/plain"
+            )
+
         # Decode URL
         url = unquote(url)
 
+        # Validate the token
+        try:
+            max_age = getattr(
+                settings, "CONTENT_IMPORT_PROXY_TOKEN_MAX_AGE", 3600  # Default: 1 hour
+            )
+            verify_proxy_token(url, token, max_age=max_age)
+
+        except SignatureExpired:
+            return HttpResponse(
+                "Token has expired. Please reload the page.",
+                status=410,  # 410 Gone - resource was available but is no longer
+                content_type="text/plain",
+            )
+
+        except BadSignature:
+            return HttpResponse(
+                "Invalid authentication token", status=401, content_type="text/plain"
+            )
+
+        # Token is valid, fetch the asset
         try:
             # Fetch asset with response headers
             asset_response = requests.get(url, timeout=30)

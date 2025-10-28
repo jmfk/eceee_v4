@@ -7,6 +7,7 @@ from typing import Dict, Any
 from urllib.parse import urljoin, urlparse, urlunparse
 from bs4 import BeautifulSoup
 from django.urls import reverse
+from ..utils.token_signing import sign_proxy_token
 
 
 logger = logging.getLogger(__name__)
@@ -171,14 +172,19 @@ class ProxyService:
         """
         Create a proxied URL with absolute path for iframe usage.
 
+        The URL includes a signed token for secure anonymous access.
+
         Args:
             url: Original URL
             request: Django request object for building absolute URLs
 
         Returns:
-            Proxied URL (absolute if request provided, relative otherwise)
+            Proxied URL with signed token (absolute if request provided, relative otherwise)
         """
         from urllib.parse import quote
+
+        # Generate signed token for the asset URL
+        signed_token = sign_proxy_token(url)
 
         # Build absolute URL if request is available (needed for iframe srcDoc)
         if request:
@@ -190,10 +196,10 @@ class ProxyService:
                 host = host.replace("backend:", "localhost:")
                 logger.debug(f"Replaced Docker hostname with localhost: {host}")
 
-            return f"{scheme}://{host}{self.base_proxy_url}?url={quote(url)}"
+            return f"{scheme}://{host}{self.base_proxy_url}?url={quote(url)}&token={quote(signed_token)}"
 
         # Fallback to relative URL
-        return f"{self.base_proxy_url}?url={quote(url)}"
+        return f"{self.base_proxy_url}?url={quote(url)}&token={quote(signed_token)}"
 
     def _inject_base_tag(self, soup: BeautifulSoup, request):
         """
