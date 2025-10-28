@@ -102,6 +102,7 @@ class AIUsageLogAdmin(admin.ModelAdmin):
         "cost_display",
         "duration_display",
         "was_successful",
+        "error_code_display",
     ]
     list_filter = [
         "provider",
@@ -135,6 +136,8 @@ class AIUsageLogAdmin(admin.ModelAdmin):
         "created_at",
         "duration_ms",
         "error_message",
+        "error_code",
+        "error_traceback",
         "was_successful",
     ]
 
@@ -177,7 +180,10 @@ class AIUsageLogAdmin(admin.ModelAdmin):
                 "classes": ("collapse",),
             },
         ),
-        ("Error Information", {"fields": ("error_message",), "classes": ("collapse",)}),
+        (
+            "Error Information",
+            {"fields": ("error_message", "error_code", "error_traceback")},
+        ),
     )
 
     def has_add_permission(self, request):
@@ -217,6 +223,14 @@ class AIUsageLogAdmin(admin.ModelAdmin):
         return "-"
 
     duration_display.short_description = "Duration"
+
+    def error_code_display(self, obj):
+        """Display error code if failed."""
+        if not obj.was_successful and obj.error_code:
+            return format_html('<span style="color: red;">{}</span>', obj.error_code)
+        return "-"
+
+    error_code_display.short_description = "Error Type"
 
 
 @admin.register(AIBudgetAlert)
@@ -314,6 +328,9 @@ class AIPromptConfigAdmin(admin.ModelAdmin):
         "track_full_data",
         "is_active",
         "total_calls",
+        "total_failed_calls",
+        "failure_rate_display",
+        "consecutive_failures_display",
         "total_cost_display",
         "last_called_at",
         "avg_cost_display",
@@ -331,6 +348,10 @@ class AIPromptConfigAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "avg_cost_display",
+        "total_failed_calls",
+        "consecutive_failures",
+        "last_failed_at",
+        "failure_rate",
     ]
 
     fieldsets = (
@@ -375,6 +396,21 @@ class AIPromptConfigAdmin(admin.ModelAdmin):
                 )
             },
         ),
+        (
+            "Failure Tracking",
+            {
+                "fields": (
+                    "total_failed_calls",
+                    "failure_rate",
+                    "consecutive_failures",
+                    "last_failed_at",
+                    "last_error_code",
+                    "last_error_message",
+                    "last_error_traceback",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
 
     def total_cost_display(self, obj):
@@ -396,3 +432,33 @@ class AIPromptConfigAdmin(admin.ModelAdmin):
         return obj.last_total_tokens
 
     last_total_tokens.short_description = "Last Total Tokens"
+
+    def failure_rate_display(self, obj):
+        """Display failure rate with color coding."""
+        rate = obj.failure_rate
+        if rate > 50:
+            return format_html(
+                '<span style="color: red; font-weight: bold;">{:.1f}%</span>', rate
+            )
+        elif rate > 20:
+            return format_html('<span style="color: orange;">{:.1f}%</span>', rate)
+        elif rate > 0:
+            return f"{rate:.1f}%"
+        return "0%"
+
+    failure_rate_display.short_description = "Failure Rate"
+
+    def consecutive_failures_display(self, obj):
+        """Display consecutive failures with alert."""
+        if obj.consecutive_failures >= 3:
+            return format_html(
+                '<span style="color: red; font-weight: bold;">⚠️ {}</span>',
+                obj.consecutive_failures,
+            )
+        elif obj.consecutive_failures > 0:
+            return format_html(
+                '<span style="color: orange;">{}</span>', obj.consecutive_failures
+            )
+        return "0"
+
+    consecutive_failures_display.short_description = "Consecutive Fails"

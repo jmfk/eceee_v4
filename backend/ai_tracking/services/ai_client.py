@@ -7,6 +7,7 @@ Supports multiple providers (OpenAI, Anthropic, etc.) with unified interface.
 
 import time
 import logging
+import traceback
 from decimal import Decimal
 from typing import Optional, Dict, Any
 from django.conf import settings
@@ -117,6 +118,8 @@ class AIClient:
         store_full_data=False,
         duration_ms=None,
         error_message="",
+        error_code="",
+        error_traceback="",
         was_successful=True,
     ):
         """Create usage log entry in database."""
@@ -134,6 +137,8 @@ class AIClient:
             "store_full_data": store_full_data,
             "duration_ms": duration_ms,
             "error_message": error_message,
+            "error_code": error_code,
+            "error_traceback": error_traceback,
             "was_successful": was_successful,
         }
 
@@ -232,6 +237,7 @@ class AIClient:
                 prompt_config.last_duration_ms = duration_ms
                 prompt_config.total_calls += 1
                 prompt_config.total_cost += cost
+                prompt_config.consecutive_failures = 0  # Reset on success
                 prompt_config.save()
 
             # Only create usage log if active (or no config)
@@ -265,10 +271,15 @@ class AIClient:
             # Log failed call
             duration_ms = int((time.time() - start_time) * 1000)
 
+            # Capture detailed error information
+            error_code = type(e).__name__
+            error_message = str(e)
+            error_traceback = traceback.format_exc()
+
             # Update prompt config even on failure
             if prompt_config:
                 prompt_config.last_prompt = str(prompt)
-                prompt_config.last_response = f"ERROR: {str(e)}"
+                prompt_config.last_response = f"ERROR: {error_message}"
                 prompt_config.last_input_tokens = 0
                 prompt_config.last_output_tokens = 0
                 prompt_config.last_cost = Decimal("0")
@@ -277,6 +288,12 @@ class AIClient:
                 prompt_config.last_called_at = timezone.now()
                 prompt_config.last_duration_ms = duration_ms
                 prompt_config.total_calls += 1
+                prompt_config.total_failed_calls += 1
+                prompt_config.consecutive_failures += 1
+                prompt_config.last_error_message = error_message
+                prompt_config.last_error_code = error_code
+                prompt_config.last_error_traceback = error_traceback
+                prompt_config.last_failed_at = timezone.now()
                 prompt_config.save()
 
             # Only create usage log if active (or no config)
@@ -293,7 +310,9 @@ class AIClient:
                     response="",
                     store_full_data=store_full_data,
                     duration_ms=duration_ms,
-                    error_message=str(e),
+                    error_message=error_message,
+                    error_code=error_code,
+                    error_traceback=error_traceback,
                     was_successful=False,
                 )
 
@@ -368,6 +387,7 @@ class AIClient:
                 prompt_config.last_duration_ms = duration_ms
                 prompt_config.total_calls += 1
                 prompt_config.total_cost += cost
+                prompt_config.consecutive_failures = 0  # Reset on success
                 await sync_to_async(prompt_config.save)()
 
             # Only create usage log if active (or no config)
@@ -401,10 +421,15 @@ class AIClient:
             # Log failed call
             duration_ms = int((time.time() - start_time) * 1000)
 
+            # Capture detailed error information
+            error_code = type(e).__name__
+            error_message = str(e)
+            error_traceback = traceback.format_exc()
+
             # Update prompt config even on failure (async)
             if prompt_config:
                 prompt_config.last_prompt = str(prompt)
-                prompt_config.last_response = f"ERROR: {str(e)}"
+                prompt_config.last_response = f"ERROR: {error_message}"
                 prompt_config.last_input_tokens = 0
                 prompt_config.last_output_tokens = 0
                 prompt_config.last_cost = Decimal("0")
@@ -413,6 +438,12 @@ class AIClient:
                 prompt_config.last_called_at = timezone.now()
                 prompt_config.last_duration_ms = duration_ms
                 prompt_config.total_calls += 1
+                prompt_config.total_failed_calls += 1
+                prompt_config.consecutive_failures += 1
+                prompt_config.last_error_message = error_message
+                prompt_config.last_error_code = error_code
+                prompt_config.last_error_traceback = error_traceback
+                prompt_config.last_failed_at = timezone.now()
                 await sync_to_async(prompt_config.save)()
 
             # Only create usage log if active (or no config)
@@ -429,7 +460,9 @@ class AIClient:
                     response="",
                     store_full_data=store_full_data,
                     duration_ms=duration_ms,
-                    error_message=str(e),
+                    error_message=error_message,
+                    error_code=error_code,
+                    error_traceback=error_traceback,
                     was_successful=False,
                 )
 

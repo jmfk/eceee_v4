@@ -142,6 +142,12 @@ class AIUsageLog(models.Model):
 
     # Error tracking
     error_message = models.TextField(blank=True)
+    error_code = models.CharField(
+        max_length=200, blank=True, help_text="Exception class name (e.g., OpenAIError)"
+    )
+    error_traceback = models.TextField(
+        blank=True, help_text="Full traceback for debugging"
+    )
     was_successful = models.BooleanField(default=True)
 
     class Meta:
@@ -228,6 +234,18 @@ class AIPromptConfig(models.Model):
         help_text="Cumulative cost of all calls",
     )
 
+    # Failure tracking
+    total_failed_calls = models.IntegerField(
+        default=0, help_text="Number of failed calls"
+    )
+    last_error_message = models.TextField(blank=True)
+    last_error_code = models.CharField(max_length=200, blank=True)
+    last_error_traceback = models.TextField(blank=True)
+    last_failed_at = models.DateTimeField(null=True, blank=True)
+    consecutive_failures = models.IntegerField(
+        default=0, help_text="Consecutive failures without success"
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -251,6 +269,13 @@ class AIPromptConfig(models.Model):
     def last_total_tokens(self):
         """Total tokens from last call."""
         return self.last_input_tokens + self.last_output_tokens
+
+    @property
+    def failure_rate(self):
+        """Calculate failure rate as percentage."""
+        if self.total_calls == 0:
+            return 0
+        return (self.total_failed_calls / self.total_calls) * 100
 
 
 class AIBudgetAlert(models.Model):
