@@ -173,6 +173,86 @@ class AIUsageLog(models.Model):
         return self.total_cost / total
 
 
+class AIPromptConfig(models.Model):
+    """
+    Configuration for controlling tracking behavior per prompt type.
+
+    Each unique prompt type gets one config object that:
+    - Controls whether to store full prompt/response in logs
+    - Stores the latest call data for reference (regardless of tracking setting)
+    - Auto-creates on first use
+    """
+
+    # Unique identifier for this prompt type
+    prompt_type = models.CharField(
+        max_length=100,
+        unique=True,
+        db_index=True,
+        help_text="Stable identifier for this prompt type (e.g., 'extract_page_metadata')",
+    )
+
+    # Human-readable information
+    description = models.TextField(
+        blank=True, help_text="Description of what this prompt type does"
+    )
+
+    # Tracking controls
+    track_full_data = models.BooleanField(
+        default=False,
+        help_text="Store full prompt/response text in AIUsageLog entries",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether to create AIUsageLog entries for this prompt type",
+    )
+
+    # Latest call data (always updated regardless of tracking settings)
+    last_prompt = models.TextField(blank=True)
+    last_response = models.TextField(blank=True)
+    last_input_tokens = models.IntegerField(default=0)
+    last_output_tokens = models.IntegerField(default=0)
+    last_cost = models.DecimalField(max_digits=10, decimal_places=6, default=0)
+    last_user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    last_metadata = models.JSONField(default=dict, blank=True)
+    last_called_at = models.DateTimeField(null=True, blank=True)
+    last_duration_ms = models.IntegerField(null=True, blank=True)
+
+    # Statistics
+    total_calls = models.IntegerField(default=0, help_text="Total number of calls made")
+    total_cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=6,
+        default=0,
+        help_text="Cumulative cost of all calls",
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["prompt_type"]
+        verbose_name = "AI Prompt Configuration"
+        verbose_name_plural = "AI Prompt Configurations"
+
+    def __str__(self):
+        return f"{self.prompt_type} (track_full_data={self.track_full_data})"
+
+    @property
+    def avg_cost_per_call(self):
+        """Average cost per call."""
+        if self.total_calls == 0:
+            return Decimal("0")
+        return self.total_cost / self.total_calls
+
+    @property
+    def last_total_tokens(self):
+        """Total tokens from last call."""
+        return self.last_input_tokens + self.last_output_tokens
+
+
 class AIBudgetAlert(models.Model):
     """
     Defines budget thresholds and alerts for AI usage.

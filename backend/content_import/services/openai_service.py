@@ -38,13 +38,16 @@ class OpenAIService:
         """Check if OpenAI service is available."""
         return bool(self.api_key and self.api_key.strip())
 
-    def _track_ai_call(self, prompt, task_description, model="gpt-4o-mini", **kwargs):
+    def _track_ai_call(
+        self, prompt, task_description, prompt_type=None, model="gpt-4o-mini", **kwargs
+    ):
         """
         Make OpenAI API call with tracking via AIClient.
 
         Args:
             prompt: The prompt (string or messages list)
             task_description: Description of what this AI call is for
+            prompt_type: Optional stable identifier for this prompt type
             model: OpenAI model to use
             **kwargs: Additional parameters for OpenAI API
 
@@ -52,7 +55,9 @@ class OpenAIService:
             Response from OpenAI (or raises exception)
         """
         # Create AI tracking client
-        ai_client = AIClient(provider="openai", model=model, user=self.user)
+        ai_client = AIClient(
+            provider="openai", model=model, user=self.user, prompt_type=prompt_type
+        )
 
         try:
             # Make tracked AI call
@@ -121,9 +126,11 @@ Determine based on:
             content = self._track_ai_call(
                 prompt=messages,
                 task_description="Analyze image layout",
+                prompt_type="analyze_image_layout",
                 model="gpt-4o-mini",
                 temperature=0.3,
                 max_tokens=150,
+                store_full_data=True,  # Store prompts and responses for analysis
             )
 
             layout = json.loads(content)
@@ -134,13 +141,14 @@ Determine based on:
             return None
 
     def extract_page_metadata(
-        self, html: str, existing_tags: List[str] = None
+        self, html: str, head_html: str = "", existing_tags: List[str] = None
     ) -> Optional[Dict[str, any]]:
         """
         Extract page title and tag suggestions from HTML content.
 
         Args:
-            html: HTML content to analyze
+            html: HTML body content to analyze (selected content)
+            head_html: HTML HEAD section (sent separately for token efficiency)
             existing_tags: List of existing tag names in the system
 
         Returns:
@@ -152,55 +160,56 @@ Determine based on:
 
         existing_tags = existing_tags or []
 
-        # Parse HTML to extract head metadata
+        # Parse HEAD HTML to extract structured metadata (more efficient than full page)
         from bs4 import BeautifulSoup
 
-        soup = BeautifulSoup(html, "html.parser")
-
-        # Extract structured metadata from <head>
         head_metadata = {}
 
-        # Title tag
-        title_tag = soup.find("title")
-        if title_tag:
-            head_metadata["title_tag"] = title_tag.get_text(strip=True)
+        if head_html:
+            head_soup = BeautifulSoup(head_html, "html.parser")
 
-        # Meta description
-        meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find(
-            "meta", attrs={"property": "og:description"}
-        )
-        if meta_desc:
-            head_metadata["description"] = meta_desc.get("content", "")
+            # Title tag
+            title_tag = head_soup.find("title")
+            if title_tag:
+                head_metadata["title_tag"] = title_tag.get_text(strip=True)
 
-        # Meta keywords
-        meta_keywords = soup.find("meta", attrs={"name": "keywords"})
-        if meta_keywords:
-            head_metadata["keywords"] = meta_keywords.get("content", "")
+            # Meta description
+            meta_desc = head_soup.find(
+                "meta", attrs={"name": "description"}
+            ) or head_soup.find("meta", attrs={"property": "og:description"})
+            if meta_desc:
+                head_metadata["description"] = meta_desc.get("content", "")
 
-        # Open Graph title
-        og_title = soup.find("meta", attrs={"property": "og:title"})
-        if og_title:
-            head_metadata["og_title"] = og_title.get("content", "")
+            # Meta keywords
+            meta_keywords = head_soup.find("meta", attrs={"name": "keywords"})
+            if meta_keywords:
+                head_metadata["keywords"] = meta_keywords.get("content", "")
 
-        # Open Graph type
-        og_type = soup.find("meta", attrs={"property": "og:type"})
-        if og_type:
-            head_metadata["og_type"] = og_type.get("content", "")
+            # Open Graph title
+            og_title = head_soup.find("meta", attrs={"property": "og:title"})
+            if og_title:
+                head_metadata["og_title"] = og_title.get("content", "")
 
-        # Article tags (if present)
-        article_tags = soup.find_all("meta", attrs={"property": "article:tag"})
-        if article_tags:
-            head_metadata["article_tags"] = [
-                tag.get("content", "") for tag in article_tags
-            ]
+            # Open Graph type
+            og_type = head_soup.find("meta", attrs={"property": "og:type"})
+            if og_type:
+                head_metadata["og_type"] = og_type.get("content", "")
 
-        # First H1 for context
-        h1 = soup.find("h1")
+            # Article tags (if present)
+            article_tags = head_soup.find_all("meta", attrs={"property": "article:tag"})
+            if article_tags:
+                head_metadata["article_tags"] = [
+                    tag.get("content", "") for tag in article_tags
+                ]
+
+        # Parse body HTML for H1 and context
+        body_soup = BeautifulSoup(html, "html.parser")
+        h1 = body_soup.find("h1")
         if h1:
             head_metadata["h1"] = h1.get_text(strip=True)
 
-        # Truncate body HTML to reasonable size for API
-        html_preview = html[:3000] if len(html) > 3000 else html
+        # Truncate body HTML to reasonable size for API (reduced from 3000)
+        html_preview = html[:2000] if len(html) > 2000 else html
 
         # Format head metadata for prompt
         head_info = []
@@ -282,7 +291,9 @@ Confidence should be 0.0-1.0 based on how clear the content is."""
         logger.info("=" * 80)
         logger.info("📝 EXTRACT PAGE METADATA - PROMPT")
         logger.info("=" * 80)
-        logger.info(f"HTML Preview Length: {len(html_preview)} chars")
+        logger.info(f"HEAD HTML Length: {len(head_html)} chars")
+        logger.info(f"Selected Content Length: {len(html)} chars")
+        logger.info(f"Preview Sent to AI: {len(html_preview)} chars (truncated)")
         logger.info(f"Existing Tags Count: {len(existing_tags)}")
         logger.info(f"\n🏷️  EXTRACTED HEAD METADATA:")
         for key, value in head_metadata.items():
@@ -292,6 +303,10 @@ Confidence should be 0.0-1.0 based on how clear the content is."""
                 logger.info(
                     f"  {key}: {value[:100] if len(str(value)) > 100 else value}"
                 )
+        logger.info(f"\n📄 Token Efficiency:")
+        logger.info(
+            f"  Sending ~{len(html_preview) + len(head_metadata_text)} chars instead of full page"
+        )
         logger.info(f"\nFull Prompt:\n{prompt}")
         logger.info("=" * 80)
 
@@ -307,10 +322,12 @@ Confidence should be 0.0-1.0 based on how clear the content is."""
             content = self._track_ai_call(
                 prompt=messages,
                 task_description="Extract page metadata",
+                prompt_type="extract_page_metadata",
                 model="gpt-4o-mini",
                 temperature=0.2,
                 max_tokens=400,
                 response_format={"type": "json_object"},
+                store_full_data=True,  # Store prompts and responses for analysis
             )
 
             metadata = json.loads(content)
@@ -437,10 +454,12 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
             content = self._track_ai_call(
                 prompt=messages,
                 task_description="Generate image metadata",
+                prompt_type="generate_image_metadata",
                 model="gpt-4o-mini",
                 temperature=0.7,
                 max_tokens=250,
                 response_format={"type": "json_object"},
+                store_full_data=True,  # Store prompts and responses for analysis
             )
 
             # Parse JSON response
@@ -518,9 +537,11 @@ Generate 3-5 relevant keywords for tags. Keep title and description concise."""
             content = self._track_ai_call(
                 prompt=messages,
                 task_description="Generate file metadata",
+                prompt_type="generate_file_metadata",
                 model="gpt-4o-mini",
                 temperature=0.7,
                 max_tokens=200,
+                store_full_data=True,  # Store prompts and responses for analysis
             )
 
             # Parse JSON response
@@ -599,9 +620,11 @@ Respond with ONLY valid JSON (no markdown) in this format:
             content = self._track_ai_call(
                 prompt=messages,
                 task_description="Select best tags",
+                prompt_type="select_best_tags",
                 model="gpt-4o-mini",
                 temperature=0.3,
                 max_tokens=200,
+                store_full_data=True,  # Store prompts and responses for analysis
             )
 
             result = json.loads(content)

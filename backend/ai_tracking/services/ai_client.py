@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Optional, Dict, Any
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
 from asgiref.sync import sync_to_async
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class AIClient:
     Supports both sync and async operations.
     """
 
-    def __init__(self, provider="openai", model=None, user=None):
+    def __init__(self, provider="openai", model=None, user=None, prompt_type=None):
         """
         Initialize AI client.
 
@@ -32,10 +33,12 @@ class AIClient:
             provider: AI provider name ('openai', 'anthropic', etc.)
             model: Model name (e.g., 'gpt-4', 'claude-3-opus')
             user: Django user making the request
+            prompt_type: Optional stable identifier for this prompt type
         """
         self.provider = provider.lower()
         self.model = model
         self.user = user
+        self.prompt_type = prompt_type
         self._client = None
 
         # Get settings
@@ -177,9 +180,23 @@ class AIClient:
                 'log': AIUsageLog instance
             }
         """
+        from ai_tracking.models import AIPromptConfig
+
         start_time = time.time()
 
-        # Determine if we should store full data
+        # Get or create prompt config if prompt_type is provided
+        prompt_config = None
+        if self.prompt_type:
+            prompt_config, created = AIPromptConfig.objects.get_or_create(
+                prompt_type=self.prompt_type,
+                defaults={"description": task_description},
+            )
+
+            # Override store_full_data from config if not explicitly set
+            if store_full_data is None:
+                store_full_data = prompt_config.track_full_data
+
+        # Determine if we should store full data (existing fallback logic)
         if store_full_data is None:
             store_full_data = self.store_prompts_default or self.store_responses_default
 
@@ -202,20 +219,37 @@ class AIClient:
             # Calculate cost
             cost = self._calculate_cost(input_tokens, output_tokens)
 
-            # Log usage
-            log = self._log_usage(
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cost=cost,
-                task_description=task_description,
-                content_object=content_object,
-                metadata=metadata,
-                prompt=str(prompt) if store_full_data else "",
-                response=str(result["response"]) if store_full_data else "",
-                store_full_data=store_full_data,
-                duration_ms=duration_ms,
-                was_successful=True,
-            )
+            # Update prompt config with latest call data
+            if prompt_config:
+                prompt_config.last_prompt = str(prompt)
+                prompt_config.last_response = str(result["response"])
+                prompt_config.last_input_tokens = input_tokens
+                prompt_config.last_output_tokens = output_tokens
+                prompt_config.last_cost = cost
+                prompt_config.last_user = self.user
+                prompt_config.last_metadata = metadata or {}
+                prompt_config.last_called_at = timezone.now()
+                prompt_config.last_duration_ms = duration_ms
+                prompt_config.total_calls += 1
+                prompt_config.total_cost += cost
+                prompt_config.save()
+
+            # Only create usage log if active (or no config)
+            log = None
+            if not prompt_config or prompt_config.is_active:
+                log = self._log_usage(
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cost=cost,
+                    task_description=task_description,
+                    content_object=content_object,
+                    metadata=metadata,
+                    prompt=str(prompt) if store_full_data else "",
+                    response=str(result["response"]) if store_full_data else "",
+                    store_full_data=store_full_data,
+                    duration_ms=duration_ms,
+                    was_successful=True,
+                )
 
             return {
                 "response": result["response"],
@@ -231,20 +265,37 @@ class AIClient:
             # Log failed call
             duration_ms = int((time.time() - start_time) * 1000)
 
-            log = self._log_usage(
-                input_tokens=0,
-                output_tokens=0,
-                cost=Decimal("0"),
-                task_description=task_description,
-                content_object=content_object,
-                metadata=metadata,
-                prompt=str(prompt) if store_full_data else "",
-                response="",
-                store_full_data=store_full_data,
-                duration_ms=duration_ms,
-                error_message=str(e),
-                was_successful=False,
-            )
+            # Update prompt config even on failure
+            if prompt_config:
+                prompt_config.last_prompt = str(prompt)
+                prompt_config.last_response = f"ERROR: {str(e)}"
+                prompt_config.last_input_tokens = 0
+                prompt_config.last_output_tokens = 0
+                prompt_config.last_cost = Decimal("0")
+                prompt_config.last_user = self.user
+                prompt_config.last_metadata = metadata or {}
+                prompt_config.last_called_at = timezone.now()
+                prompt_config.last_duration_ms = duration_ms
+                prompt_config.total_calls += 1
+                prompt_config.save()
+
+            # Only create usage log if active (or no config)
+            log = None
+            if not prompt_config or prompt_config.is_active:
+                log = self._log_usage(
+                    input_tokens=0,
+                    output_tokens=0,
+                    cost=Decimal("0"),
+                    task_description=task_description,
+                    content_object=content_object,
+                    metadata=metadata,
+                    prompt=str(prompt) if store_full_data else "",
+                    response="",
+                    store_full_data=store_full_data,
+                    duration_ms=duration_ms,
+                    error_message=str(e),
+                    was_successful=False,
+                )
 
             logger.error(f"AI API call failed: {e}")
             raise
@@ -263,9 +314,25 @@ class AIClient:
 
         Same parameters as call() but uses async/await.
         """
+        from ai_tracking.models import AIPromptConfig
+
         start_time = time.time()
 
-        # Determine if we should store full data
+        # Get or create prompt config if prompt_type is provided
+        prompt_config = None
+        if self.prompt_type:
+            prompt_config, created = await sync_to_async(
+                AIPromptConfig.objects.get_or_create
+            )(
+                prompt_type=self.prompt_type,
+                defaults={"description": task_description},
+            )
+
+            # Override store_full_data from config if not explicitly set
+            if store_full_data is None:
+                store_full_data = prompt_config.track_full_data
+
+        # Determine if we should store full data (existing fallback logic)
         if store_full_data is None:
             store_full_data = self.store_prompts_default or self.store_responses_default
 
@@ -288,20 +355,37 @@ class AIClient:
             # Calculate cost
             cost = self._calculate_cost(input_tokens, output_tokens)
 
-            # Log usage (sync operation in async context)
-            log = await sync_to_async(self._log_usage)(
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cost=cost,
-                task_description=task_description,
-                content_object=content_object,
-                metadata=metadata,
-                prompt=str(prompt) if store_full_data else "",
-                response=str(result["response"]) if store_full_data else "",
-                store_full_data=store_full_data,
-                duration_ms=duration_ms,
-                was_successful=True,
-            )
+            # Update prompt config with latest call data (async)
+            if prompt_config:
+                prompt_config.last_prompt = str(prompt)
+                prompt_config.last_response = str(result["response"])
+                prompt_config.last_input_tokens = input_tokens
+                prompt_config.last_output_tokens = output_tokens
+                prompt_config.last_cost = cost
+                prompt_config.last_user = self.user
+                prompt_config.last_metadata = metadata or {}
+                prompt_config.last_called_at = timezone.now()
+                prompt_config.last_duration_ms = duration_ms
+                prompt_config.total_calls += 1
+                prompt_config.total_cost += cost
+                await sync_to_async(prompt_config.save)()
+
+            # Only create usage log if active (or no config)
+            log = None
+            if not prompt_config or prompt_config.is_active:
+                log = await sync_to_async(self._log_usage)(
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cost=cost,
+                    task_description=task_description,
+                    content_object=content_object,
+                    metadata=metadata,
+                    prompt=str(prompt) if store_full_data else "",
+                    response=str(result["response"]) if store_full_data else "",
+                    store_full_data=store_full_data,
+                    duration_ms=duration_ms,
+                    was_successful=True,
+                )
 
             return {
                 "response": result["response"],
@@ -317,20 +401,37 @@ class AIClient:
             # Log failed call
             duration_ms = int((time.time() - start_time) * 1000)
 
-            log = await sync_to_async(self._log_usage)(
-                input_tokens=0,
-                output_tokens=0,
-                cost=Decimal("0"),
-                task_description=task_description,
-                content_object=content_object,
-                metadata=metadata,
-                prompt=str(prompt) if store_full_data else "",
-                response="",
-                store_full_data=store_full_data,
-                duration_ms=duration_ms,
-                error_message=str(e),
-                was_successful=False,
-            )
+            # Update prompt config even on failure (async)
+            if prompt_config:
+                prompt_config.last_prompt = str(prompt)
+                prompt_config.last_response = f"ERROR: {str(e)}"
+                prompt_config.last_input_tokens = 0
+                prompt_config.last_output_tokens = 0
+                prompt_config.last_cost = Decimal("0")
+                prompt_config.last_user = self.user
+                prompt_config.last_metadata = metadata or {}
+                prompt_config.last_called_at = timezone.now()
+                prompt_config.last_duration_ms = duration_ms
+                prompt_config.total_calls += 1
+                await sync_to_async(prompt_config.save)()
+
+            # Only create usage log if active (or no config)
+            log = None
+            if not prompt_config or prompt_config.is_active:
+                log = await sync_to_async(self._log_usage)(
+                    input_tokens=0,
+                    output_tokens=0,
+                    cost=Decimal("0"),
+                    task_description=task_description,
+                    content_object=content_object,
+                    metadata=metadata,
+                    prompt=str(prompt) if store_full_data else "",
+                    response="",
+                    store_full_data=store_full_data,
+                    duration_ms=duration_ms,
+                    error_message=str(e),
+                    was_successful=False,
+                )
 
             logger.error(f"AI API call failed: {e}")
             raise

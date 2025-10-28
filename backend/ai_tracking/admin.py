@@ -7,7 +7,7 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AIModelPrice, AIUsageLog, AIBudgetAlert
+from .models import AIModelPrice, AIUsageLog, AIBudgetAlert, AIPromptConfig
 
 
 @admin.register(AIModelPrice)
@@ -303,3 +303,96 @@ class AIBudgetAlertAdmin(admin.ModelAdmin):
         return f"{percentage:.1f}%"
 
     spend_percentage_display.short_description = "Spend %"
+
+
+@admin.register(AIPromptConfig)
+class AIPromptConfigAdmin(admin.ModelAdmin):
+    """Admin interface for AI prompt configurations."""
+
+    list_display = [
+        "prompt_type",
+        "track_full_data",
+        "is_active",
+        "total_calls",
+        "total_cost_display",
+        "last_called_at",
+        "avg_cost_display",
+    ]
+    list_filter = ["track_full_data", "is_active", "created_at"]
+    search_fields = ["prompt_type", "description"]
+    readonly_fields = [
+        "total_calls",
+        "total_cost",
+        "last_called_at",
+        "last_duration_ms",
+        "last_input_tokens",
+        "last_output_tokens",
+        "last_total_tokens",
+        "created_at",
+        "updated_at",
+        "avg_cost_display",
+    ]
+
+    fieldsets = (
+        (
+            "Configuration",
+            {
+                "fields": (
+                    "prompt_type",
+                    "description",
+                    "track_full_data",
+                    "is_active",
+                )
+            },
+        ),
+        (
+            "Latest Call Data",
+            {
+                "fields": (
+                    "last_called_at",
+                    "last_user",
+                    "last_input_tokens",
+                    "last_output_tokens",
+                    "last_total_tokens",
+                    "last_cost",
+                    "last_duration_ms",
+                    "last_metadata",
+                    "last_prompt",
+                    "last_response",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Statistics",
+            {
+                "fields": (
+                    "total_calls",
+                    "total_cost",
+                    "avg_cost_display",
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+    )
+
+    def total_cost_display(self, obj):
+        """Display total cost formatted."""
+        return f"${obj.total_cost:.4f}"
+
+    total_cost_display.short_description = "Total Cost"
+
+    def avg_cost_display(self, obj):
+        """Display average cost per call."""
+        if obj.total_calls > 0:
+            return f"${obj.avg_cost_per_call:.4f}"
+        return "$0"
+
+    avg_cost_display.short_description = "Avg Cost/Call"
+
+    def last_total_tokens(self, obj):
+        """Display total tokens from last call."""
+        return obj.last_total_tokens
+
+    last_total_tokens.short_description = "Last Total Tokens"
