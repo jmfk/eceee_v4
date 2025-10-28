@@ -175,6 +175,7 @@ LOCAL_APPS = [
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system
     "utils",  # Utility features like value lists and schema system
+    "ai_tracking",  # AI usage and cost tracking
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -400,12 +401,33 @@ AUTHENTICATION_BACKENDS = [
 # Updated to use new allauth settings format (v0.50+)
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
-ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_EMAIL_VERIFICATION = "mandatory"  # Require email verification
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3  # Confirmation links expire after 3 days
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True  # Auto-login after email confirmation
 
 # Legacy settings (deprecated, kept for reference)
-# ACCOUNT_EMAIL_REQUIRED = True
 # ACCOUNT_USERNAME_REQUIRED = False
 # ACCOUNT_AUTHENTICATION_METHOD = "email"
+
+# Email Configuration (Postmark)
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default=(
+        "django.core.mail.backends.console.EmailBackend"  # Console in dev
+        if DEBUG
+        else "postmark.django_backend.EmailBackend"
+    ),  # Postmark in production
+)
+POSTMARK_API_KEY = config("POSTMARK_API_KEY", default="")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@eceee.fred.nu")
+SERVER_EMAIL = config("SERVER_EMAIL", default="server@eceee.fred.nu")
+
+# Admin notifications for server errors
+ADMINS = [
+    ("ECEEE Admin", config("ADMIN_EMAIL", default="admin@eceee.fred.nu")),
+]
+MANAGERS = ADMINS
 
 # Development Tools Configuration
 if DEBUG:
@@ -499,6 +521,22 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+# Celery Beat Schedule for periodic tasks
+CELERY_BEAT_SCHEDULE = {
+    "check-ai-prices-weekly": {
+        "task": "ai_tracking.tasks.check_ai_prices",
+        "schedule": 604800.0,  # Every 7 days (in seconds)
+    },
+    "send-stale-price-reminders-weekly": {
+        "task": "ai_tracking.tasks.send_stale_price_reminders",
+        "schedule": 604800.0,  # Every 7 days
+    },
+    "check-budget-alerts-hourly": {
+        "task": "ai_tracking.tasks.check_budget_alerts",
+        "schedule": 3600.0,  # Every hour
+    },
+}
+
 # Rate Limiting
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = "default"
@@ -527,9 +565,6 @@ AWS_S3_OBJECT_PARAMETERS = {
 # Note: Production deployment adds Linode-specific settings via settings_production_override.py
 # including STORAGES configuration, public-read ACL, and s3:// URL protocol
 
-# OpenAI Configuration for Content Import
-OPENAI_API_KEY = config("OPENAI_API_KEY", default=None)
-
 # Playwright Service Configuration for Content Import
 PLAYWRIGHT_SERVICE_URL = config(
     "PLAYWRIGHT_SERVICE_URL", default="http://localhost:5000"
@@ -553,11 +588,47 @@ MEDIA_ALLOWED_TYPES = [
 ]
 
 # AI Integration Configuration
-OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 AI_TAGGING_ENABLED = config("AI_TAGGING_ENABLED", default=True, cast=bool)
+
+# AI Tracking Configuration
+AI_TRACKING = {
+    "STORE_PROMPTS_BY_DEFAULT": config(
+        "AI_STORE_PROMPTS_BY_DEFAULT", default=False, cast=bool
+    ),
+    "STORE_RESPONSES_BY_DEFAULT": config(
+        "AI_STORE_RESPONSES_BY_DEFAULT", default=False, cast=bool
+    ),
+    "PRICE_STALE_DAYS": config("AI_PRICE_STALE_DAYS", default=30, cast=int),
+    "ADMIN_EMAIL": config(
+        "AI_TRACKING_ADMIN_EMAIL",
+        default=config("DEFAULT_FROM_EMAIL", default="admin@example.com"),
+    ),
+    "BUDGET_CHECK_ENABLED": config("AI_BUDGET_CHECK_ENABLED", default=True, cast=bool),
+}
+
+# OpenAI Configuration for Content Import
+OPENAI_API_KEY = config("OPENAI_API_KEY", default=None)
+
+# Anthropic API Configuration (for AI tracking)
+ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default=None)
 
 # imgproxy Configuration
 IMGPROXY_URL = config("IMGPROXY_URL", default="http://imgproxy:8080")
 IMGPROXY_KEY = config("IMGPROXY_KEY", default="")
 IMGPROXY_SALT = config("IMGPROXY_SALT", default="")
 IMGPROXY_SIGNATURE_SIZE = config("IMGPROXY_SIGNATURE_SIZE", default=32, cast=int)
+
+FM_SERVER_URL = "https://fms.eceee.org"
+FM_USERNAME = "CWPAccount"
+FM_PASSWORD = config("FM_PASSWORD", default="")
+
+POSTMARK_API_KEY = config("POSTMARK_API_KEY", default="")
+POSTMARK_SENDER = "eceee@eceee.org"
+POSTMARK_TEST_MODE = False
+POSTMARK_TRACK_OPENS = True
+EMAIL_BACKEND = "postmark.django_backend.EmailBackend"
+DEFAULT_FROM_EMAIL = "eceee@eceee.org"
+EMAIL_HOST_USER = "eceee@eceee.org"
+
+# EMAIL_BACKEND = "email_log.backends.EmailBackend"
+# EMAIL_LOG_BACKEND = "postmark.django_backend.EmailBackend"

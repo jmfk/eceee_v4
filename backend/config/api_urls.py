@@ -45,4 +45,5 @@ urlpatterns = [
     path("media/", include("file_manager.urls")),
     path("objects/", include("object_storage.urls")),
     path("utils/", include("utils.urls")),
+    path("ai-tracking/", include("ai_tracking.urls")),
 ]
