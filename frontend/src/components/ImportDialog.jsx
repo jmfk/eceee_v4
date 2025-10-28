@@ -42,9 +42,12 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     const [saveToPage, setSaveToPage] = useState(false);
     const [importMode, setImportMode] = useState('append');
     const [stripDesign, setStripDesign] = useState(true);
-    const [iframeZoom, setIframeZoom] = useState(100);
     const [hierarchyPanelWidth, setHierarchyPanelWidth] = useState(320); // pixels
     const [isResizing, setIsResizing] = useState(false);
+    const [dialogWidth, setDialogWidth] = useState(window.innerWidth * 0.85);
+    const [dialogHeight, setDialogHeight] = useState(window.innerHeight * 0.90);
+    const [isResizingDialog, setIsResizingDialog] = useState(false);
+    const [resizeEdge, setResizeEdge] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [importResults, setImportResults] = useState(null);
@@ -125,6 +128,61 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             document.body.style.userSelect = '';
         };
     }, [isResizing]);
+
+    // Handle resize of dialog window
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isResizingDialog || !resizeEdge) return;
+
+            const minWidth = 600;
+            const minHeight = 400;
+            const maxWidth = window.innerWidth * 0.95;
+            const maxHeight = window.innerHeight * 0.95;
+
+            let newWidth = dialogWidth;
+            let newHeight = dialogHeight;
+
+            // Calculate new dimensions based on which edge is being dragged
+            if (resizeEdge.includes('e')) {
+                newWidth = e.clientX - (window.innerWidth - dialogWidth) / 2;
+            }
+            if (resizeEdge.includes('w')) {
+                const left = (window.innerWidth - dialogWidth) / 2;
+                newWidth = dialogWidth + (left - e.clientX);
+            }
+            if (resizeEdge.includes('s')) {
+                newHeight = e.clientY - (window.innerHeight - dialogHeight) / 2;
+            }
+            if (resizeEdge.includes('n')) {
+                const top = (window.innerHeight - dialogHeight) / 2;
+                newHeight = dialogHeight + (top - e.clientY);
+            }
+
+            // Apply constraints
+            newWidth = Math.min(Math.max(newWidth, minWidth), maxWidth);
+            newHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
+
+            setDialogWidth(newWidth);
+            setDialogHeight(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizingDialog(false);
+            setResizeEdge(null);
+        };
+
+        if (isResizingDialog) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            document.body.style.userSelect = 'none';
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.userSelect = '';
+        };
+    }, [isResizingDialog, resizeEdge, dialogWidth, dialogHeight]);
 
 
     const handleClose = () => {
@@ -356,7 +414,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     data-align="${align}"
     contenteditable="false"
     draggable="true"
-><img src="${mediaUrl}" alt="${alt}" />${captionHtml}</div>`;
+><img src="${mediaUrl || ''}" alt="${alt}" />${captionHtml}</div>`;
     };
 
     const handleMediaUpload = async () => {
@@ -491,22 +549,16 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 ));
 
                 // Store URL mapping with WYSIWYG HTML structure
-                // Use UUID placeholder (won't get mangled by BeautifulSoup)
-                const uuid = crypto.randomUUID();
-                const placeholder = `__MEDIA_UUID_${uuid}__`;
-
-                // Create media-insert div (same format as backend creates)
+                // Map original URL directly to WYSIWYG HTML (no placeholders needed)
                 const wysiwygHtml = createMediaInsertHtml(
-                    uploadResult.url,  // Media manager URL
+                    uploadResult.url || uploadResult.file_url || '',  // Media manager URL with fallback
                     item.alt || '',
                     metadata.layout || {},  // Layout config from AI
                     uploadResult.id  // Media file ID
                 );
 
-                urlMapping[placeholder] = {
-                    originalSrc: item.src || item.url,  // Original URL for matching
-                    wysiwygHtml: wysiwygHtml,
-                };
+                // Use original src as key for direct regex replacement on backend
+                urlMapping[item.src || item.url] = wysiwygHtml;
 
             } catch (err) {
                 console.error(`Failed to upload ${item.type}:`, err);
@@ -521,55 +573,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             }
         }
 
-        // Replace img src in HTML with UUID placeholders, then build mapping
-        const parser2 = new DOMParser();
-        const actualDoc = parser2.parseFromString(selectedElement.html, 'text/html');
-        const actualImages = Array.from(actualDoc.querySelectorAll('img'));
-
-        // Build final mapping: UUID placeholder → WYSIWYG HTML
-        const finalMapping = {};
-        let modifiedHtml = selectedElement.html;
-
-        for (const actualImg of actualImages) {
-            const actualSrc = actualImg.src;  // EXACT src from HTML
-
-            // Find corresponding uploaded item by matching decoded URLs
-            for (const [placeholder, uploadData] of Object.entries(urlMapping)) {
-                const originalSrc = uploadData.originalSrc;
-
-                // Check if they match (compare decoded proxy URLs)
-                let isMatch = false;
-                try {
-                    const actual = new URL(actualSrc);
-                    const original = new URL(originalSrc);
-
-                    // Compare decoded URLs from proxy params
-                    const actualUrl = actual.searchParams.get('url');
-                    const originalUrl = original.searchParams.get('url');
-                    if (actualUrl && originalUrl && actualUrl === originalUrl) {
-                        isMatch = true;
-                    } else if (actualSrc === originalSrc) {
-                        isMatch = true;
-                    }
-                } catch (e) {
-                    // Simple string match fallback
-                    isMatch = (actualSrc === originalSrc);
-                }
-
-                if (isMatch) {
-                    // Replace img src in HTML with UUID placeholder
-                    modifiedHtml = modifiedHtml.replace(actualSrc, placeholder);
-                    // Map UUID → WYSIWYG HTML
-                    finalMapping[placeholder] = uploadData.wysiwygHtml;
-                    break;
-                }
-            }
-        }
-
-        // Update selectedElement with modified HTML containing UUID placeholders
-        setSelectedElement({ ...selectedElement, html: modifiedHtml });
-
-        setUploadedMediaMapping(finalMapping);
+        // Send mapping directly: original URL → WYSIWYG HTML
+        // Backend will use regex to replace img tags with original src
+        setUploadedMediaMapping(urlMapping);
         setMediaUploadComplete(true);
     };
 
@@ -625,12 +631,15 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
     if (!isOpen) return null;
 
-    // Dynamic dialog width based on step
-    const dialogMaxWidth = currentStep === STEPS.IFRAME_SELECT ? 'max-w-[85vw]' : 'max-w-6xl';
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className={`dialog-container bg-white rounded-lg shadow-xl ${dialogMaxWidth} w-full max-h-[90vh] overflow-hidden flex flex-col`}>
+            <div
+                className="dialog-container bg-white rounded-lg shadow-xl overflow-hidden flex flex-col relative"
+                style={{
+                    width: `${dialogWidth}px`,
+                    height: `${dialogHeight}px`,
+                }}
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <h2 className="text-xl font-semibold text-gray-900">
@@ -693,28 +702,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                             {/* Left side: Iframe */}
                             <div className="flex-1 flex flex-col min-w-0">
                                 <div className="flex items-center justify-between mb-3 px-4">
-                                    <div className="flex items-center gap-4">
-                                        <p className="text-sm text-gray-700">
-                                            Click on the content block you want to import.
-                                        </p>
-
-                                        {/* Zoom controls */}
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <span className="text-gray-600">Zoom:</span>
-                                            {[50, 75, 100].map(zoom => (
-                                                <button
-                                                    key={zoom}
-                                                    onClick={() => setIframeZoom(zoom)}
-                                                    className={`px-2 py-1 rounded transition-colors ${iframeZoom === zoom
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                                        }`}
-                                                >
-                                                    {zoom}%
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    <p className="text-sm text-gray-700">
+                                        Click on the content block you want to import.
+                                    </p>
 
                                     <label className="flex items-center text-sm text-gray-600">
                                         <input
@@ -740,22 +730,13 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                     </label>
                                 </div>
                                 <div className="border border-gray-300 rounded-lg overflow-auto flex-1 bg-gray-100">
-                                    <div
-                                        style={{
-                                            transform: `scale(${iframeZoom / 100})`,
-                                            transformOrigin: 'top left',
-                                            width: `${100 / (iframeZoom / 100)}%`,
-                                            height: `${100 / (iframeZoom / 100)}%`,
-                                        }}
-                                    >
-                                        <iframe
-                                            ref={iframeRef}
-                                            srcDoc={proxiedHtml}
-                                            className="w-full h-full bg-white"
-                                            sandbox="allow-scripts"
-                                            title="Content preview"
-                                        />
-                                    </div>
+                                    <iframe
+                                        ref={iframeRef}
+                                        srcDoc={proxiedHtml}
+                                        className="w-full h-full bg-white"
+                                        sandbox="allow-scripts"
+                                        title="Content preview"
+                                    />
                                 </div>
                             </div>
 
@@ -1023,6 +1004,51 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         )}
                     </div>
                 </div>
+
+                {/* Resize handles for dialog */}
+                {/* Corners */}
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('nw'); }}
+                    className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'nwse-resize' }}
+                />
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('ne'); }}
+                    className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'nesw-resize' }}
+                />
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('sw'); }}
+                    className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'nesw-resize' }}
+                />
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('se'); }}
+                    className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'nwse-resize' }}
+                />
+
+                {/* Edges */}
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('n'); }}
+                    className="absolute top-0 left-3 right-3 h-1 cursor-ns-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'ns-resize' }}
+                />
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('s'); }}
+                    className="absolute bottom-0 left-3 right-3 h-1 cursor-ns-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'ns-resize' }}
+                />
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('w'); }}
+                    className="absolute left-0 top-3 bottom-3 w-1 cursor-ew-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'ew-resize' }}
+                />
+                <div
+                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('e'); }}
+                    className="absolute right-0 top-3 bottom-3 w-1 cursor-ew-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                    style={{ cursor: 'ew-resize' }}
+                />
             </div>
         </div>
     );
