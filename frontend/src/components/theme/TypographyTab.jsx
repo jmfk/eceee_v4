@@ -10,8 +10,9 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText } from 'lucide-react';
-import { createTypographyGroup } from '../../utils/themeUtils';
+import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp } from 'lucide-react';
+import { createTypographyGroup, generateClassName } from '../../utils/themeUtils';
+import { parseCSSRules, cssToGroupElements, cssToElementProperties, groupElementsToCSS, isValidClassName } from '../../utils/cssParser';
 import TypographyPreview from './TypographyPreview';
 import ColorSelector from './form-fields/ColorSelector';
 import FontSelector from './form-fields/FontSelector';
@@ -87,10 +88,13 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
   const [clipboard, setClipboard] = useState(null); // { type: 'tag' | 'group', data: {...} }
   const [copiedIndicator, setCopiedIndicator] = useState(null);
   const [editMode, setEditMode] = useState({}); // { groupIndex-tagBase-variant: 'form' | 'css' }
+  const [importModal, setImportModal] = useState(null); // { type: 'global' | 'group' | 'element', groupIndex?: number, elementKey?: string }
+  const [importCSSText, setImportCSSText] = useState('');
   const { addNotification } = useGlobalNotifications();
 
   // Refs for CSS textarea to prevent re-rendering
   const cssTextareaRefs = useRef({});
+  const fileInputRef = useRef(null);
 
   const handleAddGroup = () => {
     const baseFont = fonts?.googleFonts?.[0]?.family || 'Inter';
@@ -130,6 +134,129 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
       name: newName,
     };
     onChange({ ...typography, groups: updatedGroups });
+  };
+
+  const handleUpdateGroupClassName = (index, className) => {
+    const updatedGroups = [...groups];
+    updatedGroups[index] = {
+      ...updatedGroups[index],
+      className: className,
+    };
+    onChange({ ...typography, groups: updatedGroups });
+  };
+
+  // CSS Import Handlers
+  const openImportModal = (type, groupIndex = null, elementKey = null) => {
+    setImportModal({ type, groupIndex, elementKey });
+    setImportCSSText('');
+  };
+
+  const closeImportModal = () => {
+    setImportModal(null);
+    setImportCSSText('');
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImportCSSText(e.target.result);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset file input
+  };
+
+  const handleImportCSS = () => {
+    if (!importCSSText.trim()) {
+      addNotification({ type: 'error', message: 'Please enter or upload CSS' });
+      return;
+    }
+
+    try {
+      if (importModal.type === 'global') {
+        // Create new group from CSS
+        const rules = parseCSSRules(importCSSText);
+        const { elements, warnings } = cssToGroupElements(rules);
+
+        if (Object.keys(elements).length === 0) {
+          addNotification({ type: 'error', message: 'No valid CSS rules found' });
+          return;
+        }
+
+        const name = `Imported Group ${groups.length + 1}`;
+        const newGroup = {
+          name,
+          className: generateClassName(name),
+          widget_type: null,
+          slot: null,
+          elements,
+        };
+
+        onChange({ ...typography, groups: [...groups, newGroup] });
+        setExpandedGroups({ ...expandedGroups, [groups.length]: true });
+
+        let message = `Created new group with ${Object.keys(elements).length} elements`;
+        if (warnings.length > 0) {
+          message += ` (${warnings.length} selectors skipped)`;
+        }
+        addNotification({ type: 'success', message });
+
+      } else if (importModal.type === 'group') {
+        // Update entire group
+        const rules = parseCSSRules(importCSSText);
+        const { elements, warnings } = cssToGroupElements(rules);
+
+        if (Object.keys(elements).length === 0) {
+          addNotification({ type: 'error', message: 'No valid CSS rules found' });
+          return;
+        }
+
+        const updatedGroups = [...groups];
+        updatedGroups[importModal.groupIndex] = {
+          ...updatedGroups[importModal.groupIndex],
+          elements,
+        };
+        onChange({ ...typography, groups: updatedGroups });
+
+        let message = `Updated group with ${Object.keys(elements).length} elements`;
+        if (warnings.length > 0) {
+          message += ` (${warnings.length} selectors skipped)`;
+        }
+        addNotification({ type: 'success', message });
+
+      } else if (importModal.type === 'element') {
+        // Update single element
+        const properties = cssToElementProperties(importCSSText);
+
+        if (Object.keys(properties).length === 0) {
+          addNotification({ type: 'error', message: 'No valid CSS properties found' });
+          return;
+        }
+
+        const updatedGroups = [...groups];
+        const currentStyles = updatedGroups[importModal.groupIndex].elements[importModal.elementKey] || {};
+
+        updatedGroups[importModal.groupIndex] = {
+          ...updatedGroups[importModal.groupIndex],
+          elements: {
+            ...updatedGroups[importModal.groupIndex].elements,
+            [importModal.elementKey]: { ...currentStyles, ...properties },
+          },
+        };
+        onChange({ ...typography, groups: updatedGroups });
+
+        addNotification({
+          type: 'success',
+          message: `Updated ${importModal.elementKey} with ${Object.keys(properties).length} properties`
+        });
+      }
+
+      closeImportModal();
+    } catch (error) {
+      addNotification({ type: 'error', message: `Failed to parse CSS: ${error.message}` });
+    }
   };
 
   const handleUpdateElement = (groupIndex, element, property, value) => {
@@ -409,6 +536,15 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
           />
           <button
             type="button"
+            onClick={() => openImportModal('global')}
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            title="Import CSS to create new group"
+          >
+            <FileUp className="w-4 h-4 mr-2" />
+            Import CSS
+          </button>
+          <button
+            type="button"
             onClick={handleAddGroup}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
@@ -434,71 +570,101 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
                   className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm"
                 >
                   {/* Group Header */}
-                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(groupIndex)}
-                      className="text-gray-600 hover:text-gray-900 transition-colors"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="w-5 h-5" />
-                      ) : (
-                        <ChevronRight className="w-5 h-5" />
-                      )}
-                    </button>
-
-                    <input
-                      type="text"
-                      value={group.name}
-                      onChange={(e) => handleUpdateGroupName(groupIndex, e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-
-                    <div className="text-xs text-gray-500 font-medium">
-                      {tagGroupsInGroup.length} tags
-                    </div>
-
-                    <div className="flex gap-1">
+                  <div className="p-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+                    <div className="flex items-center gap-3 mb-2">
                       <button
                         type="button"
-                        onClick={() => handleCopyGroup(group)}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                        title="Copy entire group"
+                        onClick={() => toggleGroup(groupIndex)}
+                        className="text-gray-600 hover:text-gray-900 transition-colors"
                       >
-                        {copiedIndicator === 'group' ? (
-                          <Check className="w-4 h-4 text-green-600" />
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5" />
                         ) : (
-                          <Copy className="w-4 h-4" />
+                          <ChevronRight className="w-5 h-5" />
                         )}
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handlePaste(groupIndex)}
-                        disabled={!clipboard || clipboard.type !== 'group'}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Paste styles to all tags (creates tags if needed)"
-                      >
-                        <Clipboard className="w-4 h-4" />
-                      </button>
+                      <input
+                        type="text"
+                        value={group.name}
+                        onChange={(e) => handleUpdateGroupName(groupIndex, e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Group name"
+                      />
+
+                      <div className="text-xs text-gray-500 font-medium">
+                        {tagGroupsInGroup.length} tags
+                      </div>
+
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openImportModal('group', groupIndex)}
+                          className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                          title="Import CSS to this group"
+                        >
+                          <FileUp className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopyGroup(group)}
+                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                          title="Copy entire group"
+                        >
+                          {copiedIndicator === 'group' ? (
+                            <Check className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePaste(groupIndex)}
+                          disabled={!clipboard || clipboard.type !== 'group'}
+                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Paste styles to all tags (creates tags if needed)"
+                        >
+                          <Clipboard className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCloneGroup(groupIndex)}
+                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                          title="Clone this group"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
 
                       <button
                         type="button"
-                        onClick={() => handleCloneGroup(groupIndex)}
-                        className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                        title="Clone this group"
+                        onClick={() => handleRemoveGroup(groupIndex)}
+                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                       >
-                        <Copy className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveGroup(groupIndex)}
-                      className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* ClassName Input */}
+                    <div className="flex items-center gap-2 ml-11">
+                      <label className="text-xs text-gray-600 font-medium">CSS Class:</label>
+                      <input
+                        type="text"
+                        value={group.className || ''}
+                        onChange={(e) => handleUpdateGroupClassName(groupIndex, e.target.value)}
+                        className={`px-2 py-1 border rounded text-xs font-mono focus:outline-none focus:ring-2 ${group.className && !isValidClassName(group.className)
+                            ? 'border-red-300 focus:ring-red-500 text-red-600'
+                            : 'border-gray-300 focus:ring-blue-500'
+                          }`}
+                        placeholder="auto-generated"
+                      />
+                      <span className="text-xs text-gray-500">
+                        {group.className ? `.${group.className}` : '(global scope)'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Group Content */}
@@ -553,6 +719,15 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
                               </div>
 
                               <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openImportModal('element', groupIndex, tagGroup.base)}
+                                  className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                  title="Import CSS for this element"
+                                >
+                                  <FileUp className="w-4 h-4" />
+                                </button>
+
                                 <button
                                   type="button"
                                   onClick={() => handleCopyTag(tagGroup.base, baseStyles)}
@@ -716,6 +891,116 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
           </div>
         </div>
       </div>
+
+      {/* CSS Import Modal */}
+      {importModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Import CSS {
+                  importModal.type === 'global' ? 'to Create New Group' :
+                    importModal.type === 'group' ? 'to Update Group' :
+                      `for ${importModal.elementKey}`
+                }
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {importModal.type === 'global' && 'Paste CSS rules with selectors (e.g., h1 { font-size: 2.5rem; })'}
+                {importModal.type === 'group' && 'Paste CSS rules with selectors to update all elements in this group'}
+                {importModal.type === 'element' && 'Paste CSS properties without selector (e.g., font-size: 2.5rem; color: blue;)'}
+              </p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Upload CSS File</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".css"
+                  onChange={handleFileUpload}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+              </div>
+
+              {/* Or Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">or paste CSS</span>
+                </div>
+              </div>
+
+              {/* CSS Textarea */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CSS Code</label>
+                <textarea
+                  value={importCSSText}
+                  onChange={(e) => setImportCSSText(e.target.value)}
+                  placeholder={
+                    importModal.type === 'element'
+                      ? 'font-size: 2.5rem;\nfont-weight: 700;\ncolor: #333;'
+                      : 'h1 {\n  font-size: 2.5rem;\n  font-weight: 700;\n}\n\np {\n  font-size: 1rem;\n  line-height: 1.6;\n}'
+                  }
+                  className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Preview Info */}
+              {importCSSText.trim() && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <p className="text-sm text-blue-800">
+                    {(() => {
+                      try {
+                        if (importModal.type === 'element') {
+                          const props = cssToElementProperties(importCSSText);
+                          const count = Object.keys(props).length;
+                          return count > 0
+                            ? `✓ ${count} CSS ${count === 1 ? 'property' : 'properties'} detected`
+                            : '⚠ No valid CSS properties found';
+                        } else {
+                          const rules = parseCSSRules(importCSSText);
+                          const { elements } = cssToGroupElements(rules);
+                          const count = Object.keys(elements).length;
+                          return count > 0
+                            ? `✓ ${count} ${count === 1 ? 'element' : 'elements'} detected: ${Object.keys(elements).join(', ')}`
+                            : '⚠ No valid CSS rules found';
+                        }
+                      } catch (error) {
+                        return `⚠ Parse error: ${error.message}`;
+                      }
+                    })()}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeImportModal}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleImportCSS}
+                disabled={!importCSSText.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -257,6 +257,18 @@ export function getSupportedHTMLElements() {
 }
 
 /**
+ * Generate CSS class name from group name
+ * @param {string} name - Group name
+ * @returns {string} Valid CSS class name
+ */
+export function generateClassName(name) {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+}
+
+/**
  * Create pre-populated typography group with default HTML elements
  * @param {string} name - Group name
  * @param {string} baseFont - Base font family (optional)
@@ -265,6 +277,7 @@ export function getSupportedHTMLElements() {
 export function createTypographyGroup(name = 'New Group', baseFont = 'Inter, sans-serif') {
     return {
         name,
+        className: generateClassName(name),
         widget_type: null,
         slot: null,
         elements: {
