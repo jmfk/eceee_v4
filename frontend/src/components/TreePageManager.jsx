@@ -419,7 +419,7 @@ const TreePageManager = () => {
         const isCutOperation = cutPageIds.length > 0
         const isCopyOperation = copyPageIds.length > 0
         const sourcePageIds = isCutOperation ? cutPageIds : copyPageIds
-        
+
         if (sourcePageIds.length === 0 || !targetPage) return
 
         try {
@@ -445,7 +445,7 @@ const TreePageManager = () => {
             for (let i = 0; i < sourcePageIds.length; i++) {
                 const sourcePageId = sourcePageIds[i]
                 const newSortOrder = baseSortOrder + (i * 10) // Space pages 10 units apart
-                
+
                 if (isCutOperation) {
                     // Move the page
                     await movePageMutation.mutateAsync({
@@ -468,7 +468,7 @@ const TreePageManager = () => {
             if (isCutOperation) {
                 setCutPageIds([])
             }
-            
+
             addNotification(
                 `${isCutOperation ? 'Moved' : 'Copied'} ${sourcePageIds.length} page(s)`,
                 'success',
@@ -855,25 +855,31 @@ const TreePageManager = () => {
                         <div className="flex items-center gap-4">
                             <h2 className="text-lg font-semibold text-gray-900">Page Tree Manager</h2>
 
-                            {/* Tabs */}
-                            <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
+                            {/* Tabs - Material Design Underline Style */}
+                            <div className="flex items-center border-l border-gray-300 pl-4">
                                 <button
                                     onClick={() => setActiveTab('active')}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'active'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-600 hover:bg-gray-100'
+                                    className={`px-4 py-2 text-sm font-medium transition-all relative ${activeTab === 'active'
+                                        ? 'text-blue-600'
+                                        : 'text-gray-600 hover:text-gray-900'
                                         }`}
                                 >
                                     Active Pages
+                                    {activeTab === 'active' && (
+                                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
+                                    )}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('deleted')}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'deleted'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-600 hover:bg-gray-100'
+                                    className={`px-4 py-2 text-sm font-medium transition-all relative ${activeTab === 'deleted'
+                                        ? 'text-blue-600'
+                                        : 'text-gray-600 hover:text-gray-900'
                                         }`}
                                 >
                                     Deleted Pages
+                                    {activeTab === 'deleted' && (
+                                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
+                                    )}
                                 </button>
                             </div>
 
