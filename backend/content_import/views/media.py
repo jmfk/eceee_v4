@@ -90,7 +90,12 @@ class GenerateMediaMetadataView(APIView):
                 )
 
                 # Detect resolution (including 1x for standard images)
-                resolution_info = None
+                # Always provide resolution info, defaulting to 1x if detection fails
+                resolution_info = {
+                    "multiplier": "1x",
+                    "source": "original",
+                    "dimensions": None,
+                }
                 image_url = request.data.get("url", "")
                 if image_url:
                     try:
@@ -108,7 +113,7 @@ class GenerateMediaMetadataView(APIView):
                                     if multiplier == int(multiplier)
                                     else f"{multiplier:.1f}x"
                                 ),
-                                "source": resolution_data.get("source", ""),
+                                "source": resolution_data.get("source", "original"),
                                 "dimensions": (
                                     f"{resolution_data['dimensions'][0]}x{resolution_data['dimensions'][1]}"
                                     if resolution_data.get("dimensions")
@@ -117,7 +122,7 @@ class GenerateMediaMetadataView(APIView):
                             }
                     except Exception as e:
                         logger.debug(
-                            f"Resolution detection failed for {image_url}: {e}"
+                            f"Resolution detection failed for {image_url}: {e}, using 1x"
                         )
 
                 if metadata:

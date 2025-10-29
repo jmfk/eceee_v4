@@ -62,7 +62,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     const [mediaMetadataList, setMediaMetadataList] = useState([]); // AI-generated metadata for images and files
     const [mediaTagReviews, setMediaTagReviews] = useState({}); // Per-media tag approval state
     const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
-    const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0, type: '', itemName: '' });
+    const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0, type: '', itemName: '', resolution: '' });
+    const [skipAnalysis, setSkipAnalysis] = useState(false);
 
     const iframeRef = useRef(null);
     const resizeRef = useRef(null);
@@ -95,7 +96,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             setMediaTagReviews({});
             setAiAvailable(true);
             setShowAnalysisDialog(false);
-            setAnalysisProgress({ current: 0, total: 0, type: '', itemName: '' });
+            setAnalysisProgress({ current: 0, total: 0, type: '', itemName: '', resolution: '' });
+            setSkipAnalysis(false);
         }
     }, [isOpen]); // Only run when isOpen changes
 
@@ -474,6 +476,10 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         }
     };
 
+    const handleSkipAnalysis = () => {
+        setSkipAnalysis(true);
+    };
+
     const handleGenerateMediaTags = async () => {
         setIsLoading(true);
         setError(null);
@@ -503,22 +509,30 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             // Show analysis dialog and process items sequentially with progress
             const totalItems = imgElements.length + fileLinks.length;
             setShowAnalysisDialog(true);
-            setAnalysisProgress({ current: 0, total: totalItems, type: '', itemName: '' });
+            setSkipAnalysis(false);
+            setAnalysisProgress({ current: 0, total: totalItems, type: '', itemName: '', resolution: '' });
 
             // Generate metadata for each image (sequentially to show progress)
             const imageMetadata = [];
             for (let idx = 0; idx < imgElements.length; idx++) {
+                // Check if user clicked skip
+                if (skipAnalysis) {
+                    showNotification('Analysis skipped - using basic metadata', 'info');
+                    break;
+                }
+
                 const img = imgElements[idx];
                 const srcAttr = img.getAttribute('src') || img.src;
                 const normalizedSrc = img.src;
                 const { filename, filepath } = extractFilenameAndPath(normalizedSrc);
 
-                // Update progress
+                // Update progress (initially without resolution)
                 setAnalysisProgress({
                     current: idx + 1,
                     total: totalItems,
                     type: 'image',
-                    itemName: filename
+                    itemName: filename,
+                    resolution: ''
                 });
 
                 try {
@@ -532,6 +546,14 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         context: '',
                     });
 
+                    // Update progress with detected resolution
+                    if (metadata.resolution) {
+                        setAnalysisProgress(prev => ({
+                            ...prev,
+                            resolution: metadata.resolution.multiplier || '1x'
+                        }));
+                    }
+
                     imageMetadata.push({
                         index: idx,
                         type: 'image',
@@ -543,9 +565,10 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: metadata.description || '',
                         aiTags: metadata.tags || [],
                         aiGenerated: metadata.ai_generated !== false,
-                        resolution: metadata.resolution || null,
+                        resolution: metadata.resolution || { multiplier: '1x', source: 'original', dimensions: null },
                     });
                 } catch (err) {
+                    // Fallback to 1x resolution on error
                     imageMetadata.push({
                         index: idx,
                         type: 'image',
@@ -557,7 +580,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: '',
                         aiTags: [],
                         aiGenerated: false,
-                        resolution: null,
+                        resolution: { multiplier: '1x', source: 'original', dimensions: null },
                     });
                 }
             }
@@ -565,6 +588,11 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             // Generate metadata for each file (sequentially to show progress)
             const fileMetadata = [];
             for (let idx = 0; idx < fileLinks.length; idx++) {
+                // Check if user clicked skip
+                if (skipAnalysis) {
+                    break;
+                }
+
                 const link = fileLinks[idx];
                 const url = link.href;
                 const linkText = link.textContent.trim();
@@ -575,7 +603,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     current: imgElements.length + idx + 1,
                     total: totalItems,
                     type: 'file',
-                    itemName: filename
+                    itemName: filename,
+                    resolution: ''
                 });
 
                 try {
@@ -931,6 +960,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             <AnalysisProgressDialog
                 isOpen={showAnalysisDialog}
                 progress={analysisProgress}
+                onSkip={handleSkipAnalysis}
             />
 
             <div

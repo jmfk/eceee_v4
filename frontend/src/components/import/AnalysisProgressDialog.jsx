@@ -5,12 +5,12 @@
  */
 
 import React from 'react';
-import { Loader, Image as ImageIcon, FileText } from 'lucide-react';
+import { Loader, Image as ImageIcon, FileText, SkipForward } from 'lucide-react';
 
-const AnalysisProgressDialog = ({ isOpen, progress }) => {
+const AnalysisProgressDialog = ({ isOpen, progress, onSkip }) => {
     if (!isOpen) return null;
 
-    const { current, total, type, itemName } = progress;
+    const { current, total, type, itemName, resolution } = progress;
     const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
 
     return (
@@ -59,14 +59,31 @@ const AnalysisProgressDialog = ({ isOpen, progress }) => {
                             <p className="text-sm font-medium text-gray-900 truncate">
                                 {itemName}
                             </p>
+                            {/* Show resolution if available */}
+                            {resolution && type === 'image' && (
+                                <p className="text-xs text-blue-600 font-medium mt-1">
+                                    Resolution: {resolution}
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/* Description */}
-                <p className="text-xs text-gray-500 mt-4 text-center">
-                    Detecting resolution and generating AI metadata for each item
-                </p>
+                {/* Actions */}
+                <div className="flex items-center justify-between mt-4">
+                    <p className="text-xs text-gray-500">
+                        Detecting resolution and generating AI metadata
+                    </p>
+                    {onSkip && (
+                        <button
+                            onClick={onSkip}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            <SkipForward className="w-4 h-4" />
+                            Skip
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
