@@ -686,9 +686,66 @@ const TreePageManager = () => {
     const handleBulkDelete = useCallback(async () => {
         const idsArray = Array.from(selectedPageIds)
 
+        // Fetch all descendants for selected pages to show what will be deleted
+        let allAffectedPages = []
+        let message = ''
+
+        try {
+            // Recursive function to fetch all descendants
+            const fetchAllDescendants = async (pageId) => {
+                const children = await pagesApi.getPageChildren(pageId)
+                const allDescendants = []
+
+                for (const child of children.results || []) {
+                    allDescendants.push(child)
+                    // If this child has children, fetch them recursively
+                    if (child.childrenCount > 0) {
+                        const childDescendants = await fetchAllDescendants(child.id)
+                        allDescendants.push(...childDescendants)
+                    }
+                }
+
+                return allDescendants
+            }
+
+            addNotification('Loading page details...', 'info', 'bulk-delete-check')
+
+            // Fetch details and descendants for all selected pages
+            for (const pageId of idsArray) {
+                try {
+                    const pageDetails = await pagesApi.get(pageId)
+                    allAffectedPages.push(pageDetails)
+
+                    // If page has children, fetch all descendants
+                    if (pageDetails.childrenCount > 0) {
+                        const descendants = await fetchAllDescendants(pageId)
+                        allAffectedPages.push(...descendants)
+                    }
+                } catch (error) {
+                    console.error(`Error fetching details for page ${pageId}:`, error)
+                }
+            }
+
+            // Remove duplicates (in case of overlapping hierarchies)
+            const uniquePages = Array.from(new Map(allAffectedPages.map(p => [p.id, p])).values())
+
+            if (uniquePages.length > idsArray.length) {
+                // Show the list of affected pages
+                const pageList = uniquePages.slice(0, 10).map(p => `• ${p.title}`).join('\n')
+                const moreText = uniquePages.length > 10 ? `\n... and ${uniquePages.length - 10} more pages` : ''
+
+                message = `⚠️ RECURSIVE DELETION\n\nYou selected ${idsArray.length} page(s), but deleting them will also delete ALL ${uniquePages.length - idsArray.length} subpage(s):\n\n${pageList}${moreText}\n\nTotal pages to delete: ${uniquePages.length}\n\nThis action cannot be undone.`
+            } else {
+                message = `Are you sure you want to delete ${idsArray.length} page(s)?\n\nThis action cannot be undone.`
+            }
+        } catch (error) {
+            console.error('Error fetching page details:', error)
+            message = `⚠️ RECURSIVE DELETION\n\nAre you sure you want to delete ${idsArray.length} selected page(s)?\n\nNote: All subpages will also be deleted recursively.\n\nThis action cannot be undone.`
+        }
+
         const confirmed = await showConfirm({
             title: 'Delete Pages',
-            message: `Are you sure you want to delete ${idsArray.length} page(s)? This action cannot be undone.`,
+            message: message,
             confirmText: 'Delete',
             confirmButtonStyle: 'danger'
         })
@@ -696,10 +753,10 @@ const TreePageManager = () => {
         if (!confirmed) return
 
         setIsBulkProcessing(true)
-        addNotification(`Deleting ${idsArray.length} page(s)...`, 'info', 'bulk-delete')
+        addNotification(`Deleting pages...`, 'info', 'bulk-delete')
 
         try {
-            const result = await pagesApi.bulkDelete(idsArray, false)
+            const result = await pagesApi.bulkDelete(idsArray, true)
             setIsBulkProcessing(false)
             setSelectedPageIds(new Set())
 
@@ -710,7 +767,7 @@ const TreePageManager = () => {
             // Force refetch with fresh data
             await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
 
-            addNotification(result.message || 'Pages deleted successfully', 'success', 'bulk-delete')
+            addNotification(result.message || `Successfully deleted ${result.totalDeleted || result.total_deleted} page(s)`, 'success', 'bulk-delete')
         } catch (error) {
             setIsBulkProcessing(false)
             console.error('Failed to bulk delete:', error)
@@ -1101,7 +1158,7 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
     }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-medium text-gray-900">
@@ -1246,7 +1303,7 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
     }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-medium text-gray-900">

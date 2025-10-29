@@ -144,7 +144,7 @@ const InlineImageUpload = ({
                                 </button>
                             )}
                             {isUploading && (
-                                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
                                     <Loader className="w-6 h-6 text-white animate-spin" />
                                 </div>
                             )}

@@ -1059,7 +1059,7 @@ class LayoutRenderer {
 
     // Create modal overlay
     const overlay = document.createElement('div');
-    overlay.className = 'widget-edit-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    overlay.className = 'widget-edit-modal fixed inset-0 bg-black/50 flex items-center justify-center z-50';
 
     // Create modal content
     const modal = document.createElement('div');
@@ -1360,7 +1360,7 @@ class LayoutRenderer {
 
     // Create modal overlay
     const overlay = document.createElement('div');
-    overlay.className = 'widget-selection-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    overlay.className = 'widget-selection-modal fixed inset-0 bg-black/50 flex items-center justify-center z-50';
 
     // Create modal content
     const modal = document.createElement('div');

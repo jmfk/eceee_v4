@@ -683,7 +683,7 @@ const ContentEditor = forwardRef(({
   return (
     <div className={`content-editor relative h-full flex flex-col ${className}`}>
       {isLoading && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+        <div className="absolute inset-0 bg-white/75 flex items-center justify-center z-10">
           <div className="text-gray-600">Loading layout...</div>
         </div>
       )}

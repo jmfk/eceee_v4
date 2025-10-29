@@ -88,7 +88,7 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
     const hasWarnings = page.restorationWarnings && page.restorationWarnings.length > 0
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">

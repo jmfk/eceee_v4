@@ -247,7 +247,7 @@ const LayoutSelector = ({
                 {/* Dropdown */}
                 {isOpen && (
                     <div
-                        className={`absolute z-10 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm ${dropdownPosition.openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+                        className={`absolute z-10 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black/5 overflow-auto focus:outline-none sm:text-sm ${dropdownPosition.openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}
                         style={{ maxHeight: `${dropdownPosition.maxHeight}px` }}
                     >
                         {/* Search */}

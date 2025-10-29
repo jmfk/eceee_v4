@@ -967,7 +967,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             />
 
             <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
                 onClick={(e) => {
                     // Prevent closing on backdrop click - only Cancel/X button can close
                     // This prevents accidental data loss
@@ -1084,7 +1084,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
                                         {/* Loading overlay */}
                                         {isIframeLoading && (
-                                            <div className="absolute inset-0 bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center z-10 pointer-events-auto">
+                                            <div className="absolute inset-0 bg-gray-900/40 flex flex-col items-center justify-center z-10 pointer-events-auto">
                                                 <div className="bg-white rounded-lg shadow-xl p-6 flex flex-col items-center">
                                                     <Loader className="h-8 w-8 text-blue-600 animate-spin mb-3" />
                                                     <p className="text-sm font-medium text-gray-900">Analyzing page...</p>

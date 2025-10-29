@@ -469,7 +469,7 @@ function App() {
                       </div>
                       <button
                         onClick={() => toast.remove(t.id)}
-                        className="ml-4 p-1 rounded hover:bg-black hover:bg-opacity-10 transition-colors"
+                        className="ml-4 p-1 rounded hover:bg-black/10 transition-colors"
                         aria-label="Close notification"
                       >
                         <X className="w-4 h-4" />

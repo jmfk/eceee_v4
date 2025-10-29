@@ -178,7 +178,7 @@ const TagInput = ({
                                         e.stopPropagation()
                                         removeTag(tag)
                                     }}
-                                    className="hover:bg-black hover:bg-opacity-10 rounded"
+                                    className="hover:bg-black/10 rounded"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>

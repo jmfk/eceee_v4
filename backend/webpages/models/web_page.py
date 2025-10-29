@@ -1717,11 +1717,18 @@ class WebPage(models.Model):
             recursive: If True, also soft delete all descendant pages
 
         Returns:
-            int: Number of pages deleted
+            dict: Deletion result with total count and list of deleted pages
+                {
+                    "total_count": int,
+                    "deleted_pages": [
+                        {"id": int, "title": str, "slug": str},
+                        ...
+                    ]
+                }
         """
         from django.utils import timezone
 
-        count = 0
+        deleted_pages = []
 
         if recursive:
             # Get all descendants
@@ -1740,7 +1747,11 @@ class WebPage(models.Model):
                             "deletion_metadata",
                         ]
                     )
-                    count += 1
+                    deleted_pages.append({
+                        "id": descendant.id,
+                        "title": descendant.title,
+                        "slug": descendant.slug,
+                    })
 
         # Delete the page itself
         if not self.is_deleted:
@@ -1756,9 +1767,16 @@ class WebPage(models.Model):
                     "deletion_metadata",
                 ]
             )
-            count += 1
+            deleted_pages.append({
+                "id": self.id,
+                "title": self.title,
+                "slug": self.slug,
+            })
 
-        return count
+        return {
+            "total_count": len(deleted_pages),
+            "deleted_pages": deleted_pages,
+        }
 
     def restore(self, user, recursive=False, child_ids=None):
         """

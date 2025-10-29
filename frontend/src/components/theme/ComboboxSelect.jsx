@@ -71,7 +71,7 @@ const ComboboxSelect = ({
                     leaveTo="opacity-0"
                     afterLeave={() => setQuery('')}
                 >
-                    <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none">
                         {filteredOptions.length === 0 && query !== '' ? (
                             <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
                                 {allowCustom ? (

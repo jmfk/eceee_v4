@@ -1432,7 +1432,7 @@ class ContentWidgetEditorRenderer {
     showLinkDialog(existingHref, selectedText, linkElement, range) {
         // Create modal overlay
         const overlay = document.createElement('div')
-        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
         overlay.style.zIndex = '9999'
 
         // Create dialog

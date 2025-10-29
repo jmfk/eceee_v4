@@ -65,7 +65,7 @@ const ImageUpload = ({ imageUrl, onUpload, onRemove, isUploading = false }) => {
                     </div>
 
                     {isUploading && (
-                        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg">
+                        <div className="absolute inset-0 bg-white/75 flex items-center justify-center rounded-lg">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
                     )}

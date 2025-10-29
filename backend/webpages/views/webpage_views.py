@@ -119,6 +119,25 @@ class WebPageViewSet(viewsets.ModelViewSet):
         # Note: Version creation must now be handled explicitly via PageVersionViewSet
         # This separation ensures clean boundaries between page and version management
 
+    def destroy(self, request, pk=None):
+        """
+        Soft delete a page and all its descendants.
+        Always uses recursive deletion to ensure data consistency.
+        """
+        page = self.get_object()
+        
+        # Perform soft delete with recursive=True
+        result = page.soft_delete(user=request.user, recursive=True)
+        
+        return Response(
+            {
+                "message": f"Successfully deleted {result['total_count']} page(s)",
+                "total_deleted": result["total_count"],
+                "deleted_pages": result["deleted_pages"],
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=False, methods=["get"])
     def tree(self, request):
         """Get page hierarchy as a tree structure"""
@@ -455,16 +474,18 @@ class WebPageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="bulk-delete")
     def bulk_delete(self, request):
         """
-        Bulk soft delete pages.
+        Bulk soft delete pages with recursive deletion.
+        Always deletes all descendants to ensure data consistency.
 
         Request body:
         {
             "page_ids": [1, 2, 3],
-            "recursive": true  // optional, default false
+            "recursive": true  // always True, included for backwards compatibility
         }
         """
         page_ids = request.data.get("page_ids", [])
-        recursive = request.data.get("recursive", False)
+        # Always use recursive deletion for consistency
+        recursive = True
 
         if not page_ids:
             return Response(
@@ -480,27 +501,19 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Perform soft delete
-        total_deleted = 0
-        deleted_pages = []
+        # Perform soft delete and collect all deleted pages
+        all_deleted_pages = []
 
         for page in pages:
-            count = page.soft_delete(user=request.user, recursive=recursive)
-            total_deleted += count
-            deleted_pages.append(
-                {
-                    "id": page.id,
-                    "title": page.title,
-                    "slug": page.slug,
-                    "deleted_count": count,
-                }
-            )
+            result = page.soft_delete(user=request.user, recursive=recursive)
+            # Extend the list with all pages deleted by this operation
+            all_deleted_pages.extend(result["deleted_pages"])
 
         return Response(
             {
-                "message": f"Successfully deleted {total_deleted} page(s)",
-                "total_deleted": total_deleted,
-                "pages": deleted_pages,
+                "message": f"Successfully deleted {len(all_deleted_pages)} page(s)",
+                "total_deleted": len(all_deleted_pages),
+                "deleted_pages": all_deleted_pages,
                 "recursive": recursive,
             },
             status=status.HTTP_200_OK,

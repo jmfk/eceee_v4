@@ -308,7 +308,7 @@ const MediaPicker = ({
                 </div>
 
                 {/* Hover actions */}
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
                     <button
                         className="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600 transition-colors"
                         onClick={(e) => {
@@ -652,7 +652,7 @@ const MediaPicker = ({
                 {isOpen && (
                     <div className="fixed inset-0 z-50 overflow-y-auto">
                         <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+                            <div className="fixed inset-0 transition-opacity bg-gray-500/75" onClick={onClose} />
 
                             <div className="inline-block w-full max-w-6xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
                                 <div className="h-[80vh]">

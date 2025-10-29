@@ -615,7 +615,7 @@ const VersionTimelinePage = () => {
 
             {/* Pack Confirmation Dialog */}
             {showPackDialog && packPreview && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
                         <div className="p-6">
                             <div className="flex items-center space-x-3 mb-4">
@@ -704,7 +704,7 @@ const VersionTimelinePage = () => {
 
             {/* Schedule Dialog */}
             {showScheduleDialog && selectedVersion && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
                         <div className="p-6">
                             <h3 className="text-lg font-medium text-gray-900 mb-4">

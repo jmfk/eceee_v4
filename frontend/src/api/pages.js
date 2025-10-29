@@ -291,10 +291,10 @@ export const pagesApi = {
     /**
      * Bulk delete multiple pages
      * @param {number[]} pageIds - Array of page IDs to delete
-     * @param {boolean} recursive - Whether to delete recursively
+     * @param {boolean} recursive - Whether to delete recursively (always true for consistency)
      * @returns {Promise<Object>}
      */
-    bulkDelete: wrapApiCall(async (pageIds, recursive = false) => {
+    bulkDelete: wrapApiCall(async (pageIds, recursive = true) => {
         return api.post(endpoints.pages.bulkDelete, { pageIds, recursive })
     }, 'pages.bulkDelete'),
 

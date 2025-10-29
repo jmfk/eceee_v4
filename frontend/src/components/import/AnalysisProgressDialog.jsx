@@ -14,7 +14,7 @@ const AnalysisProgressDialog = ({ isOpen, progress, onSkip }) => {
     const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
 
     return (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
