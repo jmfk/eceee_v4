@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { Trash2, RefreshCw, Search, X, AlertCircle, CheckCircle } from 'lucide-react'
+import { Trash2, RefreshCw, Search, X, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react'
 import { pagesApi } from '@/api/pages'
 import useNotifications from '@/hooks/useNotifications'
 import RestorePageDialog from './RestorePageDialog'
@@ -9,7 +9,7 @@ import RestorePageDialog from './RestorePageDialog'
  * DeletedPagesView Component
  * 
  * Displays a searchable, infinite-scroll list of soft-deleted pages
- * with restoration capabilities.
+ * with restoration and permanent deletion capabilities.
  */
 export default function DeletedPagesView({ isStaff = false }) {
     const [searchTerm, setSearchTerm] = useState('')
@@ -163,6 +163,87 @@ export default function DeletedPagesView({ isStaff = false }) {
         }
     }, [selectedPageIds, showNotification, showConfirm, queryClient])
 
+    // Handle permanent delete single page
+    const handlePermanentDelete = useCallback(async (page) => {
+        const confirmed = await showConfirm({
+            title: '⚠️ Permanently Delete Page',
+            message: `Are you ABSOLUTELY SURE you want to permanently delete "${page.title || page.slug}"?\n\n⚠️ WARNING: This action CANNOT be undone! The page and all its data will be permanently removed from the database.`,
+            confirmText: 'Permanently Delete',
+            confirmButtonStyle: 'danger',
+            cancelText: 'Cancel'
+        })
+
+        if (!confirmed) return
+
+        try {
+            const result = await pagesApi.permanentDelete(page.id, { recursive: false })
+            showNotification(result.message || 'Page permanently deleted', 'success')
+
+            // Refetch
+            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
+            setSelectedPageIds(prev => {
+                const next = new Set(prev)
+                next.delete(page.id)
+                return next
+            })
+        } catch (error) {
+            console.error('Failed to permanently delete page:', error)
+            showNotification(error.message || 'Failed to permanently delete page', 'error')
+        }
+    }, [showNotification, showConfirm, queryClient])
+
+    // Handle bulk permanent delete
+    const handleBulkPermanentDelete = useCallback(async () => {
+        const idsArray = Array.from(selectedPageIds)
+
+        const confirmed = await showConfirm({
+            title: '⚠️ Permanently Delete Multiple Pages',
+            message: `Are you ABSOLUTELY SURE you want to permanently delete ${idsArray.length} page(s)?\n\n⚠️ WARNING: This action CANNOT be undone! All selected pages and their data will be permanently removed from the database.`,
+            confirmText: `Permanently Delete ${idsArray.length} Page(s)`,
+            confirmButtonStyle: 'danger',
+            cancelText: 'Cancel'
+        })
+
+        if (!confirmed) return
+
+        try {
+            const result = await pagesApi.bulkPermanentDelete(idsArray, false)
+            showNotification(result.message || 'Pages permanently deleted', 'success')
+
+            // Refetch
+            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
+            setSelectedPageIds(new Set())
+        } catch (error) {
+            console.error('Failed to bulk permanently delete:', error)
+            showNotification(error.message || 'Failed to permanently delete pages', 'error')
+        }
+    }, [selectedPageIds, showNotification, showConfirm, queryClient])
+
+    // Handle permanent delete all
+    const handlePermanentDeleteAll = useCallback(async () => {
+        const confirmed = await showConfirm({
+            title: '⚠️ DANGER: Permanently Delete ALL Deleted Pages',
+            message: `Are you ABSOLUTELY SURE you want to permanently delete ALL ${deletedPages.length} deleted page(s)?\n\n⚠️ CRITICAL WARNING: This action CANNOT be undone! ALL soft-deleted pages will be permanently removed from the database forever.`,
+            confirmText: `Permanently Delete ALL ${deletedPages.length} Page(s)`,
+            confirmButtonStyle: 'danger',
+            cancelText: 'Cancel'
+        })
+
+        if (!confirmed) return
+
+        try {
+            const result = await pagesApi.permanentDeleteAll(true)
+            showNotification(result.message || 'All deleted pages permanently deleted', 'success')
+
+            // Refetch
+            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
+            setSelectedPageIds(new Set())
+        } catch (error) {
+            console.error('Failed to permanently delete all:', error)
+            showNotification(error.message || 'Failed to permanently delete all pages', 'error')
+        }
+    }, [deletedPages.length, showNotification, showConfirm, queryClient])
+
     // Permission check
     if (!isStaff) {
         return (
@@ -211,42 +292,64 @@ export default function DeletedPagesView({ isStaff = false }) {
 
     return (
         <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="flex-shrink-0 border-b border-gray-200 bg-white px-6 py-4">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900">Deleted Pages</h2>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {deletedPages.length} deleted page{deletedPages.length !== 1 ? 's' : ''}
-                        </p>
+            {/* Header - Compact and responsive */}
+            <div className="flex-shrink-0 bg-white px-2 sm:px-4 py-2 sm:py-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs sm:text-sm text-gray-600">
+                        {deletedPages.length} deleted page{deletedPages.length !== 1 ? 's' : ''}
+                    </p>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        {deletedPages.length > 0 && (
+                            <button
+                                onClick={handlePermanentDeleteAll}
+                                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+                                title="Permanently delete all deleted pages"
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Clean All</span>
+                                <span className="sm:hidden">All</span>
+                            </button>
+                        )}
+                        {selectedPageIds.size > 0 && (
+                            <>
+                                <button
+                                    onClick={handleBulkPermanentDelete}
+                                    className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+                                    title="Permanently delete selected pages"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    <span className="hidden sm:inline">Clean ({selectedPageIds.size})</span>
+                                    <span className="sm:hidden">Del</span>
+                                </button>
+                                <button
+                                    onClick={handleBulkRestore}
+                                    className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                >
+                                    <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    <span className="hidden sm:inline">Restore ({selectedPageIds.size})</span>
+                                    <span className="sm:hidden">Res</span>
+                                </button>
+                            </>
+                        )}
                     </div>
-                    {selectedPageIds.size > 0 && (
-                        <button
-                            onClick={handleBulkRestore}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Restore Selected ({selectedPageIds.size})
-                        </button>
-                    )}
                 </div>
 
                 {/* Search */}
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                         type="text"
                         placeholder="Search deleted pages..."
                         value={searchTerm}
                         onChange={(e) => handleSearch(e.target.value)}
-                        className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     {searchTerm && (
                         <button
                             onClick={handleClearSearch}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4" />
                         </button>
                     )}
                 </div>
@@ -271,15 +374,15 @@ export default function DeletedPagesView({ isStaff = false }) {
                     </div>
                 ) : (
                     <div className="divide-y divide-gray-200">
-                        {/* Select all header */}
-                        <div className="bg-gray-50 px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
+                        {/* Select all header - Responsive */}
+                        <div className="bg-gray-50 px-2 sm:px-4 md:px-6 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 sticky top-0 z-10">
                             <input
                                 type="checkbox"
                                 checked={selectedPageIds.size === deletedPages.length && deletedPages.length > 0}
                                 onChange={handleSelectAll}
                                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
-                            <span className="text-sm font-medium text-gray-700">
+                            <span className="text-xs sm:text-sm font-medium text-gray-700">
                                 {selectedPageIds.size > 0
                                     ? `${selectedPageIds.size} selected`
                                     : 'Select all'}
@@ -294,6 +397,7 @@ export default function DeletedPagesView({ isStaff = false }) {
                                 isSelected={selectedPageIds.has(page.id)}
                                 onToggleSelect={handleToggleSelect}
                                 onRestore={handleRestorePage}
+                                onPermanentDelete={handlePermanentDelete}
                             />
                         ))}
 
@@ -322,44 +426,48 @@ export default function DeletedPagesView({ isStaff = false }) {
 /**
  * Deleted Page Row Component
  */
-function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore }) {
+function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore, onPermanentDelete }) {
     const hasWarnings = page.restorationWarnings && page.restorationWarnings.length > 0
 
     return (
-        <div className="px-6 py-2 hover:bg-gray-50 flex items-center gap-3">
+        <div className="px-2 sm:px-4 md:px-6 py-2 hover:bg-gray-50 flex items-start sm:items-center gap-2 sm:gap-3">
             {/* Checkbox */}
             <input
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => onToggleSelect(page.id)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 mt-1 sm:mt-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500 flex-shrink-0"
             />
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                    <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
                         {/* Row 1: Title and slug */}
-                        <div className="flex items-baseline gap-2">
-                            <h3 className="text-sm font-medium text-gray-900 truncate">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2">
+                            <h3 className="text-xs sm:text-sm font-medium text-gray-900 truncate">
                                 {page.title || page.slug || `Page ${page.id}`}
                             </h3>
-                            <span className="font-mono text-xs text-gray-500">/{page.slug}</span>
+                            <span className="font-mono text-xs text-gray-500 truncate">/{page.slug}</span>
                         </div>
 
-                        {/* Row 2: Metadata inline */}
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <span className="truncate">
+                        {/* Row 2: Metadata inline - Simplified on mobile */}
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs text-gray-600">
+                            <span className="truncate max-w-full sm:max-w-none">
                                 {page.parentPath}
                             </span>
                             {page.childrenCount > 0 && (
                                 <>
-                                    <span>•</span>
-                                    <span>{page.childrenCount} subpage{page.childrenCount !== 1 ? 's' : ''}</span>
+                                    <span className="hidden sm:inline">•</span>
+                                    <span className="whitespace-nowrap">{page.childrenCount} subpage{page.childrenCount !== 1 ? 's' : ''}</span>
                                 </>
                             )}
-                            <span>•</span>
-                            <span>Deleted {new Date(page.deletedAt).toLocaleDateString()} by {page.deletedByUsername}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="whitespace-nowrap">
+                                <span className="hidden sm:inline">Deleted </span>
+                                {new Date(page.deletedAt).toLocaleDateString()}
+                                <span className="hidden sm:inline"> by {page.deletedByUsername}</span>
+                            </span>
                         </div>
 
                         {/* Warnings - compact */}
@@ -371,17 +479,26 @@ function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore }) {
                         )}
                     </div>
 
-                    {/* Restore button */}
-                    <button
-                        onClick={() => onRestore(page)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                    >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Restore
-                    </button>
+                    {/* Action buttons */}
+                    <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2">
+                        <button
+                            onClick={() => onPermanentDelete(page)}
+                            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+                            title="Permanently delete this page (cannot be undone)"
+                        >
+                            <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                            <span className="hidden sm:inline">Clean</span>
+                        </button>
+                        <button
+                            onClick={() => onRestore(page)}
+                            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                            Restore
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     )
 }
-

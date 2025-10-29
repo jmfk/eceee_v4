@@ -13,7 +13,10 @@ import {
     X,
     Save,
     AlignJustify,
-    Download
+    Download,
+    MoreVertical,
+    CheckCircle,
+    Trash2
 } from 'lucide-react'
 import { pagesApi } from '../api'
 import { deletePage } from '../api/pages'
@@ -81,6 +84,9 @@ const TreePageManager = () => {
     const [rowHeight, setRowHeight] = useState(() => {
         return localStorage.getItem('pageTreeRowHeight') || 'compact'
     })
+
+    // Global commands dropdown state
+    const [showGlobalMenu, setShowGlobalMenu] = useState(false)
 
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
@@ -850,45 +856,44 @@ const TreePageManager = () => {
     }
 
     return (
-        <div className="flex flex-col bg-white shadow-lg rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
-            {/* Fixed Header - combines title, bulk actions, and controls */}
-            <div className="flex-shrink-0">
-                {/* Main Header - Title and Actions in One Row */}
-                <div className="border-b border-gray-200 p-4 space-y-4 bg-white">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <h2 className="text-lg font-semibold text-gray-900">Page Tree Manager</h2>
+        <div className="flex flex-col bg-white shadow-lg rounded-lg overflow-hidden h-full max-h-screen">
+            {/* Fixed Header - Responsive */}
+            <div className="flex-shrink-0 border-b border-gray-200 bg-white">
+                {/* Tabs and Actions */}
+                <div className="px-2 sm:px-4 py-2 sm:py-3">
+                    {/* First Row: Tabs, Bulk Actions (on large screens), Global Commands */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                        {/* Tabs */}
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <button
+                                onClick={() => setActiveTab('active')}
+                                className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-all relative whitespace-nowrap ${activeTab === 'active'
+                                    ? 'text-blue-600'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                    }`}
+                            >
+                                Pages
+                                {activeTab === 'active' && (
+                                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('deleted')}
+                                className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-all relative whitespace-nowrap ${activeTab === 'deleted'
+                                    ? 'text-blue-600'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                    }`}
+                            >
+                                Deleted
+                                {activeTab === 'deleted' && (
+                                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
+                                )}
+                            </button>
+                        </div>
 
-                            {/* Tabs - Material Design Underline Style */}
-                            <div className="flex items-center border-l border-gray-300 pl-4">
-                                <button
-                                    onClick={() => setActiveTab('active')}
-                                    className={`px-4 py-2 text-sm font-medium transition-all relative ${activeTab === 'active'
-                                        ? 'text-blue-600'
-                                        : 'text-gray-600 hover:text-gray-900'
-                                        }`}
-                                >
-                                    Active Pages
-                                    {activeTab === 'active' && (
-                                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('deleted')}
-                                    className={`px-4 py-2 text-sm font-medium transition-all relative ${activeTab === 'deleted'
-                                        ? 'text-blue-600'
-                                        : 'text-gray-600 hover:text-gray-900'
-                                        }`}
-                                >
-                                    Deleted Pages
-                                    {activeTab === 'deleted' && (
-                                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Bulk Actions Toolbar - Inline - Only show on active tab */}
-                            {activeTab === 'active' && (
+                        {/* Bulk Actions - Show inline on xl screens, hide on smaller */}
+                        {activeTab === 'active' && (
+                            <div className="hidden xl:block flex-1 max-w-2xl">
                                 <BulkActionsToolbar
                                     selectedCount={selectedPageIds.size}
                                     onCut={handleBulkCut}
@@ -900,101 +905,249 @@ const TreePageManager = () => {
                                     onClear={handleClearSelection}
                                     isProcessing={isBulkProcessing}
                                 />
-                            )}
-                        </div>
+                            </div>
+                        )}
 
-                        {/* Toolbar buttons - Only show on active tab */}
+                        {/* Global Commands + Menu */}
                         {activeTab === 'active' && (
                             <div className="flex items-center gap-2">
-                                <Tooltip text={`Row height: ${rowHeight}`} position="top">
+                                {/* Desktop: Show all buttons */}
+                                <div className="hidden lg:flex items-center gap-2">
+                                    <Tooltip text={`Row height: ${rowHeight}`} position="top">
+                                        <button
+                                            onClick={toggleRowHeight}
+                                            className={`p-2 rounded transition-colors ${rowHeight === 'spacious' ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                                        >
+                                            <AlignJustify className="w-4 h-4" />
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip text="Import page tree as new root page" position="top">
+                                        <button
+                                            data-testid="import-tree-button"
+                                            onClick={() => handleImportTree(null)}
+                                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip text="Add root page" position="top">
+                                        <button
+                                            data-testid="add-root-page-button"
+                                            onClick={handleCreateRootPage}
+                                            className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip text="Refresh" position="top">
+                                        <button
+                                            data-testid="refresh-button"
+                                            onClick={handleRefresh}
+                                            className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                                            disabled={isLoading}
+                                        >
+                                            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                                        </button>
+                                    </Tooltip>
+                                </div>
+
+                                {/* Falafel Menu - Shows global commands on md-lg, bulk actions + global commands on smaller */}
+                                <div className="relative lg:hidden">
                                     <button
-                                        onClick={toggleRowHeight}
-                                        className={`p-2 rounded transition-colors ${rowHeight === 'spacious' ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                                        onClick={() => setShowGlobalMenu(!showGlobalMenu)}
+                                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                                        aria-label="Menu"
                                     >
-                                        <AlignJustify className="w-4 h-4" />
+                                        <MoreVertical className="w-5 h-5" />
                                     </button>
-                                </Tooltip>
-                                <Tooltip text="Import page tree as new root page" position="top">
-                                    <button
-                                        data-testid="import-tree-button"
-                                        onClick={() => handleImportTree(null)}
-                                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                </Tooltip>
-                                <Tooltip text="Add root page" position="top">
-                                    <button
-                                        data-testid="add-root-page-button"
-                                        onClick={handleCreateRootPage}
-                                        className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </Tooltip>
-                                <Tooltip text="Refresh" position="top">
-                                    <button
-                                        data-testid="refresh-button"
-                                        onClick={handleRefresh}
-                                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                                        disabled={isLoading}
-                                    >
-                                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                                    </button>
-                                </Tooltip>
+
+                                    {showGlobalMenu && (
+                                        <>
+                                            {/* Backdrop */}
+                                            <div
+                                                className="fixed inset-0 z-10"
+                                                onClick={() => setShowGlobalMenu(false)}
+                                            />
+                                            {/* Dropdown menu */}
+                                            <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20 max-h-96 overflow-y-auto">
+                                                {/* Bulk Actions in menu on small screens only */}
+                                                <div className="md:hidden border-b border-gray-200 pb-1 mb-1">
+                                                    <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                                                        Bulk Actions
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleBulkCut()
+                                                            setShowGlobalMenu(false)
+                                                        }}
+                                                        disabled={selectedPageIds.size === 0}
+                                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 disabled:opacity-50"
+                                                    >
+                                                        <Scissors className="w-4 h-4" />
+                                                        <span>Cut ({selectedPageIds.size})</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleBulkCopy()
+                                                            setShowGlobalMenu(false)
+                                                        }}
+                                                        disabled={selectedPageIds.size === 0}
+                                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 disabled:opacity-50"
+                                                    >
+                                                        <Save className="w-4 h-4" />
+                                                        <span>Copy ({selectedPageIds.size})</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleBulkPublish()
+                                                            setShowGlobalMenu(false)
+                                                        }}
+                                                        disabled={selectedPageIds.size === 0 || isBulkProcessing}
+                                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 disabled:opacity-50"
+                                                    >
+                                                        <CheckCircle className="w-4 h-4" />
+                                                        <span>Publish ({selectedPageIds.size})</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleBulkDelete()
+                                                            setShowGlobalMenu(false)
+                                                        }}
+                                                        disabled={selectedPageIds.size === 0 || isBulkProcessing}
+                                                        className="w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 flex items-center gap-3 disabled:opacity-50"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                        <span>Delete ({selectedPageIds.size})</span>
+                                                    </button>
+                                                    {selectedPageIds.size > 0 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                handleClearSelection()
+                                                                setShowGlobalMenu(false)
+                                                            }}
+                                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                            <span>Clear Selection</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Global Commands */}
+                                                <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                                                    Commands
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        toggleRowHeight()
+                                                        setShowGlobalMenu(false)
+                                                    }}
+                                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                                >
+                                                    <AlignJustify className="w-4 h-4" />
+                                                    <span>Row height: {rowHeight}</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        handleImportTree(null)
+                                                        setShowGlobalMenu(false)
+                                                    }}
+                                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                    <span>Import page tree</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        handleCreateRootPage()
+                                                        setShowGlobalMenu(false)
+                                                    }}
+                                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                    <span>Add root page</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        handleRefresh()
+                                                        setShowGlobalMenu(false)
+                                                    }}
+                                                    disabled={isLoading}
+                                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 disabled:opacity-50"
+                                                >
+                                                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                                                    <span>Refresh</span>
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Search and filters - Only show on active tab */}
+                    {/* Second Row: Bulk Actions on md-lg screens */}
                     {activeTab === 'active' && (
-                        <>
-                            <div className="flex items-center gap-2">
-                                <div className="flex-1 relative">
-                                    <Tooltip text="Search pages" position="top">
-                                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 cursor-help">
-                                            <Search className="w-4 h-4 text-gray-400" />
-                                        </div>
-                                    </Tooltip>
-                                    <input
-                                        type="text"
-                                        placeholder="Search pages..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
-
-                                <button
-                                    data-testid="filter-button"
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className={`p-2 rounded-lg border transition-colors ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-                                >
-                                    <Filter className="w-4 h-4" />
-                                </button>
-                            </div>
-
-                            {/* Filters */}
-                            {showFilters && (
-                                <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                                    <label className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-gray-700">Status:</span>
-                                        <select
-                                            value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                            className="px-3 py-1 border border-gray-300 rounded text-sm"
-                                        >
-                                            <option value="all">All</option>
-                                            <option value="published">Published</option>
-                                            <option value="unpublished">Unpublished</option>
-                                            <option value="scheduled">Scheduled</option>
-                                        </select>
-                                    </label>
-                                </div>
-                            )}
-                        </>
+                        <div className="hidden md:block xl:hidden mt-2 pt-2 border-t border-gray-100">
+                            <BulkActionsToolbar
+                                selectedCount={selectedPageIds.size}
+                                onCut={handleBulkCut}
+                                onCopy={handleBulkCopy}
+                                onDuplicate={handleBulkDuplicate}
+                                onPublish={handleBulkPublish}
+                                onUnpublish={handleBulkUnpublish}
+                                onDelete={handleBulkDelete}
+                                onClear={handleClearSelection}
+                                isProcessing={isBulkProcessing}
+                            />
+                        </div>
                     )}
                 </div>
+
+                {/* Search and filters - Only show on active tab */}
+                {activeTab === 'active' && (
+                    <div className="px-2 sm:px-4 pb-2 sm:pb-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search pages..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                            </div>
+
+                            <button
+                                data-testid="filter-button"
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`p-1.5 sm:p-2 rounded-lg border transition-colors ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+                            >
+                                <Filter className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Filters */}
+                        {showFilters && (
+                            <div className="flex items-center gap-4 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                                <label className="flex items-center gap-2">
+                                    <span className="text-xs sm:text-sm font-medium text-gray-700">Status:</span>
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-xs sm:text-sm"
+                                    >
+                                        <option value="all">All</option>
+                                        <option value="published">Published</option>
+                                        <option value="unpublished">Unpublished</option>
+                                        <option value="scheduled">Scheduled</option>
+                                    </select>
+                                </label>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Scrollable Tree Content or Deleted Pages View */}
@@ -1088,16 +1241,16 @@ const TreePageManager = () => {
                         )}
                     </div>
 
-                    {/* Fixed Footer */}
-                    <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50">
-                        <div className="flex items-center justify-between text-sm text-gray-600">
-                            <span>
+                    {/* Fixed Footer - Responsive */}
+                    <div className="flex-shrink-0 border-t border-gray-200 px-2 sm:px-4 py-2 sm:py-3 bg-gray-50">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4 text-xs sm:text-sm text-gray-600">
+                            <span className="whitespace-nowrap">
                                 {pagesRef.current.length} root page{pagesRef.current.length !== 1 ? 's' : ''}
                                 {searchTerm && ' (filtered)'}
                             </span>
-                            <div className="flex items-center gap-4">
-                                <span>Cut to move pages • Use + (purple) to add root pages • Use + (green) on pages to add child pages</span>
-                            </div>
+                            <span className="hidden md:block text-xs">
+                                Cut to move pages • Use + (purple) to add root pages • Use + (green) on pages to add child pages
+                            </span>
                         </div>
                     </div>
                 </>
