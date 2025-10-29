@@ -1060,7 +1060,8 @@ const TreePageManager = () => {
                                         onDelete={handleDelete}
                                         onAddPageBelow={handleAddPageBelow}
                                         onImport={handleImportTree}
-                                        cutPageId={cutPageId}
+                                        cutPageIds={cutPageIds}
+                                        copyPageIds={copyPageIds}
                                         isSearchMode={!!searchTerm}
                                         searchTerm={searchTerm}
                                         rowHeight={rowHeight}
