@@ -129,6 +129,18 @@ class MediaDownloader:
             ).first()
 
             if existing_file:
+                # Update metadata even when reusing
+                use_provided_tags = image_data.get("use_provided_tags", False)
+                self._update_media_metadata(
+                    existing_file,
+                    title=image_data.get("title") if use_provided_tags else None,
+                    description=image_data.get("context"),
+                    tags=(
+                        self.page_metadata.get("tags", [])
+                        if use_provided_tags
+                        else None
+                    ),
+                )
 
                 # Still apply AI layout analysis for this usage
                 if self.openai_service.is_available():
@@ -208,6 +220,26 @@ class MediaDownloader:
                             logger.info(
                                 f"Reusing existing file {existing_slug_file.title} (new file is not larger)"
                             )
+
+                            # Update metadata even when reusing
+                            use_provided_tags = image_data.get(
+                                "use_provided_tags", False
+                            )
+                            self._update_media_metadata(
+                                existing_slug_file,
+                                title=(
+                                    image_data.get("title")
+                                    if use_provided_tags
+                                    else None
+                                ),
+                                description=image_data.get("context"),
+                                tags=(
+                                    self.page_metadata.get("tags", [])
+                                    if use_provided_tags
+                                    else None
+                                ),
+                            )
+
                             # Still apply AI layout analysis for this usage
                             if self.openai_service.is_available():
                                 layout_config = (
@@ -407,6 +439,11 @@ class MediaDownloader:
             ).first()
 
             if existing_file:
+                # Update metadata even when reusing
+                page_tags = self.page_metadata.get("tags", [])
+                if page_tags:
+                    self._add_tags(existing_file, page_tags)
+
                 return existing_file
 
             # Check size
@@ -633,7 +670,7 @@ class MediaDownloader:
         media_file: MediaFile,
         title: str = None,
         description: str = None,
-        tags: List[str] = None
+        tags: List[str] = None,
     ):
         """
         Update metadata on existing media file, merging tags.
@@ -672,9 +709,7 @@ class MediaDownloader:
             tag_names: List of tag names
         """
         # Get existing tag slugs to avoid duplicates
-        existing_slugs = set(
-            media_file.tags.values_list('slug', flat=True)
-        )
+        existing_slugs = set(media_file.tags.values_list("slug", flat=True))
 
         for tag_name in tag_names:
             if not tag_name:
