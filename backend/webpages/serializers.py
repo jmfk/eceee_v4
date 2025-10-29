@@ -1248,3 +1248,129 @@ class PageHierarchySerializer(serializers.ModelSerializer):
     def get_current_published_version(self, obj):
         """DEPRECATED: Get version info via PageVersionViewSet instead"""
         return None
+
+
+class DeletedPageSerializer(serializers.ModelSerializer):
+    """Serializer for deleted pages with restoration metadata"""
+
+    deleted_by_username = serializers.CharField(
+        source="deleted_by.username", read_only=True
+    )
+    parent_path = serializers.SerializerMethodField()
+    children_count = serializers.SerializerMethodField()
+    can_restore = serializers.SerializerMethodField()
+    restoration_warnings = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WebPage
+        fields = [
+            "id",
+            "title",
+            "slug",
+            "deleted_at",
+            "deleted_by_username",
+            "deletion_metadata",
+            "parent_path",
+            "children_count",
+            "can_restore",
+            "restoration_warnings",
+        ]
+        read_only_fields = fields
+
+    def get_parent_path(self, obj):
+        """Get formatted parent path from deletion metadata"""
+        if obj.deletion_metadata:
+            return obj.deletion_metadata.get("parent_path_display", "Unknown")
+        return "Unknown"
+
+    def get_children_count(self, obj):
+        """Get number of deleted children"""
+        return obj.children.filter(is_deleted=True).count()
+
+    def get_can_restore(self, obj):
+        """Check if page can be restored (parent exists or can be relocated)"""
+        if not obj.deletion_metadata:
+            return True  # No metadata, assume can restore to current location
+
+        original_parent_id = obj.deletion_metadata.get("parent_id")
+
+        # Root page can always be restored
+        if not original_parent_id:
+            return True
+
+        # Check if original parent exists
+        if WebPage.objects.filter(id=original_parent_id, is_deleted=False).exists():
+            return True
+
+        # Check if any ancestor in chain exists
+        parent_chain = obj.deletion_metadata.get("parent_id_chain", [])
+        for ancestor_id in parent_chain:
+            if WebPage.objects.filter(id=ancestor_id, is_deleted=False).exists():
+                return True
+
+        # Can restore as root page
+        return True
+
+    def get_restoration_warnings(self, obj):
+        """Get warnings about restoration (missing parent, slug conflicts)"""
+        warnings = []
+
+        if not obj.deletion_metadata:
+            return warnings
+
+        original_parent_id = obj.deletion_metadata.get("parent_id")
+
+        # Check parent status
+        if original_parent_id:
+            if not WebPage.objects.filter(
+                id=original_parent_id, is_deleted=False
+            ).exists():
+                # Find if alternative parent exists
+                parent_chain = obj.deletion_metadata.get("parent_id_chain", [])
+                alternative_found = False
+
+                for ancestor_id in parent_chain:
+                    try:
+                        ancestor = WebPage.objects.get(id=ancestor_id, is_deleted=False)
+                        warnings.append(
+                            f"Original parent no longer exists. Will be restored under '{ancestor.title or ancestor.slug}'"
+                        )
+                        alternative_found = True
+                        break
+                    except WebPage.DoesNotExist:
+                        continue
+
+                if not alternative_found:
+                    warnings.append(
+                        "Original parent no longer exists. Will be restored as root page"
+                    )
+
+        # Check for slug conflicts
+        target_parent_id = original_parent_id
+        if (
+            original_parent_id
+            and not WebPage.objects.filter(
+                id=original_parent_id, is_deleted=False
+            ).exists()
+        ):
+            # Need to find alternative parent for slug check
+            parent_chain = obj.deletion_metadata.get("parent_id_chain", [])
+            for ancestor_id in parent_chain:
+                if WebPage.objects.filter(id=ancestor_id, is_deleted=False).exists():
+                    target_parent_id = ancestor_id
+                    break
+            else:
+                target_parent_id = None
+
+        # Check if slug conflicts with existing pages under target parent
+        if obj.slug:
+            conflicts = WebPage.objects.filter(
+                parent_id=target_parent_id, slug=obj.slug, is_deleted=False
+            ).exclude(id=obj.id)
+
+            if conflicts.exists():
+                warnings.append(
+                    f"Slug '{obj.slug}' conflicts with existing page. Will be auto-renamed"
+                )
+
+        return warnings

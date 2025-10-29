@@ -305,7 +305,39 @@ export const pagesApi = {
      */
     duplicate: wrapApiCall(async (pageId) => {
         return api.post(endpoints.pages.duplicate(pageId))
-    }, 'pages.duplicate')
+    }, 'pages.duplicate'),
+
+    /**
+     * Get deleted pages (soft-deleted pages)
+     * @param {Object} params - Query parameters (search, ordering, page, pageSize)
+     * @returns {Promise<PaginatedResponse>}
+     */
+    getDeletedPages: wrapApiCall(async (params = {}) => {
+        const queryString = buildQueryParams(params)
+        return api.get(`${endpoints.pages.base}/deleted/${queryString}`)
+    }, 'pages.getDeletedPages'),
+
+    /**
+     * Restore a deleted page
+     * @param {number} pageId - Page ID to restore
+     * @param {Object} options - Restoration options
+     * @param {boolean} options.recursive - Restore all descendants
+     * @param {number[]} options.childIds - Specific child IDs to restore
+     * @returns {Promise<Object>}
+     */
+    restorePage: wrapApiCall(async (pageId, options = {}) => {
+        return api.post(`${endpoints.pages.detail(pageId)}/restore/`, options)
+    }, 'pages.restorePage'),
+
+    /**
+     * Bulk restore multiple deleted pages
+     * @param {number[]} pageIds - Array of page IDs to restore
+     * @param {boolean} recursive - Whether to restore recursively
+     * @returns {Promise<Object>}
+     */
+    bulkRestore: wrapApiCall(async (pageIds, recursive = false) => {
+        return api.post(endpoints.pages.bulkRestore, { pageIds, recursive })
+    }, 'pages.bulkRestore')
 }
 
 // Legacy exports for backward compatibility

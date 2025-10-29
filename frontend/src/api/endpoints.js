@@ -46,6 +46,7 @@ export const endpoints = {
         bulkUnpublish: `${BASE_PATH}/webpages/pages/bulk-unpublish/`,
         bulkMove: `${BASE_PATH}/webpages/pages/bulk-move/`,
         bulkDelete: `${BASE_PATH}/webpages/pages/bulk-delete/`,
+        bulkRestore: `${BASE_PATH}/webpages/pages/bulk-restore/`,
         duplicate: (id) => `${BASE_PATH}/webpages/pages/${id}/duplicate/`,
         // DEPRECATED: Version-related endpoints moved to versions API (but URLs remain consistent)
         versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Still works, now consistent path-based

@@ -506,10 +506,93 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=False, methods=["post"], url_path="bulk-restore")
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="deleted",
+        permission_classes=[permissions.IsAdminUser],
+    )
+    def list_deleted(self, request):
+        """
+        List all soft-deleted pages (staff/admin only).
+
+        Query parameters:
+        - search: Search by title or slug
+        - ordering: Order by field (default: -deleted_at)
+        """
+        from ..serializers import DeletedPageSerializer
+
+        # Filter deleted pages
+        queryset = WebPage.objects.filter(is_deleted=True).select_related("deleted_by")
+
+        # Search functionality
+        search = request.query_params.get("search", "").strip()
+        if search:
+            queryset = queryset.filter(
+                models.Q(title__icontains=search) | models.Q(slug__icontains=search)
+            )
+
+        # Ordering
+        ordering = request.query_params.get("ordering", "-deleted_at")
+        queryset = queryset.order_by(ordering)
+
+        # Paginate
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = DeletedPageSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = DeletedPageSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="restore",
+        permission_classes=[permissions.IsAdminUser],
+    )
+    def restore_page(self, request, pk=None):
+        """
+        Restore a single soft-deleted page (staff/admin only).
+
+        Request body:
+        {
+            "recursive": bool,  // Restore all descendants
+            "child_ids": [ids]  // Or restore specific children
+        }
+        """
+        page = self.get_object()
+
+        if not page.is_deleted:
+            return Response(
+                {"error": "Page is not deleted"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        recursive = request.data.get("recursive", False)
+        child_ids = request.data.get("child_ids", None)
+
+        # Perform restore with new signature
+        result = page.restore(
+            user=request.user, recursive=recursive, child_ids=child_ids
+        )
+
+        return Response(
+            {
+                "message": f"Successfully restored {result['restored_count']} page(s)",
+                "result": result,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="bulk-restore",
+        permission_classes=[permissions.IsAdminUser],
+    )
     def bulk_restore(self, request):
         """
-        Bulk restore soft-deleted pages.
+        Bulk restore soft-deleted pages (staff/admin only).
 
         Request body:
         {
@@ -534,27 +617,31 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Perform restore
+        # Perform restore with new signature
         total_restored = 0
         restored_pages = []
+        all_warnings = []
 
         for page in pages:
-            count = page.restore(user=request.user, recursive=recursive)
-            total_restored += count
+            result = page.restore(user=request.user, recursive=recursive)
+            total_restored += result["restored_count"]
             restored_pages.append(
                 {
                     "id": page.id,
                     "title": page.title,
                     "slug": page.slug,
-                    "restored_count": count,
+                    "restored_count": result["restored_count"],
+                    "warnings": result["warnings"],
                 }
             )
+            all_warnings.extend(result["warnings"])
 
         return Response(
             {
                 "message": f"Successfully restored {total_restored} page(s)",
                 "total_restored": total_restored,
                 "pages": restored_pages,
+                "warnings": all_warnings,
                 "recursive": recursive,
             },
             status=status.HTTP_200_OK,

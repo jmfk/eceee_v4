@@ -97,6 +97,11 @@ class WebPage(models.Model):
         blank=True,
         help_text="User who deleted this page",
     )
+    deletion_metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Metadata for restoring deleted pages (parent path, location, etc.)",
+    )
 
     class Meta:
         ordering = [
@@ -1658,6 +1663,51 @@ class WebPage(models.Model):
 
         return "\n\n".join(css_parts)
 
+    def _store_deletion_metadata(self, user):
+        """
+        Store metadata needed for intelligent page restoration.
+
+        Stores:
+        - Parent ID chain (full path to root)
+        - Page identifying information (slug, title, sort_order)
+        - Children count
+        - Deletion context (timestamp, user)
+        - Parent path for display purposes
+        """
+        from django.utils import timezone
+
+        metadata = {
+            "parent_id": self.parent_id,
+            "slug": self.slug,
+            "title": self.title,
+            "sort_order": self.sort_order,
+            "deleted_at": timezone.now().isoformat(),
+            "deleted_by_id": user.id,
+            "deleted_by_username": user.username,
+        }
+
+        # Store parent ID chain for finding nearest ancestor
+        parent_chain = []
+        parent_path_display = []
+        current = self.parent
+        while current:
+            parent_chain.append(current.id)
+            parent_path_display.append(
+                current.title or current.slug or f"Page {current.id}"
+            )
+            current = current.parent
+
+        metadata["parent_id_chain"] = parent_chain
+        metadata["parent_path_display"] = (
+            " > ".join(reversed(parent_path_display)) if parent_path_display else "Root"
+        )
+
+        # Count children for display
+        children_count = self.children.filter(is_deleted=False).count()
+        metadata["children_count"] = children_count
+
+        self.deletion_metadata = metadata
+
     def soft_delete(self, user, recursive=False):
         """
         Mark this page as deleted (soft delete).
@@ -1678,73 +1728,223 @@ class WebPage(models.Model):
             descendants = self.get_all_descendants()
             for descendant in descendants:
                 if not descendant.is_deleted:
+                    descendant._store_deletion_metadata(user)
                     descendant.is_deleted = True
                     descendant.deleted_at = timezone.now()
                     descendant.deleted_by = user
-                    descendant.save(
-                        update_fields=["is_deleted", "deleted_at", "deleted_by"]
-                    )
-                    count += 1
-
-        # Delete the page itself
-        if not self.is_deleted:
-            self.is_deleted = True
-            self.deleted_at = timezone.now()
-            self.deleted_by = user
-            self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
-            count += 1
-
-        return count
-
-    def restore(self, user, recursive=False):
-        """
-        Restore a soft-deleted page.
-
-        Args:
-            user: User performing the restoration
-            recursive: If True, also restore all descendant pages
-
-        Returns:
-            int: Number of pages restored
-        """
-        count = 0
-
-        if recursive:
-            # Get all descendants
-            descendants = self.get_all_descendants(include_deleted=True)
-            for descendant in descendants:
-                if descendant.is_deleted:
-                    descendant.is_deleted = False
-                    descendant.deleted_at = None
-                    descendant.deleted_by = None
-                    descendant.last_modified_by = user
                     descendant.save(
                         update_fields=[
                             "is_deleted",
                             "deleted_at",
                             "deleted_by",
-                            "last_modified_by",
+                            "deletion_metadata",
                         ]
                     )
                     count += 1
 
-        # Restore the page itself
-        if self.is_deleted:
-            self.is_deleted = False
-            self.deleted_at = None
-            self.deleted_by = None
-            self.last_modified_by = user
+        # Delete the page itself
+        if not self.is_deleted:
+            self._store_deletion_metadata(user)
+            self.is_deleted = True
+            self.deleted_at = timezone.now()
+            self.deleted_by = user
             self.save(
                 update_fields=[
                     "is_deleted",
                     "deleted_at",
                     "deleted_by",
-                    "last_modified_by",
+                    "deletion_metadata",
                 ]
             )
             count += 1
 
         return count
+
+    def restore(self, user, recursive=False, child_ids=None):
+        """
+        Restore a soft-deleted page with intelligent parent validation.
+
+        Args:
+            user: User performing the restoration
+            recursive: If True, restore all descendant pages
+            child_ids: List of specific child IDs to restore (if not recursive)
+
+        Returns:
+            dict: Restoration result with warnings and counts
+        """
+        result = {
+            "restored_count": 0,
+            "warnings": [],
+            "relocated": False,
+            "slug_renamed": False,
+            "original_parent_id": None,
+            "new_parent_id": None,
+            "original_slug": None,
+            "new_slug": None,
+        }
+
+        if not self.is_deleted:
+            result["warnings"].append("Page is not deleted")
+            return result
+
+        # Validate and find restoration parent
+        restoration_result = self._find_restoration_parent()
+
+        if restoration_result["relocated"]:
+            result["relocated"] = True
+            result["original_parent_id"] = restoration_result["original_parent_id"]
+            result["new_parent_id"] = restoration_result["new_parent_id"]
+            result["warnings"].append(restoration_result["warning"])
+            self.parent_id = restoration_result["new_parent_id"]
+
+        # Handle slug uniqueness
+        slug_result = self.ensure_unique_slug()
+        if slug_result["modified"]:
+            result["slug_renamed"] = True
+            result["original_slug"] = slug_result["original_slug"]
+            result["new_slug"] = slug_result["new_slug"]
+            result["warnings"].append(
+                f"Slug renamed from '{slug_result['original_slug']}' to '{slug_result['new_slug']}' to avoid conflicts"
+            )
+
+        # Restore the page itself
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.last_modified_by = user
+        self.save(
+            update_fields=[
+                "is_deleted",
+                "deleted_at",
+                "deleted_by",
+                "last_modified_by",
+                "parent",
+                "slug",
+            ]
+        )
+        result["restored_count"] += 1
+
+        # Handle children restoration
+        if recursive:
+            # Restore all descendants
+            descendants = self.get_all_descendants(include_deleted=True)
+            for descendant in descendants:
+                if descendant.is_deleted:
+                    # Validate parent still exists after restoration
+                    if descendant.parent and not descendant.parent.is_deleted:
+                        descendant.is_deleted = False
+                        descendant.deleted_at = None
+                        descendant.deleted_by = None
+                        descendant.last_modified_by = user
+
+                        # Check for slug conflicts
+                        child_slug_result = descendant.ensure_unique_slug()
+                        if child_slug_result["modified"]:
+                            result["warnings"].append(
+                                f"Child page slug renamed: '{child_slug_result['original_slug']}' → '{child_slug_result['new_slug']}'"
+                            )
+
+                        descendant.save(
+                            update_fields=[
+                                "is_deleted",
+                                "deleted_at",
+                                "deleted_by",
+                                "last_modified_by",
+                                "slug",
+                            ]
+                        )
+                        result["restored_count"] += 1
+        elif child_ids:
+            # Restore only specific children
+            children = self.children.filter(id__in=child_ids, is_deleted=True)
+            for child in children:
+                child.is_deleted = False
+                child.deleted_at = None
+                child.deleted_by = None
+                child.last_modified_by = user
+
+                # Check for slug conflicts
+                child_slug_result = child.ensure_unique_slug()
+                if child_slug_result["modified"]:
+                    result["warnings"].append(
+                        f"Child page slug renamed: '{child_slug_result['original_slug']}' → '{child_slug_result['new_slug']}'"
+                    )
+
+                child.save(
+                    update_fields=[
+                        "is_deleted",
+                        "deleted_at",
+                        "deleted_by",
+                        "last_modified_by",
+                        "slug",
+                    ]
+                )
+                result["restored_count"] += 1
+
+        return result
+
+    def _find_restoration_parent(self):
+        """
+        Find the best parent for restoring a deleted page.
+
+        Returns original parent if it exists, otherwise finds the nearest
+        existing ancestor in the parent chain.
+
+        Returns:
+            dict: Contains new_parent_id, relocated flag, and warning message
+        """
+        result = {
+            "new_parent_id": None,
+            "original_parent_id": None,
+            "relocated": False,
+            "warning": "",
+        }
+
+        # Check if metadata exists
+        if not self.deletion_metadata:
+            # No metadata, keep current parent
+            result["new_parent_id"] = self.parent_id
+            return result
+
+        original_parent_id = self.deletion_metadata.get("parent_id")
+        result["original_parent_id"] = original_parent_id
+
+        # Check if original parent still exists and is not deleted
+        if original_parent_id:
+            try:
+                original_parent = WebPage.objects.get(
+                    id=original_parent_id, is_deleted=False
+                )
+                result["new_parent_id"] = original_parent_id
+                return result
+            except WebPage.DoesNotExist:
+                # Original parent deleted or doesn't exist, find nearest ancestor
+                parent_chain = self.deletion_metadata.get("parent_id_chain", [])
+
+                # Walk up the chain to find the first existing parent
+                for ancestor_id in parent_chain:
+                    try:
+                        ancestor = WebPage.objects.get(id=ancestor_id, is_deleted=False)
+                        result["new_parent_id"] = ancestor_id
+                        result["relocated"] = True
+                        result["warning"] = (
+                            f"Original parent no longer exists. Page restored under '{ancestor.title or ancestor.slug}' instead."
+                        )
+                        return result
+                    except WebPage.DoesNotExist:
+                        continue
+
+                # No ancestors found, restore as root page
+                result["new_parent_id"] = None
+                result["relocated"] = True
+                result["warning"] = (
+                    "Original parent no longer exists. Page restored as root page."
+                )
+                return result
+        else:
+            # Was originally a root page
+            result["new_parent_id"] = None
+            return result
 
     def get_all_descendants(self, include_deleted=False):
         """

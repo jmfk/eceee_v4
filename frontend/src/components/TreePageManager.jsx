@@ -24,6 +24,7 @@ import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import pageTreeUtils from '../utils/pageTreeUtils'
+import DeletedPagesView from './DeletedPagesView'
 
 // Search helper function
 const searchAllPages = async (searchTerm, filters = {}) => {
@@ -53,6 +54,7 @@ const TreePageManager = () => {
     // State management
     const pagesRef = useRef([])
     const [, forceUpdate] = useState({})
+    const [activeTab, setActiveTab] = useState('active') // 'active' or 'deleted'
     const [searchTerm, setSearchTerm] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     const [statusFilter, setStatusFilter] = useState('all')
@@ -223,10 +225,18 @@ const TreePageManager = () => {
     }, [statusFilter])
 
     // Function to handle refresh with notification (now refetch is available)
-    const handleRefresh = useCallback(() => {
+    const handleRefresh = useCallback(async () => {
         addNotification('Refreshing pages...', 'info', 'pages-refresh')
-        refetch()
-    }, [addNotification, refetch])
+
+        // Invalidate all page-related queries to ensure complete refresh
+        queryClient.invalidateQueries({ queryKey: ['pages'] })
+        queryClient.invalidateQueries({ queryKey: ['page-children'] })
+
+        // Force refetch to ensure immediate update
+        await refetch()
+
+        addNotification('Pages refreshed', 'success', 'pages-refresh')
+    }, [addNotification, refetch, queryClient])
 
     // Move page mutation (for cut/paste)
     const movePageMutation = useMutation({
@@ -754,207 +764,245 @@ const TreePageManager = () => {
                         <div className="flex items-center gap-4">
                             <h2 className="text-lg font-semibold text-gray-900">Page Tree Manager</h2>
 
-                            {/* Bulk Actions Toolbar - Inline */}
-                            <BulkActionsToolbar
-                                selectedCount={selectedPageIds.size}
-                                onCut={handleBulkCut}
-                                onCopy={handleBulkCopy}
-                                onDuplicate={handleBulkDuplicate}
-                                onPublish={handleBulkPublish}
-                                onUnpublish={handleBulkUnpublish}
-                                onDelete={handleBulkDelete}
-                                onClear={handleClearSelection}
-                                isProcessing={isBulkProcessing}
-                            />
+                            {/* Tabs */}
+                            <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
+                                <button
+                                    onClick={() => setActiveTab('active')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'active'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    Active Pages
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('deleted')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'deleted'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    Deleted Pages
+                                </button>
+                            </div>
+
+                            {/* Bulk Actions Toolbar - Inline - Only show on active tab */}
+                            {activeTab === 'active' && (
+                                <BulkActionsToolbar
+                                    selectedCount={selectedPageIds.size}
+                                    onCut={handleBulkCut}
+                                    onCopy={handleBulkCopy}
+                                    onDuplicate={handleBulkDuplicate}
+                                    onPublish={handleBulkPublish}
+                                    onUnpublish={handleBulkUnpublish}
+                                    onDelete={handleBulkDelete}
+                                    onClear={handleClearSelection}
+                                    isProcessing={isBulkProcessing}
+                                />
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <Tooltip text={`Row height: ${rowHeight}`} position="top">
-                                <button
-                                    onClick={toggleRowHeight}
-                                    className={`p-2 rounded transition-colors ${rowHeight === 'spacious' ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
-                                >
-                                    <AlignJustify className="w-4 h-4" />
-                                </button>
-                            </Tooltip>
-                            <Tooltip text="Import page tree as new root page" position="top">
-                                <button
-                                    data-testid="import-tree-button"
-                                    onClick={() => handleImportTree(null)}
-                                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                >
-                                    <Download className="w-4 h-4" />
-                                </button>
-                            </Tooltip>
-                            <Tooltip text="Add root page" position="top">
-                                <button
-                                    data-testid="add-root-page-button"
-                                    onClick={handleCreateRootPage}
-                                    className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                </button>
-                            </Tooltip>
-                            <Tooltip text="Refresh" position="top">
-                                <button
-                                    data-testid="refresh-button"
-                                    onClick={handleRefresh}
-                                    className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                                    disabled={isLoading}
-                                >
-                                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                                </button>
-                            </Tooltip>
-                        </div>
+                        {/* Toolbar buttons - Only show on active tab */}
+                        {activeTab === 'active' && (
+                            <div className="flex items-center gap-2">
+                                <Tooltip text={`Row height: ${rowHeight}`} position="top">
+                                    <button
+                                        onClick={toggleRowHeight}
+                                        className={`p-2 rounded transition-colors ${rowHeight === 'spacious' ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                                    >
+                                        <AlignJustify className="w-4 h-4" />
+                                    </button>
+                                </Tooltip>
+                                <Tooltip text="Import page tree as new root page" position="top">
+                                    <button
+                                        data-testid="import-tree-button"
+                                        onClick={() => handleImportTree(null)}
+                                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                    </button>
+                                </Tooltip>
+                                <Tooltip text="Add root page" position="top">
+                                    <button
+                                        data-testid="add-root-page-button"
+                                        onClick={handleCreateRootPage}
+                                        className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </Tooltip>
+                                <Tooltip text="Refresh" position="top">
+                                    <button
+                                        data-testid="refresh-button"
+                                        onClick={handleRefresh}
+                                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                                        disabled={isLoading}
+                                    >
+                                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                                    </button>
+                                </Tooltip>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Search and filters */}
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1 relative">
-                            <Tooltip text="Search pages" position="top">
-                                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 cursor-help">
-                                    <Search className="w-4 h-4 text-gray-400" />
+                    {/* Search and filters - Only show on active tab */}
+                    {activeTab === 'active' && (
+                        <>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 relative">
+                                    <Tooltip text="Search pages" position="top">
+                                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 cursor-help">
+                                            <Search className="w-4 h-4 text-gray-400" />
+                                        </div>
+                                    </Tooltip>
+                                    <input
+                                        type="text"
+                                        placeholder="Search pages..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
                                 </div>
-                            </Tooltip>
-                            <input
-                                type="text"
-                                placeholder="Search pages..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                        </div>
 
-                        <button
-                            data-testid="filter-button"
-                            onClick={() => setShowFilters(!showFilters)}
-                            className={`p-2 rounded-lg border transition-colors ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-                        >
-                            <Filter className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    {/* Filters */}
-                    {showFilters && (
-                        <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                            <label className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-700">Status:</span>
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="px-3 py-1 border border-gray-300 rounded text-sm"
+                                <button
+                                    data-testid="filter-button"
+                                    onClick={() => setShowFilters(!showFilters)}
+                                    className={`p-2 rounded-lg border transition-colors ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
                                 >
-                                    <option value="all">All</option>
-                                    <option value="published">Published</option>
-                                    <option value="unpublished">Unpublished</option>
-                                    <option value="scheduled">Scheduled</option>
-                                </select>
-                            </label>
-                        </div>
+                                    <Filter className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Filters */}
+                            {showFilters && (
+                                <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                                    <label className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-gray-700">Status:</span>
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            className="px-3 py-1 border border-gray-300 rounded text-sm"
+                                        >
+                                            <option value="all">All</option>
+                                            <option value="published">Published</option>
+                                            <option value="unpublished">Unpublished</option>
+                                            <option value="scheduled">Scheduled</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
 
-            {/* Scrollable Tree Content */}
-            <div className="flex-1 overflow-auto min-h-0">
-                {(isLoading || searchLoading) ? (
-                    <div className="flex items-center justify-center p-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                        <span className="ml-2 text-gray-600">
-                            {searchLoading ? 'Searching pages...' : 'Loading pages...'}
-                        </span>
-                    </div>
-                ) : pagesRef.current.length === 0 ? (
-                    <div className="text-center p-8 text-gray-500">
-                        <Tooltip text="No pages found" position="top">
-                            <div className="cursor-help inline-block">
-                                <FolderPlus className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            {/* Scrollable Tree Content or Deleted Pages View */}
+            {activeTab === 'active' ? (
+                <>
+                    <div className="flex-1 overflow-auto min-h-0">
+                        {(isLoading || searchLoading) ? (
+                            <div className="flex items-center justify-center p-8">
+                                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                                <span className="ml-2 text-gray-600">
+                                    {searchLoading ? 'Searching pages...' : 'Loading pages...'}
+                                </span>
                             </div>
-                        </Tooltip>
-                        <p>
-                            {searchTerm ? 'No pages found matching your search' : 'No pages found'}
-                        </p>
-                        {searchTerm ? (
-                            <div className="mt-4">
-                                <button
-                                    onClick={handleClearSearch}
-                                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                                >
-                                    Clear Search
-                                </button>
+                        ) : pagesRef.current.length === 0 ? (
+                            <div className="text-center p-8 text-gray-500">
+                                <Tooltip text="No pages found" position="top">
+                                    <div className="cursor-help inline-block">
+                                        <FolderPlus className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                                    </div>
+                                </Tooltip>
+                                <p>
+                                    {searchTerm ? 'No pages found matching your search' : 'No pages found'}
+                                </p>
+                                {searchTerm ? (
+                                    <div className="mt-4">
+                                        <button
+                                            onClick={handleClearSearch}
+                                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                        >
+                                            Clear Search
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="mt-4">
+                                        <button
+                                            onClick={handleCreateNewPage}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            <Plus className="w-4 h-4 inline mr-2" />
+                                            Create First Page
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            <div className="mt-4">
-                                <button
-                                    onClick={handleCreateNewPage}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    <Plus className="w-4 h-4 inline mr-2" />
-                                    Create First Page
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="p-2">
-                        {searchTerm && searchResults.length > 0 && (
-                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Search className="w-4 h-4 text-blue-600" />
-                                        <span className="text-sm font-medium text-blue-800">
-                                            Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{debouncedSearchTerm}"
-                                        </span>
+                            <div className="p-2">
+                                {searchTerm && searchResults.length > 0 && (
+                                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Search className="w-4 h-4 text-blue-600" />
+                                                <span className="text-sm font-medium text-blue-800">
+                                                    Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{debouncedSearchTerm}"
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={handleClearSearch}
+                                                className="text-blue-600 hover:text-blue-800 text-sm"
+                                            >
+                                                Clear Search
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={handleClearSearch}
-                                        className="text-blue-600 hover:text-blue-800 text-sm"
-                                    >
-                                        Clear Search
-                                    </button>
-                                </div>
+                                )}
+                                {pagesRef.current.map((page, index) => (
+                                    <PageTreeNode
+                                        key={page.id}
+                                        page={page}
+                                        level={0}
+                                        onEdit={handleEdit}
+                                        onCut={handleCut}
+                                        onPaste={handlePaste}
+                                        onDelete={handleDelete}
+                                        onAddPageBelow={handleAddPageBelow}
+                                        onImport={handleImportTree}
+                                        cutPageId={cutPageId}
+                                        isSearchMode={!!searchTerm}
+                                        searchTerm={searchTerm}
+                                        rowHeight={rowHeight}
+                                        onMoveUp={handleMoveUp}
+                                        onMoveDown={handleMoveDown}
+                                        canMoveUp={index > 0}
+                                        canMoveDown={index < pagesRef.current.length - 1}
+                                        selectedPageIds={selectedPageIds}
+                                        onPageClick={handlePageClick}
+                                        isSelectionMode={selectedPageIds.size > 0}
+                                    />
+                                ))}
                             </div>
                         )}
-                        {pagesRef.current.map((page, index) => (
-                            <PageTreeNode
-                                key={page.id}
-                                page={page}
-                                level={0}
-                                onEdit={handleEdit}
-                                onCut={handleCut}
-                                onPaste={handlePaste}
-                                onDelete={handleDelete}
-                                onAddPageBelow={handleAddPageBelow}
-                                onImport={handleImportTree}
-                                cutPageId={cutPageId}
-                                isSearchMode={!!searchTerm}
-                                searchTerm={searchTerm}
-                                rowHeight={rowHeight}
-                                onMoveUp={handleMoveUp}
-                                onMoveDown={handleMoveDown}
-                                canMoveUp={index > 0}
-                                canMoveDown={index < pagesRef.current.length - 1}
-                                selectedPageIds={selectedPageIds}
-                                onPageClick={handlePageClick}
-                                isSelectionMode={selectedPageIds.size > 0}
-                            />
-                        ))}
                     </div>
-                )}
-            </div>
 
-            {/* Fixed Footer */}
-            <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                    <span>
-                        {pagesRef.current.length} root page{pagesRef.current.length !== 1 ? 's' : ''}
-                        {searchTerm && ' (filtered)'}
-                    </span>
-                    <div className="flex items-center gap-4">
-                        <span>Cut to move pages • Use + (purple) to add root pages • Use + (green) on pages to add child pages</span>
+                    {/* Fixed Footer */}
+                    <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50">
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                            <span>
+                                {pagesRef.current.length} root page{pagesRef.current.length !== 1 ? 's' : ''}
+                                {searchTerm && ' (filtered)'}
+                            </span>
+                            <div className="flex items-center gap-4">
+                                <span>Cut to move pages • Use + (purple) to add root pages • Use + (green) on pages to add child pages</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </>
+            ) : (
+                /* Deleted Pages View */
+                <DeletedPagesView isStaff={true} />
+            )}
 
             {/* Page Creation Modal */}
             {showCreateModal && (
