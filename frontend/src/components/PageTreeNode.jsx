@@ -19,6 +19,7 @@ import {
     X,
     Save,
     Search,
+    Download,
 } from 'lucide-react'
 import { pagesApi, publishingApi } from '../api'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
@@ -90,6 +91,7 @@ const PageTreeNode = memo(({
     onPaste,
     onDelete,
     onAddPageBelow,
+    onImport,
     cutPageId,
     isSearchMode = false,
     searchTerm = '',
@@ -229,6 +231,10 @@ const PageTreeNode = memo(({
         onAddPageBelow?.(page)
     }
 
+    const handleImport = () => {
+        onImport?.(page)
+    }
+
     const handleMoveUp = async () => {
         if (!canMoveUp) return
         // Animate immediately (optimistic)
@@ -245,8 +251,8 @@ const PageTreeNode = memo(({
         try {
             await onMoveUp?.(page.id)
             // Invalidate React Query cache to refresh
-            //queryClient.invalidateQueries(['pages', 'root'])
-            //queryClient.invalidateQueries(['page-children'])
+            queryClient.invalidateQueries(['pages', 'root'])
+            queryClient.invalidateQueries(['page-children'])
         } catch (error) {
             console.error('Failed to move page up:', error)
             showError(error, 'error')
@@ -269,8 +275,8 @@ const PageTreeNode = memo(({
         try {
             await onMoveDown?.(page.id)
             // Invalidate React Query cache to refresh
-            //queryClient.invalidateQueries(['pages', 'root'])
-            //queryClient.invalidateQueries(['page'])
+            queryClient.invalidateQueries(['pages', 'root'])
+            queryClient.invalidateQueries(['page-children'])
         } catch (error) {
             console.error('Failed to move page down:', error)
             showError(error, 'error')
@@ -315,7 +321,10 @@ const PageTreeNode = memo(({
                 pagesApi.update(child.id, { sortOrder: child.sortOrder })
             )
             await Promise.all(updatePromises)
-            forceUpdate({});
+            forceUpdate({})
+
+            // Invalidate parent's children query to refresh counts
+            queryClient.invalidateQueries(['page-children', page.id])
         } catch (error) {
             // Om det misslyckas, återställ till original ordning
             console.error('Failed to update sort order:', error)
@@ -356,7 +365,10 @@ const PageTreeNode = memo(({
                 pagesApi.update(child.id, { sortOrder: child.sortOrder })
             )
             await Promise.all(updatePromises)
-            forceUpdate({});
+            forceUpdate({})
+
+            // Invalidate parent's children query to refresh counts
+            queryClient.invalidateQueries(['page-children', page.id])
         } catch (error) {
             // Om det misslyckas, återställ till original ordning
             console.error('Failed to update sort order:', error)
@@ -787,6 +799,15 @@ const PageTreeNode = memo(({
                         </button>
                     </Tooltip>
 
+                    <Tooltip text="Import page tree as subpage of this page" position="top">
+                        <button
+                            onClick={handleImport}
+                            className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors"
+                        >
+                            <Download className="w-4 h-4" />
+                        </button>
+                    </Tooltip>
+
                     {cutPageId && (
                         <>
                             <Tooltip text="Paste above" position="top">
@@ -840,6 +861,7 @@ const PageTreeNode = memo(({
                             onPaste={onPaste}
                             onDelete={onDelete}
                             onAddPageBelow={onAddPageBelow}
+                            onImport={onImport}
                             cutPageId={cutPageId}
                             isSearchMode={isSearchMode}
                             searchTerm={searchTerm}

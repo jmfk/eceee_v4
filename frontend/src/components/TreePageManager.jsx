@@ -12,11 +12,14 @@ import {
     Loader2,
     X,
     Save,
-    AlignJustify
+    AlignJustify,
+    Download
 } from 'lucide-react'
 import { pagesApi } from '../api'
 import { deletePage } from '../api/pages'
 import PageTreeNode from './PageTreeNode'
+import TreeImporterModalV2 from './TreeImporterModalV2'
+import BulkActionsToolbar from './BulkActionsToolbar'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
@@ -56,9 +59,17 @@ const TreePageManager = () => {
     const [cutPageId, setCutPageId] = useState(null)
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showRootPageModal, setShowRootPageModal] = useState(false)
+    const [showImportModal, setShowImportModal] = useState(false)
+    const [importParentPage, setImportParentPage] = useState(null)
     const [positioningParams, setPositioningParams] = useState(null)
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
+    
+    // Multi-select state
+    const [selectedPageIds, setSelectedPageIds] = useState(new Set())
+    const [lastSelectedId, setLastSelectedId] = useState(null)
+    const [copyPageIds, setCopyPageIds] = useState([])
+    const [isBulkProcessing, setIsBulkProcessing] = useState(false)
 
     // Row height preference from localStorage
     const [rowHeight, setRowHeight] = useState(() => {
@@ -448,6 +459,26 @@ const TreePageManager = () => {
         setShowRootPageModal(true)
     }, [addNotification])
 
+    // Handle import tree
+    const handleImportTree = useCallback((parentPage = null) => {
+        setImportParentPage(parentPage)
+        setShowImportModal(true)
+    }, [])
+
+    const handleImportSuccess = useCallback(async () => {
+        addNotification('Page tree imported successfully', 'success', 'import-success')
+        addNotification('Refreshing page tree...', 'info', 'tree-refresh')
+
+        // Invalidate all page-related queries to ensure complete refresh
+        queryClient.invalidateQueries({ queryKey: ['pages'] })
+        queryClient.invalidateQueries({ queryKey: ['page-children'] })
+
+        // Force refetch to ensure immediate update
+        await refetch()
+
+        addNotification('Page tree refreshed', 'success', 'tree-refresh')
+    }, [addNotification, refetch, queryClient])
+
     // Clear clipboard
     const clearClipboard = () => {
         addNotification('Clipboard cleared', 'info', 'clipboard')
@@ -511,6 +542,15 @@ const TreePageManager = () => {
                                 className={`p-2 rounded transition-colors ${rowHeight === 'spacious' ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
                             >
                                 <AlignJustify className="w-4 h-4" />
+                            </button>
+                        </Tooltip>
+                        <Tooltip text="Import page tree as new root page" position="top">
+                            <button
+                                data-testid="import-tree-button"
+                                onClick={() => handleImportTree(null)}
+                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
                             </button>
                         </Tooltip>
                         <Tooltip text="Add root page" position="top">
@@ -651,6 +691,7 @@ const TreePageManager = () => {
                                 onPaste={handlePaste}
                                 onDelete={handleDelete}
                                 onAddPageBelow={handleAddPageBelow}
+                                onImport={handleImportTree}
                                 cutPageId={cutPageId}
                                 isSearchMode={!!searchTerm}
                                 searchTerm={searchTerm}
@@ -711,6 +752,14 @@ const TreePageManager = () => {
                     isLoading={createRootPageMutation.isPending}
                 />
             )}
+
+            {/* Tree Importer Modal */}
+            <TreeImporterModalV2
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                parentPage={importParentPage}
+                onSuccess={handleImportSuccess}
+            />
         </div>
     )
 }
