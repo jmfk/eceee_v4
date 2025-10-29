@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Lock, Plus, X, Check, Image as ImageIcon, Hash, FileText, File } from 'lucide-react';
+import { Lock, Plus, X, Check, Image as ImageIcon, Hash, FileText, File, Sparkles } from 'lucide-react';
+import { getResolutionBadgeColor } from '../../utils/imageResolution';
 
 const MediaTagReviewStep = ({
     mediaItems,
@@ -269,7 +270,7 @@ const MediaTagReviewStep = ({
                             <div className="flex gap-4">
                                 {/* Media Thumbnail/Icon */}
                                 <div className="flex-shrink-0">
-                                    <div className="w-24 h-24 bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
+                                    <div className="relative w-24 h-24 bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
                                         {isFile ? (
                                             // File icon
                                             <div className="flex flex-col items-center justify-center">
@@ -301,12 +302,33 @@ const MediaTagReviewStep = ({
                                                 <div className="hidden w-full h-full items-center justify-center">
                                                     <ImageIcon className="w-8 h-8 text-gray-400" />
                                                 </div>
+                                                {/* Resolution Badge */}
+                                                {item.resolution && (
+                                                    <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-xs font-semibold border ${getResolutionBadgeColor(item.resolution.multiplier)}`}
+                                                        title={`High-resolution: ${item.resolution.multiplier}${item.resolution.dimensions ? ` (${item.resolution.dimensions})` : ''} - ${item.resolution.source}`}>
+                                                        {item.resolution.multiplier}
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1 text-center">
                                         {isFile ? `File ${idx + 1}` : `Image ${idx + 1}`}
                                     </p>
+                                    {/* Resolution Info Display */}
+                                    {!isFile && item.resolution && (
+                                        <div className="flex items-center justify-center gap-1 mt-1">
+                                            <Sparkles className="w-3 h-3 text-blue-600" />
+                                            <p className="text-xs font-medium text-blue-700">
+                                                {item.resolution.multiplier}
+                                                {item.resolution.dimensions && (
+                                                    <span className="text-gray-600 ml-1">
+                                                        {item.resolution.dimensions}
+                                                    </span>
+                                                )}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Tag Management */}
