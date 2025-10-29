@@ -130,7 +130,7 @@ const PageTreeNode = memo(({
         if (page.isExpanded !== undefined) {
             setIsExpanded(page.isExpanded)
         }
-    }, [page.isExpanded])
+    }, [page.isExpanded, page.id])
 
     // Check if page has children (memoized)
     const hasChildren = useMemo(() => pageTreeUtils.hasChildren(page), [page])

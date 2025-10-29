@@ -224,19 +224,18 @@ const TreePageManager = () => {
         }
     }, [statusFilter])
 
-    // Function to handle refresh with notification (now refetch is available)
+    // Function to handle refresh with notification
     const handleRefresh = useCallback(async () => {
         addNotification('Refreshing pages...', 'info', 'pages-refresh')
 
-        // Invalidate all page-related queries to ensure complete refresh
-        queryClient.invalidateQueries({ queryKey: ['pages'] })
-        queryClient.invalidateQueries({ queryKey: ['page-children'] })
-
-        // Force refetch to ensure immediate update
-        await refetch()
+        // Use refetchQueries to force immediate refetch regardless of staleTime
+        await queryClient.refetchQueries({
+            queryKey: ['pages'],
+            type: 'active' // Only refetch currently active queries
+        })
 
         addNotification('Pages refreshed', 'success', 'pages-refresh')
-    }, [addNotification, refetch, queryClient])
+    }, [addNotification, queryClient])
 
     // Move page mutation (for cut/paste)
     const movePageMutation = useMutation({
@@ -250,19 +249,19 @@ const TreePageManager = () => {
             pagesRef.current = []
             forceUpdate({})
 
-            // Invalidate and refetch all page queries
-            queryClient.invalidateQueries({ queryKey: ['pages'] })
-            queryClient.invalidateQueries({ queryKey: ['page-children'] })
+            // Clear cache and refetch all page queries
+            queryClient.removeQueries({ queryKey: ['pages'] })
+            queryClient.removeQueries({ queryKey: ['page-children'] })
 
             // Wait a moment for backend transaction to commit, then refetch
             setTimeout(async () => {
-                await refetch()
+                await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
             }, 100)
 
             addNotification('Page moved successfully', 'success', 'page-move')
         },
         onError: (error) => {
-            console.error('Failed to move page: ' + error.message)
+            console.error('Failed to move page:', error.message)
             showError(error, 'error')
             addNotification('Failed to move page', 'error', 'page-move')
         }
@@ -276,12 +275,12 @@ const TreePageManager = () => {
         },
         onSuccess: () => {
             // Invalidate relevant queries to refresh data
-            queryClient.invalidateQueries(['pages', 'root'])
-            queryClient.invalidateQueries(['page-children'])
+            queryClient.invalidateQueries({ queryKey: ['pages', 'root'] })
+            queryClient.invalidateQueries({ queryKey: ['page-children'] })
             addNotification('Page deleted successfully', 'success', 'page-delete')
         },
         onError: (error) => {
-            console.error('Failed to delete page: ' + error.message)
+            console.error('Failed to delete page:', error.message)
             showError(error, 'error')
             addNotification('Failed to delete page', 'error', 'page-delete')
         }
@@ -507,15 +506,14 @@ const TreePageManager = () => {
         addNotification('Page tree imported successfully', 'success', 'import-success')
         addNotification('Refreshing page tree...', 'info', 'tree-refresh')
 
-        // Invalidate all page-related queries to ensure complete refresh
-        queryClient.invalidateQueries({ queryKey: ['pages'] })
-        queryClient.invalidateQueries({ queryKey: ['page-children'] })
+        // Clear cache and refetch to ensure complete refresh
+        queryClient.removeQueries({ queryKey: ['pages'] })
+        queryClient.removeQueries({ queryKey: ['page-children'] })
 
-        // Force refetch to ensure immediate update
-        await refetch()
+        await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
 
         addNotification('Page tree refreshed', 'success', 'tree-refresh')
-    }, [addNotification, refetch, queryClient])
+    }, [addNotification, queryClient])
 
     // Clear clipboard
     const clearClipboard = () => {
@@ -626,8 +624,9 @@ const TreePageManager = () => {
 
         setIsBulkProcessing(false)
         setSelectedPageIds(new Set())
-        queryClient.invalidateQueries(['pages'])
-        refetch()
+
+        queryClient.removeQueries({ queryKey: ['pages'] })
+        await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
 
         if (errorCount === 0) {
             addNotification(`Successfully duplicated ${successCount} page(s)`, 'success', 'bulk-duplicate')
@@ -638,7 +637,7 @@ const TreePageManager = () => {
                 'bulk-duplicate'
             )
         }
-    }, [selectedPageIds, addNotification, queryClient, refetch])
+    }, [selectedPageIds, addNotification, queryClient])
 
     const handleBulkPublish = useCallback(async () => {
         const idsArray = Array.from(selectedPageIds)
@@ -649,8 +648,10 @@ const TreePageManager = () => {
             const result = await pagesApi.bulkPublish(idsArray)
             setIsBulkProcessing(false)
             setSelectedPageIds(new Set())
-            queryClient.invalidateQueries(['pages'])
-            refetch()
+
+            queryClient.removeQueries({ queryKey: ['pages'] })
+            await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
+
             addNotification(result.message || 'Pages published successfully', 'success', 'bulk-publish')
         } catch (error) {
             setIsBulkProcessing(false)
@@ -658,7 +659,7 @@ const TreePageManager = () => {
             showError(error, 'error')
             addNotification('Failed to publish pages', 'error', 'bulk-publish')
         }
-    }, [selectedPageIds, addNotification, queryClient, refetch, showError])
+    }, [selectedPageIds, addNotification, queryClient, showError])
 
     const handleBulkUnpublish = useCallback(async () => {
         const idsArray = Array.from(selectedPageIds)
@@ -669,8 +670,10 @@ const TreePageManager = () => {
             const result = await pagesApi.bulkUnpublish(idsArray)
             setIsBulkProcessing(false)
             setSelectedPageIds(new Set())
-            queryClient.invalidateQueries(['pages'])
-            refetch()
+
+            queryClient.removeQueries({ queryKey: ['pages'] })
+            await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
+
             addNotification(result.message || 'Pages unpublished successfully', 'success', 'bulk-unpublish')
         } catch (error) {
             setIsBulkProcessing(false)
@@ -678,7 +681,7 @@ const TreePageManager = () => {
             showError(error, 'error')
             addNotification('Failed to unpublish pages', 'error', 'bulk-unpublish')
         }
-    }, [selectedPageIds, addNotification, queryClient, refetch, showError])
+    }, [selectedPageIds, addNotification, queryClient, showError])
 
     const handleBulkDelete = useCallback(async () => {
         const idsArray = Array.from(selectedPageIds)
@@ -699,8 +702,14 @@ const TreePageManager = () => {
             const result = await pagesApi.bulkDelete(idsArray, false)
             setIsBulkProcessing(false)
             setSelectedPageIds(new Set())
-            queryClient.invalidateQueries(['pages'])
-            refetch()
+
+            // Clear the cache completely before refetching
+            queryClient.removeQueries({ queryKey: ['pages'] })
+            queryClient.removeQueries({ queryKey: ['page-children'] })
+
+            // Force refetch with fresh data
+            await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
+
             addNotification(result.message || 'Pages deleted successfully', 'success', 'bulk-delete')
         } catch (error) {
             setIsBulkProcessing(false)
@@ -708,7 +717,7 @@ const TreePageManager = () => {
             showError(error, 'error')
             addNotification('Failed to delete pages', 'error', 'bulk-delete')
         }
-    }, [selectedPageIds, addNotification, queryClient, refetch, showError, showConfirm])
+    }, [selectedPageIds, addNotification, queryClient, showError, showConfirm])
 
     // Handle clear search with notification
     const handleClearSearch = useCallback(() => {
