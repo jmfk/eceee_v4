@@ -305,7 +305,7 @@ const MediaTagReviewStep = ({
                                                 {/* Resolution Badge */}
                                                 {item.resolution && (
                                                     <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-xs font-semibold border ${getResolutionBadgeColor(item.resolution.multiplier)}`}
-                                                        title={`High-resolution: ${item.resolution.multiplier}${item.resolution.dimensions ? ` (${item.resolution.dimensions})` : ''} - ${item.resolution.source}`}>
+                                                         title={`Resolution: ${item.resolution.multiplier}${item.resolution.dimensions ? ` (${item.resolution.dimensions})` : ''}${item.resolution.source ? ` - ${item.resolution.source}` : ''}`}>
                                                         {item.resolution.multiplier}
                                                     </div>
                                                 )}
@@ -315,11 +315,11 @@ const MediaTagReviewStep = ({
                                     <p className="text-xs text-gray-500 mt-1 text-center">
                                         {isFile ? `File ${idx + 1}` : `Image ${idx + 1}`}
                                     </p>
-                                    {/* Resolution Info Display */}
+                                    {/* Resolution Info Display - Always show for images */}
                                     {!isFile && item.resolution && (
                                         <div className="flex items-center justify-center gap-1 mt-1">
-                                            <Sparkles className="w-3 h-3 text-blue-600" />
-                                            <p className="text-xs font-medium text-blue-700">
+                                            <Sparkles className={`w-3 h-3 ${item.resolution.multiplier === '1x' ? 'text-gray-500' : 'text-blue-600'}`} />
+                                            <p className={`text-xs font-medium ${item.resolution.multiplier === '1x' ? 'text-gray-600' : 'text-blue-700'}`}>
                                                 {item.resolution.multiplier}
                                                 {item.resolution.dimensions && (
                                                     <span className="text-gray-600 ml-1">

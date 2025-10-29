@@ -89,7 +89,7 @@ class GenerateMediaMetadataView(APIView):
                     parent_classes=request.data.get("parent_classes", ""),
                 )
 
-                # Detect high-resolution version
+                # Detect resolution (including 1x for standard images)
                 resolution_info = None
                 image_url = request.data.get("url", "")
                 if image_url:
@@ -100,16 +100,13 @@ class GenerateMediaMetadataView(APIView):
                             check_patterns=True,
                             max_checks=10,
                         )
-                        if (
-                            resolution_data
-                            and resolution_data.get("multiplier", 1.0) > 1.0
-                        ):
+                        if resolution_data:
+                            multiplier = resolution_data.get("multiplier", 1.0)
                             resolution_info = {
                                 "multiplier": (
-                                    f"{int(resolution_data['multiplier'])}x"
-                                    if resolution_data["multiplier"]
-                                    == int(resolution_data["multiplier"])
-                                    else f"{resolution_data['multiplier']:.1f}x"
+                                    f"{int(multiplier)}x"
+                                    if multiplier == int(multiplier)
+                                    else f"{multiplier:.1f}x"
                                 ),
                                 "source": resolution_data.get("source", ""),
                                 "dimensions": (
