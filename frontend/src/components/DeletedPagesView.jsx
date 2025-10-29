@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useInfiniteQuery, useQueryClient } from '@tantml:invoke>react-query'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { Trash2, RefreshCw, Search, X, AlertCircle, CheckCircle } from 'lucide-react'
 import { pagesApi } from '@/api/pages'
-import { useNotification } from '@/hooks/useNotification'
-import { useConfirm } from '@/hooks/useConfirm'
+import useNotifications from '@/hooks/useNotifications'
 import RestorePageDialog from './RestorePageDialog'
 
 /**
@@ -16,8 +15,7 @@ export default function DeletedPagesView({ isStaff = false }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedPageIds, setSelectedPageIds] = useState(new Set())
     const [restoreDialogPage, setRestoreDialogPage] = useState(null)
-    const { addNotification } = useNotification()
-    const { showConfirm } = useConfirm()
+    const { showNotification, showConfirm } = useNotifications()
     const queryClient = useQueryClient()
 
     // Infinite query for deleted pages
@@ -30,9 +28,9 @@ export default function DeletedPagesView({ isStaff = false }) {
         isError,
         error,
         refetch
-    } = useInfiniteQuery(
-        ['deleted-pages', searchTerm],
-        async ({ pageParam = 1 }) => {
+    } = useInfiniteQuery({
+        queryKey: ['deleted-pages', searchTerm],
+        queryFn: async ({ pageParam = 1 }) => {
             const params = {
                 page: pageParam,
                 pageSize: 20,
@@ -43,18 +41,16 @@ export default function DeletedPagesView({ isStaff = false }) {
             }
             return await pagesApi.getDeletedPages(params)
         },
-        {
-            getNextPageParam: (lastPage) => {
-                if (lastPage.next) {
-                    // Extract page number from next URL
-                    const url = new URL(lastPage.next, window.location.origin)
-                    return url.searchParams.get('page')
-                }
-                return undefined
-            },
-            enabled: isStaff
-        }
-    )
+        getNextPageParam: (lastPage) => {
+            if (lastPage.next) {
+                // Extract page number from next URL
+                const url = new URL(lastPage.next, window.location.origin)
+                return url.searchParams.get('page')
+            }
+            return undefined
+        },
+        enabled: isStaff
+    })
 
     // Flatten pages from all pages
     const deletedPages = data?.pages?.flatMap(page => page.results) || []
@@ -109,18 +105,18 @@ export default function DeletedPagesView({ isStaff = false }) {
     const handleRestoreConfirm = useCallback(async (pageId, options) => {
         try {
             const result = await pagesApi.restorePage(pageId, options)
-            addNotification(result.message || 'Page restored successfully', 'success')
+            showNotification(result.message || 'Page restored successfully', 'success')
 
             // Show warnings if any
             if (result.result?.warnings && result.result.warnings.length > 0) {
                 result.result.warnings.forEach(warning => {
-                    addNotification(warning, 'warning')
+                    showNotification(warning, 'warning')
                 })
             }
 
             // Refetch deleted pages and active pages
-            queryClient.invalidateQueries(['deleted-pages'])
-            queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
+            queryClient.invalidateQueries({ queryKey: ['pages'] })
             setRestoreDialogPage(null)
             setSelectedPageIds(prev => {
                 const next = new Set(prev)
@@ -129,9 +125,9 @@ export default function DeletedPagesView({ isStaff = false }) {
             })
         } catch (error) {
             console.error('Failed to restore page:', error)
-            addNotification(error.message || 'Failed to restore page', 'error')
+            showNotification(error.message || 'Failed to restore page', 'error')
         }
-    }, [addNotification, queryClient])
+    }, [showNotification, queryClient])
 
     // Handle bulk restore
     const handleBulkRestore = useCallback(async () => {
@@ -148,24 +144,24 @@ export default function DeletedPagesView({ isStaff = false }) {
 
         try {
             const result = await pagesApi.bulkRestore(idsArray, false)
-            addNotification(result.message || 'Pages restored successfully', 'success')
+            showNotification(result.message || 'Pages restored successfully', 'success')
 
             // Show warnings if any
             if (result.warnings && result.warnings.length > 0) {
                 result.warnings.forEach(warning => {
-                    addNotification(warning, 'warning')
+                    showNotification(warning, 'warning')
                 })
             }
 
             // Refetch
-            queryClient.invalidateQueries(['deleted-pages'])
-            queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
+            queryClient.invalidateQueries({ queryKey: ['pages'] })
             setSelectedPageIds(new Set())
         } catch (error) {
             console.error('Failed to bulk restore:', error)
-            addNotification(error.message || 'Failed to restore pages', 'error')
+            showNotification(error.message || 'Failed to restore pages', 'error')
         }
-    }, [selectedPageIds, addNotification, showConfirm, queryClient])
+    }, [selectedPageIds, showNotification, showConfirm, queryClient])
 
     // Permission check
     if (!isStaff) {
@@ -330,64 +326,60 @@ function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore }) {
     const hasWarnings = page.restorationWarnings && page.restorationWarnings.length > 0
 
     return (
-        <div className="px-6 py-4 hover:bg-gray-50 flex items-start gap-3">
+        <div className="px-6 py-2 hover:bg-gray-50 flex items-center gap-3">
             {/* Checkbox */}
             <input
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => onToggleSelect(page.id)}
-                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900 truncate">
-                            {page.title || page.slug || `Page ${page.id}`}
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                            <span className="font-mono text-xs">{page.slug || 'No slug'}</span>
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                            Original location: <span className="font-medium">{page.parentPath}</span>
-                        </p>
-                        {page.childrenCount > 0 && (
-                            <p className="text-xs text-gray-600 mt-1">
-                                {page.childrenCount} subpage{page.childrenCount !== 1 ? 's' : ''}
-                            </p>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                        {/* Row 1: Title and slug */}
+                        <div className="flex items-baseline gap-2">
+                            <h3 className="text-sm font-medium text-gray-900 truncate">
+                                {page.title || page.slug || `Page ${page.id}`}
+                            </h3>
+                            <span className="font-mono text-xs text-gray-500">/{page.slug}</span>
+                        </div>
+
+                        {/* Row 2: Metadata inline */}
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <span className="truncate">
+                                {page.parentPath}
+                            </span>
+                            {page.childrenCount > 0 && (
+                                <>
+                                    <span>•</span>
+                                    <span>{page.childrenCount} subpage{page.childrenCount !== 1 ? 's' : ''}</span>
+                                </>
+                            )}
+                            <span>•</span>
+                            <span>Deleted {new Date(page.deletedAt).toLocaleDateString()} by {page.deletedByUsername}</span>
+                        </div>
+
+                        {/* Warnings - compact */}
+                        {hasWarnings && (
+                            <div className="flex items-center gap-1 text-xs text-yellow-700">
+                                <AlertCircle className="w-3 h-3" />
+                                <span>{page.restorationWarnings.length} warning{page.restorationWarnings.length !== 1 ? 's' : ''}</span>
+                            </div>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">
-                            Deleted {new Date(page.deletedAt).toLocaleDateString()} by {page.deletedByUsername}
-                        </p>
                     </div>
 
                     {/* Restore button */}
                     <button
                         onClick={() => onRestore(page)}
-                        className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
                     >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="w-3.5 h-3.5" />
                         Restore
                     </button>
                 </div>
-
-                {/* Warnings */}
-                {hasWarnings && (
-                    <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                        <div className="flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                            <div className="flex-1">
-                                <p className="text-xs font-medium text-yellow-800">Restoration Warnings:</p>
-                                <ul className="text-xs text-yellow-700 mt-1 space-y-1">
-                                    {page.restorationWarnings.map((warning, idx) => (
-                                        <li key={idx}>• {warning}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     )

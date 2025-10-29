@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tantml:invoke>react-query'
+import { useQuery } from '@tanstack/react-query'
 import { X, RefreshCw, AlertCircle, CheckCircle, Info } from 'lucide-react'
 import { pagesApi } from '@/api/pages'
 
@@ -13,16 +13,14 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
     const [selectedChildren, setSelectedChildren] = useState(new Set())
 
     // Fetch deleted children
-    const { data: childrenData, isLoading: childrenLoading } = useQuery(
-        ['deleted-page-children', page.id],
-        async () => {
+    const { data: childrenData, isLoading: childrenLoading } = useQuery({
+        queryKey: ['deleted-page-children', page.id],
+        queryFn: async () => {
             const result = await pagesApi.getPageChildren(page.id, { isDeleted: true })
             return result.results || []
         },
-        {
-            enabled: page.childrenCount > 0
-        }
-    )
+        enabled: page.childrenCount > 0
+    })
 
     const deletedChildren = childrenData || []
 
