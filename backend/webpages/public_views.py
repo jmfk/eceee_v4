@@ -20,6 +20,7 @@ import json
 from .models import WebPage
 from .renderers import WebPageRenderer
 from .serializers import PageHierarchySerializer
+from .utils.page_resolver import get_page_safely
 
 
 class PublishedPageMixin:
@@ -75,13 +76,10 @@ class PageDetailView(PublishedPageMixin, DetailView):
         parent = None
 
         for slug in slug_parts:
-            try:
-                current_page = WebPage.objects.select_related("parent").get(
-                    slug=slug, parent=parent
-                )
-                parent = current_page
-            except WebPage.DoesNotExist:
+            current_page = get_page_safely(slug=slug, parent=parent)
+            if not current_page:
                 raise Http404(f"Page not found: {'/'.join(slug_parts)}")
+            parent = current_page
 
         # Check if page is published using new date-based logic
         if not current_page.is_published():
@@ -420,14 +418,9 @@ class HostnamePageView(View):
         Returns:
             WebPage or None if no custom error page exists
         """
-        try:
-            error_page = WebPage.objects.get(
-                parent=root_page, slug=str(error_code), is_deleted=False
-            )
-            if error_page.is_published():
-                return error_page
-        except WebPage.DoesNotExist:
-            pass
+        error_page = get_page_safely(slug=str(error_code), parent=root_page)
+        if error_page and error_page.is_published():
+            return error_page
         return None
 
     def _render_error_page(self, error_page, status_code):
@@ -673,11 +666,8 @@ class HostnamePageView(View):
 
             for j in range(i):
                 slug = slug_parts[j]
-                try:
-                    temp_page = WebPage.objects.select_related("parent").get(
-                        slug=slug, parent=temp_page
-                    )
-                except WebPage.DoesNotExist:
+                temp_page = get_page_safely(slug=slug, parent=temp_page)
+                if not temp_page:
                     found = False
                     break
 
@@ -862,19 +852,14 @@ def custom_404_handler(request, exception=None):
         root_page = WebPage.get_root_page_for_hostname(hostname)
         if root_page:
             # Try to find custom 404 page
-            try:
-                error_page = WebPage.objects.get(
-                    parent=root_page, slug="404", is_deleted=False
-                )
-                if error_page.is_published():
-                    # Render custom 404 page
-                    view = HostnamePageView()
-                    view.request = request
-                    error_response = view._render_error_page(error_page, 404)
-                    if error_response:
-                        return error_response
-            except WebPage.DoesNotExist:
-                pass
+            error_page = get_page_safely(slug="404", parent=root_page)
+            if error_page and error_page.is_published():
+                # Render custom 404 page
+                view = HostnamePageView()
+                view.request = request
+                error_response = view._render_error_page(error_page, 404)
+                if error_response:
+                    return error_response
     except Exception:
         pass
 
@@ -902,10 +887,8 @@ def custom_500_handler(request):
             root_page = WebPage.get_root_page_for_hostname(hostname)
             if root_page:
                 # Try to find custom 500 page
-                error_page = WebPage.objects.get(
-                    parent=root_page, slug="500", is_deleted=False
-                )
-                if error_page.is_published():
+                error_page = get_page_safely(slug="500", parent=root_page)
+                if error_page and error_page.is_published():
                     # Render custom 500 page
                     view = HostnamePageView()
                     view.request = request
@@ -940,10 +923,8 @@ def custom_403_handler(request, exception=None):
             root_page = WebPage.get_root_page_for_hostname(hostname)
             if root_page:
                 # Try to find custom 403 page
-                error_page = WebPage.objects.get(
-                    parent=root_page, slug="403", is_deleted=False
-                )
-                if error_page.is_published():
+                error_page = get_page_safely(slug="403", parent=root_page)
+                if error_page and error_page.is_published():
                     # Render custom 403 page
                     view = HostnamePageView()
                     view.request = request
@@ -978,10 +959,8 @@ def custom_503_handler(request, exception=None):
             root_page = WebPage.get_root_page_for_hostname(hostname)
             if root_page:
                 # Try to find custom 503 page
-                error_page = WebPage.objects.get(
-                    parent=root_page, slug="503", is_deleted=False
-                )
-                if error_page.is_published():
+                error_page = get_page_safely(slug="503", parent=root_page)
+                if error_page and error_page.is_published():
                     # Render custom 503 page
                     view = HostnamePageView()
                     view.request = request

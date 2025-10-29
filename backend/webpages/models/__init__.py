@@ -8,6 +8,7 @@ Models have been split into separate files for better maintainability:
 - PageVersion: Version control for pages (page_version.py)
 - PageDataSchema: JSON Schema definitions for page data (page_data_schema.py)
 - PreviewSize: Preview viewport configurations (preview_size.py)
+- DuplicatePageLog: Logging for duplicate page occurrences (duplicate_page_log.py)
 """
 
 from .page_theme import PageTheme
@@ -15,6 +16,7 @@ from .web_page import WebPage
 from .page_version import PageVersion
 from .page_data_schema import PageDataSchema
 from .preview_size import PreviewSize
+from .duplicate_page_log import DuplicatePageLog
 
 __all__ = [
     "PageTheme",
@@ -22,4 +24,5 @@ __all__ = [
     "PageVersion",
     "PageDataSchema",
     "PreviewSize",
+    "DuplicatePageLog",
 ]

@@ -769,8 +769,8 @@ const TreePageManager = () => {
                                 <button
                                     onClick={() => setActiveTab('active')}
                                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'active'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
                                         }`}
                                 >
                                     Active Pages
@@ -778,8 +778,8 @@ const TreePageManager = () => {
                                 <button
                                     onClick={() => setActiveTab('deleted')}
                                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'deleted'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
                                         }`}
                                 >
                                     Deleted Pages

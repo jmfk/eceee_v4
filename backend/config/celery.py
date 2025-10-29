@@ -80,6 +80,12 @@ app.conf.beat_schedule = {
         "task": "utils.tasks.cancel_stuck_tasks",
         "schedule": crontab(minute="*/30"),
     },
+    # Send duplicate page report daily at 9 AM
+    "send-duplicate-page-report": {
+        "task": "webpages.tasks.send_duplicate_page_report",
+        "schedule": crontab(hour=9, minute=0),
+        "kwargs": {"period": "day"},
+    },
     # Health check every 5 minutes
     "health-check": {
         "task": "config.celery.debug_task",

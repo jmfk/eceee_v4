@@ -10,7 +10,14 @@ from django import forms
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import WebPage, PageVersion, PageTheme, PageDataSchema, PreviewSize
+from .models import (
+    WebPage,
+    PageVersion,
+    PageTheme,
+    PageDataSchema,
+    PreviewSize,
+    DuplicatePageLog,
+)
 import json
 
 
@@ -833,6 +840,103 @@ class PreviewSizeAdmin(admin.ModelAdmin):
             },
         ),
     ]
+
+
+@admin.register(DuplicatePageLog)
+class DuplicatePageLogAdmin(admin.ModelAdmin):
+    """Admin interface for duplicate page logs"""
+
+    list_display = [
+        "slug",
+        "parent_link",
+        "duplicate_count",
+        "occurrence_count",
+        "last_seen",
+        "resolved",
+        "email_sent",
+    ]
+    list_filter = ["resolved", "last_seen", "email_sent"]
+    search_fields = ["slug", "parent__title"]
+    readonly_fields = ["first_seen", "last_seen", "page_ids_display"]
+    ordering = ["-last_seen"]
+    date_hierarchy = "last_seen"
+
+    fieldsets = [
+        (
+            "Duplicate Information",
+            {
+                "fields": [
+                    "slug",
+                    "parent",
+                    "page_ids_display",
+                ]
+            },
+        ),
+        (
+            "Statistics",
+            {
+                "fields": [
+                    "occurrence_count",
+                    "first_seen",
+                    "last_seen",
+                ]
+            },
+        ),
+        (
+            "Status",
+            {
+                "fields": [
+                    "resolved",
+                    "email_sent",
+                    "notes",
+                ]
+            },
+        ),
+    ]
+
+    actions = ["mark_as_resolved", "mark_as_unresolved"]
+
+    @admin.display(description="Parent")
+    def parent_link(self, obj):
+        """Display parent page as a link"""
+        if obj.parent:
+            url = reverse("admin:webpages_webpage_change", args=[obj.parent.id])
+            return format_html('<a href="{}">{}</a>', url, obj.parent.title)
+        return "Root Level"
+
+    @admin.display(description="Duplicates")
+    def duplicate_count(self, obj):
+        """Display number of duplicate pages"""
+        if obj.page_ids:
+            return len(obj.page_ids)
+        return 0
+
+    @admin.display(description="Page IDs")
+    def page_ids_display(self, obj):
+        """Display page IDs as links"""
+        if not obj.page_ids:
+            return "None"
+
+        links = []
+        for page_id in obj.page_ids:
+            url = reverse("admin:webpages_webpage_change", args=[page_id])
+            links.append(
+                format_html('<a href="{}" target="_blank">ID {}</a>', url, page_id)
+            )
+
+        return format_html(", ".join(links))
+
+    @admin.action(description="Mark selected as resolved")
+    def mark_as_resolved(self, request, queryset):
+        """Mark selected duplicates as resolved"""
+        count = queryset.update(resolved=True)
+        self.message_user(request, f"{count} duplicate(s) marked as resolved")
+
+    @admin.action(description="Mark selected as unresolved")
+    def mark_as_unresolved(self, request, queryset):
+        """Mark selected duplicates as unresolved"""
+        count = queryset.update(resolved=False)
+        self.message_user(request, f"{count} duplicate(s) marked as unresolved")
 
 
 # Customize admin site headers
