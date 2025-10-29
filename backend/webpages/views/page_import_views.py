@@ -208,7 +208,9 @@ class ImportSinglePageView(APIView):
         hostname = request.data.get("hostname")
         namespace_slug = request.data.get("namespace", "default")
         base_url = request.data.get("base_url")
-        code_layout = request.data.get("code_layout", "")  # Empty string if not provided
+        code_layout = request.data.get(
+            "code_layout", ""
+        )  # Empty string if not provided
         request_delay = request.data.get("request_delay", 2.0)
 
         # Validate
@@ -249,7 +251,6 @@ class ImportSinglePageView(APIView):
                 base_url=base_url,
                 code_layout=code_layout,
             )
-
             return Response(result, status=status.HTTP_200_OK)
 
         except Exception as e:

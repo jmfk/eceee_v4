@@ -83,6 +83,14 @@ class SinglePageImporter:
             existing_page = self._check_existing(slug, parent_page)
 
             if existing_page:
+                # Build full hierarchical path (ignoring silent slugs)
+                path_parts = [existing_page.slug]
+                current = existing_page.parent
+                while current:
+                    path_parts.insert(0, current.slug)
+                    current = current.parent
+                full_path = "/" + "/".join(path_parts) + "/"
+
                 logger.warning(f"Slug '{slug}' already exists, skipping: {url}")
                 result["success"] = True
                 result["page"] = {
@@ -91,8 +99,9 @@ class SinglePageImporter:
                     "title": existing_page.title,  # Use existing page title
                     "url": url,
                     "skipped": True,
-                    "reason": "Slug already exists",
+                    "reason": f"Page already exists at {full_path}",
                     "use_as_parent_id": existing_page.id,  # Use this for children
+                    "full_path": full_path,
                 }
             else:
                 # Create page
@@ -106,6 +115,14 @@ class SinglePageImporter:
                         code_layout=code_layout,
                     )
 
+                # Build full path
+                path_parts = [page.slug]
+                current = page.parent
+                while current:
+                    path_parts.insert(0, current.slug)
+                    current = current.parent
+                full_path = "/" + "/".join(path_parts) + "/"
+
                 logger.info(f"Created page: {page.slug} (from {url})")
                 result["success"] = True
                 result["page"] = {
@@ -115,6 +132,7 @@ class SinglePageImporter:
                     "url": url,
                     "skipped": False,
                     "use_as_parent_id": page.id,  # Use this for children
+                    "full_path": full_path,
                 }
 
                 # Add warning if slug was modified

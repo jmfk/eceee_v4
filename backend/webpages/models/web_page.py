@@ -1747,11 +1747,13 @@ class WebPage(models.Model):
                             "deletion_metadata",
                         ]
                     )
-                    deleted_pages.append({
-                        "id": descendant.id,
-                        "title": descendant.title,
-                        "slug": descendant.slug,
-                    })
+                    deleted_pages.append(
+                        {
+                            "id": descendant.id,
+                            "title": descendant.title,
+                            "slug": descendant.slug,
+                        }
+                    )
 
         # Delete the page itself
         if not self.is_deleted:
@@ -1767,11 +1769,13 @@ class WebPage(models.Model):
                     "deletion_metadata",
                 ]
             )
-            deleted_pages.append({
-                "id": self.id,
-                "title": self.title,
-                "slug": self.slug,
-            })
+            deleted_pages.append(
+                {
+                    "id": self.id,
+                    "title": self.title,
+                    "slug": self.slug,
+                }
+            )
 
         return {
             "total_count": len(deleted_pages),
@@ -1963,6 +1967,73 @@ class WebPage(models.Model):
             # Was originally a root page
             result["new_parent_id"] = None
             return result
+
+    def permanent_delete(self, recursive=False):
+        """
+        Permanently delete this page from the database.
+
+        WARNING: This action is irreversible. The page and all associated data
+        will be permanently removed from the database.
+
+        Args:
+            recursive: If True, also permanently delete all descendant pages
+
+        Returns:
+            dict: Deletion result with total count and list of deleted pages
+                {
+                    "total_count": int,
+                    "deleted_pages": [
+                        {"id": int, "title": str, "slug": str},
+                        ...
+                    ]
+                }
+
+        Raises:
+            ValidationError: If the page is not soft-deleted
+        """
+        if not self.is_deleted:
+            raise ValidationError(
+                "Cannot permanently delete a page that is not soft-deleted. "
+                "Use soft_delete() first."
+            )
+
+        deleted_pages = []
+
+        if recursive:
+            # Get all descendants (including deleted ones)
+            descendants = self.get_all_descendants(include_deleted=True)
+            for descendant in descendants:
+                # Only delete if already soft-deleted
+                if descendant.is_deleted:
+                    deleted_pages.append(
+                        {
+                            "id": descendant.id,
+                            "title": descendant.title,
+                            "slug": descendant.slug,
+                        }
+                    )
+                    # Actually delete from database
+                    descendant.delete()
+
+        # Delete the page itself
+        deleted_pages.append(
+            {
+                "id": self.id,
+                "title": self.title,
+                "slug": self.slug,
+            }
+        )
+
+        # Store info before deletion
+        page_id = self.id
+
+        # Actually delete from database
+        super().delete()
+
+        return {
+            "total_count": len(deleted_pages),
+            "deleted_pages": deleted_pages,
+        }
 
     def get_all_descendants(self, include_deleted=False):
         """

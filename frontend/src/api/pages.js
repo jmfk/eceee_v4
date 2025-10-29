@@ -366,7 +366,40 @@ export const pagesApi = {
      */
     bulkRestore: wrapApiCall(async (pageIds, recursive = false) => {
         return api.post(endpoints.pages.bulkRestore, { pageIds, recursive })
-    }, 'pages.bulkRestore')
+    }, 'pages.bulkRestore'),
+
+    /**
+     * Permanently delete a soft-deleted page
+     * WARNING: This action is irreversible!
+     * @param {number} pageId - Page ID to permanently delete
+     * @param {Object} options - Deletion options
+     * @param {boolean} options.recursive - Whether to permanently delete all soft-deleted descendants
+     * @returns {Promise<Object>}
+     */
+    permanentDelete: wrapApiCall(async (pageId, options = {}) => {
+        return api.delete(`${endpoints.pages.detail(pageId)}/permanent-delete/`, { data: options })
+    }, 'pages.permanentDelete'),
+
+    /**
+     * Bulk permanently delete multiple soft-deleted pages
+     * WARNING: This action is irreversible!
+     * @param {number[]} pageIds - Array of page IDs to permanently delete
+     * @param {boolean} recursive - Whether to permanently delete descendants
+     * @returns {Promise<Object>}
+     */
+    bulkPermanentDelete: wrapApiCall(async (pageIds, recursive = false) => {
+        return api.post(`${endpoints.pages.base}/bulk-permanent-delete/`, { pageIds, recursive })
+    }, 'pages.bulkPermanentDelete'),
+
+    /**
+     * Permanently delete ALL soft-deleted pages
+     * WARNING: This action is irreversible!
+     * @param {boolean} confirm - Must be true to proceed
+     * @returns {Promise<Object>}
+     */
+    permanentDeleteAll: wrapApiCall(async (confirm = false) => {
+        return api.post(`${endpoints.pages.base}/permanent-delete-all/`, { confirm })
+    }, 'pages.permanentDeleteAll')
 }
 
 // Legacy exports for backward compatibility

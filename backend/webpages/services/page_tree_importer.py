@@ -198,8 +198,16 @@ class PageTreeImporter:
                 ).first()
 
             if existing_page:
+                # Build full hierarchical path (ignoring silent slugs)
+                path_parts = [existing_page.slug]
+                current = existing_page.parent
+                while current:
+                    path_parts.insert(0, current.slug)
+                    current = current.parent
+                full_path = "/" + "/".join(path_parts) + "/"
+
                 logger.warning(
-                    f"Slug '{slug}' already exists under parent, skipping: {crawled_page.url}"
+                    f"Page already exists at {full_path}, skipping: {crawled_page.url}"
                 )
                 self.progress.pages_skipped += 1
                 # Use existing page as parent for children

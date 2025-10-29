@@ -34,46 +34,44 @@ const getShortUrl = (url) => {
 }
 
 /**
- * Find the parent URL for a given URL based on path hierarchy
- * E.g., /summerstudy/about/evaluations → parent is /summerstudy/about
+ * Normalize URL to path for consistent matching
+ * Always uses trailing slash
+ * E.g., https://example.com/summerstudy → /summerstudy/
  */
-const findParentUrl = (url, allUrls) => {
+const normalizeToPath = (url) => {
     try {
         const urlObj = new URL(url)
-        const pathParts = urlObj.pathname.split('/').filter(Boolean)
-
-        // If it's a root path or single segment, no parent
-        if (pathParts.length <= 1) {
-            return null
+        let path = urlObj.pathname
+        // Ensure trailing slash for consistency
+        if (!path.endsWith('/')) {
+            path += '/'
         }
-
-        // Build parent path by removing last segment
-        const parentPathParts = pathParts.slice(0, -1)
-        const parentPath = '/' + parentPathParts.join('/')
-
-        // Construct potential parent URL
-        const parentUrl = `${urlObj.protocol}//${urlObj.host}${parentPath}`
-
-        // Check if parent URL exists in our list
-        if (allUrls.includes(parentUrl)) {
-            return parentUrl
-        }
-
-        // Also try without trailing slash normalization
-        const parentUrlNoSlash = parentUrl.endsWith('/') ? parentUrl.slice(0, -1) : parentUrl
-        const parentUrlWithSlash = parentUrl.endsWith('/') ? parentUrl : parentUrl + '/'
-
-        if (allUrls.includes(parentUrlNoSlash)) {
-            return parentUrlNoSlash
-        }
-        if (allUrls.includes(parentUrlWithSlash)) {
-            return parentUrlWithSlash
-        }
-
-        return null
+        return path
     } catch (e) {
+        return url
+    }
+}
+
+/**
+ * Find the parent path for a given path based on hierarchy
+ * E.g., /summerstudy/about/evaluations/ → parent is /summerstudy/about/
+ */
+const findParentPath = (path, allPaths) => {
+    // path is already normalized (e.g., /summerstudy/programme/)
+    const pathParts = path.split('/').filter(Boolean)
+
+    if (pathParts.length <= 1) {
         return null
     }
+
+    const parentPathParts = pathParts.slice(0, -1)
+    const parentPath = '/' + parentPathParts.join('/') + '/'
+
+    if (allPaths.includes(parentPath)) {
+        return parentPath
+    }
+
+    return null
 }
 
 const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) => {
@@ -87,14 +85,18 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
 
     // Queue management
     const [queue, setQueue] = useState([]) // URLs to process
-    const [completed, setCompleted] = useState([]) // {url, title, slug, skipped}
+    const [completed, setCompleted] = useState([]) // {url, title, slug, fullPath, skipped}
     const [failed, setFailed] = useState([]) // {url, error}
     const [currentUrl, setCurrentUrl] = useState(null)
-    const [visitedUrls, setVisitedUrls] = useState(new Set())
+    const [visitedPaths, setVisitedPaths] = useState(new Set())
     const [isFirstPage, setIsFirstPage] = useState(true) // Track if processing first page
 
-    // URL to parent page ID mapping (critical for hierarchy)
-    const [urlToParentMap, setUrlToParentMap] = useState({})
+    // Path to parent page ID mapping (critical for hierarchy)
+    const [pathToParentMap, setPathToParentMap] = useState({})
+
+    // Path to created page ID mapping (for finding parents)
+    // Use ref to avoid stale closure issues in async callbacks
+    const pathToPageIdMapRef = useRef({})
 
     // Use ref to track if import should stop
     const shouldStopRef = useRef(false)
@@ -123,8 +125,9 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
             setCompleted([])
             setFailed([])
             setCurrentUrl(null)
-            setVisitedUrls(new Set())
-            setUrlToParentMap({})
+            setVisitedPaths(new Set())
+            setPathToParentMap({})
+            pathToPageIdMapRef.current = {}
             setIsFirstPage(true)
             shouldStopRef.current = false
             onClose()
@@ -148,18 +151,19 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
 
         // Initialize queue with start URL
         setQueue([startUrl])
-        setVisitedUrls(new Set([startUrl]))
+        const startPath = normalizeToPath(startUrl)
+        setVisitedPaths(new Set([startPath]))
         setCompleted([])
         setFailed([])
 
-        // Initialize URL to parent mapping
+        // Initialize path to parent mapping
         // The start URL imports under the specified parent (or as root)
         // For subpage mode, the start URL's children will be imported under it
         const initialMapping = {}
         if (importMode === 'subpage' && parentPage?.id) {
-            initialMapping[startUrl] = parentPage.id
+            initialMapping[startPath] = parentPage.id
         }
-        setUrlToParentMap(initialMapping)
+        setPathToParentMap(initialMapping)
         setIsFirstPage(true)
 
         shouldStopRef.current = false
@@ -173,7 +177,8 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
 
     const handleSkipUrl = (url) => {
         setQueue(prev => prev.filter(u => u !== url))
-        setVisitedUrls(prev => new Set([...prev, url]))
+        const path = normalizeToPath(url)
+        setVisitedPaths(prev => new Set([...prev, path]))
     }
 
     // Process queue
@@ -214,14 +219,26 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                     options.codeLayout = codeLayout
                 }
 
-                // Determine parent for this URL
-                // Use mapping if available, otherwise use initial parent
-                const urlParentId = urlToParentMap[url]
+                // Normalize URL to path
+                const currentPath = normalizeToPath(url)
 
-                if (importMode === 'root' && !urlParentId) {
+                // Determine parent for this URL
+                // Use mapping if available, otherwise try to find parent dynamically
+                let parentPageId = pathToParentMap[currentPath]
+
+                // If no mapping exists, try to find parent path and look up its page ID
+                if (!parentPageId) {
+                    const allKnownPaths = Object.keys(pathToPageIdMapRef.current)
+                    const parentPath = findParentPath(currentPath, allKnownPaths)
+                    if (parentPath && pathToPageIdMapRef.current[parentPath]) {
+                        parentPageId = pathToPageIdMapRef.current[parentPath]
+                    }
+                }
+
+                if (importMode === 'root' && !parentPageId) {
                     options.hostname = hostname
                 } else {
-                    options.parentPageId = urlParentId || parentPage?.id
+                    options.parentPageId = parentPageId || parentPage?.id
                 }
 
                 const result = await pageImportApi.importSinglePage(url, options)
@@ -233,7 +250,8 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                         importMode === 'subpage' &&
                         result.page?.slug === parentPage?.slug
 
-                    let pageId = result.page?.useAsParentId
+                    // Use useAsParentId if available, otherwise fallback to page.id for skipped pages
+                    let pageId = result.page?.useAsParentId || result.page?.id
 
                     if (shouldMergeWithParent) {
                         // Don't create duplicate - use parent page instead
@@ -244,6 +262,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                             url,
                             title: result.page?.title || 'Untitled',
                             slug: result.page?.slug || '',
+                            fullPath: result.page?.fullPath || `/${result.page?.slug || ''}`,
                             skipped: true,
                             reason: `Merged with parent page "${parentPage.title || parentPage.slug}"`
                         }])
@@ -254,6 +273,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                             url,
                             title: result.page?.title || 'Untitled',
                             slug: result.page?.slug || '',
+                            fullPath: result.page?.fullPath || `/${result.page?.slug || ''}`,
                             skipped: result.page?.skipped || false,
                             reason: result.page?.reason || null
                         }])
@@ -264,38 +284,54 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                         setIsFirstPage(false)
                     }
 
-                    // Add discovered URLs to queue (if not visited)
+                    // Store the created page ID for this path in ref (synchronous, no stale closure issues)
+                    pathToPageIdMapRef.current = {
+                        ...pathToPageIdMapRef.current,
+                        [currentPath]: pageId
+                    }
+                    const updatedPathToPageMap = pathToPageIdMapRef.current
+
+                    // Now process discovered URLs with the fresh map
                     if (result.discoveredUrls && result.discoveredUrls.length > 0) {
-                        const newUrls = result.discoveredUrls.filter(u => !visitedUrls.has(u))
-                        if (newUrls.length > 0) {
-                            setQueue(prev => [...prev, ...newUrls])
-                            setVisitedUrls(prev => new Set([...prev, ...newUrls]))
+                        // Normalize and deduplicate discovered URLs
+                        const discoveredPaths = result.discoveredUrls.map(normalizeToPath)
+                        const uniquePaths = [...new Set(discoveredPaths)] // Remove duplicates
+                        const newPaths = uniquePaths.filter(p => !visitedPaths.has(p))
 
-                            // Map each discovered URL to its correct parent based on URL structure
-                            setUrlToParentMap(prev => {
-                                const newMapping = { ...prev }
-
-                                // Update current URL mapping
-                                if (pageId) {
-                                    newMapping[url] = pageId
+                        if (newPaths.length > 0) {
+                            // Find corresponding URLs for the new paths (for queue display)
+                            const pathToUrlMap = {}
+                            result.discoveredUrls.forEach(url => {
+                                const path = normalizeToPath(url)
+                                if (!pathToUrlMap[path]) {
+                                    pathToUrlMap[path] = url
                                 }
-
-                                newUrls.forEach(discoveredUrl => {
-                                    // Find parent URL based on path hierarchy
-                                    const allProcessedUrls = [...Object.keys(newMapping), url]
-                                    const parentUrl = findParentUrl(discoveredUrl, allProcessedUrls)
-
-                                    if (parentUrl && newMapping[parentUrl]) {
-                                        // Use the page ID from the parent URL
-                                        newMapping[discoveredUrl] = newMapping[parentUrl]
-                                    } else if (pageId) {
-                                        // Fallback: use current page as parent (or merged parent for first page)
-                                        newMapping[discoveredUrl] = pageId
-                                    }
-                                })
-
-                                return newMapping
                             })
+                            const newUrls = newPaths.map(p => pathToUrlMap[p])
+
+                            setQueue(q => [...q, ...newUrls])
+                            setVisitedPaths(v => new Set([...v, ...newPaths]))
+
+                            // Build parent mappings using the updated map
+                            const newParentMappings = {}
+                            newPaths.forEach(discoveredPath => {
+                                // Find parent path based on hierarchy
+                                const allKnownPaths = Object.keys(updatedPathToPageMap)
+                                const parentPath = findParentPath(discoveredPath, allKnownPaths)
+
+                                if (parentPath && updatedPathToPageMap[parentPath]) {
+                                    // Parent path found in map - use its page ID
+                                    newParentMappings[discoveredPath] = updatedPathToPageMap[parentPath]
+                                }
+                                // Otherwise: Parent path not in map yet (or no parent found)
+                                // DON'T add a mapping - will be determined dynamically at processing time
+                            })
+
+                            // Update parent map with all new mappings
+                            setPathToParentMap(prev => ({
+                                ...prev,
+                                ...newParentMappings
+                            }))
                         }
                     }
                 } else if (result.error) {
@@ -314,12 +350,12 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
         }
 
         processNext()
-    }, [isImporting, queue, currentUrl, namespace, codeLayout, requestDelay, startUrl, importMode, hostname, parentPage, onSuccess, visitedUrls])
+    }, [isImporting, queue, currentUrl, namespace, codeLayout, requestDelay, startUrl, importMode, hostname, parentPage, onSuccess, visitedPaths, pathToParentMap])
 
     if (!isOpen) return null
 
     const stats = {
-        total: visitedUrls.size,
+        total: visitedPaths.size,
         completed: completed.length,
         failed: failed.length,
         inQueue: queue.length,
@@ -579,7 +615,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                         {completed.map((item, idx) => (
                                             <div key={idx} className="bg-white p-2 rounded text-xs">
                                                 <p className="font-medium text-green-900">{item.title}</p>
-                                                <p className="text-green-700">/{item.slug}</p>
+                                                <p className="text-green-700">{item.fullPath}</p>
                                                 {item.skipped && (
                                                     <p className="text-orange-600 text-xs mt-1">
                                                         ⚠️ {item.reason}

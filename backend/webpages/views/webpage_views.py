@@ -688,6 +688,178 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path="permanent-delete",
+        permission_classes=[permissions.IsAdminUser],
+    )
+    def permanent_delete(self, request, pk=None):
+        """
+        Permanently delete a soft-deleted page (staff/admin only).
+
+        WARNING: This action is irreversible!
+
+        Request body:
+        {
+            "recursive": bool  // If True, also permanently delete all soft-deleted descendants
+        }
+        """
+        page = self.get_object()
+
+        if not page.is_deleted:
+            return Response(
+                {
+                    "error": "Page is not soft-deleted. Only soft-deleted pages can be permanently deleted."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        recursive = request.data.get("recursive", False)
+
+        # Perform permanent deletion
+        try:
+            result = page.permanent_delete(recursive=recursive)
+
+            return Response(
+                {
+                    "message": f"Successfully permanently deleted {result['total_count']} page(s)",
+                    "result": result,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Permanent deletion failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="bulk-permanent-delete",
+        permission_classes=[permissions.IsAdminUser],
+    )
+    def bulk_permanent_delete(self, request):
+        """
+        Bulk permanently delete soft-deleted pages (staff/admin only).
+
+        WARNING: This action is irreversible!
+
+        Request body:
+        {
+            "page_ids": [1, 2, 3],
+            "recursive": true  // optional, default false
+        }
+        """
+        page_ids = request.data.get("page_ids", [])
+        recursive = request.data.get("recursive", False)
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch soft-deleted pages
+        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=True)
+
+        if not pages.exists():
+            return Response(
+                {"error": "No soft-deleted pages found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Perform permanent deletion
+        total_deleted = 0
+        deleted_pages = []
+        errors = []
+
+        for page in pages:
+            try:
+                result = page.permanent_delete(recursive=recursive)
+                total_deleted += result["total_count"]
+                deleted_pages.extend(result["deleted_pages"])
+            except Exception as e:
+                errors.append(
+                    {
+                        "page_id": page.id,
+                        "error": str(e),
+                    }
+                )
+
+        return Response(
+            {
+                "message": f"Successfully permanently deleted {total_deleted} page(s)",
+                "total_deleted": total_deleted,
+                "deleted_pages": deleted_pages,
+                "errors": errors,
+                "recursive": recursive,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="permanent-delete-all",
+        permission_classes=[permissions.IsAdminUser],
+    )
+    def permanent_delete_all(self, request):
+        """
+        Permanently delete ALL soft-deleted pages (staff/admin only).
+
+        WARNING: This action is irreversible! It will delete ALL soft-deleted pages.
+
+        Request body:
+        {
+            "confirm": true  // Must be true to proceed
+        }
+        """
+        confirm = request.data.get("confirm", False)
+
+        if not confirm:
+            return Response(
+                {
+                    "error": "confirm must be set to true to permanently delete all pages"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get all soft-deleted pages
+        deleted_pages = WebPage.objects.filter(is_deleted=True)
+
+        if not deleted_pages.exists():
+            return Response(
+                {
+                    "message": "No soft-deleted pages found",
+                    "total_deleted": 0,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Count before deletion
+        page_count = deleted_pages.count()
+        deleted_page_list = [
+            {
+                "id": page.id,
+                "title": page.title,
+                "slug": page.slug,
+            }
+            for page in deleted_pages
+        ]
+
+        # Permanently delete all
+        deleted_pages.delete()
+
+        return Response(
+            {
+                "message": f"Successfully permanently deleted all {page_count} soft-deleted page(s)",
+                "total_deleted": page_count,
+                "deleted_pages": deleted_page_list,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=False, methods=["post"], url_path="bulk-publish")
     def bulk_publish(self, request):
         """
