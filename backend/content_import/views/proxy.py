@@ -13,6 +13,7 @@ from django.conf import settings
 
 from ..services.proxy_service import ProxyService
 from ..utils.token_signing import verify_proxy_token
+from ..utils.image_resolution import find_highest_resolution, get_image_dimensions
 
 
 logger = logging.getLogger(__name__)
@@ -79,9 +80,11 @@ class ProxyAssetView(APIView):
         """
         Fetch an asset from external URL with token validation.
 
+        For images, automatically detects and serves the highest resolution available.
+
         GET /api/content-import/proxy-asset/?url=https://example.com/image.jpg&token=signed_token
 
-        Returns the asset with appropriate content type
+        Returns the asset with appropriate content type and resolution headers
         """
         url = request.GET.get("url")
         token = request.GET.get("token")
@@ -97,12 +100,12 @@ class ProxyAssetView(APIView):
         # Decode URL
         url = unquote(url)
 
-        # Validate the token
+        # Validate the token and get metadata
         try:
             max_age = getattr(
                 settings, "CONTENT_IMPORT_PROXY_TOKEN_MAX_AGE", 3600  # Default: 1 hour
             )
-            verify_proxy_token(url, token, max_age=max_age)
+            metadata = verify_proxy_token(url, token, max_age=max_age)
 
         except SignatureExpired:
             return HttpResponse(
@@ -118,11 +121,9 @@ class ProxyAssetView(APIView):
 
         # Token is valid, fetch the asset
         try:
-            # Fetch asset with response headers
-            asset_response = requests.get(url, timeout=30)
-            asset_response.raise_for_status()
-            asset_bytes = asset_response.content
-            content_type = asset_response.headers.get(
+            # Determine content type first
+            initial_response = requests.head(url, timeout=10)
+            content_type = initial_response.headers.get(
                 "content-type", "application/octet-stream"
             )
 
@@ -143,7 +144,72 @@ class ProxyAssetView(APIView):
                 elif url.endswith(".webp"):
                     content_type = "image/webp"
 
-            return HttpResponse(asset_bytes, content_type=content_type)
+            # High-resolution detection for images
+            resolution_info = None
+            final_url = url
+
+            is_image = content_type and content_type.startswith("image/")
+            if is_image and not content_type.startswith("image/svg"):
+                # Extract srcset from metadata
+                srcset_data = None
+                if metadata and "srcset" in metadata:
+                    srcset_data = metadata["srcset"]
+
+                # Find highest resolution version
+                try:
+                    resolution_info = find_highest_resolution(
+                        base_url=url,
+                        srcset=srcset_data,
+                        check_patterns=True,
+                        max_checks=10,
+                    )
+                    final_url = resolution_info["url"]
+                    logger.info(
+                        f"High-res detection: {url} -> {final_url} "
+                        f"({resolution_info['multiplier']}x from {resolution_info['source']})"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"High-res detection failed for {url}: {e}, using original"
+                    )
+                    resolution_info = None
+
+            # Fetch the final asset (potentially high-res version)
+            asset_response = requests.get(final_url, timeout=30)
+            asset_response.raise_for_status()
+            asset_bytes = asset_response.content
+
+            # Get image dimensions if it's an image
+            dimensions = None
+            if is_image and resolution_info:
+                dimensions = get_image_dimensions(asset_bytes)
+                if dimensions:
+                    resolution_info["dimensions"] = dimensions
+
+            # Create response with custom headers
+            response = HttpResponse(asset_bytes, content_type=content_type)
+
+            # Add resolution headers for images
+            if resolution_info:
+                multiplier = resolution_info["multiplier"]
+                # Format multiplier as "2x", "3x", "1x"
+                if multiplier == int(multiplier):
+                    multiplier_str = f"{int(multiplier)}x"
+                else:
+                    multiplier_str = f"{multiplier:.1f}x"
+
+                response["X-Image-Resolution"] = multiplier_str
+                response["X-Resolution-Source"] = resolution_info["source"]
+
+                if dimensions:
+                    response["X-Image-Dimensions"] = f"{dimensions[0]}x{dimensions[1]}"
+
+                # Allow frontend to read these custom headers
+                response["Access-Control-Expose-Headers"] = (
+                    "X-Image-Resolution, X-Resolution-Source, X-Image-Dimensions"
+                )
+
+            return response
 
         except Exception as e:
             logger.error(f"Failed to fetch asset: {e}")
