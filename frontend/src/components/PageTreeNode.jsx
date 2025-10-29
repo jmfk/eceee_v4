@@ -230,47 +230,44 @@ const PageTreeNode = memo(({
 
     const handleDelete = async () => {
         let message = `Are you sure you want to delete "${page.title}"?`
+        let descendants = []
 
-        // If page has children, fetch them to show what will be deleted
+        // If page has children, fetch them recursively to show what will be deleted
         if (hasChildren && page.childrenCount > 0) {
             try {
-                // Load children if not already loaded
-                if (!childrenLoaded) {
-                    await loadChildren()
-                }
-
-                // Collect all descendant pages recursively
-                const collectDescendants = (pages, collected = []) => {
-                    pages.forEach(p => {
-                        collected.push(p)
-                        if (p.children && p.children.length > 0) {
-                            collectDescendants(p.children, collected)
-                        } else if (childrenRef.current) {
-                            // Check if this page's children are loaded in childrenRef
-                            const childNode = childrenRef.current.find(c => c.id === p.id)
-                            if (childNode && childNode.children && childNode.children.length > 0) {
-                                collectDescendants(childNode.children, collected)
-                            }
+                // Recursive function to fetch all descendants
+                const fetchAllDescendants = async (pageId) => {
+                    const children = await pagesApi.getPageChildren(pageId)
+                    const allDescendants = []
+                    
+                    for (const child of children.results || []) {
+                        allDescendants.push(child)
+                        // If this child has children, fetch them recursively
+                        if (child.childrenCount > 0) {
+                            const childDescendants = await fetchAllDescendants(child.id)
+                            allDescendants.push(...childDescendants)
                         }
-                    })
-                    return collected
+                    }
+                    
+                    return allDescendants
                 }
 
-                const descendants = collectDescendants(childrenRef.current || [])
+                // Fetch all descendants recursively
+                descendants = await fetchAllDescendants(page.id)
                 const totalCount = descendants.length + 1 // +1 for the page itself
 
                 if (descendants.length > 0) {
                     // Create a list of pages that will be deleted
                     const pageList = descendants.slice(0, 10).map(p => `• ${p.title}`).join('\n')
-                    const moreText = descendants.length > 10 ? `\n... and ${descendants.length - 10} more pages` : ''
+                    const moreText = descendants.length > 10 ? `\n... and ${descendants.length - 10} more subpages` : ''
 
-                    message = `This page has ${descendants.length} subpage(s). Deleting "${page.title}" will also delete:\n\n${pageList}${moreText}\n\nTotal pages to delete: ${totalCount}\n\nThis action cannot be undone.`
+                    message = `⚠️ RECURSIVE DELETION\n\nDeleting "${page.title}" will also delete ALL ${descendants.length} subpage(s):\n\n${pageList}${moreText}\n\nTotal pages to delete: ${totalCount}\n\nThis action cannot be undone.`
                 }
             } catch (error) {
-                console.error('Error loading children for delete confirmation:', error)
+                console.error('Error loading descendants for delete confirmation:', error)
                 // Fall back to showing count if available
                 if (page.childrenCount > 0) {
-                    message = `This page has ${page.childrenCount} subpage(s). Deleting "${page.title}" will also delete all of its subpages recursively.\n\nThis action cannot be undone.`
+                    message = `⚠️ RECURSIVE DELETION\n\nThis page has ${page.childrenCount} direct subpage(s). Deleting "${page.title}" will also delete ALL of its subpages and their descendants recursively.\n\nThis action cannot be undone.`
                 }
             }
         } else {
@@ -640,7 +637,7 @@ const PageTreeNode = memo(({
             {/* Main node */}
             <div
                 className={`
-                    flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} hover:bg-gray-50 group relative
+                    flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
                     ${isCut ? 'opacity-60 bg-orange-50' : ''}
                     ${isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
                     ${page.isSearchResult && !isSelected ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
@@ -1036,7 +1033,7 @@ const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {
     }
 
     return (
-        <div className="fixed inset-0 bg-orange-50 bg-opacity-10 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-orange-50/10 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-medium text-gray-900">
