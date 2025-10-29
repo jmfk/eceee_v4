@@ -149,7 +149,8 @@ const PageTreeNode = memo(({
     onDelete,
     onAddPageBelow,
     onImport,
-    cutPageId,
+    cutPageIds = [],
+    copyPageIds = [],
     isSearchMode = false,
     searchTerm = '',
     rowHeight = 'compact',
@@ -193,7 +194,10 @@ const PageTreeNode = memo(({
     const hasChildren = useMemo(() => pageTreeUtils.hasChildren(page), [page])
 
     // Check if page is cut (memoized)
-    const isCut = useMemo(() => cutPageId === page.id, [cutPageId, page.id])
+    const isCut = useMemo(() => cutPageIds.includes(page.id), [cutPageIds, page.id])
+
+    // Check if page is copied (memoized)
+    const isCopied = useMemo(() => copyPageIds.includes(page.id), [copyPageIds, page.id])
 
     // Check if page is selected (memoized)
     const isSelected = useMemo(() => selectedPageIds.has(page.id), [selectedPageIds, page.id])
