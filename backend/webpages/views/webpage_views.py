@@ -8,7 +8,8 @@ from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.throttling import UserRateThrottle
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Exists, OuterRef
+from django.db import models
+from django.db.models import Q, Exists, OuterRef, F
 from django.utils import timezone
 
 from ..models import WebPage, PageVersion
@@ -558,6 +559,280 @@ class WebPageViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=False, methods=["post"], url_path="bulk-publish")
+    def bulk_publish(self, request):
+        """
+        Bulk publish multiple pages.
+
+        Request body:
+        {
+            "page_ids": [1, 2, 3],
+            "change_summary": "Bulk publish operation"  // optional
+        }
+        """
+        page_ids = request.data.get("page_ids", [])
+        change_summary = request.data.get("change_summary", "Bulk publish operation")
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Use publishing service
+        from ..publishing import PublishingService
+
+        publishing_service = PublishingService(request.user)
+        published_count, errors = publishing_service.bulk_publish_pages(
+            page_ids, change_summary
+        )
+
+        response_data = {
+            "message": f"Successfully published {published_count} page(s)",
+            "published_count": published_count,
+        }
+
+        if errors:
+            response_data["errors"] = errors
+            response_data["message"] += f" with {len(errors)} error(s)"
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="bulk-unpublish")
+    def bulk_unpublish(self, request):
+        """
+        Bulk unpublish multiple pages.
+
+        Request body:
+        {
+            "page_ids": [1, 2, 3],
+            "change_summary": "Bulk unpublish operation"  // optional
+        }
+        """
+        page_ids = request.data.get("page_ids", [])
+        change_summary = request.data.get("change_summary", "Bulk unpublish operation")
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch pages
+        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
+
+        if not pages.exists():
+            return Response(
+                {"error": "No valid pages found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Unpublish each page
+        unpublished_count = 0
+        errors = []
+
+        for page in pages:
+            try:
+                # Get latest version
+                latest_version = page.versions.order_by("-version_number").first()
+
+                if not latest_version:
+                    # Create a new version if none exists
+                    latest_version = page.create_version(request.user, change_summary)
+
+                # Clear effective_date to unpublish
+                latest_version.effective_date = None
+                latest_version.save(update_fields=["effective_date"])
+
+                unpublished_count += 1
+
+            except Exception as e:
+                error_msg = f"Failed to unpublish {page.title}: {str(e)}"
+                errors.append(error_msg)
+
+        response_data = {
+            "message": f"Successfully unpublished {unpublished_count} page(s)",
+            "unpublished_count": unpublished_count,
+        }
+
+        if errors:
+            response_data["errors"] = errors
+            response_data["message"] += f" with {len(errors)} error(s)"
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="duplicate")
+    def duplicate(self, request, pk=None):
+        """
+        Create a duplicate of this page.
+
+        Creates a copy with:
+        - Same parent
+        - Title with "(Copy)" suffix
+        - Slug with "-copy" suffix (with number if needed)
+        - All page data, widgets, and settings copied
+        - Placed after original page (sortOrder + 1)
+        """
+        page = self.get_object()
+
+        # Generate new title and slug
+        new_title = f"{page.title} (Copy)"
+        base_slug = f"{page.slug}-copy"
+
+        # Find unique slug
+        new_slug = base_slug
+        counter = 1
+        while WebPage.objects.filter(
+            parent=page.parent, slug=new_slug, is_deleted=False
+        ).exists():
+            new_slug = f"{base_slug}-{counter}"
+            counter += 1
+
+        try:
+            # Get latest version to copy from
+            latest_version = page.versions.order_by("-version_number").first()
+
+            # Create new page
+            new_page = WebPage.objects.create(
+                parent=page.parent,
+                slug=new_slug,
+                sort_order=page.sort_order + 1,
+                created_by=request.user,
+                last_modified_by=request.user,
+            )
+
+            # Create version with copied data
+            if latest_version:
+                new_version = PageVersion.objects.create(
+                    page=new_page,
+                    version_number=1,
+                    created_by=request.user,
+                    change_summary="Duplicated from original page",
+                    # Copy version data
+                    title=new_title,
+                    layout_name=latest_version.layout_name,
+                    theme_id=latest_version.theme_id,
+                    widgets=latest_version.widgets,
+                    page_data=latest_version.page_data,
+                    seo_title=latest_version.seo_title,
+                    seo_description=latest_version.seo_description,
+                    seo_keywords=latest_version.seo_keywords,
+                    # Don't copy publishing dates - start as draft
+                    effective_date=None,
+                    expiry_date=None,
+                )
+            else:
+                # No version exists, create basic version
+                new_version = new_page.create_version(
+                    request.user, "Duplicated from original page"
+                )
+                new_version.title = new_title
+                new_version.save()
+
+            # Shift sort orders of pages after this one
+            WebPage.objects.filter(
+                parent=page.parent, sort_order__gt=page.sort_order, is_deleted=False
+            ).update(sort_order=F("sort_order") + 1)
+
+            serializer = self.get_serializer(new_page)
+            return Response(
+                {
+                    "message": f"Page duplicated successfully as '{new_title}'",
+                    "page": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to duplicate page: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["post"], url_path="bulk-move")
+    def bulk_move(self, request):
+        """
+        Move multiple pages to a new parent.
+
+        Request body:
+        {
+            "page_ids": [1, 2, 3],
+            "parent_id": 5,  // null for root level
+            "sort_order": 10  // optional, where to place first page
+        }
+        """
+        page_ids = request.data.get("page_ids", [])
+        parent_id = request.data.get("parent_id")
+        sort_order = request.data.get("sort_order", 0)
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get parent page if specified
+        parent_page = None
+        if parent_id:
+            try:
+                parent_page = WebPage.objects.get(id=parent_id, is_deleted=False)
+            except WebPage.DoesNotExist:
+                return Response(
+                    {"error": f"Parent page {parent_id} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        # Fetch pages to move
+        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
+
+        if not pages.exists():
+            return Response(
+                {"error": "No valid pages found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Check for circular references
+        if parent_page:
+            for page in pages:
+                # Check if trying to move parent into its own child
+                ancestor = parent_page
+                while ancestor:
+                    if ancestor.id == page.id:
+                        return Response(
+                            {
+                                "error": f"Cannot move page '{page.title}' into its own descendant"
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    ancestor = ancestor.parent
+
+        # Move pages
+        moved_count = 0
+        errors = []
+        current_sort_order = sort_order
+
+        for page in pages:
+            try:
+                page.parent = parent_page
+                page.sort_order = current_sort_order
+                page.last_modified_by = request.user
+                page.save()
+
+                moved_count += 1
+                current_sort_order += 10  # Space out pages
+
+            except Exception as e:
+                error_msg = f"Failed to move {page.title}: {str(e)}"
+                errors.append(error_msg)
+
+        response_data = {
+            "message": f"Successfully moved {moved_count} page(s)",
+            "moved_count": moved_count,
+        }
+
+        if errors:
+            response_data["errors"] = errors
+            response_data["message"] += f" with {len(errors)} error(s)"
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="deleted")
     def list_deleted(self, request):

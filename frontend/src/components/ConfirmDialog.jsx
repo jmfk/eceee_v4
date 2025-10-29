@@ -42,9 +42,9 @@ const ConfirmDialog = ({
                     <AlertTriangle className="w-8 h-8 text-amber-500" />
                 </div>
                 <div className="flex-1">
-                    <p className="text-gray-700 mb-6">
+                    <div className="text-gray-700 mb-6 max-h-96 overflow-y-auto whitespace-pre-wrap">
                         {message}
-                    </p>
+                    </div>
 
                     <div className="flex justify-end space-x-3">
                         <button

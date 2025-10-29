@@ -548,6 +548,65 @@ class WebPage(models.Model):
             current = current.parent
         return breadcrumbs
 
+    def _slug_exists_for_parent(self, slug, parent):
+        """Check if a slug already exists for siblings (same parent)"""
+        if not slug:
+            return False
+
+        queryset = WebPage.objects.filter(parent=parent, slug=slug, is_deleted=False)
+
+        # Exclude self if this is an update operation
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+
+        return queryset.exists()
+
+    def _get_unique_slug(self, slug, parent):
+        """
+        Get a unique slug for the given parent by appending numeric suffix if needed.
+
+        Returns:
+            tuple: (unique_slug, was_modified)
+        """
+        if not slug:
+            return slug, False
+
+        # Check if original slug is available
+        if not self._slug_exists_for_parent(slug, parent):
+            return slug, False
+
+        # Find next available numeric suffix
+        base_slug = slug
+        counter = 2
+
+        while self._slug_exists_for_parent(slug, parent):
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
+        return slug, True
+
+    def ensure_unique_slug(self):
+        """
+        Ensure slug is unique within parent by auto-renaming if needed.
+
+        Returns:
+            dict: Contains 'modified' (bool) and 'original_slug' (str) if modified
+        """
+        if not self.slug:
+            return {"modified": False, "original_slug": None}
+
+        original_slug = self.slug
+        self.slug, was_modified = self._get_unique_slug(self.slug, self.parent)
+
+        if was_modified:
+            return {
+                "modified": True,
+                "original_slug": original_slug,
+                "new_slug": self.slug,
+            }
+
+        return {"modified": False, "original_slug": None}
+
     def clean(self):
         """Validate the page data"""
         super().clean()

@@ -99,7 +99,10 @@ const PageTreeNode = memo(({
     onMoveUp,
     onMoveDown,
     canMoveUp = true,
-    canMoveDown = true
+    canMoveDown = true,
+    selectedPageIds = new Set(),
+    onPageClick = null,
+    isSelectionMode = false
 }) => {
     // Each node manages its own state independently
     const [page, setPage] = useState(initialPage)
@@ -134,6 +137,9 @@ const PageTreeNode = memo(({
 
     // Check if page is cut (memoized)
     const isCut = useMemo(() => cutPageId === page.id, [cutPageId, page.id])
+
+    // Check if page is selected (memoized)
+    const isSelected = useMemo(() => selectedPageIds.has(page.id), [selectedPageIds, page.id])
 
     // Animation state for page movement
     const [isAnimating, setIsAnimating] = useState(false)
@@ -214,10 +220,66 @@ const PageTreeNode = memo(({
         onCut?.(page.id)
     }
 
+    // Handle row click for selection
+    const handleRowClick = (event) => {
+        // Only handle selection if onPageClick is provided and not clicking on buttons
+        if (onPageClick && !event.defaultPrevented) {
+            onPageClick(page.id, event)
+        }
+    }
+
     const handleDelete = async () => {
+        let message = `Are you sure you want to delete "${page.title}"?`
+
+        // If page has children, fetch them to show what will be deleted
+        if (hasChildren && page.childrenCount > 0) {
+            try {
+                // Load children if not already loaded
+                if (!childrenLoaded) {
+                    await loadChildren()
+                }
+
+                // Collect all descendant pages recursively
+                const collectDescendants = (pages, collected = []) => {
+                    pages.forEach(p => {
+                        collected.push(p)
+                        if (p.children && p.children.length > 0) {
+                            collectDescendants(p.children, collected)
+                        } else if (childrenRef.current) {
+                            // Check if this page's children are loaded in childrenRef
+                            const childNode = childrenRef.current.find(c => c.id === p.id)
+                            if (childNode && childNode.children && childNode.children.length > 0) {
+                                collectDescendants(childNode.children, collected)
+                            }
+                        }
+                    })
+                    return collected
+                }
+
+                const descendants = collectDescendants(childrenRef.current || [])
+                const totalCount = descendants.length + 1 // +1 for the page itself
+
+                if (descendants.length > 0) {
+                    // Create a list of pages that will be deleted
+                    const pageList = descendants.slice(0, 10).map(p => `• ${p.title}`).join('\n')
+                    const moreText = descendants.length > 10 ? `\n... and ${descendants.length - 10} more pages` : ''
+
+                    message = `This page has ${descendants.length} subpage(s). Deleting "${page.title}" will also delete:\n\n${pageList}${moreText}\n\nTotal pages to delete: ${totalCount}\n\nThis action cannot be undone.`
+                }
+            } catch (error) {
+                console.error('Error loading children for delete confirmation:', error)
+                // Fall back to showing count if available
+                if (page.childrenCount > 0) {
+                    message = `This page has ${page.childrenCount} subpage(s). Deleting "${page.title}" will also delete all of its subpages recursively.\n\nThis action cannot be undone.`
+                }
+            }
+        } else {
+            message += '\n\nThis action cannot be undone.'
+        }
+
         const confirmed = await showConfirm({
             title: 'Delete Page',
-            message: `Are you sure you want to delete "${page.title}"? This action cannot be undone.`,
+            message: message,
             confirmText: 'Delete',
             confirmButtonStyle: 'danger'
         })
@@ -580,20 +642,26 @@ const PageTreeNode = memo(({
                 className={`
                     flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} hover:bg-gray-50 group relative
                     ${isCut ? 'opacity-60 bg-orange-50' : ''}
-                    ${page.isSearchResult ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
-                    ${page.highlightSearch ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}
+                    ${isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
+                    ${page.isSearchResult && !isSelected ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
+                    ${page.highlightSearch && !isSelected ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}
                     ${level > 0 ? 'border-l border-gray-200' : ''}
                     ${isAnimating ? 'transition-all duration-500 ease-in-out' : ''}
                     ${animationDirection === 'up' ? 'transform -translate-y-8' : ''}
                     ${animationDirection === 'down' ? 'transform translate-y-8' : ''}
                     ${animationDirection === 'left' ? 'transform -translate-x-8' : ''}
                     ${animationDirection === 'right' ? 'transform translate-x-8' : ''}
+                    ${onPageClick ? 'cursor-pointer' : ''}
                 `}
                 style={{ paddingLeft: `${level * 24 + 8}px` }}
+                onClick={handleRowClick}
             >
                 {/* Expand/collapse button */}
                 <button
-                    onClick={handleToggleExpand}
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        handleToggleExpand()
+                    }}
                     className={`
                             mr-1 p-1.5 rounded transition-all duration-200 hover:shadow-sm
                             ${!hasChildren ? 'opacity-30 cursor-default' : 'hover:bg-gray-200'}
@@ -754,7 +822,10 @@ const PageTreeNode = memo(({
                 <div className="flex items-center gap-1">
                     <Tooltip text="Edit" position="top">
                         <button
-                            onClick={handleEdit}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleEdit()
+                            }}
                             className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-blue-600 transition-colors"
                         >
                             <Edit className="w-4 h-4" />
@@ -763,7 +834,10 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Move up" position="top">
                         <button
-                            onClick={handleMoveUp}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleMoveUp()
+                            }}
                             disabled={!canMoveUp}
                             className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -773,7 +847,10 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Move down" position="top">
                         <button
-                            onClick={handleMoveDown}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleMoveDown()
+                            }}
                             disabled={!canMoveDown}
                             className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -783,7 +860,10 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Cut" position="top">
                         <button
-                            onClick={handleCut}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleCut()
+                            }}
                             className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-orange-600 transition-colors"
                         >
                             <Scissors className="w-4 h-4" />
@@ -792,7 +872,10 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Add child page" position="top">
                         <button
-                            onClick={handleAddPageBelow}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleAddPageBelow()
+                            }}
                             className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-600 transition-colors"
                         >
                             <Plus className="w-4 h-4" />
@@ -801,7 +884,10 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Import page tree as subpage of this page" position="top">
                         <button
-                            onClick={handleImport}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleImport()
+                            }}
                             className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors"
                         >
                             <Download className="w-4 h-4" />
@@ -812,7 +898,10 @@ const PageTreeNode = memo(({
                         <>
                             <Tooltip text="Paste above" position="top">
                                 <button
-                                    onClick={() => onPaste?.(page, 'above')}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onPaste?.(page, 'above')
+                                    }}
                                     className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋↑</span>
@@ -820,7 +909,10 @@ const PageTreeNode = memo(({
                             </Tooltip>
                             <Tooltip text="Paste below" position="top">
                                 <button
-                                    onClick={() => onPaste?.(page, 'below')}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onPaste?.(page, 'below')
+                                    }}
                                     className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋↓</span>
@@ -828,7 +920,10 @@ const PageTreeNode = memo(({
                             </Tooltip>
                             <Tooltip text="Paste as child" position="top">
                                 <button
-                                    onClick={() => onPaste?.(page, 'child')}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onPaste?.(page, 'child')
+                                    }}
                                     className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋→</span>
@@ -839,7 +934,10 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Delete" position="top">
                         <button
-                            onClick={handleDelete}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleDelete()
+                            }}
                             className="p-1.5 rounded hover:bg-red-100 text-gray-500 hover:text-red-700 transition-colors"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -870,6 +968,9 @@ const PageTreeNode = memo(({
                             onMoveDown={handleChildMoveDown}
                             canMoveUp={index > 0}
                             canMoveDown={index < childrenRef.current.length - 1}
+                            selectedPageIds={selectedPageIds}
+                            onPageClick={onPageClick}
+                            isSelectionMode={isSelectionMode}
                         />
                     ))}
                 </div>
@@ -891,7 +992,13 @@ const PageTreeNode = memo(({
 }, (prevProps, nextProps) => {
     // Custom comparison function for React.memo
     // Only re-render if these specific props change
-    // Since each node is now independent, we only care about the page ID and basic props
+
+    // If selectedPageIds Set reference changed, we need to re-render to update selection visual state
+    // This is simpler and more reliable than checking individual page selection
+    if (prevProps.selectedPageIds !== nextProps.selectedPageIds) {
+        return false // Re-render because selection changed
+    }
+
     return (
         prevProps.page.id === nextProps.page.id &&
         prevProps.cutPageId === nextProps.cutPageId &&
@@ -899,7 +1006,8 @@ const PageTreeNode = memo(({
         prevProps.canMoveUp === nextProps.canMoveUp &&
         prevProps.canMoveDown === nextProps.canMoveDown &&
         prevProps.searchTerm === nextProps.searchTerm &&
-        prevProps.level === nextProps.level
+        prevProps.level === nextProps.level &&
+        prevProps.isSelectionMode === nextProps.isSelectionMode
     )
 })
 

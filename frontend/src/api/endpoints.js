@@ -37,6 +37,16 @@ export const endpoints = {
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
         widgetInheritance: (id) => `${BASE_PATH}/webpages/pages/${id}/widget-inheritance/`,
         publicationStatus: `${BASE_PATH}/webpages/pages/publicationStatus/`,
+        // Page tree import endpoints
+        importTree: `${BASE_PATH}/webpages/pages/import-tree/`,
+        importStatus: (taskId) => `${BASE_PATH}/webpages/pages/import-tree/${taskId}/status/`,
+        importPage: `${BASE_PATH}/webpages/pages/import-page/`,
+        // Bulk operations
+        bulkPublish: `${BASE_PATH}/webpages/pages/bulk-publish/`,
+        bulkUnpublish: `${BASE_PATH}/webpages/pages/bulk-unpublish/`,
+        bulkMove: `${BASE_PATH}/webpages/pages/bulk-move/`,
+        bulkDelete: `${BASE_PATH}/webpages/pages/bulk-delete/`,
+        duplicate: (id) => `${BASE_PATH}/webpages/pages/${id}/duplicate/`,
         // DEPRECATED: Version-related endpoints moved to versions API (but URLs remain consistent)
         versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Still works, now consistent path-based
         versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`, // Still works, now consistent path-based

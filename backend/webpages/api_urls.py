@@ -29,6 +29,11 @@ from .views.simplified_layout_views import (
     simplified_layout_schema,
     validate_simplified_layout,
 )
+from .views.page_import_views import (
+    ImportTreeView,
+    ImportStatusView,
+    ImportSinglePageView,
+)
 from .api_structure_views import (
     page_metadata_view,
     page_by_path_view,
@@ -202,6 +207,16 @@ urlpatterns = [
         name="page-structure-summary",
     ),
     path("pages/search/", pages_search_view, name="pages-search"),
+    # Page import endpoints
+    path("pages/import-tree/", ImportTreeView.as_view(), name="import-tree"),
+    path(
+        "pages/import-tree/<str:task_id>/status/",
+        ImportStatusView.as_view(),
+        name="import-status",
+    ),
+    path(
+        "pages/import-page/", ImportSinglePageView.as_view(), name="import-single-page"
+    ),
     # Pydantic model schema endpoint for ConditionalGroupField
     re_path(
         r"^pydantic-models/(?P<model_name>[A-Za-z0-9_]+)/schema/$",

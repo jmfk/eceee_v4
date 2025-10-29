@@ -564,6 +564,15 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                                         ⚠️ {item.reason}
                                                     </p>
                                                 )}
+                                                {item.warnings && item.warnings.length > 0 && (
+                                                    <div className="mt-1 space-y-1">
+                                                        {item.warnings.map((warning, wIdx) => (
+                                                            <p key={wIdx} className="text-amber-600 text-xs">
+                                                                ⚠️ {warning.message}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>

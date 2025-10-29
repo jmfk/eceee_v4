@@ -653,6 +653,74 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
         return super().validate(attrs)
 
+    def create(self, validated_data):
+        """Create a new WebPage with auto-slug uniqueness"""
+        # Extract parent_id and set parent
+        parent_id = validated_data.pop("parent_id", None)
+        if parent_id:
+            validated_data["parent"] = WebPage.objects.get(pk=parent_id)
+
+        # Create the page instance (don't save yet)
+        page = WebPage(**validated_data)
+
+        # Ensure unique slug and track if modified
+        slug_info = page.ensure_unique_slug()
+
+        # Save the page
+        page.save()
+
+        # Store slug modification info in context for to_representation
+        if slug_info["modified"]:
+            self.context["slug_warning"] = {
+                "field": "slug",
+                "message": f"Slug '{slug_info['original_slug']}' was modified to '{slug_info['new_slug']}' to ensure uniqueness",
+                "original_value": slug_info["original_slug"],
+            }
+
+        return page
+
+    def update(self, instance, validated_data):
+        """Update a WebPage with auto-slug uniqueness"""
+        # Extract parent_id and set parent if provided
+        parent_id = validated_data.pop("parent_id", None)
+        if parent_id is not None:
+            validated_data["parent"] = (
+                WebPage.objects.get(pk=parent_id) if parent_id else None
+            )
+
+        # Update instance fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Ensure unique slug if slug was changed
+        if "slug" in validated_data:
+            slug_info = instance.ensure_unique_slug()
+
+            # Store slug modification info in context for to_representation
+            if slug_info["modified"]:
+                self.context["slug_warning"] = {
+                    "field": "slug",
+                    "message": f"Slug '{slug_info['original_slug']}' was modified to '{slug_info['new_slug']}' to ensure uniqueness",
+                    "original_value": slug_info["original_slug"],
+                }
+
+        # Save the instance
+        instance.save()
+
+        return instance
+
+    def to_representation(self, instance):
+        """Add warnings to representation if slug was modified"""
+        data = super().to_representation(instance)
+
+        # Add warnings if slug was auto-renamed
+        if "slug_warning" in self.context:
+            data["warnings"] = [self.context["slug_warning"]]
+            # Clean up context to avoid leaking to other serializations
+            del self.context["slug_warning"]
+
+        return data
+
 
 class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""

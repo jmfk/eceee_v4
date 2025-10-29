@@ -255,7 +255,57 @@ export const pagesApi = {
      */
     getWidgetInheritance: wrapApiCall(async (pageId) => {
         return api.get(endpoints.pages.widgetInheritance(pageId))
-    }, 'pages.getWidgetInheritance')
+    }, 'pages.getWidgetInheritance'),
+
+    /**
+     * Bulk publish multiple pages
+     * @param {number[]} pageIds - Array of page IDs to publish
+     * @param {string} changeSummary - Optional change summary
+     * @returns {Promise<Object>}
+     */
+    bulkPublish: wrapApiCall(async (pageIds, changeSummary = 'Bulk publish operation') => {
+        return api.post(endpoints.pages.bulkPublish, { pageIds, changeSummary })
+    }, 'pages.bulkPublish'),
+
+    /**
+     * Bulk unpublish multiple pages
+     * @param {number[]} pageIds - Array of page IDs to unpublish
+     * @param {string} changeSummary - Optional change summary
+     * @returns {Promise<Object>}
+     */
+    bulkUnpublish: wrapApiCall(async (pageIds, changeSummary = 'Bulk unpublish operation') => {
+        return api.post(endpoints.pages.bulkUnpublish, { pageIds, changeSummary })
+    }, 'pages.bulkUnpublish'),
+
+    /**
+     * Bulk move pages to a new parent
+     * @param {number[]} pageIds - Array of page IDs to move
+     * @param {number|null} parentId - New parent ID (null for root level)
+     * @param {number} sortOrder - Sort order for first page
+     * @returns {Promise<Object>}
+     */
+    bulkMove: wrapApiCall(async (pageIds, parentId, sortOrder = 0) => {
+        return api.post(endpoints.pages.bulkMove, { pageIds, parentId, sortOrder })
+    }, 'pages.bulkMove'),
+
+    /**
+     * Bulk delete multiple pages
+     * @param {number[]} pageIds - Array of page IDs to delete
+     * @param {boolean} recursive - Whether to delete recursively
+     * @returns {Promise<Object>}
+     */
+    bulkDelete: wrapApiCall(async (pageIds, recursive = false) => {
+        return api.post(endpoints.pages.bulkDelete, { pageIds, recursive })
+    }, 'pages.bulkDelete'),
+
+    /**
+     * Duplicate a page
+     * @param {number} pageId - Page ID to duplicate
+     * @returns {Promise<Object>}
+     */
+    duplicate: wrapApiCall(async (pageId) => {
+        return api.post(endpoints.pages.duplicate(pageId))
+    }, 'pages.duplicate')
 }
 
 // Legacy exports for backward compatibility
