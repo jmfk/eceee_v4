@@ -308,6 +308,35 @@ export const pagesApi = {
     }, 'pages.duplicate'),
 
     /**
+     * Publish the latest version of a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>} Response with published version info
+     */
+    publishLatestVersion: wrapApiCall(async (pageId) => {
+        return api.post(`${endpoints.pages.detail(pageId)}/publish-latest/`)
+    }, 'pages.publishLatestVersion'),
+
+    /**
+     * Unpublish a version with options
+     * @param {number} pageId - Page ID
+     * @param {Object} options - Unpublish options
+     * @param {string} options.mode - "current" (unpublish current, restore previous) or "all" (unpublish all)
+     * @returns {Promise<Object>} Response with unpublished version info
+     */
+    unpublishVersion: wrapApiCall(async (pageId, options = { mode: 'current' }) => {
+        return api.post(`${endpoints.pages.detail(pageId)}/unpublish/`, options)
+    }, 'pages.unpublishVersion'),
+
+    /**
+     * Unpublish all versions of a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>} Response with unpublished count
+     */
+    unpublishAllVersions: wrapApiCall(async (pageId) => {
+        return api.post(`${endpoints.pages.detail(pageId)}/unpublish-all/`)
+    }, 'pages.unpublishAllVersions'),
+
+    /**
      * Get deleted pages (soft-deleted pages)
      * @param {Object} params - Query parameters (search, ordering, page, pageSize)
      * @returns {Promise<PaginatedResponse>}

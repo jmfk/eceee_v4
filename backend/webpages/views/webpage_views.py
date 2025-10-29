@@ -15,7 +15,6 @@ from django.utils import timezone
 from ..models import WebPage, PageVersion
 from ..serializers import (
     WebPageSimpleSerializer,
-    WebPageTreeSerializer,
     PageHierarchySerializer,
 )
 from ..filters import WebPageFilter
@@ -51,10 +50,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
     ]
 
     def get_serializer_class(self):
-        """Use different serializers based on action"""
-        if self.action in ["tree", "hierarchy"]:
-            return WebPageTreeSerializer
-        # Use simplified serializer by default (no version data)
+        """Use WebPageSimpleSerializer for all actions (includes version data)"""
         return WebPageSimpleSerializer
 
     def get_queryset(self):
@@ -69,6 +65,38 @@ class WebPageViewSet(viewsets.ModelViewSet):
             except Exception:
                 # is_deleted field doesn't exist yet (migration not run)
                 pass
+
+        # Optimize queries for list action by prefetching version data
+        if self.action == "list":
+            from django.utils import timezone
+
+            now = timezone.now()
+
+            # Prefetch the published version, latest version, and scheduled version
+            # Using Prefetch to add them as cached attributes
+            from django.db.models import Prefetch
+
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "versions",
+                    queryset=PageVersion.objects.filter(effective_date__lte=now)
+                    .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+                    .order_by("-effective_date", "-version_number"),
+                    to_attr="_published_versions_list",
+                ),
+                Prefetch(
+                    "versions",
+                    queryset=PageVersion.objects.order_by("-version_number"),
+                    to_attr="_all_versions_list",
+                ),
+                Prefetch(
+                    "versions",
+                    queryset=PageVersion.objects.filter(
+                        effective_date__gt=now
+                    ).order_by("effective_date"),
+                    to_attr="_scheduled_versions_list",
+                ),
+            )
 
         if self.action in ["list", "retrieve"]:
             # For public endpoints, only show published pages to non-staff users
@@ -125,10 +153,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
         Always uses recursive deletion to ensure data consistency.
         """
         page = self.get_object()
-        
+
         # Perform soft delete with recursive=True
         result = page.soft_delete(user=request.user, recursive=True)
-        
+
         return Response(
             {
                 "message": f"Successfully deleted {result['total_count']} page(s)",
@@ -794,6 +822,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Create new page
             new_page = WebPage.objects.create(
                 parent=page.parent,
+                title=new_title,
                 slug=new_slug,
                 sort_order=page.sort_order + 1,
                 created_by=request.user,
@@ -807,15 +836,18 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     version_number=1,
                     created_by=request.user,
                     change_summary="Duplicated from original page",
+                    version_title="Initial version",
                     # Copy version data
-                    title=new_title,
-                    layout_name=latest_version.layout_name,
-                    theme_id=latest_version.theme_id,
+                    code_layout=latest_version.code_layout,
+                    theme=latest_version.theme,
                     widgets=latest_version.widgets,
                     page_data=latest_version.page_data,
-                    seo_title=latest_version.seo_title,
-                    seo_description=latest_version.seo_description,
-                    seo_keywords=latest_version.seo_keywords,
+                    meta_title=latest_version.meta_title,
+                    meta_description=latest_version.meta_description,
+                    page_css_variables=latest_version.page_css_variables,
+                    page_custom_css=latest_version.page_custom_css,
+                    enable_css_injection=latest_version.enable_css_injection,
+                    tags=latest_version.tags,
                     # Don't copy publishing dates - start as draft
                     effective_date=None,
                     expiry_date=None,
@@ -823,10 +855,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
             else:
                 # No version exists, create basic version
                 new_version = new_page.create_version(
-                    request.user, "Duplicated from original page"
+                    request.user, "Initial version (duplicated)"
                 )
-                new_version.title = new_title
-                new_version.save()
 
             # Shift sort orders of pages after this one
             WebPage.objects.filter(
@@ -845,6 +875,162 @@ class WebPageViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {"error": f"Failed to duplicate page: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["post"], url_path="publish-latest")
+    def publish_latest_version(self, request, pk=None):
+        """
+        Publish the latest version of this page.
+
+        Sets the effective_date to now, making the latest version live.
+
+        POST /api/pages/{id}/publish-latest/
+        """
+        page = self.get_object()
+
+        # Get latest version
+        latest_version = page.get_latest_version()
+
+        if not latest_version:
+            return Response(
+                {"error": "Page has no versions to publish"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check if it's already published
+        if latest_version.is_published():
+            return Response(
+                {
+                    "message": "Latest version is already published",
+                    "version_id": latest_version.id,
+                    "version_number": latest_version.version_number,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        try:
+            # Publish the version
+            latest_version.publish(request.user)
+
+            # Return updated page data
+            serializer = self.get_serializer(page)
+            return Response(
+                {
+                    "message": f"Published version {latest_version.version_number}",
+                    "version_id": latest_version.id,
+                    "version_number": latest_version.version_number,
+                    "effective_date": latest_version.effective_date,
+                    "page": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to publish version: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["post"], url_path="unpublish")
+    def unpublish_version(self, request, pk=None):
+        """
+        Unpublish a version with options.
+
+        POST /api/pages/{id}/unpublish/
+
+        Request body:
+        {
+            "mode": "current" | "all"  // "current" = unpublish current and restore previous, "all" = unpublish all
+        }
+        """
+        page = self.get_object()
+        mode = request.data.get("mode", "current")
+
+        if mode == "all":
+            # Unpublish all versions
+            return self.unpublish_all_versions(request, pk)
+
+        # Unpublish current version and restore previous
+        current_published = page.get_current_published_version()
+
+        if not current_published:
+            return Response(
+                {"error": "Page has no published version"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Clear the effective date of current published version
+            current_published.effective_date = None
+            current_published.save(update_fields=["effective_date"])
+
+            # Get the new current published version (if any)
+            new_published = page.get_current_published_version()
+
+            # Return updated page data
+            serializer = self.get_serializer(page)
+            response_data = {
+                "message": f"Unpublished version {current_published.version_number}",
+                "unpublished_version_id": current_published.id,
+                "unpublished_version_number": current_published.version_number,
+                "page": serializer.data,
+            }
+
+            if new_published:
+                response_data[
+                    "message"
+                ] += f", restored version {new_published.version_number}"
+                response_data["restored_version_id"] = new_published.id
+                response_data["restored_version_number"] = new_published.version_number
+            else:
+                response_data["message"] += ", no previous version to restore"
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to unpublish version: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["post"], url_path="unpublish-all")
+    def unpublish_all_versions(self, request, pk=None):
+        """
+        Unpublish all versions of this page.
+
+        Sets effective_date to None for all versions.
+
+        POST /api/pages/{id}/unpublish-all/
+        """
+        page = self.get_object()
+
+        # Get all published versions
+        published_versions = page.versions.filter(effective_date__isnull=False)
+
+        if not published_versions.exists():
+            return Response(
+                {"error": "Page has no published versions"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Unpublish all versions
+            unpublished_count = published_versions.update(effective_date=None)
+
+            # Return updated page data
+            serializer = self.get_serializer(page)
+            return Response(
+                {
+                    "message": f"Unpublished all {unpublished_count} version(s)",
+                    "unpublished_count": unpublished_count,
+                    "page": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to unpublish all versions: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

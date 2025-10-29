@@ -377,114 +377,9 @@ class LayoutSerializer(serializers.Serializer):
         return None
 
 
-class WebPageTreeSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for page tree views"""
-
-    title = serializers.SerializerMethodField()
-    children_count = serializers.SerializerMethodField()
-    publication_status = serializers.SerializerMethodField()
-    effective_date = serializers.SerializerMethodField()
-    expiry_date = serializers.SerializerMethodField()
-    title = serializers.SerializerMethodField()
-    # description = serializers.SerializerMethodField()
-    code_layout = serializers.SerializerMethodField()
-    is_deleted = serializers.SerializerMethodField()
-    deleted_at = serializers.SerializerMethodField()
-    deleted_by = serializers.SerializerMethodField()
-    latest_version_number = serializers.SerializerMethodField()
-    published_version_number = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WebPage
-        fields = [
-            "id",
-            "slug",
-            "title",
-            "description",
-            "code_layout",
-            "parent",
-            "sort_order",
-            "hostnames",
-            "site_icon",  # Site icon for root pages
-            "path_pattern_key",  # Registry-based path pattern key
-            "publication_status",
-            "effective_date",
-            "expiry_date",
-            "children_count",
-            "is_deleted",  # NEW: Add soft delete fields
-            "deleted_at",
-            "deleted_by",
-            "latest_version_number",
-            "published_version_number",
-        ]
-
-    def get_title(self, obj):
-        """Get title from WebPage model - for version title use PageVersionSerializer"""
-        return obj.title
-
-    def get_code_layout(self, obj):
-        """DEPRECATED: Get code layout from PageVersionSerializer instead"""
-        return ""
-
-    def get_children_count(self, obj):
-        return obj.children.count()
-
-    def get_is_deleted(self, obj):
-        """Get is_deleted field (safe if migration not run)"""
-        return getattr(obj, "is_deleted", False)
-
-    def get_deleted_at(self, obj):
-        """Get deleted_at field (safe if migration not run)"""
-        return getattr(obj, "deleted_at", None)
-
-    def get_deleted_by(self, obj):
-        """Get deleted_by field (safe if migration not run)"""
-        deleted_by = getattr(obj, "deleted_by", None)
-        if deleted_by:
-            return deleted_by.id
-        return None
-
-    def get_publication_status(self, obj):
-        """Get publication status from current published version"""
-        published_version = obj.get_current_published_version()
-        if published_version:
-            return published_version.get_publication_status()
-        
-        # If no published version, check if there's a latest version
-        latest_version = obj.get_latest_version()
-        if latest_version:
-            return latest_version.get_publication_status()
-        
-        # No versions at all
-        return "unpublished"
-
-    def get_effective_date(self, obj):
-        """DEPRECATED: Get dates from PageVersionSerializer instead"""
-        return None
-
-    def get_expiry_date(self, obj):
-        """DEPRECATED: Get dates from PageVersionSerializer instead"""
-        return None
-
-    def get_latest_version_number(self, obj):
-        """Get the latest version number for this page"""
-        latest_version = obj.get_latest_version()
-        if latest_version:
-            return latest_version.version_number
-        return None
-
-    def get_published_version_number(self, obj):
-        """Get the currently published version number for this page"""
-        published_version = obj.get_current_published_version()
-        if published_version:
-            return published_version.version_number
-        return None
-
-
 class WebPageSimpleSerializer(serializers.ModelSerializer):
-    """Simplified page serializer - only page metadata, no version data"""
+    """Page serializer with version management support"""
 
-    parent = WebPageTreeSerializer(read_only=True)
     parent_id = serializers.IntegerField(
         write_only=True, required=False, allow_null=True
     )
@@ -504,6 +399,26 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     deleted_at = serializers.SerializerMethodField()
     deleted_by = serializers.SerializerMethodField()
 
+    # Version management fields
+    publication_status = serializers.SerializerMethodField()
+    code_layout = serializers.SerializerMethodField()
+
+    # Published version information
+    published_version_id = serializers.SerializerMethodField()
+    published_version_number = serializers.SerializerMethodField()
+    published_effective_date = serializers.SerializerMethodField()
+
+    # Latest draft version information
+    latest_version_number = serializers.SerializerMethodField()
+    latest_draft_version_id = serializers.SerializerMethodField()
+    latest_draft_version_number = serializers.SerializerMethodField()
+    has_unpublished_changes = serializers.SerializerMethodField()
+
+    # Scheduled version information
+    scheduled_version_id = serializers.SerializerMethodField()
+    scheduled_version_number = serializers.SerializerMethodField()
+    scheduled_effective_date = serializers.SerializerMethodField()
+
     class Meta:
         model = WebPage
         fields = [
@@ -511,12 +426,11 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "slug",
             "title",
             "description",
-            "parent",
             "parent_id",
             "sort_order",
             "hostnames",
-            "site_icon",  # Site icon for root pages
-            "path_pattern_key",  # Registry-based path pattern key
+            "site_icon",
+            "path_pattern_key",
             "created_at",
             "updated_at",
             "created_by",
@@ -528,9 +442,25 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "layout_inheritance_info",
             "available_code_layouts",
             "children_count",
-            "is_deleted",  # NEW: Add soft delete fields
+            "is_deleted",
             "deleted_at",
             "deleted_by",
+            # Version management fields
+            "publication_status",
+            "code_layout",
+            # Published version
+            "published_version_id",
+            "published_version_number",
+            "published_effective_date",
+            # Latest/draft version
+            "latest_version_number",
+            "latest_draft_version_id",
+            "latest_draft_version_number",
+            "has_unpublished_changes",
+            # Scheduled version
+            "scheduled_version_id",
+            "scheduled_version_number",
+            "scheduled_effective_date",
         ]
         read_only_fields = [
             "id",
@@ -658,6 +588,157 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         if deleted_by:
             return UserSerializer(deleted_by).data
         return None
+
+    # Version management methods
+    def get_code_layout(self, obj):
+        """Get code layout from published version"""
+        if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
+            return obj._published_versions_list[0].code_layout or ""
+        published_version = obj.get_current_published_version()
+        if published_version:
+            return published_version.code_layout or ""
+        return ""
+
+    def get_publication_status(self, obj):
+        """Get publication status from current published version"""
+        if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
+            return obj._published_versions_list[0].get_publication_status()
+
+        published_version = obj.get_current_published_version()
+        if published_version:
+            return published_version.get_publication_status()
+
+        # No published version - check for drafts
+        if hasattr(obj, "_all_versions_list") and obj._all_versions_list:
+            return obj._all_versions_list[0].get_publication_status()
+
+        latest_version = obj.get_latest_version()
+        if latest_version:
+            return latest_version.get_publication_status()
+
+        return "unpublished"
+
+    # Published version methods
+    def get_published_version_id(self, obj):
+        """Get the ID of currently published version"""
+        if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
+            return obj._published_versions_list[0].id
+        published_version = obj.get_current_published_version()
+        return published_version.id if published_version else None
+
+    def get_published_version_number(self, obj):
+        """Get the version number of currently published version"""
+        if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
+            return obj._published_versions_list[0].version_number
+        published_version = obj.get_current_published_version()
+        return published_version.version_number if published_version else None
+
+    def get_published_effective_date(self, obj):
+        """Get the effective date of published version"""
+        if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
+            return obj._published_versions_list[0].effective_date
+        published_version = obj.get_current_published_version()
+        return published_version.effective_date if published_version else None
+
+    # Latest/draft version methods
+    def get_latest_version_number(self, obj):
+        """Get the latest version number (including drafts)"""
+        if hasattr(obj, "_all_versions_list") and obj._all_versions_list:
+            return obj._all_versions_list[0].version_number
+        latest_version = obj.get_latest_version()
+        return latest_version.version_number if latest_version else None
+
+    def get_latest_draft_version_id(self, obj):
+        """Get the ID of latest draft (unpublished) version"""
+        if hasattr(obj, "_all_versions_list") and obj._all_versions_list:
+            latest = obj._all_versions_list[0]
+            if latest.get_publication_status() in ["draft", "unpublished"]:
+                return latest.id
+        else:
+            latest_version = obj.get_latest_version()
+            if latest_version and latest_version.get_publication_status() in [
+                "draft",
+                "unpublished",
+            ]:
+                return latest_version.id
+        return None
+
+    def get_latest_draft_version_number(self, obj):
+        """Get the version number of latest draft"""
+        if hasattr(obj, "_all_versions_list") and obj._all_versions_list:
+            latest = obj._all_versions_list[0]
+            if latest.get_publication_status() in ["draft", "unpublished"]:
+                return latest.version_number
+        else:
+            latest_version = obj.get_latest_version()
+            if latest_version and latest_version.get_publication_status() in [
+                "draft",
+                "unpublished",
+            ]:
+                return latest_version.version_number
+        return None
+
+    def get_has_unpublished_changes(self, obj):
+        """Check if there are unpublished changes"""
+        published_version = None
+        latest_version = None
+
+        if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
+            published_version = obj._published_versions_list[0]
+        else:
+            published_version = obj.get_current_published_version()
+
+        if hasattr(obj, "_all_versions_list") and obj._all_versions_list:
+            latest_version = obj._all_versions_list[0]
+        else:
+            latest_version = obj.get_latest_version()
+
+        if not latest_version:
+            return False
+
+        if not published_version:
+            # Has versions but none published
+            return True
+
+        # Has unpublished changes if latest version is newer than published
+        return latest_version.version_number > published_version.version_number
+
+    # Scheduled version methods
+    def get_scheduled_version_id(self, obj):
+        """Get the ID of next scheduled version"""
+        if hasattr(obj, "_scheduled_versions_list") and obj._scheduled_versions_list:
+            return obj._scheduled_versions_list[0].id
+        scheduled_version = self._get_scheduled_version(obj)
+        return scheduled_version.id if scheduled_version else None
+
+    def get_scheduled_version_number(self, obj):
+        """Get the version number of next scheduled version"""
+        if hasattr(obj, "_scheduled_versions_list") and obj._scheduled_versions_list:
+            return obj._scheduled_versions_list[0].version_number
+        scheduled_version = self._get_scheduled_version(obj)
+        return scheduled_version.version_number if scheduled_version else None
+
+    def get_scheduled_effective_date(self, obj):
+        """Get the scheduled publication date"""
+        if hasattr(obj, "_scheduled_versions_list") and obj._scheduled_versions_list:
+            return obj._scheduled_versions_list[0].effective_date
+        scheduled_version = self._get_scheduled_version(obj)
+        return scheduled_version.effective_date if scheduled_version else None
+
+    def _get_scheduled_version(self, obj):
+        """Helper to get the next scheduled version"""
+        from django.utils import timezone
+
+        now = timezone.now()
+
+        # Find the next version that will be published
+        scheduled = (
+            obj.versions.filter(effective_date__gt=now)
+            .order_by("effective_date")
+            .first()
+        )
+
+        return scheduled
 
     def validate(self, attrs):
         """Validate WebPage data including site_icon restrictions"""

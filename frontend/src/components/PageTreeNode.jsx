@@ -21,7 +21,7 @@ import {
     Search,
     Download,
 } from 'lucide-react'
-import { pagesApi, publishingApi } from '../api'
+import { pagesApi } from '../api'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
@@ -300,7 +300,7 @@ const PageTreeNode = memo(({
                 const fetchAllDescendants = async (pageId) => {
                     const children = await pagesApi.getPageChildren(pageId)
                     const allDescendants = []
-                    
+
                     for (const child of children.results || []) {
                         allDescendants.push(child)
                         // If this child has children, fetch them recursively
@@ -309,7 +309,7 @@ const PageTreeNode = memo(({
                             allDescendants.push(...childDescendants)
                         }
                     }
-                    
+
                     return allDescendants
                 }
 
@@ -649,15 +649,16 @@ const PageTreeNode = memo(({
         }
     })
 
-    // Publish page mutation
+    // Publish page mutation - uses new version-aware endpoint
     const publishPageMutation = useMutation({
         mutationFn: async () => {
-            return await publishingApi.publishPage(page.id)
+            return await pagesApi.publishLatestVersion(page.id)
         },
-        onSuccess: (updatedPage) => {
+        onSuccess: (response) => {
             setIsTogglingPublication(false)
-            // Update local state
-            setPage(prev => ({ ...prev, publicationStatus: updatedPage.publicationStatus || 'published' }))
+            // Invalidate queries to refresh tree with new version data
+            queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries(['page-children'])
         },
         onError: (error) => {
             console.error('Failed to publish page:', error.response?.data?.detail || error.message)
@@ -666,15 +667,16 @@ const PageTreeNode = memo(({
         }
     })
 
-    // Unpublish page mutation
+    // Unpublish page mutation - uses new version-aware endpoint
     const unpublishPageMutation = useMutation({
         mutationFn: async () => {
-            return await publishingApi.unpublishPage(page.id)
+            return await pagesApi.unpublishVersion(page.id, { mode: 'current' })
         },
-        onSuccess: (updatedPage) => {
+        onSuccess: (response) => {
             setIsTogglingPublication(false)
-            // Update local state
-            setPage(prev => ({ ...prev, publicationStatus: updatedPage.publicationStatus || 'unpublished' }))
+            // Invalidate queries to refresh tree with new version data
+            queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries(['page-children'])
         },
         onError: (error) => {
             console.error('Failed to unpublish page:', error.response?.data?.detail || error.message)
@@ -846,6 +848,45 @@ const PageTreeNode = memo(({
                             latestVersionNumber={page.latestVersionNumber}
                             publishedVersionNumber={page.publishedVersionNumber}
                         />
+
+                        {/* Version badges */}
+                        <div className="flex items-center gap-1">
+                            {/* Published version badge */}
+                            {page.publishedVersionNumber && (
+                                <Tooltip
+                                    text={`Published version ${page.publishedVersionNumber}${page.publishedEffectiveDate ? ` on ${new Date(page.publishedEffectiveDate).toLocaleDateString()}` : ''}`}
+                                    position="top"
+                                >
+                                    <span className="px-1 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 rounded border border-green-200 hover:border-green-300 flex items-center gap-0.5 transition-colors cursor-help">
+                                        📗 v{page.publishedVersionNumber}
+                                    </span>
+                                </Tooltip>
+                            )}
+
+                            {/* Draft version badge (if has unpublished changes) */}
+                            {page.hasUnpublishedChanges && page.latestDraftVersionNumber && (
+                                <Tooltip
+                                    text={`Draft version ${page.latestDraftVersionNumber} (unpublished changes)`}
+                                    position="top"
+                                >
+                                    <span className="px-1 py-0.5 text-[10px] font-medium bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700 rounded border border-yellow-200 hover:border-yellow-300 flex items-center gap-0.5 transition-colors cursor-help">
+                                        ✏️ v{page.latestDraftVersionNumber}
+                                    </span>
+                                </Tooltip>
+                            )}
+
+                            {/* Scheduled version badge */}
+                            {page.scheduledVersionNumber && page.scheduledEffectiveDate && (
+                                <Tooltip
+                                    text={`Version ${page.scheduledVersionNumber} scheduled for ${new Date(page.scheduledEffectiveDate).toLocaleString()}`}
+                                    position="top"
+                                >
+                                    <span className="px-1 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded border border-blue-200 hover:border-blue-300 flex items-center gap-0.5 transition-colors cursor-help">
+                                        📅 v{page.scheduledVersionNumber} → {new Date(page.scheduledEffectiveDate).toLocaleDateString()}
+                                    </span>
+                                </Tooltip>
+                            )}
+                        </div>
 
                         {/* Error page badge */}
                         {(() => {
@@ -1023,7 +1064,8 @@ const PageTreeNode = memo(({
                             onDelete={onDelete}
                             onAddPageBelow={onAddPageBelow}
                             onImport={onImport}
-                            cutPageId={cutPageId}
+                            cutPageIds={cutPageIds}
+                            copyPageIds={copyPageIds}
                             isSearchMode={isSearchMode}
                             searchTerm={searchTerm}
                             rowHeight={rowHeight}
@@ -1062,9 +1104,29 @@ const PageTreeNode = memo(({
         return false // Re-render because selection changed
     }
 
+    // Compare array props by stringifying for simplicity
+    const cutPageIdsChanged = JSON.stringify(prevProps.cutPageIds) !== JSON.stringify(nextProps.cutPageIds)
+    const copyPageIdsChanged = JSON.stringify(prevProps.copyPageIds) !== JSON.stringify(nextProps.copyPageIds)
+
+    if (cutPageIdsChanged || copyPageIdsChanged) {
+        return false // Re-render because clipboard changed
+    }
+
+    // Check for version-related changes
+    const versionChanged = (
+        prevProps.page.publishedVersionNumber !== nextProps.page.publishedVersionNumber ||
+        prevProps.page.latestDraftVersionNumber !== nextProps.page.latestDraftVersionNumber ||
+        prevProps.page.scheduledVersionNumber !== nextProps.page.scheduledVersionNumber ||
+        prevProps.page.hasUnpublishedChanges !== nextProps.page.hasUnpublishedChanges
+    )
+
+    if (versionChanged) {
+        return false // Re-render because version data changed
+    }
+
     return (
         prevProps.page.id === nextProps.page.id &&
-        prevProps.cutPageId === nextProps.cutPageId &&
+        prevProps.page.title === nextProps.page.title &&
         prevProps.rowHeight === nextProps.rowHeight &&
         prevProps.canMoveUp === nextProps.canMoveUp &&
         prevProps.canMoveDown === nextProps.canMoveDown &&
