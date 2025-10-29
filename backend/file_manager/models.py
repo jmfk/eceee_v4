@@ -504,6 +504,16 @@ class MediaFile(models.Model):
         related_name="deleted_media_files",
     )
 
+    # Replacement tracking
+    replaced_by = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replaced_files",
+        help_text="If this file was replaced, points to the replacement",
+    )
+
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

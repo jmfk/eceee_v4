@@ -107,6 +107,18 @@ class MediaDownloader:
             # Read content
             content = response.content
 
+            # Extract image dimensions for deduplication
+            from PIL import Image
+            import io
+
+            width = None
+            height = None
+            try:
+                img = Image.open(io.BytesIO(content))
+                width, height = img.size
+            except Exception as e:
+                logger.warning(f"Could not extract dimensions from image: {e}")
+
             # Check if image already exists by hash
             import hashlib
 
@@ -130,7 +142,9 @@ class MediaDownloader:
                 return existing_file
 
             # Check size
-            content_length = int(response.headers.get("content-length", 0))
+            content_length = int(
+                response.headers.get("content-length", 0) or len(content)
+            )
             if content_length > MAX_FILE_SIZE:
                 logger.warning(f"Image too large: {content_length} bytes")
                 return None
@@ -145,6 +159,79 @@ class MediaDownloader:
 
             # Track downloaded size
             self.total_downloaded += len(content)
+
+            # Check for existing file with same slug (slug-based deduplication)
+            from django.utils.text import slugify
+
+            # Calculate proposed slug from title or filename
+            title_for_slug = image_data.get("title") or filename
+            proposed_slug = slugify(title_for_slug)[:255]
+
+            existing_slug_file = MediaFile.objects.filter(
+                slug=proposed_slug, namespace=self.namespace, is_deleted=False
+            ).first()
+
+            replaced_file = None  # Track if we're replacing a file
+
+            if existing_slug_file:
+                # Check if dimensions match (for images only)
+                if (
+                    width
+                    and height
+                    and existing_slug_file.width
+                    and existing_slug_file.height
+                ):
+                    if (
+                        existing_slug_file.width == width
+                        and existing_slug_file.height == height
+                    ):
+                        # Same dimensions - check if new file is larger
+                        if content_length > existing_slug_file.file_size:
+                            # Replace: rename old file slug, mark as replaced
+                            from django.utils import timezone
+
+                            timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+                            existing_slug_file.slug = (
+                                f"{proposed_slug}-replaced-{timestamp}"
+                            )
+                            existing_slug_file.is_deleted = True
+                            existing_slug_file.deleted_at = timezone.now()
+                            existing_slug_file.deleted_by = self.user
+                            existing_slug_file.save()
+                            replaced_file = existing_slug_file
+                            # Continue with upload using original slug
+                            logger.info(
+                                f"Replacing existing file {existing_slug_file.title} with higher quality version"
+                            )
+                        else:
+                            # New file is smaller/same, reuse existing
+                            logger.info(
+                                f"Reusing existing file {existing_slug_file.title} (new file is not larger)"
+                            )
+                            # Still apply AI layout analysis for this usage
+                            if self.openai_service.is_available():
+                                layout_config = (
+                                    self.openai_service.analyze_image_layout(
+                                        img_element_html=image_data.get("html", ""),
+                                        surrounding_html=image_data.get(
+                                            "parent_html", ""
+                                        ),
+                                        parent_classes=image_data.get(
+                                            "parent_classes", ""
+                                        ),
+                                    )
+                                )
+                                existing_slug_file._import_layout_config = layout_config
+                            return existing_slug_file
+                    else:
+                        # Different dimensions - generate unique slug
+                        proposed_slug = self._generate_unique_slug(proposed_slug)
+                        logger.info(
+                            f"Different dimensions detected, using unique slug: {proposed_slug}"
+                        )
+                else:
+                    # Can't compare dimensions, generate unique slug
+                    proposed_slug = self._generate_unique_slug(proposed_slug)
 
             # Generate metadata with AI first (before creating file object)
             # UNLESS we're using pre-approved tags from the frontend
@@ -210,10 +297,21 @@ class MediaDownloader:
                 title = metadata.get("title", filename) if metadata else filename
                 description = metadata.get("description", "") if metadata else ""
 
-                # Auto-approve and create MediaFile
+                # Auto-approve and create MediaFile with explicit slug
                 media_file = pending_file.approve_and_create_media_file(
-                    title=title, description=description, access_level="public"
+                    title=title,
+                    slug=proposed_slug,
+                    description=description,
+                    access_level="public",
                 )
+
+                # Link replacement if we replaced an old file
+                if replaced_file:
+                    replaced_file.replaced_by = media_file
+                    replaced_file.save(update_fields=["replaced_by"])
+                    logger.info(
+                        f"Linked replacement: {replaced_file.title} -> {media_file.title}"
+                    )
 
                 # Handle tags based on whether they're pre-approved or AI-generated
                 if use_provided_tags:
@@ -487,34 +585,123 @@ class MediaDownloader:
             if not tag_name:
                 continue
 
-            # Get or create tag in the namespace
-            tag, created = MediaTag.objects.get_or_create(
-                name=tag_name.lower()[:50],  # Truncate to max length
-                namespace=self.namespace,
-                defaults={"created_by": self.user},
-            )
+            # Get or create tag with proper slug handling
+            from django.utils.text import slugify
+
+            slug = slugify(tag_name.lower()[:50])
+
+            # Try to find existing tag by slug first (more reliable than name)
+            try:
+                tag = MediaTag.objects.get(slug=slug, namespace=self.namespace)
+            except MediaTag.DoesNotExist:
+                # Create new tag
+                tag, created = MediaTag.objects.get_or_create(
+                    slug=slug,
+                    namespace=self.namespace,
+                    defaults={
+                        "name": tag_name.lower()[:50],
+                        "created_by": self.user,
+                    },
+                )
 
             # Add tag to media file
             media_file.tags.add(tag)
 
+    def _generate_unique_slug(self, base_slug: str) -> str:
+        """
+        Generate a unique slug by appending numbers if needed.
+
+        Args:
+            base_slug: Base slug to make unique
+
+        Returns:
+            Unique slug string
+        """
+        slug = base_slug
+        counter = 1
+
+        while MediaFile.objects.filter(
+            slug=slug, namespace=self.namespace, is_deleted=False
+        ).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
+        return slug
+
+    def _update_media_metadata(
+        self,
+        media_file: MediaFile,
+        title: str = None,
+        description: str = None,
+        tags: List[str] = None
+    ):
+        """
+        Update metadata on existing media file, merging tags.
+
+        Args:
+            media_file: MediaFile to update
+            title: New title (optional)
+            description: New description (optional)
+            tags: Tags to merge with existing (optional)
+        """
+        updated = False
+
+        # Update title if provided and different
+        if title and title != media_file.title:
+            media_file.title = title
+            updated = True
+
+        # Update description if provided and different
+        if description and description != media_file.description:
+            media_file.description = description
+            updated = True
+
+        if updated:
+            media_file.save()
+
+        # Merge tags (preserve existing + add new)
+        if tags:
+            self._add_tags(media_file, tags)
+
     def _add_tags(self, media_file: MediaFile, tag_names: List[str]):
         """
-        Add tags to a media file (simple version without AI selection).
+        Add tags to a media file, merging with existing (no duplicates).
 
         Args:
             media_file: MediaFile to tag
             tag_names: List of tag names
         """
+        # Get existing tag slugs to avoid duplicates
+        existing_slugs = set(
+            media_file.tags.values_list('slug', flat=True)
+        )
+
         for tag_name in tag_names:
             if not tag_name:
                 continue
 
-            # Get or create tag in the namespace
-            tag, created = MediaTag.objects.get_or_create(
-                name=tag_name.lower()[:50],  # Truncate to max length
-                namespace=self.namespace,
-                defaults={"created_by": self.user},
-            )
+            # Get or create tag with proper slug handling
+            from django.utils.text import slugify
+
+            slug = slugify(tag_name.lower()[:50])
+
+            # Skip if already assigned to this media file
+            if slug in existing_slugs:
+                continue
+
+            # Try to find existing tag by slug first
+            try:
+                tag = MediaTag.objects.get(slug=slug, namespace=self.namespace)
+            except MediaTag.DoesNotExist:
+                # Create new tag
+                tag, created = MediaTag.objects.get_or_create(
+                    slug=slug,
+                    namespace=self.namespace,
+                    defaults={
+                        "name": tag_name.lower()[:50],
+                        "created_by": self.user,
+                    },
+                )
 
             # Add tag to media file
             media_file.tags.add(tag)
