@@ -17,6 +17,7 @@ import MediaTagReviewStep from './import/MediaTagReviewStep';
 import HierarchySelector from './import/HierarchySelector';
 import { proxyPage, extractMetadata, analyzeHierarchy, generateMediaMetadata, uploadMediaFile, processImport } from '../api/contentImport';
 import { useNotificationContext } from './NotificationManager';
+import { fetchImageResolution } from '../utils/imageResolution';
 
 const STEPS = {
     URL_INPUT: 1,
@@ -504,15 +505,19 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 const { filename, filepath } = extractFilenameAndPath(normalizedSrc);
 
                 try {
-                    const metadata = await generateMediaMetadata({
-                        type: 'image',
-                        url: normalizedSrc,
-                        filename: filename,
-                        filepath: filepath,
-                        alt: img.alt || '',
-                        text: img.alt || filename || `Image ${idx + 1}`,
-                        context: '',
-                    });
+                    // Fetch resolution info and AI metadata in parallel
+                    const [metadata, resolutionInfo] = await Promise.all([
+                        generateMediaMetadata({
+                            type: 'image',
+                            url: normalizedSrc,
+                            filename: filename,
+                            filepath: filepath,
+                            alt: img.alt || '',
+                            text: img.alt || filename || `Image ${idx + 1}`,
+                            context: '',
+                        }),
+                        fetchImageResolution(normalizedSrc)
+                    ]);
 
                     return {
                         index: idx,
@@ -525,9 +530,17 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: metadata.description || '',
                         aiTags: metadata.tags || [],
                         aiGenerated: metadata.ai_generated !== false,
+                        resolution: resolutionInfo,  // Resolution info from proxy headers
                     };
                 } catch (err) {
-                    // Fallback to basic metadata
+                    // Fallback to basic metadata (still try to get resolution)
+                    let resolutionInfo = null;
+                    try {
+                        resolutionInfo = await fetchImageResolution(normalizedSrc);
+                    } catch (resErr) {
+                        console.debug('Failed to fetch resolution:', resErr);
+                    }
+
                     return {
                         index: idx,
                         type: 'image',
@@ -539,6 +552,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: '',
                         aiTags: [],
                         aiGenerated: false,
+                        resolution: resolutionInfo,
                     };
                 }
             });
@@ -706,7 +720,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
         // Process each media file individually with detailed steps
         // Use array instead of URL-keyed object to avoid URL encoding/case issues
-        const imageReplacements = [];
+        const mediaReplacements = [];
 
         for (let i = 0; i < allMedia.length; i++) {
             const item = allMedia[i];
@@ -794,11 +808,17 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
                 // Store simple URL to mediaManagerId mapping for backend
                 if (item.type === 'image') {
-                    imageReplacements.push({
+                    mediaReplacements.push({
                         url: item.src,  // Original image URL
                         media_manager_id: uploadResult.id,  // MediaFile ID
                         alt: item.alt || '',
                         layout: metadata.layout || {},  // Layout config from AI
+                    });
+                } else if (item.type === 'file') {
+                    mediaReplacements.push({
+                        url: item.url,  // Original file URL
+                        media_manager_id: uploadResult.id,  // MediaFile ID
+                        type: 'file',  // Mark as file type for backend
                     });
                 }
 
@@ -815,7 +835,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         }
 
         // Send simple URL mapping to backend (no HTML modification needed)
-        setUploadedMediaMapping(imageReplacements);
+        setUploadedMediaMapping(mediaReplacements);
         setMediaUploadComplete(true);
     };
 
@@ -1137,7 +1157,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                 </div>
                             )}
 
-                            {mediaUploadStatus.length > 0 && (
+                            {/* Refresh Status button hidden - uploads complete automatically */}
+                            {/* {mediaUploadStatus.length > 0 && (
                                 <div className="mt-4 flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
                                     <div className="text-sm text-gray-600">
                                         {mediaUploadComplete ? (
@@ -1153,7 +1174,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                         🔄 Refresh Status
                                     </button>
                                 </div>
-                            )}
+                            )} */}
                         </div>
                     )}
 
