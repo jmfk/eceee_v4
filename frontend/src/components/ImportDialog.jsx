@@ -497,8 +497,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             const fileExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip'];
             const fileLinks = Array.from(doc.querySelectorAll('a'))
                 .filter(link => {
-                    // Check data-original-href first (set by proxy), then href
-                    const href = (link.getAttribute('data-original-href') || link.href || '').toLowerCase();
+                    const href = (link.href || '').toLowerCase();
                     return fileExtensions.some(ext => href.endsWith(ext));
                 });
 
@@ -598,8 +597,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 }
 
                 const link = fileLinks[idx];
-                // Check data-original-href first (set by proxy), then href
-                const url = link.getAttribute('data-original-href') || link.href;
+                const url = link.href;
                 const linkText = link.textContent.trim();
                 const { filename, filepath } = extractFilenameAndPath(url);
 

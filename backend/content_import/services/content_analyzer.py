@@ -238,8 +238,7 @@ class ContentAnalyzer:
         """
         count = 0
         for link in soup.find_all("a"):
-            # Check data-original-href first (set by proxy service), then href
-            href = link.get("data-original-href") or link.get("href", "")
+            href = link.get("href", "")
             href = href.lower()
             if any(href.endswith(ext) for ext in self.file_extensions):
                 count += 1

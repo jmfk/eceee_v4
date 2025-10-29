@@ -115,12 +115,9 @@ class ContentParser:
                 # Handle different tag types
                 if child.name == "table":
                     self._extract_table(child, segments)
-                elif child.name == "a" and (
-                    child.get("href") or child.get("data-original-href")
-                ):
+                elif child.name == "a" and child.get("href"):
                     # Check if it's a file link
-                    # Check data-original-href first (set by proxy service), then href
-                    href = child.get("data-original-href") or child.get("href", "")
+                    href = child.get("href", "")
                     if is_file_link(href):
                         self._extract_file_link(child, segments)
                     else:
@@ -171,8 +168,7 @@ class ContentParser:
 
     def _extract_file_link(self, link_element, segments: List[ContentSegment]):
         """Extract file link as a segment."""
-        # Check data-original-href first (set by proxy service), then href
-        href = link_element.get("data-original-href") or link_element.get("href", "")
+        href = link_element.get("href", "")
         link_text = link_element.get_text(strip=True)
         title = link_element.get("title", "")
 

@@ -149,11 +149,11 @@ class ProxyService:
             absolute_url = urljoin(base_url, script["src"])
             script["src"] = self._create_proxy_url(absolute_url, request)
 
-        # Rewrite anchor hrefs - make them non-functional to prevent navigation
+        # Make anchor hrefs absolute (navigation is already prevented by click handler)
         for a in soup.find_all("a", href=True):
             original_href = a.get("href", "")
-            a["data-original-href"] = urljoin(base_url, original_href)
-            a["href"] = "javascript:void(0)"
+            # Keep href but make it absolute - click handler prevents navigation
+            a["href"] = urljoin(base_url, original_href)
 
         # Rewrite CSS url() references in style tags
         for style in soup.find_all("style"):

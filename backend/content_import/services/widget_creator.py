@@ -196,7 +196,6 @@ def _replace_urls(html: str, url_mapping: Dict[str, str]) -> str:
         for original, new in url_mapping.items()
         if new and not ("<" in new and ">" in new)
     }
-
     # Step 3: Apply deep_clean_html to handle file links and final cleanup
     cleaned_html = deep_clean_html(html, url_mapping=file_url_mapping)
 

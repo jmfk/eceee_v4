@@ -259,7 +259,6 @@ def deep_clean_html(html: str, url_mapping: dict = None) -> str:
 
     if not html:
         return ""
-
     url_mapping = url_mapping or {}
 
     soup = BeautifulSoup(html, "html.parser")
@@ -324,16 +323,6 @@ def deep_clean_html(html: str, url_mapping: dict = None) -> str:
             else:
                 # Unwrap the invalid nested block tag
                 child_tag.unwrap()
-
-    # STEP 2.5: Restore original hrefs for file links before attribute stripping
-    # This allows STEP 4 to properly match and replace file URLs
-    if url_mapping:
-        for link in soup.find_all("a"):
-            data_href = link.get("data-original-href")
-            if data_href and data_href in url_mapping:
-                # This is a file link that will be replaced - restore original href
-                link["href"] = data_href
-            # Links not in url_mapping are left as-is (external links, etc.)
 
     # STEP 3: Strip ALL attributes except essential ones
     for tag in soup.find_all(True):
