@@ -656,7 +656,7 @@ class PageStructureHelpers:
     def _count_descendants(self, page_id: int) -> int:
         """Count all descendants recursively"""
         count = 0
-        children = self.Page.objects.filter(parent_id=page_id)
+        children = self.Page.objects.filter(parent_id=page_id, is_deleted=False)
         count += children.count()
 
         for child in children:

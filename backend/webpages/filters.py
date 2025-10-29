@@ -73,11 +73,12 @@ class WebPageFilter(django_filters.FilterSet):
         }
 
     def filter_has_children(self, queryset, name, value):
-        """Filter pages that have or don't have children"""
+        """Filter pages that have or don't have children (excluding deleted)"""
         if value:
-            return queryset.filter(children__isnull=False).distinct()
+            return queryset.filter(children__is_deleted=False).distinct()
         else:
-            return queryset.filter(children__isnull=True)
+            # Pages with no non-deleted children
+            return queryset.exclude(children__is_deleted=False)
 
     def filter_depth_level(self, queryset, name, value):
         """Filter pages at a specific depth level (0=root, 1=first level, etc.)"""

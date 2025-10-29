@@ -572,7 +572,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         ]
 
     def get_children_count(self, obj):
-        return obj.children.count()
+        return obj.children.filter(is_deleted=False).count()
 
     def get_is_deleted(self, obj):
         """Get is_deleted field (safe if migration not run)"""
