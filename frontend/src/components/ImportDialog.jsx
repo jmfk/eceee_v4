@@ -64,6 +64,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
     const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0, type: '', itemName: '', resolution: '' });
     const [skipAnalysis, setSkipAnalysis] = useState(false);
+    const [isIframeLoading, setIsIframeLoading] = useState(false);
 
     const iframeRef = useRef(null);
     const resizeRef = useRef(null);
@@ -98,6 +99,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             setShowAnalysisDialog(false);
             setAnalysisProgress({ current: 0, total: 0, type: '', itemName: '', resolution: '' });
             setSkipAnalysis(false);
+            setIsIframeLoading(false);
         }
     }, [isOpen]); // Only run when isOpen changes
 
@@ -335,6 +337,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             try {
                 const data = await proxyPage(url, stripDesign);
                 setProxiedHtml(data.html);
+                setIsIframeLoading(true);
                 setCurrentStep(STEPS.IFRAME_SELECT);
             } catch (err) {
                 setError(err.response?.data?.error || err.message || 'Failed to load page');
@@ -1059,6 +1062,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                                     try {
                                                         const data = await proxyPage(url, newValue);
                                                         setProxiedHtml(data.html);
+                                                        setIsIframeLoading(true);
                                                     } catch (err) {
                                                         // Silently fail - user can retry
                                                     } finally {
@@ -1070,14 +1074,26 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                             Strip original design
                                         </label>
                                     </div>
-                                    <div className="border border-gray-300 rounded-lg overflow-auto flex-1 bg-gray-100">
+                                    <div className="border border-gray-300 rounded-lg overflow-auto flex-1 bg-gray-100 relative">
                                         <iframe
                                             ref={iframeRef}
                                             srcDoc={proxiedHtml}
                                             className="w-full h-full bg-white"
                                             sandbox="allow-scripts"
                                             title="Content preview"
+                                            onLoad={() => setIsIframeLoading(false)}
                                         />
+
+                                        {/* Loading overlay */}
+                                        {isIframeLoading && (
+                                            <div className="absolute inset-0 bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center z-10 pointer-events-auto">
+                                                <div className="bg-white rounded-lg shadow-xl p-6 flex flex-col items-center">
+                                                    <Loader className="h-8 w-8 text-blue-600 animate-spin mb-3" />
+                                                    <p className="text-sm font-medium text-gray-900">Analyzing page...</p>
+                                                    <p className="text-xs text-gray-600 mt-1">Please wait while we load the content</p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
