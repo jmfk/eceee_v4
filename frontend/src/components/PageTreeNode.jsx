@@ -33,7 +33,9 @@ const PublicationStatusIcon = memo(({
     publicationStatus,
     canToggle,
     isToggling,
-    onToggle
+    onToggle,
+    latestVersionNumber,
+    publishedVersionNumber
 }) => {
     const getStatusIcon = () => {
         switch (publicationStatus) {
@@ -41,6 +43,10 @@ const PublicationStatusIcon = memo(({
                 return <Globe className="w-3 h-3 text-green-500" />
             case 'scheduled':
                 return <Clock className="w-3 h-3 text-blue-500" />
+            case 'expired':
+                return <AlertCircle className="w-3 h-3 text-orange-500" />
+            case 'draft':
+                return <AlertCircle className="w-3 h-3 text-yellow-500" />
             case 'unpublished':
                 return <AlertCircle className="w-3 h-3 text-gray-400" />
             default:
@@ -48,33 +54,84 @@ const PublicationStatusIcon = memo(({
         }
     }
 
-    const getTooltipText = () => {
-        if (canToggle) {
-            return publicationStatus === 'published' ?
-                'Published - Click to unpublish' :
-                'Unpublished - Click to publish'
-        }
-
+    const getStatusText = () => {
         switch (publicationStatus) {
+            case 'published':
+                return 'Published'
             case 'scheduled':
                 return 'Scheduled'
             case 'expired':
                 return 'Expired'
-            default:
+            case 'draft':
                 return 'Draft'
+            case 'unpublished':
+                return 'Unpublished'
+            default:
+                return 'Unknown'
         }
+    }
+
+    const getStatusTextColor = () => {
+        switch (publicationStatus) {
+            case 'published':
+                return 'text-green-600'
+            case 'scheduled':
+                return 'text-blue-600'
+            case 'expired':
+                return 'text-orange-600'
+            case 'draft':
+                return 'text-yellow-600'
+            case 'unpublished':
+                return 'text-gray-500'
+            default:
+                return 'text-gray-500'
+        }
+    }
+
+    const getVersionDisplay = () => {
+        if (!latestVersionNumber) {
+            return null
+        }
+        if (publishedVersionNumber && publishedVersionNumber !== latestVersionNumber) {
+            return `v${latestVersionNumber} / v${publishedVersionNumber}`
+        }
+        return `v${latestVersionNumber}`
+    }
+
+    const getTooltipText = () => {
+        let tooltip = getStatusText()
+        const versionDisplay = getVersionDisplay()
+        if (versionDisplay) {
+            tooltip += ` (${versionDisplay})`
+        }
+        if (canToggle) {
+            tooltip += publicationStatus === 'published' ?
+                ' - Click to unpublish' :
+                ' - Click to publish'
+        }
+        return tooltip
     }
 
     return (
         <Tooltip text={getTooltipText()} position="top">
-            <div
-                className={`${canToggle ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-help'} ${isToggling ? 'opacity-50' : ''}`}
-                onClick={canToggle ? onToggle : undefined}
-            >
-                {isToggling ? (
-                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                ) : (
-                    getStatusIcon()
+            <div className="flex items-center gap-1.5">
+                <div
+                    className={`flex-shrink-0 ${canToggle ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-help'} ${isToggling ? 'opacity-50' : ''}`}
+                    onClick={canToggle ? onToggle : undefined}
+                >
+                    {isToggling ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                    ) : (
+                        getStatusIcon()
+                    )}
+                </div>
+                <span className={`text-xs font-medium ${getStatusTextColor()}`}>
+                    {getStatusText()}
+                </span>
+                {getVersionDisplay() && (
+                    <span className="text-xs text-gray-500 font-mono">
+                        {getVersionDisplay()}
+                    </span>
                 )}
             </div>
         </Tooltip>
@@ -638,8 +695,9 @@ const PageTreeNode = memo(({
             <div
                 className={`
                     flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
-                    ${isCut ? 'opacity-60 bg-orange-50' : ''}
-                    ${isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
+                    ${isCut && isSelected ? 'opacity-70 bg-orange-100 border-l-4 border-blue-500 ring-2 ring-orange-300' : ''}
+                    ${isCut && !isSelected ? 'opacity-60 bg-orange-50' : ''}
+                    ${isSelected && !isCut ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
                     ${page.isSearchResult && !isSelected ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
                     ${page.highlightSearch && !isSelected ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}
                     ${level > 0 ? 'border-l border-gray-200' : ''}
@@ -779,6 +837,8 @@ const PageTreeNode = memo(({
                             canToggle={canTogglePublication()}
                             isToggling={isTogglingPublication}
                             onToggle={handlePublicationToggle}
+                            latestVersionNumber={page.latestVersionNumber}
+                            publishedVersionNumber={page.publishedVersionNumber}
                         />
 
                         {/* Error page badge */}

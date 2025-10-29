@@ -391,6 +391,8 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
     is_deleted = serializers.SerializerMethodField()
     deleted_at = serializers.SerializerMethodField()
     deleted_by = serializers.SerializerMethodField()
+    latest_version_number = serializers.SerializerMethodField()
+    published_version_number = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -412,6 +414,8 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
             "is_deleted",  # NEW: Add soft delete fields
             "deleted_at",
             "deleted_by",
+            "latest_version_number",
+            "published_version_number",
         ]
 
     def get_title(self, obj):
@@ -441,8 +445,18 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
         return None
 
     def get_publication_status(self, obj):
-        """DEPRECATED: Get publication status from PageVersionSerializer instead"""
-        return "unknown"
+        """Get publication status from current published version"""
+        published_version = obj.get_current_published_version()
+        if published_version:
+            return published_version.get_publication_status()
+        
+        # If no published version, check if there's a latest version
+        latest_version = obj.get_latest_version()
+        if latest_version:
+            return latest_version.get_publication_status()
+        
+        # No versions at all
+        return "unpublished"
 
     def get_effective_date(self, obj):
         """DEPRECATED: Get dates from PageVersionSerializer instead"""
@@ -450,6 +464,20 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
 
     def get_expiry_date(self, obj):
         """DEPRECATED: Get dates from PageVersionSerializer instead"""
+        return None
+
+    def get_latest_version_number(self, obj):
+        """Get the latest version number for this page"""
+        latest_version = obj.get_latest_version()
+        if latest_version:
+            return latest_version.version_number
+        return None
+
+    def get_published_version_number(self, obj):
+        """Get the currently published version number for this page"""
+        published_version = obj.get_current_published_version()
+        if published_version:
+            return published_version.version_number
         return None
 
 
