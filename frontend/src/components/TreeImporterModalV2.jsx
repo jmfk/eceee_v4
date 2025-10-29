@@ -3,6 +3,7 @@ import { X, Download, AlertCircle, CheckCircle, Loader2, SkipForward } from 'luc
 import { useQuery } from '@tanstack/react-query'
 import { pageImportApi } from '../api'
 import { namespacesApi } from '../api'
+import LayoutSelector from './LayoutSelector'
 
 /**
  * Get a shortened display version of a URL
@@ -79,6 +80,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
     const [startUrl, setStartUrl] = useState('')
     const [hostname, setHostname] = useState('')
     const [namespace, setNamespace] = useState('default')
+    const [codeLayout, setCodeLayout] = useState('')
     const [requestDelay, setRequestDelay] = useState(2.0)
     const [isImporting, setIsImporting] = useState(false)
     const [error, setError] = useState(null)
@@ -114,6 +116,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
             setStartUrl('')
             setHostname('')
             setNamespace('default')
+            setCodeLayout('')
             setRequestDelay(2.0)
             setError(null)
             setQueue([])
@@ -204,6 +207,11 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                     namespace,
                     requestDelay,
                     baseUrl: startUrl, // Filter discovered links to same base
+                }
+
+                // Add code layout if specified
+                if (codeLayout) {
+                    options.codeLayout = codeLayout
                 }
 
                 // Determine parent for this URL
@@ -306,7 +314,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
         }
 
         processNext()
-    }, [isImporting, queue, currentUrl, namespace, requestDelay, startUrl, importMode, hostname, parentPage, onSuccess, visitedUrls])
+    }, [isImporting, queue, currentUrl, namespace, codeLayout, requestDelay, startUrl, importMode, hostname, parentPage, onSuccess, visitedUrls])
 
     if (!isOpen) return null
 
@@ -415,6 +423,19 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+
+                            {/* Default Layout */}
+                            <div>
+                                <LayoutSelector
+                                    value={codeLayout}
+                                    onChange={setCodeLayout}
+                                    label="Default Layout"
+                                    description="Layout to apply to all imported pages. Leave empty to use the default layout."
+                                    placeholder="Use default layout..."
+                                    allowClear={true}
+                                    required={false}
+                                />
                             </div>
 
                             {/* Request Delay */}

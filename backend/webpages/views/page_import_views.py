@@ -184,6 +184,7 @@ class ImportSinglePageView(APIView):
             "hostname": "example.com",  # Optional, for root pages
             "namespace": "default",
             "baseUrl": "https://example.com/section",  # Filter discovered links
+            "codeLayout": "main_layout",  # Optional code layout name
             "requestDelay": 2.0
         }
 
@@ -207,6 +208,7 @@ class ImportSinglePageView(APIView):
         hostname = request.data.get("hostname")
         namespace_slug = request.data.get("namespace", "default")
         base_url = request.data.get("base_url")
+        code_layout = request.data.get("code_layout", "")  # Empty string if not provided
         request_delay = request.data.get("request_delay", 2.0)
 
         # Validate
@@ -245,6 +247,7 @@ class ImportSinglePageView(APIView):
                 parent_page=parent_page,
                 hostname=hostname,
                 base_url=base_url,
+                code_layout=code_layout,
             )
 
             return Response(result, status=status.HTTP_200_OK)

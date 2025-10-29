@@ -41,6 +41,7 @@ class SinglePageImporter:
         parent_page: WebPage = None,
         hostname: str = None,
         base_url: str = None,
+        code_layout: str = "",
     ) -> Dict[str, Any]:
         """
         Import a single page and return discovered links.
@@ -50,6 +51,7 @@ class SinglePageImporter:
             parent_page: Optional parent page
             hostname: Optional hostname for root pages
             base_url: Base URL to filter discovered links
+            code_layout: Optional code layout name to apply to imported page
 
         Returns:
             {
@@ -101,6 +103,7 @@ class SinglePageImporter:
                         url=url,
                         parent_page=parent_page,
                         hostname=hostname,
+                        code_layout=code_layout,
                     )
 
                 logger.info(f"Created page: {page.slug} (from {url})")
@@ -187,9 +190,18 @@ class SinglePageImporter:
         url: str,
         parent_page: WebPage = None,
         hostname: str = None,
+        code_layout: str = "",
     ) -> tuple:
         """
         Create WebPage and PageVersion.
+
+        Args:
+            slug: Page slug
+            metadata: Extracted page metadata
+            url: Source URL
+            parent_page: Optional parent page
+            hostname: Optional hostname for root pages
+            code_layout: Optional code layout name to apply
 
         Returns:
             tuple: (page, slug_warning_dict or None)
@@ -215,6 +227,7 @@ class SinglePageImporter:
         page.save()
 
         # Create initial PageVersion (version 1 for new page)
+        # Leave effective_date as None to keep the page as unpublished/draft
         page_version = PageVersion.objects.create(
             page=page,
             version_number=1,
@@ -224,8 +237,8 @@ class SinglePageImporter:
                 "metaDescription": metadata["description"],
             },
             widgets={},
-            code_layout="",
-            effective_date=timezone.now(),
+            code_layout=code_layout,  # Use provided layout or empty string for default
+            # effective_date is None by default, keeping the page as draft/unpublished
             created_by=self.user,
             tags=metadata["tags"],  # tags is an ArrayField of strings
         )

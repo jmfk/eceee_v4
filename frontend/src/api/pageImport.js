@@ -50,6 +50,7 @@ export const getImportStatus = async (taskId) => {
  * @param {string} options.hostname - Optional hostname for root pages
  * @param {string} options.namespace - Namespace for tags
  * @param {string} options.baseUrl - Base URL to filter discovered links
+ * @param {string} options.codeLayout - Optional code layout name to apply to imported pages
  * @param {number} options.requestDelay - Delay between requests
  * @returns {Promise<Object>} Result with page and discovered URLs
  */
@@ -60,6 +61,7 @@ export const importSinglePage = async (url, options = {}) => {
         hostname: options.hostname,
         namespace: options.namespace || 'default',
         baseUrl: options.baseUrl,
+        codeLayout: options.codeLayout,
         requestDelay: options.requestDelay || 2.0,
     })
     return response.data
