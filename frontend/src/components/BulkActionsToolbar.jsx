@@ -118,7 +118,7 @@ const BulkActionsToolbar = ({
                     <div className="h-5 w-px bg-gray-300" />
                     <div className="flex items-center gap-2">
                         <CheckSquare className="w-4 h-4 text-blue-600" />
-                        <span className="font-medium text-sm text-gray-700">
+                        <span className="font-medium text-sm text-gray-700 whitespace-nowrap">
                             {selectedCount} selected
                         </span>
                     </div>
