@@ -15,9 +15,9 @@ import ContentPreview from './import/ContentPreview';
 import MetadataConfirmationStep from './import/MetadataConfirmationStep';
 import MediaTagReviewStep from './import/MediaTagReviewStep';
 import HierarchySelector from './import/HierarchySelector';
+import AnalysisProgressDialog from './import/AnalysisProgressDialog';
 import { proxyPage, extractMetadata, analyzeHierarchy, generateMediaMetadata, uploadMediaFile, processImport } from '../api/contentImport';
 import { useNotificationContext } from './NotificationManager';
-import { fetchImageResolution } from '../utils/imageResolution';
 
 const STEPS = {
     URL_INPUT: 1,
@@ -61,6 +61,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     const [aiAvailable, setAiAvailable] = useState(true);
     const [mediaMetadataList, setMediaMetadataList] = useState([]); // AI-generated metadata for images and files
     const [mediaTagReviews, setMediaTagReviews] = useState({}); // Per-media tag approval state
+    const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+    const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0, type: '', itemName: '' });
 
     const iframeRef = useRef(null);
     const resizeRef = useRef(null);
@@ -92,6 +94,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             setMediaMetadataList([]);
             setMediaTagReviews({});
             setAiAvailable(true);
+            setShowAnalysisDialog(false);
+            setAnalysisProgress({ current: 0, total: 0, type: '', itemName: '' });
         }
     }, [isOpen]); // Only run when isOpen changes
 
@@ -496,52 +500,53 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 return;
             }
 
-            // Generate metadata for each image
-            const imagePromises = imgElements.map(async (img, idx) => {
-                // Use getAttribute to get original src (may be relative)
-                // AND normalized src for API call
+            // Show analysis dialog and process items sequentially with progress
+            const totalItems = imgElements.length + fileLinks.length;
+            setShowAnalysisDialog(true);
+            setAnalysisProgress({ current: 0, total: totalItems, type: '', itemName: '' });
+
+            // Generate metadata for each image (sequentially to show progress)
+            const imageMetadata = [];
+            for (let idx = 0; idx < imgElements.length; idx++) {
+                const img = imgElements[idx];
                 const srcAttr = img.getAttribute('src') || img.src;
-                const normalizedSrc = img.src; // For API call
+                const normalizedSrc = img.src;
                 const { filename, filepath } = extractFilenameAndPath(normalizedSrc);
 
-                try {
-                    // Fetch resolution info and AI metadata in parallel
-                    const [metadata, resolutionInfo] = await Promise.all([
-                        generateMediaMetadata({
-                            type: 'image',
-                            url: normalizedSrc,
-                            filename: filename,
-                            filepath: filepath,
-                            alt: img.alt || '',
-                            text: img.alt || filename || `Image ${idx + 1}`,
-                            context: '',
-                        }),
-                        fetchImageResolution(normalizedSrc)
-                    ]);
+                // Update progress
+                setAnalysisProgress({
+                    current: idx + 1,
+                    total: totalItems,
+                    type: 'image',
+                    itemName: filename
+                });
 
-                    return {
+                try {
+                    const metadata = await generateMediaMetadata({
+                        type: 'image',
+                        url: normalizedSrc,
+                        filename: filename,
+                        filepath: filepath,
+                        alt: img.alt || '',
+                        text: img.alt || filename || `Image ${idx + 1}`,
+                        context: '',
+                    });
+
+                    imageMetadata.push({
                         index: idx,
                         type: 'image',
-                        src: srcAttr,  // Original src attribute for matching
-                        normalizedSrc: normalizedSrc,  // For display/debugging
+                        src: srcAttr,
+                        normalizedSrc: normalizedSrc,
                         alt: img.alt || '',
                         filename: filename,
                         title: metadata.title || filename,
                         description: metadata.description || '',
                         aiTags: metadata.tags || [],
                         aiGenerated: metadata.ai_generated !== false,
-                        resolution: resolutionInfo,  // Resolution info from proxy headers
-                    };
+                        resolution: metadata.resolution || null,
+                    });
                 } catch (err) {
-                    // Fallback to basic metadata (still try to get resolution)
-                    let resolutionInfo = null;
-                    try {
-                        resolutionInfo = await fetchImageResolution(normalizedSrc);
-                    } catch (resErr) {
-                        console.debug('Failed to fetch resolution:', resErr);
-                    }
-
-                    return {
+                    imageMetadata.push({
                         index: idx,
                         type: 'image',
                         src: srcAttr,
@@ -552,16 +557,26 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: '',
                         aiTags: [],
                         aiGenerated: false,
-                        resolution: resolutionInfo,
-                    };
+                        resolution: null,
+                    });
                 }
-            });
+            }
 
-            // Generate metadata for each file
-            const filePromises = fileLinks.map(async (link, idx) => {
+            // Generate metadata for each file (sequentially to show progress)
+            const fileMetadata = [];
+            for (let idx = 0; idx < fileLinks.length; idx++) {
+                const link = fileLinks[idx];
                 const url = link.href;
                 const linkText = link.textContent.trim();
                 const { filename, filepath } = extractFilenameAndPath(url);
+
+                // Update progress
+                setAnalysisProgress({
+                    current: imgElements.length + idx + 1,
+                    total: totalItems,
+                    type: 'file',
+                    itemName: filename
+                });
 
                 try {
                     const metadata = await generateMediaMetadata({
@@ -573,8 +588,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         context: '',
                     });
 
-                    return {
-                        index: imgElements.length + idx,  // Offset by image count
+                    fileMetadata.push({
+                        index: imgElements.length + idx,
                         type: 'file',
                         url: url,
                         filename: filename,
@@ -583,10 +598,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: metadata.description || '',
                         aiTags: metadata.tags || [],
                         aiGenerated: metadata.ai_generated !== false,
-                    };
+                    });
                 } catch (err) {
-                    // Fallback to basic metadata
-                    return {
+                    fileMetadata.push({
                         index: imgElements.length + idx,
                         type: 'file',
                         url: url,
@@ -596,15 +610,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: '',
                         aiTags: [],
                         aiGenerated: false,
-                    };
+                    });
                 }
-            });
-
-            // Wait for all metadata generation to complete
-            const [imageMetadata, fileMetadata] = await Promise.all([
-                Promise.all(imagePromises),
-                Promise.all(filePromises)
-            ]);
+            }
 
             // Combine images and files into one list
             const allMediaMetadata = [...imageMetadata, ...fileMetadata];
@@ -621,6 +629,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             });
             setMediaTagReviews(initialReviews);
 
+            // Hide analysis dialog
+            setShowAnalysisDialog(false);
+
             // Move to media tag review step
             setCurrentStep(STEPS.MEDIA_TAG_REVIEW);
         } catch (err) {
@@ -628,6 +639,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             showNotification('Failed to generate media tags', 'error');
         } finally {
             setIsLoading(false);
+            setShowAnalysisDialog(false);
         }
     };
 
@@ -914,251 +926,258 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     if (!isOpen) return null;
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-            onClick={(e) => {
-                // Prevent closing on backdrop click - only Cancel/X button can close
-                // This prevents accidental data loss
-            }}
-        >
+        <>
+            {/* Analysis Progress Dialog */}
+            <AnalysisProgressDialog
+                isOpen={showAnalysisDialog}
+                progress={analysisProgress}
+            />
+
             <div
-                className="dialog-container bg-white rounded-lg shadow-xl overflow-hidden flex flex-col relative"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                    width: `${dialogWidth}px`,
-                    height: `${dialogHeight}px`,
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+                onClick={(e) => {
+                    // Prevent closing on backdrop click - only Cancel/X button can close
+                    // This prevents accidental data loss
                 }}
             >
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        Import Content from Web
-                    </h2>
-                    <button
-                        onClick={handleClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                        <X className="h-6 w-6" />
-                    </button>
-                </div>
-
-                {/* Step indicator */}
-                <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-                    <div className="text-sm font-medium text-gray-700">
-                        Step {currentStep}/8: {
-                            currentStep === STEPS.URL_INPUT ? 'Enter URL' :
-                                currentStep === STEPS.IFRAME_SELECT ? 'Select Content (Live Preview)' :
-                                    currentStep === STEPS.METADATA_CONFIRM ? 'Confirm Page Metadata' :
-                                        currentStep === STEPS.MEDIA_TAG_REVIEW ? 'Review Media Tags' :
-                                            currentStep === STEPS.MEDIA_UPLOAD ? 'Upload Media Files' :
-                                                currentStep === STEPS.CONTENT_PREVIEW ? 'Preview Content' :
-                                                    currentStep === STEPS.IMPORT_OPTIONS ? 'Import Options' :
-                                                        'Importing...'
-                        }
+                <div
+                    className="dialog-container bg-white rounded-lg shadow-xl overflow-hidden flex flex-col relative"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                        width: `${dialogWidth}px`,
+                        height: `${dialogHeight}px`,
+                    }}
+                >
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            Import Content from Web
+                        </h2>
+                        <button
+                            onClick={handleClose}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
                     </div>
-                </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                            {error}
+                    {/* Step indicator */}
+                    <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                        <div className="text-sm font-medium text-gray-700">
+                            Step {currentStep}/8: {
+                                currentStep === STEPS.URL_INPUT ? 'Enter URL' :
+                                    currentStep === STEPS.IFRAME_SELECT ? 'Select Content (Live Preview)' :
+                                        currentStep === STEPS.METADATA_CONFIRM ? 'Confirm Page Metadata' :
+                                            currentStep === STEPS.MEDIA_TAG_REVIEW ? 'Review Media Tags' :
+                                                currentStep === STEPS.MEDIA_UPLOAD ? 'Upload Media Files' :
+                                                    currentStep === STEPS.CONTENT_PREVIEW ? 'Preview Content' :
+                                                        currentStep === STEPS.IMPORT_OPTIONS ? 'Import Options' :
+                                                            'Importing...'
+                            }
                         </div>
-                    )}
+                    </div>
 
-                    {/* Step 1: URL Input */}
-                    {currentStep === STEPS.URL_INPUT && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Enter the URL of the page you want to import from:
-                            </label>
-                            <input
-                                type="url"
-                                value={url}
-                                onChange={(e) => setUrl(e.target.value)}
-                                placeholder="https://example.com/article"
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                onKeyPress={(e) => e.key === 'Enter' && handleNext()}
-                            />
-                            <p className="mt-2 text-sm text-gray-500">
-                                The page will be displayed live so you can click on the content you want.
-                            </p>
-                        </div>
-                    )}
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto p-6">
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                                {error}
+                            </div>
+                        )}
 
-                    {/* Step 2: Iframe Content Selection */}
-                    {currentStep === STEPS.IFRAME_SELECT && proxiedHtml && (
-                        <div className="flex gap-0 h-full" style={{ height: '600px' }}>
-                            {/* Left side: Iframe */}
-                            <div className="flex-1 flex flex-col min-w-0">
-                                <div className="flex items-center justify-between mb-3 px-4">
-                                    <p className="text-sm text-gray-700">
-                                        Click on the content block you want to import.
-                                    </p>
+                        {/* Step 1: URL Input */}
+                        {currentStep === STEPS.URL_INPUT && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Enter the URL of the page you want to import from:
+                                </label>
+                                <input
+                                    type="url"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    placeholder="https://example.com/article"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                                />
+                                <p className="mt-2 text-sm text-gray-500">
+                                    The page will be displayed live so you can click on the content you want.
+                                </p>
+                            </div>
+                        )}
 
-                                    <label className="flex items-center text-sm text-gray-600">
-                                        <input
-                                            type="checkbox"
-                                            checked={stripDesign}
-                                            onChange={async (e) => {
-                                                const newValue = e.target.checked;
-                                                setStripDesign(newValue);
-                                                // Reload page with new design setting
-                                                setIsLoading(true);
-                                                try {
-                                                    const data = await proxyPage(url, newValue);
-                                                    setProxiedHtml(data.html);
-                                                } catch (err) {
-                                                    // Silently fail - user can retry
-                                                } finally {
-                                                    setIsLoading(false);
-                                                }
-                                            }}
-                                            className="mr-2"
+                        {/* Step 2: Iframe Content Selection */}
+                        {currentStep === STEPS.IFRAME_SELECT && proxiedHtml && (
+                            <div className="flex gap-0 h-full" style={{ height: '600px' }}>
+                                {/* Left side: Iframe */}
+                                <div className="flex-1 flex flex-col min-w-0">
+                                    <div className="flex items-center justify-between mb-3 px-4">
+                                        <p className="text-sm text-gray-700">
+                                            Click on the content block you want to import.
+                                        </p>
+
+                                        <label className="flex items-center text-sm text-gray-600">
+                                            <input
+                                                type="checkbox"
+                                                checked={stripDesign}
+                                                onChange={async (e) => {
+                                                    const newValue = e.target.checked;
+                                                    setStripDesign(newValue);
+                                                    // Reload page with new design setting
+                                                    setIsLoading(true);
+                                                    try {
+                                                        const data = await proxyPage(url, newValue);
+                                                        setProxiedHtml(data.html);
+                                                    } catch (err) {
+                                                        // Silently fail - user can retry
+                                                    } finally {
+                                                        setIsLoading(false);
+                                                    }
+                                                }}
+                                                className="mr-2"
+                                            />
+                                            Strip original design
+                                        </label>
+                                    </div>
+                                    <div className="border border-gray-300 rounded-lg overflow-auto flex-1 bg-gray-100">
+                                        <iframe
+                                            ref={iframeRef}
+                                            srcDoc={proxiedHtml}
+                                            className="w-full h-full bg-white"
+                                            sandbox="allow-scripts"
+                                            title="Content preview"
                                         />
-                                        Strip original design
-                                    </label>
+                                    </div>
                                 </div>
-                                <div className="border border-gray-300 rounded-lg overflow-auto flex-1 bg-gray-100">
-                                    <iframe
-                                        ref={iframeRef}
-                                        srcDoc={proxiedHtml}
-                                        className="w-full h-full bg-white"
-                                        sandbox="allow-scripts"
-                                        title="Content preview"
+
+                                {/* Resize handle */}
+                                <div
+                                    ref={resizeRef}
+                                    onMouseDown={() => setIsResizing(true)}
+                                    className="w-1 bg-gray-300 hover:bg-blue-500 cursor-ew-resize transition-colors flex-shrink-0"
+                                    style={{ cursor: 'ew-resize' }}
+                                />
+
+                                {/* Right side: Hierarchy Selector (resizable) */}
+                                <div
+                                    className="flex-shrink-0 bg-gray-50 border-l border-gray-200 overflow-hidden"
+                                    style={{ width: `${hierarchyPanelWidth}px` }}
+                                >
+                                    <HierarchySelector
+                                        hierarchy={selectedHierarchy}
+                                        selectedIndex={selectedHierarchyIndex}
+                                        onSelect={handleHierarchySelect}
+                                        onHover={handleHierarchyHover}
+                                        onClearHover={handleHierarchyClearHover}
+                                        stats={hierarchyStats}
+                                        isLoadingStats={isLoadingStats}
                                     />
                                 </div>
                             </div>
+                        )}
 
-                            {/* Resize handle */}
-                            <div
-                                ref={resizeRef}
-                                onMouseDown={() => setIsResizing(true)}
-                                className="w-1 bg-gray-300 hover:bg-blue-500 cursor-ew-resize transition-colors flex-shrink-0"
-                                style={{ cursor: 'ew-resize' }}
+                        {/* Step 3: Metadata Confirmation */}
+                        {currentStep === STEPS.METADATA_CONFIRM && pageMetadata && (
+                            <MetadataConfirmationStep
+                                metadata={pageMetadata}
+                                onTitleChange={setConfirmedTitle}
+                                onTagsChange={setConfirmedTags}
+                                onSaveToPageChange={setSaveToPage}
                             />
+                        )}
 
-                            {/* Right side: Hierarchy Selector (resizable) */}
-                            <div
-                                className="flex-shrink-0 bg-gray-50 border-l border-gray-200 overflow-hidden"
-                                style={{ width: `${hierarchyPanelWidth}px` }}
-                            >
-                                <HierarchySelector
-                                    hierarchy={selectedHierarchy}
-                                    selectedIndex={selectedHierarchyIndex}
-                                    onSelect={handleHierarchySelect}
-                                    onHover={handleHierarchyHover}
-                                    onClearHover={handleHierarchyClearHover}
-                                    stats={hierarchyStats}
-                                    isLoadingStats={isLoadingStats}
-                                />
-                            </div>
-                        </div>
-                    )}
+                        {/* Step 4: Media Tag Review */}
+                        {currentStep === STEPS.MEDIA_TAG_REVIEW && (
+                            <MediaTagReviewStep
+                                mediaItems={mediaMetadataList}
+                                pageTags={confirmedTags}
+                                onTagReviewsChange={setMediaTagReviews}
+                            />
+                        )}
 
-                    {/* Step 3: Metadata Confirmation */}
-                    {currentStep === STEPS.METADATA_CONFIRM && pageMetadata && (
-                        <MetadataConfirmationStep
-                            metadata={pageMetadata}
-                            onTitleChange={setConfirmedTitle}
-                            onTagsChange={setConfirmedTags}
-                            onSaveToPageChange={setSaveToPage}
-                        />
-                    )}
+                        {/* Step 5: Media Upload */}
+                        {currentStep === STEPS.MEDIA_UPLOAD && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                                    Uploading Media Files
+                                </h3>
 
-                    {/* Step 4: Media Tag Review */}
-                    {currentStep === STEPS.MEDIA_TAG_REVIEW && (
-                        <MediaTagReviewStep
-                            mediaItems={mediaMetadataList}
-                            pageTags={confirmedTags}
-                            onTagReviewsChange={setMediaTagReviews}
-                        />
-                    )}
+                                {!aiAvailable && mediaUploadStatus.length > 0 && (
+                                    <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                                        ⚠️ AI metadata generation is not available. Files will be uploaded with basic titles only.
+                                        <div className="text-xs mt-1">Configure OPENAI_API_KEY in backend to enable AI-powered metadata.</div>
+                                    </div>
+                                )}
 
-                    {/* Step 5: Media Upload */}
-                    {currentStep === STEPS.MEDIA_UPLOAD && (
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                                Uploading Media Files
-                            </h3>
-
-                            {!aiAvailable && mediaUploadStatus.length > 0 && (
-                                <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                                    ⚠️ AI metadata generation is not available. Files will be uploaded with basic titles only.
-                                    <div className="text-xs mt-1">Configure OPENAI_API_KEY in backend to enable AI-powered metadata.</div>
-                                </div>
-                            )}
-
-                            {mediaUploadStatus.length === 0 ? (
-                                <div className="text-center py-8">
-                                    <Loader className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
-                                    <p className="text-gray-600">Analyzing content and preparing uploads...</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {mediaUploadStatus.map((item, index) => (
-                                        <div key={index} className="border border-gray-200 rounded-lg p-3">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div className="flex-1">
-                                                    <div className="font-medium text-sm text-gray-900">
-                                                        {item.type === 'image' ? '🖼️' : '📎'} {item.title || item.filename}
+                                {mediaUploadStatus.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <Loader className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
+                                        <p className="text-gray-600">Analyzing content and preparing uploads...</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {mediaUploadStatus.map((item, index) => (
+                                            <div key={index} className="border border-gray-200 rounded-lg p-3">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-sm text-gray-900">
+                                                            {item.type === 'image' ? '🖼️' : '📎'} {item.title || item.filename}
+                                                        </div>
+                                                        {item.currentStep && (
+                                                            <div className="text-xs text-gray-500 mt-1">
+                                                                {item.currentStep}
+                                                            </div>
+                                                        )}
+                                                        {item.tags && item.tags.length > 0 && (
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {item.tags.map((tag, tidx) => (
+                                                                    <span key={tidx} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    {item.currentStep && (
-                                                        <div className="text-xs text-gray-500 mt-1">
-                                                            {item.currentStep}
-                                                        </div>
-                                                    )}
-                                                    {item.tags && item.tags.length > 0 && (
-                                                        <div className="mt-1 flex flex-wrap gap-1">
-                                                            {item.tags.map((tag, tidx) => (
-                                                                <span key={tidx} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                                                                    {tag}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                                    <div>
+                                                        {item.status === 'pending' && (
+                                                            <span className="text-gray-400" title="Waiting">⏱</span>
+                                                        )}
+                                                        {item.status === 'uploading' && (
+                                                            <Loader className="h-4 w-4 text-blue-500 animate-spin" />
+                                                        )}
+                                                        {item.status === 'success' && (
+                                                            <span className="text-green-600 text-lg">✓</span>
+                                                        )}
+                                                        {item.status === 'error' && (
+                                                            <span className="text-red-600 text-lg">✗</span>
+                                                        )}
+                                                        {item.status === 'reused' && (
+                                                            <span className="text-blue-600 text-lg" title="File already exists - reused">↻</span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    {item.status === 'pending' && (
-                                                        <span className="text-gray-400" title="Waiting">⏱</span>
-                                                    )}
-                                                    {item.status === 'uploading' && (
-                                                        <Loader className="h-4 w-4 text-blue-500 animate-spin" />
-                                                    )}
-                                                    {item.status === 'success' && (
-                                                        <span className="text-green-600 text-lg">✓</span>
-                                                    )}
-                                                    {item.status === 'error' && (
-                                                        <span className="text-red-600 text-lg">✗</span>
-                                                    )}
-                                                    {item.status === 'reused' && (
-                                                        <span className="text-blue-600 text-lg" title="File already exists - reused">↻</span>
-                                                    )}
-                                                </div>
+                                                {item.error && (
+                                                    <div className="text-xs text-red-600 mt-1">
+                                                        Error: {item.error}
+                                                    </div>
+                                                )}
+                                                {item.description && (
+                                                    <div className="text-xs text-gray-600 mt-1">
+                                                        {item.description}
+                                                    </div>
+                                                )}
                                             </div>
-                                            {item.error && (
-                                                <div className="text-xs text-red-600 mt-1">
-                                                    Error: {item.error}
-                                                </div>
-                                            )}
-                                            {item.description && (
-                                                <div className="text-xs text-gray-600 mt-1">
-                                                    {item.description}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                )}
 
-                            {mediaUploadComplete && (
-                                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                                    ✓ All media files uploaded successfully!
-                                </div>
-                            )}
+                                {mediaUploadComplete && (
+                                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                                        ✓ All media files uploaded successfully!
+                                    </div>
+                                )}
 
-                            {/* Refresh Status button hidden - uploads complete automatically */}
-                            {/* {mediaUploadStatus.length > 0 && (
+                                {/* Refresh Status button hidden - uploads complete automatically */}
+                                {/* {mediaUploadStatus.length > 0 && (
                                 <div className="mt-4 flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
                                     <div className="text-sm text-gray-600">
                                         {mediaUploadComplete ? (
@@ -1175,191 +1194,192 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                     </button>
                                 </div>
                             )} */}
-                        </div>
-                    )}
-
-                    {/* Step 4: Content Preview */}
-                    {currentStep === STEPS.CONTENT_PREVIEW && selectedElement && (
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                                Preview Content
-                            </h3>
-                            <ContentPreview
-                                html={selectedElement.html}
-                                mediaItems={mediaUploadStatus}
-                                currentTheme={null}
-                            />
-                        </div>
-                    )}
-
-                    {/* Step 4: Import Options */}
-                    {currentStep === STEPS.IMPORT_OPTIONS && (
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                                Import Options
-                            </h3>
-
-                            <div className="space-y-3 mb-6">
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        name="import-mode"
-                                        value="append"
-                                        checked={importMode === 'append'}
-                                        onChange={(e) => setImportMode(e.target.value)}
-                                        className="mr-3"
-                                    />
-                                    <div>
-                                        <div className="font-medium text-gray-900">Append to existing widgets</div>
-                                        <div className="text-sm text-gray-600">Add imported content after current widgets in the slot</div>
-                                    </div>
-                                </label>
-
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        name="import-mode"
-                                        value="replace"
-                                        checked={importMode === 'replace'}
-                                        onChange={(e) => setImportMode(e.target.value)}
-                                        className="mr-3"
-                                    />
-                                    <div>
-                                        <div className="font-medium text-gray-900">Replace existing widgets</div>
-                                        <div className="text-sm text-gray-600">Remove current widgets and add only imported content</div>
-                                    </div>
-                                </label>
                             </div>
+                        )}
 
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <h4 className="font-medium text-blue-900 mb-2">Media files will be:</h4>
-                                <ul className="text-sm text-blue-800 space-y-1">
-                                    <li>• Downloaded automatically</li>
-                                    <li>• Tagged with "imported"</li>
-                                    <li>• AI-generated metadata added (if configured)</li>
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 6: Final Processing */}
-                    {currentStep === STEPS.PROCESSING && (
-                        <div className="text-center py-8">
-                            <Loader className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
-                            <p className="text-lg font-medium text-gray-900 mb-2">
-                                {progress.step}
-                            </p>
-
-                            {/* Progress bar */}
-                            <div className="w-full max-w-md mx-auto bg-gray-200 rounded-full h-2 mb-3">
-                                <div
-                                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${progress.percent}%` }}
+                        {/* Step 4: Content Preview */}
+                        {currentStep === STEPS.CONTENT_PREVIEW && selectedElement && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                                    Preview Content
+                                </h3>
+                                <ContentPreview
+                                    html={selectedElement.html}
+                                    mediaItems={mediaUploadStatus}
+                                    currentTheme={null}
                                 />
                             </div>
+                        )}
 
-                            <p className="text-sm text-gray-600">
-                                Creating {mediaUploadStatus.filter(m => m.status === 'success' || m.status === 'reused').length} widgets from uploaded media...
-                            </p>
+                        {/* Step 4: Import Options */}
+                        {currentStep === STEPS.IMPORT_OPTIONS && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                    Import Options
+                                </h3>
+
+                                <div className="space-y-3 mb-6">
+                                    <label className="flex items-center">
+                                        <input
+                                            type="radio"
+                                            name="import-mode"
+                                            value="append"
+                                            checked={importMode === 'append'}
+                                            onChange={(e) => setImportMode(e.target.value)}
+                                            className="mr-3"
+                                        />
+                                        <div>
+                                            <div className="font-medium text-gray-900">Append to existing widgets</div>
+                                            <div className="text-sm text-gray-600">Add imported content after current widgets in the slot</div>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-center">
+                                        <input
+                                            type="radio"
+                                            name="import-mode"
+                                            value="replace"
+                                            checked={importMode === 'replace'}
+                                            onChange={(e) => setImportMode(e.target.value)}
+                                            className="mr-3"
+                                        />
+                                        <div>
+                                            <div className="font-medium text-gray-900">Replace existing widgets</div>
+                                            <div className="text-sm text-gray-600">Remove current widgets and add only imported content</div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <h4 className="font-medium text-blue-900 mb-2">Media files will be:</h4>
+                                    <ul className="text-sm text-blue-800 space-y-1">
+                                        <li>• Downloaded automatically</li>
+                                        <li>• Tagged with "imported"</li>
+                                        <li>• AI-generated metadata added (if configured)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 6: Final Processing */}
+                        {currentStep === STEPS.PROCESSING && (
+                            <div className="text-center py-8">
+                                <Loader className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
+                                <p className="text-lg font-medium text-gray-900 mb-2">
+                                    {progress.step}
+                                </p>
+
+                                {/* Progress bar */}
+                                <div className="w-full max-w-md mx-auto bg-gray-200 rounded-full h-2 mb-3">
+                                    <div
+                                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${progress.percent}%` }}
+                                    />
+                                </div>
+
+                                <p className="text-sm text-gray-600">
+                                    Creating {mediaUploadStatus.filter(m => m.status === 'success' || m.status === 'reused').length} widgets from uploaded media...
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+                        <div>
+                            {currentStep > STEPS.URL_INPUT && currentStep < STEPS.PROCESSING && (
+                                <button
+                                    onClick={handleBack}
+                                    className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                                >
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                    Back
+                                </button>
+                            )}
                         </div>
-                    )}
-                </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-                    <div>
-                        {currentStep > STEPS.URL_INPUT && currentStep < STEPS.PROCESSING && (
+                        <div className="flex items-center space-x-3">
                             <button
-                                onClick={handleBack}
-                                className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                                onClick={handleClose}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                             >
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back
+                                Cancel
                             </button>
-                        )}
+
+                            {currentStep < STEPS.PROCESSING && (
+                                <button
+                                    onClick={handleNext}
+                                    disabled={isLoading || (currentStep === STEPS.IFRAME_SELECT && !selectedElement) || (currentStep === STEPS.MEDIA_UPLOAD && !mediaUploadComplete)}
+                                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader className="h-4 w-4 mr-2 animate-spin" />
+                                            Loading...
+                                        </>
+                                    ) : currentStep === STEPS.IMPORT_OPTIONS ? (
+                                        <>
+                                            <Download className="h-4 w-4 mr-2" />
+                                            Import
+                                        </>
+                                    ) : (
+                                        <>
+                                            Next
+                                            <ArrowRight className="h-4 w-4 ml-2" />
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                        <button
-                            onClick={handleClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                        >
-                            Cancel
-                        </button>
+                    {/* Resize handles for dialog */}
+                    {/* Corners */}
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('nw'); }}
+                        className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'nwse-resize' }}
+                    />
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('ne'); }}
+                        className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'nesw-resize' }}
+                    />
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('sw'); }}
+                        className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'nesw-resize' }}
+                    />
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('se'); }}
+                        className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'nwse-resize' }}
+                    />
 
-                        {currentStep < STEPS.PROCESSING && (
-                            <button
-                                onClick={handleNext}
-                                disabled={isLoading || (currentStep === STEPS.IFRAME_SELECT && !selectedElement) || (currentStep === STEPS.MEDIA_UPLOAD && !mediaUploadComplete)}
-                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <Loader className="h-4 w-4 mr-2 animate-spin" />
-                                        Loading...
-                                    </>
-                                ) : currentStep === STEPS.IMPORT_OPTIONS ? (
-                                    <>
-                                        <Download className="h-4 w-4 mr-2" />
-                                        Import
-                                    </>
-                                ) : (
-                                    <>
-                                        Next
-                                        <ArrowRight className="h-4 w-4 ml-2" />
-                                    </>
-                                )}
-                            </button>
-                        )}
-                    </div>
+                    {/* Edges */}
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('n'); }}
+                        className="absolute top-0 left-3 right-3 h-1 cursor-ns-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'ns-resize' }}
+                    />
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('s'); }}
+                        className="absolute bottom-0 left-3 right-3 h-1 cursor-ns-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'ns-resize' }}
+                    />
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('w'); }}
+                        className="absolute left-0 top-3 bottom-3 w-1 cursor-ew-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'ew-resize' }}
+                    />
+                    <div
+                        onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('e'); }}
+                        className="absolute right-0 top-3 bottom-3 w-1 cursor-ew-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
+                        style={{ cursor: 'ew-resize' }}
+                    />
                 </div>
-
-                {/* Resize handles for dialog */}
-                {/* Corners */}
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('nw'); }}
-                    className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'nwse-resize' }}
-                />
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('ne'); }}
-                    className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'nesw-resize' }}
-                />
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('sw'); }}
-                    className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'nesw-resize' }}
-                />
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('se'); }}
-                    className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'nwse-resize' }}
-                />
-
-                {/* Edges */}
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('n'); }}
-                    className="absolute top-0 left-3 right-3 h-1 cursor-ns-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'ns-resize' }}
-                />
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('s'); }}
-                    className="absolute bottom-0 left-3 right-3 h-1 cursor-ns-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'ns-resize' }}
-                />
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('w'); }}
-                    className="absolute left-0 top-3 bottom-3 w-1 cursor-ew-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'ew-resize' }}
-                />
-                <div
-                    onMouseDown={() => { setIsResizingDialog(true); setResizeEdge('e'); }}
-                    className="absolute right-0 top-3 bottom-3 w-1 cursor-ew-resize hover:bg-blue-500 opacity-0 hover:opacity-50 transition-opacity"
-                    style={{ cursor: 'ew-resize' }}
-                />
             </div>
-        </div>
+        </>
     );
 };
 

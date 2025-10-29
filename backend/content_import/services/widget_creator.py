@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 
 from .content_parser import ContentSegment
 from ..utils.html_sanitizer import deep_clean_html
+from ..utils.table_parser import parse_html_table
 
 
 logger = logging.getLogger(__name__)
@@ -91,17 +92,48 @@ def _create_table_widget(segment: ContentSegment) -> Dict[str, Any]:
     Returns:
         Widget configuration
     """
-    return {
-        "id": f"widget-{uuid.uuid4()}",
-        "type": "eceee_widgets.TableWidget",
-        "name": "Imported Table",
-        "config": {
-            "tableHtml": segment.content,
-            "responsive": True,
-            "striped": False,
-            "bordered": True,
-        },
-    }
+    try:
+        # Parse HTML table into structured format
+        table_config = parse_html_table(segment.content)
+
+        return {
+            "id": f"widget-{uuid.uuid4()}",
+            "type": "eceee_widgets.TableWidget",
+            "name": "Imported Table",
+            "config": table_config,
+        }
+    except ValueError as e:
+        logger.error(f"Failed to parse table HTML: {e}")
+        # Return a minimal valid table widget as fallback
+        return {
+            "id": f"widget-{uuid.uuid4()}",
+            "type": "eceee_widgets.TableWidget",
+            "name": "Imported Table (Parse Error)",
+            "config": {
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "contentType": "text",
+                                "content": "Error parsing table",
+                                "colspan": 1,
+                                "rowspan": 1,
+                                "fontStyle": "normal",
+                                "alignment": "left",
+                            }
+                        ],
+                        "height": None,
+                    }
+                ],
+                "columnWidths": ["auto"],
+                "caption": None,
+                "showBorders": True,
+                "stripedRows": False,
+                "hoverEffect": True,
+                "responsive": True,
+                "tableWidth": "full",
+            },
+        }
 
 
 def _replace_urls(html: str, url_mapping: Dict[str, str]) -> str:

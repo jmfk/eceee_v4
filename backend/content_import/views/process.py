@@ -107,6 +107,9 @@ class ProcessImportView(APIView):
             for item in uploaded_media:
                 original_url = item.get("url", "")
                 media_id = item.get("media_manager_id", "")
+                item_type = item.get(
+                    "type", "image"
+                )  # Default to image for backwards compatibility
                 alt_text = item.get("alt", "")
                 layout = item.get("layout", {})
 
@@ -114,19 +117,23 @@ class ProcessImportView(APIView):
                     logger.warning(f"⚠️  Skipping invalid media item: {item}")
                     continue
 
-                # Get MediaFile and create proper media-insert HTML
+                # Get MediaFile
                 try:
                     media_file = MediaFile.objects.get(id=media_id)
 
-                    # Use the _create_image_html helper for proper WYSIWYG format
-                    media_insert_html = self._create_image_html(
-                        media_file.get_file_url(),
-                        alt_text,
-                        layout,
-                        media_id=str(media_id),
-                    )
-
-                    url_mapping[original_url] = media_insert_html
+                    # Handle files vs images differently
+                    if item_type == "file":
+                        # Simple URL replacement for files
+                        url_mapping[original_url] = media_file.get_file_url()
+                    else:
+                        # Media-insert HTML for images
+                        media_insert_html = self._create_image_html(
+                            media_file.get_file_url(),
+                            alt_text,
+                            layout,
+                            media_id=str(media_id),
+                        )
+                        url_mapping[original_url] = media_insert_html
 
                     # Collect media info for response
                     tags = [tag.name for tag in media_file.tags.all()[:5]]
@@ -134,7 +141,7 @@ class ProcessImportView(APIView):
                         {
                             "id": str(media_file.id),
                             "title": media_file.title,
-                            "type": "image",
+                            "type": item_type,
                             "url": media_file.file_url,
                             "originalSrc": original_url,
                             "tags": tags,

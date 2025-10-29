@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from content.models import Namespace
 from ..services.openai_service import OpenAIService
 from ..services.media_downloader import MediaDownloader
+from ..utils.image_resolution import find_highest_resolution
 
 
 logger = logging.getLogger(__name__)
@@ -88,8 +89,43 @@ class GenerateMediaMetadataView(APIView):
                     parent_classes=request.data.get("parent_classes", ""),
                 )
 
+                # Detect high-resolution version
+                resolution_info = None
+                image_url = request.data.get("url", "")
+                if image_url:
+                    try:
+                        resolution_data = find_highest_resolution(
+                            base_url=image_url,
+                            srcset=None,  # Could be passed from frontend if available
+                            check_patterns=True,
+                            max_checks=10,
+                        )
+                        if (
+                            resolution_data
+                            and resolution_data.get("multiplier", 1.0) > 1.0
+                        ):
+                            resolution_info = {
+                                "multiplier": (
+                                    f"{int(resolution_data['multiplier'])}x"
+                                    if resolution_data["multiplier"]
+                                    == int(resolution_data["multiplier"])
+                                    else f"{resolution_data['multiplier']:.1f}x"
+                                ),
+                                "source": resolution_data.get("source", ""),
+                                "dimensions": (
+                                    f"{resolution_data['dimensions'][0]}x{resolution_data['dimensions'][1]}"
+                                    if resolution_data.get("dimensions")
+                                    else None
+                                ),
+                            }
+                    except Exception as e:
+                        logger.debug(
+                            f"Resolution detection failed for {image_url}: {e}"
+                        )
+
                 if metadata:
                     metadata["layout"] = layout
+                    metadata["resolution"] = resolution_info
                     metadata["ai_generated"] = True
                     return Response(metadata)
 
