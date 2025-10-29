@@ -151,8 +151,9 @@ class ProxyService:
 
         # Rewrite anchor hrefs - make them non-functional to prevent navigation
         for a in soup.find_all("a", href=True):
+            original_href = a.get("href", "")
+            a["data-original-href"] = urljoin(base_url, original_href)
             a["href"] = "javascript:void(0)"
-            a["data-original-href"] = urljoin(base_url, a.get("href", ""))
 
         # Rewrite CSS url() references in style tags
         for style in soup.find_all("style"):

@@ -90,7 +90,6 @@ class ContentParser:
         # Merge consecutive text content segments
         segments = self._merge_text_segments(segments)
 
-
         return segments
 
     def _process_element(self, element, segments: List[ContentSegment], depth: int = 0):
@@ -116,9 +115,12 @@ class ContentParser:
                 # Handle different tag types
                 if child.name == "table":
                     self._extract_table(child, segments)
-                elif child.name == "a" and child.get("href"):
+                elif child.name == "a" and (
+                    child.get("href") or child.get("data-original-href")
+                ):
                     # Check if it's a file link
-                    href = child.get("href", "")
+                    # Check data-original-href first (set by proxy service), then href
+                    href = child.get("data-original-href") or child.get("href", "")
                     if is_file_link(href):
                         self._extract_file_link(child, segments)
                     else:
@@ -169,7 +171,8 @@ class ContentParser:
 
     def _extract_file_link(self, link_element, segments: List[ContentSegment]):
         """Extract file link as a segment."""
-        href = link_element.get("href", "")
+        # Check data-original-href first (set by proxy service), then href
+        href = link_element.get("data-original-href") or link_element.get("href", "")
         link_text = link_element.get_text(strip=True)
         title = link_element.get("title", "")
 
