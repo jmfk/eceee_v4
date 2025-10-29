@@ -26,9 +26,13 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import pageTreeUtils from '../utils/pageTreeUtils'
 import DeletedPagesView from './DeletedPagesView'
 
-// Search helper function
+// Search helper function - excludes root pages
 const searchAllPages = async (searchTerm, filters = {}) => {
-    return await pagesApi.list({ search: searchTerm, ...filters })
+    return await pagesApi.list({
+        search: searchTerm,
+        parent_isnull: 'false', // Exclude root pages (only show child pages)
+        ...filters
+    })
 }
 
 // Debounce hook for search

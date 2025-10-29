@@ -154,5 +154,5 @@ export function getPageDisplayUrl(page) {
         const firstHostname = getFirstHostname(page);
         return firstHostname || '(hostname missing)';
     }
-    return `/${page.slug}`;
+    return page.slug || '';
 } 

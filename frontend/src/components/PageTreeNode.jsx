@@ -793,13 +793,15 @@ const PageTreeNode = memo(({
                                 {highlightSearchTerm(page.title, searchTerm)}
                             </span>
                         )}
-                        {isRootPageCheck ? (
+                        {isTopLevel ? (
                             <button
                                 onClick={handleHostnameClick}
                                 className="text-xs text-gray-500 truncate hover:text-blue-600 hover:underline cursor-pointer transition-colors"
                                 title="Click to edit hostnames"
                             >
-                                {getPageDisplayUrl(sanitizedPage)}
+                                {sanitizedPage.hostnames && sanitizedPage.hostnames.length > 0
+                                    ? sanitizedPage.hostnames[0]
+                                    : '(hostname missing)'}
                             </button>
                         ) : isEditingSlug ? (
                             <div className="flex items-center gap-1">
@@ -836,7 +838,7 @@ const PageTreeNode = memo(({
                                 onClick={handleSlugClick}
                                 title="Click to edit slug"
                             >
-                                {highlightSearchTerm(getPageDisplayUrl(sanitizedPage), searchTerm)}
+                                {highlightSearchTerm(page.slug || '', searchTerm)}
                             </span>
                         )}
                         <PublicationStatusIcon

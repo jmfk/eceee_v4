@@ -23,7 +23,7 @@ vi.mock('react-hot-toast', () => ({
 
 // Mock utils
 vi.mock('../../utils/apiValidation.js', () => ({
-    getPageDisplayUrl: vi.fn((page) => `/${page.slug}`),
+    getPageDisplayUrl: vi.fn((page) => page.slug || ''),
     isRootPage: vi.fn(() => false), // Non-root page to show slug editing
     sanitizePageData: vi.fn((page) => page)
 }))
@@ -69,7 +69,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
             <PageTreeNode page={mockPage} level={1} />
         )
 
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         expect(slugElement).toBeInTheDocument()
         expect(slugElement).toHaveClass('cursor-pointer')
         expect(slugElement.tagName).toBe('SPAN')
@@ -80,7 +80,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
             <PageTreeNode page={mockPage} level={1} />
         )
 
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Should show input field with current slug
@@ -96,7 +96,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         expect(screen.getByTitle('Cancel (Escape)')).toBeInTheDocument()
 
         // Original slug span should be hidden
-        expect(screen.queryByText('/test-page')).not.toBeInTheDocument()
+        expect(screen.queryByText('test-page')).not.toBeInTheDocument()
     })
 
     it('should cancel editing when cancel button is clicked', async () => {
@@ -105,7 +105,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Change the input value
@@ -118,7 +118,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         await user.click(cancelButton)
 
         // Should return to original slug
-        expect(screen.getByText('/test-page')).toBeInTheDocument()
+        expect(screen.getByText('test-page')).toBeInTheDocument()
         expect(screen.queryByDisplayValue('modified-slug')).not.toBeInTheDocument()
     })
 
@@ -128,7 +128,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Change the input value
@@ -140,7 +140,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         await user.keyboard('{Escape}')
 
         // Should return to original slug
-        expect(screen.getByText('/test-page')).toBeInTheDocument()
+        expect(screen.getByText('test-page')).toBeInTheDocument()
         expect(screen.queryByDisplayValue('modified-slug')).not.toBeInTheDocument()
     })
 
@@ -153,7 +153,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Change the input value
@@ -178,7 +178,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Change the input value and press Enter
@@ -196,7 +196,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Clear the input
@@ -220,7 +220,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Enter invalid slug with special characters
@@ -247,7 +247,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Click save without changing anything
@@ -258,7 +258,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         expect(api.patch).not.toHaveBeenCalled()
 
         // Should exit edit mode
-        expect(screen.getByText('/test-page')).toBeInTheDocument()
+        expect(screen.getByText('test-page')).toBeInTheDocument()
         expect(screen.queryByDisplayValue('test-page')).not.toBeInTheDocument()
     })
 
@@ -272,7 +272,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Change the input value
@@ -302,7 +302,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
         )
 
         // Enter edit mode
-        const slugElement = screen.getByText('/test-page')
+        const slugElement = screen.getByText('test-page')
         await user.click(slugElement)
 
         // Change the input value
