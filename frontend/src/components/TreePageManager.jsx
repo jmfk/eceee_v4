@@ -58,7 +58,7 @@ const TreePageManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     const [statusFilter, setStatusFilter] = useState('all')
-    const [cutPageId, setCutPageId] = useState(null)
+    const [cutPageIds, setCutPageIds] = useState([])
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showRootPageModal, setShowRootPageModal] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
@@ -411,45 +411,75 @@ const TreePageManager = () => {
 
     // Cut/Copy/Paste handlers
     const handleCut = useCallback((pageId) => {
-        setCutPageId(pageId)
+        setCutPageIds([pageId])
+        setCopyPageIds([]) // Clear copy clipboard when cutting
     }, [])
 
     const handlePaste = useCallback(async (targetPage, pasteMode = 'child') => {
-        const sourcePageId = cutPageId
-        if (!sourcePageId || !targetPage) return
+        const isCutOperation = cutPageIds.length > 0
+        const isCopyOperation = copyPageIds.length > 0
+        const sourcePageIds = isCutOperation ? cutPageIds : copyPageIds
+        
+        if (sourcePageIds.length === 0 || !targetPage) return
 
         try {
             let newParentId = null
-            let newSortOrder = 0
+            let baseSortOrder = 0
 
-            // Calculate new parent and sort order based on paste mode
+            // Calculate new parent and base sort order based on paste mode
             if (pasteMode === 'child') {
                 newParentId = targetPage.id
-                newSortOrder = 0
+                baseSortOrder = 0
             } else if (pasteMode === 'top' || pasteMode === 'bottom') {
                 newParentId = null
-                newSortOrder = pasteMode === 'top' ? -1 : 999999
+                baseSortOrder = pasteMode === 'top' ? -1 : 999999
             } else if (pasteMode === 'above' || pasteMode === 'below') {
                 // targetPage is now the full page object with parent info
                 newParentId = targetPage.parent?.id || null
-                newSortOrder = pasteMode === 'above' ?
+                baseSortOrder = pasteMode === 'above' ?
                     pageTreeUtils.calculateSortOrderAbove([], targetPage) :
                     pageTreeUtils.calculateSortOrderBelow([], targetPage)
             }
 
-            // Call the API
-            await movePageMutation.mutateAsync({
-                pageId: sourcePageId,
-                parentId: newParentId,
-                sortOrder: newSortOrder
-            })
+            // Paste all pages in order
+            for (let i = 0; i < sourcePageIds.length; i++) {
+                const sourcePageId = sourcePageIds[i]
+                const newSortOrder = baseSortOrder + (i * 10) // Space pages 10 units apart
+                
+                if (isCutOperation) {
+                    // Move the page
+                    await movePageMutation.mutateAsync({
+                        pageId: sourcePageId,
+                        parentId: newParentId,
+                        sortOrder: newSortOrder
+                    })
+                } else {
+                    // Copy operation - duplicate the page
+                    const duplicatedPage = await pagesApi.duplicate(sourcePageId)
+                    // Move the duplicated page to the target location
+                    await pagesApi.update(duplicatedPage.id, {
+                        parentId: newParentId,
+                        sortOrder: newSortOrder
+                    })
+                }
+            }
 
-            setCutPageId(null)
+            // Clear clipboard only for cut operations
+            if (isCutOperation) {
+                setCutPageIds([])
+            }
+            
+            addNotification(
+                `${isCutOperation ? 'Moved' : 'Copied'} ${sourcePageIds.length} page(s)`,
+                'success',
+                'paste-operation'
+            )
         } catch (error) {
-            console.error('Failed to move page')
+            console.error('Failed to paste pages:', error)
             showError(error, 'error')
+            addNotification('Failed to paste pages', 'error', 'paste-operation')
         }
-    }, [cutPageId, movePageMutation, showError])
+    }, [cutPageIds, copyPageIds, movePageMutation, showError, addNotification])
 
     // Delete handler
     const handleDelete = useCallback(async (pageId) => {
@@ -518,7 +548,8 @@ const TreePageManager = () => {
     // Clear clipboard
     const clearClipboard = () => {
         addNotification('Clipboard cleared', 'info', 'clipboard')
-        setCutPageId(null)
+        setCutPageIds([])
+        setCopyPageIds([])
     }
 
     // Selection handlers
@@ -584,15 +615,8 @@ const TreePageManager = () => {
     // Bulk operation handlers
     const handleBulkCut = useCallback(() => {
         const idsArray = Array.from(selectedPageIds)
-        // For simplicity, we'll use the single cutPageId approach but extend it
-        // In a full implementation, you'd want to support multiple cut pages
-        if (idsArray.length === 1) {
-            setCutPageId(idsArray[0])
-        } else {
-            // For multiple pages, we'd need to extend the cut/paste logic
-            // For now, let's just cut the first one as a simple implementation
-            setCutPageId(idsArray[0])
-        }
+        setCutPageIds(idsArray)
+        setCopyPageIds([]) // Clear copy clipboard when cutting
         setSelectedPageIds(new Set())
         addNotification(`Cut ${idsArray.length} page(s)`, 'info', 'bulk-cut')
     }, [selectedPageIds, addNotification])
@@ -600,6 +624,7 @@ const TreePageManager = () => {
     const handleBulkCopy = useCallback(() => {
         const idsArray = Array.from(selectedPageIds)
         setCopyPageIds(idsArray)
+        setCutPageIds([]) // Clear cut clipboard when copying
         setSelectedPageIds(new Set())
         addNotification(`Copied ${idsArray.length} page(s)`, 'info', 'bulk-copy')
     }, [selectedPageIds, addNotification])
