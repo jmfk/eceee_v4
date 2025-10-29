@@ -701,9 +701,11 @@ const PageTreeNode = memo(({
                     flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
                     ${isCut && isSelected ? 'opacity-70 bg-orange-100 border-l-4 border-blue-500 ring-2 ring-orange-300' : ''}
                     ${isCut && !isSelected ? 'opacity-60 bg-orange-50' : ''}
-                    ${isSelected && !isCut ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
-                    ${page.isSearchResult && !isSelected ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
-                    ${page.highlightSearch && !isSelected ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}
+                    ${isCopied && isSelected && !isCut ? 'opacity-70 bg-green-100 border-l-4 border-blue-500 ring-2 ring-green-300' : ''}
+                    ${isCopied && !isSelected && !isCut ? 'opacity-60 bg-green-50' : ''}
+                    ${isSelected && !isCut && !isCopied ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
+                    ${page.isSearchResult && !isSelected && !isCut && !isCopied ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
+                    ${page.highlightSearch && !isSelected && !isCut && !isCopied ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}
                     ${level > 0 ? 'border-l border-gray-200' : ''}
                     ${isAnimating ? 'transition-all duration-500 ease-in-out' : ''}
                     ${animationDirection === 'up' ? 'transform -translate-y-8' : ''}
@@ -955,7 +957,7 @@ const PageTreeNode = memo(({
                         </button>
                     </Tooltip>
 
-                    {cutPageId && (
+                    {(cutPageIds.length > 0 || copyPageIds.length > 0) && (
                         <>
                             <Tooltip text="Paste above" position="top">
                                 <button
