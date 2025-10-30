@@ -66,7 +66,13 @@ class PageTheme(models.Model):
         upload_to="theme_images/",
         blank=True,
         null=True,
-        help_text="Theme preview image for listings and selection",
+        help_text=(
+            "Theme preview image for listings and selection. "
+            "Note: Files uploaded to theme_images/ should have public-read ACL "
+            "in object storage for direct browser access. "
+            "Set AWS_DEFAULT_ACL='public-read' in production settings or configure "
+            "bucket policy to allow public read access to theme_images/* objects."
+        ),
     )
     is_active = models.BooleanField(default=True)
     is_default = models.BooleanField(

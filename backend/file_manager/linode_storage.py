@@ -33,3 +33,40 @@ class LinodeObjectStorage(S3Boto3Storage):
 
         # Return S3 protocol URL that imgproxy understands
         return f"s3://{bucket}/{name}"
+
+    def get_public_url(self, name):
+        """
+        Return public HTTPS URL for direct browser access.
+
+        This method is used for files that need to be accessed directly
+        (like theme images) rather than through imgproxy.
+
+        Args:
+            name: File name or path
+
+        Returns:
+            Public HTTPS URL
+        """
+        # Clean the name (remove any leading slashes)
+        name = name.lstrip("/")
+
+        # Get configuration from settings
+        bucket = getattr(settings, "AWS_STORAGE_BUCKET_NAME", "eceee-media")
+        custom_domain = getattr(settings, "AWS_S3_CUSTOM_DOMAIN", None)
+        endpoint_url = getattr(settings, "AWS_S3_ENDPOINT_URL", None)
+        region = getattr(settings, "AWS_S3_REGION_NAME", "us-east-1")
+
+        # Priority 1: Use custom domain if configured (CDN)
+        if custom_domain:
+            return f"https://{custom_domain}/{name}"
+
+        # Priority 2: Construct from endpoint_url (Linode/MinIO)
+        if endpoint_url:
+            # Remove http:// or https:// prefix to rebuild with proper protocol
+            endpoint = endpoint_url.replace("http://", "").replace("https://", "")
+            # Use HTTPS for production, HTTP for local dev (MinIO)
+            protocol = "https" if "linodeobjects.com" in endpoint else "http"
+            return f"{protocol}://{endpoint}/{bucket}/{name}"
+
+        # Priority 3: Standard AWS S3 URL format
+        return f"https://{bucket}.s3.{region}.amazonaws.com/{name}"

@@ -79,11 +79,36 @@ class PageThemeSerializer(serializers.ModelSerializer):
 
         # Convert image field to full URL
         if instance.image:
+            # Get the URL from the ImageField
+            image_url = instance.image.url
+            
+            # Check if it's an s3:// protocol URL (from LinodeObjectStorage)
+            if image_url.startswith("s3://"):
+                # Extract the file path from s3://bucket/path format
+                try:
+                    from django.core.files.storage import default_storage
+                    # Remove s3://bucket/ prefix to get just the path
+                    parts = image_url.replace("s3://", "").split("/", 1)
+                    if len(parts) == 2:
+                        file_path = parts[1]
+                        # Use storage backend's get_public_url method if available
+                        if hasattr(default_storage, "get_public_url"):
+                            image_url = default_storage.get_public_url(file_path)
+                        else:
+                            # Fallback: use the image.name directly with storage
+                            image_url = default_storage.url(instance.image.name)
+                except Exception as e:
+                    # If conversion fails, log and use the original URL
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to convert s3:// URL to public URL: {e}")
+            
+            # Build absolute URI if request is available
             request = self.context.get("request")
-            if request:
-                data["image"] = request.build_absolute_uri(instance.image.url)
+            if request and not image_url.startswith(("http://", "https://")):
+                data["image"] = request.build_absolute_uri(image_url)
             else:
-                data["image"] = instance.image.url
+                data["image"] = image_url
         else:
             data["image"] = None
 
