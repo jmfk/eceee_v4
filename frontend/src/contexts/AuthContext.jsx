@@ -43,6 +43,33 @@ export const AuthProvider = ({ children }) => {
         };
     }, [sessionExpired]);
 
+    const fetchUserDetails = async () => {
+        try {
+            const accessToken = localStorage.getItem('access_token');
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            // Add JWT token if available (not needed for session auth in dev)
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+
+            const response = await fetch('/api/v1/utils/current-user/', {
+                credentials: 'include',
+                headers: headers
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return data;
+            }
+        } catch (error) {
+            console.error('Failed to fetch user details:', error);
+        }
+        return null;
+    };
+
     const checkAuthStatus = async () => {
         try {
             // STEP 1: Try dev auto-login (session-based auth with no tokens)
@@ -55,7 +82,9 @@ export const AuthProvider = ({ children }) => {
                 if (devAuthResponse.ok) {
                     // Dev auto-login is working! No tokens needed
                     setIsAuthenticated(true);
-                    setUser({ username: 'dev_auto_user' }); // Mark as dev user
+                    // Try to fetch user details
+                    const userData = await fetchUserDetails();
+                    setUser(userData || { username: 'dev_auto_user' });
                     setIsLoading(false);
                     return;
                 }
@@ -82,9 +111,9 @@ export const AuthProvider = ({ children }) => {
 
             if (response.ok) {
                 setIsAuthenticated(true);
-                // Optionally fetch user details
-                // const userData = await fetchUserDetails();
-                // setUser(userData);
+                // Fetch full user details
+                const userData = await fetchUserDetails();
+                setUser(userData);
             } else if (response.status === 401) {
                 // Token might be expired, try to refresh
                 try {
@@ -102,6 +131,9 @@ export const AuthProvider = ({ children }) => {
                         const data = await refreshResponse.json();
                         localStorage.setItem('access_token', data.access);
                         setIsAuthenticated(true);
+                        // Fetch full user details
+                        const userData = await fetchUserDetails();
+                        setUser(userData);
                     } else {
                         // Refresh failed, clear tokens
                         localStorage.removeItem('access_token');

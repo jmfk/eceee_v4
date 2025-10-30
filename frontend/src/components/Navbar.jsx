@@ -1,12 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Code, Settings, Grid3X3, ChevronDown, FolderOpen, Database, Hash } from 'lucide-react'
+import { Menu, X, Code, Settings, Grid3X3, ChevronDown, FolderOpen, Database, Hash, User as UserIcon } from 'lucide-react'
 import { useState } from 'react'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const location = useLocation()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
 
   const navigation = [
     { name: 'Pages', href: '/pages', icon: Grid3X3 },
@@ -14,6 +14,7 @@ const Navbar = () => {
     { name: 'Media', href: '/media', icon: FolderOpen },
     { name: 'Tags', href: '/tags', icon: Hash },
     { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Profile', href: '/profile', icon: UserIcon },
   ]
 
   const isSchemasActive = false
@@ -34,6 +35,8 @@ const Navbar = () => {
         'themes': 'Themes',
         'widgets': 'Widgets',
         'object-types': 'Object Types',
+        'value-lists': 'Value Lists',
+        'users': 'Users',
         'versions': 'Versions',
         'publishing': 'Publishing',
         'namespaces': 'Namespaces'
@@ -52,6 +55,7 @@ const Navbar = () => {
     if (path.startsWith('/objects')) return 'Objects'
     if (path.startsWith('/media')) return 'Media'
     if (path.startsWith('/tags')) return 'Tags'
+    if (path.startsWith('/profile')) return 'Profile'
     return ''
   }
 

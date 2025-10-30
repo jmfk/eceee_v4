@@ -1,26 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash, Database, Package, Menu, List } from 'lucide-react'
+import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash, Database, Package, Menu, List, Users } from 'lucide-react'
 import { themesApi } from '../api'
 import { objectTypesApi } from '../api/objectStorage'
 import { layoutsApi } from '../api/layouts'
 import { valueListsApi } from '../api/valueLists'
-
-const tabs = [
-    { id: 'layouts', label: 'Layouts', icon: Grid3X3, href: '/settings/layouts' },
-    { id: 'themes', label: 'Themes', icon: Palette, href: '/settings/themes' },
-    { id: 'widgets', label: 'Widgets', icon: Package, href: '/settings/widgets' },
-    { id: 'value-lists', label: 'Value Lists', icon: List, href: '/settings/value-lists' },
-    { id: 'object-types', label: 'Object Types', icon: Database, href: '/settings/object-types' },
-    { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
-    { id: 'publishing', label: 'Publishing Workflow', icon: Calendar, href: '/settings/publishing' },
-    { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings/namespaces' },
-]
+import { useAuth } from '../contexts/AuthContext'
 
 export default function SettingsTabs() {
     const location = useLocation()
     const [openSubmenu, setOpenSubmenu] = useState(null)
+    const { user } = useAuth()
 
     const isSettingsPath = location.pathname.startsWith('/settings')
     const isSchemasPath = location.pathname.startsWith('/schemas')
@@ -125,7 +116,12 @@ export default function SettingsTabs() {
 
     // Organized navigation structure with submenus
     const navigationStructure = {
-        core: [],
+        core: [
+            ...(user?.isSuperuser ? [{ id: 'users', label: 'Users', icon: Users, href: '/settings/users', description: 'User management' }] : []),
+            { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions', description: 'Version history' },
+            { id: 'publishing', label: 'Publishing', icon: Calendar, href: '/settings/publishing', description: 'Publishing workflow' },
+            { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings/namespaces', description: 'Content namespaces' },
+        ],
         layouts: {
             id: 'layouts',
             label: 'Layouts',
@@ -290,6 +286,27 @@ export default function SettingsTabs() {
             {/* Horizontal Menubar */}
             <nav className="border-b border-gray-200">
                 <div className="flex">
+                    {/* Render core items as simple links */}
+                    {navigationStructure.core.map((item) => {
+                        const Icon = item.icon
+                        const active = isActive(item)
+
+                        return (
+                            <Link
+                                key={item.id}
+                                to={item.href}
+                                className={`flex items-center px-4 py-3 text-sm font-medium transition-colors border-b-2 ${active
+                                    ? 'text-blue-600 bg-blue-50 border-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50 border-transparent hover:border-gray-300'
+                                    }`}
+                            >
+                                <Icon className="w-4 h-4 mr-2" />
+                                {item.label}
+                            </Link>
+                        )
+                    })}
+
+                    {/* Render sections with dropdowns */}
                     {menuSections.map((section) => {
                         const Icon = section.icon
                         const isOpen = openSubmenu === section.id

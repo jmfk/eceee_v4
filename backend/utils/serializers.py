@@ -170,3 +170,116 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "username", "first_name", "last_name", "email"]
         read_only_fields = fields
+
+
+class UserListSerializer(serializers.ModelSerializer):
+    """Extended serializer for User model with staff/superuser status."""
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "is_staff",
+            "is_superuser",
+            "date_joined",
+            "last_login",
+        ]
+        read_only_fields = fields
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Serializer for password change."""
+
+    old_password = serializers.CharField(required=True, write_only=True)
+    new_password = serializers.CharField(required=True, write_only=True)
+    confirm_password = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, data):
+        if data["new_password"] != data["confirm_password"]:
+            raise serializers.ValidationError(
+                {"confirm_password": "Passwords do not match."}
+            )
+        if len(data["new_password"]) < 8:
+            raise serializers.ValidationError(
+                {"new_password": "Password must be at least 8 characters long."}
+            )
+        return data
+
+
+class PasswordResetLinkSerializer(serializers.Serializer):
+    """Serializer for password reset link generation response."""
+
+    reset_url = serializers.URLField(read_only=True)
+    user_id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    expires_in = serializers.CharField(read_only=True)
+
+
+class CreateUserSerializer(serializers.ModelSerializer):
+    """Serializer for creating new users."""
+
+    password = serializers.CharField(required=True, write_only=True, min_length=8)
+    confirm_password = serializers.CharField(required=True, write_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "password",
+            "confirm_password",
+            "is_staff",
+            "is_superuser",
+        ]
+
+    def validate(self, data):
+        if data["password"] != data["confirm_password"]:
+            raise serializers.ValidationError(
+                {"confirm_password": "Passwords do not match."}
+            )
+        return data
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username already exists.")
+        return value
+
+    def validate_email(self, value):
+        if value and User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists.")
+        return value
+
+    def create(self, validated_data):
+        validated_data.pop("confirm_password")
+        password = validated_data.pop("password")
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+
+class UpdateUserSerializer(serializers.ModelSerializer):
+    """Serializer for updating user permissions."""
+
+    class Meta:
+        model = User
+        fields = [
+            "email",
+            "first_name",
+            "last_name",
+            "is_staff",
+            "is_superuser",
+        ]
+
+    def validate_email(self, value):
+        # Check if email is being changed and if it already exists
+        user = self.instance
+        if value and value != user.email and User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists.")
+        return value

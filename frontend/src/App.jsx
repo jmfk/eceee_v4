@@ -21,6 +21,8 @@ import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import LayoutSchemaEditorPage from '@pages/LayoutSchemaEditorPage'
 import MediaManagerPage from '@pages/MediaManagerPage'
 import TagsPage from '@pages/TagsPage'
+import ProfilePage from '@pages/ProfilePage'
+import UserManagementPage from '@pages/UserManagementPage'
 import ObjectBrowser from '@components/ObjectBrowser'
 import ObjectTypeEditorPage from '@pages/ObjectTypeEditorPage'
 import ObjectInstanceEditPage from '@pages/ObjectInstanceEditPage'
@@ -30,6 +32,7 @@ import VersionTimelinePage from '@pages/VersionTimelinePage'
 import NotFoundPage from '@pages/NotFoundPage'
 import SelfContainedFormDemo from '@components/demos/SelfContainedFormDemo'
 import SimpleFormDemo from '@components/demos/SimpleFormDemo'
+import SettingsTabs from '@components/SettingsTabs'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
@@ -135,6 +138,35 @@ function App() {
                           </div>
                         </main>
                         <StatusBar customStatusContent={<span>Tags - Ready</span>} />
+                      </div>
+                    </PrivateRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <PrivateRoute>
+                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                        <Navbar />
+                        <main className="flex-1 overflow-hidden">
+                          <div className="h-full overflow-y-auto">
+                            <ProfilePage />
+                          </div>
+                        </main>
+                        <StatusBar customStatusContent={<span>Profile - Ready</span>} />
+                      </div>
+                    </PrivateRoute>
+                  } />
+                  <Route path="/settings/users" element={
+                    <PrivateRoute>
+                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                        <Navbar />
+                        <main className="flex-1 overflow-hidden">
+                          <div className="h-full overflow-y-auto">
+                            <div className="container mx-auto px-4 py-8">
+                              <SettingsTabs />
+                              <UserManagementPage />
+                            </div>
+                          </div>
+                        </main>
+                        <StatusBar customStatusContent={<span>Settings - Users</span>} />
                       </div>
                     </PrivateRoute>
                   } />

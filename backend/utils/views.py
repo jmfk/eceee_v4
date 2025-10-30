@@ -4,11 +4,15 @@ General utility API views for the schema system and value lists
 
 import logging
 from django.http import HttpResponse
+from django.contrib.auth.models import User
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.sites.shortcuts import get_current_site
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from .schema_system import field_registry, register_custom_field_type
 from .models import (
@@ -30,6 +34,12 @@ from .serializers import (
     AIAgentTaskFromTemplateSerializer,
     TaskStatusUpdateSerializer,
     TaskConfigValidationSerializer,
+    UserSerializer,
+    UserListSerializer,
+    ChangePasswordSerializer,
+    PasswordResetLinkSerializer,
+    CreateUserSerializer,
+    UpdateUserSerializer,
 )
 
 
@@ -507,3 +517,199 @@ def task_sse_stream(request, task_id):
             {"error": "Failed to establish SSE stream"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+class CurrentUserView(APIView):
+    """
+    Get current authenticated user details.
+    
+    GET /api/v1/utils/current-user/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserListSerializer(request.user)
+        return Response(serializer.data)
+
+
+class ChangePasswordView(APIView):
+    """
+    Change password for authenticated user.
+    
+    POST /api/v1/utils/change-password/
+    
+    Request body:
+    {
+        "old_password": "current_password",
+        "new_password": "new_password",
+        "confirm_password": "new_password"
+    }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = request.user
+
+            # Check old password
+            if not user.check_password(serializer.validated_data["old_password"]):
+                return Response(
+                    {"old_password": "Current password is incorrect."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Set new password
+            user.set_password(serializer.validated_data["new_password"])
+            user.save()
+
+            # Update session to prevent logout
+            update_session_auth_hash(request, user)
+
+            logger.info(f"Password changed successfully for user {user.username}")
+
+            return Response(
+                {"message": "Password changed successfully."},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserListView(APIView):
+    """
+    List all users and create new users (superuser only).
+    
+    GET /api/v1/utils/users/
+    POST /api/v1/utils/users/
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        users = User.objects.all().order_by("username")
+        serializer = UserListSerializer(users, many=True)
+        return Response({"users": serializer.data, "count": users.count()})
+
+    def post(self, request):
+        serializer = CreateUserSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            user = serializer.save()
+            logger.info(f"User {user.username} created by {request.user.username}")
+            
+            return Response(
+                {
+                    "message": f"User {user.username} created successfully.",
+                    "user": UserListSerializer(user).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserDetailView(APIView):
+    """
+    Update or delete a user (superuser only).
+    
+    PATCH /api/v1/utils/users/<user_id>/
+    DELETE /api/v1/utils/users/<user_id>/
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def patch(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = UpdateUserSerializer(user, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            logger.info(f"User {user.username} updated by {request.user.username}")
+            
+            return Response(
+                {
+                    "message": f"User {user.username} updated successfully.",
+                    "user": UserListSerializer(user).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Prevent deleting yourself
+        if user.id == request.user.id:
+            return Response(
+                {"error": "You cannot delete your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        username = user.username
+        user.delete()
+
+        logger.info(f"User {username} deleted by {request.user.username}")
+
+        return Response(
+            {"message": f"User {username} deleted successfully."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class GeneratePasswordResetView(APIView):
+    """
+    Generate password reset link for a user (superuser only).
+    
+    POST /api/v1/utils/users/<user_id>/reset-password/
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Generate password reset token using django-allauth
+        from allauth.account.forms import default_token_generator
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+
+        # Generate token
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+        # Build reset URL
+        # Using the frontend URL pattern
+        reset_url = f"{request.scheme}://{request.get_host()}/accounts/password/reset/key/{uid}-{token}/"
+
+        logger.info(f"Password reset link generated for user {user.username} by {request.user.username}")
+
+        serializer = PasswordResetLinkSerializer(
+            data={
+                "reset_url": reset_url,
+                "user_id": user.id,
+                "username": user.username,
+                "expires_in": "3 days",
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
