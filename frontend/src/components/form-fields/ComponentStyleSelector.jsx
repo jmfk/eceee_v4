@@ -37,26 +37,31 @@ const ComponentStyleSelector = ({
         try {
             setLoading(true)
             
-            // Try to get theme from various sources
+            // Try to get theme from various sources (in order of priority)
             let theme = pageTheme
             
-            // Try context (from page editor)
+            // Try context.theme (from widget editing context)
             if (!theme && context?.theme) {
                 theme = context.theme
             }
             
-            // Try context page data
+            // Try context.pageVersionData.effectiveTheme (fallback)
+            if (!theme && context?.pageVersionData?.effectiveTheme) {
+                theme = context.pageVersionData.effectiveTheme
+            }
+            
+            // Try context.pageData.theme (legacy)
             if (!theme && context?.pageData?.theme) {
                 theme = context.pageData.theme
             }
             
-            // Get component styles from theme
+            // Get component styles from theme (handle both camelCase and snake_case)
             if (theme && theme.componentStyles) {
                 setComponentStyles(theme.componentStyles || {})
             } else if (theme && theme.component_styles) {
                 setComponentStyles(theme.component_styles || {})
             } else {
-                // No theme available - could fetch current theme from API if needed
+                // No theme available
                 setComponentStyles({})
             }
         } catch (error) {

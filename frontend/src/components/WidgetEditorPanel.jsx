@@ -504,7 +504,8 @@ const WidgetEditorPanel = forwardRef(({
                                         pageId: context?.pageId || webpageData?.id,
                                         versionId: context?.versionId || pageVersionData?.versionId,
                                         webpageData: context?.webpageData || webpageData,
-                                        pageVersionData: context?.pageVersionData || pageVersionData
+                                        pageVersionData: context?.pageVersionData || pageVersionData,
+                                        theme: pageVersionData?.effectiveTheme
                                     }}
                                 />
                                 <WidgetPublishingInheritanceFields
