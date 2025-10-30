@@ -504,7 +504,7 @@ For detailed testing documentation, see [docs/CODE_BASED_WIDGET_SYSTEM_TESTING.m
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the SSPL 1.0 - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
