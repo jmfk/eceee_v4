@@ -93,11 +93,11 @@ class NavigationConfig(BaseModel):
             "groups": {
                 "pageSections": {
                     "label": "Page Section",
-                    "config_model": "PageSectionConfig",
+                    "configModel": "PageSectionConfig",
                 },
                 "pageSubmenu": {
                     "label": "Page Submenu",
-                    "config_model": "PageSubmenuConfig",
+                    "configModel": "PageSubmenuConfig",
                 },
                 "none": {
                     "label": "None",
@@ -114,6 +114,16 @@ class NavigationConfig(BaseModel):
             "addButtonText": "Add Menu Item",
             "emptyText": "No menu items added yet",
             "itemLabelTemplate": "label",  # Use the label field for item display
+        },
+    )
+
+    navigation_style: Optional[str] = Field(
+        None,
+        description="Component style to use for rendering (from theme)",
+        json_schema_extra={
+            "component": "ComponentStyleSelect",
+            "label": "Navigation Style",
+            "description": "Select a component style from the theme",
         },
     )
 
@@ -202,3 +212,61 @@ class NavigationWidget(BaseWidget):
         template_config["dynamic_menu_items"] = dynamic_menu_items
 
         return template_config
+
+    def render_with_style(self, config, theme=None):
+        """
+        Render navigation using theme's component styles with Mustache templates.
+
+        Args:
+            config: Widget configuration (already prepared via prepare_template_context)
+            theme: PageTheme instance
+
+        Returns:
+            Tuple of (html, css) or None if no custom style
+        """
+        from webpages.utils.mustache_renderer import render_mustache
+
+        # Support both snake_case and camelCase
+        style_name = config.get("navigation_style") or config.get("navigationStyle")
+
+        # Only render with custom style if a style is explicitly selected
+        if not style_name or style_name == "default":
+            return None
+
+        # Get style from theme
+        style = None
+        if theme:
+            styles = theme.component_styles or {}
+            style = styles.get(style_name)
+
+        # If style not found, return None to use default template
+        if not style:
+            return None
+
+        # Prepare navigation items (combine dynamic and static)
+        all_items = []
+        
+        # Add dynamic menu items
+        dynamic_items = config.get("dynamic_menu_items", [])
+        all_items.extend(dynamic_items)
+        
+        # Add static menu items
+        static_items = config.get("menu_items", [])
+        all_items.extend(static_items)
+
+        if not all_items:
+            return None
+
+        # Prepare context for Mustache rendering
+        context = {
+            "items": all_items,
+            "itemCount": len(all_items),
+            "hasItems": len(all_items) > 0,
+            **(style.get("variables") or {}),
+        }
+
+        # Render template
+        html = render_mustache(style.get("template", ""), context)
+        css = style.get("css", "")
+
+        return html, css
