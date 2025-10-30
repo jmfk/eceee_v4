@@ -184,181 +184,181 @@ const ThemeSelector = ({
                                     <p className="text-sm mt-1">Create themes in the Theme Editor to style your content</p>
                                 </div>
                             ) : (
-                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                                    {themes.map((theme) => {
-                                                        const isSelected = selectedThemeId === theme.id
-                                                        const isEffective = effectiveThemeId === theme.id && !selectedThemeId
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    {themes.map((theme) => {
+                                        const isSelected = selectedThemeId === theme.id
+                                        const isEffective = effectiveThemeId === theme.id && !selectedThemeId
 
-                                                        return (
-                                                            <div
-                                                                key={theme.id}
-                                                                className={`border-2 rounded-lg overflow-hidden transition-all cursor-pointer flex flex-col ${isSelected
-                                                                        ? 'border-blue-500 bg-blue-50'
-                                                                        : isEffective
-                                                                            ? 'border-blue-300 bg-blue-25'
-                                                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                                                    }`}
-                                                            >
-                                                                {/* Theme Image */}
-                                                                {theme.image && (
-                                                                    <div className="w-full h-32 bg-gray-100 overflow-hidden flex-shrink-0">
-                                                                        <img 
-                                                                            src={theme.image} 
-                                                                            alt={theme.name}
-                                                                            className="w-full h-full object-cover"
-                                                                        />
-                                                                    </div>
+                                        return (
+                                            <div
+                                                key={theme.id}
+                                                className={`border-2 rounded-lg overflow-hidden transition-all cursor-pointer flex flex-col ${isSelected
+                                                    ? 'border-blue-500 bg-blue-50'
+                                                    : isEffective
+                                                        ? 'border-blue-300 bg-blue-25'
+                                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                {/* Theme Image */}
+                                                {theme.image && (
+                                                    <div className="w-full h-32 bg-gray-100 overflow-hidden flex-shrink-0">
+                                                        <img
+                                                            src={theme.image}
+                                                            alt={theme.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div className="p-4 flex flex-col flex-1">
+                                                    <div className="flex-1">
+                                                        {/* Theme Header */}
+                                                        <div className="flex items-start justify-between mb-3">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center space-x-2">
+                                                                    <h4 className="font-medium text-gray-900">{theme.name}</h4>
+                                                                    {theme.isDefault && !isEffective && (
+                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                                                                            Default
+                                                                        </span>
+                                                                    )}
+                                                                    {isSelected && (
+                                                                        <Check className="w-4 h-4 text-blue-600" />
+                                                                    )}
+                                                                    {isEffective && (
+                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                                            {themeInheritanceInfo?.source === 'inherited' ? 'Inherited' : 'Active (Default)'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {theme.description && (
+                                                                    <p className="text-sm text-gray-600 mt-1">{theme.description}</p>
                                                                 )}
+                                                            </div>
+                                                            <div className="flex items-center space-x-1">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handlePreviewToggle(theme.id)
+                                                                    }}
+                                                                    className={`p-1 rounded text-xs transition-colors ${showPreview && previewThemeId === theme.id
+                                                                        ? 'bg-purple-100 text-purple-700'
+                                                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                                                                        }`}
+                                                                    title={showPreview && previewThemeId === theme.id ? 'Hide preview' : 'Show preview'}
+                                                                >
+                                                                    {showPreview && previewThemeId === theme.id ? (
+                                                                        <EyeOff className="w-4 h-4" />
+                                                                    ) : (
+                                                                        <Eye className="w-4 h-4" />
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        </div>
 
-                                                                <div className="p-4 flex flex-col flex-1">
-                                                                    <div className="flex-1">
-                                                                        {/* Theme Header */}
-                                                                        <div className="flex items-start justify-between mb-3">
-                                                                        <div className="flex-1">
-                                                                            <div className="flex items-center space-x-2">
-                                                                                <h4 className="font-medium text-gray-900">{theme.name}</h4>
-                                                                                {theme.isDefault && !isEffective && (
-                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
-                                                                                        Default
+                                                        {/* Color Preview */}
+                                                        <div className="flex items-center space-x-1 mb-3">
+                                                            {getColorVariables(theme.cssVariables).slice(0, 6).map((color, i) => (
+                                                                <div
+                                                                    key={i}
+                                                                    className="w-6 h-6 rounded border border-gray-300"
+                                                                    style={{ backgroundColor: color }}
+                                                                    title={color}
+                                                                />
+                                                            ))}
+                                                            {getColorVariables(theme.cssVariables).length > 6 && (
+                                                                <span className="text-xs text-gray-400">
+                                                                    +{getColorVariables(theme.cssVariables).length - 6}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-xs text-gray-500 ml-2">
+                                                                {Object.keys(theme.cssVariables || {}).length} variables
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Available Styles */}
+                                                        {(theme.componentStyles || theme.galleryStyles || theme.carouselStyles || theme.tableTemplates) && (
+                                                            <div className="mb-3 p-2 bg-gray-50 rounded border border-gray-200">
+                                                                <div className="text-xs font-medium text-gray-700 mb-2">Available Templates</div>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    {theme.componentStyles && Object.keys(theme.componentStyles).length > 0 && (
+                                                                        <div>
+                                                                            <div className="text-xs font-medium text-gray-700 mb-0.5">Components:</div>
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {Object.keys(theme.componentStyles).map(styleName => (
+                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+                                                                                        {styleName}
                                                                                     </span>
-                                                                                )}
-                                                                                {isSelected && (
-                                                                                    <Check className="w-4 h-4 text-blue-600" />
-                                                                                )}
-                                                                                {isEffective && (
-                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                                                        {themeInheritanceInfo?.source === 'inherited' ? 'Inherited' : 'Active (Default)'}
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    {theme.galleryStyles && Object.keys(theme.galleryStyles).length > 0 && (
+                                                                        <div>
+                                                                            <div className="text-xs font-medium text-gray-700 mb-0.5">Gallery:</div>
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {Object.keys(theme.galleryStyles).map(styleName => (
+                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+                                                                                        {styleName}
                                                                                     </span>
-                                                                                )}
+                                                                                ))}
                                                                             </div>
-                                                                            {theme.description && (
-                                                                                <p className="text-sm text-gray-600 mt-1">{theme.description}</p>
-                                                                            )}
                                                                         </div>
-                                                                        <div className="flex items-center space-x-1">
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation()
-                                                                                    handlePreviewToggle(theme.id)
-                                                                                }}
-                                                                                className={`p-1 rounded text-xs transition-colors ${showPreview && previewThemeId === theme.id
-                                                                                    ? 'bg-purple-100 text-purple-700'
-                                                                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                                                                                    }`}
-                                                                                title={showPreview && previewThemeId === theme.id ? 'Hide preview' : 'Show preview'}
-                                                                            >
-                                                                                {showPreview && previewThemeId === theme.id ? (
-                                                                                    <EyeOff className="w-4 h-4" />
-                                                                                ) : (
-                                                                                    <Eye className="w-4 h-4" />
-                                                                                )}
-                                                                            </button>
-                                                                        </div>
-                                                                        </div>
-
-                                                                        {/* Color Preview */}
-                                                                        <div className="flex items-center space-x-1 mb-3">
-                                                                            {getColorVariables(theme.cssVariables).slice(0, 6).map((color, i) => (
-                                                                                <div
-                                                                                    key={i}
-                                                                                    className="w-6 h-6 rounded border border-gray-300"
-                                                                                    style={{ backgroundColor: color }}
-                                                                                    title={color}
-                                                                                />
-                                                                            ))}
-                                                                            {getColorVariables(theme.cssVariables).length > 6 && (
-                                                                                <span className="text-xs text-gray-400">
-                                                                                    +{getColorVariables(theme.cssVariables).length - 6}
-                                                                                </span>
-                                                                            )}
-                                                                            <span className="text-xs text-gray-500 ml-2">
-                                                                                {Object.keys(theme.cssVariables || {}).length} variables
-                                                                            </span>
-                                                                        </div>
-
-                                                                        {/* Available Styles */}
-                                                                        {(theme.componentStyles || theme.galleryStyles || theme.carouselStyles || theme.tableTemplates) && (
-                                                                            <div className="mb-3 p-2 bg-gray-50 rounded border border-gray-200">
-                                                                                <div className="text-xs font-medium text-gray-700 mb-2">Available Templates</div>
-                                                                                <div className="grid grid-cols-2 gap-2">
-                                                                                    {theme.componentStyles && Object.keys(theme.componentStyles).length > 0 && (
-                                                                                        <div>
-                                                                                            <div className="text-xs font-medium text-blue-700 mb-0.5">Components:</div>
-                                                                                            <div className="flex flex-wrap gap-1">
-                                                                                                {Object.keys(theme.componentStyles).map(styleName => (
-                                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
-                                                                                                        {styleName}
-                                                                                                    </span>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {theme.galleryStyles && Object.keys(theme.galleryStyles).length > 0 && (
-                                                                                        <div>
-                                                                                            <div className="text-xs font-medium text-purple-700 mb-0.5">Gallery:</div>
-                                                                                            <div className="flex flex-wrap gap-1">
-                                                                                                {Object.keys(theme.galleryStyles).map(styleName => (
-                                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-800">
-                                                                                                        {styleName}
-                                                                                                    </span>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {theme.carouselStyles && Object.keys(theme.carouselStyles).length > 0 && (
-                                                                                        <div>
-                                                                                            <div className="text-xs font-medium text-green-700 mb-0.5">Carousel:</div>
-                                                                                            <div className="flex flex-wrap gap-1">
-                                                                                                {Object.keys(theme.carouselStyles).map(styleName => (
-                                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800">
-                                                                                                        {styleName}
-                                                                                                    </span>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {theme.tableTemplates && Object.keys(theme.tableTemplates).length > 0 && (
-                                                                                        <div>
-                                                                                            <div className="text-xs font-medium text-amber-700 mb-0.5">Tables:</div>
-                                                                                            <div className="flex flex-wrap gap-1">
-                                                                                                {Object.keys(theme.tableTemplates).map(styleName => (
-                                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
-                                                                                                        {styleName}
-                                                                                                    </span>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
+                                                                    )}
+                                                                    {theme.carouselStyles && Object.keys(theme.carouselStyles).length > 0 && (
+                                                                        <div>
+                                                                            <div className="text-xs font-medium text-gray-700 mb-0.5">Carousel:</div>
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {Object.keys(theme.carouselStyles).map(styleName => (
+                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+                                                                                        {styleName}
+                                                                                    </span>
+                                                                                ))}
                                                                             </div>
-                                                                        )}
-
-                                                                        {/* Theme Preview */}
-                                                                        {showPreview && previewThemeId === theme.id && previewTheme && (
-                                                                            <div className="mt-3 p-3 bg-gray-50 rounded border">
-                                                                                <h5 className="text-xs font-medium text-gray-700 mb-2">Preview</h5>
-                                                                                <ThemePreview theme={previewTheme} />
+                                                                        </div>
+                                                                    )}
+                                                                    {theme.tableTemplates && Object.keys(theme.tableTemplates).length > 0 && (
+                                                                        <div>
+                                                                            <div className="text-xs font-medium text-gray-700 mb-0.5">Tables:</div>
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {Object.keys(theme.tableTemplates).map(styleName => (
+                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+                                                                                        {styleName}
+                                                                                    </span>
+                                                                                ))}
                                                                             </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    {/* Select Button */}
-                                                                    <button
-                                                                        onClick={() => handleThemeSelect(theme.id)}
-                                                                        className={`w-full mt-3 px-3 py-2 rounded text-sm font-medium transition-colors ${isSelected
-                                                                                ? 'bg-blue-600 text-white'
-                                                                                : isEffective
-                                                                                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                                            }`}
-                                                                    >
-                                                                        {isSelected ? 'Currently Selected' : isEffective ? (themeInheritanceInfo?.source === 'inherited' ? 'Inherited (Click to Override)' : 'Using Default (Click to Override)') : 'Select Theme'}
-                                                                    </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
-                                                        )
-                                                    })}
+                                                        )}
+
+                                                        {/* Theme Preview */}
+                                                        {showPreview && previewThemeId === theme.id && previewTheme && (
+                                                            <div className="mt-3 p-3 bg-gray-50 rounded border">
+                                                                <h5 className="text-xs font-medium text-gray-700 mb-2">Preview</h5>
+                                                                <ThemePreview theme={previewTheme} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Select Button */}
+                                                    <button
+                                                        onClick={() => handleThemeSelect(theme.id)}
+                                                        className={`w-full mt-3 px-3 py-2 rounded text-sm font-medium transition-colors ${isSelected
+                                                            ? 'bg-blue-600 text-white'
+                                                            : isEffective
+                                                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                            }`}
+                                                    >
+                                                        {isSelected ? 'Currently Selected' : isEffective ? (themeInheritanceInfo?.source === 'inherited' ? 'Inherited (Click to Override)' : 'Using Default (Click to Override)') : 'Select Theme'}
+                                                    </button>
                                                 </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             )}
                         </div>
 
