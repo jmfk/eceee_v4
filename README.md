@@ -226,7 +226,7 @@ eceee_v4/
 │   ├── SYSTEM_OVERVIEW.md       # System architecture
 │   └── FRONTEND_REFACTORING_GUIDE.md  # Clean code refactoring
 ├── tests/                 # Integration tests
-├── docker-compose.yml     # Multi-container orchestration
+├── docker-compose.dev.yml # Multi-container orchestration
 ├── .env.template          # Environment variables template
 └── README.md             # This file
 ```
@@ -237,67 +237,67 @@ eceee_v4/
 
 ```bash
 # Start all services
-docker-compose up -d
+docker-compose -f docker-compose.dev.yml up -d
 
 # View logs
-docker-compose logs -f
+docker-compose -f docker-compose.dev.yml logs -f
 
 # Stop all services
-docker-compose down
+docker-compose -f docker-compose.dev.yml down
 
 # Rebuild containers
-docker-compose up --build
+docker-compose -f docker-compose.dev.yml up --build
 
 # Remove volumes (reset database)
-docker-compose down -v
+docker-compose -f docker-compose.dev.yml down -v
 ```
 
 ### Django Backend
 
 ```bash
 # Django shell
-docker-compose exec backend python manage.py shell
+docker-compose -f docker-compose.dev.yml exec backend python manage.py shell
 
 # Create superuser
-docker-compose exec backend python manage.py createsuperuser
+docker-compose -f docker-compose.dev.yml exec backend python manage.py createsuperuser
 
 # Run migrations
-docker-compose exec backend python manage.py migrate
+docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate
 
 # Collect static files
-docker-compose exec backend python manage.py collectstatic
+docker-compose -f docker-compose.dev.yml exec backend python manage.py collectstatic
 
 # Run tests
-docker-compose exec backend python manage.py test
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test
 
 # Django shell with enhanced features
-docker-compose exec backend python manage.py shell_plus
+docker-compose -f docker-compose.dev.yml exec backend python manage.py shell_plus
 ```
 
 ### React Frontend
 
 ```bash
 # Install new package
-docker-compose exec frontend npm install <package-name>
+docker-compose -f docker-compose.dev.yml exec frontend npm install <package-name>
 
 # Run linting
-docker-compose exec frontend npm run lint
+docker-compose -f docker-compose.dev.yml exec frontend npm run lint
 
 # Build for production
-docker-compose exec frontend npm run build
+docker-compose -f docker-compose.dev.yml exec frontend npm run build
 ```
 
 ### Database Management
 
 ```bash
 # Access PostgreSQL shell
-docker-compose exec db psql -U postgres -d eceee_v4
+docker-compose -f docker-compose.dev.yml exec db psql -U postgres -d eceee_v4
 
 # Backup database
-docker-compose exec db pg_dump -U postgres eceee_v4 > backup.sql
+docker-compose -f docker-compose.dev.yml exec db pg_dump -U postgres eceee_v4 > backup.sql
 
 # Restore database
-docker-compose exec -T db psql -U postgres eceee_v4 < backup.sql
+docker-compose -f docker-compose.dev.yml exec -T db psql -U postgres eceee_v4 < backup.sql
 ```
 
 ## 🧪 Testing
@@ -306,27 +306,27 @@ docker-compose exec -T db psql -U postgres eceee_v4 < backup.sql
 
 ```bash
 # Run all tests
-docker-compose exec backend python manage.py test
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test
 
 # Run specific test file
-docker-compose exec backend python manage.py test apps.core.tests
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test apps.core.tests
 
 # Run with coverage
-docker-compose exec backend coverage run --source='.' manage.py test
-docker-compose exec backend coverage report
+docker-compose -f docker-compose.dev.yml exec backend coverage run --source='.' manage.py test
+docker-compose -f docker-compose.dev.yml exec backend coverage report
 ```
 
 ### Frontend Testing
 
 ```bash
 # Run Jest tests
-docker-compose exec frontend npm test
+docker-compose -f docker-compose.dev.yml exec frontend npm test
 
 # Run tests with coverage
-docker-compose exec frontend npm run test:coverage
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:coverage
 
 # Run E2E tests
-docker-compose exec frontend npm run test:e2e
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:e2e
 ```
 
 ## 🤖 AI Integration
@@ -408,6 +408,8 @@ docker-compose -f docker-compose.prod.yml build
 
 # Deploy to production
 docker-compose -f docker-compose.prod.yml up -d
+
+# Note: Use docker-compose.dev.yml for development
 ```
 
 ### Environment Configuration
@@ -461,21 +463,21 @@ The project has been fully migrated to a code-based widget system with comprehen
 ### Backend Testing
 ```bash
 # Run all backend tests
-docker-compose exec backend python manage.py test
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test
 
 # Test widget system specifically  
-docker-compose exec backend python manage.py test webpages.tests.WidgetRegistryTest
-docker-compose exec backend python manage.py test webpages.tests.WidgetTypeAPITest
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test webpages.tests.WidgetRegistryTest
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test webpages.tests.WidgetTypeAPITest
 ```
 
 ### Frontend Testing
 ```bash
 # Run all frontend tests
-docker-compose exec frontend npm run test:run
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:run
 
 # Test widget components specifically
-docker-compose exec frontend npm run test:run src/components/__tests__/WidgetLibrary.test.jsx
-docker-compose exec frontend npm run test:run src/components/__tests__/WidgetConfigurator.test.jsx
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:run src/components/__tests__/WidgetLibrary.test.jsx
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:run src/components/__tests__/WidgetConfigurator.test.jsx
 ```
 
 ### Key Testing Updates

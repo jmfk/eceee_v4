@@ -17,55 +17,55 @@ eceee_v4 is a Django-based CMS with a React frontend featuring:
 ### Docker Environment
 ```bash
 # Start database and cache services
-docker-compose up db redis -d
+docker-compose -f docker-compose.dev.yml up db redis -d
 
 # Start backend and frontend
-docker-compose up backend
-docker-compose up frontend
+docker-compose -f docker-compose.dev.yml up backend
+docker-compose -f docker-compose.dev.yml up frontend
 
 # Full rebuild
-docker-compose up --build
+docker-compose -f docker-compose.dev.yml up --build
 
 # Stop and reset
-docker-compose down -v
+docker-compose -f docker-compose.dev.yml down -v
 ```
 
 ### Backend Commands
 ```bash
 # Django development
-docker-compose exec backend python manage.py runserver
-docker-compose exec backend python manage.py shell
-docker-compose exec backend python manage.py createsuperuser
-docker-compose exec backend python manage.py migrate
-docker-compose exec backend python manage.py makemigrations
+docker-compose -f docker-compose.dev.yml exec backend python manage.py runserver
+docker-compose -f docker-compose.dev.yml exec backend python manage.py shell
+docker-compose -f docker-compose.dev.yml exec backend python manage.py createsuperuser
+docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate
+docker-compose -f docker-compose.dev.yml exec backend python manage.py makemigrations
 
 # Testing
-docker-compose exec backend python manage.py test
-docker-compose exec backend python manage.py test webpages
-docker-compose exec backend coverage run --source='.' manage.py test
-docker-compose exec backend coverage report
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test webpages
+docker-compose -f docker-compose.dev.yml exec backend coverage run --source='.' manage.py test
+docker-compose -f docker-compose.dev.yml exec backend coverage report
 
 # Code quality
-docker-compose exec backend black .
-docker-compose exec backend flake8
-docker-compose exec backend isort .
-docker-compose exec backend mypy .
+docker-compose -f docker-compose.dev.yml exec backend black .
+docker-compose -f docker-compose.dev.yml exec backend flake8
+docker-compose -f docker-compose.dev.yml exec backend isort .
+docker-compose -f docker-compose.dev.yml exec backend mypy .
 ```
 
 ### Frontend Commands
 ```bash
 # Development
-docker-compose exec frontend npm run dev
-docker-compose exec frontend npm run build
+docker-compose -f docker-compose.dev.yml exec frontend npm run dev
+docker-compose -f docker-compose.dev.yml exec frontend npm run build
 
 # Testing
-docker-compose exec frontend npm test
-docker-compose exec frontend npm run test:run
-docker-compose exec frontend npm run test:coverage
+docker-compose -f docker-compose.dev.yml exec frontend npm test
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:run
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:coverage
 
 # Code quality
-docker-compose exec frontend npm run lint
-docker-compose exec frontend npx eslint .
+docker-compose -f docker-compose.dev.yml exec frontend npm run lint
+docker-compose -f docker-compose.dev.yml exec frontend npx eslint .
 ```
 
 ### Makefile Commands
@@ -159,19 +159,19 @@ The CMS uses a code-based widget system:
 ### Running Tests
 ```bash
 # Backend
-docker-compose exec backend python manage.py test
-docker-compose exec backend python manage.py test webpages
-docker-compose exec backend python manage.py test content
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test webpages
+docker-compose -f docker-compose.dev.yml exec backend python manage.py test content
 
 # Frontend
-docker-compose exec frontend npm test
-docker-compose exec frontend npm run test:run
-docker-compose exec frontend npm run test:coverage
+docker-compose -f docker-compose.dev.yml exec frontend npm test
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:run
+docker-compose -f docker-compose.dev.yml exec frontend npm run test:coverage
 
 # Code quality checks
 make lint                    # Frontend linting
-docker-compose exec backend black . --check
-docker-compose exec backend flake8
+docker-compose -f docker-compose.dev.yml exec backend black . --check
+docker-compose -f docker-compose.dev.yml exec backend flake8
 ```
 
 ## Development Workflow
@@ -230,7 +230,7 @@ docker-compose exec backend flake8
 - `frontend/vite.config.js` - Build config with @ alias for src/
 
 ### Configuration Files
-- `docker-compose.yml` - PostgreSQL, Redis, Django, React services
+- `docker-compose.dev.yml` - PostgreSQL, Redis, Django, React services
 - `Makefile` - Development command shortcuts
 - `backend/requirements.txt` - Python dependencies
 - `frontend/package.json` - Node dependencies

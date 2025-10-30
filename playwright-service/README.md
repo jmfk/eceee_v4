@@ -359,7 +359,7 @@ spec:
 
 2. **Out of memory errors**
    ```bash
-   # Increase memory limits in docker-compose.yml
+   # Increase memory limits in docker-compose.yml (or docker-compose.dev.yml for dev)
    deploy:
      resources:
        limits:

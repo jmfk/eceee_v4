@@ -75,14 +75,14 @@ install:
 
 # Run Django backend server
 servers:
-	docker-compose up db redis minio imgproxy -d
+	docker-compose -f docker-compose.dev.yml up db redis minio imgproxy -d
 
 backend:
-	docker-compose up backend
+	docker-compose -f docker-compose.dev.yml up backend
 
 # Run React frontend dev server
 frontend:
-	docker-compose up frontend
+	docker-compose -f docker-compose.dev.yml up frontend
 
 # Run Playwright website rendering service
 playwright-service:
@@ -90,60 +90,60 @@ playwright-service:
 
 # Run Django migrations
 migrations:
-	docker-compose exec backend python manage.py makemigrations
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py makemigrations
 
 migrate:
-	docker-compose exec backend python manage.py migrate
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate
 
 requirements:
-	docker-compose exec backend pip install -r requirements.txt
+	docker-compose -f docker-compose.dev.yml exec backend pip install -r requirements.txt
 
 
 # Create Django superuser
 createsuperuser:
-	docker-compose exec backend python manage.py createsuperuser
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py createsuperuser
 
 changepassword:
-	docker-compose exec backend python manage.py changepassword admin
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py changepassword admin
 
 # Create sample data
 sample-content:
-	docker-compose exec backend python manage.py create_sample_content --count 10 --verbose
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_content --count 10 --verbose
 
 sample-pages:
-	docker-compose exec backend python manage.py create_sample_pages --verbose
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_pages --verbose
 
 sample-data: sample-content sample-pages
 
 sample-clean:
-	docker-compose exec backend python manage.py create_sample_content --clean --count 10 --verbose
-	docker-compose exec backend python manage.py create_sample_pages --clear --verbose
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_content --clean --count 10 --verbose
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_pages --clear --verbose
 
 # Migration commands for camelCase conversion
 migrate-to-camelcase-dry:
-	docker-compose exec backend python manage.py migrate_to_camelcase --dry-run --backup
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --dry-run --backup
 
 migrate-to-camelcase:
-	docker-compose exec backend python manage.py migrate_to_camelcase --backup
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --backup
 
 migrate-schemas-only:
-	docker-compose exec backend python manage.py migrate_to_camelcase --schemas-only --backup
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --schemas-only --backup
 
 migrate-pagedata-only:
-	docker-compose exec backend python manage.py migrate_to_camelcase --pagedata-only --backup
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --pagedata-only --backup
 
 migrate-widgets-only:
-	docker-compose exec backend python manage.py migrate_to_camelcase --widgets-only --backup
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --widgets-only --backup
 
 # Object Type Schema Management
 import-schemas: ## Import all JSON schemas to ObjectTypeDefinitions
-	docker-compose exec backend python manage.py import_schemas
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas
 
 import-schemas-dry: ## Preview schema import without saving (dry run)
-	docker-compose exec backend python manage.py import_schemas --dry-run
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas --dry-run
 
 import-schemas-force: ## Import/update all schemas without confirmation prompts
-	docker-compose exec backend python manage.py import_schemas --force
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas --force
 
 import-schema: ## Import single schema file (use: make import-schema FILE=news.json NAME=news)
 	@if [ -z "$(FILE)" ] || [ -z "$(NAME)" ]; then \
@@ -151,16 +151,16 @@ import-schema: ## Import single schema file (use: make import-schema FILE=news.j
 		echo "Usage: make import-schema FILE=news.json NAME=news"; \
 		exit 1; \
 	fi
-	docker-compose exec backend python manage.py import_schemas \
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas \
 		--file scripts/migration/schemas/$(FILE) \
 		--name $(NAME)
 
 shell:
-	docker-compose exec backend bash
+	docker-compose -f docker-compose.dev.yml exec backend bash
 
 # Run backend tests
 backend-test:
-	docker-compose exec backend python manage.py test
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py test
 
 # Test Playwright service endpoints
 playwright-test:
@@ -172,15 +172,15 @@ lint:
 
 # Start all services with Docker Compose
 docker-up:
-	docker-compose up --build
+	docker-compose -f docker-compose.dev.yml up --build
 
 # Stop all Docker Compose services
 docker-down:
-	docker-compose down
+	docker-compose -f docker-compose.dev.yml down
 
 # Restart all Docker Compose services
 restart:
-	docker-compose restart
+	docker-compose -f docker-compose.dev.yml restart
 
 # Stop Playwright service
 playwright-down:
@@ -195,7 +195,7 @@ clean:
 	find backend -type d -name '__pycache__' -exec rm -rf {} +
 	rm -rf backend/*.pyc backend/*.pyo backend/.pytest_cache
 	rm -rf frontend/node_modules frontend/dist
-	docker-compose down -v
+	docker-compose -f docker-compose.dev.yml down -v
 	cd playwright-service && docker-compose down -v
 
 # ECEEE Components Sync Commands
@@ -209,11 +209,11 @@ clean:
 
 clear-layout-cache: ## Clear layout-related caches to force refresh
 	@echo "🧹 Clearing layout caches..."
-	docker-compose exec backend python manage.py clear_layout_cache
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache
 
 clear-layout-cache-all: ## Clear all caches (nuclear option)
 	@echo "🧹 Clearing ALL caches..."
-	docker-compose exec backend python manage.py clear_layout_cache --all
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache --all
 
 # Tailwind CSS build commands
 tailwind-build: ## Build Tailwind CSS for backend templates

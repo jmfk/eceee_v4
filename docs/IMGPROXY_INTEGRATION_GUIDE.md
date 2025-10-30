@@ -21,7 +21,7 @@ The eceee_v4 media system now includes **imgproxy** integration for high-perform
 
 ### imgproxy Service Configuration
 
-The imgproxy service is configured in `docker-compose.yml`:
+The imgproxy service is configured in `docker-compose.dev.yml`:
 
 ```yaml
 # imgproxy for on-the-fly image resizing
@@ -524,7 +524,7 @@ Vary: Accept
 Scale imgproxy horizontally:
 
 ```yaml
-# docker-compose.yml
+# docker-compose.dev.yml
 imgproxy:
   deploy:
     replicas: 3

@@ -389,7 +389,7 @@ CELERY_TASK_ROUTES = {
 
 ### Docker Deployment
 ```yaml
-# docker-compose.yml additions
+# docker-compose.dev.yml additions
 services:
   celery-worker:
     build: ./backend

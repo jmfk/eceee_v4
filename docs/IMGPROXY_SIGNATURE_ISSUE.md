@@ -7,7 +7,7 @@
 - ❌ Signed URLs are not working (signature validation fails)
 
 ## Current Configuration
-`docker-compose.yml` has been temporarily modified:
+`docker-compose.dev.yml` has been temporarily modified:
 - `IMGPROXY_ALLOW_UNSAFE_URL: true` (development only)
 - Keys are commented out temporarily
 
