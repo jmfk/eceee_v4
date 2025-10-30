@@ -120,10 +120,37 @@ const WidgetSlot = ({
         }
     }, [isPreviewMode, hasInheritance, slotInheritedWidgets, localWidgets, slotRules.inheritableTypes, name]);
 
-    const displayLocalWidgets = useMemo(() => {
-        if (isPreviewMode) return [];
-        return Array.isArray(localWidgets) ? localWidgets : [];
+    // Split local widgets by inheritance behavior for proper ordering in edit mode
+    const { beforeLocalWidgets, afterLocalWidgets, overrideLocalWidgets } = useMemo(() => {
+        if (isPreviewMode) return { beforeLocalWidgets: [], afterLocalWidgets: [], overrideLocalWidgets: [] };
+
+        const before = [];
+        const after = [];
+        const override = [];
+
+        if (Array.isArray(localWidgets)) {
+            localWidgets.forEach(widget => {
+                // Check for inheritance_behavior (snake_case from API or camelCase from frontend)
+                const behavior = widget.inheritanceBehavior || widget.inheritance_behavior || 'insert_after_parent';
+
+                if (behavior === 'override_parent') {
+                    override.push(widget);
+                } else if (behavior === 'insert_before_parent') {
+                    before.push(widget);
+                } else {
+                    // Default: insert_after_parent
+                    after.push(widget);
+                }
+            });
+        }
+
+        return { beforeLocalWidgets: before, afterLocalWidgets: after, overrideLocalWidgets: override };
     }, [isPreviewMode, localWidgets]);
+
+    // For backward compatibility - combined local widgets
+    const displayLocalWidgets = useMemo(() => {
+        return [...beforeLocalWidgets, ...afterLocalWidgets, ...overrideLocalWidgets];
+    }, [beforeLocalWidgets, afterLocalWidgets, overrideLocalWidgets]);
 
     // Extract parent page info from first inherited widget
     const parentPageInfo = useMemo(() => {
@@ -181,7 +208,7 @@ const WidgetSlot = ({
 
             // Check for allowed_types in slot rules
             const hasAllowedTypes = slotRules.allowedTypes !== undefined && slotRules.allowedTypes.length > 0;
-            
+
             if (slotRules.inheritableTypes !== undefined) {
                 // inheritableTypes is explicitly set in the layout
                 if (slotRules.inheritableTypes.length > 0) {
@@ -228,7 +255,7 @@ const WidgetSlot = ({
         // Determine allowed widget types for this slot (same logic as handleAddWidget)
         let allowedTypes = finalAllowedWidgetTypes;
         const hasAllowedTypes = slotRules.allowedTypes !== undefined && slotRules.allowedTypes.length > 0;
-        
+
         if (slotRules.inheritableTypes !== undefined) {
             if (slotRules.inheritableTypes.length > 0) {
                 allowedTypes = slotRules.inheritableTypes;
@@ -390,61 +417,77 @@ const WidgetSlot = ({
                             effectiveWidgets.map((widget, index) => renderWidget(widget, index))
                         ) : null
                     ) : (
-                        // Edit mode: Show inherited widgets (read-only) + local widgets (editable) separately
+                        // Edit mode: Show widgets in correct inheritance order
                         editable && (
                             <>
-                                {/* Inherited Widgets Section */}
-                                {Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && (
-                                    <div className="inherited-widgets-section">
-                                        {displayInheritedWidgets.map((widget, index) =>
-                                            renderWidget({ ...widget, isInherited: true }, index)
+                                {/* Override widgets replace everything */}
+                                {overrideLocalWidgets.length > 0 ? (
+                                    <div className="override-widgets-section">
+                                        {overrideLocalWidgets.map((widget, index) => renderWidget(widget, index))}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Before Local Widgets - appear BEFORE inherited */}
+                                        {beforeLocalWidgets.length > 0 && (
+                                            <div className="before-local-widgets-section">
+                                                {beforeLocalWidgets.map((widget, index) => renderWidget(widget, index))}
+                                            </div>
                                         )}
-                                    </div>
-                                )}
 
-                                {/* Add Widget Section - Show when in merge mode with inherited widgets but no local widgets */}
-                                {slotRules.mergeMode && Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && Array.isArray(displayLocalWidgets) && displayLocalWidgets.length === 0 && (
-                                    <div className="add-widget-section text-center py-8 border-2 border-dashed border-blue-300 bg-blue-50">
-                                        <button
-                                            onClick={handleAddWidget}
-                                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                        >
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Add Your First Widget
-                                        </button>
-                                        <p className="text-xs text-blue-700 mt-2">
-                                            Widgets added here will appear alongside the inherited content above
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* Local Widgets Section (editable) */}
-                                {Array.isArray(displayLocalWidgets) && displayLocalWidgets.length > 0 && (
-                                    <div className="local-widgets-section">
-                                        {displayLocalWidgets.map((widget, index) => renderWidget(widget, index))}
-                                    </div>
-                                )}
-
-                                {/* Empty slot handling - only when NO inherited AND NO local widgets */}
-                                {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && (!Array.isArray(displayLocalWidgets) || displayLocalWidgets.length === 0) && (
-                                    <div className="empty-slot text-center py-12 text-gray-500 border-2 border-dashed border-gray-300">
-                                        <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                        <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
-                                        <p className="text-sm">{description}</p>
-
-                                        <div className="mt-4">
-                                            <button
-                                                onClick={handleAddWidget}
-                                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                            >
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Your First Widget
-                                            </button>
-                                        </div>
-                                        {finalRequired && (
-                                            <p className="text-xs text-orange-600 mt-2">This slot is required</p>
+                                        {/* Inherited Widgets Section */}
+                                        {Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && (
+                                            <div className="inherited-widgets-section">
+                                                {displayInheritedWidgets.map((widget, index) =>
+                                                    renderWidget({ ...widget, isInherited: true }, index)
+                                                )}
+                                            </div>
                                         )}
-                                    </div>
+
+                                        {/* After Local Widgets - appear AFTER inherited (default) */}
+                                        {afterLocalWidgets.length > 0 && (
+                                            <div className="after-local-widgets-section">
+                                                {afterLocalWidgets.map((widget, index) => renderWidget(widget, index))}
+                                            </div>
+                                        )}
+
+                                        {/* Add Widget Section - Show when in merge mode with inherited widgets but no local widgets */}
+                                        {slotRules.mergeMode && Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && displayLocalWidgets.length === 0 && (
+                                            <div className="add-widget-section text-center py-8 border-2 border-dashed border-blue-300 bg-blue-50">
+                                                <button
+                                                    onClick={handleAddWidget}
+                                                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                                >
+                                                    <Plus className="h-4 w-4 mr-2" />
+                                                    Add Your First Widget
+                                                </button>
+                                                <p className="text-xs text-blue-700 mt-2">
+                                                    Widgets added here will appear alongside the inherited content above
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Empty slot handling - only when NO inherited AND NO local widgets */}
+                                        {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && displayLocalWidgets.length === 0 && (
+                                            <div className="empty-slot text-center py-12 text-gray-500 border-2 border-dashed border-gray-300">
+                                                <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                                <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
+                                                <p className="text-sm">{description}</p>
+
+                                                <div className="mt-4">
+                                                    <button
+                                                        onClick={handleAddWidget}
+                                                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                        Add Your First Widget
+                                                    </button>
+                                                </div>
+                                                {finalRequired && (
+                                                    <p className="text-xs text-orange-600 mt-2">This slot is required</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </>
                         )

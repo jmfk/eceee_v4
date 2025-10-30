@@ -40,12 +40,38 @@ export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], sl
     }
 
     // MERGE MODE: Check if slot supports merging (mergeMode = inheritanceAllowed AND allowMerge)
-    // If mergeMode is true, combine inherited + local widgets
+    // If mergeMode is true, combine inherited + local widgets respecting inheritance_behavior
     if (slotRules.mergeMode && safeInheritedWidgets.length > 0) {
+        // Categorize local widgets by inheritance behavior
+        const beforeWidgets = [];
+        const overrideWidgets = [];
+        const afterWidgets = [];
+
+        safeLocalWidgets.forEach(widget => {
+            // Check for inheritance_behavior (snake_case from API or camelCase from frontend)
+            const behavior = widget.inheritanceBehavior || widget.inheritance_behavior || 'insert_after_parent';
+
+            if (behavior === 'override_parent') {
+                overrideWidgets.push(widget);
+            } else if (behavior === 'insert_before_parent') {
+                beforeWidgets.push(widget);
+            } else {
+                // Default: insert_after_parent
+                afterWidgets.push(widget);
+            }
+        });
+
+        // If any override widgets exist, they replace ALL widgets
+        if (overrideWidgets.length > 0) {
+            return overrideWidgets.map(w => ({ ...w, isInherited: false }));
+        }
+
+        // Otherwise: before + inherited + after
         return [
+            ...beforeWidgets.map(w => ({ ...w, isInherited: false })),
             ...safeInheritedWidgets.map(w => ({ ...w, isInherited: true })),
-            ...safeLocalWidgets.map(w => ({ ...w, isInherited: false }))
-        ]
+            ...afterWidgets.map(w => ({ ...w, isInherited: false }))
+        ];
     }
 
     // REPLACEMENT MODE (allowMerge=false): Local widgets REPLACE inherited widgets

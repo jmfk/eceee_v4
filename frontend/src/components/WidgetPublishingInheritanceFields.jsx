@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react'
-import { Eye, EyeOff, Calendar, Layers, ChevronDown, ChevronRight } from 'lucide-react'
+import { Eye, EyeOff, Calendar, Layers } from 'lucide-react'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 
 /**
@@ -24,9 +24,6 @@ const WidgetPublishingInheritanceFields = ({
 
     // Get default inheritance level from widget type
     const defaultInheritanceLevel = widgetType?.default_inheritance_level ?? 0
-
-    // Accordion state - closed by default
-    const [isExpanded, setIsExpanded] = useState(false)
 
     // Use local state for immediate UI updates (camelCase for frontend)
     const [localValues, setLocalValues] = useState({
@@ -65,12 +62,8 @@ const WidgetPublishingInheritanceFields = ({
 
     return (
         <div className="border-t border-gray-200 bg-gray-50">
-            {/* Accordion Header */}
-            <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-100 transition-colors"
-            >
+            {/* Header */}
+            <div className="w-full flex items-center justify-between p-4">
                 <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Layers className="w-4 h-4" />
                     Publishing & Inheritance
@@ -90,16 +83,10 @@ const WidgetPublishingInheritanceFields = ({
                         </span>
                     )}
                 </h3>
-                {isExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                ) : (
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                )}
-            </button>
+            </div>
 
-            {/* Accordion Content */}
-            {isExpanded && (
-                <div className="px-4 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+            {/* Content */}
+            <div className="px-4 pb-4 space-y-4">
                     {/* Publishing Toggle */}
                     <div className="flex items-center justify-between">
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -215,8 +202,7 @@ const WidgetPublishingInheritanceFields = ({
                             </p>
                         </div>
                     )}
-                </div>
-            )}
+            </div>
         </div>
     )
 }
