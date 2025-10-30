@@ -24,6 +24,7 @@ class NavbarItem(BaseModel):
     target_blank: bool = Field(
         False, description="Whether the link opens in a new window"
     )
+    order: int = Field(0, description="Display order")
 
 
 class SecondaryMenuItem(BaseModel):
@@ -52,6 +53,7 @@ class SecondaryMenuItem(BaseModel):
             "mediaTypes": ["image"],
         },
     )
+    order: int = Field(0, description="Display order")
 
 
 class NavbarConfig(BaseModel):
@@ -151,7 +153,7 @@ class NavbarWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """Prepare navbar menu items and background styling"""
         template_config = super().prepare_template_context(config, context)
-        context = DictToObj(context)
+        context_obj = DictToObj(context)
 
         # Build complete inline style string in Python
         style_parts = []
@@ -162,8 +164,8 @@ class NavbarWidget(BaseWidget):
             imgproxy_base_url = background_image.get("imgproxy_base_url")
             imgproxy_url = imgproxy_service.generate_url(
                 source_url=imgproxy_base_url,
-                width=context.slot.dimensions.desktop.width,
-                height=context.slot.dimensions.desktop.height or 28,
+                width=context_obj.slot.dimensions.desktop.width,
+                height=context_obj.slot.dimensions.desktop.height or 28,
                 resize_type="fill",
             )
 
@@ -192,4 +194,100 @@ class NavbarWidget(BaseWidget):
         # Join all style parts with a space
         template_config["navbar_style"] = " ".join(style_parts)
 
+        # Filter menu items based on publication status (public site only)
+        filtered_menu_items = self._filter_published_menu_items(
+            config.get("menu_items", []), context
+        )
+        # Sort by order field
+        filtered_menu_items = sorted(
+            filtered_menu_items, key=lambda x: x.get("order", 0)
+        )
+        template_config["menu_items"] = filtered_menu_items
+
+        # Same for secondary menu items
+        filtered_secondary = self._filter_published_menu_items(
+            config.get("secondary_menu_items", []), context
+        )
+        # Sort by order field
+        filtered_secondary = sorted(filtered_secondary, key=lambda x: x.get("order", 0))
+        template_config["secondary_menu_items"] = filtered_secondary
+
         return template_config
+
+    def _filter_published_menu_items(self, menu_items, context):
+        """Filter menu items based on hostname-aware page lookup and publication status"""
+        from webpages.models import WebPage, PageVersion
+        from django.utils import timezone
+        from django.db.models import Q, Exists, OuterRef
+
+        if not menu_items:
+            return menu_items
+
+        # Get hostname from request to find root page
+        request = context.get("request")
+        if not request:
+            return menu_items
+
+        hostname = request.get_host().lower()
+
+        # Get root page for this hostname
+        root_page = WebPage.get_root_page_for_hostname(hostname)
+        if not root_page:
+            return menu_items
+
+        # Separate items into internal URLs and external/special URLs
+        internal_urls = {}  # url -> [items]
+        external_items = []
+
+        for item in menu_items:
+            url = item.get("url", "")
+
+            # Keep external URLs, anchors, and special protocols
+            if (
+                "://" in url
+                or url.startswith("#")
+                or url.startswith("mailto:")
+                or url.startswith("tel:")
+                or not url
+            ):
+                external_items.append(item)
+            elif url.startswith("/"):
+                # Internal URL - add to lookup dict
+                if url not in internal_urls:
+                    internal_urls[url] = []
+                internal_urls[url].append(item)
+            else:
+                external_items.append(item)
+
+        if not internal_urls:
+            return external_items
+
+        # Normalize URLs to match cached_path format
+        normalized_paths = {}
+        for url, items in internal_urls.items():
+            normalized = "/" + url.strip("/") + "/"
+            normalized_paths[normalized] = items
+
+        # Single batch query using cached_path - much faster!
+        now = timezone.now()
+
+        published_version_exists = PageVersion.objects.filter(
+            page=OuterRef("pk"), effective_date__lte=now
+        ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+
+        published_pages = (
+            WebPage.objects.filter(cached_path__in=normalized_paths.keys())
+            .annotate(has_published=Exists(published_version_exists))
+            .filter(has_published=True)
+        )
+
+        published_paths = set(published_pages.values_list("cached_path", flat=True))
+        print("published_paths", published_paths)
+        print("internal_urls", internal_urls)
+        # Build result list
+        result = list(external_items)
+        for path, items in normalized_paths.items():
+            if path in published_paths:
+                result.extend(items)
+
+        return result

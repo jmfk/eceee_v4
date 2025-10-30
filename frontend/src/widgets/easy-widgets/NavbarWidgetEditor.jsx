@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Trash2, X, Download, FileText, Loader2 } from 'lucide-react'
+import { Plus, Trash2, X, Download, FileText, Loader2, GripVertical } from 'lucide-react'
 import { usePageChildren } from '../../hooks/usePageStructure'
 import { pagesApi } from '../../api'
 
@@ -30,12 +30,20 @@ const NavbarWidgetEditor = ({
     )
 
     const [selectedPageIds, setSelectedPageIds] = useState(new Set())
-    const [showImportSection, setShowImportSection] = useState(true)
+    const [showImportSection, setShowImportSection] = useState(false)
 
     // Sync state when widget config changes externally
     useEffect(() => {
-        setMenuItems(config.menuItems || [])
-        setSecondaryMenuItems(config.secondaryMenuItems || [])
+        const items = (config.menuItems || []).map((item, idx) => ({
+            ...item,
+            order: item.order ?? idx
+        }))
+        const secItems = (config.secondaryMenuItems || []).map((item, idx) => ({
+            ...item,
+            order: item.order ?? idx
+        }))
+        setMenuItems(items)
+        setSecondaryMenuItems(secItems)
     }, [config.menuItems, config.secondaryMenuItems])
 
     // Helper to update config
@@ -93,7 +101,8 @@ const NavbarWidgetEditor = ({
                 newMenuItems.push({
                     label: label,
                     url: url,
-                    targetBlank: false
+                    targetBlank: false,
+                    order: newMenuItems.length
                 })
             }
         })
@@ -115,7 +124,7 @@ const NavbarWidgetEditor = ({
 
     // Add a new menu item
     const addMenuItem = useCallback(() => {
-        const newMenuItems = [...menuItems, { label: '', url: '', targetBlank: false }]
+        const newMenuItems = [...menuItems, { label: '', url: '', targetBlank: false, order: menuItems.length }]
         setMenuItems(newMenuItems)
         updateConfig(newMenuItems, undefined)
     }, [menuItems, updateConfig])
@@ -143,7 +152,8 @@ const NavbarWidgetEditor = ({
         const newSecondaryMenuItems = [...secondaryMenuItems, {
             label: '',
             url: '',
-            targetBlank: false
+            targetBlank: false,
+            order: secondaryMenuItems.length
         }]
         setSecondaryMenuItems(newSecondaryMenuItems)
         updateConfig(menuItems, newSecondaryMenuItems)
@@ -165,6 +175,26 @@ const NavbarWidgetEditor = ({
         }
         setSecondaryMenuItems(newSecondaryMenuItems)
         updateConfig(menuItems, newSecondaryMenuItems)
+    }, [secondaryMenuItems, menuItems, updateConfig])
+
+    // Move menu item
+    const moveMenuItem = useCallback((fromIndex, toIndex) => {
+        const items = [...menuItems]
+        const [movedItem] = items.splice(fromIndex, 1)
+        items.splice(toIndex, 0, movedItem)
+        const reordered = items.map((item, idx) => ({ ...item, order: idx }))
+        setMenuItems(reordered)
+        updateConfig(reordered, undefined)
+    }, [menuItems, updateConfig])
+
+    // Move secondary menu item
+    const moveSecondaryMenuItem = useCallback((fromIndex, toIndex) => {
+        const items = [...secondaryMenuItems]
+        const [movedItem] = items.splice(fromIndex, 1)
+        items.splice(toIndex, 0, movedItem)
+        const reordered = items.map((item, idx) => ({ ...item, order: idx }))
+        setSecondaryMenuItems(reordered)
+        updateConfig(menuItems, reordered)
     }, [secondaryMenuItems, menuItems, updateConfig])
 
     return (
@@ -323,8 +353,25 @@ const NavbarWidgetEditor = ({
                                 <div
                                     key={index}
                                     className="border border-gray-200 rounded p-3 bg-white space-y-2"
+                                    draggable
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.effectAllowed = 'move'
+                                        e.dataTransfer.setData('text/plain', index)
+                                    }}
+                                    onDragOver={(e) => {
+                                        e.preventDefault()
+                                        e.dataTransfer.dropEffect = 'move'
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault()
+                                        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'))
+                                        moveMenuItem(fromIndex, index)
+                                    }}
                                 >
                                     <div className="flex items-start gap-2">
+                                        <div className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">
+                                            <GripVertical size={18} />
+                                        </div>
                                         <div className="flex-1 space-y-2">
                                             <input
                                                 type="text"
@@ -389,8 +436,25 @@ const NavbarWidgetEditor = ({
                                 <div
                                     key={index}
                                     className="border border-gray-200 rounded p-3 bg-white space-y-2"
+                                    draggable
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.effectAllowed = 'move'
+                                        e.dataTransfer.setData('text/plain', index)
+                                    }}
+                                    onDragOver={(e) => {
+                                        e.preventDefault()
+                                        e.dataTransfer.dropEffect = 'move'
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault()
+                                        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'))
+                                        moveSecondaryMenuItem(fromIndex, index)
+                                    }}
                                 >
                                     <div className="flex items-start gap-2">
+                                        <div className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">
+                                            <GripVertical size={18} />
+                                        </div>
                                         <div className="flex-1 space-y-2">
                                             <input
                                                 type="text"
