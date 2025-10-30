@@ -206,6 +206,81 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                 <span>Publish Page + All Subpages</span>
                             </button>
                         </div>
+
+                        {/* Cached Publication Status */}
+                        {webpageData && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                                <h3 className="text-sm font-semibold text-gray-700 mb-3">Current Publication Status (Cached)</h3>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-600">Status:</span>
+                                        <span className={`ml-2 font-medium ${webpageData.isCurrentlyPublished
+                                                ? 'text-green-600'
+                                                : 'text-gray-500'
+                                            }`}>
+                                            {webpageData.isCurrentlyPublished ? '✓ Published' : '○ Not Published'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Cached Path:</span>
+                                        <span className="ml-2 font-mono text-xs text-gray-700">
+                                            {webpageData.cachedPath || '/'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Root Page ID:</span>
+                                        <span className="ml-2 text-gray-700">
+                                            {webpageData.cachedRootId || 'N/A'}
+                                        </span>
+                                    </div>
+                                    {webpageData.cachedRootHostnames && webpageData.cachedRootHostnames.length > 0 && (
+                                        <div className="col-span-2">
+                                            <span className="text-gray-600">Root Hostnames:</span>
+                                            <span className="ml-2 text-gray-700">
+                                                {webpageData.cachedRootHostnames.join(', ')}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <span className="text-gray-600">Current Version:</span>
+                                        <span className="ml-2 text-gray-700">
+                                            {webpageData.currentPublishedVersion
+                                                ? `v${webpageData.publishedVersionNumber || '?'}`
+                                                : 'None'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Latest Version:</span>
+                                        <span className="ml-2 text-gray-700">
+                                            {webpageData.latestVersion
+                                                ? `v${webpageData.latestVersionNumber || '?'}`
+                                                : 'None'}
+                                        </span>
+                                    </div>
+                                    {webpageData.cachedEffectiveDate && (
+                                        <div>
+                                            <span className="text-gray-600">Effective:</span>
+                                            <span className="ml-2 text-gray-700">
+                                                {new Date(webpageData.cachedEffectiveDate).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {webpageData.cachedExpiryDate && (
+                                        <div>
+                                            <span className="text-gray-600">Expires:</span>
+                                            <span className="ml-2 text-gray-700">
+                                                {new Date(webpageData.cachedExpiryDate).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {webpageData.cacheUpdatedAt && (
+                                        <div className="col-span-2 text-xs text-gray-500">
+                                            Cache updated: {new Date(webpageData.cacheUpdatedAt).toLocaleString()}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Version List */}

@@ -117,6 +117,21 @@ class Command(BaseCommand):
         for error in publish_errors + expire_errors:
             self.stdout.write(self.style.ERROR(error))
 
+        # Update publication cache for all pages (since publication status can change based on time)
+        if published_count > 0 or expired_count > 0:
+            from webpages.models import WebPage
+            from webpages.signals import update_page_publication_cache
+            
+            if self.verbose:
+                self.stdout.write("Updating publication cache for all pages...")
+            
+            # Update cache for all pages to reflect time-based publication changes
+            for page in WebPage.objects.all():
+                update_page_publication_cache(page)
+            
+            if self.verbose:
+                self.stdout.write(self.style.SUCCESS("Publication cache updated"))
+
         return {
             "published": published_count,
             "expired": expired_count,

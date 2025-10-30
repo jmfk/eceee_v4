@@ -216,9 +216,7 @@ class NavbarWidget(BaseWidget):
 
     def _filter_published_menu_items(self, menu_items, context):
         """Filter menu items based on hostname-aware page lookup and publication status"""
-        from webpages.models import WebPage, PageVersion
-        from django.utils import timezone
-        from django.db.models import Q, Exists, OuterRef
+        from webpages.models import WebPage
 
         if not menu_items:
             return menu_items
@@ -229,11 +227,6 @@ class NavbarWidget(BaseWidget):
             return menu_items
 
         hostname = request.get_host().lower()
-
-        # Get root page for this hostname
-        root_page = WebPage.get_root_page_for_hostname(hostname)
-        if not root_page:
-            return menu_items
 
         # Separate items into internal URLs and external/special URLs
         internal_urls = {}  # url -> [items]
@@ -262,31 +255,18 @@ class NavbarWidget(BaseWidget):
         if not internal_urls:
             return external_items
 
-        # Normalize URLs to match cached_path format
-        normalized_paths = {}
-        for url, items in internal_urls.items():
-            normalized = "/" + url.strip("/") + "/"
-            normalized_paths[normalized] = items
-
-        # Single batch query using cached_path - much faster!
-        now = timezone.now()
-
-        published_version_exists = PageVersion.objects.filter(
-            page=OuterRef("pk"), effective_date__lte=now
-        ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-
-        published_pages = (
-            WebPage.objects.filter(cached_path__in=normalized_paths.keys())
-            .annotate(has_published=Exists(published_version_exists))
-            .filter(has_published=True)
+        # Single batch query using cached fields - ultra fast!
+        published_pages = WebPage.objects.filter(
+            cached_path__in=internal_urls.keys(),
+            is_currently_published=True,  # Use cached publication status!
+            is_deleted=False,
+            cached_root_hostnames__contains=[hostname],  # Filter by hostname!
         )
-
         published_paths = set(published_pages.values_list("cached_path", flat=True))
-        print("published_paths", published_paths)
-        print("internal_urls", internal_urls)
+
         # Build result list
         result = list(external_items)
-        for path, items in normalized_paths.items():
+        for path, items in internal_urls.items():
             if path in published_paths:
                 result.extend(items)
 

@@ -10,9 +10,8 @@ class WebpagesConfig(AppConfig):
         Called when the app is ready.
         Triggers layout and widget type autodiscovery and imports cache invalidation signals.
         """
-        # Import signals for cache invalidation
-        # TODO: Temporarily disabled - check if causing save issues
-        # import webpages.signals
+        # Import signals for cache invalidation and cached_path maintenance
+        import webpages.signals
 
         # Import here to avoid circular imports
         from .layout_autodiscovery import (

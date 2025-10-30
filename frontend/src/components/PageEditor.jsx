@@ -1405,7 +1405,7 @@ const PageEditor = () => {
         { id: 'content', label: 'Content', icon: Layout },
         { id: 'settings', label: 'Settings & SEO', icon: Settings },
         { id: 'theme', label: 'Theme', icon: Palette },
-        { id: 'publishing', label: 'Publishing', icon: Calendar },
+        { id: 'publishing', label: 'Publish', icon: Calendar },
         { id: 'preview', label: 'Preview', icon: Eye },
     ]
 

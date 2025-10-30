@@ -36,6 +36,66 @@ class WebPage(models.Model):
     description = models.TextField(blank=True, default="")
     slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
 
+    # Cached absolute path for fast lookups (denormalized for performance)
+    cached_path = models.CharField(
+        max_length=2048,
+        db_index=True,  # Critical for WHERE cached_path lookups
+        blank=True,
+        default="",
+        help_text="Cached absolute URL path (auto-maintained via signals)",
+    )
+
+    # Cached publication status (denormalized for performance)
+    is_currently_published = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Cached: Whether page has a currently published version",
+    )
+    current_published_version = models.ForeignKey(
+        "PageVersion",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="published_for_pages",
+        help_text="Cached: Current published version (if any)",
+    )
+    latest_version = models.ForeignKey(
+        "PageVersion",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="latest_for_pages",
+        help_text="Cached: Latest version (regardless of publication status)",
+    )
+    cached_effective_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Cached: Effective date of current published version",
+    )
+    cached_expiry_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Cached: Expiry date of current published version",
+    )
+    cache_updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When publication cache was last updated",
+    )
+
+    # Cached root page information (denormalized for performance)
+    cached_root_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Cached: Root page ID for this page (auto-maintained via signals)",
+    )
+    cached_root_hostnames = ArrayField(
+        models.CharField(max_length=255),
+        default=list,
+        blank=True,
+        help_text="Cached: Hostnames from root page (auto-maintained via signals)",
+    )
+
     # URL pattern matching for dynamic object publishing
     # Uses secure registry-based patterns instead of arbitrary regex
     path_pattern_key = models.CharField(
@@ -117,18 +177,29 @@ class WebPage(models.Model):
         ]  # Use id instead of title since title is now a property
         indexes = [
             models.Index(fields=["slug"], name="webpages_slug_idx"),
+            models.Index(fields=["cached_path"], name="webpages_cached_path_idx"),
+            models.Index(
+                fields=["is_currently_published"], name="webpages_is_published_idx"
+            ),
+            models.Index(fields=["cached_root_id"], name="webpages_cached_root_idx"),
             GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),
+            GinIndex(fields=["cached_root_hostnames"], name="webpages_root_hosts_gin"),
         ]
 
     def get_latest_version(self):
-        """Get the latest version of this page"""
-        return self.versions.order_by("-version_number").first()
+        """Get the latest version of this page (uses cache)"""
+        return self.latest_version
 
     def __str__(self):
         return self.slug
 
     def get_absolute_url(self):
-        """Generate the public URL for this page"""
+        """Get the public URL (uses cached_path if available for performance)"""
+        # Use cached_path if available (fast path)
+        if self.cached_path:
+            return self.cached_path
+
+        # Fallback for unsaved instances or if cached_path not yet populated
         if self.parent:
             parent_url = (self.parent.get_absolute_url() or "/").rstrip("/")
             slug_part = (self.slug or "").strip("/")
@@ -546,10 +617,15 @@ class WebPage(models.Model):
 
     def is_published(self, now=None):
         """
-        Check if this page should be visible to the public.
+        Check if this page should be visible to the public (uses cache for current time).
 
         NEW: Page is published if it has a currently published version (date-based).
         """
+        if now is None:
+            # Use cached value for current time (fast path)
+            return self.is_currently_published
+
+        # Fall back to query for specific time
         current_version = self.get_current_published_version(now)
         return current_version is not None
 
@@ -1349,17 +1425,17 @@ class WebPage(models.Model):
 
     def get_current_published_version(self, now=None):
         """
-        Get the currently published version of this page using date-based logic.
+        Get the currently published version of this page (uses cache for current time).
 
         Returns the latest version that:
         - Has effective_date <= now
         - Has no expiry_date OR expiry_date > now
         """
         if now is None:
-            from django.utils import timezone
+            # Use cached value for current time (fast path)
+            return self.current_published_version
 
-            now = timezone.now()
-
+        # Fall back to query for specific time
         return (
             self.versions.filter(effective_date__lte=now)
             .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
@@ -1368,8 +1444,8 @@ class WebPage(models.Model):
         )
 
     def get_latest_version(self):
-        """Get the latest version of this page (regardless of publication status)"""
-        return self.versions.order_by("-version_number").first()
+        """Get the latest version of this page (uses cache)"""
+        return self.latest_version
 
     def has_newer_versions(self):
         """Check if there are versions newer than the current published version"""

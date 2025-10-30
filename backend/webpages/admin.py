@@ -209,6 +209,15 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         "get_hostnames_display",
         "is_root_page_display",
         "get_all_active_hostnames_display",
+        "cached_path",
+        "cached_root_id",
+        "cached_root_hostnames",
+        "is_currently_published",
+        "current_published_version",
+        "latest_version",
+        "cached_effective_date",
+        "cached_expiry_date",
+        "cache_updated_at",
     ]
 
     inlines = [PageVersionInline]
@@ -237,6 +246,24 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
                 ),
                 "description": "Hostname configuration (only available for root pages without parent)",
                 "classes": ("wide",),
+            },
+        ),
+        (
+            "Cached Fields (Auto-maintained)",
+            {
+                "fields": (
+                    "cached_path",
+                    "cached_root_id",
+                    "cached_root_hostnames",
+                    "is_currently_published",
+                    "current_published_version",
+                    "latest_version",
+                    "cached_effective_date",
+                    "cached_expiry_date",
+                    "cache_updated_at",
+                ),
+                "classes": ("collapse",),
+                "description": "These fields are automatically maintained by signals for performance optimization",
             },
         ),
         (
