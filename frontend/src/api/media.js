@@ -114,6 +114,20 @@ export const mediaFilesApi = {
         apiClient.get(`${endpoints.media.file(id)}references/`)
     ),
 
+    /**
+     * Replace file in storage while preserving metadata
+     * @param {string} id - Media file ID
+     * @param {File} file - New file to upload
+     * @returns {Promise} API response with updated file
+     */
+    replaceFile: (id, file) => wrapApiCall(() => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return apiClient.post(`${endpoints.media.file(id)}replace_file/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    }),
+
 };
 
 /**

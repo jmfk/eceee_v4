@@ -6,6 +6,8 @@ import logging
 from django.utils import timezone
 from django.db import models
 from django.http import Http404
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,7 +16,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 
 from ..models import MediaFile
 from ..serializers import MediaFileListSerializer, MediaFileDetailSerializer
-from ..storage import storage
+from ..storage import storage, S3MediaStorage
 from .pagination import MediaFilePagination
 
 logger = logging.getLogger(__name__)
@@ -302,3 +304,100 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             # Fallback to public URL
             public_url = storage.get_public_url(media_file.file_path)
             return redirect(public_url)
+
+    @action(detail=True, methods=["post"])
+    def replace_file(self, request, pk=None):
+        """Replace the file in storage while preserving all metadata."""
+        from ..security import SecurityAuditLogger
+
+        media_file = self.get_object()
+
+        # Check if file is provided
+        if "file" not in request.FILES:
+            return Response(
+                {"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        uploaded_file = request.FILES["file"]
+
+        # Validate file size (100MB max)
+        max_size = 100 * 1024 * 1024  # 100MB
+        if uploaded_file.size > max_size:
+            return Response(
+                {"error": f"File too large. Maximum size is {max_size / (1024 * 1024)}MB"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate file type (basic check)
+        allowed_types = [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "video/mp4",
+            "video/webm",
+            "audio/mpeg",
+            "audio/wav",
+        ]
+        if uploaded_file.content_type not in allowed_types:
+            return Response(
+                {
+                    "error": f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Delete old file from storage
+            old_file_path = media_file.file_path
+            try:
+                if old_file_path:
+                    default_storage.delete(old_file_path)
+                    logger.info(f"Deleted old file: {old_file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete old file {old_file_path}: {e}")
+                # Continue anyway - we'll upload the new file
+
+            # Upload new file using S3MediaStorage
+            s3_storage = S3MediaStorage()
+            upload_result = s3_storage.upload_file(
+                uploaded_file, folder_path=f"{media_file.namespace.slug}/media"
+            )
+
+            # Update MediaFile fields with new file information
+            media_file.file_path = upload_result["file_path"]
+            media_file.file_size = upload_result["file_size"]
+            media_file.content_type = upload_result["content_type"]
+            media_file.file_hash = upload_result["file_hash"]
+            media_file.width = upload_result.get("width")
+            media_file.height = upload_result.get("height")
+            media_file.original_filename = uploaded_file.name
+            media_file.last_modified_by = request.user
+            media_file.save()
+
+            # Log the file replacement
+            SecurityAuditLogger.log_file_upload(
+                request.user,
+                {
+                    "filename": uploaded_file.name,
+                    "size": uploaded_file.size,
+                    "id": str(media_file.id),
+                    "action": "replace",
+                    "old_file": old_file_path,
+                },
+                success=True,
+            )
+
+            # Return updated media file
+            serializer = self.get_serializer(media_file)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Failed to replace file: {e}")
+            return Response(
+                {"error": f"Failed to replace file: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

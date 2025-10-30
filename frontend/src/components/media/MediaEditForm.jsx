@@ -5,7 +5,7 @@
  * Used for both pending files and approved files.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Save,
     X,
@@ -13,7 +13,8 @@ import {
     RefreshCw,
     Sparkles,
     AlertCircle,
-    FileText
+    FileText,
+    Upload
 } from 'lucide-react';
 import { mediaApi, mediaTagsApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
@@ -39,12 +40,15 @@ const MediaEditForm = ({
     const [validationErrors, setValidationErrors] = useState({});
     const [saving, setSaving] = useState(false);
     const [availableTags, setAvailableTags] = useState([]);
-
+    const [replacingFile, setReplacingFile] = useState(false);
 
     // Local file state (to avoid triggering onSave/exit)
     const [localFile, setLocalFile] = useState(file);
 
     const { addNotification } = useGlobalNotifications();
+    
+    // Ref for file input
+    const fileInputRef = useRef(null);
 
 
 
@@ -184,7 +188,52 @@ const MediaEditForm = ({
         updateFormData('tags', newTags);
     };
 
+    // Handle replace file button click
+    const handleReplaceFileClick = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
 
+    // Handle file input change
+    const handleFileInputChange = async (event) => {
+        const selectedFile = event.target.files?.[0];
+        if (!selectedFile) return;
+
+        // Confirm replacement
+        if (!window.confirm(`Are you sure you want to replace "${file.originalFilename}" with "${selectedFile.name}"? This action cannot be undone.`)) {
+            // Reset file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+            return;
+        }
+
+        setReplacingFile(true);
+        try {
+            const result = await mediaApi.files.replaceFile(file.id, selectedFile)();
+            
+            addNotification('File replaced successfully', 'success');
+            
+            // Update local file state with the new file data
+            setLocalFile(result);
+            
+            // Call onSave to update parent component
+            onSave(result);
+        } catch (error) {
+            console.error('Failed to replace file:', error);
+            addNotification(
+                error?.context?.data?.error || 'Failed to replace file',
+                'error'
+            );
+        } finally {
+            setReplacingFile(false);
+            // Reset file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
 
     // Save form data
     const handleSave = async () => {
@@ -340,6 +389,36 @@ const MediaEditForm = ({
                         <p className="truncate">{file.originalFilename}</p>
                         <p>{formatFileSize(file.fileSize)}</p>
                     </div>
+                    
+                    {/* Replace File Button - Only show in edit mode */}
+                    {mode === 'edit' && (
+                        <>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                onChange={handleFileInputChange}
+                                className="hidden"
+                                accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/mp4,video/webm,audio/mpeg,audio/wav"
+                            />
+                            <button
+                                onClick={handleReplaceFileClick}
+                                disabled={replacingFile}
+                                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                            >
+                                {replacingFile ? (
+                                    <>
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                        Replacing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload className="w-4 h-4" />
+                                        Replace File
+                                    </>
+                                )}
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Form Fields */}
