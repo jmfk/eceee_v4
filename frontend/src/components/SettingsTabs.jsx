@@ -285,7 +285,7 @@ export default function SettingsTabs() {
         <div className="bg-white rounded-lg shadow settings-menubar">
             {/* Horizontal Menubar */}
             <nav className="border-b border-gray-200">
-                <div className="flex">
+                <div className="flex flex-wrap">
                     {/* Render core items as simple links */}
                     {navigationStructure.core.map((item) => {
                         const Icon = item.icon
