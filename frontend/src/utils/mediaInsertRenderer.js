@@ -153,7 +153,8 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         mediaId,
         width = 'full',
         align = 'center',
-        caption = ''
+        caption = '',
+        galleryStyle = null
     } = config;
 
     // Generate inner content based on media type
@@ -173,7 +174,13 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
     const widthClass = `media-width-${width}`;
     const alignClass = `media-align-${align}`;
 
+    // Get media title for data attribute
+    const mediaTitle = mediaData?.title || mediaData?.original_filename || '';
+
     // Create the complete media insert div
+    const galleryStyleAttr = galleryStyle ? `data-gallery-style="${galleryStyle}"` : '';
+    const captionAttr = caption ? `data-caption="${escapeHtml(caption)}"` : '';
+    const titleAttr = mediaTitle ? `data-title="${escapeHtml(mediaTitle)}"` : '';
     const html = `<div 
         class="media-insert ${widthClass} ${alignClass}" 
         data-media-insert="true"
@@ -181,6 +188,9 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         data-media-id="${mediaId}"
         data-width="${width}"
         data-align="${align}"
+        ${galleryStyleAttr}
+        ${captionAttr}
+        ${titleAttr}
         contenteditable="false"
         draggable="true"
     >${innerContent}${captionHtml}</div>`;
@@ -201,7 +211,8 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
         mediaType,
         width = 'full',
         align = 'center',
-        caption = ''
+        caption = '',
+        galleryStyle = null
     } = config;
 
     // Generate updated inner content
@@ -235,6 +246,27 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
     element.setAttribute('data-align', align);
     element.setAttribute('data-media-id', mediaData.id);
     element.setAttribute('data-media-type', mediaType);
+    
+    // Update gallery style attribute
+    if (galleryStyle) {
+        element.setAttribute('data-gallery-style', galleryStyle);
+    } else {
+        element.removeAttribute('data-gallery-style');
+    }
+    
+    // Update caption and title attributes
+    if (caption) {
+        element.setAttribute('data-caption', caption);
+    } else {
+        element.removeAttribute('data-caption');
+    }
+    
+    const mediaTitle = mediaData?.title || mediaData?.original_filename || '';
+    if (mediaTitle) {
+        element.setAttribute('data-title', mediaTitle);
+    } else {
+        element.removeAttribute('data-title');
+    }
 
     // Update innerHTML
     element.innerHTML = innerContent + captionHtml;
@@ -255,7 +287,8 @@ export function extractMediaConfig(element) {
         mediaId: element.getAttribute('data-media-id'),
         width: element.getAttribute('data-width') || 'full',
         align: element.getAttribute('data-align') || 'center',
-        caption: caption
+        caption: caption,
+        galleryStyle: element.getAttribute('data-gallery-style') || null
     };
 }
 

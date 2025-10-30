@@ -2,5 +2,9 @@
 {% load security_filters %}
 
 <div class="content-widget">
-    {{ config.content|sanitize_html:config.allow_scripts }}
+    {% if config.processed_content %}
+        {{ config.processed_content|safe }}
+    {% else %}
+        {{ config.content|sanitize_html:config.allow_scripts }}
+    {% endif %}
 </div>

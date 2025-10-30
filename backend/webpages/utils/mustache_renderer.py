@@ -47,9 +47,6 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
     if config.get("imgproxy_override"):
         final_imgproxy_config.update(config["imgproxy_override"])
 
-    print("final_imgproxy_config", final_imgproxy_config)
-    print("images", images)
-
     # Add index to each image and process with imgproxy (make a copy to avoid mutating input)
     indexed_images = []
     for i, img in enumerate(images):
@@ -74,7 +71,7 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
                 )
 
         indexed_images.append(img_copy)
-    print("indexed_images", indexed_images)
+
     return {
         "images": indexed_images,
         "imageCount": len(images),

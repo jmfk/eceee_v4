@@ -3,18 +3,32 @@
  * Modal for editing existing media inserts in WYSIWYG editor
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Trash2, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
+import { useTheme } from '../../hooks/useTheme';
 
 const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, namespace }) => {
+    const { currentTheme } = useTheme();
     const [config, setConfig] = useState({
         width: 'full',
         align: 'center',
-        caption: ''
+        caption: '',
+        galleryStyle: null
     });
     const [mediaData, setMediaData] = useState(initialMediaData);
     const [isChangingMedia, setIsChangingMedia] = useState(false);
+
+    // Get available gallery styles from theme
+    const availableGalleryStyles = useMemo(() => {
+        if (!currentTheme || !currentTheme.galleryStyles) return [];
+
+        return Object.entries(currentTheme.galleryStyles).map(([key, style]) => ({
+            value: key,
+            label: style.name || key,
+            description: style.description
+        }));
+    }, [currentTheme]);
 
     // Initialize config when modal opens
     useEffect(() => {
@@ -22,7 +36,8 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
             setConfig({
                 width: initialConfig.width || 'full',
                 align: initialConfig.align || 'center',
-                caption: initialConfig.caption || ''
+                caption: initialConfig.caption || '',
+                galleryStyle: initialConfig.galleryStyle || null
             });
             setMediaData(initialMediaData);
             setIsChangingMedia(false);
@@ -235,6 +250,32 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
+
+                                {/* Gallery Style () */}
+                                {availableGalleryStyles.length > 0 && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-900 mb-2">
+                                            Gallery Style
+                                        </label>
+                                        <select
+                                            value={config.galleryStyle || ''}
+                                            onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                            <option value="">Default</option>
+                                            {availableGalleryStyles.map(style => (
+                                                <option key={style.value} value={style.value}>
+                                                    {style.label}
+                                                    {style.description ? ` - ${style.description}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            Choose a custom gallery style from the theme
+                                        </p>
+                                    </div>
+                                )}
+
                             </div>
                         </>
                     )}

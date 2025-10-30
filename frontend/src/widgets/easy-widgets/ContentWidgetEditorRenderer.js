@@ -24,7 +24,8 @@ const cleanHTML = (html) => {
     const allowedAttributes = ['href', 'target']
     const mediaInsertAttributes = [
         'class', 'data-media-insert', 'data-media-type', 'data-media-id',
-        'data-width', 'data-align', 'contenteditable', 'draggable',
+        'data-width', 'data-align', 'data-gallery-style', 'data-caption', 'data-title',
+        'contenteditable', 'draggable',
         'src', 'alt', 'width', 'height', 'loading'
     ]
     const allAllowedAttributes = [...allowedAttributes, ...mediaInsertAttributes]
@@ -1850,7 +1851,11 @@ class ContentWidgetEditorRenderer {
         const ReactDOM = await import('react-dom/client')
         const { default: MediaInsertModal } = await import('@/components/media/MediaInsertModal.jsx')
         const { GlobalNotificationProvider } = await import('@/contexts/GlobalNotificationContext.jsx')
+        const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
         const { namespacesApi } = await import('@/api')
+
+        // Create a QueryClient for this modal
+        const queryClient = new QueryClient()
 
         // Get namespace - use provided one or fetch default
         let namespace = this.namespace
@@ -1884,13 +1889,15 @@ class ContentWidgetEditorRenderer {
 
         // Wrap modal with required providers
         root.render(
-            React.createElement(GlobalNotificationProvider, {},
-                React.createElement(MediaInsertModal, {
-                    isOpen: true,
-                    onClose: handleClose,
-                    onInsert: handleInsert,
-                    namespace: namespace
-                })
+            React.createElement(QueryClientProvider, { client: queryClient },
+                React.createElement(GlobalNotificationProvider, {},
+                    React.createElement(MediaInsertModal, {
+                        isOpen: true,
+                        onClose: handleClose,
+                        onInsert: handleInsert,
+                        namespace: namespace
+                    })
+                )
             )
         )
     }
@@ -1998,7 +2005,11 @@ class ContentWidgetEditorRenderer {
         const ReactDOM = await import('react-dom/client')
         const { default: MediaEditModal } = await import('@/components/media/MediaEditModal.jsx')
         const { GlobalNotificationProvider } = await import('@/contexts/GlobalNotificationContext.jsx')
+        const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
         const { namespacesApi } = await import('@/api')
+
+        // Create a QueryClient for this modal
+        const queryClient = new QueryClient()
 
         // Get namespace - use provided one or fetch default
         let namespace = this.namespace
@@ -2039,16 +2050,18 @@ class ContentWidgetEditorRenderer {
 
         // Wrap modal with required providers
         root.render(
-            React.createElement(GlobalNotificationProvider, {},
-                React.createElement(MediaEditModal, {
-                    isOpen: true,
-                    onClose: handleClose,
-                    onSave: handleSave,
-                    onDelete: handleDelete,
-                    initialConfig: { ...initialConfig, mediaType: initialConfig.mediaType },
-                    mediaData: mediaData,
-                    namespace: namespace
-                })
+            React.createElement(QueryClientProvider, { client: queryClient },
+                React.createElement(GlobalNotificationProvider, {},
+                    React.createElement(MediaEditModal, {
+                        isOpen: true,
+                        onClose: handleClose,
+                        onSave: handleSave,
+                        onDelete: handleDelete,
+                        initialConfig: { ...initialConfig, mediaType: initialConfig.mediaType },
+                        mediaData: mediaData,
+                        namespace: namespace
+                    })
+                )
             )
         )
     }
