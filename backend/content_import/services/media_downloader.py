@@ -73,6 +73,32 @@ class MediaDownloader:
         self.openai_service = OpenAIService(user=user)
         self.total_downloaded = 0
 
+    def _extract_original_url(self, url: str) -> str:
+        """
+        Extract original URL from proxy URL if applicable.
+
+        Args:
+            url: Potentially proxied URL
+
+        Returns:
+            Original URL if this was a proxy URL, otherwise the input URL unchanged
+        """
+        from urllib.parse import parse_qs
+
+        parsed = urlparse(url)
+
+        # Check if this is a proxy URL
+        if "proxy-asset" in parsed.path and parsed.query:
+            query_params = parse_qs(parsed.query)
+            if "url" in query_params:
+                # Return the original URL from the query parameter
+                original_url = query_params["url"][0]
+                logger.debug(f"Extracted original URL from proxy: {original_url}")
+                return original_url
+
+        # Not a proxy URL, return as-is
+        return url
+
     def download_image(
         self, image_data: Dict[str, Any], base_url: str = ""
     ) -> Optional[MediaFile]:
@@ -94,6 +120,9 @@ class MediaDownloader:
         # Resolve relative URLs
         if base_url and not src.startswith(("http://", "https://", "data:")):
             src = urljoin(base_url, src)
+
+        # Extract original URL if this is a proxy URL
+        src = self._extract_original_url(src)
 
         # Skip data URLs for now
         if src.startswith("data:"):
@@ -420,6 +449,9 @@ class MediaDownloader:
         # Resolve relative URLs
         if base_url and not url.startswith(("http://", "https://")):
             url = urljoin(base_url, url)
+
+        # Extract original URL if this is a proxy URL
+        url = self._extract_original_url(url)
 
         try:
             # Download file to check hash
