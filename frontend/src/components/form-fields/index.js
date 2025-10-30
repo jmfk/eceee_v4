@@ -31,6 +31,7 @@ export { default as ColorInput } from './ColorInput'
 export { default as SliderInput } from './SliderInput'
 export { default as DateRangeInput } from './DateRangeInput'
 export { default as ImageStyleSelect } from './ImageStyleSelect'
+export { default as ComponentStyleSelect } from './ComponentStyleSelect'
 
 // Special Interactive Components
 export { default as CommandPaletteInput } from './CommandPaletteInput'
@@ -97,6 +98,7 @@ export const FIELD_COMPONENTS = {
     SliderInput: () => import('./SliderInput'),
     DateRangeInput: () => import('./DateRangeInput'),
     ImageStyleSelect: () => import('./ImageStyleSelect'),
+    ComponentStyleSelect: () => import('./ComponentStyleSelect'),
     CommandPaletteInput: () => import('./CommandPaletteInput'),
     ComboboxInput: () => import('./ComboboxInput'),
     MentionsInput: () => import('./MentionsInput'),

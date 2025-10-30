@@ -143,6 +143,7 @@ class WebPageRenderer:
                     style_result = widget_type.render_with_style(
                         template_config, theme_obj
                     )
+                    print("style_result", style_result)
                     if style_result:
                         custom_style_html, custom_style_css = style_result
                 except Exception as e:

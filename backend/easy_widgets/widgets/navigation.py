@@ -228,16 +228,19 @@ class NavigationWidget(BaseWidget):
 
         # Support both snake_case and camelCase
         style_name = config.get("navigation_style") or config.get("navigationStyle")
-
+        print(f"style_name: {style_name}")
         # Only render with custom style if a style is explicitly selected
         if not style_name or style_name == "default":
             return None
+
+        print(f"theme: {theme}")
 
         # Get style from theme
         style = None
         if theme:
             styles = theme.component_styles or {}
             style = styles.get(style_name)
+        print(f"style: {style}")
 
         # If style not found, return None to use default template
         if not style:
@@ -245,11 +248,11 @@ class NavigationWidget(BaseWidget):
 
         # Prepare navigation items (combine dynamic and static)
         all_items = []
-        
+
         # Add dynamic menu items
         dynamic_items = config.get("dynamic_menu_items", [])
         all_items.extend(dynamic_items)
-        
+
         # Add static menu items
         static_items = config.get("menu_items", [])
         all_items.extend(static_items)
@@ -260,13 +263,17 @@ class NavigationWidget(BaseWidget):
         # Prepare context for Mustache rendering
         context = {
             "items": all_items,
+            "dynamic_items": dynamic_items,
+            "static_items": static_items,
             "itemCount": len(all_items),
             "hasItems": len(all_items) > 0,
             **(style.get("variables") or {}),
         }
 
         # Render template
+        print("Render template")
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")
-
+        print("html")
+        print(html)
         return html, css

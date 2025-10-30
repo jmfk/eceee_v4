@@ -93,7 +93,15 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
 
             <div className="text-sm text-gray-600">
                 Component styles use Mustache templates with optional CSS. They can be used for widgets
-                and inline objects (like images in WYSIWYG content). Available variable: <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">{'{{content}}'}</code>
+                (like Navigation) and inline objects (like images in WYSIWYG content).
+                <div className="mt-2">
+                    <strong>Available variables:</strong>
+                    <ul className="list-disc list-inside mt-1">
+                        <li><code className="px-1 py-0.5 bg-gray-100 rounded text-xs">{'{{content}}'}</code> - Generic content (for inline objects)</li>
+                        <li><code className="px-1 py-0.5 bg-gray-100 rounded text-xs">{'{{#items}}...{{/items}}'}</code> - Navigation items (for Navigation widget)</li>
+                        <li><code className="px-1 py-0.5 bg-gray-100 rounded text-xs">{'{{label}}, {{url}}, {{targetBlank}}'}</code> - Item properties (within items loop)</li>
+                    </ul>
+                </div>
             </div>
 
             {/* Add Style Form */}
@@ -274,7 +282,7 @@ const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, temp
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                     Mustache Template
                     <span className="ml-2 text-xs text-gray-500">
-                        Use <code className="px-1 py-0.5 bg-gray-100 rounded">{'{{content}}'}</code> for content placeholder
+                        Use <code className="px-1 py-0.5 bg-gray-100 rounded">{'{{content}}'}</code> or <code className="px-1 py-0.5 bg-gray-100 rounded">{'{{#items}}...{{/items}}'}</code>
                     </span>
                 </label>
                 <textarea
@@ -283,7 +291,7 @@ const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, temp
                     defaultValue={style.template || ''}
                     onChange={handleTextareaChange}
                     onBlur={onSave}
-                    placeholder='<div class="rounded-lg shadow-lg p-4">{{content}}</div>'
+                    placeholder='<nav><ul>{{#items}}<li><a href="{{url}}">{{label}}</a></li>{{/items}}</ul></nav>'
                     rows={6}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-50"
                 />
