@@ -6,6 +6,7 @@
 // Constants for widget actions to eliminate magic strings
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import DjangoTemplateRenderer from '../utils/DjangoTemplateRenderer.js';
+import { formatFieldLabel } from '../utils/labelFormatting.js';
 // Note: Widget menu items and actions are now handled by editor-specific frameworks
 // This is a placeholder for backward compatibility
 const getWidgetMenuItems = () => [];
@@ -1121,7 +1122,7 @@ class LayoutRenderer {
       const value = config[key] !== undefined ? config[key] : field.default || '';
       const label = document.createElement('label');
       label.className = 'block text-sm font-medium text-gray-700';
-      label.textContent = field.title || key;
+      label.textContent = field.title || formatFieldLabel(key);
       label.htmlFor = `widget-edit-${key}`;
       form.appendChild(label);
       let input;

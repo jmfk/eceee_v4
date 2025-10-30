@@ -14,6 +14,7 @@
 
 import { validateWidgetConfiguration } from '../../api/widgetSchemas.js'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
+import { formatFieldLabel } from '../../utils/labelFormatting.js'
 
 /**
  * Central Widget Registry (Singleton)
@@ -516,7 +517,7 @@ class SelfContainedWidgetForm {
         label.className = 'block text-sm font-medium text-gray-700'
         label.setAttribute('for', `field-${this.widgetId}-${fieldName}`)
 
-        const title = fieldSchema.title || fieldName
+        const title = fieldSchema.title || formatFieldLabel(fieldName)
         label.textContent = title
 
         // Add required indicator

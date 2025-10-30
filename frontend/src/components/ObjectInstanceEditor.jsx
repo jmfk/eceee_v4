@@ -6,6 +6,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import Modal from './Modal'
 import ObjectVersionViewer from './ObjectVersionViewer'
 import ObjectSchemaForm from './ObjectSchemaForm'
+import { formatFieldLabel } from '../utils/labelFormatting'
 
 const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVisible }) => {
     // Helper function to convert object type schema to ObjectSchemaForm format
@@ -165,7 +166,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                 if (field.required) {
                     const value = formData.data[field.name]
                     if (!value && value !== 0 && value !== false) {
-                        newErrors[`data_${field.name}`] = `${field.label || field.name} is required`
+                        newErrors[`data_${field.name}`] = `${field.label || formatFieldLabel(field.name)} is required`
                     }
                 }
             })
@@ -549,7 +550,7 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
                         onChange={(e) => onChange(e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${error ? 'border-red-300' : 'border-gray-300'
                             }`}
-                        placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
+                        placeholder={field.placeholder || `Enter ${field.label || formatFieldLabel(field.name)}...`}
                         maxLength={field.maxLength}
                     />
                 )
@@ -562,7 +563,7 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
                         rows={4}
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${error ? 'border-red-300' : 'border-gray-300'
                             }`}
-                        placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
+                        placeholder={field.placeholder || `Enter ${field.label || formatFieldLabel(field.name)}...`}
                     />
                 )
 
@@ -574,7 +575,7 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
                         onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${error ? 'border-red-300' : 'border-gray-300'
                             }`}
-                        placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
+                        placeholder={field.placeholder || `Enter ${field.label || formatFieldLabel(field.name)}...`}
                         min={field.min}
                         max={field.max}
                         step={field.step}
@@ -643,7 +644,7 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
                         onChange={(e) => onChange(e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${error ? 'border-red-300' : 'border-gray-300'
                             }`}
-                        placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
+                        placeholder={field.placeholder || `Enter ${field.label || formatFieldLabel(field.name)}...`}
                     />
                 )
 
@@ -655,7 +656,7 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
                         onChange={(e) => onChange(e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${error ? 'border-red-300' : 'border-gray-300'
                             }`}
-                        placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
+                        placeholder={field.placeholder || `Enter ${field.label || formatFieldLabel(field.name)}...`}
                     />
                 )
 
@@ -667,7 +668,7 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
                         onChange={(e) => onChange(e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${error ? 'border-red-300' : 'border-gray-300'
                             }`}
-                        placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
+                        placeholder={field.placeholder || `Enter ${field.label || formatFieldLabel(field.name)}...`}
                     />
                 )
         }
@@ -677,7 +678,7 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
         <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
                 <Icon className="h-4 w-4 mr-2" />
-                {field.label || field.name}
+                {field.label || formatFieldLabel(field.name)}
                 {field.required && <span className="text-red-500 ml-1">*</span>}
             </label>
             {renderInput()}

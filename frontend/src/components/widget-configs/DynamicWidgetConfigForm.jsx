@@ -4,6 +4,7 @@ import { initializeWidgetConfigRegistry, getWidgetSchema, isWidgetConfigRegistry
 import SliderInput from './field-components/SliderInput'
 import SegmentedControl from './field-components/SegmentedControl'
 import ReorderableListInput from './field-components/ReorderableListInput'
+import { formatFieldLabel } from '../../utils/labelFormatting'
 
 /**
  * Dynamic Widget Configuration Form
@@ -82,7 +83,7 @@ export default function DynamicWidgetConfigForm({
         const { type, description, required, ui = {}, enum: enumValues, minimum, maximum, minLength, maxLength } = fieldMeta
         const fieldValue = config[fieldName]
         const component = ui.component || 'TextInput'
-        const fieldLabel = ui.label || fieldName
+        const fieldLabel = ui.label || formatFieldLabel(fieldName)
 
         // Hidden fields
         if (ui.hidden) {
@@ -389,8 +390,8 @@ export default function DynamicWidgetConfigForm({
                         type="button"
                         onClick={() => setViewMode('form')}
                         className={`px-3 py-1 text-sm rounded ${viewMode === 'form'
-                                ? 'bg-blue-100 text-blue-700 font-medium'
-                                : 'text-gray-600 hover:bg-gray-100'
+                            ? 'bg-blue-100 text-blue-700 font-medium'
+                            : 'text-gray-600 hover:bg-gray-100'
                             }`}
                     >
                         Form
@@ -399,8 +400,8 @@ export default function DynamicWidgetConfigForm({
                         type="button"
                         onClick={() => setViewMode('json')}
                         className={`px-3 py-1 text-sm rounded flex items-center space-x-1 ${viewMode === 'json'
-                                ? 'bg-blue-100 text-blue-700 font-medium'
-                                : 'text-gray-600 hover:bg-gray-100'
+                            ? 'bg-blue-100 text-blue-700 font-medium'
+                            : 'text-gray-600 hover:bg-gray-100'
                             }`}
                     >
                         <Code className="w-4 h-4" />

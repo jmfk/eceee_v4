@@ -3,6 +3,7 @@ import { FileText, Loader2 } from 'lucide-react'
 import { fieldTypeRegistry } from '../utils/fieldTypeRegistry'
 import { getFieldComponent } from './form-fields'
 import LocalStateFieldWrapper from './forms/LocalStateFieldWrapper'
+import { formatFieldLabel } from '../utils/labelFormatting'
 
 const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, namespace }, ref) => {
     const [fieldComponents, setFieldComponents] = useState({})
@@ -118,10 +119,10 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
         // Props for the field component (without value and onChange)
         // LocalStateFieldWrapper will handle validation internally
         const fieldProps = {
-            label: field.label || field.name,
+            label: field.label || formatFieldLabel(field.name),
             description: field.help || field.description,
             required: field.required,
-            placeholder: field.placeholder || `Enter ${field.label || field.name}...`,
+            placeholder: field.placeholder || `Enter ${field.label || formatFieldLabel(field.name)}...`,
             // Pass namespace for media operations
             namespace: namespace,
             // Pass fieldName for UDC integration

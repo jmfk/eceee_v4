@@ -3,6 +3,7 @@ import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
 import { getFieldComponent, FIELD_COMPONENTS } from '../form-fields'
 import { Loader2 } from 'lucide-react'
 import LocalStateFieldWrapper from './LocalStateFieldWrapper'
+import { formatFieldLabel } from '../../utils/labelFormatting'
 
 /**
  * FieldPlaceholder - Shows a visual representation of the field while loading
@@ -206,7 +207,7 @@ const SchemaFieldRenderer = ({
         })
 
         const fieldProps = {
-            label: fieldSchema.title || fieldName,
+            label: fieldSchema.title || formatFieldLabel(fieldName),
             description: fieldSchema.description,
             required,
             disabled,
@@ -269,7 +270,7 @@ const SchemaFieldRenderer = ({
         return (
             <div className="space-y-1">
                 <label className="block text-sm font-medium text-gray-700">
-                    {fieldSchema.title || fieldName}
+                    {fieldSchema.title || formatFieldLabel(fieldName)}
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 <input
@@ -299,7 +300,7 @@ const SchemaFieldRenderer = ({
 
     // Prepare props for the field component
     const fieldProps = {
-        label: fieldSchema.title || fieldName,
+        label: fieldSchema.title || formatFieldLabel(fieldName),
         description: fieldSchema.description,
         required,
         disabled,

@@ -5,6 +5,8 @@
  * that can be used by the ItemForm component.
  */
 
+import { formatFieldLabel } from '../../../utils/labelFormatting'
+
 /**
  * Parse item schema from various formats
  * 
@@ -118,7 +120,7 @@ function parseFieldSchema(name, schema, isRequired = false) {
     const field = {
         name,
         type: schema.type || 'string',
-        title: schema.title || formatFieldName(name),
+        title: schema.title || formatFieldLabel(name),
         description: schema.description,
         required: isRequired,
         format: schema.format,
@@ -149,7 +151,7 @@ function parseFieldSchema(name, schema, isRequired = false) {
     if (field.enum) {
         field.props.options = field.enum.map(value => ({
             value,
-            label: formatEnumValue(value)
+            label: formatFieldLabel(String(value))
         }))
     }
 
@@ -197,22 +199,18 @@ function extractDefaultValues(fields) {
 /**
  * Format field name for display
  * Converts snake_case to Title Case
+ * @deprecated Use formatFieldLabel from utils/labelFormatting instead
  */
 function formatFieldName(name) {
-    return name
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, char => char.toUpperCase())
+    return formatFieldLabel(name)
 }
 
 /**
  * Format enum value for display
+ * @deprecated Use formatFieldLabel from utils/labelFormatting instead
  */
 function formatEnumValue(value) {
-    if (typeof value !== 'string') return String(value)
-
-    return value
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, char => char.toUpperCase())
+    return formatFieldLabel(String(value))
 }
 
 /**

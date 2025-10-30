@@ -4,6 +4,7 @@ import { getFieldComponent } from '../form-fields'
 import { Loader2 } from 'lucide-react'
 import useLocalFormState from '../../hooks/useLocalFormState'
 import LocalStateFieldWrapper from './LocalStateFieldWrapper'
+import { formatFieldLabel } from '../../utils/labelFormatting'
 
 /**
  * DynamicFormRenderer Component
@@ -121,7 +122,7 @@ const DynamicFormRenderer = React.memo(({
         const uiProps = fieldTypeDef?.uiProps || {}
 
         const fieldProps = {
-            label: fieldDef.title || fieldName,
+            label: fieldDef.title || formatFieldLabel(fieldName),
             description: fieldDef.description,
             required: schema?.required?.includes(fieldName),
             disabled,
