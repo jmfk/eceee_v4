@@ -1,0 +1,20 @@
+{% load static %}
+
+<div class="hero-widget" style="{{ hero_style }}">
+    {% if config.background_image_url %}
+        <div class="hero-background" style="background-image: url('{{ config.background_image_url }}');"></div>
+    {% endif %}
+    
+    <div class="hero-content">
+        {% if config.before_text %}
+            <div class="before-text">{{ config.before_text|linebreaks }}</div>
+        {% endif %}
+        
+        <h1>{{ config.header }}</h1>
+        
+        {% if config.after_text %}
+            <div class="after-text">{{ config.after_text|linebreaks }}</div>
+        {% endif %}
+    </div>
+</div>
+
