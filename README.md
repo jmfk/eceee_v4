@@ -1,4 +1,4 @@
-# ECEEE v4 - AI-Integrated Development Environment
+# EASY v4 - AI-Integrated Development Environment
 
 A comprehensive, AI-assisted development environment featuring Django backend, React frontend, PostgreSQL database, and Model Context Protocol (MCP) servers for enhanced AI-assisted development workflows.
 
