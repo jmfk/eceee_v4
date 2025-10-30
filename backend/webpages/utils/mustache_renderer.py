@@ -139,12 +139,13 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
     }
 
 
-def prepare_component_context(content, style_vars=None):
+def prepare_component_context(content, anchor="", style_vars=None):
     """
     Prepare context for component style template rendering.
 
     Args:
         content: The content to render (HTML string or dict)
+        anchor: Optional anchor/heading text
         style_vars: Style-specific variables
 
     Returns:
@@ -152,5 +153,6 @@ def prepare_component_context(content, style_vars=None):
     """
     return {
         "content": content,
+        "anchor": anchor,
         **(style_vars or {}),
     }

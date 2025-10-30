@@ -56,6 +56,13 @@ class ContentConfig(BaseModel):
             "variant": "toggle",
         },
     )
+    component_style: str = Field(
+        "default",
+        description="Component style from theme",
+        json_schema_extra={
+            "component": "ComponentStyleSelector",
+        },
+    )
 
 
 @register_widget_type
@@ -152,6 +159,50 @@ class ContentWidget(BaseWidget):
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return ContentConfig
+
+    def render_with_style(self, config, theme):
+        """
+        Render content with custom component style from theme.
+
+        Args:
+            config: Widget configuration
+            theme: PageTheme instance
+
+        Returns:
+            Tuple of (html, css) or None for default rendering
+        """
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
+
+        style_name = config.get("component_style", "default")
+        if not style_name or style_name == "default":
+            return None
+
+        styles = theme.component_styles or {}
+        style = styles.get(style_name)
+        if not style:
+            return None
+
+        template = style.get("template", "")
+        css = style.get("css", "")
+
+        # Check for passthru marker (must be only content in template after trimming)
+        if template.strip() == "{{passthru}}":
+            # Passthru mode: use default rendering but inject CSS
+            return None, css
+
+        # Prepare context with content and anchor
+        context = prepare_component_context(
+            content=config.get("content", ""),
+            anchor=config.get("anchor", ""),
+            style_vars=style.get("variables", {}),
+        )
+
+        # Render template
+        html = render_mustache(template, context)
+        return html, css
 
     def prepare_template_context(self, config, context=None):
         """

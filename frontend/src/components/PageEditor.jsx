@@ -937,7 +937,11 @@ const PageEditor = () => {
                 updates: versionUpdates
             });
         }
-    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id])
+        // Mark as dirty if any updates were made
+        if (Object.keys(webpageUpdates).length > 0 || Object.keys(versionUpdates).length > 0) {
+            setIsDirty(true);
+        }
+    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id, setIsDirty])
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback(async (validatedData) => {

@@ -80,6 +80,13 @@ class FooterConfig(LayoutWidgetConfig):
         default_factory=list,
         description="Social media links [{'name': 'Facebook', 'url': 'https://...', 'icon': 'fab fa-facebook'}]",
     )
+    component_style: str = Field(
+        "default",
+        description="Component style from theme",
+        json_schema_extra={
+            "component": "ComponentStyleSelector",
+        },
+    )
 
 
 @register_widget_type
@@ -206,3 +213,44 @@ class FooterWidget(BaseWidget):
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return FooterConfig
+
+    def render_with_style(self, config, theme):
+        """
+        Render footer with custom component style from theme.
+        
+        Args:
+            config: Widget configuration
+            theme: PageTheme instance
+            
+        Returns:
+            Tuple of (html, css) or None for default rendering
+        """
+        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from django.template.loader import render_to_string
+        
+        style_name = config.get("component_style", "default")
+        if not style_name or style_name == "default":
+            return None
+        
+        styles = theme.component_styles or {}
+        style = styles.get(style_name)
+        if not style:
+            return None
+        
+        # Render the footer HTML using the default template first
+        footer_html = render_to_string(
+            self.template_name,
+            {"config": config}
+        )
+        
+        # Prepare context with rendered footer as content
+        context = prepare_component_context(
+            content=footer_html,
+            anchor="",
+            style_vars=style.get("variables", {})
+        )
+        
+        # Render with style template
+        html = render_mustache(style.get("template", ""), context)
+        css = style.get("css", "")
+        return html, css

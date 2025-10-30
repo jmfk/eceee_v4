@@ -174,6 +174,13 @@ class FormsConfig(BaseModel):
     css_framework: Literal["default", "bootstrap", "tailwind", "custom"] = Field(
         "default", description="CSS framework for styling"
     )
+    component_style: str = Field(
+        "default",
+        description="Component style from theme",
+        json_schema_extra={
+            "component": "ComponentStyleSelector",
+        },
+    )
 
 
 @register_widget_type
@@ -372,3 +379,44 @@ class FormsWidget(BaseWidget):
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return FormsConfig
+
+    def render_with_style(self, config, theme):
+        """
+        Render form with custom component style from theme.
+        
+        Args:
+            config: Widget configuration
+            theme: PageTheme instance
+            
+        Returns:
+            Tuple of (html, css) or None for default rendering
+        """
+        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from django.template.loader import render_to_string
+        
+        style_name = config.get("component_style", "default")
+        if not style_name or style_name == "default":
+            return None
+        
+        styles = theme.component_styles or {}
+        style = styles.get(style_name)
+        if not style:
+            return None
+        
+        # Render the form HTML using the default template first
+        form_html = render_to_string(
+            self.template_name,
+            {"config": config}
+        )
+        
+        # Prepare context with rendered form as content
+        context = prepare_component_context(
+            content=form_html,
+            anchor=config.get("anchor", ""),
+            style_vars=style.get("variables", {})
+        )
+        
+        # Render with style template
+        html = render_mustache(style.get("template", ""), context)
+        css = style.get("css", "")
+        return html, css

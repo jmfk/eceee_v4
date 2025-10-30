@@ -132,6 +132,13 @@ class NavbarConfig(BaseModel):
             "suffix": "px",
         },
     )
+    component_style: str = Field(
+        "default",
+        description="Component style from theme",
+        json_schema_extra={
+            "component": "ComponentStyleSelector",
+        },
+    )
 
 
 @register_widget_type
@@ -151,6 +158,50 @@ class NavbarWidget(BaseWidget):
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return NavbarConfig
+
+    def render_with_style(self, config, theme):
+        """
+        Render navbar with custom component style from theme.
+        
+        Args:
+            config: Widget configuration
+            theme: PageTheme instance
+            
+        Returns:
+            Tuple of (html, css) or None for default rendering
+        """
+        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from django.template.loader import render_to_string
+        
+        style_name = config.get("component_style", "default")
+        if not style_name or style_name == "default":
+            return None
+        
+        styles = theme.component_styles or {}
+        style = styles.get(style_name)
+        if not style:
+            return None
+        
+        # Prepare template context first
+        prepared_config = self.prepare_template_context(config, {"theme": theme})
+        
+        # Render the navbar HTML using the default template first
+        navbar_html = render_to_string(
+            self.template_name,
+            {"config": prepared_config}
+        )
+        
+        # Prepare context with rendered navbar as content
+        context = prepare_component_context(
+            content=navbar_html,
+            anchor="",
+            style_vars=style.get("variables", {})
+        )
+        
+        # Render with style template
+        html = render_mustache(style.get("template", ""), context)
+        css = style.get("css", "")
+        return html, css
 
     def prepare_template_context(self, config, context=None):
         """Prepare navbar menu items and background styling"""

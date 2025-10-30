@@ -72,6 +72,13 @@ class SidebarTopNewsConfig(BaseModel):
             "placeholder": "e.g., Top News, Latest Updates",
         },
     )
+    component_style: str = Field(
+        "default",
+        description="Component style from theme",
+        json_schema_extra={
+            "component": "ComponentStyleSelector",
+        },
+    )
 
 
 @register_widget_type

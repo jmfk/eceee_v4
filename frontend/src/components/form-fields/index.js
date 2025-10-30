@@ -28,6 +28,7 @@ export { default as TagInput } from './TagInput'
 
 // Advanced Components
 export { default as ColorInput } from './ColorInput'
+export { default as ComponentStyleSelector } from './ComponentStyleSelector'
 export { default as SliderInput } from './SliderInput'
 export { default as DateRangeInput } from './DateRangeInput'
 export { default as ImageStyleSelect } from './ImageStyleSelect'
@@ -98,7 +99,8 @@ export const FIELD_COMPONENTS = {
     SliderInput: () => import('./SliderInput'),
     DateRangeInput: () => import('./DateRangeInput'),
     ImageStyleSelect: () => import('./ImageStyleSelect'),
-    ComponentStyleSelect: () => import('./ComponentStyleSelect'),
+    ComponentStyleSelect: () => import('./ComponentStyleSelector'),
+    ComponentStyleSelector: () => import('./ComponentStyleSelector'),
     CommandPaletteInput: () => import('./CommandPaletteInput'),
     ComboboxInput: () => import('./ComboboxInput'),
     MentionsInput: () => import('./MentionsInput'),

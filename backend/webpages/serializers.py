@@ -866,6 +866,14 @@ class PageVersionSerializer(serializers.ModelSerializer):
         help_text="Page ID for creating new version",
     )
 
+    # Writable theme field
+    theme = serializers.PrimaryKeyRelatedField(
+        queryset=PageTheme.objects.all(),
+        allow_null=True,
+        required=False,
+        help_text="Theme for this version (leave blank to inherit from parent)",
+    )
+
     # Tags as array of strings
     tags = serializers.ListField(
         child=serializers.CharField(max_length=50),
@@ -916,6 +924,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "is_published",
             "is_current_published",
             "publication_status",
+            "effective_theme",
+            "theme_inheritance_info",
             "created_at",
             "created_by",
         ]

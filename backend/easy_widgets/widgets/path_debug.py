@@ -19,6 +19,14 @@ class PathDebugConfig(BaseModel):
         populate_by_name=True,
     )
 
+    component_style: str = Field(
+        "default",
+        description="Component style from theme",
+        json_schema_extra={
+            "component": "ComponentStyleSelector",
+        },
+    )
+
 
 class PathDebugWidget(BaseWidget):
     """

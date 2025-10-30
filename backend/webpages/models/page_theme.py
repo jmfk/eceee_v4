@@ -817,6 +817,162 @@ class PageTheme(models.Model):
     def get_default_component_styles():
         """Default component styles for reusable elements, extracted from widget templates"""
         return {
+            "content-card": {
+                "name": "Card",
+                "description": "Content wrapped in a card with shadow and padding",
+                "template": """<div class="content-card">
+  {{#anchor}}
+    <h2 class="card-heading" id="{{anchor}}">{{anchor}}</h2>
+  {{/anchor}}
+  <div class="card-body">
+    {{{content}}}
+  </div>
+</div>""",
+                "css": """.content-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.content-card .card-heading {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 1rem 0;
+  border-bottom: 2px solid #3b82f6;
+  padding-bottom: 0.5rem;
+}
+.content-card .card-body {
+  color: #374151;
+  line-height: 1.6;
+}""",
+                "variables": {},
+            },
+            "content-callout": {
+                "name": "Callout Box",
+                "description": "Highlighted callout box with colored border",
+                "template": """<div class="content-callout">
+  {{#anchor}}
+    <h3 class="callout-heading" id="{{anchor}}">{{anchor}}</h3>
+  {{/anchor}}
+  <div class="callout-body">
+    {{{content}}}
+  </div>
+</div>""",
+                "css": """.content-callout {
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+  border-radius: 0.25rem;
+}
+.content-callout .callout-heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e40af;
+  margin: 0 0 0.75rem 0;
+}
+.content-callout .callout-body {
+  color: #1e3a8a;
+  line-height: 1.6;
+}""",
+                "variables": {},
+            },
+            "content-banner": {
+                "name": "Banner",
+                "description": "Full-width banner with background color",
+                "template": """<div class="content-banner">
+  {{#anchor}}
+    <h2 class="banner-heading" id="{{anchor}}">{{anchor}}</h2>
+  {{/anchor}}
+  <div class="banner-body">
+    {{{content}}}
+  </div>
+</div>""",
+                "css": """.content-banner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  padding: 2.5rem 2rem;
+  margin: 2rem 0;
+  border-radius: 0.75rem;
+  text-align: center;
+}
+.content-banner .banner-heading {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 1rem 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.content-banner .banner-body {
+  font-size: 1.125rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.95);
+}""",
+                "variables": {},
+            },
+            "content-sidebar-box": {
+                "name": "Sidebar Box",
+                "description": "Compact sidebar-styled content box",
+                "template": """<div class="content-sidebar-box">
+  {{#anchor}}
+    <h4 class="sidebar-heading" id="{{anchor}}">{{anchor}}</h4>
+  {{/anchor}}
+  <div class="sidebar-body">
+    {{{content}}}
+  </div>
+</div>""",
+                "css": """.content-sidebar-box {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  padding: 1.25rem;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+}
+.content-sidebar-box .sidebar-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.content-sidebar-box .sidebar-body {
+  color: #4b5563;
+  line-height: 1.5;
+}""",
+                "variables": {},
+            },
+            "content-highlight": {
+                "name": "Highlight (CSS Only)",
+                "description": "Adds highlight styling without changing HTML structure",
+                "template": "{{passthru}}",
+                "css": """.content-widget {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 0.25rem;
+}""",
+                "variables": {},
+            },
+            "content-info-box": {
+                "name": "Info Box (CSS Only)",
+                "description": "Blue info box styling with default HTML",
+                "template": "{{passthru}}",
+                "css": """.content-widget {
+  background: #dbeafe;
+  border: 1px solid #3b82f6;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+  color: #1e40af;
+}""",
+                "variables": {},
+            },
             "image-simple": {
                 "name": "Simple Image",
                 "description": "Basic image with size and alignment options",

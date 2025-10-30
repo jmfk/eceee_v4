@@ -144,7 +144,14 @@ class WebPageRenderer:
                         template_config, theme_obj
                     )
                     if style_result:
-                        custom_style_html, custom_style_css = style_result
+                        html_part, css_part = style_result
+                        # Check for passthru mode (None html but has css)
+                        if html_part is None and css_part:
+                            # Passthru mode: use default rendering but inject CSS
+                            custom_style_css = css_part
+                        else:
+                            # Normal custom style
+                            custom_style_html, custom_style_css = html_part, css_part
                 except Exception as e:
                     import logging
 
