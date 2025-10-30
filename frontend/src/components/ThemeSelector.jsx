@@ -148,7 +148,7 @@ const ThemeSelector = ({
                                 onClick={() => handleThemeSelect(effectiveThemeId)}
                                 className="text-sm text-blue-700 hover:text-blue-900 font-medium"
                             >
-                                Override Inheritance
+                                Select Inherited Theme
                             </button>
                         )}
                         {selectedThemeId && (
