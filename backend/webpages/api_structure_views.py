@@ -85,6 +85,7 @@ def page_children_view(request, page_id):
     )
 
     helpers = get_structure_helpers()
+    print("page_id", page_id)
     children = helpers.get_active_children(page_id, include_unpublished)
 
     return Response([asdict(child) for child in children])

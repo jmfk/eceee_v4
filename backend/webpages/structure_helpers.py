@@ -59,7 +59,7 @@ class PageStructureHelpers:
         try:
             page = self.Page.objects.select_related(
                 "created_by", "last_modified_by", "parent"
-            ).get(id=page_id)
+            ).get(id=page_id, is_deleted=False)
 
             # Get version if requested
             version = None
@@ -94,7 +94,9 @@ class PageStructureHelpers:
             if hostname:
                 root_page = self.Page.get_root_page_for_hostname(hostname)
             else:
-                root_page = self.Page.objects.filter(parent__isnull=True).first()
+                root_page = self.Page.objects.filter(
+                    parent__isnull=True, is_deleted=False
+                ).first()
 
             if not root_page:
                 return None
@@ -114,7 +116,7 @@ class PageStructureHelpers:
             current_page = self.Page.get_root_page_for_hostname(hostname)
         else:
             current_page = self.Page.objects.filter(
-                parent__isnull=True, slug=segments[0]
+                parent__isnull=True, slug=segments[0], is_deleted=False
             ).first()
 
         if not current_page:
@@ -127,7 +129,9 @@ class PageStructureHelpers:
                 continue
 
             try:
-                current_page = self.Page.objects.get(parent=current_page, slug=segment)
+                current_page = self.Page.objects.get(
+                    parent=current_page, slug=segment, is_deleted=False
+                )
             except self.Page.DoesNotExist:
                 return None
 
@@ -152,9 +156,11 @@ class PageStructureHelpers:
             List of ChildPageInfo objects
         """
         query = (
-            self.Page.objects.filter(parent_id=page_id)
+            self.Page.objects.filter(parent_id=page_id, is_deleted=False)
             .select_related("created_by", "last_modified_by")
-            .annotate(child_count=Count("children"))
+            .annotate(
+                child_count=Count("children", filter=Q(children__is_deleted=False))
+            )
             .order_by("sort_order", "id")
         )
 
@@ -200,8 +206,10 @@ class PageStructureHelpers:
         try:
             page = (
                 self.Page.objects.select_related("created_by", "last_modified_by")
-                .annotate(child_count=Count("children"))
-                .get(id=page_id)
+                .annotate(
+                    child_count=Count("children", filter=Q(children__is_deleted=False))
+                )
+                .get(id=page_id, is_deleted=False)
             )
         except self.Page.DoesNotExist:
             raise StructureQueryError(
@@ -221,7 +229,9 @@ class PageStructureHelpers:
             List of PageMetadata from immediate parent to root
         """
         try:
-            page = self.Page.objects.select_related("parent").get(id=page_id)
+            page = self.Page.objects.select_related("parent").get(
+                id=page_id, is_deleted=False
+            )
         except self.Page.DoesNotExist:
             return []
 
@@ -229,7 +239,8 @@ class PageStructureHelpers:
         current = page.parent
 
         while current:
-            ancestors.append(self._page_to_metadata(current))
+            if not current.is_deleted:
+                ancestors.append(self._page_to_metadata(current))
             current = current.parent
 
         return ancestors
@@ -245,7 +256,9 @@ class PageStructureHelpers:
             List of BreadcrumbItem from root to current page
         """
         try:
-            page = self.Page.objects.select_related("parent").get(id=page_id)
+            page = self.Page.objects.select_related("parent").get(
+                id=page_id, is_deleted=False
+            )
         except self.Page.DoesNotExist:
             return []
 
@@ -253,7 +266,8 @@ class PageStructureHelpers:
         pages = [page]
         current = page.parent
         while current:
-            pages.insert(0, current)
+            if not current.is_deleted:
+                pages.insert(0, current)
             current = current.parent
 
         # Build breadcrumbs
@@ -281,7 +295,9 @@ class PageStructureHelpers:
             PageMetadata of root page or None
         """
         try:
-            page = self.Page.objects.select_related("parent").get(id=page_id)
+            page = self.Page.objects.select_related("parent").get(
+                id=page_id, is_deleted=False
+            )
         except self.Page.DoesNotExist:
             return None
 
@@ -297,9 +313,9 @@ class PageStructureHelpers:
     def get_version_by_id(self, version_id: int) -> Optional[VersionMetadata]:
         """Get version metadata by ID"""
         try:
-            version = self.Version.objects.select_related("created_by", "theme").get(
-                id=version_id
-            )
+            version = self.Version.objects.select_related(
+                "created_by", "theme", "page"
+            ).get(id=version_id, page__is_deleted=False)
             return self._version_to_metadata(version)
         except self.Version.DoesNotExist:
             return None
@@ -318,8 +334,8 @@ class PageStructureHelpers:
             List of VersionMetadata ordered by version number (newest first)
         """
         query = (
-            self.Version.objects.filter(page_id=page_id)
-            .select_related("created_by", "theme")
+            self.Version.objects.filter(page_id=page_id, page__is_deleted=False)
+            .select_related("created_by", "theme", "page")
             .order_by("-version_number")
         )
 
@@ -337,7 +353,7 @@ class PageStructureHelpers:
     def get_current_version(self, page_id: int) -> Optional[VersionMetadata]:
         """Get the current published version for a page"""
         try:
-            page = self.Page.objects.get(id=page_id)
+            page = self.Page.objects.get(id=page_id, is_deleted=False)
             version = self._get_current_published_version(page)
             return self._version_to_metadata(version) if version else None
         except self.Page.DoesNotExist:
@@ -357,7 +373,7 @@ class PageStructureHelpers:
             page = (
                 self.Page.objects.select_related("created_by", "last_modified_by")
                 .annotate(version_count=Count("versions"))
-                .get(id=page_id)
+                .get(id=page_id, is_deleted=False)
             )
         except self.Page.DoesNotExist:
             return None
@@ -410,9 +426,9 @@ class PageStructureHelpers:
                     "created_by", "last_modified_by", "parent"
                 )
                 .annotate(
-                    child_count=Count("children"),
+                    child_count=Count("children", filter=Q(children__is_deleted=False)),
                 )
-                .get(id=page_id)
+                .get(id=page_id, is_deleted=False)
             )
         except self.Page.DoesNotExist:
             return None
@@ -483,7 +499,9 @@ class PageStructureHelpers:
         Returns:
             List of matching PageMetadata
         """
-        query = self.Page.objects.select_related("created_by", "last_modified_by")
+        query = self.Page.objects.filter(is_deleted=False).select_related(
+            "created_by", "last_modified_by"
+        )
 
         # Apply filters
         if options.parent_id is not None:
@@ -626,9 +644,11 @@ class PageStructureHelpers:
         children = []
         if max_depth is None or depth < max_depth:
             child_pages = (
-                self.Page.objects.filter(parent=page)
+                self.Page.objects.filter(parent=page, is_deleted=False)
                 .select_related("created_by", "last_modified_by")
-                .annotate(child_count=Count("children"))
+                .annotate(
+                    child_count=Count("children", filter=Q(children__is_deleted=False))
+                )
                 .order_by("sort_order", "id")
             )
 

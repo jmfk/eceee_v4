@@ -411,7 +411,7 @@ class WebPage(models.Model):
 
         # Look for exact hostname match in array field
         pages = cls.objects.filter(
-            parent__isnull=True, hostnames__contains=[normalized_hostname]
+            parent__isnull=True, hostnames__contains=[normalized_hostname], is_deleted=False
         )
 
         if pages.exists():
@@ -419,7 +419,7 @@ class WebPage(models.Model):
 
         # Fallback: look for wildcard or default patterns using array overlap
         wildcard_pages = cls.objects.filter(
-            parent__isnull=True, hostnames__overlap=["*", "default"]
+            parent__isnull=True, hostnames__overlap=["*", "default"], is_deleted=False
         )
 
         if wildcard_pages.exists():
