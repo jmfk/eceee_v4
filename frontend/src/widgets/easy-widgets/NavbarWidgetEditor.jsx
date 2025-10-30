@@ -387,15 +387,26 @@ const NavbarWidgetEditor = ({
                                                 placeholder="URL *"
                                                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
-                                            <label className="flex items-center gap-2 text-xs text-gray-600">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={item.targetBlank || false}
-                                                    onChange={(e) => updateMenuItem(index, 'targetBlank', e.target.checked)}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                Open in new tab
-                                            </label>
+                                            <div className="flex gap-4">
+                                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.isActive !== false}
+                                                        onChange={(e) => updateMenuItem(index, 'isActive', e.target.checked)}
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    />
+                                                    Active
+                                                </label>
+                                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.targetBlank || false}
+                                                        onChange={(e) => updateMenuItem(index, 'targetBlank', e.target.checked)}
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    />
+                                                    Open in new tab
+                                                </label>
+                                            </div>
                                         </div>
                                         <button
                                             type="button"
@@ -470,15 +481,26 @@ const NavbarWidgetEditor = ({
                                                 placeholder="URL *"
                                                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
-                                            <label className="flex items-center gap-2 text-xs text-gray-600">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={item.targetBlank || false}
-                                                    onChange={(e) => updateSecondaryMenuItem(index, 'targetBlank', e.target.checked)}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                Open in new tab
-                                            </label>
+                                            <div className="flex gap-4">
+                                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.isActive !== false}
+                                                        onChange={(e) => updateSecondaryMenuItem(index, 'isActive', e.target.checked)}
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    />
+                                                    Active
+                                                </label>
+                                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.targetBlank || false}
+                                                        onChange={(e) => updateSecondaryMenuItem(index, 'targetBlank', e.target.checked)}
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    />
+                                                    Open in new tab
+                                                </label>
+                                            </div>
                                             <div>
                                                 <label className="block text-xs text-gray-600 mb-1">
                                                     Background Color

@@ -21,6 +21,7 @@ class NavbarItem(BaseModel):
 
     label: str = Field(..., description="Menu item label")
     url: str = Field(..., description="Menu item URL")
+    is_active: bool = Field(True, description="Whether this item is active")
     target_blank: bool = Field(
         False, description="Whether the link opens in a new window"
     )
@@ -37,6 +38,7 @@ class SecondaryMenuItem(BaseModel):
 
     label: str = Field(..., description="Menu item label")
     url: str = Field(..., description="Menu item URL")
+    is_active: bool = Field(True, description="Whether this item is active")
     target_blank: bool = Field(
         False, description="Whether the link opens in a new window"
     )
@@ -198,6 +200,10 @@ class NavbarWidget(BaseWidget):
         filtered_menu_items = self._filter_published_menu_items(
             config.get("menu_items", []), context
         )
+        # Filter out inactive items
+        filtered_menu_items = [
+            item for item in filtered_menu_items if item.get("is_active", True)
+        ]
         # Sort by order field
         filtered_menu_items = sorted(
             filtered_menu_items, key=lambda x: x.get("order", 0)
@@ -208,6 +214,10 @@ class NavbarWidget(BaseWidget):
         filtered_secondary = self._filter_published_menu_items(
             config.get("secondary_menu_items", []), context
         )
+        # Filter out inactive items
+        filtered_secondary = [
+            item for item in filtered_secondary if item.get("is_active", True)
+        ]
         # Sort by order field
         filtered_secondary = sorted(filtered_secondary, key=lambda x: x.get("order", 0))
         template_config["secondary_menu_items"] = filtered_secondary

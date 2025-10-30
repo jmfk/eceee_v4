@@ -32,9 +32,13 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
         hamburgerBreakpoint = 768,
     } = config
 
+    // Filter active items (undefined/null treated as active for backwards compatibility)
+    const activeMenuItems = menuItems.filter(item => item.isActive !== false)
+    const activeSecondaryMenuItems = secondaryMenuItems.filter(item => item.isActive !== false)
+
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [isOverflowMenuOpen, setIsOverflowMenuOpen] = useState(false)
-    const [visibleItems, setVisibleItems] = useState(menuItems)
+    const [visibleItems, setVisibleItems] = useState(activeMenuItems)
     const [overflowItems, setOverflowItems] = useState([])
     const [showHamburger, setShowHamburger] = useState(false)
     const [showSecondaryMenu, setShowSecondaryMenu] = useState(true)
@@ -60,7 +64,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
     useEffect(() => {
         if (showHamburger || mode === 'editor') {
             setVisibleItems(prev => {
-                const newVal = menuItems
+                const newVal = activeMenuItems
                 return JSON.stringify(prev) !== JSON.stringify(newVal) ? newVal : prev
             })
             setOverflowItems(prev => prev.length === 0 ? prev : [])
@@ -68,7 +72,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             return
         }
 
-        if (!menuItems.length) {
+        if (!activeMenuItems.length) {
             setVisibleItems(prev => prev.length === 0 ? prev : [])
             setOverflowItems(prev => prev.length === 0 ? prev : [])
             setShowSecondaryMenu(prev => prev === true ? prev : true)
@@ -85,7 +89,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
 
             // Calculate secondary menu width
             let secondaryMenuWidth = 0
-            if (secondaryMenuItems && secondaryMenuItems.length > 0) {
+            if (activeSecondaryMenuItems && activeSecondaryMenuItems.length > 0) {
                 const SECONDARY_GAP = 4 // 0.25rem = 4px gap between items
                 secondaryItemRefs.current.forEach((ref) => {
                     if (ref) {
@@ -93,8 +97,8 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                     }
                 })
                 // Add gaps between items (n-1 gaps for n items)
-                if (secondaryMenuItems.length > 1) {
-                    secondaryMenuWidth += SECONDARY_GAP * (secondaryMenuItems.length - 1)
+                if (activeSecondaryMenuItems.length > 1) {
+                    secondaryMenuWidth += SECONDARY_GAP * (activeSecondaryMenuItems.length - 1)
                 }
                 secondaryMenuWidth += RIGHT_PADDING // Add right padding
             }
@@ -106,7 +110,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             const visible = []
             const overflow = []
 
-            menuItems.forEach((item, index) => {
+            activeMenuItems.forEach((item, index) => {
                 const itemWidth = itemRefs.current[index]?.offsetWidth || 100
 
                 if (usedWidth + itemWidth + OVERFLOW_BUTTON_WIDTH < availableWidth) {
@@ -129,7 +133,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             // Primary menu needs space, so if it doesn't fit even without secondary menu, hide secondary
             const primaryMenuWidth = usedWidth + (overflow.length > 0 ? OVERFLOW_BUTTON_WIDTH : 0)
             const totalNeededWidth = primaryMenuWidth + secondaryMenuWidth
-            const shouldShowSecondary = secondaryMenuItems.length > 0 && totalNeededWidth <= navWidth
+            const shouldShowSecondary = activeSecondaryMenuItems.length > 0 && totalNeededWidth <= navWidth
 
             // Only update state if values have actually changed
             setVisibleItems(prev => {
@@ -169,7 +173,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             cancelAnimationFrame(rafId)
             observer.disconnect()
         }
-    }, [menuItems, secondaryMenuItems, showHamburger, mode])
+    }, [activeMenuItems, activeSecondaryMenuItems, showHamburger, mode])
 
     // Click outside handler for overflow dropdown
     useEffect(() => {
@@ -289,7 +293,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
     const shouldUseDefaultBg = !imageUrl && !backgroundColor
 
     // Empty state for editor
-    if (mode === 'editor' && (!menuItems || menuItems.length === 0)) {
+    if (mode === 'editor' && (!activeMenuItems || activeMenuItems.length === 0)) {
         return (
             <nav
                 className={`shadow-sm h-[28px] ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
@@ -297,7 +301,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             >
                 <div className="flex items-center h-full pl-[20px]">
                     <span className="text-white text-sm opacity-50">
-                        No menu items added yet
+                        No active menu items
                     </span>
                 </div>
             </nav>
@@ -327,16 +331,16 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                     <div className="absolute top-full left-0 w-64 bg-white shadow-lg z-50 border border-gray-200">
                         <div className="py-2">
                             {/* Primary menu items */}
-                            {menuItems.map((item, index) => (
+                            {activeMenuItems.map((item, index) => (
                                 <div key={index}>
                                     {renderMenuItem(item, index, true)}
                                 </div>
                             ))}
 
                             {/* Secondary menu items */}
-                            {secondaryMenuItems.length > 0 && (
+                            {activeSecondaryMenuItems.length > 0 && (
                                 <div className="border-t border-gray-200 mt-2 pt-2">
-                                    {secondaryMenuItems.map((item, index) => (
+                                    {activeSecondaryMenuItems.map((item, index) => (
                                         <div key={`secondary-${index}`}>
                                             {renderSecondaryMenuItem(item, index, true)}
                                         </div>
@@ -405,7 +409,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                     {/* Hidden items for measuring */}
                     {mode !== 'editor' && (
                         <div className="absolute opacity-0 pointer-events-none flex gap-6">
-                            {menuItems.map((item, index) => (
+                            {activeMenuItems.map((item, index) => (
                                 <span
                                     key={`measure-${index}`}
                                     ref={(el) => {
@@ -423,12 +427,12 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                 </ul>
 
                 {/* Secondary menu (right-aligned) */}
-                {secondaryMenuItems.length > 0 && showSecondaryMenu && (
+                {activeSecondaryMenuItems.length > 0 && showSecondaryMenu && (
                     <ul
                         className="flex gap-1 m-0 p-0 pr-[20px] items-center ml-auto"
                         style={{ listStyle: 'none' }}
                     >
-                        {secondaryMenuItems.map((item, index) => (
+                        {activeSecondaryMenuItems.map((item, index) => (
                             <li key={index}>
                                 {renderSecondaryMenuItem(item, index, false)}
                             </li>
@@ -437,9 +441,9 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                 )}
 
                 {/* Hidden secondary menu items for measuring (always rendered) */}
-                {secondaryMenuItems.length > 0 && (
+                {activeSecondaryMenuItems.length > 0 && (
                     <div className="absolute opacity-0 pointer-events-none flex gap-1 right-[20px]">
-                        {secondaryMenuItems.map((item, index) => {
+                        {activeSecondaryMenuItems.map((item, index) => {
                             const itemBgColor = item.backgroundColor || '#3b82f6'
                             const itemBgImage = getImageUrl(item.backgroundImage)
                             return (
