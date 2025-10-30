@@ -545,6 +545,9 @@ class HostnamePageView(View):
                     # If pattern doesn't match, it's a 404
                     if path_variables is None:
                         raise Http404(f"Path does not match pattern: {remaining_path}")
+                elif remaining_path:
+                    # Page doesn't support path patterns, so extra path is a 404
+                    raise Http404(f"Page not found: {remaining_path}")
 
             # Get the published version
             content = current_page.get_current_published_version()

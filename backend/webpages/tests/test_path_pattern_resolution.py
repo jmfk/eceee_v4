@@ -215,6 +215,32 @@ class PathResolutionTests(TestCase):
         with self.assertRaises(Http404):
             view._resolve_page_with_pattern(self.root_page, ["nonexistent"])
 
+    def test_nonexistent_subpage_without_pattern_raises_404(self):
+        """Test that non-existent sub-pages return 404 when parent has no path_pattern_key"""
+        # Create a page without path_pattern_key
+        about_page = WebPage.objects.create(
+            slug="about",
+            parent=self.root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        
+        # Create published version for about page
+        about_version = about_page.create_version(self.user, "About version")
+        about_version.effective_date = "2024-01-01T00:00:00Z"
+        about_version.save()
+        
+        # Test that accessing /about/missing/ raises 404
+        view = HostnamePageView()
+        request = self.factory.get("/about/missing/", HTTP_HOST="testserver")
+        view.request = request
+        view.kwargs = {"slug_path": "about/missing"}
+        
+        with self.assertRaises(Http404) as context:
+            view.get(request)
+        
+        self.assertIn("Page not found", str(context.exception))
+
 
 class PathVariableSecurityTests(TestCase):
     """Security tests for path variable sanitization"""
