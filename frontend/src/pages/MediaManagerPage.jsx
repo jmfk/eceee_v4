@@ -14,8 +14,12 @@ import { Loader2, FolderOpen } from 'lucide-react';
 import { namespacesApi } from '../api';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import MediaManager from '../components/media/MediaManager';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const MediaManagerPage = () => {
+  // Set document title
+  useDocumentTitle('Media Manager');
+
   const [namespaces, setNamespaces] = useState([]);
   const [selectedNamespace, setSelectedNamespace] = useState(null);
   const [loading, setLoading] = useState(true);

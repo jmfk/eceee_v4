@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import ObjectTypeForm from '../components/ObjectTypeForm'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const ObjectTypeEditorPage = () => {
     const { id, tab = 'basic' } = useParams()
@@ -27,6 +28,9 @@ const ObjectTypeEditorPage = () => {
     })
 
     const objectType = objectTypeResponse?.data
+
+    // Set document title
+    useDocumentTitle(isCreating ? 'New Object Type' : (objectType?.label || 'Object Type'))
 
     // Create object type mutation
     const createMutation = useMutation({

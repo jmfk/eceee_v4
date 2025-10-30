@@ -117,7 +117,6 @@ const AdvancedUIDemo = () => {
     }
 
     const handleSubmit = (data) => {
-        console.log('Advanced UI form submitted:', data)
         alert('Form submitted! Check console for data.')
     }
 

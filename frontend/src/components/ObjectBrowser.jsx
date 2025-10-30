@@ -5,8 +5,12 @@ import { Search, ArrowLeft, Plus, Grid, List, AlertCircle, Image, FolderOpen, Tr
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const ObjectBrowser = () => {
+    // Set document title
+    useDocumentTitle('Objects')
+
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const { typeName } = useParams()

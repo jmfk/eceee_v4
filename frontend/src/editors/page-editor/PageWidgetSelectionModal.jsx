@@ -35,7 +35,6 @@ const PageWidgetSelectionModal = ({
             const data = await widgetsApi.getTypes(true); // Include template JSON
             setAvailableWidgets(data || []);
         } catch (error) {
-            console.error('Failed to fetch available widgets:', error);
             setAvailableWidgets([]);
         } finally {
             setLoading(false);

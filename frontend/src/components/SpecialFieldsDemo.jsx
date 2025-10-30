@@ -109,7 +109,6 @@ const SpecialFieldsDemo = () => {
     }
 
     const handleSubmit = (data) => {
-        console.log('Special fields form submitted:', data)
         alert('Form submitted! Check console for data.')
     }
 

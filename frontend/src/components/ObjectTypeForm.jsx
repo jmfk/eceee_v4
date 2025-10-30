@@ -196,10 +196,6 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             const detection = detectSchemaIssue(formData.schema)
             setNeedsSchemaFix(detection.needsFix)
             setSchemaFixInfo(detection)
-
-            if (detection.needsFix) {
-                console.log('[ObjectTypeForm] Schema needs fixing:', detection)
-            }
         }
     }, [formData.schema])
 
@@ -512,13 +508,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     // Handle fixing schema field type issues
     const handleFixSchema = () => {
         if (!schemaFixInfo || !schemaFixInfo.needsFix) {
-            console.log('[ObjectTypeForm] No schema issues to fix')
             return
         }
-
-        console.log('[ObjectTypeForm] Fixing schema...', {
-            affectedProperties: schemaFixInfo.affectedProperties
-        })
 
         // Convert the schema
         const fixedSchema = fixSchema(formData.schema)
@@ -539,8 +530,6 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             duration: 8000,
             icon: '✅',
         })
-
-        console.log('[ObjectTypeForm] Schema fixed successfully')
     }
 
     const handleSaveSchema = async () => {

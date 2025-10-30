@@ -91,7 +91,6 @@ const ColorInput = ({
                 const result = await eyeDropper.open()
                 handleColorSelect(result.sRGBHex)
             } catch (err) {
-                console.log('EyeDropper was cancelled or failed:', err)
             }
         } else {
             alert('EyeDropper API is not supported in this browser')

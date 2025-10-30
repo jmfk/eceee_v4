@@ -37,6 +37,7 @@ import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import pageTreeUtils from '../utils/pageTreeUtils'
 import DeletedPagesView from './DeletedPagesView'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 // Search helper function - excludes root pages
 const searchAllPages = async (searchTerm, filters = {}) => {
@@ -66,6 +67,9 @@ const useDebounce = (value, delay) => {
 
 const TreePageManager = () => {
     const navigate = useNavigate()
+    
+    // Set document title
+    useDocumentTitle('Pages')
 
     // State management
     const pagesRef = useRef([])

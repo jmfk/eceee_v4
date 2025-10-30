@@ -99,7 +99,6 @@ export function detectSchemaIssue(schema) {
  */
 export function fixSchema(schema) {
     if (!schema || !schema.properties) {
-        console.warn('[SchemaFixer] Invalid schema provided to fixSchema')
         return schema
     }
 
@@ -113,8 +112,6 @@ export function fixSchema(schema) {
 
         if (componentValue && COMPONENT_TO_KEY_MAP[componentValue]) {
             const correctKey = COMPONENT_TO_KEY_MAP[componentValue]
-
-            console.log(`[SchemaFixer] Converting property "${key}": "${componentValue}" → "${correctKey}"`)
 
             // Remove the old 'component' field if it exists (to avoid backend validation errors)
             if (property.component) {

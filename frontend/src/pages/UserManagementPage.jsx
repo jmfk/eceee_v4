@@ -3,8 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { getUserList, generatePasswordReset, createUser, updateUser, deleteUser } from '../api/users';
 import { Users, Shield, Mail, Calendar, Key, Copy, X, CheckCircle, UserPlus, AlertCircle, Trash2, Edit } from 'lucide-react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const UserManagementPage = () => {
+    // Set document title
+    useDocumentTitle('User Management');
+
     const { user } = useAuth();
     const { addNotification } = useGlobalNotifications();
 

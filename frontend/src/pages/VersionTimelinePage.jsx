@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink, E
 import { getPageVersionsList, scheduleVersion, publishVersionNow, updateVersion, packVersionsAggressive, packVersionsDrafts } from '../api/versions.js';
 import { getPage, getPageActiveVersion } from '../api/pages.js';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 /**
  * VersionTimelinePage - Dedicated page for version management and publishing
@@ -43,6 +44,9 @@ const VersionTimelinePage = () => {
     });
     const [pageTitle, setPageTitle] = useState('');
     const [pageData, setPageData] = useState(null);
+
+    // Set document title
+    useDocumentTitle(pageTitle ? `${pageTitle} - Versions` : 'Versions')
 
     // Inline editing state
     const [editingVersionId, setEditingVersionId] = useState(null);

@@ -14,6 +14,7 @@ import { X } from 'lucide-react'
 // import './utils/rerenderInvestigation' // Initialize render investigation - DISABLED
 import Navbar from '@components/Navbar'
 import GlobalWysiwygToolbar from '@components/wysiwyg/GlobalWysiwygToolbar'
+import { useAutoPageTitle } from './hooks/useDocumentTitle'
 
 import SettingsManager from '@pages/SettingsManager'
 import SystemSchemaPage from '@pages/SystemSchemaPage'
@@ -53,15 +54,11 @@ const queryClient = new QueryClient({
   },
 })
 
-function App() {
+const AppRoutes = () => {
+  useAutoPageTitle()
+  
   return (
-    <QueryClientProvider client={queryClient}>
-      <NotificationProvider>
-        <GlobalNotificationProvider>
-          <UnifiedDataProvider enableDevTools={true}>
-            <AuthProvider>
-              <SessionExpiredOverlay />
-              <Router>
+    <>
                 <Routes>
                   {/* Login route - no authentication required */}
                   <Route path="/login" element={<LoginPage />} />
@@ -518,6 +515,20 @@ function App() {
                     </div>
                   )}
                 </Toaster>
+    </>
+  )
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <NotificationProvider>
+        <GlobalNotificationProvider>
+          <UnifiedDataProvider enableDevTools={true}>
+            <AuthProvider>
+              <SessionExpiredOverlay />
+              <Router>
+                <AppRoutes />
               </Router>
             </AuthProvider>
           </UnifiedDataProvider>

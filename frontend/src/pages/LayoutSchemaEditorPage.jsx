@@ -4,9 +4,14 @@ import { validateFieldName } from '../utils/schemaValidation'
 import SettingsTabs from '../components/SettingsTabs'
 import LayoutSchemaManager from '../components/LayoutSchemaManager'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const LayoutSchemaEditorPage = () => {
     const { layoutName } = useParams()
+    
+    // Set document title
+    useDocumentTitle(layoutName ? `${layoutName} Schema` : 'Layout Schema')
+    
     const isValidLayout = typeof layoutName === 'string' && /^[a-zA-Z0-9_-]+$/.test(layoutName)
 
     if (!isValidLayout) {

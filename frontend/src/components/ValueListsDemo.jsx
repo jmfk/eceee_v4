@@ -47,7 +47,6 @@ const ValueListsDemo = () => {
     }
 
     const handleSubmit = (data) => {
-        console.log('Value lists form submitted:', data)
         alert('Form submitted! Check console for data.')
     }
 

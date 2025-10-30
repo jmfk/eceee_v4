@@ -45,6 +45,7 @@ import ObjectTypeManager from '../components/ObjectTypeManager'
 import WidgetManager from '../components/WidgetManager'
 import ValueListEditor from '../components/ValueListEditor'
 import { extractErrorMessage } from '../utils/errorHandling.js'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
 const SettingsManager = () => {
@@ -66,6 +67,19 @@ const SettingsManager = () => {
     }
 
     const activeTab = getActiveTabFromPath()
+
+    // Set document title based on active tab
+    const tabTitles = {
+        'layouts': 'Settings - Layouts',
+        'themes': 'Settings - Themes',
+        'widgets': 'Settings - Widgets',
+        'value-lists': 'Settings - Value Lists',
+        'object-types': 'Settings - Object Types',
+        'versions': 'Settings - Versions',
+        'publishing': 'Settings - Publishing',
+        'namespaces': 'Settings - Namespaces'
+    }
+    useDocumentTitle(tabTitles[activeTab] || 'Settings')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [showVersionManager, setShowVersionManager] = useState(false)

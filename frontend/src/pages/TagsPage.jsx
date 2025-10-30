@@ -1,8 +1,11 @@
 import React from 'react'
 import { Hash } from 'lucide-react'
 import TagManager from '../components/TagManager'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const TagsPage = () => {
+    // Set document title
+    useDocumentTitle('Tags')
     return (
         <div className="container mx-auto px-4 py-8">
             <div className="mb-6">

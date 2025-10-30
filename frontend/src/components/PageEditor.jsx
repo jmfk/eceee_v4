@@ -52,6 +52,7 @@ import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
 import GlobalWysiwygToolbar from './wysiwyg/GlobalWysiwygToolbar'
 import GlobalTableToolbar from './table-toolbar/GlobalTableToolbar'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 import { logValidationSync } from '../utils/stateVerification'
 import { buildPathVariablesContext, getDefaultSimulatedPath } from '../utils/pathParser'
@@ -202,6 +203,20 @@ const PageEditor = () => {
     const [pageVersionData, setPageVersionData] = useState(null)
     const [originalWebpageData, setOriginalWebpageData] = useState(null) // Track original for smart saving
     const [originalPageVersionData, setOriginalPageVersionData] = useState(null) // Track original for smart saving
+
+    // Set document title based on page and tab
+    const tabNames = {
+        'content': 'Content',
+        'settings': 'Settings',
+        'metadata': 'Metadata',
+        'preview': 'Preview',
+        'publishing': 'Publishing'
+    }
+    const pageTitle = isNewPage 
+        ? 'New Page' 
+        : (webpageData?.title || 'Loading...')
+    const tabName = tabNames[activeTab] || activeTab
+    useDocumentTitle(`${pageTitle} - ${tabName}`)
 
     // Local widget state for fast UI operations
     const [localWidgets, setLocalWidgets] = useState({})

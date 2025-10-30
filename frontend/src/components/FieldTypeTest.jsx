@@ -27,7 +27,6 @@ const FieldTypeTest = () => {
                 setFieldTypes(types)
                 setError(null)
             } catch (err) {
-                console.error('Failed to load field types:', err)
                 setError(err.message)
             } finally {
                 setLoading(false)
@@ -144,7 +143,6 @@ const FieldTypeTest = () => {
     }
 
     const handleFormSubmit = (data) => {
-        console.log('Form submitted:', data)
         alert('Form submitted! Check console for data.')
     }
 

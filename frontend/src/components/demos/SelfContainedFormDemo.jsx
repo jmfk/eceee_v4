@@ -65,8 +65,6 @@ const SelfContainedFormDemo = () => {
 
     // Handle real-time updates from the form
     const handleRealTimeUpdate = (updatedWidget) => {
-        console.log('Real-time update received:', updatedWidget)
-
         // Update the widget state
         setWidgetStates(prev => ({
             ...prev,
@@ -86,12 +84,10 @@ const SelfContainedFormDemo = () => {
 
     // Handle unsaved changes notification
     const handleUnsavedChanges = (hasChanges) => {
-        console.log('Unsaved changes:', hasChanges)
     }
 
     // Handle save
     const handleSave = (savedWidget) => {
-        console.log('Widget saved:', savedWidget)
         setWidgetStates(prev => ({
             ...prev,
             [selectedWidget]: savedWidget

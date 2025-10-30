@@ -3,8 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { changePassword } from '../api/users';
 import { Lock, User, Mail, Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const ProfilePage = () => {
+    // Set document title
+    useDocumentTitle('Profile');
+
     const { user } = useAuth();
     const { addNotification } = useGlobalNotifications();
 

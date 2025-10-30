@@ -10,6 +10,7 @@ import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataCont
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import StatusBar from '../components/StatusBar'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 // Import individual tab components
 import ObjectContentView from '../components/objectEdit/ObjectContentView'
@@ -153,6 +154,12 @@ const ObjectInstanceEditPage = () => {
 
     const objectType = objectTypeResponse?.data
     const instance = instanceResponse?.data
+
+    // Set document title
+    const documentTitle = isNewInstance 
+        ? `New ${objectType?.label || 'Object'}` 
+        : (instance?.title || 'Loading...')
+    useDocumentTitle(documentTitle)
 
     // Show modal for new instances
     useEffect(() => {

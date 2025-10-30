@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Lock, AlertCircle } from 'lucide-react';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 /**
  * LoginPage - Authentication interface for the application
@@ -14,6 +15,9 @@ import { useAuth } from '../contexts/AuthContext';
  * - Error handling and validation
  */
 const LoginPage = () => {
+    // Set document title
+    useDocumentTitle('Login');
+
     const navigate = useNavigate();
     const location = useLocation();
     const { addNotification } = useGlobalNotifications();

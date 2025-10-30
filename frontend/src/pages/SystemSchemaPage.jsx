@@ -2,8 +2,11 @@ import React from 'react'
 import SettingsTabs from '../components/SettingsTabs'
 import SystemSchemaManager from '../components/SystemSchemaManager'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const SystemSchemaPage = () => {
+    // Set document title
+    useDocumentTitle('System Schema')
     return (
         <div className="container mx-auto px-4 py-8 space-y-6">
             <SettingsTabs />

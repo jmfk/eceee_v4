@@ -58,11 +58,6 @@ export default function SchemaEditor({
   // that are stable across renders, so we don't need them in dependencies
   useEffect(() => {
     if (!isLoading && !initError) {
-      console.log('[SchemaEditor] Schema prop changed, updating properties', {
-        schema,
-        isLoading,
-        initError
-      })
       const internalProperties = convertSchemaToProperties(schema)
       setProperties(internalProperties)
       validateProperties(internalProperties)
@@ -141,8 +136,6 @@ export default function SchemaEditor({
    * to prevent data loss during editing. Validation errors will prevent saving.
    */
   const convertPropertiesToSchema = useCallback((propertiesList) => {
-    console.log('[SchemaEditor] convertPropertiesToSchema called with', propertiesList.length, 'properties')
-
     const newSchema = {
       type: 'object',
       properties: {},
@@ -153,21 +146,12 @@ export default function SchemaEditor({
     propertiesList.forEach((prop, index) => {
       const { key, required, _id, ...schemaProp } = prop
 
-      console.log(`[SchemaEditor] Processing property ${index}:`, {
-        key,
-        required,
-        hasType: !!schemaProp.type,
-        hasComponentType: !!schemaProp.componentType,
-        componentType: schemaProp.componentType
-      })
-
       // Preserve all properties with keys, even invalid ones
       // This prevents fields from being deleted when editing
       if (key) {
         // Ensure the property has a 'type' field (required by backend validation)
         if (!schemaProp.type && schemaProp.componentType) {
           schemaProp.type = getJsonSchemaType(schemaProp.componentType, schemaProp.multiple)
-          console.log(`[SchemaEditor] Added type '${schemaProp.type}' for ${key}`)
         }
 
         // Backend expects 'field_type' not 'componentType'
@@ -175,7 +159,6 @@ export default function SchemaEditor({
         if (schemaProp.componentType) {
           schemaProp.field_type = schemaProp.componentType
           // DON'T delete componentType - we need it for the UI
-          console.log(`[SchemaEditor] Set field_type from componentType for ${key}`)
         }
 
         // Add to properties object
@@ -186,18 +169,7 @@ export default function SchemaEditor({
         if (required) {
           newSchema.required.push(key)
         }
-
-        console.log(`[SchemaEditor] Added property '${key}' to schema. Required: ${required}`)
-      } else {
-        console.warn(`[SchemaEditor] Skipping property at index ${index} - no key`)
       }
-    })
-
-    console.log('[SchemaEditor] Final schema:', {
-      propertyCount: Object.keys(newSchema.properties).length,
-      propertyKeys: Object.keys(newSchema.properties),
-      required: newSchema.required,
-      propertyOrder: newSchema.propertyOrder
     })
 
     return newSchema
@@ -263,11 +235,6 @@ export default function SchemaEditor({
    * Handle properties change and update schema
    */
   const handlePropertiesChange = useCallback((newProperties) => {
-    console.log('[SchemaEditor] handlePropertiesChange called', {
-      newProperties,
-      propertiesCount: newProperties.length
-    })
-
     setProperties(newProperties)
 
     // Validate properties
@@ -275,11 +242,6 @@ export default function SchemaEditor({
 
     // Convert to schema format and notify parent
     const newSchema = convertPropertiesToSchema(newProperties)
-    console.log('[SchemaEditor] Calling onChange with new schema', {
-      newSchema,
-      isValid,
-      note: 'Always calling onChange to keep parent in sync'
-    })
     onChange(newSchema)
   }, [onChange, validateProperties, convertPropertiesToSchema])
 

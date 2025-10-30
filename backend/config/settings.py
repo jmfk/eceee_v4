@@ -526,6 +526,9 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     X_FRAME_OPTIONS = "DENY"
+else:
+    # Disable COOP header in development to avoid warnings on non-HTTPS origins
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 # Celery Configuration (for background tasks)
 CELERY_BROKER_URL = config("REDIS_URL", default="redis://redis:6379/0")

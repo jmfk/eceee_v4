@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Home, ArrowLeft } from 'lucide-react'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const NotFoundPage = () => {
+  // Set document title
+  useDocumentTitle('Page Not Found')
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="text-center space-y-6">

@@ -2,6 +2,16 @@
 {% extends "easy_layouts/base.html" %}
 {% load webpages_tags %}
 
+{% block page_title %}{% if meta_title %}{{ meta_title }}{% else %}{{ current_page.title }}{% endif %}{% if root_page %} - {{ root_page.title }}{% endif %}{% endblock %}
+
+{% block meta_tags %}
+  {% render_page_seo page=current_page version=content page_data=page_data %}
+{% endblock %}
+
+{% block icon_tags %}
+  {% render_site_icons root_page=root_page %}
+{% endblock %}
+
 {% block content %}
 <div class="min-h-screen bg-white">
   <div class="max-w-6xl mx-auto px-4 py-8">
