@@ -115,7 +115,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "updated_at",
             "created_by",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "created_by", "image"]
+        read_only_fields = ["id", "created_at", "updated_at", "created_by"]
 
     def validate_fonts(self, value):
         """Validate fonts configuration"""

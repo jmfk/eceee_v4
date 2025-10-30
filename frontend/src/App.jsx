@@ -201,36 +201,6 @@ const AppRoutes = () => {
                       </div>
                     </PrivateRoute>
                   } />
-                  <Route path="/settings/themes/new" element={
-                    <PrivateRoute>
-                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                        <Navbar />
-                        <main className="flex-1 overflow-hidden">
-                          <div className="h-full overflow-y-auto">
-                            <div className="container mx-auto px-4 py-8">
-                              <SettingsManager />
-                            </div>
-                          </div>
-                        </main>
-                        <StatusBar customStatusContent={<span>Settings - Themes (New)</span>} />
-                      </div>
-                    </PrivateRoute>
-                  } />
-                  <Route path="/settings/themes/new/:tab" element={
-                    <PrivateRoute>
-                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                        <Navbar />
-                        <main className="flex-1 overflow-hidden">
-                          <div className="h-full overflow-y-auto">
-                            <div className="container mx-auto px-4 py-8">
-                              <SettingsManager />
-                            </div>
-                          </div>
-                        </main>
-                        <StatusBar customStatusContent={<span>Settings - Themes (New)</span>} />
-                      </div>
-                    </PrivateRoute>
-                  } />
                   <Route path="/settings/themes/:themeId" element={
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
@@ -242,7 +212,7 @@ const AppRoutes = () => {
                             </div>
                           </div>
                         </main>
-                        <StatusBar customStatusContent={<span>Settings - Themes (Edit)</span>} />
+                        <StatusBar customStatusContent={<span>Settings - Themes</span>} />
                       </div>
                     </PrivateRoute>
                   } />
@@ -257,7 +227,7 @@ const AppRoutes = () => {
                             </div>
                           </div>
                         </main>
-                        <StatusBar customStatusContent={<span>Settings - Themes (Edit)</span>} />
+                        <StatusBar customStatusContent={<span>Settings - Themes</span>} />
                       </div>
                     </PrivateRoute>
                   } />
