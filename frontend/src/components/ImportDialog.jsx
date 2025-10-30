@@ -61,6 +61,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     const [aiAvailable, setAiAvailable] = useState(true);
     const [mediaMetadataList, setMediaMetadataList] = useState([]); // AI-generated metadata for images and files
     const [mediaTagReviews, setMediaTagReviews] = useState({}); // Per-media tag approval state
+    const [mediaSkipSelections, setMediaSkipSelections] = useState({}); // Per-media skip/include state
     const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
     const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0, type: '', itemName: '', resolution: '' });
     const [skipAnalysis, setSkipAnalysis] = useState(false);
@@ -95,6 +96,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
             setUploadedMediaMapping([]);
             setMediaMetadataList([]);
             setMediaTagReviews({});
+            setMediaSkipSelections({});
             setAiAvailable(true);
             setShowAnalysisDialog(false);
             setAnalysisProgress({ current: 0, total: 0, type: '', itemName: '', resolution: '' });
@@ -133,9 +135,10 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
         if (selectedElement && currentStep >= STEPS.METADATA_CONFIRM && currentStep < STEPS.MEDIA_TAG_REVIEW) {
             // If we have a new selectedElement but we're before the MEDIA_TAG_REVIEW step,
             // clear any stale media metadata
-            if (mediaMetadataList.length > 0) {
+                if (mediaMetadataList.length > 0) {
                 setMediaMetadataList([]);
                 setMediaTagReviews({});
+                setMediaSkipSelections({});
                 setMediaUploadStatus([]);
                 setMediaUploadComplete(false);
             }
@@ -547,6 +550,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         alt: img.alt || '',
                         text: img.alt || filename || `Image ${idx + 1}`,
                         context: '',
+                        namespace: 'default',
                     });
 
                     // Update progress with detected resolution
@@ -569,6 +573,11 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         aiTags: metadata.tags || [],
                         aiGenerated: metadata.ai_generated !== false,
                         resolution: metadata.resolution || { multiplier: '1x', source: 'original', dimensions: null },
+                        skip: metadata.alreadyImported === true,
+                        alreadyImported: metadata.alreadyImported === true,
+                        existingFileId: metadata.existingFileId || null,
+                        existingFileTitle: metadata.existingFileTitle || null,
+                        fileHash: metadata.fileHash || null,
                     });
                 } catch (err) {
                     // Fallback to 1x resolution on error
@@ -584,6 +593,11 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         aiTags: [],
                         aiGenerated: false,
                         resolution: { multiplier: '1x', source: 'original', dimensions: null },
+                        skip: false,
+                        alreadyImported: false,
+                        existingFileId: null,
+                        existingFileTitle: null,
+                        fileHash: null,
                     });
                 }
             }
@@ -618,6 +632,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         filepath: filepath,
                         text: linkText || filename,
                         context: '',
+                        namespace: 'default',
                     });
 
                     fileMetadata.push({
@@ -630,6 +645,11 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: metadata.description || '',
                         aiTags: metadata.tags || [],
                         aiGenerated: metadata.ai_generated !== false,
+                        skip: metadata.alreadyImported === true,
+                        alreadyImported: metadata.alreadyImported === true,
+                        existingFileId: metadata.existingFileId || null,
+                        existingFileTitle: metadata.existingFileTitle || null,
+                        fileHash: metadata.fileHash || null,
                     });
                 } catch (err) {
                     fileMetadata.push({
@@ -642,6 +662,11 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         description: '',
                         aiTags: [],
                         aiGenerated: false,
+                        skip: false,
+                        alreadyImported: false,
+                        existingFileId: null,
+                        existingFileTitle: null,
+                        fileHash: null,
                     });
                 }
             }
@@ -718,8 +743,14 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
     const handleMediaUpload = async () => {
         // Use pre-generated metadata from media tag review
-        // Map mediaMetadataList to the format expected by upload UI
-        const allMedia = mediaMetadataList.map((mediaMeta) => {
+        // Filter out skipped items
+        const mediaToUpload = mediaMetadataList.filter((mediaMeta) => {
+            // Skip if user deselected this item
+            return mediaSkipSelections[mediaMeta.index] !== true;
+        });
+
+        // Map to format expected by upload UI
+        const allMedia = mediaToUpload.map((mediaMeta) => {
             if (mediaMeta.type === 'image') {
                 return {
                     id: `img_${mediaMeta.index}`,
@@ -734,6 +765,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     alt: mediaMeta.alt || '',
                     title: mediaMeta.title,
                     description: mediaMeta.description,
+                    alreadyImported: mediaMeta.alreadyImported,
+                    existingFileId: mediaMeta.existingFileId,
                 };
             } else {
                 // file
@@ -748,6 +781,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                     url: mediaMeta.url,
                     title: mediaMeta.title,
                     description: mediaMeta.description,
+                    alreadyImported: mediaMeta.alreadyImported,
+                    existingFileId: mediaMeta.existingFileId,
                 };
             }
         });
@@ -819,12 +854,19 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 ));
 
                 // Step 2/3: Upload file to media manager with pre-approved tags
-                const uploadResult = await uploadMediaFile({
+                const uploadData = {
                     type: item.type,
                     url: item.src || item.url,
                     namespace: 'default',
                     metadata: metadata,
-                });
+                };
+
+                // If file is already imported and user selected it, pass existingFileId to reuse
+                if (item.existingFileId) {
+                    uploadData.existingFileId = item.existingFileId;
+                }
+
+                const uploadResult = await uploadMediaFile(uploadData);
 
                 // Step 3/3: Approve pending upload
                 setMediaUploadStatus(prev => prev.map(m =>
@@ -1137,6 +1179,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                 mediaItems={mediaMetadataList}
                                 pageTags={confirmedTags}
                                 onTagReviewsChange={setMediaTagReviews}
+                                onSkipSelectionsChange={setMediaSkipSelections}
                             />
                         )}
 

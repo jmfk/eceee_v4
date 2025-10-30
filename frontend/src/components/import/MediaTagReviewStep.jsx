@@ -16,6 +16,7 @@ const MediaTagReviewStep = ({
     mediaItems,
     pageTags,
     onTagReviewsChange,
+    onSkipSelectionsChange,
 }) => {
     const [mediaReviews, setMediaReviews] = useState(() => {
         // Initialize with all AI tags approved (green)
@@ -30,12 +31,35 @@ const MediaTagReviewStep = ({
         return initial;
     });
 
+    const [skipSelections, setSkipSelections] = useState(() => {
+        // Initialize skip state: true for already imported, false for new files
+        const initial = {};
+        mediaItems.forEach((item, idx) => {
+            initial[idx] = item.skip === true || item.alreadyImported === true;
+        });
+        return initial;
+    });
+
     // Sync changes to parent whenever mediaReviews changes
     useEffect(() => {
         if (onTagReviewsChange) {
             onTagReviewsChange(mediaReviews);
         }
     }, [mediaReviews, onTagReviewsChange]);
+
+    // Sync skip selections to parent
+    useEffect(() => {
+        if (onSkipSelectionsChange) {
+            onSkipSelectionsChange(skipSelections);
+        }
+    }, [skipSelections, onSkipSelectionsChange]);
+
+    const handleToggleSkip = (mediaIndex) => {
+        setSkipSelections(prev => ({
+            ...prev,
+            [mediaIndex]: !prev[mediaIndex]
+        }));
+    };
 
     const handleToggleTag = (mediaIndex, tagName) => {
         setMediaReviews(prev => {
@@ -264,10 +288,22 @@ const MediaTagReviewStep = ({
                     const aiTags = item.aiTags || [];
                     const isFile = item.type === 'file';
                     const extension = isFile ? getFileExtension(item) : '';
+                    const isSkipped = skipSelections[idx] === true;
+                    const isAlreadyImported = item.alreadyImported === true;
 
                     return (
-                        <div key={idx} className="border border-gray-300 rounded-lg p-4 bg-white">
+                        <div key={idx} className={`border rounded-lg p-4 ${isSkipped ? 'bg-gray-50 border-gray-300 opacity-60' : 'bg-white border-gray-300'}`}>
                             <div className="flex gap-4">
+                                {/* Checkbox to select/deselect for upload */}
+                                <div className="flex-shrink-0 flex items-start pt-1">
+                                    <input
+                                        type="checkbox"
+                                        checked={!isSkipped}
+                                        onChange={() => handleToggleSkip(idx)}
+                                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                        title={isSkipped ? 'Click to include in upload' : 'Click to skip upload'}
+                                    />
+                                </div>
                                 {/* Media Thumbnail/Icon */}
                                 <div className="flex-shrink-0">
                                     <div className="relative w-24 h-24 bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
@@ -335,9 +371,16 @@ const MediaTagReviewStep = ({
                                 <div className="flex-1 space-y-3">
                                     {/* Media Title/Name */}
                                     <div>
-                                        <p className="font-medium text-gray-900 text-sm">
-                                            {item.title || item.alt || item.filename || item.linkText || `${isFile ? 'File' : 'Image'} ${idx + 1}`}
-                                        </p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <p className="font-medium text-gray-900 text-sm">
+                                                {item.title || item.alt || item.filename || item.linkText || `${isFile ? 'File' : 'Image'} ${idx + 1}`}
+                                            </p>
+                                            {isAlreadyImported && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                                                    Already Imported
+                                                </span>
+                                            )}
+                                        </div>
                                         {item.description && (
                                             <p className="text-xs text-gray-600 mt-1">
                                                 {item.description}

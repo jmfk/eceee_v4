@@ -1,12 +1,15 @@
 """Media processing views for content import."""
 
+import hashlib
 import logging
+import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
 from content.models import Namespace
+from file_manager.models import MediaFile
 from ..services.openai_service import OpenAIService
 from ..services.media_downloader import MediaDownloader
 from ..utils.image_resolution import find_highest_resolution
@@ -31,7 +34,8 @@ class GenerateMediaMetadataView(APIView):
             "alt": "Image description",
             "context": "Surrounding text...",
             "parent_classes": "img-center full-width",
-            "parent_html": "<div>...</div>"
+            "parent_html": "<div>...</div>",
+            "namespace": "default"
         }
 
         Returns:
@@ -44,16 +48,58 @@ class GenerateMediaMetadataView(APIView):
                 "size": "medium",
                 "caption": "",
                 "display": "block"
-            }
+            },
+            "alreadyImported": false,
+            "existingFileId": null,
+            "existingFileTitle": null,
+            "fileHash": "sha256hash"
         }
         """
         media_type = request.data.get("type")
+        media_url = request.data.get("url") or request.data.get("src")
+        namespace_slug = request.data.get("namespace", "default")
 
         if media_type not in ["image", "file"]:
             return Response(
                 {"error": "Type must be 'image' or 'file'"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if not media_url:
+            return Response(
+                {"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get namespace
+        try:
+            if namespace_slug == "default":
+                namespace = Namespace.get_default()
+            else:
+                namespace = Namespace.objects.get(slug=namespace_slug)
+        except Namespace.DoesNotExist:
+            return Response(
+                {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Download file and compute hash to check for duplicates
+        file_hash = None
+        existing_file = None
+        try:
+            response = requests.get(media_url, timeout=30)
+            response.raise_for_status()
+            content = response.content
+
+            # Compute SHA-256 hash
+            file_hash = hashlib.sha256(content).hexdigest()
+
+            # Check if file already exists in this namespace
+            existing_file = MediaFile.objects.filter(
+                file_hash=file_hash, namespace=namespace, is_deleted=False
+            ).first()
+
+        except Exception as e:
+            logger.warning(f"Failed to download file for hash check: {e}")
+            # Continue without hash check - file will be processed normally
 
         try:
             openai_service = OpenAIService(user=request.user)
@@ -66,6 +112,14 @@ class GenerateMediaMetadataView(APIView):
                         "tags": ["imported"],
                         "layout": None,
                         "ai_generated": False,
+                        "alreadyImported": existing_file is not None,
+                        "existingFileId": (
+                            str(existing_file.id) if existing_file else None
+                        ),
+                        "existingFileTitle": (
+                            existing_file.title if existing_file else None
+                        ),
+                        "fileHash": file_hash,
                     }
                 )
 
@@ -129,6 +183,14 @@ class GenerateMediaMetadataView(APIView):
                     metadata["layout"] = layout
                     metadata["resolution"] = resolution_info
                     metadata["ai_generated"] = True
+                    metadata["alreadyImported"] = existing_file is not None
+                    metadata["existingFileId"] = (
+                        str(existing_file.id) if existing_file else None
+                    )
+                    metadata["existingFileTitle"] = (
+                        existing_file.title if existing_file else None
+                    )
+                    metadata["fileHash"] = file_hash
                     return Response(metadata)
 
             else:  # file
@@ -140,6 +202,14 @@ class GenerateMediaMetadataView(APIView):
 
                 if metadata:
                     metadata["ai_generated"] = True
+                    metadata["alreadyImported"] = existing_file is not None
+                    metadata["existingFileId"] = (
+                        str(existing_file.id) if existing_file else None
+                    )
+                    metadata["existingFileTitle"] = (
+                        existing_file.title if existing_file else None
+                    )
+                    metadata["fileHash"] = file_hash
                     return Response(metadata)
 
             # Fallback if AI generation fails - use provided text
@@ -153,10 +223,14 @@ class GenerateMediaMetadataView(APIView):
             return Response(
                 {
                     "title": fallback_title,
-                    "description": f"Imported from {request.data.get('url', 'external source')[:100]}",
+                    "description": f"Imported from {media_url[:100]}",
                     "tags": ["imported"],
                     "layout": None,
                     "ai_generated": False,
+                    "alreadyImported": existing_file is not None,
+                    "existingFileId": str(existing_file.id) if existing_file else None,
+                    "existingFileTitle": existing_file.title if existing_file else None,
+                    "fileHash": file_hash,
                 }
             )
 
@@ -181,6 +255,7 @@ class UploadMediaFileView(APIView):
             "type": "image",  // or "file"
             "url": "https://example.com/image.jpg",
             "namespace": "default",
+            "existingFileId": "uuid",  // Optional: if file already exists
             "metadata": {
                 "title": "Generated title",
                 "description": "Description",
@@ -195,7 +270,7 @@ class UploadMediaFileView(APIView):
             "title": "Title",
             "url": "media-manager-url",
             "file_hash": "sha256hash",
-            "was_reused": false,
+            "was_reused": true/false,
             "tags": ["tag1", "tag2"]
         }
         """
@@ -203,6 +278,7 @@ class UploadMediaFileView(APIView):
         url = request.data.get("url")
         namespace_slug = request.data.get("namespace", "default")
         metadata = request.data.get("metadata", {})
+        existing_file_id = request.data.get("existingFileId")
 
         if not url:
             return Response(
@@ -219,6 +295,47 @@ class UploadMediaFileView(APIView):
             return Response(
                 {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        # If existingFileId is provided, reuse the existing file and update tags
+        if existing_file_id:
+            try:
+                existing_file = MediaFile.objects.get(
+                    id=existing_file_id, namespace=namespace, is_deleted=False
+                )
+
+                # Update tags by merging with existing tags
+                new_tags = metadata.get("tags", [])
+                if new_tags:
+                    from content.models import Tag
+
+                    for tag_name in new_tags:
+                        tag, _ = Tag.objects.get_or_create(
+                            name=tag_name, namespace=namespace
+                        )
+                        if tag not in existing_file.tags.all():
+                            existing_file.tags.add(tag)
+                            tag.usage_count += 1
+                            tag.save()
+
+                tags = [tag.name for tag in existing_file.tags.all()[:10]]
+
+                return Response(
+                    {
+                        "id": str(existing_file.id),
+                        "title": existing_file.title,
+                        "url": existing_file.file_url,
+                        "file_hash": existing_file.file_hash,
+                        "was_reused": True,
+                        "tags": tags,
+                        "description": existing_file.description,
+                    }
+                )
+
+            except MediaFile.DoesNotExist:
+                return Response(
+                    {"error": "Existing file not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
         try:
             # Pass metadata with pre-approved tags to MediaDownloader
