@@ -263,8 +263,8 @@ class ContentWidget(BaseWidget):
                         {
                             "id": str(file.id),
                             "url": (
-                                file.get_imgproxy_url()
-                                if hasattr(file, "get_imgproxy_url")
+                                file.get_file_url()
+                                if hasattr(file, "get_file_url")
                                 else file.file_url
                             ),
                             "alt_text": title or file.title or "",
@@ -281,8 +281,8 @@ class ContentWidget(BaseWidget):
                     {
                         "id": str(media_file.id),
                         "url": (
-                            media_file.get_imgproxy_url()
-                            if hasattr(media_file, "get_imgproxy_url")
+                            media_file.get_file_url()
+                            if hasattr(media_file, "get_file_url")
                             else media_file.file_url
                         ),
                         "alt_text": title or media_file.title or "",
