@@ -130,6 +130,15 @@ const ThemeSelector = ({
                             </div>
                         )}
                     </div>
+                    {selectedThemeId && (
+                        <button
+                            onClick={() => handleThemeSelect(null)}
+                            className="text-sm text-blue-700 hover:text-blue-900 font-medium"
+                        >
+                            Clear Override
+                        </button>
+                    )}
+
                 </div>
             </div>
 
@@ -143,26 +152,10 @@ const ThemeSelector = ({
                                 Theme inherited from <span className="font-medium">{themeInheritanceInfo.inheritedFrom.pageTitle}</span>
                             </span>
                         </div>
-                        {!selectedThemeId && (
-                            <button
-                                onClick={() => handleThemeSelect(effectiveThemeId)}
-                                className="text-sm text-blue-700 hover:text-blue-900 font-medium"
-                            >
-                                Select Inherited Theme
-                            </button>
-                        )}
-                        {selectedThemeId && (
-                            <button
-                                onClick={() => handleThemeSelect(null)}
-                                className="text-sm text-blue-700 hover:text-blue-900 font-medium"
-                            >
-                                Clear Override
-                            </button>
-                        )}
+
                     </div>
                 </div>
             )}
-
             {/* Content */}
             <div className="flex-1 overflow-auto">
                 {isLoading ? (
