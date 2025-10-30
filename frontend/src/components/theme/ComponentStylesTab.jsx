@@ -272,7 +272,7 @@ const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, temp
             {/* Template - Uncontrolled with ref */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                    HTML Template
+                    Mustache Template
                     <span className="ml-2 text-xs text-gray-500">
                         Use <code className="px-1 py-0.5 bg-gray-100 rounded">{'{{content}}'}</code> for content placeholder
                     </span>
