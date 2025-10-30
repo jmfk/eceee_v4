@@ -1,5 +1,5 @@
 /**
- * Unified API Client for ECEEE v4 Frontend
+ * Unified API Client for EASY v4 Frontend
  * 
  * Central module that exports all API functionality with consistent patterns:
  * - Unified error handling

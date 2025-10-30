@@ -1,5 +1,5 @@
 """
-API URL configuration for ECEEE v4.
+API URL configuration for EASY v4.
 
 This file contains all API endpoint routing for the application.
 As you add new apps, include their API URLs here.

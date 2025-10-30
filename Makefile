@@ -203,9 +203,9 @@ clean:
 #	@echo "🔄 Syncing components FROM eceee-components TO eceee_v4..."
 #	@./sync-from-eceee-components.sh
 
-sync-to: ## Sync components FROM eceee_v4 TO eceee-components
-	@echo "🔄 Syncing components FROM eceee_v4 TO eceee-components..."
-	@./sync-to-eceee-components.sh
+# sync-to: ## Sync components FROM eceee_v4 TO eceee-components
+# 	@echo "🔄 Syncing components FROM eceee_v4 TO eceee-components..."
+# 	@./sync-to-eceee-components.sh
 
 clear-layout-cache: ## Clear layout-related caches to force refresh
 	@echo "🧹 Clearing layout caches..."

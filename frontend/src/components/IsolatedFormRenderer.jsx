@@ -27,7 +27,7 @@ const IsolatedFieldWrapper = React.memo(({
 
     // Hide fields that are managed by special editors
     const hiddenFields = {
-        'eceee_widgets.ImageWidget': ['collectionId', 'collectionConfig', 'mediaItems']
+        'easy_widgets.ImageWidget': ['collectionId', 'collectionConfig', 'mediaItems']
     }
 
     if (hiddenFields[widgetType]?.includes(fieldName)) {

@@ -1,5 +1,5 @@
 """
-General Schema System for ECEEE v4
+General Schema System for EASY v4
 
 Provides a reusable, extensible schema system that can be used across:
 - Object Type schemas

@@ -3,7 +3,7 @@ Tag Migration Script
 
 Migrates all tags from the legacy system to the new Tag model with default namespace.
 Focus on three critical tag types:
-1. Normal Tags (eceee_category, keywords, etc.)
+1. Normal Tags (easy_category, keywords, etc.)
 2. News Tags (news_type, news_category, news_source)
 3. Related News (relationships between news items)
 
@@ -38,7 +38,7 @@ class TagMigrator(BaseMigrator):
                 # Step 1: Get or create default namespace
                 self.namespace = self.get_or_create_default_namespace()
 
-                # Step 2: Migrate normal tags (eceee_category, keywords)
+                # Step 2: Migrate normal tags (easy_category, keywords)
                 self.migrate_normal_tags()
 
                 # Step 3: Migrate news-specific tags
@@ -66,7 +66,7 @@ class TagMigrator(BaseMigrator):
 
     def migrate_normal_tags(self):
         """
-        Migrate normal tags (eceee_category, keywords, etc.)
+        Migrate normal tags (easy_category, keywords, etc.)
 
         This function should be customized based on your legacy schema.
         Example assumes you have tables like:

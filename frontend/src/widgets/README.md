@@ -7,7 +7,7 @@ This directory contains the **widget system** that can be used by any editor fra
 ```
 frontend/src/
 ├── widgets/                    # 🔗 WIDGET SYSTEM
-│   ├── eceee-widgets/         # ECEEE widget implementations
+│   ├── easy-widgets/         # ECEEE widget implementations
 │   │   ├── eceeeContentWidget.jsx
 │   │   ├── eceeeImageWidget.jsx
 │   │   ├── registry.js        # Widget registry
@@ -15,7 +15,7 @@ frontend/src/
 │   ├── WidgetRegistryManager.js # Central registry manager
 │   └── index.js               # Main widget exports
 ├── layouts/                    # 🎨 LAYOUT SYSTEM  
-│   ├── eceee-layouts/         # ECEEE layout implementations
+│   ├── easy-layouts/         # ECEEE layout implementations
 │   │   ├── LayoutRegistry.jsx
 │   │   ├── WidgetSlot.jsx
 │   │   └── index.js           # Package exports
@@ -64,7 +64,7 @@ const MyWidget = ({ config, mode, onConfigChange, ...props }) => {
 
 // Metadata for registry
 MyWidget.displayName = 'MyWidget'
-MyWidget.widgetType = 'eceee_widgets.MyWidget'
+MyWidget.widgetType = 'easy_widgets.MyWidget'
 MyWidget.defaultConfig = { /* defaults */ }
 MyWidget.metadata = { /* display info */ }
 ```
@@ -80,7 +80,7 @@ import { ContentWidget, ImageWidget } from '../../widgets'
 ### Import from Specific Package
 
 ```jsx
-import { ContentWidget } from '../../widgets/eceee-widgets'
+import { ContentWidget } from '../../widgets/easy-widgets'
 ```
 
 ### Registry Usage
@@ -92,7 +92,7 @@ import {
     isWidgetTypeSupported 
 } from '../../widgets'
 
-const WidgetComponent = getWidgetComponent('eceee_widgets.ContentWidget')
+const WidgetComponent = getWidgetComponent('easy_widgets.ContentWidget')
 ```
 
 ## Widget Registry System
@@ -104,7 +104,7 @@ The widget system uses a **priority-based registry** for managing widgets. Third
 ```
 Priority Levels:
 ├── DEFAULT (100)      # Reserved for base widgets
-├── THIRD_PARTY (200)  # eceee-widgets (current level)
+├── THIRD_PARTY (200)  # easy-widgets (current level)
 ├── EXTENDED (300)     # Extended third-party widgets
 └── CUSTOM (400)       # Custom/user widgets
 ```
@@ -114,7 +114,7 @@ Priority Levels:
 ```
 widgets/
 ├── WidgetRegistryManager.js    # Central registry manager
-├── eceee-widgets/             # ECEEE widget implementations (priority 200)
+├── easy-widgets/             # ECEEE widget implementations (priority 200)
 │   ├── eceeeContentWidget.jsx
 │   ├── eceeeImageWidget.jsx
 │   ├── eceeeTableWidget.jsx
@@ -168,4 +168,4 @@ registerWidgetRegistry(CUSTOM_WIDGET_REGISTRY, 'my-custom-widgets', 400)
 
 ## Migration Notes
 
-The default-widgets and default-layouts packages have been removed from the system. All functionality is now provided by eceee-widgets and eceee-layouts.
+The default-widgets and default-layouts packages have been removed from the system. All functionality is now provided by easy-widgets and easy-layouts.

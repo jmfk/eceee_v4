@@ -1,0 +1,32 @@
+<!-- templates/easy_layouts/layouts/landing_page.html -->
+{% extends "easy_layouts/base.html" %}
+{% load webpages_tags %}
+
+{% block page_title %}{% if meta_title %}{{ meta_title }}{% else %}{{ current_page.title }}{% endif %}{% if root_page %} - {{ root_page.title }}{% endif %}{% endblock %}
+
+{% block meta_tags %}
+  {% render_page_seo page=current_page version=content page_data=page_data %}
+{% endblock %}
+
+{% block icon_tags %}
+  {% render_site_icons root_page=root_page %}
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-400 flex flex-col">
+  <div class="w-full max-w-[1280px] mx-auto flex-1 flex flex-col">
+    
+    {% render_slot "header" %}
+    {% render_slot "navbar" %}
+
+    <main class="bg-white p-8 min-h-[310px]">
+      {% render_slot "main" %}
+    </main>
+
+    <footer class="bg-gray-800 shadow-sm p-8 min-h-[300px]">
+      {% render_slot "footer" %}
+    </footer>
+        
+  </div>
+</div>
+{% endblock %}

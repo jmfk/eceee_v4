@@ -617,7 +617,7 @@ class Command(BaseCommand):
             {
                 "title": "AI-Integrated CMS Platform Launch",
                 "summary": "Announcing the launch of our revolutionary AI-integrated content management system.",
-                "content": "We are excited to announce the launch of ECEEE v4, a groundbreaking content management system that seamlessly integrates artificial intelligence into every aspect of content creation and management. This platform represents a new paradigm in web development.",
+                "content": "We are excited to announce the launch of EASY v4, a groundbreaking content management system that seamlessly integrates artificial intelligence into every aspect of content creation and management. This platform represents a new paradigm in web development.",
                 "category": "company",
                 "featured": True,
             },
@@ -724,7 +724,7 @@ class Command(BaseCommand):
             },
             {
                 "title": "Virtual CMS Demo Session",
-                "description": "Live demonstration of the ECEEE v4 platform features and capabilities.",
+                "description": "Live demonstration of the EASY v4 platform features and capabilities.",
                 "start_date": timezone.now() + timedelta(days=7),
                 "end_date": timezone.now() + timedelta(days=7, hours=1),
                 "location": "Online",

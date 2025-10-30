@@ -74,7 +74,7 @@ def _create_content_widget(
 
     return {
         "id": f"widget-{uuid.uuid4()}",
-        "type": "eceee_widgets.ContentWidget",
+        "type": "easy_widgets.ContentWidget",
         "name": "Imported Content",
         "config": {
             "content": content,
@@ -98,7 +98,7 @@ def _create_table_widget(segment: ContentSegment) -> Dict[str, Any]:
 
         return {
             "id": f"widget-{uuid.uuid4()}",
-            "type": "eceee_widgets.TableWidget",
+            "type": "easy_widgets.TableWidget",
             "name": "Imported Table",
             "config": table_config,
         }
@@ -107,7 +107,7 @@ def _create_table_widget(segment: ContentSegment) -> Dict[str, Any]:
         # Return a minimal valid table widget as fallback
         return {
             "id": f"widget-{uuid.uuid4()}",
-            "type": "eceee_widgets.TableWidget",
+            "type": "easy_widgets.TableWidget",
             "name": "Imported Table (Parse Error)",
             "config": {
                 "rows": [

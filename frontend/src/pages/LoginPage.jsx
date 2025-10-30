@@ -104,7 +104,7 @@ const LoginPage = () => {
             <div className="max-w-md w-full space-y-8">
                 {/* Header */}
                 <div className="text-center">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">ECEEE v4</h1>
+                    <h1 className="text-4xl font-bold text-gray-900 mb-2">EASY v4</h1>
                     <h2 className="text-xl text-gray-600 mb-6">AI-Integrated CMS</h2>
                     <p className="text-sm text-gray-500">
                         Sign in to access the content management system

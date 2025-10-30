@@ -389,8 +389,8 @@ CONTENT_IMPORT_PROXY_TOKEN_MAX_AGE = 3600  # 1 hour
 
 # API Documentation with drf-spectacular
 SPECTACULAR_SETTINGS = {
-    "TITLE": "ECEEE v4 API",
-    "DESCRIPTION": "AI-integrated CMS system for ECEEE project",
+    "TITLE": "EASY v4 API",
+    "DESCRIPTION": "AI-integrated CMS system for EASY project",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
@@ -439,7 +439,7 @@ SERVER_EMAIL = config("SERVER_EMAIL", default="server@eceee.fred.nu")
 
 # Admin notifications for server errors
 ADMINS = [
-    ("ECEEE Admin", config("ADMIN_EMAIL", default="admin@eceee.fred.nu")),
+    ("EASY Admin", config("ADMIN_EMAIL", default="admin@eceee.fred.nu")),
 ]
 MANAGERS = ADMINS
 

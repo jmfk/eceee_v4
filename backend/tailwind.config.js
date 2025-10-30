@@ -2,8 +2,8 @@
 module.exports = {
     content: [
         './templates/**/*.html',
-        './eceee_layouts/templates/**/*.html',
-        './eceee_widgets/templates/**/*.html',
+        './easy_layouts/templates/**/*.html',
+        './easy_widgets/templates/**/*.html',
         './file_manager/templates/**/*.html',
         './htmx/templates/**/*.html',
         './object_storage/templates/**/*.html',

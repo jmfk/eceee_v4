@@ -156,7 +156,7 @@ const PageWidgetFactory = ({
         setIsLoadingPreview(false)
     }
 
-    // Get the widget component (supports ECEEE widgets and overrides)
+    // Get the widget component (supports EASY widgets and overrides)
     const CoreWidgetComponent = getWidgetComponent(widget.type)
 
     if (!CoreWidgetComponent) {

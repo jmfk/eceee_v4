@@ -1,0 +1,59 @@
+{% load static %}
+
+<div class="top-news-plug-widget {{ layout_class }}" data-widget-type="top-news-plug">
+    {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+    {% elif news_items %}
+        <div class="news-grid">
+            {% for item in news_items %}
+                <article class="news-card{% if item.is_pinned %} pinned{% endif %}" data-object-id="{{ item.id }}">
+                    {% if item.featured_image_url %}
+                        <div class="news-image">
+                            <img src="{{ item.featured_image_url }}" alt="{{ item.title }}" loading="lazy">
+                        </div>
+                    {% endif %}
+
+                    <div class="news-body">
+                        <div class="news-meta">
+                            {% if config.show_object_type %}
+                                <span class="news-type-badge">{{ item.object_type.label }}</span>
+                            {% endif %}
+                            {% if config.show_publish_date and item.publish_date %}
+                                <time class="news-date" datetime="{{ item.publish_date|date:'c' }}">
+                                    {{ item.publish_date|date:"M j, Y" }}
+                                </time>
+                            {% endif %}
+                        </div>
+
+                        <h3 class="news-title">
+                            <a href="/{{ item.object_type.name }}/{{ item.slug }}/">{{ item.title }}</a>
+                        </h3>
+
+                        {% if config.show_excerpts and item.excerpt_text %}
+                            <div class="news-excerpt">
+                                {{ item.excerpt_text }}
+                            </div>
+                        {% endif %}
+
+                        <div class="news-footer">
+                            <a href="/{{ item.object_type.name }}/{{ item.slug }}/" class="read-more">
+                                Read more
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="no-news-message">
+            <p>No news articles available at this time.</p>
+        </div>
+    {% endif %}
+</div>
+

@@ -28,14 +28,14 @@ class TagMigratorExample(BaseMigrator):
         self.tag_mapping = {}
 
     def migrate_normal_tags(self):
-        """Example: Migrate eceee_category and keywords"""
+        """Example: Migrate easy_category and keywords"""
 
         # EXAMPLE 1: Migrate eceeeCategory
         try:
             # Import your legacy model - UPDATE THIS PATH
-            from eceeebase.models import eceeeCategory
+            from base.models import Category
 
-            categories = eceeeCategory.objects.all()
+            categories = Category.objects.all()
 
             for category in categories:
                 # Get the tag name - UPDATE FIELD NAME if different
@@ -60,7 +60,6 @@ class TagMigratorExample(BaseMigrator):
                         self.stats["skipped"] += 1
                 else:
                     self.stats["errors"] += 1
-
 
         except ImportError as e:
             logger.warning(f"Could not import eceeeCategory: {e}")
@@ -87,7 +86,6 @@ class TagMigratorExample(BaseMigrator):
                         self.stats["created"] += 1
                     else:
                         self.stats["skipped"] += 1
-
 
         except ImportError as e:
             logger.warning(f"Could not import Keyword: {e}")
@@ -187,7 +185,6 @@ class TagMigratorExample(BaseMigrator):
                     relationship_count += len(related_ids)
                     self.stats["created"] += 1
 
-
         except ImportError as e:
             logger.warning(f"Could not import eceeeNews: {e}")
         except AttributeError as e:
@@ -209,7 +206,6 @@ class TagMigratorExample(BaseMigrator):
             for event in events:
                 if hasattr(event, "event_type") and event.event_type:
                     event_types.add(event.event_type)
-
 
             for event_type in event_types:
                 tag, created = self.get_or_create_tag(

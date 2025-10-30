@@ -39,7 +39,7 @@ Fields managed by special editors are now hidden from schema-based controls.
 
 #### Backend Changes
 
-**image.py** (both default_widgets and eceee_widgets)
+**image.py** (both default_widgets and easy_widgets)
 - Added `"hidden": True` to `mediaItems`, `collectionId`, and `collectionConfig` fields
 - These fields are now only managed by MediaSpecialEditor, not shown in form controls
 
@@ -53,7 +53,7 @@ mediaItems: List[ImageMediaItem] = Field(
 )
 ```
 
-**header.py** (both default_widgets and eceee_widgets)
+**header.py** (both default_widgets and easy_widgets)
 - Added complete UI control metadata (`json_schema_extra`) to all fields
 - Organized into groups: Content, Background, Styling, Advanced
 - Now fully editable with proper controls
@@ -70,13 +70,13 @@ mediaItems: List[ImageMediaItem] = Field(
 ### Frontend
 - `frontend/src/components/special-editors/SpecialEditorRenderer.jsx`
 - `frontend/src/widgets/default-widgets/ImageWidget.jsx`
-- `frontend/src/widgets/eceee-widgets/eceeeImageWidget.jsx`
+- `frontend/src/widgets/easy-widgets/eceeeImageWidget.jsx`
 
 ### Backend
 - `backend/default_widgets/widgets/image.py`
-- `backend/eceee_widgets/widgets/image.py`
+- `backend/easy_widgets/widgets/image.py`
 - `backend/default_widgets/widgets/header.py`
-- `backend/eceee_widgets/widgets/header.py`
+- `backend/easy_widgets/widgets/header.py`
 
 ## How to Add Special Editors to New Widgets
 
@@ -131,7 +131,7 @@ class MyWidgetConfig(BaseModel):
 
 ### Issue: Special Editor Not Opening for eceee Widgets
 
-**Problem**: The `autoOpenSpecialEditor` prop was hardcoded to only check for `'default_widgets.ImageWidget'`, so it never opened for other widget types including `'eceee_widgets.ImageWidget'`.
+**Problem**: The `autoOpenSpecialEditor` prop was hardcoded to only check for `'default_widgets.ImageWidget'`, so it never opened for other widget types including `'easy_widgets.ImageWidget'`.
 
 **Solution**: Changed `autoOpenSpecialEditor` to always be `true`. The `WidgetEditorPanel` component already has logic to check if a widget has a special editor using `supportsSpecialEditor()`, so it will only open the special editor when one exists.
 
@@ -154,7 +154,7 @@ const metadata = widgetEntry?.metadata  // Access nested metadata
    - Special editor should automatically open (MediaSpecialEditor)
    - Should show visual media browser on the left
    - Should NOT show mediaItems field in schema controls on the right
-   - Check console for: `[SpecialEditor] Found editor "MediaSpecialEditor" for eceee_widgets.ImageWidget`
+   - Check console for: `[SpecialEditor] Found editor "MediaSpecialEditor" for easy_widgets.ImageWidget`
 4. **Test Header Widget**:
    - Should show all editable fields organized in groups
    - Should have proper controls (color pickers, toggles, etc.)

@@ -1,0 +1,63 @@
+{% load static %}
+{% load security_filters %}
+
+<div class="footer-content">
+    {% if config.columns %}
+    <div class="footer-columns" style="--footer-column-count: {{ config.column_count|default:3 }};">
+        {% for column in config.columns %}
+        <div class="footer-column">
+            {% if column.title %}
+            <h3 class="footer-column-title">{{ column.title }}</h3>
+            {% endif %}
+            
+            {% if column.items %}
+            <ul class="footer-column-items">
+                {% for item in column.items %}
+                <li class="footer-column-item">
+                    {% if item.url %}
+                        <a href="{{ item.url }}" 
+                           {% if item.open_in_new_tab %}target="_blank" rel="noopener noreferrer"{% endif %}>
+                            {{ item.label }}
+                        </a>
+                    {% else %}
+                        {{ item.label }}
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if config.social_links %}
+    <div class="footer-social-links">
+        {% for link in config.social_links %}
+            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" 
+                class="footer-social-link" title="{{ link.name }}">
+                {% if link.icon %}
+                    <i class="{{ link.icon }}"></i>
+                {% endif %}
+                <span class="sr-only">{{ link.name }}</span>
+            </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if config.show_copyright %}
+    <div class="footer-copyright">
+        {% if config.copyright_text %}
+            {{ config.copyright_text }}
+        {% else %}
+            &copy; {% now "Y" %} All rights reserved.
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{% if config.custom_css %}
+<style>
+    {{ config.custom_css|safe }}
+</style>
+{% endif %}

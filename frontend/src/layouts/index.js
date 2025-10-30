@@ -1,17 +1,17 @@
 /**
  * Layouts Main Export
  * 
- * Uses eceee-layouts only. The default-layouts have been removed from the system.
+ * Uses easy-layouts only. The default-layouts have been removed from the system.
  */
 
-// Export everything from eceee layouts
-export * from './eceee-layouts';
+// Export everything from easy layouts
+export * from './easy-layouts';
 
-// Import eceee layout registry
-import { ECEEE_LAYOUT_REGISTRY } from './eceee-layouts';
+// Import easy layout registry
+import { EASY_LAYOUT_REGISTRY } from './easy-layouts';
 
-// Use ECEEE layouts as the main registry
-export const LAYOUT_REGISTRY = ECEEE_LAYOUT_REGISTRY;
+// Use EASY layouts as the main registry
+export const LAYOUT_REGISTRY = EASY_LAYOUT_REGISTRY;
 
 // Utility functions that work with the layout registry
 export const getLayoutComponent = (layoutName) => {
@@ -31,9 +31,9 @@ export const layoutExists = (layoutName) => {
     return layoutName in LAYOUT_REGISTRY;
 };
 
-// Export eceee layout components for easy access
+// Export easy layout components for easy access
 export {
     MainLayout,
     LandingPage,
     WidgetSlot
-} from './eceee-layouts';
+} from './easy-layouts';

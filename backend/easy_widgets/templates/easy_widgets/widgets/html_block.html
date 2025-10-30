@@ -1,0 +1,11 @@
+{% load security_filters %}
+
+<div class="html-block-widget">
+    {{ config.html_content|sanitize_html:config.allow_scripts }}
+</div>
+
+<style>
+.html-block-widget {
+    margin: 1rem 0;
+}
+</style>

@@ -65,7 +65,7 @@ The `collapse_behavior` field is added to slot configurations in layout definiti
 
 **Note:** The backend uses `snake_case` for all Python code. The `djangorestframework-camel-case` package automatically converts snake_case to camelCase when sending JSON responses to the frontend.
 
-**File:** `backend/eceee_layouts/layouts/main_layout.py`
+**File:** `backend/easy_layouts/layouts/main_layout.py`
 
 ```python
 @property

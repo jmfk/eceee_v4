@@ -24,7 +24,7 @@ A singleton class that manages:
 - `subscribe(event, callback)` - Subscribe to manager events
 
 ### 2. Enhanced Editor Class
-**File:** `frontend/src/widgets/eceee-widgets/ContentWidgetEditorRenderer.js`
+**File:** `frontend/src/widgets/easy-widgets/ContentWidgetEditorRenderer.js`
 
 Added detached toolbar mode to the vanilla JS editor:
 
@@ -80,7 +80,7 @@ Reusable toolbar button components:
 - Mouse down prevention to avoid focus loss
 
 ### 5. React Wrapper Updates
-**File:** `frontend/src/widgets/eceee-widgets/eceeeContentWidget.jsx`
+**File:** `frontend/src/widgets/easy-widgets/eceeeContentWidget.jsx`
 
 Updated `ContentWidgetEditor` wrapper to:
 - Pass `detachedToolbar: true` to renderer
@@ -279,8 +279,8 @@ The system handles multiple editors on a page:
 
 ## Files Modified
 
-- `frontend/src/widgets/eceee-widgets/ContentWidgetEditorRenderer.js` (+130 lines)
-- `frontend/src/widgets/eceee-widgets/eceeeContentWidget.jsx` (+40 lines)
+- `frontend/src/widgets/easy-widgets/ContentWidgetEditorRenderer.js` (+130 lines)
+- `frontend/src/widgets/easy-widgets/eceeeContentWidget.jsx` (+40 lines)
 - `frontend/src/App.jsx` (+5 lines)
 - `frontend/src/components/PageEditor.jsx` (+3 lines)
 

@@ -11,7 +11,7 @@
  * - Loop logic: {% for %} / {% endfor %}
  * - Security: XSS protection, prototype pollution prevention
  * 
- * @author eceee_v4 Development Team
+ * @author easy_v4 Development Team
  * @version 1.0.0
  */
 

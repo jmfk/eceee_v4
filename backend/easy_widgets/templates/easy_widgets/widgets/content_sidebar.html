@@ -1,0 +1,13 @@
+{% load static %}
+
+<div class="content-widget w-full h-[310px] p-[20px] overflow-hidden bg-gray-200">
+    {% if config.sanitize_html and not config.allow_scripts %}
+        <!-- Sanitized HTML content -->
+        {{ config.content|safe }}
+    {% elif config.allow_scripts %}
+        <!-- Raw HTML content with scripts allowed (use with caution) -->
+        {{ config.content|safe }}
+    {% else %}
+        {{ config.content|safe }}
+    {% endif %}
+</div>

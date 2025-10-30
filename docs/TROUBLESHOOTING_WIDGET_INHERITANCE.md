@@ -236,7 +236,7 @@ def fix_inheritance_levels(apps, schema_editor):
         # Fix header widgets
         if version.widgets.get('header'):
             for widget in version.widgets['header']:
-                if widget.get('type') in ['eceee_widgets.HeaderWidget', 'NavigationWidget']:
+                if widget.get('type') in ['easy_widgets.HeaderWidget', 'NavigationWidget']:
                     if widget.get('inheritance_level') is None:
                         widget['inheritance_level'] = -1
                         modified = True
@@ -244,7 +244,7 @@ def fix_inheritance_levels(apps, schema_editor):
         # Fix footer widgets
         if version.widgets.get('footer'):
             for widget in version.widgets['footer']:
-                if widget.get('type') == 'eceee_widgets.FooterWidget':
+                if widget.get('type') == 'easy_widgets.FooterWidget':
                     if widget.get('inheritance_level') is None:
                         widget['inheritance_level'] = -1
                         modified = True

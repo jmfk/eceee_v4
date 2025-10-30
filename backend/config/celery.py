@@ -1,5 +1,5 @@
 """
-Celery configuration for ECEEE v4.
+Celery configuration for EASY v4.
 
 This module sets up Celery for background task processing including
 AI agent tasks, scheduled tasks, and other async operations.

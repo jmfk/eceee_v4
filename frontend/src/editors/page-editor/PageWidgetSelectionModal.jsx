@@ -47,7 +47,7 @@ const PageWidgetSelectionModal = ({
         // Check if widget type is allowed in this slot
         const isAllowed = allowedWidgetTypes.includes('*') ||
             allowedWidgetTypes.some(allowedType => {
-                // Support wildcards like 'eceee_widgets.*'
+                // Support wildcards like 'easy_widgets.*'
                 if (allowedType.endsWith('.*')) {
                     const prefix = allowedType.slice(0, -2);
                     return widget.type.startsWith(prefix);
@@ -61,7 +61,7 @@ const PageWidgetSelectionModal = ({
 
         const matchesCategory = selectedCategory === 'all' ||
             widget.category === selectedCategory ||
-            (selectedCategory === 'core' && widget.type.startsWith('eceee_widgets.'));
+            (selectedCategory === 'core' && widget.type.startsWith('easy_widgets.'));
 
         return isAllowed && matchesSearch && matchesCategory;
     });

@@ -1,7 +1,7 @@
 {
-  "name": "eceee-backend-static",
+  "name": "easy-backend-static",
   "version": "1.0.0",
-  "description": "Static asset compilation for ECEEE v4 Backend",
+  "description": "Static asset compilation for EASY v4 Backend",
   "scripts": {
     "build:css": "tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --minify",
     "watch:css": "tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --watch",

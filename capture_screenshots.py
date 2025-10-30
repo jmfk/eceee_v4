@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Screenshot capture script for eceee_v4 user manual.
+Screenshot capture script for easy_v4 user manual.
 Automatically navigates the frontend and captures screenshots.
 """
 
@@ -57,7 +57,7 @@ def capture_all_screenshots():
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 60)
-    print("eceee_v4 Screenshot Capture Script")
+    print("easy_v4 Screenshot Capture Script")
     print("=" * 60)
     print(f"Screenshots will be saved to: {SCREENSHOTS_DIR}")
     print(f"Frontend URL: {BASE_URL}\n")

@@ -571,7 +571,7 @@ const ContentEditor = forwardRef(({
 
         slotWidgets.forEach((widget, index) => {
           // Only collect content for ContentWidgets
-          if (widget.type === 'eceee_widgets.ContentWidget') {
+          if (widget.type === 'easy_widgets.ContentWidget') {
             try {
               // Find the widget element in DOM
               const widgetElement = document.querySelector(`[data-widget-id="${widget.id}"]`);

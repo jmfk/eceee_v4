@@ -2,7 +2,7 @@
 
 ## Overview
 
-Successfully implemented four news widgets for the `eceee_widgets` app that work with ObjectType instances from the `object_storage` system. All widgets support multi-ObjectType selection and responsive design.
+Successfully implemented four news widgets for the `easy_widgets` app that work with ObjectType instances from the `object_storage` system. All widgets support multi-ObjectType selection and responsive design.
 
 ## Implemented Widgets
 
@@ -11,8 +11,8 @@ Successfully implemented four news widgets for the `eceee_widgets` app that work
 **Purpose**: Display a list of news articles from selected ObjectTypes with filtering and pagination support.
 
 **File Locations**:
-- Widget: `/backend/eceee_widgets/widgets/news_list.py`
-- Template: `/backend/eceee_widgets/templates/eceee_widgets/widgets/news_list.html`
+- Widget: `/backend/easy_widgets/widgets/news_list.py`
+- Template: `/backend/easy_widgets/templates/easy_widgets/widgets/news_list.html`
 
 **Configuration Options**:
 - `object_types`: Multi-select list of ObjectType names (default: ["news"])
@@ -37,8 +37,8 @@ Successfully implemented four news widgets for the `eceee_widgets` app that work
 **Purpose**: Display a single news article based on slug in URL path. Supports multiple detail widgets on the same page, each configured for different ObjectTypes.
 
 **File Locations**:
-- Widget: `/backend/eceee_widgets/widgets/news_detail.py`
-- Template: `/backend/eceee_widgets/templates/eceee_widgets/widgets/news_detail.html`
+- Widget: `/backend/easy_widgets/widgets/news_detail.py`
+- Template: `/backend/easy_widgets/templates/easy_widgets/widgets/news_detail.html`
 
 **Configuration Options**:
 - `slug_variable_name`: Name of path variable holding slug (default: "slug")
@@ -66,8 +66,8 @@ This is the key feature - you can have multiple NewsDetailWidget instances on th
 **Purpose**: Display top news in various grid configurations for homepage/landing pages.
 
 **File Locations**:
-- Widget: `/backend/eceee_widgets/widgets/top_news_plug.py`
-- Template: `/backend/eceee_widgets/templates/eceee_widgets/widgets/top_news_plug.html`
+- Widget: `/backend/easy_widgets/widgets/top_news_plug.py`
+- Template: `/backend/easy_widgets/templates/easy_widgets/widgets/top_news_plug.html`
 
 **Configuration Options**:
 - `object_types`: Multi-select list of ObjectType names
@@ -99,8 +99,8 @@ This is the key feature - you can have multiple NewsDetailWidget instances on th
 **Purpose**: Compact vertical list of top news for sidebar placement.
 
 **File Locations**:
-- Widget: `/backend/eceee_widgets/widgets/sidebar_top_news.py`
-- Template: `/backend/eceee_widgets/templates/eceee_widgets/widgets/sidebar_top_news.html`
+- Widget: `/backend/easy_widgets/widgets/sidebar_top_news.py`
+- Template: `/backend/easy_widgets/templates/easy_widgets/widgets/sidebar_top_news.html`
 
 **Configuration Options**:
 - `object_types`: Multi-select list of ObjectType names
@@ -248,38 +248,38 @@ To test the widgets:
 ## Files Created
 
 ### Backend Python Widget Files
-1. `/backend/eceee_widgets/widgets/news_list.py`
-2. `/backend/eceee_widgets/widgets/news_detail.py`
-3. `/backend/eceee_widgets/widgets/top_news_plug.py`
-4. `/backend/eceee_widgets/widgets/sidebar_top_news.py`
+1. `/backend/easy_widgets/widgets/news_list.py`
+2. `/backend/easy_widgets/widgets/news_detail.py`
+3. `/backend/easy_widgets/widgets/top_news_plug.py`
+4. `/backend/easy_widgets/widgets/sidebar_top_news.py`
 
 ### Backend HTML Templates
-1. `/backend/eceee_widgets/templates/eceee_widgets/widgets/news_list.html`
-2. `/backend/eceee_widgets/templates/eceee_widgets/widgets/news_detail.html`
-3. `/backend/eceee_widgets/templates/eceee_widgets/widgets/top_news_plug.html`
-4. `/backend/eceee_widgets/templates/eceee_widgets/widgets/sidebar_top_news.html`
+1. `/backend/easy_widgets/templates/easy_widgets/widgets/news_list.html`
+2. `/backend/easy_widgets/templates/easy_widgets/widgets/news_detail.html`
+3. `/backend/easy_widgets/templates/easy_widgets/widgets/top_news_plug.html`
+4. `/backend/easy_widgets/templates/easy_widgets/widgets/sidebar_top_news.html`
 
 ### Frontend Widget Components
-1. `/frontend/src/widgets/eceee-widgets/eceeeNewsListWidget.jsx`
-2. `/frontend/src/widgets/eceee-widgets/eceeeNewsDetailWidget.jsx`
-3. `/frontend/src/widgets/eceee-widgets/eceeeTopNewsPlugWidget.jsx`
-4. `/frontend/src/widgets/eceee-widgets/eceeeSidebarTopNewsWidget.jsx`
+1. `/frontend/src/widgets/easy-widgets/eceeeNewsListWidget.jsx`
+2. `/frontend/src/widgets/easy-widgets/eceeeNewsDetailWidget.jsx`
+3. `/frontend/src/widgets/easy-widgets/eceeeTopNewsPlugWidget.jsx`
+4. `/frontend/src/widgets/easy-widgets/eceeeSidebarTopNewsWidget.jsx`
 
 ### Modified Files
-1. `/backend/eceee_widgets/widgets/__init__.py` - Added backend widget imports
-2. `/frontend/src/widgets/eceee-widgets/index.js` - Added frontend widget registration
+1. `/backend/easy_widgets/widgets/__init__.py` - Added backend widget imports
+2. `/frontend/src/widgets/easy-widgets/index.js` - Added frontend widget registration
 
 ---
 
 ## Integration
 
 ### Backend Integration
-All widgets are automatically registered through the `@register_widget_type` decorator and the `eceee_widgets/apps.py` ready() method.
+All widgets are automatically registered through the `@register_widget_type` decorator and the `easy_widgets/apps.py` ready() method.
 
 **Important**: Model imports are done lazily (inside methods) to avoid circular import issues during Django startup.
 
 ### Frontend Integration
-All widgets are registered in the ECEEE_WIDGET_REGISTRY in `/frontend/src/widgets/eceee-widgets/index.js`. Each widget:
+All widgets are registered in the ECEEE_WIDGET_REGISTRY in `/frontend/src/widgets/easy-widgets/index.js`. Each widget:
 - Has a displayName, widgetType, and metadata
 - Provides defaultConfig matching the backend Pydantic models
 - Shows a placeholder UI in editor mode

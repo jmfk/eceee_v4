@@ -22,7 +22,7 @@ The Widget Inheritance Tree provides a unified data structure and API for widget
     "main": [
       {
         "id": "widget-123",
-        "type": "eceee_widgets.ContentWidget",
+        "type": "easy_widgets.ContentWidget",
         "config": {
           "content": "<h2>Page Content</h2>"
         },
@@ -51,7 +51,7 @@ The Widget Inheritance Tree provides a unified data structure and API for widget
       "sidebar": [
         {
           "id": "widget-456",
-          "type": "eceee_widgets.NavigationWidget",
+          "type": "easy_widgets.NavigationWidget",
           "config": {
             "menu_items": [...]
           },
@@ -80,7 +80,7 @@ The Widget Inheritance Tree provides a unified data structure and API for widget
         "header": [
           {
             "id": "widget-789",
-            "type": "eceee_widgets.HeaderWidget",
+            "type": "easy_widgets.HeaderWidget",
             "config": {
               "image": {...}
             },
@@ -107,7 +107,7 @@ Each widget in the tree contains:
 interface TreeWidget {
   // Core widget data
   id: string                                    // Unique widget identifier
-  type: string                                  // Widget type (e.g., "eceee_widgets.ContentWidget")
+  type: string                                  // Widget type (e.g., "easy_widgets.ContentWidget")
   config: Record<string, any>                   // Widget configuration object
   order: number                                 // Sort order within slot
 

@@ -1,5 +1,5 @@
 """
-Pydantic models for JSON field validation throughout the eceee_v4 system.
+Pydantic models for JSON field validation throughout the easy_v4 system.
 
 These models provide type-safe validation for JSON fields in various models,
 replacing ad-hoc JSON validation with structured pydantic models.
@@ -158,7 +158,7 @@ class PageWidgetData(BaseModel):
     )
     type: Optional[str] = Field(
         None,
-        description="Widget type identifier (new format: eceee_widgets.WidgetName)",
+        description="Widget type identifier (new format: easy_widgets.WidgetName)",
     )
     slot_name: str = Field(..., description="Slot where the widget is placed")
     sort_order: int = Field(0, description="Order within the slot")

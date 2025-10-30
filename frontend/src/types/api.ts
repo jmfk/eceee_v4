@@ -1,4 +1,4 @@
-// API Response Types for eceee_v4 Frontend
+// API Response Types for easy_v4 Frontend
 // These match the Pydantic models defined in backend/webpages/json_models.py
 
 export type PublicationStatus = 'unpublished' | 'scheduled' | 'published' | 'expired';

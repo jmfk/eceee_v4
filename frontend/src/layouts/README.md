@@ -6,7 +6,7 @@ This directory contains the **layout system** that provides different page layou
 
 ```
 layouts/
-├── eceee-layouts/         # ECEEE layout implementations
+├── easy-layouts/         # ECEEE layout implementations
 │   ├── LayoutRegistry.jsx # Layout definitions and registry
 │   ├── WidgetSlot.jsx     # Shared slot component
 │   ├── MainLayout.jsx     # Main layout component
@@ -57,7 +57,7 @@ Layouts are registered in `LayoutRegistry.jsx`:
 
 ```jsx
 export const ECEEE_LAYOUT_REGISTRY = {
-    'eceee_layouts.MainLayout': {
+    'easy_layouts.MainLayout': {
         component: MainLayout,
         displayName: 'Main Layout',
         description: 'Main application layout with header, navigation, and footer',
@@ -78,7 +78,7 @@ import { MainLayout, LAYOUT_REGISTRY } from '../../layouts'
 ### Import from Specific Package
 
 ```jsx
-import { MainLayout } from '../../layouts/eceee-layouts'
+import { MainLayout } from '../../layouts/easy-layouts'
 ```
 
 ### Registry Usage
@@ -86,8 +86,8 @@ import { MainLayout } from '../../layouts/eceee-layouts'
 ```jsx
 import { getLayoutComponent, layoutExists } from '../../layouts'
 
-const LayoutComponent = getLayoutComponent('eceee_layouts.MainLayout')
-const exists = layoutExists('eceee_layouts.MainLayout')
+const LayoutComponent = getLayoutComponent('easy_layouts.MainLayout')
+const exists = layoutExists('easy_layouts.MainLayout')
 ```
 
 ## WidgetSlot Component
@@ -128,7 +128,7 @@ This structure allows for future layout packages:
 
 ```
 layouts/
-├── eceee-layouts/      # ECEEE-specific layouts (current)
+├── easy-layouts/      # ECEEE-specific layouts (current)
 ├── custom-layouts/     # Custom layout packages  
 └── third-party-layouts/ # Third-party packages
 ```
@@ -137,4 +137,4 @@ Each package can extend or replace existing layouts through the registry system.
 
 ## Migration Notes
 
-The default-layouts package has been removed from the system. All layout functionality is now provided by eceee-layouts, which includes the WidgetSlot component and layout implementations.
+The default-layouts package has been removed from the system. All layout functionality is now provided by easy-layouts, which includes the WidgetSlot component and layout implementations.

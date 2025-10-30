@@ -601,7 +601,6 @@ Respond with ONLY valid JSON (no markdown) in this format:
             selected_tags = result.get("selected_tags", [])
             reasoning = result.get("reasoning", "")
 
-
             return (
                 selected_tags[:max_tags] if selected_tags else potential_tags[:max_tags]
             )

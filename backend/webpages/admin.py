@@ -940,6 +940,6 @@ class DuplicatePageLogAdmin(admin.ModelAdmin):
 
 
 # Customize admin site headers
-admin.site.site_header = "ECEEE v4 Web Publishing System"
-admin.site.site_title = "ECEEE v4 Admin"
+admin.site.site_header = "EASY v4 Web Publishing System"
+admin.site.site_title = "EASY v4 Admin"
 admin.site.index_title = "Web Publishing Administration"

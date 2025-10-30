@@ -32,7 +32,7 @@ Successfully implemented Django template tags for imgproxy image optimization wi
   - Best practices
 
 ### 5. Example Usage
-- **`backend/eceee_widgets/templates/eceee_widgets/widgets/header.html`** - Updated to use new tags
+- **`backend/easy_widgets/templates/easy_widgets/widgets/header.html`** - Updated to use new tags
 
 ---
 

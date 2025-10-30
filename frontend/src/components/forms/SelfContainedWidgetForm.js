@@ -289,7 +289,7 @@ class SelfContainedWidgetForm {
      */
     getMockSchema() {
         const mockSchemas = {
-            'eceee_widgets.TextWidget': {
+            'easy_widgets.TextWidget': {
                 type: 'object',
                 properties: {
                     text: {
@@ -335,7 +335,7 @@ class SelfContainedWidgetForm {
                 },
                 required: ['text']
             },
-            'eceee_widgets.ImageWidget': {
+            'easy_widgets.ImageWidget': {
                 type: 'object',
                 properties: {
                     src: {
@@ -377,7 +377,7 @@ class SelfContainedWidgetForm {
                 },
                 required: ['src', 'alt']
             },
-            'eceee_widgets.ButtonWidget': {
+            'easy_widgets.ButtonWidget': {
                 type: 'object',
                 properties: {
                     text: {
@@ -894,7 +894,7 @@ class SelfContainedWidgetForm {
     /**
      * Sync current config to server
      * 
-     * NOTE: In the eceee_v4 system, widgets are not saved individually.
+     * NOTE: In the easy_v4 system, widgets are not saved individually.
      * Instead, widget changes are saved as part of the page version data.
      * This method simulates a save for UI feedback but doesn't make API calls.
      */

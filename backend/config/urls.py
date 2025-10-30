@@ -1,5 +1,5 @@
 """
-URL configuration for ECEEE v4 AI-integrated development environment.
+URL configuration for EASY v4 AI-integrated development environment.
 
 This configuration includes:
 - Admin interface
@@ -88,9 +88,9 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # Custom admin configuration
-admin.site.site_header = "ECEEE v4 Administration"
-admin.site.site_title = "ECEEE v4 Admin"
-admin.site.index_title = "Welcome to ECEEE v4 Administration"
+admin.site.site_header = "EASY v4 Administration"
+admin.site.site_title = "EASY v4 Admin"
+admin.site.index_title = "Welcome to EASY v4 Administration"
 
 # Custom error handlers for site-specific error pages
 handler404 = "webpages.public_views.custom_404_handler"

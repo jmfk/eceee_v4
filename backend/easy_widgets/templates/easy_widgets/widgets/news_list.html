@@ -1,0 +1,68 @@
+{% load static %}
+
+<div class="news-list-widget" data-widget-type="news-list">
+    {% if hidden %}
+        <!-- Widget hidden on detail view -->
+    {% elif error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+    {% elif config.news_items %}
+        <!-- Future HTMX filtering placeholder -->
+        <div class="news-filters" data-htmx-filter-target style="display: none;">
+            <!-- Filtering UI will be added here in future -->
+        </div>
+
+        <div class="news-items-container">
+            {% for item in config.news_items %}
+                <article class="news-item{% if item.is_pinned %} pinned{% endif %}" data-object-id="{{ item.id }}">
+                    {% if config.show_featured_image and item.featured_image_url %}
+                        <div class="news-featured-image">
+                            <img src="{{ item.featured_image_url }}" alt="{{ item.title }}" loading="lazy">
+                        </div>
+                    {% endif %}
+
+                    <div class="news-content">
+                        <div class="news-meta">
+                            <span class="news-type">{{ item.object_type.label }}</span>
+                            {% if item.is_pinned %}
+                                <span class="pinned-badge">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/>
+                                    </svg>
+                                    Pinned
+                                </span>
+                            {% endif %}
+                            {% if config.show_publish_date and item.publish_date %}
+                                <time class="news-date" datetime="{{ item.publish_date|date:'c' }}">
+                                    {{ item.publish_date|date:"F j, Y" }}
+                                </time>
+                            {% endif %}
+                        </div>
+
+                        <h3 class="news-title">
+                            <a href="/{{ item.object_type.name }}/{{ item.slug }}/">{{ item.title }}</a>
+                        </h3>
+
+                        {% if config.show_excerpts and item.excerpt_text %}
+                            <div class="news-excerpt">
+                                {{ item.excerpt_text }}
+                            </div>
+                        {% endif %}
+
+                        <div class="news-footer">
+                            <a href="/{{ item.object_type.name }}/{{ item.slug }}/" class="read-more">
+                                Read more →
+                            </a>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="no-news-message">
+            <p>No news articles available at this time.</p>
+        </div>
+    {% endif %}
+</div>
+

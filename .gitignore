@@ -76,8 +76,3 @@ mcp-server-logs/
 # Local storage for development
 storage/
 
-# eceee-components synced directories (managed in separate repo)
-backend/eceee_layouts/
-backend/eceee_widgets/
-frontend/src/layouts/eceee-layouts/
-frontend/src/widgets/eceee-widgets/

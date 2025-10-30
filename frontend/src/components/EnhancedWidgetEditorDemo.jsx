@@ -23,7 +23,7 @@ const EnhancedWidgetEditorDemo = ({
     // Sample widget data and schema for demonstration
     const demoWidgetData = widgetData || {
         id: 'demo-widget',
-        type: 'eceee_widgets.ContentWidget',
+        type: 'easy_widgets.ContentWidget',
         config: {
             title: 'Sample Content',
             content: 'This is sample content for the demo.',

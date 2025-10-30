@@ -1,5 +1,5 @@
 """
-Celery tasks for AI Agent execution in ECEEE v4
+Celery tasks for AI Agent execution in EASY v4
 
 This module contains all Celery tasks for running AI agents in the background
 and providing real-time updates to the frontend.
@@ -74,7 +74,6 @@ class AIAgentTaskManager:
             },
         )
 
-
     def update_status(self, status: str, message: str = None):
         """Update task status."""
         from .models import AIAgentTaskUpdate
@@ -103,7 +102,6 @@ class AIAgentTaskManager:
                 "timestamp": update.timestamp.isoformat(),
             },
         )
-
 
     def add_result(
         self, result_data: Dict[str, Any], message: str = "Result generated"
@@ -136,7 +134,6 @@ class AIAgentTaskManager:
                 "timestamp": update.timestamp.isoformat(),
             },
         )
-
 
     def log_error(self, error: str, data: Dict[str, Any] = None):
         """Log an error or warning."""
@@ -541,7 +538,6 @@ def cleanup_old_tasks():
 
     task_count = old_tasks.count()
     old_tasks.delete()
-
 
     return f"Cleaned up {task_count} tasks"
 

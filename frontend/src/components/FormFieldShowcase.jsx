@@ -187,7 +187,7 @@ const FormFieldShowcase = () => {
                             </h1>
                         </div>
                         <div className="text-sm text-gray-500">
-                            ECEEE v4 • Phase 3 Complete
+                            EASY v4 • Phase 3 Complete
                         </div>
                     </div>
                 </div>

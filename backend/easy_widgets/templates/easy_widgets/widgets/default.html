@@ -1,0 +1,11 @@
+<div class="default-widget">
+    <h4>{{ widget.widget_type.name }}</h4>
+    <p>{{ widget.widget_type.description }}</p>
+    
+    {% if config %}
+        <div class="widget-config">
+            <h5>Configuration:</h5>
+            <pre>{{ config|pprint }}</pre>
+        </div>
+    {% endif %}
+</div> 

@@ -1,3 +1,3 @@
 """
-Migration scripts for migrating legacy ECEEE data to the new system.
+Migration scripts for migrating legacy EASY data to the new system.
 """
