@@ -1,5 +1,5 @@
 /**
- * ECEEE Sidebar Top News Widget
+ * EASY Sidebar Top News Widget
  * 
  * Compact vertical list of top news for sidebar placement.
  * Widget type: easy_widgets.SidebarTopNewsWidget

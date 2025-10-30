@@ -152,6 +152,10 @@ class WebPageRenderer:
                     logger = logging.getLogger(__name__)
                     logger.error(f"Error rendering widget with custom style: {e}")
 
+        # If we have custom style HTML, use it directly
+        if custom_style_html is not None:
+            return custom_style_html
+
         slot_name = context.get("slot_name", "")
         layout_name = context.get("layout_name", "")
         theme = context.get("theme", "") or context.get("theme_name", "")

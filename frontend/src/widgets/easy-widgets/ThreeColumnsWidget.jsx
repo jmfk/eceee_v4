@@ -1,7 +1,7 @@
 /**
- * ECEEE Three-Column Widget Component
+ * EASY Three-Column Widget Component
  * 
- * ECEEE-specific three-column layout with left, center, and right slots.
+ * EASY-specific three-column layout with left, center, and right slots.
  * Widget type: easy_widgets.ThreeColumnsWidget
  */
 

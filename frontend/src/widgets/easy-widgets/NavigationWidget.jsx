@@ -3,7 +3,7 @@ import { usePageChildren } from '../../hooks/usePageStructure'
 import { Menu, X, ChevronDown } from 'lucide-react'
 
 /**
- * ECEEE Navigation Widget Component
+ * EASY Navigation Widget Component
  * Renders navigation menus with dropdowns, mobile support, and branding
  */
 const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {

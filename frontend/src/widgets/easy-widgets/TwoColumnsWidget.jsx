@@ -1,7 +1,7 @@
 /**
- * ECEEE Two-Column Widget Component
+ * EASY Two-Column Widget Component
  * 
- * ECEEE-specific two-column layout with left and right slots that work like regular page slots.
+ * EASY-specific two-column layout with left and right slots that work like regular page slots.
  * Widget type: easy_widgets.TwoColumnsWidget
  */
 

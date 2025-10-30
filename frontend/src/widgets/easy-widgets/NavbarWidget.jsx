@@ -19,7 +19,7 @@ const getImageUrl = (image) => {
 }
 
 /**
- * ECEEE Navbar Widget Component
+ * EASY Navbar Widget Component
  * Renders a navigation bar with configurable menu items and responsive overflow
  */
 const NavbarWidget = ({ config = {}, mode = 'preview' }) => {

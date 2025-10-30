@@ -1,5 +1,5 @@
 /**
- * ECEEE Widget Registry
+ * EASY Widget Registry
  * 
  * Registry for ECEEE-specific widget implementations.
  * This is independent of default-widgets.

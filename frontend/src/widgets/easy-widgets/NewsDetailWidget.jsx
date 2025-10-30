@@ -1,5 +1,5 @@
 /**
- * ECEEE News Detail Widget
+ * EASY News Detail Widget
  * 
  * Displays a single news article based on slug in URL path.
  * Widget type: easy_widgets.NewsDetailWidget

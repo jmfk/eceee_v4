@@ -1,7 +1,7 @@
 /**
- * ECEEE Content Widget
+ * EASY Content Widget
  * 
- * ECEEE-specific implementation of the Content widget.
+ * EASY-specific implementation of the Content widget.
  * Widget type: easy_widgets.ContentWidget
  */
 
@@ -144,7 +144,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
 })
 
 /**
- * ECEEE Content Widget Component
+ * Content Widget Component
  * Renders HTML content with WYSIWYG editing capabilities
  */
 const ContentWidget = memo(({
@@ -253,12 +253,12 @@ const ContentWidget = memo(({
 })
 
 // === COLOCATED METADATA ===
-ContentWidget.displayName = 'ECEEE Content'
+ContentWidget.displayName = 'Content'
 ContentWidget.widgetType = 'easy_widgets.ContentWidget'
 
 // Default configuration
 ContentWidget.defaultConfig = {
-    content: '<h2>ECEEE Content</h2><p>This is an ECEEE-specific content widget.</p>',
+    content: '<h2>Content</h2><p>This is a content widget.</p>',
     allow_scripts: false,
     sanitize_html: true
 }

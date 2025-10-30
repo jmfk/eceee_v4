@@ -1,5 +1,5 @@
 /**
- * ECEEE News List Widget
+ * EASY News List Widget
  * 
  * Displays a list of news articles from selected ObjectTypes.
  * Widget type: easy_widgets.NewsListWidget

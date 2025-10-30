@@ -3,7 +3,7 @@ import { Image as ImageIcon } from 'lucide-react'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 
 /**
- * ECEEE Header Widget Component
+ * EASY Header Widget Component
  * Responsive header widget with fixed sizes per breakpoint
  * - Mobile: 640x80px (default)
  * - Tablet: 1024x112px (default)

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { FileText, Send } from 'lucide-react'
 
 /**
- * ECEEE Forms Widget Component
+ * EASY Forms Widget Component
  * Renders dynamic forms with schema-based field generation and validation
  */
 const FormsWidget = ({ config = {}, mode = 'preview' }) => {

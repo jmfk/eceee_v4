@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { PanelRight, ChevronLeft, ChevronRight } from 'lucide-react'
 
 /**
- * ECEEE Sidebar Widget Component
+ * EASY Sidebar Widget Component
  * Renders sidebar content with nested widgets, collapsible functionality, and positioning
  */
 const SidebarWidget = ({ config = {}, mode = 'preview' }) => {

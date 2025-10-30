@@ -1,7 +1,7 @@
 /**
- * ECEEE Widgets Package
+ * EASY Widgets Package
  * 
- * ECEEE-specific widget implementations that mirror the backend easy_widgets app.
+ * EASY-specific widget implementations that mirror the backend easy_widgets app.
  * These are NEW widgets with their own namespace (easy_widgets.*), not overrides.
  */
 

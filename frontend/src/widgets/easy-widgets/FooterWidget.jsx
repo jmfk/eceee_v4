@@ -2,7 +2,7 @@ import React from 'react'
 import { Hash } from 'lucide-react'
 
 /**
- * ECEEE Footer Widget Component
+ * EASY Footer Widget Component
  * Footer widget with multi-column grid layout, background styling, social links, and copyright
  * Matches backend easy_widgets.FooterWidget schema
  */

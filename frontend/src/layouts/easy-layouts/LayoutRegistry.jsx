@@ -1,5 +1,5 @@
 /**
- * ECEEE Layout Registry - ECEEE-specific Layout Definitions
+ * EASY Layout Registry - ECEEE-specific Layout Definitions
  * 
  * This file imports ECEEE-specific layout definitions that mirror the backend easy_layouts app.
  * These layouts are designed for specialized ECEEE use cases and extend the default layout system.

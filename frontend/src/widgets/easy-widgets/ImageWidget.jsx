@@ -9,7 +9,7 @@ import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import { renderMustache, prepareGalleryContext, prepareCarouselContext } from '../../utils/mustacheRenderer'
 
 /**
- * ECEEE Image Widget Component
+ * EASY Image Widget Component
  * Renders images, galleries, and videos with multiple display modes
  */
 const ImageWidget = ({

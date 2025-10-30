@@ -7,7 +7,7 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 /**
- * ECEEE Table Widget Component
+ * EASY Table Widget Component
  * Renders configurable data tables with advanced styling and cell spanning
  */
 const TableWidget = memo(({

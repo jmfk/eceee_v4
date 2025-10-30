@@ -1,5 +1,5 @@
 /**
- * ECEEE Top News Plug Widget
+ * EASY Top News Plug Widget
  * 
  * Displays top news in various grid configurations for homepage/landing pages.
  * Widget type: easy_widgets.TopNewsPlugWidget
