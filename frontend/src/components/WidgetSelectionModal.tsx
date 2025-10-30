@@ -9,59 +9,102 @@ import {
 } from '../widgets'
 const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes, context }) => {
     const [searchTerm, setSearchTerm] = useState('')
+    const [showAllWidgets, setShowAllWidgets] = useState(false) // Override filtering
     const modalRef = useRef<HTMLDivElement | null>(null)
 
     // Filter available widget types based on slot configuration and search term
     const filteredWidgets = useMemo(() => {
         if (!availableWidgetTypes) return []
 
-        // If no widgetControls, use all available widgets (fallback - matches backend behavior)
-        if (!slot?.widgetControls || slot.widgetControls.length === 0) {
-            let widgets = availableWidgetTypes.map(wt => ({
+        let widgets = []
+
+        // If override is active, show all widgets
+        if (showAllWidgets) {
+            widgets = availableWidgetTypes.map(wt => ({
                 type: wt.type || wt.widgetType,
                 name: wt.name || wt.display_name || getWidgetDisplayName(wt.type || wt.widgetType),
                 description: getWidgetDescription(wt.type || wt.widgetType) || wt.description || 'No description available',
                 category: getWidgetCategory(wt.type || wt.widgetType) || wt.category || 'General',
                 icon: getWidgetIcon(wt.type || wt.widgetType) || wt.icon || '🧩'
             }))
+        }
+        // If widgetControls exist, use them
+        else if (slot?.widgetControls && slot.widgetControls.length > 0) {
+            widgets = slot.widgetControls
+                .filter(control => {
+                    // Only show widget controls that are available on the server
+                    return availableWidgetTypes.some(available =>
+                        available.type === control.widgetType ||
+                        available.widgetType === control.widgetType
+                    )
+                })
+                .map(control => {
+                    const widgetType = availableWidgetTypes.find(available =>
+                        available.type === control.widgetType ||
+                        available.widgetType === control.widgetType
+                    )
+                    return {
+                        type: control.widgetType,
+                        name: control.label || getWidgetDisplayName(control.widgetType),
+                        description: getWidgetDescription(control.widgetType) || widgetType?.description || 'No description available',
+                        category: getWidgetCategory(control.widgetType) || widgetType?.category || 'General',
+                        icon: getWidgetIcon(control.widgetType) || widgetType?.icon || '🧩'
+                    }
+                })
+        }
+        // Check for allowed_types or disallowed_types
+        else if (slot?.allowedTypes || slot?.disallowedTypes) {
+            const allowedTypes = slot.allowedTypes || []
+            const disallowedTypes = slot.disallowedTypes || []
 
-            // Apply search filter
-            if (searchTerm.trim()) {
-                const term = searchTerm.toLowerCase()
-                widgets = widgets.filter(widget =>
-                    widget.name.toLowerCase().includes(term) ||
-                    widget.description.toLowerCase().includes(term) ||
-                    widget.category.toLowerCase().includes(term) ||
-                    widget.type.toLowerCase().includes(term)
-                )
-            }
+            widgets = availableWidgetTypes
+                .filter(wt => {
+                    const widgetType = wt.type || wt.widgetType
 
-            return widgets
+                    // If allowed_types exists, use it as whitelist
+                    if (allowedTypes.length > 0) {
+                        return allowedTypes.some(allowedType => {
+                            if (allowedType.endsWith('.*')) {
+                                const prefix = allowedType.slice(0, -2)
+                                return widgetType.startsWith(prefix)
+                            }
+                            return widgetType === allowedType
+                        })
+                    }
+
+                    // Otherwise, use disallowed_types as blacklist
+                    if (disallowedTypes.length > 0) {
+                        return !disallowedTypes.some(disallowedType => {
+                            if (disallowedType.endsWith('.*')) {
+                                const prefix = disallowedType.slice(0, -2)
+                                return widgetType.startsWith(prefix)
+                            }
+                            return widgetType === disallowedType
+                        })
+                    }
+
+                    return true
+                })
+                .map(wt => ({
+                    type: wt.type || wt.widgetType,
+                    name: wt.name || wt.display_name || getWidgetDisplayName(wt.type || wt.widgetType),
+                    description: getWidgetDescription(wt.type || wt.widgetType) || wt.description || 'No description available',
+                    category: getWidgetCategory(wt.type || wt.widgetType) || wt.category || 'General',
+                    icon: getWidgetIcon(wt.type || wt.widgetType) || wt.icon || '🧩'
+                }))
+        }
+        // Default fallback: show all available widgets
+        else {
+            widgets = availableWidgetTypes.map(wt => ({
+                type: wt.type || wt.widgetType,
+                name: wt.name || wt.display_name || getWidgetDisplayName(wt.type || wt.widgetType),
+                description: getWidgetDescription(wt.type || wt.widgetType) || wt.description || 'No description available',
+                category: getWidgetCategory(wt.type || wt.widgetType) || wt.category || 'General',
+                icon: getWidgetIcon(wt.type || wt.widgetType) || wt.icon || '🧩'
+            }))
         }
 
-        let widgets = slot.widgetControls
-            .filter(control => {
-                // Only show widget controls that are available on the server
-                return availableWidgetTypes.some(available =>
-                    available.type === control.widgetType ||
-                    available.widgetType === control.widgetType
-                )
-            })
-            .map(control => {
-                const widgetType = availableWidgetTypes.find(available =>
-                    available.type === control.widgetType ||
-                    available.widgetType === control.widgetType
-                )
-                return {
-                    type: control.widgetType,
-                    name: control.label || getWidgetDisplayName(control.widgetType),
-                    description: getWidgetDescription(control.widgetType) || widgetType?.description || 'No description available',
-                    category: getWidgetCategory(control.widgetType) || widgetType?.category || 'General',
-                    icon: getWidgetIcon(control.widgetType) || widgetType?.icon || '🧩'
-                }
-            })
-
-        // Filter by search term
+        // Apply search filter
         if (searchTerm.trim()) {
             const term = searchTerm.toLowerCase()
             widgets = widgets.filter(widget =>
@@ -71,8 +114,9 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                 widget.type.toLowerCase().includes(term)
             )
         }
+
         return widgets
-    }, [slot, availableWidgetTypes, searchTerm])
+    }, [slot, availableWidgetTypes, searchTerm, showAllWidgets])
 
     // Close modal when clicking outside
     useEffect(() => {
@@ -140,6 +184,26 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
+
+                    {/* Override checkbox */}
+                    {(slot?.widgetControls?.length > 0 || slot?.allowedTypes?.length > 0 || slot?.disallowedTypes?.length > 0) && (
+                        <div className="mb-4 flex items-center gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={showAllWidgets}
+                                    onChange={(e) => setShowAllWidgets(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">Show All Widgets</span>
+                                {showAllWidgets && (
+                                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+                                        Override Active
+                                    </span>
+                                )}
+                            </label>
+                        </div>
+                    )}
 
                     {/* Widget Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">

@@ -15,12 +15,14 @@ const PageWidgetSelectionModal = ({
     onWidgetSelect,
     slotName,
     slotLabel,
-    allowedWidgetTypes = ['*'] // Default to all widgets
+    allowedWidgetTypes = ['*'], // Default to all widgets
+    disallowedWidgetTypes = null // Blacklist (only used if allowedWidgetTypes is ['*'])
 }) => {
     const [availableWidgets, setAvailableWidgets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [showAllWidgets, setShowAllWidgets] = useState(false); // Override filtering
 
     // Fetch available widget types
     useEffect(() => {
@@ -41,11 +43,41 @@ const PageWidgetSelectionModal = ({
         }
     };
 
-    // Filter widgets based on allowed types, search, and category
+    // Filter widgets based on allowed types, disallowed types, search, and category
     const filteredWidgets = availableWidgets.filter(widget => {
+        // If override is active, skip type filtering
+        if (showAllWidgets) {
+            const matchesSearch = !searchTerm ||
+                widget.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                widget.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            const matchesCategory = selectedCategory === 'all' ||
+                widget.category === selectedCategory ||
+                (selectedCategory === 'core' && widget.type.startsWith('easy_widgets.'));
+
+            return matchesSearch && matchesCategory;
+        }
+
         // Check if widget type is allowed in this slot
-        const isAllowed = allowedWidgetTypes.includes('*') ||
-            allowedWidgetTypes.some(allowedType => {
+        let isAllowed;
+        
+        if (allowedWidgetTypes.includes('*')) {
+            // All widgets allowed by default, check disallowed list
+            if (disallowedWidgetTypes && disallowedWidgetTypes.length > 0) {
+                isAllowed = !disallowedWidgetTypes.some(disallowedType => {
+                    // Support wildcards like 'easy_widgets.*'
+                    if (disallowedType.endsWith('.*')) {
+                        const prefix = disallowedType.slice(0, -2);
+                        return widget.type.startsWith(prefix);
+                    }
+                    return widget.type === disallowedType;
+                });
+            } else {
+                isAllowed = true;
+            }
+        } else {
+            // Only specific widgets allowed
+            isAllowed = allowedWidgetTypes.some(allowedType => {
                 // Support wildcards like 'easy_widgets.*'
                 if (allowedType.endsWith('.*')) {
                     const prefix = allowedType.slice(0, -2);
@@ -53,6 +85,7 @@ const PageWidgetSelectionModal = ({
                 }
                 return widget.type === allowedType;
             });
+        }
 
         const matchesSearch = !searchTerm ||
             widget.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,13 +174,14 @@ const PageWidgetSelectionModal = ({
                         />
                     </div>
 
-                    {/* Category Filter */}
-                    <div className="flex flex-wrap gap-2">
-                        {categories.map(category => (
-                            <button
-                                key={category.id}
-                                onClick={() => setSelectedCategory(category.id)}
-                                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedCategory === category.id
+                    {/* Override Checkbox and Category Filter */}
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-wrap gap-2 flex-1">
+                            {categories.map(category => (
+                                <button
+                                    key={category.id}
+                                    onClick={() => setSelectedCategory(category.id)}
+                                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedCategory === category.id
                                     ? 'bg-blue-100 text-blue-800'
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
@@ -155,6 +189,25 @@ const PageWidgetSelectionModal = ({
                                 {category.label}
                             </button>
                         ))}
+                        </div>
+                        
+                        {/* Override checkbox */}
+                        {(allowedWidgetTypes.length > 0 && !allowedWidgetTypes.includes('*')) || disallowedWidgetTypes ? (
+                            <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                                <input
+                                    type="checkbox"
+                                    checked={showAllWidgets}
+                                    onChange={(e) => setShowAllWidgets(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">Show All Widgets</span>
+                                {showAllWidgets && (
+                                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+                                        Override Active
+                                    </span>
+                                )}
+                            </label>
+                        ) : null}
                     </div>
                 </div>
 

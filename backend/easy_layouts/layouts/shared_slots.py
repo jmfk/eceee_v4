@@ -17,6 +17,8 @@ header = {
         "easy_widgets.HeaderWidget"
     ],  # Only inherit navigation widgets
     "allowed_types": ["easy_widgets.HeaderWidget"],
+    # Alternative: Use disallowed_types when allowed_types is not specified
+    # "disallowed_types": ["easy_widgets.FooterWidget"],  # Block specific types
     "dimensions": {
         "mobile": {"width": 640, "height": 112},
         "tablet": {"width": 1024, "height": 112},

@@ -175,10 +175,13 @@ const WidgetSlot = ({
     const handleAddWidget = () => {
         if (onShowWidgetModal) {
             // Determine which widget types are allowed for this slot
-            // Priority: inheritableTypes (if defined and non-empty) > allowedWidgetTypes
-            // Note: empty inheritableTypes array means "all types" according to backend
+            // Priority: allowed_types/inheritableTypes > disallowed_types
             let allowedTypes = finalAllowedWidgetTypes;
+            let disallowedTypes = null;
 
+            // Check for allowed_types in slot rules
+            const hasAllowedTypes = slotRules.allowedTypes !== undefined && slotRules.allowedTypes.length > 0;
+            
             if (slotRules.inheritableTypes !== undefined) {
                 // inheritableTypes is explicitly set in the layout
                 if (slotRules.inheritableTypes.length > 0) {
@@ -188,11 +191,19 @@ const WidgetSlot = ({
                     // Empty array means "all types allowed" (backend convention)
                     allowedTypes = ['*'];
                 }
+            } else if (hasAllowedTypes) {
+                // Use allowed_types from slot rules
+                allowedTypes = slotRules.allowedTypes;
+            } else if (slotRules.disallowedTypes !== undefined && slotRules.disallowedTypes.length > 0) {
+                // No allowed_types, but disallowed_types exists - use as blacklist
+                allowedTypes = ['*'];
+                disallowedTypes = slotRules.disallowedTypes;
             }
 
             onShowWidgetModal(name, {
                 label,
                 allowedWidgetTypes: allowedTypes,
+                disallowedWidgetTypes: disallowedTypes,
                 maxWidgets: finalMaxWidgets
             });
         } else {
@@ -216,12 +227,19 @@ const WidgetSlot = ({
 
         // Determine allowed widget types for this slot (same logic as handleAddWidget)
         let allowedTypes = finalAllowedWidgetTypes;
+        const hasAllowedTypes = slotRules.allowedTypes !== undefined && slotRules.allowedTypes.length > 0;
+        
         if (slotRules.inheritableTypes !== undefined) {
             if (slotRules.inheritableTypes.length > 0) {
                 allowedTypes = slotRules.inheritableTypes;
             } else {
                 allowedTypes = ['*'];
             }
+        } else if (hasAllowedTypes) {
+            allowedTypes = slotRules.allowedTypes;
+        } else if (slotRules.disallowedTypes !== undefined && slotRules.disallowedTypes.length > 0) {
+            // Note: disallowedTypes filtering is handled in the widget modal
+            allowedTypes = ['*'];
         }
 
         try {

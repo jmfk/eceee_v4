@@ -231,6 +231,26 @@ class ObjectTypeDefinition(models.Model):
                             f"Slot '{slot['name']}': maxWidgets must be a positive integer or null"
                         )
 
+                # Validate allowed_types (accept both camelCase and snake_case)
+                allowed_types = slot.get("allowed_types") or slot.get("allowedTypes")
+                if allowed_types is not None:
+                    if not isinstance(allowed_types, list):
+                        raise ValidationError(
+                            f"Slot '{slot['name']}': allowed_types must be an array"
+                        )
+                    # Validate widget types exist
+                    self._validate_widget_types(allowed_types, slot["name"])
+
+                # Validate disallowed_types (accept both camelCase and snake_case)
+                disallowed_types = slot.get("disallowed_types") or slot.get("disallowedTypes")
+                if disallowed_types is not None:
+                    if not isinstance(disallowed_types, list):
+                        raise ValidationError(
+                            f"Slot '{slot['name']}': disallowed_types must be an array"
+                        )
+                    # Validate widget types exist
+                    self._validate_widget_types(disallowed_types, slot["name"])
+
                 if "preCreatedWidgets" in slot:
                     if not isinstance(slot["preCreatedWidgets"], list):
                         raise ValidationError(

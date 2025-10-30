@@ -30,6 +30,11 @@ class LandingPageLayout(BaseLayout):
                     "max_widgets": None,
                     "css_classes": "slot-main",
                     "required": True,
+                    "disallowed_types": [
+                        "easy_widgets.FooterWidget",
+                        "easy_widgets.NavbarWidget",
+                        "easy_widgets.HeaderWidget",
+                    ],
                     "dimensions": {
                         "mobile": {"width": 640, "height": None},
                         "tablet": {"width": 1024, "height": None},

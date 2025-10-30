@@ -39,6 +39,11 @@ class MainLayoutLayout(BaseLayout):
                         },
                     ],
                     "allows_inheritance": False,
+                    "disallowed_types": [
+                        "easy_widgets.FooterWidget",
+                        "easy_widgets.NavbarWidget",
+                        "easy_widgets.HeaderWidget",
+                    ],
                     "allow_merge": False,  # Main content is page-specific, no merge
                     "collapse_behavior": "never",  # Never collapse - always show in edit mode
                     "dimensions": {
@@ -56,6 +61,11 @@ class MainLayoutLayout(BaseLayout):
                     "allows_inheritance": True,
                     "allow_merge": True,  # Enable merge mode for additive widgets
                     "inheritable_types": [],
+                    "disallowed_types": [
+                        "easy_widgets.FooterWidget",
+                        "easy_widgets.NavbarWidget",
+                        "easy_widgets.HeaderWidget",
+                    ],
                     "collapse_behavior": "all",  # Collapse only if all widgets are inherited
                     "dimensions": {
                         "mobile": {"width": 640, "height": None},

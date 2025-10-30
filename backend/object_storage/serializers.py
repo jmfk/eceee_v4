@@ -442,6 +442,32 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                         f"Slot '{slot['name']}': widget type '{widget_type}' not found in registry"
                     )
 
+        # Validate allowed_types
+        if "allowed_types" in slot:
+            if not isinstance(slot["allowed_types"], list):
+                raise serializers.ValidationError(
+                    f"Slot '{slot['name']}': allowed_types must be an array"
+                )
+
+            for widget_type in slot["allowed_types"]:
+                if widget_type not in available_widgets:
+                    raise serializers.ValidationError(
+                        f"Slot '{slot['name']}': widget type '{widget_type}' not found in registry"
+                    )
+
+        # Validate disallowed_types
+        if "disallowed_types" in slot:
+            if not isinstance(slot["disallowed_types"], list):
+                raise serializers.ValidationError(
+                    f"Slot '{slot['name']}': disallowed_types must be an array"
+                )
+
+            for widget_type in slot["disallowed_types"]:
+                if widget_type not in available_widgets:
+                    raise serializers.ValidationError(
+                        f"Slot '{slot['name']}': widget type '{widget_type}' not found in registry"
+                    )
+
         # Validate max_widgets
         if "max_widgets" in slot and slot["max_widgets"] is not None:
             if not isinstance(slot["max_widgets"], int) or slot["max_widgets"] < 0:
