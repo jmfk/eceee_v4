@@ -2,12 +2,12 @@
 
 ## Problem
 
-ECEEE widgets (`eceee_widgets.ContentWidget`, etc.) were not being recognized in the PageEditor and ObjectEditor, showing "Unsupported Widget" errors even though they had proper implementations.
+ECEEE widgets (`easy_widgets.ContentWidget`, etc.) were not being recognized in the PageEditor and ObjectEditor, showing "Unsupported Widget" errors even though they had proper implementations.
 
 **Error Message:**
 ```
 Unsupported Widget
-Widget type "eceee_widgets.ContentWidget" is not supported in PageEditor
+Widget type "easy_widgets.ContentWidget" is not supported in PageEditor
 ```
 
 ## Root Cause
@@ -43,14 +43,14 @@ WidgetRegistryManager
 ├── CORE_WIDGET_REGISTRY (Priority: 100)
 │   └── default_widgets.* (ContentWidget, ImageWidget, etc.)
 └── ECEEE_WIDGET_REGISTRY (Priority: 200)
-    ├── eceee_widgets.* (ContentWidget, ImageWidget, etc.)
+    ├── easy_widgets.* (ContentWidget, ImageWidget, etc.)
     └── default_widgets.FooterWidget (override)
 ```
 
 ### Priority System
 
 - **Priority 100**: Default widgets (`default_widgets.*`)
-- **Priority 200**: ECEEE widgets (`eceee_widgets.*`)
+- **Priority 200**: ECEEE widgets (`easy_widgets.*`)
 - Higher priority numbers override lower ones
 - ECEEE FooterWidget overrides default FooterWidget using the same key
 
@@ -58,13 +58,13 @@ WidgetRegistryManager
 
 ```javascript
 // OLD (broken)
-getCoreWidgetComponent('eceee_widgets.ContentWidget')
+getCoreWidgetComponent('easy_widgets.ContentWidget')
   → Only checks CORE_WIDGET_REGISTRY
   → Returns null (not found)
   → Shows "Unsupported Widget" error
 
 // NEW (fixed)
-getWidgetComponent('eceee_widgets.ContentWidget')
+getWidgetComponent('easy_widgets.ContentWidget')
   → Checks WidgetRegistryManager
   → Queries ECEEE_WIDGET_REGISTRY (priority 200)
   → Finds and returns eceeeContentWidget
@@ -78,7 +78,7 @@ The registries are automatically initialized in `frontend/src/widgets/index.js`:
 ```javascript
 import widgetRegistryManager from './WidgetRegistryManager';
 import { CORE_WIDGET_REGISTRY } from './default-widgets/registry';
-import { ECEEE_WIDGET_REGISTRY } from './eceee-widgets';
+import { ECEEE_WIDGET_REGISTRY } from './easy-widgets';
 
 // Register both registries with priority levels
 widgetRegistryManager.registerRegistry(
@@ -90,7 +90,7 @@ widgetRegistryManager.registerRegistry(
 widgetRegistryManager.registerRegistry(
     ECEEE_WIDGET_REGISTRY, 
     widgetRegistryManager.priorities.ECEEE, 
-    'eceee-widgets'
+    'easy-widgets'
 );
 ```
 
@@ -98,15 +98,15 @@ widgetRegistryManager.registerRegistry(
 
 All ECEEE widgets are now properly recognized:
 
-- ✅ `eceee_widgets.ContentWidget`
-- ✅ `eceee_widgets.ImageWidget`
-- ✅ `eceee_widgets.TableWidget`
-- ✅ `eceee_widgets.HeaderWidget`
-- ✅ `eceee_widgets.NavigationWidget`
-- ✅ `eceee_widgets.SidebarWidget`
-- ✅ `eceee_widgets.FormsWidget`
-- ✅ `eceee_widgets.TwoColumnsWidget`
-- ✅ `eceee_widgets.ThreeColumnsWidget`
+- ✅ `easy_widgets.ContentWidget`
+- ✅ `easy_widgets.ImageWidget`
+- ✅ `easy_widgets.TableWidget`
+- ✅ `easy_widgets.HeaderWidget`
+- ✅ `easy_widgets.NavigationWidget`
+- ✅ `easy_widgets.SidebarWidget`
+- ✅ `easy_widgets.FormsWidget`
+- ✅ `easy_widgets.TwoColumnsWidget`
+- ✅ `easy_widgets.ThreeColumnsWidget`
 - ✅ `default_widgets.FooterWidget` (ECEEE override)
 
 ## Testing
@@ -129,5 +129,5 @@ To verify the fix:
 - `frontend/src/widgets/WidgetRegistryManager.js` - Registry manager implementation
 - `frontend/src/widgets/index.js` - Registry initialization
 - `frontend/src/widgets/default-widgets/registry.js` - Default widgets registry
-- `frontend/src/widgets/eceee-widgets/index.js` - ECEEE widgets registry
+- `frontend/src/widgets/easy-widgets/index.js` - ECEEE widgets registry
 

@@ -212,7 +212,7 @@ docker-compose exec backend flake8
 - `backend/webpages/serializers.py` - DRF serializers with validation
 - `backend/webpages/widget_registry.py` - Widget registry and base classes
 - `backend/default_widgets/` - Default widget implementations
-- `backend/eceee_widgets/` - Custom ECEEE widget implementations
+- `backend/easy_widgets/` - Custom ECEEE widget implementations
 - `backend/content/` - Content management (Events, LibraryItems, Tags)
 - `backend/config/settings.py` - Django configuration
 - `backend/templates/` - Page and widget templates

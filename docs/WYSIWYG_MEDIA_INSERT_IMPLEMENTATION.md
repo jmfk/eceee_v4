@@ -59,7 +59,7 @@ Modal for editing existing media inserts:
 
 ### Files Modified
 
-#### 1. `/frontend/src/widgets/eceee-widgets/ContentWidgetEditorRenderer.js`
+#### 1. `/frontend/src/widgets/easy-widgets/ContentWidgetEditorRenderer.js`
 Major additions to the WYSIWYG editor:
 
 **Updated cleanHTML() function**:
@@ -91,7 +91,7 @@ Major additions to the WYSIWYG editor:
 - Responsive adjustments for mobile devices
 - Float clearing for left/right aligned images
 
-#### 2. `/frontend/src/widgets/eceee-widgets/eceeeContentWidget.jsx`
+#### 2. `/frontend/src/widgets/easy-widgets/eceeeContentWidget.jsx`
 - Added `namespace` prop support
 - Passes namespace to ContentWidgetEditorRenderer
 - Updated ContentWidgetEditor to accept and forward namespace

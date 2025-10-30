@@ -2,7 +2,7 @@
  * ECEEE Content Widget
  * 
  * ECEEE-specific implementation of the Content widget.
- * Widget type: eceee_widgets.ContentWidget
+ * Widget type: easy_widgets.ContentWidget
  */
 
 import React, { useRef, useEffect, useCallback, memo, useState } from 'react'
@@ -147,7 +147,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
  * ECEEE Content Widget Component
  * Renders HTML content with WYSIWYG editing capabilities
  */
-const eceeeContentWidget = memo(({
+const ContentWidget = memo(({
     config = {},
     mode = 'editor',
     onConfigChange,
@@ -253,18 +253,18 @@ const eceeeContentWidget = memo(({
 })
 
 // === COLOCATED METADATA ===
-eceeeContentWidget.displayName = 'ECEEE Content'
-eceeeContentWidget.widgetType = 'eceee_widgets.ContentWidget'
+ContentWidget.displayName = 'ECEEE Content'
+ContentWidget.widgetType = 'easy_widgets.ContentWidget'
 
 // Default configuration
-eceeeContentWidget.defaultConfig = {
+ContentWidget.defaultConfig = {
     content: '<h2>ECEEE Content</h2><p>This is an ECEEE-specific content widget.</p>',
     allow_scripts: false,
     sanitize_html: true
 }
 
 // Action handlers for widget menu items
-eceeeContentWidget.actionHandlers = {
+ContentWidget.actionHandlers = {
     'format-content': (widgetInstance, layoutRenderer) => {
         // Get the widget element
         const widgetElement = document.querySelector(`[data-widget-id="${widgetInstance.id}"]`)
@@ -331,7 +331,7 @@ eceeeContentWidget.actionHandlers = {
 }
 
 // Display metadata
-eceeeContentWidget.metadata = {
+ContentWidget.metadata = {
     name: 'ECEEE Content',
     description: 'ECEEE-specific HTML content widget',
     category: 'content',
@@ -362,4 +362,4 @@ eceeeContentWidget.metadata = {
     ]
 }
 
-export default eceeeContentWidget
+export default ContentWidget

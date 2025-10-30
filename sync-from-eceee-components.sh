@@ -21,35 +21,35 @@ cd "$ECEEE_V4_PATH"
 echo "📁 Syncing backend components..."
 
 # Remove existing backend directories if they exist
-rm -rf backend/eceee_layouts backend/eceee_widgets
+rm -rf backend/easy_layouts backend/easy_widgets
 
 # Copy backend components
-echo "  📥 Copying backend/eceee_layouts..."
-cp -r "$ECEEE_COMPONENTS_PATH/backend/eceee_layouts" backend/
+echo "  📥 Copying backend/easy_layouts..."
+cp -r "$ECEEE_COMPONENTS_PATH/backend/easy_layouts" backend/
 
-echo "  📥 Copying backend/eceee_widgets..."
-cp -r "$ECEEE_COMPONENTS_PATH/backend/eceee_widgets" backend/
+echo "  📥 Copying backend/easy_widgets..."
+cp -r "$ECEEE_COMPONENTS_PATH/backend/easy_widgets" backend/
 
 echo "📁 Syncing frontend components..."
 
 # Remove existing frontend directories if they exist
-rm -rf frontend/src/layouts/eceee-layouts frontend/src/widgets/eceee-widgets
+rm -rf frontend/src/layouts/easy-layouts frontend/src/widgets/easy-widgets
 
 # Copy frontend components
-echo "  📥 Copying frontend/src/layouts/eceee-layouts..."
+echo "  📥 Copying frontend/src/layouts/easy-layouts..."
 mkdir -p frontend/src/layouts/
-cp -r "$ECEEE_COMPONENTS_PATH/frontend/src/layouts/eceee-layouts" frontend/src/layouts/
+cp -r "$ECEEE_COMPONENTS_PATH/frontend/src/layouts/easy-layouts" frontend/src/layouts/
 
-echo "  📥 Copying frontend/src/widgets/eceee-widgets..."
+echo "  📥 Copying frontend/src/widgets/easy-widgets..."
 mkdir -p frontend/src/widgets/
-cp -r "$ECEEE_COMPONENTS_PATH/frontend/src/widgets/eceee-widgets" frontend/src/widgets/
+cp -r "$ECEEE_COMPONENTS_PATH/frontend/src/widgets/easy-widgets" frontend/src/widgets/
 
 echo "✅ Sync complete! Components copied from eceee-components to eceee_v4"
 echo ""
 echo "📋 Summary:"
-echo "  • backend/eceee_layouts ← eceee-components/backend/eceee_layouts"
-echo "  • backend/eceee_widgets ← eceee-components/backend/eceee_widgets"
-echo "  • frontend/src/layouts/eceee-layouts ← eceee-components/frontend/src/layouts/eceee-layouts"
-echo "  • frontend/src/widgets/eceee-widgets ← eceee-components/frontend/src/widgets/eceee-widgets"
+echo "  • backend/easy_layouts ← eceee-components/backend/easy_layouts"
+echo "  • backend/easy_widgets ← eceee-components/backend/easy_widgets"
+echo "  • frontend/src/layouts/easy-layouts ← eceee-components/frontend/src/layouts/easy-layouts"
+echo "  • frontend/src/widgets/easy-widgets ← eceee-components/frontend/src/widgets/easy-widgets"
 echo ""
 echo "💡 Note: These files are now local copies. Use sync-to-eceee-components.sh to push changes back."

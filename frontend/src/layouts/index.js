@@ -1,14 +1,14 @@
 /**
  * Layouts Main Export
  * 
- * Uses eceee-layouts only. The default-layouts have been removed from the system.
+ * Uses easy-layouts only. The default-layouts have been removed from the system.
  */
 
 // Export everything from eceee layouts
-export * from './eceee-layouts';
+export * from './easy-layouts';
 
 // Import eceee layout registry
-import { ECEEE_LAYOUT_REGISTRY } from './eceee-layouts';
+import { ECEEE_LAYOUT_REGISTRY } from './easy-layouts';
 
 // Use ECEEE layouts as the main registry
 export const LAYOUT_REGISTRY = ECEEE_LAYOUT_REGISTRY;
@@ -36,4 +36,4 @@ export {
     MainLayout,
     LandingPage,
     WidgetSlot
-} from './eceee-layouts';
+} from './easy-layouts';

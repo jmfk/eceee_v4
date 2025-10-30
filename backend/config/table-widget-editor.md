@@ -17,7 +17,7 @@ Implement a professional table widget with a dedicated special editor modal for 
 
 ### 1. Backend Model Updates
 
-**File**: `backend/eceee_widgets/widgets/table.py`
+**File**: `backend/easy_widgets/widgets/table.py`
 
 Update data models to support new features:
 
@@ -64,7 +64,7 @@ class TableConfig(BaseModel):
 
 ### 2. Backend Template Updates
 
-**File**: `backend/eceee_widgets/templates/eceee_widgets/widgets/table.html`
+**File**: `backend/easy_widgets/templates/easy_widgets/widgets/table.html`
 
 Render enhanced table features:
 
@@ -182,7 +182,7 @@ React component (400-500 lines):
 export { default as TableSpecialEditor } from './TableSpecialEditor'
 ```
 
-**File**: `backend/eceee_widgets/widgets/table.py`
+**File**: `backend/easy_widgets/widgets/table.py`
 
 ```python
 class TableWidget(BaseWidget):

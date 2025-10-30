@@ -1,0 +1,299 @@
+{% if custom_style_html %}
+    <!-- Custom Style Rendering via Mustache -->
+    {% if custom_style_css %}
+        <style>{{ custom_style_css|safe }}</style>
+    {% endif %}
+    {{ custom_style_html|safe }}
+
+{% elif config.display_type == 'gallery' and config.media_items %}
+    <!-- Gallery Display -->
+    <div class="image-widget gallery-widget" data-widget-type="gallery">
+        <div class="gallery-container" 
+             data-columns="{{ config.gallery_columns|default:3 }}"
+             data-show-captions="{{ config.show_captions|yesno:'true,false' }}"
+             data-enable-lightbox="{{ config.enable_lightbox|yesno:'true,false' }}">
+            
+            <div class="gallery-grid" 
+                 style="grid-template-columns: repeat({{ config.gallery_columns|default:3 }}, 1fr);">
+                {% for item in config.media_items %}
+                    <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                        <div class="image-container">
+                            {% if item.type == 'video' %}
+                                <video 
+                                    src="{{ item.url }}" 
+                                    class="gallery-image"
+                                    {% if config.auto_play %}autoplay loop muted{% endif %}
+                                    loading="lazy">
+                                </video>
+                            {% else %}
+                                <img 
+                                    src="{{ item.thumbnail_url|default:item.url }}" 
+                                    alt="{{ item.alt_text }}"
+                                    class="gallery-image"
+                                    loading="lazy"
+                                    {% if config.enable_lightbox %}
+                                        onclick="openLightbox({{ forloop.counter0 }})"
+                                        style="cursor: pointer;"
+                                    {% endif %}>
+                            {% endif %}
+                            
+                            {% if config.enable_lightbox %}
+                                <div class="image-overlay">
+                                    <span class="expand-icon">🔍</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if config.show_captions and item.caption %}
+                            <div class="image-caption">
+                                {{ item.caption }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if config.enable_lightbox %}
+            <!-- Lightbox Modal -->
+            <div class="lightbox-modal" id="lightbox-modal-{{ widget.id }}" style="display: none;" onclick="closeLightbox(event)">
+                <div class="lightbox-content">
+                    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+                    
+                    <div class="lightbox-image-container">
+                        <img id="lightbox-image-{{ widget.id }}" src="" alt="" class="lightbox-image">
+                        
+                        {% if config.media_items|length > 1 %}
+                            <button class="lightbox-btn lightbox-prev" onclick="lightboxChangeSlide(-1)">◀</button>
+                            <button class="lightbox-btn lightbox-next" onclick="lightboxChangeSlide(1)">▶</button>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="lightbox-info" id="lightbox-info-{{ widget.id }}">
+                        <h3 id="lightbox-caption-{{ widget.id }}"></h3>
+                    </div>
+                    
+                    {% if config.media_items|length > 1 %}
+                        <div class="lightbox-counter" id="lightbox-counter-{{ widget.id }}"></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <script type="application/json" id="gallery-images-data-{{ widget.id }}">
+                {{ config.media_items|safe }}
+            </script>
+            
+            <script>
+            (function() {
+                let currentLightboxIndex = 0;
+                let galleryImages = [];
+
+                document.addEventListener('DOMContentLoaded', function() {
+                    const imagesDataEl = document.getElementById('gallery-images-data-{{ widget.id }}');
+                    if (imagesDataEl) {
+                        galleryImages = JSON.parse(imagesDataEl.textContent || '[]');
+                    }
+                });
+
+                window.openLightbox = function(index) {
+                    const modal = document.getElementById('lightbox-modal-{{ widget.id }}');
+                    const lightboxImage = document.getElementById('lightbox-image-{{ widget.id }}');
+                    const lightboxCaption = document.getElementById('lightbox-caption-{{ widget.id }}');
+                    const lightboxCounter = document.getElementById('lightbox-counter-{{ widget.id }}');
+                    
+                    if (!modal || !galleryImages[index]) return;
+                    
+                    currentLightboxIndex = index;
+                    const image = galleryImages[index];
+                    
+                    lightboxImage.src = image.url;
+                    lightboxImage.alt = image.alt_text;
+                    
+                    if (lightboxCaption) lightboxCaption.textContent = image.caption || '';
+                    
+                    if (lightboxCounter && galleryImages.length > 1) {
+                        lightboxCounter.textContent = `${index + 1} / ${galleryImages.length}`;
+                    }
+                    
+                    modal.style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                };
+
+                window.closeLightbox = function(event) {
+                    if (event && event.target !== event.currentTarget && !event.target.classList.contains('lightbox-close')) {
+                        return;
+                    }
+                    
+                    const modal = document.getElementById('lightbox-modal-{{ widget.id }}');
+                    if (modal) {
+                        modal.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                };
+
+                window.lightboxChangeSlide = function(direction) {
+                    const totalImages = galleryImages.length;
+                    currentLightboxIndex = (currentLightboxIndex + direction + totalImages) % totalImages;
+                    openLightbox(currentLightboxIndex);
+                };
+
+                // Keyboard navigation
+                document.addEventListener('keydown', function(event) {
+                    const modal = document.getElementById('lightbox-modal-{{ widget.id }}');
+                    if (modal && modal.style.display === 'flex') {
+                        switch(event.key) {
+                            case 'Escape':
+                                closeLightbox();
+                                break;
+                            case 'ArrowLeft':
+                                lightboxChangeSlide(-1);
+                                break;
+                            case 'ArrowRight':
+                                lightboxChangeSlide(1);
+                                break;
+                        }
+                    }
+                });
+            })();
+            </script>
+        {% endif %}
+    </div>
+
+{% elif config.display_type == 'carousel' and config.media_items %}
+    <!-- Carousel Display -->
+    <div class="image-widget carousel-widget" data-widget-type="carousel">
+        <div class="carousel-container">
+            <div class="carousel-track" id="carousel-track-{{ widget.id }}">
+                {% for item in config.media_items %}
+                    <div class="carousel-slide" data-index="{{ forloop.counter0 }}">
+                        {% if item.type == 'video' %}
+                            <video 
+                                src="{{ item.url }}" 
+                                class="carousel-image"
+                                {% if config.auto_play %}autoplay loop muted{% endif %}>
+                            </video>
+                        {% else %}
+                            <img 
+                                src="{{ item.thumbnail_url|default:item.url }}" 
+                                alt="{{ item.alt_text }}"
+                                class="carousel-image">
+                        {% endif %}
+                        {% if config.show_captions and item.caption %}
+                            <div class="carousel-caption">{{ item.caption }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            
+            {% if config.media_items|length > 1 %}
+                <button class="carousel-btn carousel-prev" onclick="changeSlide{{ widget.id }}(-1)">◀</button>
+                <button class="carousel-btn carousel-next" onclick="changeSlide{{ widget.id }}(1)">▶</button>
+                
+                <div class="carousel-indicators">
+                    {% for item in config.media_items %}
+                        <button class="indicator-dot {% if forloop.first %}active{% endif %}" 
+                                onclick="goToSlide{{ widget.id }}({{ forloop.counter0 }})"></button>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        
+        <script>
+        (function() {
+            let currentSlide = 0;
+
+            window.changeSlide{{ widget.id }} = function(direction) {
+                const track = document.getElementById('carousel-track-{{ widget.id }}');
+                const slides = track.querySelectorAll('.carousel-slide');
+                const totalSlides = slides.length;
+                
+                currentSlide = (currentSlide + direction + totalSlides) % totalSlides;
+                updateCarousel{{ widget.id }}();
+            };
+
+            window.goToSlide{{ widget.id }} = function(index) {
+                currentSlide = index;
+                updateCarousel{{ widget.id }}();
+            };
+
+            function updateCarousel{{ widget.id }}() {
+                const track = document.getElementById('carousel-track-{{ widget.id }}');
+                const container = track.closest('.carousel-widget');
+                const indicators = container.querySelectorAll('.indicator-dot');
+                
+                if (track) {
+                    track.style.transform = `translateX(-${currentSlide * 100}%)`;
+                }
+                
+                indicators.forEach((indicator, index) => {
+                    indicator.classList.toggle('active', index === currentSlide);
+                });
+            }
+
+            {% if config.auto_play %}
+            // Auto-play functionality
+            setInterval(function() {
+                changeSlide{{ widget.id }}(1);
+            }, {{ config.auto_play_interval|default:3 }} * 1000);
+            {% endif %}
+        })();
+        </script>
+    </div>
+
+{% else %}
+    <!-- Single Image Display -->
+    <div class="image-widget image-size-{{ config.size|default:'medium' }} image-align-{{ config.alignment|default:'center' }}">
+        {% if config.media_items and config.media_items|length > 0 %}
+            {% with item=config.media_items.0 %}
+                <div class="image-container">
+                    {% if item.type == 'video' %}
+                        <video 
+                            src="{{ item.url }}" 
+                            class="widget-image"
+                            {% if config.auto_play %}autoplay loop muted{% endif %}
+                            loading="lazy">
+                        </video>
+                    {% else %}
+                        <img 
+                            src="{{ item.url }}" 
+                            alt="{{ item.alt_text }}"
+                            class="widget-image"
+                            loading="lazy"
+                        />
+                    {% endif %}
+                </div>
+                
+                {% if config.show_captions and item.caption %}
+                    <div class="image-caption">
+                        {{ item.caption }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+        {% elif config.image_url %}
+            <div class="image-container">
+                <img 
+                    src="{{ config.image_url }}" 
+                    alt="{{ config.alt_text }}"
+                    class="widget-image"
+                    loading="lazy"
+                />
+            </div>
+            
+            {% if config.caption %}
+                <div class="image-caption">
+                    {{ config.caption }}
+                </div>
+            {% endif %}
+{% endif %}
+</div>
+{% endif %}
+
+<!-- 
+    Image/Gallery/Carousel/Lightbox CSS now loaded dynamically from theme
+    See /api/webpages/themes/{theme_id}/styles.css
+    
+    All widget styling has been moved to the theme system for:
+    - Better performance (cached and served separately)
+    - Easier customization (edit in theme editor)
+    - Centralized management (all CSS in one place)
+-->

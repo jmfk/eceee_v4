@@ -289,7 +289,7 @@ class SelfContainedWidgetForm {
      */
     getMockSchema() {
         const mockSchemas = {
-            'eceee_widgets.TextWidget': {
+            'easy_widgets.TextWidget': {
                 type: 'object',
                 properties: {
                     text: {
@@ -335,7 +335,7 @@ class SelfContainedWidgetForm {
                 },
                 required: ['text']
             },
-            'eceee_widgets.ImageWidget': {
+            'easy_widgets.ImageWidget': {
                 type: 'object',
                 properties: {
                     src: {
@@ -377,7 +377,7 @@ class SelfContainedWidgetForm {
                 },
                 required: ['src', 'alt']
             },
-            'eceee_widgets.ButtonWidget': {
+            'easy_widgets.ButtonWidget': {
                 type: 'object',
                 properties: {
                     text: {

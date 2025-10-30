@@ -11,7 +11,7 @@ import { Settings } from 'lucide-react'
 // Simple mock widget data
 const mockWidget = {
     id: 'demo-text-widget-simple',
-    type: 'eceee_widgets.TextWidget',
+    type: 'easy_widgets.TextWidget',
     name: 'Demo Text Widget',
     slotName: 'demo-slot',
     config: {

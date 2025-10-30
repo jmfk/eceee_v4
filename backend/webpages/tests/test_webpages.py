@@ -364,7 +364,7 @@ class InheritanceEnhancementTest(TestCase):
                 "header": [
                     {
                         "id": "infinite-widget",
-                        "type": "eceee_widgets.HeaderWidget",
+                        "type": "easy_widgets.HeaderWidget",
                         "config": {"content": "Infinite"},
                         "inheritance_level": -1,
                         "is_published": True,
@@ -372,7 +372,7 @@ class InheritanceEnhancementTest(TestCase):
                     },
                     {
                         "id": "page-only-widget",
-                        "type": "eceee_widgets.HeaderWidget",
+                        "type": "easy_widgets.HeaderWidget",
                         "config": {"content": "Page Only"},
                         "inheritance_level": 0,
                         "is_published": True,
@@ -415,7 +415,7 @@ class InheritanceEnhancementTest(TestCase):
                 "header": [
                     {
                         "id": "published-widget",
-                        "type": "eceee_widgets.HeaderWidget",
+                        "type": "easy_widgets.HeaderWidget",
                         "config": {"content": "Published"},
                         "inheritance_level": -1,
                         "is_published": True,
@@ -423,7 +423,7 @@ class InheritanceEnhancementTest(TestCase):
                     },
                     {
                         "id": "unpublished-widget",
-                        "type": "eceee_widgets.HeaderWidget",
+                        "type": "easy_widgets.HeaderWidget",
                         "config": {"content": "Unpublished"},
                         "inheritance_level": -1,
                         "is_published": False,

@@ -30,7 +30,7 @@
 
 ## Technical Changes Made
 
-### File: `frontend/src/widgets/eceee-widgets/FooterWidgetEditor.jsx`
+### File: `frontend/src/widgets/easy-widgets/FooterWidgetEditor.jsx`
 
 #### Props Updated
 ```javascript
@@ -132,7 +132,7 @@ The FooterWidgetEditor now follows the same pattern as MediaSpecialEditor and Ta
 
 ## Files Modified
 
-1. `frontend/src/widgets/eceee-widgets/FooterWidgetEditor.jsx`
+1. `frontend/src/widgets/easy-widgets/FooterWidgetEditor.jsx`
    - Complete refactor for UDC integration
    - Added scrollable container
    - All handlers now call `updateConfig`
@@ -140,7 +140,7 @@ The FooterWidgetEditor now follows the same pattern as MediaSpecialEditor and Ta
 ## Related Files (No changes needed)
 
 - `frontend/src/components/special-editors/SpecialEditorRenderer.jsx` - Already had FooterWidgetEditor registered
-- `frontend/src/widgets/eceee-widgets/eceeeFooterWidget.jsx` - Already had `specialEditor: 'FooterWidgetEditor'` in metadata
+- `frontend/src/widgets/easy-widgets/eceeeFooterWidget.jsx` - Already had `specialEditor: 'FooterWidgetEditor'` in metadata
 
 ## Next Steps
 

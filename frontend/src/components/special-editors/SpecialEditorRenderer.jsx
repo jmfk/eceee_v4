@@ -7,8 +7,8 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
 import TableSpecialEditor from './TableSpecialEditor'
-import FooterWidgetEditor from '../../widgets/eceee-widgets/FooterWidgetEditor'
-import NavbarWidgetEditor from '../../widgets/eceee-widgets/NavbarWidgetEditor'
+import FooterWidgetEditor from '../../widgets/easy-widgets/FooterWidgetEditor'
+import NavbarWidgetEditor from '../../widgets/easy-widgets/NavbarWidgetEditor'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -25,7 +25,7 @@ const SPECIAL_EDITOR_COMPONENTS = {
 
 // Legacy registry for backward compatibility (deprecated - use widget metadata instead)
 const LEGACY_SPECIAL_EDITORS = {
-    'eceee_widgets.ImageWidget': 'MediaSpecialEditor',
+    'easy_widgets.ImageWidget': 'MediaSpecialEditor',
 }
 
 /**

@@ -1,0 +1,78 @@
+{% load static %}
+{% load security_filters %}
+
+
+{% if should_render and config.news_object %}
+<article class="news-detail-widget" data-widget-type="news-detail" data-object-id="{{ news_object.id }}">
+    
+    <header class="news-header">
+        {% if config.show_object_type %}
+            <div class="news-type-badge">
+                {{ news_object.object_type.label }}
+            </div>
+        {% endif %}
+
+        <h1 class="news-title">{{ news_object.title }}</h1>
+
+        {% if config.show_metadata %}
+            <div class="news-metadata">
+                {% if metadata.publish_date %}
+                    <div class="news-metadata-item">
+                        <span class="news-metadata-label">Published:</span>
+                        <time datetime="{{ metadata.publish_date|date:'c' }}">
+                            {{ metadata.publish_date|date:"F j, Y" }}
+                        </time>
+                    </div>
+                {% endif %}
+
+                {% if metadata.author %}
+                    <div class="news-metadata-item">
+                        <span class="news-metadata-label">Author:</span>
+                        <span>{{ metadata.author }}</span>
+                    </div>
+                {% endif %}
+
+                {% if metadata.updated_at and metadata.updated_at != metadata.created_at %}
+                    <div class="news-metadata-item">
+                        <span class="news-metadata-label">Updated:</span>
+                        <time datetime="{{ metadata.updated_at|date:'c' }}">
+                            {{ metadata.updated_at|date:"F j, Y" }}
+                        </time>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </header>
+
+    {% if config.show_featured_image and featured_image %}
+        <div class="news-featured-image">
+            <img src="{{ featured_image }}" alt="{{ news_object.title }}" loading="eager">
+        </div>
+    {% endif %}
+
+    <div class="news-content">
+        {{ content_html|sanitize_html }}
+    </div>
+
+    {% if config.render_object_widgets and rendered_widgets %}
+        <div class="news-object-widgets">
+            {% for slot_name, widgets in rendered_widgets.items %}
+                <div class="news-widget-slot news-widget-slot-{{ slot_name }}" data-slot="{{ slot_name }}">
+                    {% for widget_html in widgets %}
+                        {{ widget_html|sanitize_html }}
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</article>
+{% elif should_render == False %}
+    <!-- Widget not rendering: slug not in path_variables or doesn't match configured ObjectTypes -->
+{% elif error %}
+<div class="news-detail-widget">
+    <div class="not-found-message">
+        <p>{{ error }}</p>
+    </div>
+</div>
+{% endif %}
+

@@ -1,22 +1,22 @@
 /**
  * Widgets Main Export
  * 
- * Unified widget system using eceee-widgets.
+ * Unified widget system using easy-widgets.
  * The default-widgets have been removed from the system.
  */
 
 import widgetRegistryManager from './WidgetRegistryManager';
-import { ECEEE_WIDGET_REGISTRY } from './eceee-widgets';
+import { ECEEE_WIDGET_REGISTRY } from './easy-widgets';
 
 // Register eceee widgets registry
 widgetRegistryManager.registerRegistry(
     ECEEE_WIDGET_REGISTRY,
     widgetRegistryManager.priorities.THIRD_PARTY,
-    'eceee-widgets'
+    'easy-widgets'
 );
 
 // Export eceee widgets
-export * from './eceee-widgets';
+export * from './easy-widgets';
 
 // Export the unified widget functions that support overrides
 export const getWidgetComponent = (widgetType) => {
@@ -88,28 +88,28 @@ export const getWidgetTags = (widgetType) => {
 // Export the registry manager for advanced usage
 export { widgetRegistryManager };
 
-// Export individual widget components from eceee-widgets
-// Using aliases to maintain backward compatibility
+// Export individual widget components from easy-widgets
+// Direct exports with clean names
 export {
-    eceeeContentWidget as ContentWidget,
-    eceeeImageWidget as ImageWidget,
-    eceeeTableWidget as TableWidget,
-    eceeeHeaderWidget as HeaderWidget,
-    eceeeFooterWidget as FooterWidget,
-    eceeeNavigationWidget as NavigationWidget,
-    eceeeNavbarWidget as NavbarWidget,
-    eceeeSidebarWidget as SidebarWidget,
-    eceeeFormsWidget as FormsWidget,
-    eceeeNewsListWidget as NewsListWidget,
-    eceeeNewsDetailWidget as NewsDetailWidget,
-    eceeePathDebugWidget as PathDebugWidget,
-    eceeeSidebarTopNewsWidget as SidebarTopNewsWidget,
-    eceeeTopNewsPlugWidget as TopNewsPlugWidget,
+    ContentWidget,
+    ImageWidget,
+    TableWidget,
+    HeaderWidget,
+    FooterWidget,
+    NavigationWidget,
+    NavbarWidget,
+    SidebarWidget,
+    FormsWidget,
+    NewsListWidget,
+    NewsDetailWidget,
+    PathDebugWidget,
+    SidebarTopNewsWidget,
+    TopNewsPlugWidget,
     // Container widgets
-    eceeeTwoColumnsWidget as TwoColumnsWidget,
-    eceeeThreeColumnsWidget as ThreeColumnsWidget,
+    TwoColumnsWidget,
+    ThreeColumnsWidget,
     registerWidget  // Export utility for custom widget packages
-} from './eceee-widgets';
+} from './easy-widgets';
 
 /**
  * Register a third-party widget registry

@@ -1,0 +1,41 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Page Title -->
+    <title>{% block page_title %}ECEEE v4 - AI-Integrated CMS{% endblock %}</title>
+    
+    <!-- SEO Meta Tags -->
+    {% block meta_tags %}{% endblock %}
+    
+    <!-- Site Icons/Favicons -->
+    {% block icon_tags %}{% endblock %}
+    
+    <!-- Google Fonts - Source Sans 3 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <link href="{% static 'css/tailwind.output.css' %}" rel="stylesheet">
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.1" 
+            integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/" 
+            crossorigin="anonymous"></script>
+    
+    <!-- HTMX Extensions -->
+    <script src="{% static 'js/htmx-ext-json-enc.js' %}"></script>
+    <script src="{% static 'js/htmx-ext-response-targets.js' %}"></script>
+    
+    <!-- Alpine.js for additional interactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>    
+</head>
+<body>
+    {% block content %}{% endblock %}
+</body>
+</html>
+

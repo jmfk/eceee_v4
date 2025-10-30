@@ -27,9 +27,9 @@ Implemented comprehensive SEO metadata rendering for pages, including dynamic ti
 
 #### Layout Templates
 Updated all layout templates to use new SEO blocks:
-- `backend/eceee_layouts/templates/eceee_layouts/layouts/main_layout.html`
-- `backend/eceee_layouts/templates/eceee_layouts/layouts/landing_page.html`
-- `backend/eceee_layouts/templates/eceee_layouts/layouts/minimal.html`
+- `backend/easy_layouts/templates/easy_layouts/layouts/main_layout.html`
+- `backend/easy_layouts/templates/easy_layouts/layouts/landing_page.html`
+- `backend/easy_layouts/templates/easy_layouts/layouts/minimal.html`
 - `backend/templates/webpages/page_detail.html`
 
 Each template now includes:

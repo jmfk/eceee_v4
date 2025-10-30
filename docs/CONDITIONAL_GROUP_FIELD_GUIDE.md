@@ -561,7 +561,7 @@ class MyConfig(BaseModel):
 
 **Solutions**:
 1. Check that the model name matches exactly (case-sensitive)
-2. Verify the model is in a widget module (`default_widgets.widgets`, `eceee_widgets.widgets`, etc.)
+2. Verify the model is in a widget module (`default_widgets.widgets`, `easy_widgets.widgets`, etc.)
 3. Check browser console for API errors
 4. Verify the API endpoint is accessible: `/api/v1/webpages/pydantic-models/{model_name}/schema/`
 5. Ensure the URL uses `/api/v1/` prefix, not just `/api/`
@@ -616,5 +616,5 @@ For issues or questions about ConditionalGroupField:
 
 1. Check this documentation
 2. Review the component source code at `/frontend/src/components/form-fields/ConditionalGroupField.jsx`
-3. Look at usage examples in the Navigation widget (`/backend/eceee_widgets/widgets/navigation.py`)
+3. Look at usage examples in the Navigation widget (`/backend/easy_widgets/widgets/navigation.py`)
 

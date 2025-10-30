@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # ECEEE Components Sync Script
-# This script helps sync the eceee_layouts and eceee_widgets components 
+# This script helps sync the easy_layouts and easy_widgets components 
 # to the private repository using git subtrees
 
 set -e
 
 PRIVATE_REPO="https://github.com/jmfk/eceee-components.git"
-LAYOUTS_PREFIX="backend/eceee_layouts"
-WIDGETS_PREFIX="backend/eceee_widgets"
+LAYOUTS_PREFIX="backend/easy_layouts"
+WIDGETS_PREFIX="backend/easy_widgets"
 
 echo "🔄 ECEEE Components Sync Script"
 echo "================================"
@@ -32,9 +32,9 @@ show_usage() {
 }
 
 # Check if we're in the right directory
-if [ ! -d "backend/eceee_layouts" ] || [ ! -d "backend/eceee_widgets" ]; then
+if [ ! -d "backend/easy_layouts" ] || [ ! -d "backend/easy_widgets" ]; then
     echo "❌ Error: This script must be run from the eceee_v4 project root"
-    echo "   Make sure you're in the directory containing backend/eceee_layouts and backend/eceee_widgets"
+    echo "   Make sure you're in the directory containing backend/easy_layouts and backend/easy_widgets"
     exit 1
 fi
 

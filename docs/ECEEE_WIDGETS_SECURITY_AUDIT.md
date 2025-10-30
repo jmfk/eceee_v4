@@ -1,7 +1,7 @@
 # ECEEE Widgets - XSS Security Audit Complete
 
 ## Summary
-✅ **All `eceee_widgets` templates are now secure from XSS vulnerabilities**
+✅ **All `easy_widgets` templates are now secure from XSS vulnerabilities**
 
 ## Templates Fixed (7 total)
 
@@ -64,12 +64,12 @@
 - No `|safe` filters present
 
 ### ✅ Other templates
-All other templates in `eceee_widgets` were reviewed and contain no `|safe` filters or XSS vulnerabilities.
+All other templates in `easy_widgets` were reviewed and contain no `|safe` filters or XSS vulnerabilities.
 
 ## Verification
 ```bash
 # Confirm no |safe filters remain
-grep -r "|safe" backend/eceee_widgets/templates/
+grep -r "|safe" backend/easy_widgets/templates/
 # Result: No matches found ✅
 ```
 
@@ -81,7 +81,7 @@ grep -r "|safe" backend/eceee_widgets/templates/
 - 🔴 **HIGH RISK**: User-generated content rendered without sanitization
 
 ### After Fix
-- ✅ **0 XSS vulnerabilities** in eceee_widgets
+- ✅ **0 XSS vulnerabilities** in easy_widgets
 - ✅ **All user content** properly sanitized
 - ✅ **Flexible security model**: Widgets can optionally allow scripts for trusted content
 - ✅ **News widgets**: Always sanitize (no bypass)
@@ -112,7 +112,7 @@ All sanitization is covered by comprehensive test suite in:
 ## Deployment Checklist
 
 - [x] Install bleach: `pip install -r requirements.txt`
-- [x] All eceee_widgets templates updated
+- [x] All easy_widgets templates updated
 - [x] Comprehensive tests created
 - [ ] Run tests: `python manage.py test utils.tests.test_security_filters`
 - [ ] Manual testing in staging environment
@@ -131,7 +131,7 @@ Some templates use `<script type="application/json">{{ data|safe }}</script>` fo
 
 ## Conclusion
 
-✅ **All eceee_widgets templates are now protected against XSS attacks**
+✅ **All easy_widgets templates are now protected against XSS attacks**
 
 The sanitization system:
 - Blocks malicious scripts, event handlers, and dangerous URLs

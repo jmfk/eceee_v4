@@ -2,7 +2,7 @@
 
 ## Implementation Summary
 
-The image widget (`frontend/src/widgets/eceee-widgets/eceeeImageWidget.jsx`) has been refactored to render custom gallery and carousel style templates in both editor and preview modes.
+The image widget (`frontend/src/widgets/easy-widgets/eceeeImageWidget.jsx`) has been refactored to render custom gallery and carousel style templates in both editor and preview modes.
 
 ### Changes Made
 
@@ -93,7 +93,7 @@ The image widget (`frontend/src/widgets/eceee-widgets/eceeeImageWidget.jsx`) has
 ```
 
 ### Key Files
-- **Widget**: `frontend/src/widgets/eceee-widgets/eceeeImageWidget.jsx`
+- **Widget**: `frontend/src/widgets/easy-widgets/eceeeImageWidget.jsx`
 - **Mustache Renderer**: `frontend/src/utils/mustacheRenderer.js`
 - **Theme Model**: `backend/webpages/models/page_theme.py`
 - **Image Style Selector**: `frontend/src/components/form-fields/ImageStyleSelect.jsx`

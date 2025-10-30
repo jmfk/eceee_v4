@@ -2,7 +2,7 @@
  * Widget Registry Manager - Unified widget override system
  * 
  * This manager handles widget registration with priority-based overrides.
- * Third-party widget packages (like eceee-widgets) can override default widgets
+ * Third-party widget packages (like easy-widgets) can override default widgets
  * by registering widgets with the same widget type.
  */
 

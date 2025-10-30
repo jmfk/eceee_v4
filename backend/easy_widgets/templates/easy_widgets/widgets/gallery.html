@@ -1,0 +1,293 @@
+{% load static %}
+
+<div class="gallery-widget widget-gallery" data-widget-type="gallery">
+    {% if config.title %}
+        <header class="gallery-header">
+            <h2 class="gallery-title">{{ config.title }}</h2>
+        </header>
+    {% endif %}
+
+    <div class="gallery-container" 
+         data-layout="{{ config.layout|default:'grid' }}"
+         data-columns="{{ config.columns|default:3 }}"
+         data-show-captions="{{ config.show_captions|yesno:'true,false' }}"
+         data-enable-lightbox="{{ config.enable_lightbox|yesno:'true,false' }}"
+         data-auto-play="{{ config.auto_play|yesno:'true,false' }}">
+         
+        {% if config.layout == 'carousel' %}
+            <div class="gallery-carousel" id="gallery-carousel">
+                <div class="carousel-container">
+                    <div class="carousel-track" id="carousel-track">
+                        {% for image in config.images %}
+                            <div class="carousel-slide" data-index="{{ forloop.counter0 }}">
+                                                                 <img src="{{ image.thumbnail|default:image.url }}" 
+                                     alt="{{ image.alt_text }}"
+                                     class="carousel-image{% if config.enable_lightbox %} lightbox-trigger{% endif %}"
+                                     data-index="{{ forloop.counter0 }}"
+                                     {% if config.enable_lightbox %}style="cursor: pointer;"{% endif %}>
+                                {% if config.show_captions and image.caption %}
+                                    <div class="carousel-caption">{{ image.caption }}</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    
+                    {% if config.images|length > 1 %}
+                        <button class="carousel-btn carousel-prev" data-direction="-1">
+                            <i class="icon-prev" aria-hidden="true"></i>
+                        </button>
+                        <button class="carousel-btn carousel-next" data-direction="1">
+                            <i class="icon-next" aria-hidden="true"></i>
+                        </button>
+                        
+                        <div class="carousel-indicators">
+                            {% for image in config.images %}
+                                <button class="indicator-dot {% if forloop.first %}active{% endif %}" 
+                                        data-slide-index="{{ forloop.counter0 }}"></button>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+        {% else %}
+            <!-- Grid, Masonry, or Lightbox layouts -->
+            <div class="gallery-grid" 
+                 style="grid-template-columns: repeat({{ config.columns|default:3 }}, 1fr);">
+                {% for image in config.images %}
+                    <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                        <div class="image-container">
+                            <img src="{{ image.thumbnail|default:image.url }}" 
+                                 alt="{{ image.alt_text }}"
+                                 class="gallery-image"
+                                 loading="lazy"
+                                 {% if config.enable_lightbox %}
+                                     onclick="openLightbox({{ forloop.counter0 }})"
+                                     style="cursor: pointer;"
+                                 {% endif %}>
+                            
+                            {% if config.enable_lightbox %}
+                                <div class="image-overlay">
+                                    <i class="icon-expand" aria-hidden="true"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if config.show_captions and image.caption %}
+                            <div class="image-caption">
+                                <h4 class="caption-title">{{ image.caption }}</h4>
+                                {% if image.description %}
+                                    <p class="caption-description">{{ image.description }}</p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    {% if config.enable_lightbox %}
+        <!-- Lightbox Modal -->
+        <div class="lightbox-modal" id="lightbox-modal" style="display: none;" onclick="closeLightbox(event)">
+            <div class="lightbox-content">
+                <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+                
+                <div class="lightbox-image-container">
+                    <img id="lightbox-image" src="" alt="" class="lightbox-image">
+                    
+                    {% if config.images|length > 1 %}
+                        <button class="lightbox-btn lightbox-prev" onclick="lightboxChangeSlide(-1)">
+                            <i class="icon-prev" aria-hidden="true"></i>
+                        </button>
+                        <button class="lightbox-btn lightbox-next" onclick="lightboxChangeSlide(1)">
+                            <i class="icon-next" aria-hidden="true"></i>
+                        </button>
+                    {% endif %}
+                </div>
+                
+                <div class="lightbox-info" id="lightbox-info">
+                    <h3 id="lightbox-caption"></h3>
+                    <p id="lightbox-description"></p>
+                </div>
+                
+                {% if config.images|length > 1 %}
+                    <div class="lightbox-counter" id="lightbox-counter"></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Store image data for lightbox -->
+        <script type="application/json" id="gallery-images-data">
+            {{ config.images|safe }}
+        </script>
+    {% endif %}
+</div>
+
+<script>
+let currentSlide = 0;
+let currentLightboxIndex = 0;
+let galleryImages = [];
+let autoPlayInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const galleryWidget = document.querySelector('.gallery-widget');
+    const imagesDataEl = document.getElementById('gallery-images-data');
+    
+    if (imagesDataEl) {
+        galleryImages = JSON.parse(imagesDataEl.textContent || '[]');
+    }
+    
+    const autoPlay = galleryWidget?.querySelector('.gallery-container')?.dataset.autoPlay === 'true';
+    const layout = galleryWidget?.querySelector('.gallery-container')?.dataset.layout;
+    
+    // Initialize carousel auto-play if enabled
+    if (autoPlay && layout === 'carousel' && galleryImages.length > 1) {
+        startAutoPlay();
+    }
+    
+    // Initialize masonry layout if needed
+    if (layout === 'masonry') {
+        initMasonryLayout();
+    }
+});
+
+// Carousel functionality
+function changeSlide(direction) {
+    const track = document.getElementById('carousel-track');
+    const slides = track.querySelectorAll('.carousel-slide');
+    const totalSlides = slides.length;
+    
+    currentSlide = (currentSlide + direction + totalSlides) % totalSlides;
+    updateCarousel();
+    resetAutoPlay();
+}
+
+function goToSlide(index) {
+    currentSlide = index;
+    updateCarousel();
+    resetAutoPlay();
+}
+
+function updateCarousel() {
+    const track = document.getElementById('carousel-track');
+    const indicators = document.querySelectorAll('.indicator-dot');
+    
+    if (track) {
+        track.style.transform = `translateX(-${currentSlide * 100}%)`;
+    }
+    
+    indicators.forEach((indicator, index) => {
+        indicator.classList.toggle('active', index === currentSlide);
+    });
+}
+
+function startAutoPlay() {
+    const autoPlayDelay = 5000; // 5 seconds
+    autoPlayInterval = setInterval(() => {
+        changeSlide(1);
+    }, autoPlayDelay);
+}
+
+function resetAutoPlay() {
+    if (autoPlayInterval) {
+        clearInterval(autoPlayInterval);
+        startAutoPlay();
+    }
+}
+
+// Lightbox functionality
+function openLightbox(index) {
+    const modal = document.getElementById('lightbox-modal');
+    const lightboxImage = document.getElementById('lightbox-image');
+    const lightboxCaption = document.getElementById('lightbox-caption');
+    const lightboxDescription = document.getElementById('lightbox-description');
+    const lightboxCounter = document.getElementById('lightbox-counter');
+    
+    if (!modal || !galleryImages[index]) return;
+    
+    currentLightboxIndex = index;
+    const image = galleryImages[index];
+    
+    lightboxImage.src = image.url;
+    lightboxImage.alt = image.alt_text;
+    
+    if (lightboxCaption) lightboxCaption.textContent = image.caption || '';
+    if (lightboxDescription) lightboxDescription.textContent = image.description || '';
+    
+    if (lightboxCounter && galleryImages.length > 1) {
+        lightboxCounter.textContent = `${index + 1} / ${galleryImages.length}`;
+    }
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Stop carousel auto-play when lightbox opens
+    if (autoPlayInterval) {
+        clearInterval(autoPlayInterval);
+    }
+}
+
+function closeLightbox(event) {
+    if (event && event.target !== event.currentTarget && !event.target.classList.contains('lightbox-close')) {
+        return;
+    }
+    
+    const modal = document.getElementById('lightbox-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        
+        // Restart auto-play if it was enabled
+        const galleryContainer = document.querySelector('.gallery-container');
+        if (galleryContainer?.dataset.autoPlay === 'true') {
+            startAutoPlay();
+        }
+    }
+}
+
+function lightboxChangeSlide(direction) {
+    const totalImages = galleryImages.length;
+    currentLightboxIndex = (currentLightboxIndex + direction + totalImages) % totalImages;
+    openLightbox(currentLightboxIndex);
+}
+
+// Masonry layout (basic implementation)
+function initMasonryLayout() {
+    const grid = document.querySelector('.gallery-grid');
+    if (!grid) return;
+    
+    // This is a simplified masonry layout
+    // For production, consider using a library like Masonry.js
+    grid.style.display = 'columns';
+    grid.style.columnGap = '1rem';
+}
+
+// Keyboard navigation for lightbox
+document.addEventListener('keydown', function(event) {
+    const modal = document.getElementById('lightbox-modal');
+    if (modal && modal.style.display === 'flex') {
+        switch(event.key) {
+            case 'Escape':
+                closeLightbox();
+                break;
+            case 'ArrowLeft':
+                lightboxChangeSlide(-1);
+                break;
+            case 'ArrowRight':
+                lightboxChangeSlide(1);
+                break;
+        }
+    }
+});
+</script>
+
+<!-- 
+    Gallery/Carousel/Lightbox CSS now loaded dynamically from theme
+    See /api/webpages/themes/{theme_id}/styles.css
+    
+    All widget styling has been moved to the theme system for:
+    - Better performance (cached and served separately)
+    - Easier customization (edit in theme editor)
+    - Centralized management (all CSS in one place)
+--> 

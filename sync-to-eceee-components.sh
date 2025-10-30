@@ -21,20 +21,20 @@ cd "$ECEEE_V4_PATH"
 # Check if source directories exist
 missing_dirs=()
 
-if [ ! -d "backend/eceee_layouts" ]; then
-    missing_dirs+=("backend/eceee_layouts")
+if [ ! -d "backend/easy_layouts" ]; then
+    missing_dirs+=("backend/easy_layouts")
 fi
 
-if [ ! -d "backend/eceee_widgets" ]; then
-    missing_dirs+=("backend/eceee_widgets")
+if [ ! -d "backend/easy_widgets" ]; then
+    missing_dirs+=("backend/easy_widgets")
 fi
 
-if [ ! -d "frontend/src/layouts/eceee-layouts" ]; then
-    missing_dirs+=("frontend/src/layouts/eceee-layouts")
+if [ ! -d "frontend/src/layouts/easy-layouts" ]; then
+    missing_dirs+=("frontend/src/layouts/easy-layouts")
 fi
 
-if [ ! -d "frontend/src/widgets/eceee-widgets" ]; then
-    missing_dirs+=("frontend/src/widgets/eceee-widgets")
+if [ ! -d "frontend/src/widgets/easy-widgets" ]; then
+    missing_dirs+=("frontend/src/widgets/easy-widgets")
 fi
 
 if [ ${#missing_dirs[@]} -gt 0 ]; then
@@ -54,50 +54,50 @@ fi
 echo "📁 Syncing backend components..."
 
 # Copy backend components if they exist
-if [ -d "backend/eceee_layouts" ]; then
-    echo "  📤 Copying backend/eceee_layouts..."
-    rm -rf "$ECEEE_COMPONENTS_PATH/backend/eceee_layouts"
-    cp -r backend/eceee_layouts "$ECEEE_COMPONENTS_PATH/backend/"
+if [ -d "backend/easy_layouts" ]; then
+    echo "  📤 Copying backend/easy_layouts..."
+    rm -rf "$ECEEE_COMPONENTS_PATH/backend/easy_layouts"
+    cp -r backend/easy_layouts "$ECEEE_COMPONENTS_PATH/backend/"
 else
-    echo "  ⏭️  Skipping backend/eceee_layouts (not found)"
+    echo "  ⏭️  Skipping backend/easy_layouts (not found)"
 fi
 
-if [ -d "backend/eceee_widgets" ]; then
-    echo "  📤 Copying backend/eceee_widgets..."
-    rm -rf "$ECEEE_COMPONENTS_PATH/backend/eceee_widgets"
-    cp -r backend/eceee_widgets "$ECEEE_COMPONENTS_PATH/backend/"
+if [ -d "backend/easy_widgets" ]; then
+    echo "  📤 Copying backend/easy_widgets..."
+    rm -rf "$ECEEE_COMPONENTS_PATH/backend/easy_widgets"
+    cp -r backend/easy_widgets "$ECEEE_COMPONENTS_PATH/backend/"
 else
-    echo "  ⏭️  Skipping backend/eceee_widgets (not found)"
+    echo "  ⏭️  Skipping backend/easy_widgets (not found)"
 fi
 
 echo "📁 Syncing frontend components..."
 
 # Copy frontend components if they exist
-if [ -d "frontend/src/layouts/eceee-layouts" ]; then
-    echo "  📤 Copying frontend/src/layouts/eceee-layouts..."
-    rm -rf "$ECEEE_COMPONENTS_PATH/frontend/src/layouts/eceee-layouts"
+if [ -d "frontend/src/layouts/easy-layouts" ]; then
+    echo "  📤 Copying frontend/src/layouts/easy-layouts..."
+    rm -rf "$ECEEE_COMPONENTS_PATH/frontend/src/layouts/easy-layouts"
     mkdir -p "$ECEEE_COMPONENTS_PATH/frontend/src/layouts/"
-    cp -r frontend/src/layouts/eceee-layouts "$ECEEE_COMPONENTS_PATH/frontend/src/layouts/"
+    cp -r frontend/src/layouts/easy-layouts "$ECEEE_COMPONENTS_PATH/frontend/src/layouts/"
 else
-    echo "  ⏭️  Skipping frontend/src/layouts/eceee-layouts (not found)"
+    echo "  ⏭️  Skipping frontend/src/layouts/easy-layouts (not found)"
 fi
 
-if [ -d "frontend/src/widgets/eceee-widgets" ]; then
-    echo "  📤 Copying frontend/src/widgets/eceee-widgets..."
-    rm -rf "$ECEEE_COMPONENTS_PATH/frontend/src/widgets/eceee-widgets"
+if [ -d "frontend/src/widgets/easy-widgets" ]; then
+    echo "  📤 Copying frontend/src/widgets/easy-widgets..."
+    rm -rf "$ECEEE_COMPONENTS_PATH/frontend/src/widgets/easy-widgets"
     mkdir -p "$ECEEE_COMPONENTS_PATH/frontend/src/widgets/"
-    cp -r frontend/src/widgets/eceee-widgets "$ECEEE_COMPONENTS_PATH/frontend/src/widgets/"
+    cp -r frontend/src/widgets/easy-widgets "$ECEEE_COMPONENTS_PATH/frontend/src/widgets/"
 else
-    echo "  ⏭️  Skipping frontend/src/widgets/eceee-widgets (not found)"
+    echo "  ⏭️  Skipping frontend/src/widgets/easy-widgets (not found)"
 fi
 
 echo "✅ Sync complete! Components copied from eceee_v4 to eceee-components"
 echo ""
 echo "📋 Summary:"
-echo "  • eceee-components/backend/eceee_layouts ← backend/eceee_layouts"
-echo "  • eceee-components/backend/eceee_widgets ← backend/eceee_widgets"
-echo "  • eceee-components/frontend/src/layouts/eceee-layouts ← frontend/src/layouts/eceee-layouts"
-echo "  • eceee-components/frontend/src/widgets/eceee-widgets ← frontend/src/widgets/eceee-widgets"
+echo "  • eceee-components/backend/easy_layouts ← backend/easy_layouts"
+echo "  • eceee-components/backend/easy_widgets ← backend/easy_widgets"
+echo "  • eceee-components/frontend/src/layouts/easy-layouts ← frontend/src/layouts/easy-layouts"
+echo "  • eceee-components/frontend/src/widgets/easy-widgets ← frontend/src/widgets/easy-widgets"
 echo ""
 echo "💡 Next steps:"
 echo "   cd $ECEEE_COMPONENTS_PATH"

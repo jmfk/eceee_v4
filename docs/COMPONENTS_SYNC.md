@@ -1,10 +1,10 @@
 # Component Synchronization with Private Repository
 
-This document explains how to work with the `eceee_layouts` and `eceee_widgets` components that are synchronized with a private repository.
+This document explains how to work with the `easy_layouts` and `easy_widgets` components that are synchronized with a private repository.
 
 ## Overview
 
-The `backend/eceee_layouts/` and `backend/eceee_widgets/` directories are maintained in both this public repository and a private repository at `https://github.com/jmfk/eceee-components`. This setup allows you to:
+The `backend/easy_layouts/` and `backend/easy_widgets/` directories are maintained in both this public repository and a private repository at `https://github.com/jmfk/eceee-components`. This setup allows you to:
 
 - Keep sensitive component code private
 - Continue developing in the same location
@@ -14,8 +14,8 @@ The `backend/eceee_layouts/` and `backend/eceee_widgets/` directories are mainta
 
 ### Normal Development
 Continue working on the components exactly as before:
-- Edit files in `backend/eceee_layouts/`
-- Edit files in `backend/eceee_widgets/`
+- Edit files in `backend/easy_layouts/`
+- Edit files in `backend/easy_widgets/`
 - Commit changes to this repository normally
 
 ### Syncing to Private Repository
@@ -55,19 +55,19 @@ If you prefer to use Git subtree commands directly:
 ### Push Changes
 ```bash
 # Push layouts
-git subtree push --prefix=backend/eceee_layouts https://github.com/jmfk/eceee-components.git layouts
+git subtree push --prefix=backend/easy_layouts https://github.com/jmfk/eceee-components.git layouts
 
 # Push widgets
-git subtree push --prefix=backend/eceee_widgets https://github.com/jmfk/eceee-components.git widgets
+git subtree push --prefix=backend/easy_widgets https://github.com/jmfk/eceee-components.git widgets
 ```
 
 ### Pull Changes
 ```bash
 # Pull layouts
-git subtree pull --prefix=backend/eceee_layouts https://github.com/jmfk/eceee-components.git layouts --squash
+git subtree pull --prefix=backend/easy_layouts https://github.com/jmfk/eceee-components.git layouts --squash
 
 # Pull widgets
-git subtree pull --prefix=backend/eceee_widgets https://github.com/jmfk/eceee-components.git widgets --squash
+git subtree pull --prefix=backend/easy_widgets https://github.com/jmfk/eceee-components.git widgets --squash
 ```
 
 ## Repository Structure
@@ -79,8 +79,8 @@ git subtree pull --prefix=backend/eceee_widgets https://github.com/jmfk/eceee-co
 
 ### Private Repository
 - `main` branch: Documentation and setup
-- `layouts` branch: Complete `eceee_layouts` directory
-- `widgets` branch: Complete `eceee_widgets` directory
+- `layouts` branch: Complete `easy_layouts` directory
+- `widgets` branch: Complete `easy_widgets` directory
 
 ## Best Practices
 

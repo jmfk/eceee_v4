@@ -6,7 +6,7 @@
 
 #### Step 1: Import the ContentWidgetEditorRenderer
 ```javascript
-import ContentWidgetEditorRenderer from '@/widgets/eceee-widgets/ContentWidgetEditorRenderer.js'
+import ContentWidgetEditorRenderer from '@/widgets/easy-widgets/ContentWidgetEditorRenderer.js'
 ```
 
 #### Step 2: Create Renderer with Detached Toolbar
@@ -57,7 +57,7 @@ function MyLayout() {
 
 ```jsx
 import { useRef, useEffect } from 'react';
-import ContentWidgetEditorRenderer from '@/widgets/eceee-widgets/ContentWidgetEditorRenderer.js';
+import ContentWidgetEditorRenderer from '@/widgets/easy-widgets/ContentWidgetEditorRenderer.js';
 
 function MyEditor({ content, onChange }) {
     const containerRef = useRef(null);

@@ -30,7 +30,7 @@ Fixed critical XSS (Cross-Site Scripting) vulnerabilities across the application
 ### 3. Updated Templates to Use Sanitization
 
 #### High Priority - User-Generated Content
-- **`backend/eceee_widgets/templates/eceee_widgets/widgets/news_detail.html`**
+- **`backend/easy_widgets/templates/easy_widgets/widgets/news_detail.html`**
   - Line 53: `{{ content_html|safe }}` → `{{ content_html|sanitize_html }}`
   - Line 61: `{{ widget_html|safe }}` → `{{ widget_html|sanitize_html }}`
   - Always sanitizes news content (no `allow_scripts` option)
@@ -156,15 +156,15 @@ python manage.py test utils.tests.test_security_filters
 ### Modified Files
 1. `backend/requirements.txt`
 
-**eceee_widgets templates (7 files):**
-2. `backend/eceee_widgets/templates/eceee_widgets/widgets/news_detail.html`
-3. `backend/eceee_widgets/templates/eceee_widgets/widgets/content.html`
-4. `backend/eceee_widgets/templates/eceee_widgets/widgets/html_block.html`
-5. `backend/eceee_widgets/templates/eceee_widgets/widgets/sidebar.html`
-6. `backend/eceee_widgets/templates/eceee_widgets/widgets/footer.html`
-7. `backend/eceee_widgets/templates/eceee_widgets/widgets/three_columns.html`
-8. `backend/eceee_widgets/templates/eceee_widgets/widgets/two_column.html`
-9. `backend/eceee_widgets/templates/eceee_widgets/widgets/table.html`
+**easy_widgets templates (7 files):**
+2. `backend/easy_widgets/templates/easy_widgets/widgets/news_detail.html`
+3. `backend/easy_widgets/templates/easy_widgets/widgets/content.html`
+4. `backend/easy_widgets/templates/easy_widgets/widgets/html_block.html`
+5. `backend/easy_widgets/templates/easy_widgets/widgets/sidebar.html`
+6. `backend/easy_widgets/templates/easy_widgets/widgets/footer.html`
+7. `backend/easy_widgets/templates/easy_widgets/widgets/three_columns.html`
+8. `backend/easy_widgets/templates/easy_widgets/widgets/two_column.html`
+9. `backend/easy_widgets/templates/easy_widgets/widgets/table.html`
 
 **default_widgets templates (9 files):**
 10. `backend/default_widgets/templates/default_widgets/widgets/content.html`

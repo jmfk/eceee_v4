@@ -16,7 +16,7 @@ A context-aware right-click menu has been successfully implemented for the WYSIW
 
 ### Files Modified
 
-1. **`frontend/src/widgets/eceee-widgets/ContentWidgetEditorRenderer.js`**
+1. **`frontend/src/widgets/easy-widgets/ContentWidgetEditorRenderer.js`**
    - Added WysiwygContextMenu import
    - Added contextMenu property and initialization
    - Added handleContextMenu method with context detection
