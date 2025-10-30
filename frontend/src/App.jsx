@@ -1,3 +1,12 @@
+/*
+ * Copyright (C) 2025 Johan Mats Fred Karlsson
+ *
+ * This file is part of easy_v4.
+ *
+ * This program is licensed under the Server Side Public License, version 1,
+ * as published by MongoDB, Inc. See the LICENSE file for details.
+ */
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'

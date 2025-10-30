@@ -1,3 +1,10 @@
+# Copyright (C) 2025 Johan Mats Fred Karlsson
+#
+# This file is part of eceee_v4.
+#
+# This program is licensed under the Server Side Public License, version 1,
+# as published by MongoDB, Inc. See the LICENSE file for details.
+
 """
 Django REST Framework serializers for the Web Page Publishing System
 

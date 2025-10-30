@@ -504,7 +504,29 @@ For detailed testing documentation, see [docs/CODE_BASED_WIDGET_SYSTEM_TESTING.m
 
 ## 📄 License
 
-This project is licensed under the SSPL 1.0 - see the [LICENSE](LICENSE) file for details.
+![License: SSPL-1.0](https://img.shields.io/badge/License-SSPL--1.0-blue.svg)
+
+This project is licensed under the **Server Side Public License (SSPL) v1.0**.
+
+### What does this mean?
+
+- ✅ **Free to use, modify, and distribute** for any purpose
+- ✅ **Strong copyleft protection** - derivatives must use the same license
+- ⚠️ **Service providers must share infrastructure code** - If you offer this software as a service (SaaS), you must release all service infrastructure code under SSPL
+
+### Why SSPL?
+
+The SSPL license protects open source projects from being exploited by cloud providers who offer the software as a service without contributing back to the community. It ensures that if someone builds a business around this software as a service, they must share their improvements and infrastructure.
+
+### For Users
+
+- **Open Source Projects**: Use freely under SSPL terms
+- **Self-Hosting**: No restrictions - host for yourself or your organization
+- **Commercial License**: Contact for alternative licensing if SSPL Section 13 is incompatible with your use case
+
+For full license text and terms, see the [LICENSE](LICENSE) file.
+
+**Copyright (C) 2025 Johan Mats Fred Karlsson**
 
 ## 🙏 Acknowledgments
 

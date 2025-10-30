@@ -1,3 +1,10 @@
+# Copyright (C) 2025 Johan Mats Fred Karlsson
+#
+# This file is part of eceee_v4.
+#
+# This program is licensed under the Server Side Public License, version 1,
+# as published by MongoDB, Inc. See the LICENSE file for details.
+
 """
 Widget Registry System for Code-Based Widget Types
 
@@ -249,7 +256,7 @@ class BaseWidget(ABC):
                 omit it to reduce payload size and avoid parsing overhead.
         """
         result = {
-            "type": self.type,  # Unique type id (e.g., "eceee_widgets.ContentWidget")
+            "type": self.type,  # Unique type id (e.g., "easy_widgets.ContentWidget")
             "name": self.name,
             "description": self.description,
             "template_name": self.template_name,  # Include template name for backward compatibility
@@ -399,7 +406,7 @@ class WidgetTypeRegistry:
         return None
 
     def get_widget_type_by_type(self, widget_type: str) -> Optional[BaseWidget]:
-        """Get a widget type instance by type identifier (e.g., 'eceee_widgets.TextBlockWidget')."""
+        """Get a widget type instance by type identifier (e.g., 'easy_widgets.TextBlockWidget')."""
         for widget in self._instances.values():
             if widget.type == widget_type:
                 return widget
@@ -411,14 +418,14 @@ class WidgetTypeRegistry:
         This provides backward compatibility during the transition to new naming.
 
         Lookup order:
-        1. Exact type match (e.g., "eceee_widgets.ContentWidget")
+        1. Exact type match (e.g., "easy_widgets.ContentWidget")
         2. Case-insensitive type match
         3. Human-readable name (legacy)
         """
         if not identifier:
             return None
 
-        # Try new format first (eceee_widgets.WidgetName) - exact match
+        # Try new format first (easy_widgets.WidgetName) - exact match
         widget = self.get_widget_type_by_type(identifier)
         if widget:
             return widget

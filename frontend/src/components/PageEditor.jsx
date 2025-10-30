@@ -1,3 +1,12 @@
+/*
+ * Copyright (C) 2025 Johan Mats Fred Karlsson
+ *
+ * This file is part of easy_v4.
+ *
+ * This program is licensed under the Server Side Public License, version 1,
+ * as published by MongoDB, Inc. See the LICENSE file for details.
+ */
+
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'

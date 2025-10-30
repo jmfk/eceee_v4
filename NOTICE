@@ -1,0 +1,150 @@
+NOTICE - easy_v4
+==================
+
+Copyright (C) 2025 Johan Mats Fred Karlsson
+
+This product includes software developed by Johan Mats Fred Karlsson.
+
+Licensed under the Server Side Public License (SSPL) v1.0
+See LICENSE file for full license text.
+
+================================================================================
+IMPORTANT NOTICE REGARDING SECTION 13 - SERVICE SOURCE CODE
+================================================================================
+
+If you make the functionality of this Program or a modified version available
+to third parties as a service, you must make the Service Source Code available
+via network download to everyone at no charge, under the terms of the SSPL.
+
+"Service Source Code" means the Corresponding Source for the Program or the
+modified version, AND the Corresponding Source for ALL programs that you use
+to make the Program or modified version available as a service, including,
+without limitation, management software, user interfaces, application program
+interfaces, automation software, monitoring software, backup software, storage
+software and hosting software.
+
+For questions about commercial licensing options that do not require Section 13
+compliance, please contact the copyright holder.
+
+================================================================================
+THIRD-PARTY COMPONENTS
+================================================================================
+
+This software includes or depends upon the following third-party components:
+
+BACKEND (Python/Django)
+------------------------
+
+Django Framework
+  Copyright (c) Django Software Foundation and contributors
+  License: BSD 3-Clause License
+  https://www.djangoproject.com/
+
+Django REST Framework
+  Copyright (c) Encode OSS Ltd.
+  License: BSD 3-Clause License
+  https://www.django-rest-framework.org/
+
+PostgreSQL
+  Copyright (c) PostgreSQL Global Development Group
+  License: PostgreSQL License
+  https://www.postgresql.org/
+
+Redis
+  Copyright (c) Redis Ltd.
+  License: BSD 3-Clause License (Redis 7.x)
+  https://redis.io/
+
+FRONTEND (JavaScript/React)
+----------------------------
+
+React
+  Copyright (c) Meta Platforms, Inc. and affiliates
+  License: MIT License
+  https://react.dev/
+
+Vite
+  Copyright (c) Evan You and Vite contributors
+  License: MIT License
+  https://vitejs.dev/
+
+Tailwind CSS
+  Copyright (c) Tailwind Labs, Inc.
+  License: MIT License
+  https://tailwindcss.com/
+
+React Router
+  Copyright (c) Remix Software Inc.
+  License: MIT License
+  https://reactrouter.com/
+
+TanStack Query (React Query)
+  Copyright (c) Tanner Linsley
+  License: MIT License
+  https://tanstack.com/query/
+
+Zustand
+  Copyright (c) Daishi Kato
+  License: MIT License
+  https://github.com/pmndrs/zustand
+
+Lucide React (Icons)
+  Copyright (c) Lucide Contributors
+  License: ISC License
+  https://lucide.dev/
+
+Headless UI
+  Copyright (c) Tailwind Labs, Inc.
+  License: MIT License
+  https://headlessui.com/
+
+DOMPurify
+  Copyright (c) Cure53 and contributors
+  License: Apache License 2.0 / Mozilla Public License 2.0
+  https://github.com/cure53/DOMPurify
+
+React Hook Form
+  Copyright (c) Bluebits
+  License: MIT License
+  https://react-hook-form.com/
+
+Zod
+  Copyright (c) Colin McDonnell
+  License: MIT License
+  https://zod.dev/
+
+DEVELOPMENT & INFRASTRUCTURE
+-----------------------------
+
+Docker
+  Copyright (c) Docker, Inc.
+  License: Apache License 2.0
+  https://www.docker.com/
+
+Node.js
+  Copyright (c) Node.js contributors
+  License: MIT License (and others)
+  https://nodejs.org/
+
+Python
+  Copyright (c) Python Software Foundation
+  License: PSF License Agreement
+  https://www.python.org/
+
+================================================================================
+ADDITIONAL INFORMATION
+================================================================================
+
+For a complete list of all dependencies and their licenses, see:
+- Backend: backend/requirements.txt
+- Frontend: frontend/package.json
+
+All third-party components retain their original licenses and copyrights.
+This NOTICE file is provided in accordance with the licensing requirements
+of the included components.
+
+For questions or concerns about licensing, please contact:
+Johan Mats Fred Karlsson
+
+Last updated: January 30, 2025
+

@@ -1,5 +1,12 @@
+# Copyright (C) 2025 Johan Mats Fred Karlsson
+#
+# This file is part of eceee_v4.
+#
+# This program is licensed under the Server Side Public License, version 1,
+# as published by MongoDB, Inc. See the LICENSE file for details.
+
 """
-Django settings for ECEEE v4 AI-integrated development environment.
+Django settings for EASY v4 AI-integrated development environment.
 
 This configuration supports:
 - PostgreSQL database integration
@@ -173,8 +180,8 @@ LOCAL_APPS = [
     "webpages",  # Core CMS system (required)
     "content",
     "content_import",  # Content import from external websites
-    "eceee_layouts",  # ECEEE layout definitions
-    "eceee_widgets",  # ECEEE widget definitions
+    "easy_layouts",  # Easy layout definitions
+    "easy_widgets",  # Easy widget definitions
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system
     "utils",  # Utility features like value lists and schema system
