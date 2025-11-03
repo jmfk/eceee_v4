@@ -52,7 +52,7 @@ const cleanHTML = (html) => {
  * Vanilla JS Editor Wrapper Component
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions }) => {
+const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -68,6 +68,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
                 className,
                 namespace,  // Pass namespace for media browser
                 slotDimensions,  // Pass slot dimensions for imgproxy sizing
+                pageId,  // Pass pageId for theme context
                 detachedToolbar: true  // Enable global toolbar mode
             })
             rendererRef.current.render()
@@ -112,12 +113,12 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
         }
     }, [content])
 
-    // Separate effect for onChange, className, namespace, and slotDimensions updates
+    // Separate effect for onChange, className, namespace, slotDimensions, and pageId updates
     useEffect(() => {
         if (rendererRef.current) {
-            rendererRef.current.updateConfig({ onChange, className, namespace, slotDimensions })
+            rendererRef.current.updateConfig({ onChange, className, namespace, slotDimensions, pageId })
         }
-    }, [onChange, className, namespace, slotDimensions])
+    }, [onChange, className, namespace, slotDimensions, pageId])
 
     useEffect(() => {
         return () => {
@@ -164,7 +165,7 @@ const ContentWidget = memo(({
     namespace = null,
     // Slot configuration (for dimensions)
     slotConfig = null,
-    //context = {}
+    context = {}
 }) => {
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
     const configRef = useRef(config);
@@ -230,6 +231,7 @@ const ContentWidget = memo(({
                 className=""
                 namespace={namespace}
                 slotDimensions={slotConfig?.dimensions}
+                pageId={context?.pageId}
             />
         )
     }

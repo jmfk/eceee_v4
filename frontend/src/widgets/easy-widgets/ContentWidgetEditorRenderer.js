@@ -544,6 +544,7 @@ class ContentWidgetEditorRenderer {
         this.onChange = options.onChange || (() => { })
         this.namespace = options.namespace || null // Namespace for media browser
         this.slotDimensions = options.slotDimensions || null // Slot dimensions for imgproxy sizing
+        this.pageId = options.pageId || null // Page ID for theme context
 
         // Theme configuration
         this.maxHeaderLevel = options.maxHeaderLevel || this.getThemeHeaderLevel() || 3
@@ -1895,7 +1896,8 @@ class ContentWidgetEditorRenderer {
                         isOpen: true,
                         onClose: handleClose,
                         onInsert: handleInsert,
-                        namespace: namespace
+                        namespace: namespace,
+                        pageId: this.pageId
                     })
                 )
             )
@@ -2059,7 +2061,8 @@ class ContentWidgetEditorRenderer {
                         onDelete: handleDelete,
                         initialConfig: { ...initialConfig, mediaType: initialConfig.mediaType },
                         mediaData: mediaData,
-                        namespace: namespace
+                        namespace: namespace,
+                        pageId: this.pageId
                     })
                 )
             )
@@ -2451,6 +2454,9 @@ class ContentWidgetEditorRenderer {
         }
         if (options.slotDimensions !== undefined) {
             this.slotDimensions = options.slotDimensions
+        }
+        if (options.pageId !== undefined) {
+            this.pageId = options.pageId
         }
     }
 

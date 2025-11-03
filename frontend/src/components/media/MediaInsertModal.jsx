@@ -8,8 +8,8 @@ import { X, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 
-const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace }) => {
-    const { currentTheme } = useTheme();
+const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
+    const { currentTheme } = useTheme({ pageId });
     const [step, setStep] = useState('select'); // 'select' or 'configure'
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'

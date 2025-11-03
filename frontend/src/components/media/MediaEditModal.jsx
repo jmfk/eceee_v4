@@ -8,8 +8,8 @@ import { X, Trash2, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 
-const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, namespace }) => {
-    const { currentTheme } = useTheme();
+const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, namespace, pageId }) => {
+    const { currentTheme } = useTheme({ pageId });
     const [config, setConfig] = useState({
         width: 'full',
         align: 'center',

@@ -24,10 +24,11 @@ const MediaSpecialEditor = ({
     isAnimating = false,
     isClosing = false,
     onConfigChange,
-    namespace: providedNamespace = null
+    namespace: providedNamespace = null,
+    context = {}
 }) => {
     // Get current theme for image styles and notifications
-    const { currentTheme } = useTheme()
+    const { currentTheme } = useTheme({ pageId: context?.pageId })
     const { addNotification } = useGlobalNotifications()
 
     // Core state
