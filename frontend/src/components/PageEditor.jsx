@@ -49,6 +49,7 @@ import SettingsEditor from './SettingsEditor'
 import PublishingEditor from './PublishingEditor'
 import { getWidgetDisplayName } from '../hooks/useWidgets'
 import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
+import { usePageInheritance } from '../hooks/usePageInheritance'
 import GlobalWysiwygToolbar from './wysiwyg/GlobalWysiwygToolbar'
 import GlobalTableToolbar from './table-toolbar/GlobalTableToolbar'
 import { useAutoSave } from '../hooks/useAutoSave'
@@ -478,15 +479,22 @@ const PageEditor = () => {
         refetchOnWindowFocus: false // Don't refetch on window focus
     })
 
-    // Fetch widget inheritance data
+    // Get unified inheritance data for this page (widgets, layout, theme)
+    const pageInheritance = usePageInheritance(pageId, {
+        enabled: !isNewPage && Boolean(pageId),
+        includeWidgets: true
+    })
+    
+    // Extract widget inheritance (for backward compatibility)
     const {
-        inheritedWidgets,
-        slotInheritanceRules,
-        hasInheritedContent,
-        parentId,
-        isLoading: isLoadingInheritance,
-        refetch: refetchInheritance
-    } = useWidgetInheritance(pageId, !isNewPage && Boolean(pageId))
+        inherited: inheritedWidgets,
+        rules: slotInheritanceRules,
+        hasContent: hasInheritedContent,
+        parentId
+    } = pageInheritance.widgets
+    
+    const isLoadingInheritance = pageInheritance.isLoading
+    const refetchInheritance = pageInheritance.refetch
 
     // Combined loading state
     const isLoading = isLoadingWebpage || isLoadingPageVersion
@@ -544,12 +552,16 @@ const PageEditor = () => {
             setPageVersionData(processedVersionData);
             setOriginalPageVersionData(processedVersionData); // Track original for smart saving
 
-            // Publish version data to UDC
+            // Publish version data to UDC (including effectiveTheme for inheritance)
             // Note: Using pageVersion.id here instead of componentId to avoid dependency cycle
             const versionComponentId = `page-editor-${pageId}-${pageVersion.versionId || pageVersion.id || 'current'}`;
-            publishUpdate(versionComponentId, OperationTypes.INIT_PAGE, {
+            publishUpdate(versionComponentId, OperationTypes.INIT_VERSION, {
                 id: processedVersionData.id,
-                data: processedVersionData
+                data: {
+                    ...processedVersionData,
+                    pageId: pageId, // Ensure pageId is set for INIT_VERSION
+                    versionNumber: processedVersionData.versionNumber || 1 // Ensure versionNumber is set
+                }
             });
         }
     }, [pageVersion, isNewPage, publishUpdate, pageId])
@@ -1746,7 +1758,7 @@ const PageEditor = () => {
                                 key={`theme-${pageVersionData?.versionId || 'new'}`}
                                 selectedThemeId={pageVersionData?.theme}
                                 effectiveThemeId={pageVersionData?.effectiveTheme?.id}
-                                themeInheritanceInfo={pageVersionData?.themeInheritanceInfo}
+                                themeInheritanceInfo={pageInheritance.theme.inheritanceInfo || pageVersionData?.themeInheritanceInfo}
                                 onThemeChange={(themeId) => updatePageData({ theme: themeId })}
                             />
                         )}

@@ -32,12 +32,20 @@ export const useTheme = ({
     try {
         const { state } = useUnifiedData()
 
-        // Try to get theme from current page version
         const currentVersionId = state.metadata.currentVersionId
-        if (currentVersionId && state.versions[currentVersionId]?.theme) {
-            const pageThemeId = state.versions[currentVersionId].theme
-            // Try to find theme in UDC themes cache
-            udcTheme = state.themes[pageThemeId]
+        if (currentVersionId) {
+            const version = state.versions[currentVersionId]
+            
+            // PRIORITY 1: Use effectiveTheme if available (includes inherited theme)
+            if (version?.effectiveTheme) {
+                udcTheme = version.effectiveTheme
+            } 
+            // PRIORITY 2: Fallback to explicit theme by ID
+            else if (version?.theme) {
+                const pageThemeId = version.theme
+                // Try to find theme in UDC themes cache
+                udcTheme = state.themes[pageThemeId]
+            }
         }
 
         // Fallback to default theme from state

@@ -219,7 +219,7 @@ const IsolatedFormRenderer = React.memo(({
     const requiredFields = activeSchema?.schema?.required || activeSchema?.required || []
 
     return (
-        <div className="space-y-4 p-4">
+        <div className="space-y-4 p-4 min-w-0">
             {Object.entries(schemaProperties)
                 .filter(([fieldName, fieldSchema]) => {
                     // Filter out hidden fields

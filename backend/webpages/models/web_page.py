@@ -914,22 +914,32 @@ class WebPage(models.Model):
         # Find where the effective theme comes from
         current = self
         while current:
+            current_version = current.get_current_published_version()
+            current_theme = current_version.theme if current_version else None
+            
             inheritance_info["inheritance_chain"].append(
                 {
                     "page": current,
-                    "theme": current.theme,
-                    "is_override": current.theme is not None,
+                    "theme": current_theme,
+                    "is_override": current_theme is not None,
                 }
             )
 
-            if current.theme:
-                inheritance_info["effective_theme"] = current.theme
+            if current_theme:
+                inheritance_info["effective_theme"] = current_theme
                 inheritance_info["inherited_from"] = (
                     current if current != self else None
                 )
                 break
 
             current = current.parent
+
+        # Fall back to default theme if no theme found in chain
+        if not inheritance_info["effective_theme"]:
+            default_theme = PageTheme.get_default_theme()
+            if default_theme:
+                inheritance_info["effective_theme"] = default_theme
+                # Default theme has no inherited_from since it's system-level
 
         # Get available themes for override
         inheritance_info["override_options"] = PageTheme.objects.filter(is_active=True)

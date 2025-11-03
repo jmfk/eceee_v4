@@ -81,12 +81,13 @@ class PageThemeSerializer(serializers.ModelSerializer):
         if instance.image:
             # Get the URL from the ImageField
             image_url = instance.image.url
-            
+
             # Check if it's an s3:// protocol URL (from LinodeObjectStorage)
             if image_url.startswith("s3://"):
                 # Extract the file path from s3://bucket/path format
                 try:
                     from django.core.files.storage import default_storage
+
                     # Remove s3://bucket/ prefix to get just the path
                     parts = image_url.replace("s3://", "").split("/", 1)
                     if len(parts) == 2:
@@ -100,9 +101,10 @@ class PageThemeSerializer(serializers.ModelSerializer):
                 except Exception as e:
                     # If conversion fails, log and use the original URL
                     import logging
+
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Failed to convert s3:// URL to public URL: {e}")
-            
+
             # Build absolute URI if request is available
             request = self.context.get("request")
             if request and not image_url.startswith(("http://", "https://")):
@@ -425,6 +427,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     effective_layout = serializers.SerializerMethodField()
     effective_theme = serializers.SerializerMethodField()
     layout_inheritance_info = serializers.SerializerMethodField()
+    theme_inheritance_info = serializers.SerializerMethodField()
     available_code_layouts = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
     is_deleted = serializers.SerializerMethodField()
@@ -480,6 +483,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "effective_layout",
             "effective_theme",
             "layout_inheritance_info",
+            "theme_inheritance_info",
             "available_code_layouts",
             "children_count",
             "is_deleted",
@@ -598,6 +602,67 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
                     for layout in inheritance_info["override_options"]["code_layouts"]
                 ]
             },
+        }
+
+        return serialized_inheritance_info
+
+    def get_theme_inheritance_info(self, obj):
+        """Get detailed theme inheritance information"""
+        inheritance_info = obj.get_theme_inheritance_info()
+
+        # Serialize the inheritance chain for API consumption
+        serialized_chain = []
+        for chain_item in inheritance_info["inheritance_chain"]:
+            page = chain_item["page"]
+            theme = chain_item["theme"]
+            serialized_chain.append(
+                {
+                    "page_id": page.id,
+                    "page_title": page.title,
+                    "theme_id": theme.id if theme else None,
+                    "theme_name": theme.name if theme else None,
+                    "is_override": chain_item["is_override"],
+                }
+            )
+
+        # Serialize effective theme
+        effective_theme = inheritance_info["effective_theme"]
+        serialized_effective_theme = None
+        if effective_theme:
+            serialized_effective_theme = {
+                "id": effective_theme.id,
+                "name": effective_theme.name,
+                "description": effective_theme.description,
+                "is_default": effective_theme.is_default,
+            }
+
+        # Serialize inherited_from page
+        inherited_from = inheritance_info["inherited_from"]
+        serialized_inherited_from = None
+        if inherited_from:
+            serialized_inherited_from = {
+                "id": inherited_from.id,
+                "title": inherited_from.title,
+                "slug": inherited_from.slug,
+            }
+
+        # Serialize override options
+        serialized_override_options = []
+        for theme in inheritance_info["override_options"]:
+            serialized_override_options.append(
+                {
+                    "id": theme.id,
+                    "name": theme.name,
+                    "description": theme.description,
+                    "is_default": theme.is_default,
+                }
+            )
+
+        serialized_inheritance_info = {
+            "effective_theme": serialized_effective_theme,
+            "inherited_from": serialized_inherited_from,
+            "inheritance_chain": serialized_chain,
+            "override_options": serialized_override_options,
         }
 
         return serialized_inheritance_info

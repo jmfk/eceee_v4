@@ -126,7 +126,7 @@ const FooterWidgetEditor = ({
     }, [columns, columnCount, draggedItem, updateConfig])
 
     return (
-        <div className="h-full flex flex-col overflow-hidden">
+        <div className="h-full flex flex-col overflow-hidden min-w-0">
             {/* Header */}
             <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-white">
                 <h2 className="text-lg font-semibold">Footer Configuration</h2>
@@ -136,15 +136,15 @@ const FooterWidgetEditor = ({
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-6">
                 {/* Columns Section */}
-                <div>
+                <div className="min-w-0">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Footer Columns</h3>
                         <button
                             type="button"
                             onClick={addColumn}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex-shrink-0"
                             disabled={columns.length >= 6}
                         >
                             <Plus size={16} />
@@ -152,11 +152,11 @@ const FooterWidgetEditor = ({
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
                         {columns.map((column, columnIndex) => (
                             <div
                                 key={columnIndex}
-                                className="border border-gray-300 rounded-lg p-4 bg-white"
+                                className="border border-gray-300 rounded-lg p-4 bg-white min-w-0"
                             >
                                 {/* Column Header */}
                                 <div className="flex items-center justify-between mb-3">
@@ -185,7 +185,7 @@ const FooterWidgetEditor = ({
                                         value={column.title || ''}
                                         onChange={(e) => updateColumnTitle(columnIndex, e.target.value)}
                                         placeholder="e.g., Quick Links"
-                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
 
@@ -206,7 +206,7 @@ const FooterWidgetEditor = ({
                                     </div>
 
                                     {column.items && column.items.length > 0 ? (
-                                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                                        <div className="space-y-2 max-h-96 overflow-y-auto min-w-0">
                                             {column.items.map((item, itemIndex) => (
                                                 <div
                                                     key={itemIndex}
@@ -214,18 +214,18 @@ const FooterWidgetEditor = ({
                                                     onDragStart={() => handleDragStart(columnIndex, itemIndex)}
                                                     onDragOver={handleDragOver}
                                                     onDrop={() => handleDrop(columnIndex, itemIndex)}
-                                                    className="border border-gray-200 rounded p-2 bg-gray-50 space-y-2 cursor-move hover:border-gray-300"
+                                                    className="border border-gray-200 rounded p-2 bg-gray-50 space-y-2 cursor-move hover:border-gray-300 min-w-0"
                                                 >
                                                     <div className="flex items-start gap-2">
                                                         <GripVertical size={16} className="text-gray-400 mt-1.5 flex-shrink-0" />
-                                                        <div className="flex-1 space-y-2">
+                                                        <div className="flex-1 min-w-0 space-y-2">
                                                             {/* Label */}
                                                             <input
                                                                 type="text"
                                                                 value={item.label || ''}
                                                                 onChange={(e) => updateItem(columnIndex, itemIndex, 'label', e.target.value)}
                                                                 placeholder="Label *"
-                                                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                className="w-full max-w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                             />
 
                                                             {/* URL */}
@@ -234,7 +234,7 @@ const FooterWidgetEditor = ({
                                                                 value={item.url || ''}
                                                                 onChange={(e) => updateItem(columnIndex, itemIndex, 'url', e.target.value)}
                                                                 placeholder="URL (optional)"
-                                                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                className="w-full max-w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 break-all"
                                                             />
 
                                                             {/* Open in New Tab */}

@@ -446,9 +446,9 @@ const TableSpecialEditor = ({
     }
 
     return (
-        <div className="table-special-editor h-full flex flex-col bg-white">
+        <div className="table-special-editor h-full flex flex-col bg-white min-w-0">
             {/* Toolbar */}
-            <div ref={toolbarRef} className="border-b bg-gray-50 px-4 py-3">
+            <div ref={toolbarRef} className="border-b bg-gray-50 px-4 py-3 overflow-x-auto">
                 <div className="flex flex-wrap gap-2">
                     {/* Structure Section */}
                     <div className="flex items-center gap-1 border-r pr-2">

@@ -55,7 +55,7 @@ const PageChildrenDisplayField = ({
     }
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
             {/* Label */}
             {label && (
                 <label className="block text-sm font-medium text-gray-700">
@@ -69,7 +69,7 @@ const PageChildrenDisplayField = ({
             )}
 
             {/* Children List */}
-            <div className="border border-gray-200 rounded-md bg-gray-50">
+            <div className="border border-gray-200 rounded-md bg-gray-50 min-w-0">
                 {isLoading ? (
                     <div className="flex items-center justify-center p-6">
                         <Loader2 className="w-5 h-5 text-blue-600 animate-spin mr-2" />
@@ -84,11 +84,11 @@ const PageChildrenDisplayField = ({
                         </div>
                     </div>
                 ) : children && children.length > 0 ? (
-                    <div className="divide-y divide-gray-200">
+                    <div className="divide-y divide-gray-200 min-w-0">
                         {children.map((child) => (
                             <div
                                 key={child.page.id}
-                                className="flex items-center justify-between p-3 hover:bg-gray-100 transition-colors"
+                                className="flex items-center justify-between gap-2 p-3 hover:bg-gray-100 transition-colors min-w-0"
                             >
                                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -99,7 +99,7 @@ const PageChildrenDisplayField = ({
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-2 flex-shrink-0">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
                                         {child.currentVersion.status}
                                     </span>
                                 </div>

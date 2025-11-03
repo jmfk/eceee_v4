@@ -28,6 +28,8 @@ const ImageStyleSelect = ({
     const contextType = context?.contextType;
     const widgetPath = context?.widgetPath;
 
+    console.log("ImageStyleSelect", currentTheme)
+
     // State to track current displayType from UDC
     const [udcDisplayType, setUdcDisplayType] = useState(() => {
         // Initialize from current widget config

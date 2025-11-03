@@ -142,7 +142,7 @@ const SpecialEditorRenderer = ({
 
     return (
         <div
-            className={`flex-shrink-0 border-r border-gray-200 bg-gray-50 transition-all duration-500 ease-out ${isAnimating ? 'animate-slide-in-left' : ''
+            className={`flex-shrink-0 min-w-0 overflow-x-auto border-r border-gray-200 bg-gray-50 transition-all duration-500 ease-out ${isAnimating ? 'animate-slide-in-left' : ''
                 } ${isClosing ? 'animate-slide-out-left' : ''
                 }`}
             style={{ width: `${specialEditorWidth}%` }}

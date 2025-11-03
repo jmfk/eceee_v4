@@ -100,7 +100,8 @@ export interface VersionData {
   status: 'draft' | 'published';
   widgets: Record<string, WidgetData[]>;
   layoutId: string;  // Reference to layout in layouts collection
-  themeId?: string;  // Reference to theme in themes collection
+  themeId?: string;  // Reference to theme in themes collection (explicit override, null = inherit)
+  effectiveTheme?: ThemeData;  // Resolved theme (explicit or inherited from parent)
   content: Record<string, ContentData>;
   metadata: PageMetadata;
   created_at: string;

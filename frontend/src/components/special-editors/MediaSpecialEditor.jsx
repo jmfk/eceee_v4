@@ -1726,7 +1726,7 @@ const MediaSpecialEditor = ({
     )
 
     return (
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col min-w-0 overflow-x-auto">
             {/* Floating Messages */}
             {floatingMessages.map(msg => (
                 <FloatingMessage

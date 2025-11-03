@@ -431,15 +431,15 @@ const WidgetEditorPanel = forwardRef(({
                 )}
 
                 {/* Panel content */}
-                <div className={`flex-1 flex flex-col ${showSpecialEditor ? 'border-l border-gray-200' : ''}`}>
+                <div className={`flex-1 flex flex-col min-w-0 ${showSpecialEditor ? 'border-l border-gray-200' : ''}`}>
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 transition-all duration-300 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-100' : ''
+                    <div className={`flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50 transition-all duration-300 min-w-0 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-100' : ''
                         } ${showSpecialEditor && isClosingSpecialEditor ? 'animate-fade-out-down' : ''
                         }`}>
-                        <div className="flex items-center space-x-3">
-                            <h3 className="text-md font-medium text-gray-900">{title}</h3>
+                        <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            <h3 className="text-md font-medium text-gray-900 truncate">{title}</h3>
                             {hasChanges && (
-                                <span className="flex items-center text-xs text-blue-600">
+                                <span className="flex items-center text-xs text-blue-600 flex-shrink-0">
                                     <Save className="w-3 h-3 mr-1" />
                                     Changes will auto-save
                                 </span>
@@ -447,7 +447,7 @@ const WidgetEditorPanel = forwardRef(({
                         </div>
                         <button
                             onClick={handleClose}
-                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
                         >
                             <X className={`w-4 h-4 transition-all duration-300 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-bounce-in delay-200' : ''
                                 }`} />
@@ -455,7 +455,7 @@ const WidgetEditorPanel = forwardRef(({
                     </div>
 
                     {/* Form content - scrollable */}
-                    <div className={`flex-1 overflow-y-auto transition-all duration-500 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-300' : ''
+                    <div className={`flex-1 overflow-y-auto overflow-x-hidden min-w-0 transition-all duration-500 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-300' : ''
                         } ${showSpecialEditor && isClosingSpecialEditor ? 'animate-fade-out-down' : ''
                         }`}>
                         {isValidatingType ? (

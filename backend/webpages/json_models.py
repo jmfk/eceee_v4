@@ -109,6 +109,7 @@ class WebPageDetailResponse(BaseModel):
     effective_theme: Optional[ThemeResponse] = None
     layout_type: Optional[str] = None
     layout_inheritance_info: Dict[str, Any] = Field(default_factory=dict)
+    theme_inheritance_info: Dict[str, Any] = Field(default_factory=dict)
     available_code_layouts: List[LayoutResponse] = Field(default_factory=list)
     children_count: int = 0
 

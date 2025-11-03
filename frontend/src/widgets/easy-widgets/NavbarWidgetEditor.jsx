@@ -198,7 +198,7 @@ const NavbarWidgetEditor = ({
     }, [secondaryMenuItems, menuItems, updateConfig])
 
     return (
-        <div className="h-full flex flex-col overflow-hidden">
+        <div className="h-full flex flex-col overflow-hidden min-w-0">
             {/* Header */}
             <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-white">
                 <h2 className="text-lg font-semibold">Navbar Configuration</h2>
@@ -208,12 +208,12 @@ const NavbarWidgetEditor = ({
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-6">
                 {/* Import Subpages Section */}
                 {showImportSection && (
-                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 min-w-0">
                         <div className="flex items-center justify-between mb-3">
-                            <div>
+                            <div className="min-w-0 flex-1 mr-2">
                                 <h3 className="text-base font-semibold flex items-center gap-2">
                                     <FileText size={18} />
                                     Import Subpages
@@ -274,7 +274,7 @@ const NavbarWidgetEditor = ({
                                 </div>
 
                                 {/* Page list */}
-                                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded bg-white">
+                                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded bg-white min-w-0">
                                     {childrenPages.map((child) => {
                                         const page = child.page
                                         const pageVersion = child.currentVersion
@@ -284,14 +284,14 @@ const NavbarWidgetEditor = ({
                                         return (
                                             <label
                                                 key={page.id}
-                                                className={`flex items-center gap-3 p-3 border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''
+                                                className={`flex items-center gap-3 p-3 border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 min-w-0 ${isSelected ? 'bg-blue-50' : ''
                                                     }`}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     checked={isSelected}
                                                     onChange={() => togglePageSelection(page.id)}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                                                 />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="font-medium text-sm text-gray-900 truncate">
@@ -334,13 +334,13 @@ const NavbarWidgetEditor = ({
                 )}
 
                 {/* Primary Menu Items */}
-                <div>
+                <div className="min-w-0">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-base font-semibold">Primary Menu Items</h3>
                         <button
                             type="button"
                             onClick={addMenuItem}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex-shrink-0"
                         >
                             <Plus size={16} />
                             Add Item
@@ -348,11 +348,11 @@ const NavbarWidgetEditor = ({
                     </div>
 
                     {menuItems.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-2 min-w-0">
                             {menuItems.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="border border-gray-200 rounded p-3 bg-white space-y-2"
+                                    className="border border-gray-200 rounded p-3 bg-white space-y-2 min-w-0"
                                     draggable
                                     onDragStart={(e) => {
                                         e.dataTransfer.effectAllowed = 'move'
@@ -372,20 +372,20 @@ const NavbarWidgetEditor = ({
                                         <div className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">
                                             <GripVertical size={18} />
                                         </div>
-                                        <div className="flex-1 space-y-2">
+                                        <div className="flex-1 min-w-0 space-y-2">
                                             <input
                                                 type="text"
                                                 value={item.label || ''}
                                                 onChange={(e) => updateMenuItem(index, 'label', e.target.value)}
                                                 placeholder="Label *"
-                                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                             <input
                                                 type="text"
                                                 value={item.url || ''}
                                                 onChange={(e) => updateMenuItem(index, 'url', e.target.value)}
                                                 placeholder="URL *"
-                                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 break-all"
                                             />
                                             <div className="flex gap-4">
                                                 <label className="flex items-center gap-2 text-xs text-gray-600">
@@ -428,13 +428,13 @@ const NavbarWidgetEditor = ({
                 </div>
 
                 {/* Secondary Menu Items */}
-                <div>
+                <div className="min-w-0">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-base font-semibold">Secondary Menu Items</h3>
                         <button
                             type="button"
                             onClick={addSecondaryMenuItem}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex-shrink-0"
                         >
                             <Plus size={16} />
                             Add Item
@@ -442,11 +442,11 @@ const NavbarWidgetEditor = ({
                     </div>
 
                     {secondaryMenuItems.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-2 min-w-0">
                             {secondaryMenuItems.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="border border-gray-200 rounded p-3 bg-white space-y-2"
+                                    className="border border-gray-200 rounded p-3 bg-white space-y-2 min-w-0"
                                     draggable
                                     onDragStart={(e) => {
                                         e.dataTransfer.effectAllowed = 'move'
@@ -466,20 +466,20 @@ const NavbarWidgetEditor = ({
                                         <div className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">
                                             <GripVertical size={18} />
                                         </div>
-                                        <div className="flex-1 space-y-2">
+                                        <div className="flex-1 min-w-0 space-y-2">
                                             <input
                                                 type="text"
                                                 value={item.label || ''}
                                                 onChange={(e) => updateSecondaryMenuItem(index, 'label', e.target.value)}
                                                 placeholder="Label *"
-                                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                             <input
                                                 type="text"
                                                 value={item.url || ''}
                                                 onChange={(e) => updateSecondaryMenuItem(index, 'url', e.target.value)}
                                                 placeholder="URL *"
-                                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 break-all"
                                             />
                                             <div className="flex gap-4">
                                                 <label className="flex items-center gap-2 text-xs text-gray-600">
@@ -521,7 +521,7 @@ const NavbarWidgetEditor = ({
                                                     value={item.backgroundImage || ''}
                                                     onChange={(e) => updateSecondaryMenuItem(index, 'backgroundImage', e.target.value)}
                                                     placeholder="https://example.com/image.jpg"
-                                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 break-all"
                                                 />
                                             </div>
                                         </div>
