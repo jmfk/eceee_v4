@@ -5,12 +5,14 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, Play, Eye, Code, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Play, Eye, Code, X, BookOpen, Edit } from 'lucide-react';
 import { renderMustache, prepareCarouselContext } from '../../utils/mustacheRenderer';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
-const CarouselStylesTab = ({ carouselStyles, onChange, onDirty }) => {
+const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
+    const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
     const [showPreview, setShowPreview] = useState(false);
@@ -133,15 +135,28 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Carousel Styles</h3>
-                <CopyButton
-                    data={carouselStyles}
-                    level="section"
-                    section="carouselStyles"
-                    label="Copy All Carousel Styles"
-                    onSuccess={() => addNotification({ type: 'success', message: 'Carousel styles copied to clipboard' })}
-                    onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
-                />
+                <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Carousel Styles</h3>
+                    <p className="text-sm text-gray-500 mt-1">Define custom carousel templates using Mustache syntax</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => window.open('/docs/carousel-styles-reference.html', '_blank')}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                        title="Open Carousel Styles Documentation"
+                    >
+                        <BookOpen className="w-4 h-4" />
+                        Documentation
+                    </button>
+                    <CopyButton
+                        data={carouselStyles}
+                        level="section"
+                        section="carouselStyles"
+                        label="Copy All Carousel Styles"
+                        onSuccess={() => addNotification({ type: 'success', message: 'Carousel styles copied to clipboard' })}
+                        onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                    />
+                </div>
             </div>
 
             <div className="text-sm text-gray-600">
@@ -188,17 +203,21 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty }) => {
                                 className={`flex items-center border rounded-lg overflow-hidden transition-colors ${editingStyle === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
                                     }`}
                             >
-                                <button
-                                    type="button"
-                                    onClick={() => setEditingStyle(editingStyle === key ? null : key)}
-                                    className="flex-1 text-left px-3 py-2 min-w-0"
-                                >
+                                <div className="flex-1 px-3 py-2 min-w-0">
                                     <div className="font-medium text-gray-900 truncate">{style.name || key}</div>
                                     {style.description && (
                                         <div className="text-xs text-gray-500 truncate">{style.description}</div>
                                     )}
-                                </button>
+                                </div>
                                 <div className="flex items-center border-l border-gray-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/settings/themes/${themeId}/carousel-styles/${key}`)}
+                                        className="px-3 py-2 text-blue-600 hover:text-blue-700"
+                                        title="Edit style"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                    </button>
                                     <CopyButton
                                         data={{ [key]: style }}
                                         level="item"
@@ -206,7 +225,7 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty }) => {
                                         itemKey={key}
                                         iconOnly
                                         size="default"
-                                        className="px-3 py-2"
+                                        className="px-3 py-2 border-l border-gray-200"
                                         onSuccess={() => addNotification({ type: 'success', message: `Carousel style "${key}" copied` })}
                                     />
                                     <button
@@ -293,6 +312,38 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty }) => {
                                             placeholder="400"
                                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Max Width (px)</label>
+                                        <input
+                                            type="number"
+                                            value={styles[editingStyle].imgproxy_config?.max_width || styles[editingStyle].imgproxyConfig?.maxWidth || ''}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    max_width: parseInt(e.target.value) || null
+                                                }
+                                            })}
+                                            placeholder="2400"
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Prevents upscaling beyond original</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Max Height (px)</label>
+                                        <input
+                                            type="number"
+                                            value={styles[editingStyle].imgproxy_config?.max_height || styles[editingStyle].imgproxyConfig?.maxHeight || ''}
+                                            onChange={(e) => handleUpdateStyle(editingStyle, {
+                                                imgproxy_config: {
+                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    max_height: parseInt(e.target.value) || null
+                                                }
+                                            })}
+                                            placeholder="800"
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Prevents upscaling beyond original</p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Resize Type</label>

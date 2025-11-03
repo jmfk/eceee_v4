@@ -5,13 +5,15 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, Code, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Code, Eye, BookOpen, Edit } from 'lucide-react';
 import { createEmptyComponentStyle } from '../../utils/themeUtils';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
-const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
+const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => {
+    const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
     const templateRefs = useRef({});
@@ -80,15 +82,28 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Component Styles</h3>
-                <CopyButton
-                    data={componentStyles}
-                    level="section"
-                    section="componentStyles"
-                    label="Copy All Component Styles"
-                    onSuccess={() => addNotification({ type: 'success', message: 'Component styles copied to clipboard' })}
-                    onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
-                />
+                <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Component Styles</h3>
+                    <p className="text-sm text-gray-500 mt-1">Define custom component templates using Mustache syntax</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => window.open('/docs/component-styles-reference.html', '_blank')}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                        title="Open Component Styles Documentation"
+                    >
+                        <BookOpen className="w-4 h-4" />
+                        Documentation
+                    </button>
+                    <CopyButton
+                        data={componentStyles}
+                        level="section"
+                        section="componentStyles"
+                        label="Copy All Component Styles"
+                        onSuccess={() => addNotification({ type: 'success', message: 'Component styles copied to clipboard' })}
+                        onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                    />
+                </div>
             </div>
 
             <div className="text-sm text-gray-600">
@@ -144,17 +159,21 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty }) => {
                                     : 'border-gray-200 bg-white hover:border-gray-300'
                                     }`}
                             >
-                                <button
-                                    type="button"
-                                    onClick={() => setEditingStyle(key)}
-                                    className="flex-1 text-left px-3 py-2 min-w-0"
-                                >
+                                <div className="flex-1 px-3 py-2 min-w-0">
                                     <div className="font-medium text-gray-900 truncate">{key}</div>
                                     {style.description && (
                                         <div className="text-xs text-gray-500 truncate">{style.description}</div>
                                     )}
-                                </button>
+                                </div>
                                 <div className="flex items-center border-l border-gray-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/settings/themes/${themeId}/component-styles/${key}`)}
+                                        className="px-3 py-2 text-blue-600 hover:text-blue-700"
+                                        title="Edit style"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                    </button>
                                     <CopyButton
                                         data={{ [key]: style }}
                                         level="item"

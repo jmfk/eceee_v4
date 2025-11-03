@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery Styles Reference</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f7fa;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            margin: -2rem -2rem 2rem;
+            border-radius: 8px 8px 0 0;
+        }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        h2 { color: #2d3748; margin: 2rem 0 1rem; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem; }
+        h3 { color: #4a5568; margin: 1.5rem 0 0.75rem; }
+        code {
+            background: #f7fafc;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e53e3e;
+        }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        pre code { background: none; color: inherit; padding: 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th {
+            background: #667eea;
+            color: white;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        tr:hover { background: #f7fafc; }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .badge-type { background: #bee3f8; color: #2c5282; }
+        .note {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        .example {
+            background: #f0fff4;
+            border-left: 4px solid #48bb78;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gallery Styles Reference</h1>
+            <p>Complete guide for creating custom gallery templates</p>
+        </header>
+
+        <section>
+            <h2>Available Template Variables</h2>
+            
+            <h3>Top-Level Variables</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>images</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Array of image objects with all image data</td>
+                    </tr>
+                    <tr>
+                        <td><code>imageCount</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Total number of images in gallery</td>
+                    </tr>
+                    <tr>
+                        <td><code>multipleImages</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if more than one image (useful for conditionals)</td>
+                    </tr>
+                    <tr>
+                        <td><code>showCaptions</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>Whether to display image captions</td>
+                    </tr>
+                    <tr>
+                        <td><code>enableLightbox</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>Whether lightbox functionality is enabled</td>
+                    </tr>
+                    <tr>
+                        <td><code>columns</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Number of grid columns (default: 3, customizable via style variables)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Image Object Properties</h3>
+            <p>Each item in the <code>images</code> array contains:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>index</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Zero-based index (0, 1, 2...)</td>
+                    </tr>
+                    <tr>
+                        <td><code>url</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Optimized imgproxy URL (1x size)</td>
+                    </tr>
+                    <tr>
+                        <td><code>srcset</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Responsive srcset attribute (e.g., "url1 800w, url2 1600w")</td>
+                    </tr>
+                    <tr>
+                        <td><code>display_width</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Calculated display width in pixels (1x)</td>
+                    </tr>
+                    <tr>
+                        <td><code>display_height</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Calculated display height in pixels (1x)</td>
+                    </tr>
+                    <tr>
+                        <td><code>alt_text</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Alt text for accessibility (required!)</td>
+                    </tr>
+                    <tr>
+                        <td><code>caption</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Image caption text</td>
+                    </tr>
+                    <tr>
+                        <td><code>title</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Image title</td>
+                    </tr>
+                    <tr>
+                        <td><code>width</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Original image width</td>
+                    </tr>
+                    <tr>
+                        <td><code>height</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Original image height</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Basic Template Example</h2>
+            <pre><code>&lt;div class="gallery"&gt;
+  &lt;div class="gallery-grid" style="grid-template-columns: repeat({{columns}}, 1fr);"&gt;
+    {{#images}}
+      &lt;div class="gallery-item"&gt;
+        &lt;img 
+          src="{{url}}" 
+          srcset="{{srcset}}"
+          width="{{display_width}}"
+          height="{{display_height}}"
+          alt="{{alt_text}}"
+          loading="lazy"&gt;
+        {{#caption}}
+          &lt;p class="caption"&gt;{{caption}}&lt;/p&gt;
+        {{/caption}}
+      &lt;/div&gt;
+    {{/images}}
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+        </section>
+
+        <section>
+            <h2>Imgproxy Configuration</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Option</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>width</code></td>
+                        <td>Target width in pixels</td>
+                        <td>800</td>
+                    </tr>
+                    <tr>
+                        <td><code>height</code></td>
+                        <td>Target height in pixels</td>
+                        <td>600</td>
+                    </tr>
+                    <tr>
+                        <td><code>max_width</code></td>
+                        <td>Maximum width (prevents upscaling)</td>
+                        <td>1600</td>
+                    </tr>
+                    <tr>
+                        <td><code>max_height</code></td>
+                        <td>Maximum height (prevents upscaling)</td>
+                        <td>1200</td>
+                    </tr>
+                    <tr>
+                        <td><code>resize_type</code></td>
+                        <td>"fit", "fill", "crop", or "force"</td>
+                        <td>"fill"</td>
+                    </tr>
+                    <tr>
+                        <td><code>gravity</code></td>
+                        <td>"sm" (smart), "ce" (center), etc.</td>
+                        <td>"sm"</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <strong>Tip:</strong> Always set <code>max_width</code> and <code>max_height</code> to prevent images from being upscaled beyond their original size!
+            </div>
+        </section>
+
+        <section>
+            <h2>Mustache Conditionals</h2>
+            <h3>Show/Hide Based on Conditions</h3>
+            <pre><code>{{#showCaptions}}
+  &lt;p&gt;{{caption}}&lt;/p&gt;
+{{/showCaptions}}
+
+{{#multipleImages}}
+  &lt;div class="navigation"&gt;...&lt;/div&gt;
+{{/multipleImages}}</code></pre>
+
+            <h3>Loop Through Images</h3>
+            <pre><code>{{#images}}
+  &lt;div data-index="{{index}}"&gt;
+    &lt;img src="{{url}}" alt="{{alt_text}}"&gt;
+  &lt;/div&gt;
+{{/images}}</code></pre>
+        </section>
+
+        <section>
+            <h2>Best Practices</h2>
+            <ul style="margin-left: 2rem;">
+                <li>Always use <code>srcset</code> for responsive images</li>
+                <li>Include <code>width</code> and <code>height</code> attributes to prevent layout shift</li>
+                <li>Use <code>loading="lazy"</code> for better performance</li>
+                <li>Provide meaningful <code>alt_text</code> for accessibility</li>
+                <li>Use grid or flexbox for responsive layouts</li>
+                <li>Test with different numbers of images (1, 3, 6, 12)</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Example: Grid with Hover Effect</h2>
+            <div class="example">
+                <h3>Template:</h3>
+                <pre><code>&lt;div class="hover-gallery"&gt;
+  {{#images}}
+    &lt;div class="item"&gt;
+      &lt;img src="{{url}}" srcset="{{srcset}}" 
+           width="{{display_width}}" height="{{display_height}}"
+           alt="{{alt_text}}"&gt;
+      &lt;div class="overlay"&gt;
+        &lt;h3&gt;{{title}}&lt;/h3&gt;
+        &lt;p&gt;{{caption}}&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  {{/images}}
+&lt;/div&gt;</code></pre>
+
+                <h3>CSS:</h3>
+                <pre><code>.hover-gallery {
+  display: grid;
+  grid-template-columns: repeat({{columns}}, 1fr);
+  gap: 1rem;
+}
+.item {
+  position: relative;
+  overflow: hidden;
+}
+.item img {
+  width: 100%;
+  height: auto;
+  transition: transform 0.3s;
+}
+.item:hover img {
+  transform: scale(1.1);
+}
+.overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  padding: 1rem;
+  transform: translateY(100%);
+  transition: transform 0.3s;
+}
+.item:hover .overlay {
+  transform: translateY(0);
+}</code></pre>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
+

@@ -53,14 +53,37 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
         img_copy = img.copy() if isinstance(img, dict) else {}
         img_copy["index"] = i
 
-        # Generate imgproxy URL if config provided and image has URL
+        # Generate responsive imgproxy URLs if config provided and image has URL
         if final_imgproxy_config and img_copy.get("url"):
             try:
-                imgproxy_url = imgproxy_service.generate_url(
-                    source_url=img_copy["url"], **final_imgproxy_config
+                # Extract max dimensions (prefer max_width/max_height, fallback to width/height)
+                max_width = final_imgproxy_config.get("max_width") or final_imgproxy_config.get("width")
+                max_height = final_imgproxy_config.get("max_height") or final_imgproxy_config.get("height")
+                
+                # Get original dimensions from image
+                original_width = img_copy.get("width")
+                original_height = img_copy.get("height")
+                
+                # Generate responsive URLs
+                responsive_data = imgproxy_service.generate_responsive_urls(
+                    source_url=img_copy["url"],
+                    max_width=max_width,
+                    max_height=max_height,
+                    original_width=original_width,
+                    original_height=original_height,
+                    resize_type=final_imgproxy_config.get("resize_type", "fit"),
+                    gravity=final_imgproxy_config.get("gravity", "sm"),
+                    quality=final_imgproxy_config.get("quality"),
+                    format=final_imgproxy_config.get("format"),
                 )
-                # Replace the original URL with the imgproxy URL
-                img_copy["url"] = imgproxy_url
+                
+                # Update image with responsive data
+                if responsive_data and "1x" in responsive_data:
+                    img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
+                    img_copy["display_width"] = responsive_data["1x"]["width"]
+                    img_copy["display_height"] = responsive_data["1x"]["height"]
+                    img_copy["srcset"] = responsive_data.get("srcset", "")
+                    img_copy["responsive_sizes"] = responsive_data.get("sizes", [])
             except Exception as e:
                 # Log error but continue with original URL
                 import logging
@@ -109,14 +132,37 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
         img_copy = img.copy() if isinstance(img, dict) else {}
         img_copy["index"] = i
 
-        # Generate imgproxy URL if config provided and image has URL
+        # Generate responsive imgproxy URLs if config provided and image has URL
         if final_imgproxy_config and img_copy.get("url"):
             try:
-                imgproxy_url = imgproxy_service.generate_url(
-                    source_url=img_copy["url"], **final_imgproxy_config
+                # Extract max dimensions (prefer max_width/max_height, fallback to width/height)
+                max_width = final_imgproxy_config.get("max_width") or final_imgproxy_config.get("width")
+                max_height = final_imgproxy_config.get("max_height") or final_imgproxy_config.get("height")
+                
+                # Get original dimensions from image
+                original_width = img_copy.get("width")
+                original_height = img_copy.get("height")
+                
+                # Generate responsive URLs
+                responsive_data = imgproxy_service.generate_responsive_urls(
+                    source_url=img_copy["url"],
+                    max_width=max_width,
+                    max_height=max_height,
+                    original_width=original_width,
+                    original_height=original_height,
+                    resize_type=final_imgproxy_config.get("resize_type", "fit"),
+                    gravity=final_imgproxy_config.get("gravity", "sm"),
+                    quality=final_imgproxy_config.get("quality"),
+                    format=final_imgproxy_config.get("format"),
                 )
-                # Replace the original URL with the imgproxy URL
-                img_copy["url"] = imgproxy_url
+                
+                # Update image with responsive data
+                if responsive_data and "1x" in responsive_data:
+                    img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
+                    img_copy["display_width"] = responsive_data["1x"]["width"]
+                    img_copy["display_height"] = responsive_data["1x"]["height"]
+                    img_copy["srcset"] = responsive_data.get("srcset", "")
+                    img_copy["responsive_sizes"] = responsive_data.get("sizes", [])
             except Exception as e:
                 # Log error but continue with original URL
                 import logging

@@ -193,6 +193,171 @@ class ImgProxyService:
             quality=quality,
         )
 
+    def _constrain_dimensions(
+        self,
+        requested_width: Optional[int],
+        requested_height: Optional[int],
+        original_width: Optional[int],
+        original_height: Optional[int],
+    ) -> Tuple[Optional[int], Optional[int]]:
+        """
+        Constrain requested dimensions to prevent upscaling.
+
+        Args:
+            requested_width: Desired width
+            requested_height: Desired height
+            original_width: Original image width
+            original_height: Original image height
+
+        Returns:
+            Tuple of (constrained_width, constrained_height)
+        """
+        # If no original dimensions available, return requested dimensions
+        if not original_width or not original_height:
+            return requested_width, requested_height
+
+        # If no requested dimensions, return None (use original)
+        if not requested_width and not requested_height:
+            return None, None
+
+        # Calculate aspect ratio
+        aspect_ratio = original_width / original_height
+
+        # If only width requested
+        if requested_width and not requested_height:
+            constrained_width = min(requested_width, original_width)
+            constrained_height = int(constrained_width / aspect_ratio)
+            return constrained_width, constrained_height
+
+        # If only height requested
+        if requested_height and not requested_width:
+            constrained_height = min(requested_height, original_height)
+            constrained_width = int(constrained_height * aspect_ratio)
+            return constrained_width, constrained_height
+
+        # Both dimensions requested - constrain to fit within both limits
+        width_scale = requested_width / original_width
+        height_scale = requested_height / original_height
+        
+        # Don't upscale
+        if width_scale >= 1.0 and height_scale >= 1.0:
+            return original_width, original_height
+        
+        # Use the smaller scale to ensure we fit within both dimensions
+        scale = min(width_scale, height_scale, 1.0)
+        constrained_width = int(original_width * scale)
+        constrained_height = int(original_height * scale)
+        
+        return constrained_width, constrained_height
+
+    def generate_responsive_urls(
+        self,
+        source_url: str,
+        max_width: Optional[int] = None,
+        max_height: Optional[int] = None,
+        original_width: Optional[int] = None,
+        original_height: Optional[int] = None,
+        resize_type: str = "fit",
+        gravity: str = "sm",
+        quality: Optional[int] = None,
+        format: Optional[str] = None,
+        densities: list = None,
+        **kwargs,
+    ) -> Dict:
+        """
+        Generate multiple responsive image URLs for different pixel densities.
+
+        Args:
+            source_url: Source image URL
+            max_width: Maximum width (won't exceed original)
+            max_height: Maximum height (won't exceed original)
+            original_width: Original image width
+            original_height: Original image height
+            resize_type: Resizing type ('fit', 'fill', 'crop', 'force')
+            gravity: Gravity for cropping
+            quality: JPEG/WebP quality (1-100)
+            format: Output format
+            densities: List of pixel densities (e.g., [1, 2]). Defaults to [1, 2]
+            **kwargs: Additional processing options
+
+        Returns:
+            Dict with URLs and dimensions for each density:
+            {
+                '1x': {'url': '...', 'width': 800, 'height': 600},
+                '2x': {'url': '...', 'width': 1600, 'height': 1200},
+                'srcset': 'url1 800w, url2 1600w',
+                'sizes': [...]
+            }
+        """
+        if densities is None:
+            densities = [1, 2]
+
+        # Constrain base dimensions (1x)
+        base_width, base_height = self._constrain_dimensions(
+            max_width, max_height, original_width, original_height
+        )
+
+        result = {}
+        srcset_parts = []
+        sizes_list = []
+
+        for density in densities:
+            # Calculate dimensions for this density
+            if base_width:
+                density_width = base_width * density
+            else:
+                density_width = None
+
+            if base_height:
+                density_height = base_height * density
+            else:
+                density_height = None
+
+            # Further constrain to not exceed original dimensions
+            final_width, final_height = self._constrain_dimensions(
+                density_width, density_height, original_width, original_height
+            )
+
+            # Skip if dimensions would be 0 or None
+            if not final_width or not final_height:
+                continue
+
+            # Generate URL for this density
+            url = self.generate_url(
+                source_url=source_url,
+                width=final_width,
+                height=final_height,
+                resize_type=resize_type,
+                gravity=gravity,
+                quality=quality,
+                format=format,
+                **kwargs,
+            )
+
+            density_key = f"{density}x"
+            result[density_key] = {
+                "url": url,
+                "width": final_width,
+                "height": final_height,
+            }
+
+            # Build srcset string (using width descriptor)
+            srcset_parts.append(f"{url} {final_width}w")
+
+            # Build sizes array
+            sizes_list.append({
+                "url": url,
+                "width": final_width,
+                "height": final_height,
+                "density": density_key,
+            })
+
+        # Add srcset string
+        result["srcset"] = ", ".join(srcset_parts)
+        result["sizes"] = sizes_list
+
+        return result
+
     def health_check(self) -> bool:
         """
         Check if imgproxy service is available.

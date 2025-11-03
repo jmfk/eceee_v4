@@ -176,10 +176,10 @@ const CodeEditorPanel = ({
             <textarea
                 value={editorValue}
                 onChange={(e) => handleEditorChange(e.target.value)}
-                readOnly={readOnly || mode === 'css'}
+                readOnly={readOnly}
                 rows={12}
                 className={`w-full px-3 py-2 border rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${error ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    } ${readOnly || mode === 'css' ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}`}
+                    } ${readOnly ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}`}
             />
 
             {/* Error Display */}

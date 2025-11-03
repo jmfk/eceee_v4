@@ -791,6 +791,7 @@ const ThemeEditor = ({ onSave }) => {
                             componentStyles={themeData?.componentStyles || {}}
                             onChange={(componentStyles) => updateThemeField('componentStyles', componentStyles)}
                             onDirty={() => setThemeDirty(true)}
+                            themeId={themeId}
                         />
                     )}
 
@@ -799,6 +800,7 @@ const ThemeEditor = ({ onSave }) => {
                             galleryStyles={themeData?.galleryStyles || {}}
                             onChange={(galleryStyles) => updateThemeField('galleryStyles', galleryStyles)}
                             onDirty={() => setThemeDirty(true)}
+                            themeId={themeId}
                         />
                     )}
 
@@ -807,6 +809,7 @@ const ThemeEditor = ({ onSave }) => {
                             carouselStyles={themeData?.carouselStyles || {}}
                             onChange={(carouselStyles) => updateThemeField('carouselStyles', carouselStyles)}
                             onDirty={() => setThemeDirty(true)}
+                            themeId={themeId}
                         />
                     )}
 
