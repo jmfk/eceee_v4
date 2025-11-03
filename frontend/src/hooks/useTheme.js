@@ -8,39 +8,55 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { themesApi } from '../api'
+import { themesApi, pagesApi } from '../api'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 
 /**
  * Hook for applying themes to content areas
  * @param {Object} options - Configuration options
- * @param {number} options.themeId - Theme ID to apply
+ * @param {number} options.themeId - Explicit theme ID to apply
+ * @param {number} options.pageId - Page ID to fetch effectiveTheme from (includes inheritance)
  * @param {string} options.scopeSelector - CSS selector to scope theme to (default: '.theme-content')
  * @param {boolean} options.enabled - Whether theme application is enabled
  * @returns {Object} Theme application utilities
  */
 export const useTheme = ({
     themeId = null,
+    pageId = null,
     scopeSelector = '.theme-content',
     enabled = true
 } = {}) => {
     const injectedStyleRef = useRef(null)
     const currentThemeIdRef = useRef(null)
 
-    // Try to get theme from UDC if no themeId provided
+    // Fetch page data to get effectiveTheme (includes inheritance)
+    const { data: pageData, isLoading: fetchingPage } = useQuery({
+        queryKey: ['page-for-theme', pageId],
+        queryFn: async () => {
+            const response = await pagesApi.get(pageId);
+            return response;
+        },
+        enabled: enabled && !!pageId && !themeId,
+        staleTime: 5 * 60 * 1000
+    });
+
+    const pageTheme = pageData?.effectiveTheme;
+
+    // Try to get theme from UDC if no pageId or themeId provided
     let udcTheme = null
     try {
         const { state } = useUnifiedData()
 
         const currentVersionId = state.metadata.currentVersionId
+
         if (currentVersionId) {
             const version = state.versions[currentVersionId]
-            
-            // PRIORITY 1: Use effectiveTheme if available (includes inherited theme)
+
+            // Use effectiveTheme if available (includes inherited theme)
             if (version?.effectiveTheme) {
                 udcTheme = version.effectiveTheme
-            } 
-            // PRIORITY 2: Fallback to explicit theme by ID
+            }
+            // Fallback to explicit theme by ID
             else if (version?.theme) {
                 const pageThemeId = version.theme
                 // Try to find theme in UDC themes cache
@@ -70,7 +86,7 @@ export const useTheme = ({
         cacheTime: 10 * 60 * 1000, // 10 minutes
     })
 
-    // Fetch default theme when no themeId provided
+    // Fetch default theme when no themeId or pageId provided
     const { data: defaultTheme, isLoading: fetchingDefault } = useQuery({
         queryKey: ['default-theme'],
         queryFn: async () => {
@@ -78,13 +94,16 @@ export const useTheme = ({
             const themes = Array.isArray(response) ? response : response.results || [];
             return themes.find(t => t.isDefault === true);
         },
-        enabled: !themeId && enabled,
+        enabled: !themeId && !pageId && enabled,
         staleTime: 5 * 60 * 1000
     });
 
-    // Use fetched theme if available, otherwise use UDC theme, otherwise use default theme
-    const theme = fetchedTheme || udcTheme || defaultTheme
-    const isLoading = fetchingTheme || fetchingDefault
+    // PRIORITY 1: Explicit themeId (fetched)
+    // PRIORITY 2: Page's effectiveTheme (from page API - includes inheritance)
+    // PRIORITY 3: UDC effectiveTheme (fallback)
+    // PRIORITY 4: Default theme
+    const theme = fetchedTheme || pageTheme || udcTheme || defaultTheme
+    const isLoading = fetchingTheme || fetchingPage || fetchingDefault
 
     /**
      * Generate CSS content from theme data

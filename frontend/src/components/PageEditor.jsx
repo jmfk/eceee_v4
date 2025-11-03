@@ -546,25 +546,44 @@ const PageEditor = () => {
     }, [webpage, isNewPage, publishUpdate])
 
     // Process page version data (PageVersion model fields)
+    // MUST run after webpage is initialized in UDC
     useEffect(() => {
-        if (pageVersion && !isNewPage) {
+        if (pageVersion && !isNewPage && webpage) {
             const processedVersionData = processLoadedVersionData({ ...pageVersion });
             setPageVersionData(processedVersionData);
             setOriginalPageVersionData(processedVersionData); // Track original for smart saving
 
             // Publish version data to UDC (including effectiveTheme for inheritance)
             // Note: Using pageVersion.id here instead of componentId to avoid dependency cycle
-            const versionComponentId = `page-editor-${pageId}-${pageVersion.versionId || pageVersion.id || 'current'}`;
-            publishUpdate(versionComponentId, OperationTypes.INIT_VERSION, {
-                id: processedVersionData.id,
-                data: {
-                    ...processedVersionData,
-                    pageId: pageId, // Ensure pageId is set for INIT_VERSION
-                    versionNumber: processedVersionData.versionNumber || 1 // Ensure versionNumber is set
+            const initVersionAsync = async () => {
+                try {
+                    // First ensure page exists in UDC
+                    const webpageComponentId = `page-editor-${pageId}-webpage`;
+                    await publishUpdate(webpageComponentId, OperationTypes.INIT_PAGE, {
+                        id: webpage.id,
+                        data: webpage
+                    });
+                    
+                    // Then initialize version
+                    const versionComponentId = `page-editor-${pageId}-${pageVersion.versionId || pageVersion.id || 'current'}`;
+                    const versionDataForUDC = {
+                        ...processedVersionData,
+                        pageId: String(pageId), // Ensure pageId is string for consistency
+                        versionNumber: processedVersionData.versionNumber || 1 // Ensure versionNumber is set
+                    };
+                    
+                    await publishUpdate(versionComponentId, OperationTypes.INIT_VERSION, {
+                        id: processedVersionData.id,
+                        data: versionDataForUDC
+                    });
+                } catch (error) {
+                    console.error('[PageEditor] Error initializing version in UDC:', error);
                 }
-            });
+            };
+            
+            initVersionAsync();
         }
-    }, [pageVersion, isNewPage, publishUpdate, pageId])
+    }, [pageVersion, isNewPage, webpage, publishUpdate, pageId])
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {

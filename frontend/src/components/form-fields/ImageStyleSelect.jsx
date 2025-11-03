@@ -17,18 +17,18 @@ const ImageStyleSelect = ({
     context,
     ...props
 }) => {
-    const { currentTheme } = useTheme();
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef(null);
-
     // UDC Integration
     const { useExternalChanges, getState } = useUnifiedData();
     const widgetId = context?.widgetId;
     const slotName = context?.slotName;
     const contextType = context?.contextType;
     const widgetPath = context?.widgetPath;
+    const pageId = context?.pageId;
 
-    console.log("ImageStyleSelect", currentTheme)
+    // Get theme using pageId to fetch effectiveTheme (includes inheritance)
+    const { currentTheme } = useTheme({ pageId });
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
 
     // State to track current displayType from UDC
     const [udcDisplayType, setUdcDisplayType] = useState(() => {

@@ -21,10 +21,10 @@ const ImageWidget = ({
     context,
     widgetPath = []
 }) => {
+    const pageId = context?.pageId;
 
-
-    // Get current theme for image styles
-    const { currentTheme } = useTheme()
+    // Get current theme for image styles (includes inheritance)
+    const { currentTheme } = useTheme({ pageId })
 
     // ODC Integration
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData()

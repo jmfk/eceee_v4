@@ -9,9 +9,13 @@ import { ChevronDown } from 'lucide-react';
 const ComponentStyleSelect = ({
     value,
     onChange,
+    context,
     ...props
 }) => {
-    const { currentTheme } = useTheme();
+    const pageId = context?.pageId;
+    
+    // Get theme using pageId to fetch effectiveTheme (includes inheritance)
+    const { currentTheme } = useTheme({ pageId });
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 

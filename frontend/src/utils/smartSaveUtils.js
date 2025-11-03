@@ -94,10 +94,7 @@ export function processLoadedVersionData(versionData) {
 
     // Preserve effectiveTheme from API response for UDC state
     // This includes inherited theme information that components need
-    if (processed.effectiveTheme) {
-        // effectiveTheme is already in camelCase from API, just preserve it
-        // No transformation needed
-    }
+    // effectiveTheme is already in camelCase from API, just preserve it
 
     return processed;
 }
