@@ -8,6 +8,10 @@ from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class ImageMediaItem(BaseModel):
     """Individual media item for Image widget"""
@@ -503,5 +507,9 @@ class ImageWidget(BaseWidget):
         # Render template
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")
+
+        # Ensure we return valid HTML (not empty string) when using custom style
+        if not html or html.strip() == "":
+            return None
 
         return html, css

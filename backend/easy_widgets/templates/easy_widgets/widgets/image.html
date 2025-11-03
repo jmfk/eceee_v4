@@ -1,11 +1,4 @@
-{% if custom_style_html %}
-    <!-- Custom Style Rendering via Mustache -->
-    {% if custom_style_css %}
-        <style>{{ custom_style_css|safe }}</style>
-    {% endif %}
-    {{ custom_style_html|safe }}
-
-{% elif config.display_type == 'gallery' and config.media_items %}
+{% if config.display_type == 'gallery' and config.media_items %}
     <!-- Gallery Display -->
     <div class="image-widget gallery-widget" data-widget-type="gallery">
         <div class="gallery-container" 
@@ -28,6 +21,9 @@
                             {% else %}
                                 <img 
                                     src="{{ item.thumbnail_url|default:item.url }}" 
+                                    {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                    {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                    {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
                                     alt="{{ item.alt_text }}"
                                     class="gallery-image"
                                     loading="lazy"
@@ -175,6 +171,9 @@
                         {% else %}
                             <img 
                                 src="{{ item.thumbnail_url|default:item.url }}" 
+                                {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
                                 alt="{{ item.alt_text }}"
                                 class="carousel-image">
                         {% endif %}
@@ -256,6 +255,9 @@
                     {% else %}
                         <img 
                             src="{{ item.url }}" 
+                            {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                            {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                            {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
                             alt="{{ item.alt_text }}"
                             class="widget-image"
                             loading="lazy"

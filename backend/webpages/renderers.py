@@ -158,8 +158,11 @@ class WebPageRenderer:
                     logger = logging.getLogger(__name__)
                     logger.error(f"Error rendering widget with custom style: {e}")
 
-        # If we have custom style HTML, use it directly
-        if custom_style_html is not None:
+        # If we have custom style HTML, use it directly (with CSS if present)
+        # This must return immediately to prevent the default template from also rendering
+        if custom_style_html is not None and custom_style_html != "":
+            if custom_style_css:
+                return f"<style>{custom_style_css}</style>\n{custom_style_html}"
             return custom_style_html
 
         slot_name = context.get("slot_name", "")
@@ -205,8 +208,6 @@ class WebPageRenderer:
             "widget_id": widget_data.get("id", "unknown"),
             "widget_type": widget_type,
             "widget_data": widget_data,  # Full widget data access
-            "custom_style_html": custom_style_html,  # Mustache-rendered custom style
-            "custom_style_css": custom_style_css,  # CSS for custom style
             **enhanced_context,
         }
         try:
@@ -215,6 +216,9 @@ class WebPageRenderer:
                 {**template_config, **context},
                 request=self.request,
             )
+            # Inject custom CSS in passthru mode (when custom_style_css exists but custom_style_html doesn't)
+            if custom_style_css:
+                widget_html = f"<style>{custom_style_css}</style>\n{widget_html}"
             return widget_html
         except Exception as e:
             return f"<!-- Error rendering widget: {e} -->"
