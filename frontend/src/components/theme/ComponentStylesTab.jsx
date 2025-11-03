@@ -6,16 +6,20 @@
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Code, Eye, BookOpen, Edit } from 'lucide-react';
+import { Plus, Trash2, Code, Eye, BookOpen, Edit, Sparkles } from 'lucide-react';
 import { createEmptyComponentStyle } from '../../utils/themeUtils';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
+import PresetSelector from './PresetSelector';
+import { smartInsert } from '../../utils/codeInsertion';
+import StyleAIHelper from './StyleAIHelper';
 
 const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => {
     const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
+    const [showPresetSelector, setShowPresetSelector] = useState(false);
     const templateRefs = useRef({});
     const cssRefs = useRef({});
     const { addNotification } = useGlobalNotifications();
@@ -77,6 +81,39 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => 
         if (editingStyle === key) {
             setEditingStyle(null);
         }
+    };
+
+    const handlePresetInsert = (template, css, mode) => {
+        if (!editingStyle) return;
+
+        const currentTemplate = templateRefs.current[editingStyle]?.value || styles[editingStyle]?.template || '';
+        const currentCSS = cssRefs.current[editingStyle]?.value || styles[editingStyle]?.css || '';
+
+        const { template: newTemplate, css: newCSS } = smartInsert({
+            existingTemplate: currentTemplate,
+            existingCSS: currentCSS,
+            newTemplate: template,
+            newCSS: css,
+            mode,
+            presetCategory: 'component'
+        });
+
+        // Update refs directly
+        if (templateRefs.current[editingStyle]) {
+            templateRefs.current[editingStyle].value = newTemplate;
+        }
+        if (cssRefs.current[editingStyle]) {
+            cssRefs.current[editingStyle].value = newCSS;
+        }
+
+        // Update state
+        handleUpdateStyle(editingStyle, {
+            template: newTemplate,
+            css: newCSS
+        });
+
+        setShowPresetSelector(false);
+        addNotification({ type: 'success', message: 'Preset inserted successfully' });
     };
 
     return (
@@ -203,11 +240,13 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => 
                     {/* Editor panel */}
                     {editingStyle && styles[editingStyle] && (
                         <ComponentStyleEditor
+                            themeId={themeId}
                             styleKey={editingStyle}
                             style={styles[editingStyle]}
                             onUpdate={(updates) => handleUpdateStyle(editingStyle, updates)}
                             onSave={() => handleSaveFromRefs(editingStyle)}
                             onDirty={onDirty}
+                            onShowPresetSelector={() => setShowPresetSelector(true)}
                             templateRef={(el) => {
                                 if (el) templateRefs.current[editingStyle] = el;
                             }}
@@ -225,12 +264,25 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => 
                     </p>
                 </div>
             )}
+
+            {/* Preset Selector Modal */}
+            {showPresetSelector && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                        <PresetSelector
+                            categories={['component']}
+                            onInsert={handlePresetInsert}
+                            onClose={() => setShowPresetSelector(false)}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 // Component Style Editor
-const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, templateRef, cssRef }) => {
+const ComponentStyleEditor = ({ themeId, styleKey, style, onUpdate, onSave, onDirty, onShowPresetSelector, templateRef, cssRef }) => {
     const [showPreview, setShowPreview] = useState(false);
     const [previewHTML, setPreviewHTML] = useState('');
 
@@ -258,14 +310,26 @@ const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, temp
         <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
                 <h4 className="font-semibold text-gray-900">{styleKey}</h4>
-                <button
-                    type="button"
-                    onClick={handleShowPreview}
-                    className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
-                >
-                    <Eye className="w-3 h-3 mr-1" />
-                    {showPreview ? 'Hide' : 'Show'} Preview
-                </button>
+                <div className="flex items-center gap-2">
+                    {onShowPresetSelector && (
+                        <button
+                            onClick={onShowPresetSelector}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                            title="Insert preset template"
+                        >
+                            <Sparkles className="w-3 h-3" />
+                            Insert Preset
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={handleShowPreview}
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                    >
+                        <Eye className="w-3 h-3 mr-1" />
+                        {showPreview ? 'Hide' : 'Show'} Preview
+                    </button>
+                </div>
             </div>
 
             {/* Name */}
@@ -295,6 +359,14 @@ const ComponentStyleEditor = ({ styleKey, style, onUpdate, onSave, onDirty, temp
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
             </div>
+
+            {/* AI Helper */}
+            <StyleAIHelper
+                themeId={themeId}
+                styleType="component"
+                currentStyle={style}
+                onUpdateStyle={onUpdate}
+            />
 
             {/* Template - Uncontrolled with ref */}
             <div>

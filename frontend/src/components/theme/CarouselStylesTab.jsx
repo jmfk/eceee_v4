@@ -6,16 +6,20 @@
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Play, Eye, Code, X, BookOpen, Edit } from 'lucide-react';
+import { Plus, Trash2, Play, Eye, Code, X, BookOpen, Edit, Sparkles } from 'lucide-react';
 import { renderMustache, prepareCarouselContext } from '../../utils/mustacheRenderer';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
+import PresetSelector from './PresetSelector';
+import { smartInsert } from '../../utils/codeInsertion';
+import StyleAIHelper from './StyleAIHelper';
 
 const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
     const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
     const [showPreview, setShowPreview] = useState(false);
+    const [showPresetSelector, setShowPresetSelector] = useState(false);
     const templateRefs = useRef({});
     const cssRefs = useRef({});
     const { addNotification } = useGlobalNotifications();
@@ -108,6 +112,39 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
             handleUpdateStyle(editingStyle, { previewImage: reader.result });
         };
         reader.readAsDataURL(file);
+    };
+
+    const handlePresetInsert = (template, css, mode) => {
+        if (!editingStyle) return;
+
+        const currentTemplate = templateRefs.current[editingStyle]?.value || styles[editingStyle]?.template || '';
+        const currentCSS = cssRefs.current[editingStyle]?.value || styles[editingStyle]?.css || '';
+
+        const { template: newTemplate, css: newCSS } = smartInsert({
+            existingTemplate: currentTemplate,
+            existingCSS: currentCSS,
+            newTemplate: template,
+            newCSS: css,
+            mode,
+            presetCategory: 'carousel'
+        });
+
+        // Update refs directly
+        if (templateRefs.current[editingStyle]) {
+            templateRefs.current[editingStyle].value = newTemplate;
+        }
+        if (cssRefs.current[editingStyle]) {
+            cssRefs.current[editingStyle].value = newCSS;
+        }
+
+        // Update state
+        handleUpdateStyle(editingStyle, {
+            template: newTemplate,
+            css: newCSS
+        });
+
+        setShowPresetSelector(false);
+        addNotification({ type: 'success', message: 'Preset inserted successfully' });
     };
 
     const renderPreview = (style) => {
@@ -249,12 +286,22 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                         <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-white">
                             <div className="flex items-center justify-between">
                                 <h4 className="text-sm font-semibold text-gray-700">Edit: {styles[editingStyle].name || editingStyle}</h4>
-                                <button
-                                    onClick={() => setEditingStyle(null)}
-                                    className="p-1 text-gray-400 hover:text-gray-600"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setShowPresetSelector(true)}
+                                        className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                                        title="Insert preset template"
+                                    >
+                                        <Sparkles className="w-3 h-3" />
+                                        Insert Preset
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingStyle(null)}
+                                        className="p-1 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Name and Description */}
@@ -278,6 +325,14 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                                     />
                                 </div>
                             </div>
+
+                            {/* AI Helper */}
+                            <StyleAIHelper
+                                themeId={themeId}
+                                styleType="carousel"
+                                currentStyle={styles[editingStyle]}
+                                onUpdateStyle={(updates) => handleUpdateStyle(editingStyle, updates)}
+                            />
 
                             {/* Imgproxy Configuration */}
                             <div className="bg-blue-50 border border-blue-200 rounded p-3 space-y-3">
@@ -487,6 +542,19 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                     <p className="text-gray-500">
                         No carousel styles defined. Add a style to get started.
                     </p>
+                </div>
+            )}
+
+            {/* Preset Selector Modal */}
+            {showPresetSelector && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                        <PresetSelector
+                            categories={['carousel', 'buttons']}
+                            onInsert={handlePresetInsert}
+                            onClose={() => setShowPresetSelector(false)}
+                        />
+                    </div>
                 </div>
             )}
         </div>
