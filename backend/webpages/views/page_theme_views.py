@@ -14,6 +14,7 @@ from ..models import PageTheme
 from ..serializers import PageThemeSerializer
 from ..theme_service import ThemeService
 from ..services import ThemeCSSGenerator
+from ..services.style_ai_helper import StyleAIHelper
 
 
 class PageThemeViewSet(viewsets.ModelViewSet):
@@ -362,3 +363,89 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "status": "cache_cleared",
             }
         )
+
+    @action(detail=True, methods=["post"], url_path="ai-style-helper")
+    def ai_style_helper(self, request, pk=None):
+        """
+        AI helper for generating/modifying theme styles.
+
+        Request body:
+        {
+            "style_type": "gallery" | "carousel" | "component",
+            "user_prompt": "Generate a masonry gallery layout",
+            "current_style": {
+                "name": "...",
+                "description": "...",
+                "template": "...",
+                "css": "..."
+            },
+            "context_log": [
+                {"role": "user", "content": "..."},
+                {"role": "assistant", "content": "..."}
+            ]
+        }
+
+        Response:
+        {
+            "type": "question" | "result",
+            "question": "..." (if type=question),
+            "template": "..." (if type=result),
+            "css": "..." (if type=result),
+            "usage": {
+                "input_tokens": int,
+                "output_tokens": int,
+                "total_cost": Decimal
+            }
+        }
+        """
+        # Validate request data
+        style_type = request.data.get("style_type")
+        user_prompt = request.data.get("user_prompt")
+        current_style = request.data.get("current_style", {})
+        context_log = request.data.get("context_log", [])
+
+        if not style_type:
+            return Response(
+                {"error": "style_type is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not user_prompt:
+            return Response(
+                {"error": "user_prompt is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if style_type not in StyleAIHelper.STYLE_TYPES:
+            return Response(
+                {
+                    "error": f"Invalid style_type. Must be one of: {StyleAIHelper.STYLE_TYPES}"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Create AI helper
+        helper = StyleAIHelper(
+            user=request.user,
+            provider=request.data.get("provider", "openai"),
+            model=request.data.get("model", "gpt-4o-mini"),
+        )
+
+        try:
+            # Generate style
+            result = helper.generate_style(
+                style_type=style_type,
+                user_prompt=user_prompt,
+                current_style=current_style,
+                context_log=context_log,
+            )
+
+            return Response(result)
+
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {"error": f"AI generation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
