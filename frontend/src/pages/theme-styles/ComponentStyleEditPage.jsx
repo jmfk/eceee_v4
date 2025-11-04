@@ -8,11 +8,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, Save, Eye } from 'lucide-react';
+import { ArrowLeft, BookOpen, Save, Eye, Copy, Check } from 'lucide-react';
 import { themesApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import CodeEditorPanel from '../../components/theme/CodeEditorPanel';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
+import { scenarios, getScenarioById } from '../../utils/componentStyleScenarios';
 
 const ComponentStyleEditPage = () => {
     const { themeId, styleKey } = useParams();
@@ -27,6 +28,8 @@ const ComponentStyleEditPage = () => {
     const [description, setDescription] = useState('');
     const [showPreview, setShowPreview] = useState(false);
     const [initialData, setInitialData] = useState(null);
+    const [selectedScenario, setSelectedScenario] = useState('manual-menu');
+    const [copyStatus, setCopyStatus] = useState({ template: false, css: false });
 
     // Fetch theme data
     const { data: themeData, isLoading } = useQuery({
@@ -124,6 +127,46 @@ const ComponentStyleEditPage = () => {
             return <div className="text-red-600 text-sm">Preview error: {error.message}</div>;
         }
     };
+
+    const handleCopyTemplate = async () => {
+        const scenario = getScenarioById(selectedScenario);
+        try {
+            await navigator.clipboard.writeText(scenario.template);
+            setTemplate(scenario.template);
+            setCopyStatus({ ...copyStatus, template: true });
+            addNotification({
+                type: 'success',
+                message: 'Template copied to editor',
+            });
+            setTimeout(() => setCopyStatus({ ...copyStatus, template: false }), 2000);
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: 'Failed to copy template',
+            });
+        }
+    };
+
+    const handleCopyCSS = async () => {
+        const scenario = getScenarioById(selectedScenario);
+        try {
+            await navigator.clipboard.writeText(scenario.css);
+            setCss(scenario.css);
+            setCopyStatus({ ...copyStatus, css: true });
+            addNotification({
+                type: 'success',
+                message: 'CSS copied to editor',
+            });
+            setTimeout(() => setCopyStatus({ ...copyStatus, css: false }), 2000);
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: 'Failed to copy CSS',
+            });
+        }
+    };
+
+    const currentScenario = getScenarioById(selectedScenario);
 
     if (isLoading) {
         return (
@@ -256,37 +299,122 @@ const ComponentStyleEditPage = () => {
                         {/* Quick Reference */}
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             <h4 className="text-sm font-semibold text-gray-900 mb-3">📋 Quick Reference</h4>
-                            <div className="space-y-3 text-sm">
+                            
+                            {/* Scenario Selector */}
+                            <div className="mb-4">
+                                <label className="block text-xs font-medium text-gray-700 mb-2">
+                                    Select Scenario:
+                                </label>
+                                <select
+                                    value={selectedScenario}
+                                    onChange={(e) => setSelectedScenario(e.target.value)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                >
+                                    {scenarios.map((scenario) => (
+                                        <option key={scenario.id} value={scenario.id}>
+                                            {scenario.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {currentScenario.description}
+                                </p>
+                            </div>
+
+                            <div className="space-y-4 text-sm">
+                                {/* Available Variables */}
                                 <div>
-                                    <p className="font-medium text-gray-700 mb-1">Main Variables:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <code className="px-2 py-1 bg-white rounded text-xs border">content</code>
-                                        <code className="px-2 py-1 bg-white rounded text-xs border">anchor</code>
-                                        <code className="px-2 py-1 bg-white rounded text-xs border">+ custom variables</code>
+                                    <p className="font-medium text-gray-700 mb-2">Available Variables:</p>
+                                    <div className="space-y-1">
+                                        {currentScenario.variables.map((variable) => (
+                                            <div key={variable.name} className="flex items-start gap-2">
+                                                <code className="px-2 py-1 bg-white rounded text-xs border font-mono">
+                                                    {variable.name}
+                                                </code>
+                                                <span className="text-xs text-gray-600 flex-1">
+                                                    <span className="text-gray-400">({variable.type})</span> {variable.description}
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                                <div>
-                                    <p className="font-medium text-gray-700 mb-1">Mustache Syntax:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <code className="px-2 py-1 bg-white rounded text-xs border">{'{{variable}}'}</code>
-                                        <code className="px-2 py-1 bg-white rounded text-xs border">{'{{{html}}}'}</code>
-                                        <code className="px-2 py-1 bg-white rounded text-xs border">{'{{#if}}...{{/if}}'}</code>
-                                        <code className="px-2 py-1 bg-white rounded text-xs border">{'{{^not}}...{{/not}}'}</code>
+
+                                {/* Item Properties */}
+                                {currentScenario.itemProperties && currentScenario.itemProperties.length > 0 && (
+                                    <div>
+                                        <p className="font-medium text-gray-700 mb-2">Item Properties:</p>
+                                        <div className="space-y-1">
+                                            {currentScenario.itemProperties.map((prop) => (
+                                                <div key={prop.name} className="flex items-start gap-2">
+                                                    <code className="px-2 py-1 bg-white rounded text-xs border font-mono">
+                                                        {prop.name}
+                                                    </code>
+                                                    <span className="text-xs text-gray-600 flex-1">
+                                                        <span className="text-gray-400">({prop.type})</span> {prop.description}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+                                {/* Template Example */}
                                 <div>
-                                    <p className="font-medium text-gray-700 mb-1">Basic Template:</p>
-                                    <pre className="bg-white p-2 rounded text-xs overflow-x-auto border">
-{`<div class="component">
-  {{#anchor}}
-    <h2>{{anchor}}</h2>
-  {{/anchor}}
-  {{{content}}}
-</div>`}
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="font-medium text-gray-700">HTML Template Example:</p>
+                                        <button
+                                            onClick={handleCopyTemplate}
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                                            title="Copy template to editor"
+                                        >
+                                            {copyStatus.template ? (
+                                                <>
+                                                    <Check className="w-3 h-3" />
+                                                    Copied!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-3 h-3" />
+                                                    Copy
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                    <pre className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono">
+                                        {currentScenario.template}
                                     </pre>
                                 </div>
-                                <div className="text-xs text-amber-600">
-                                    <strong>⚠️ Important:</strong> Use triple braces <code>{'{{{content}}}'}</code> for HTML content to avoid escaping!
+
+                                {/* CSS Example */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="font-medium text-gray-700">CSS Example:</p>
+                                        <button
+                                            onClick={handleCopyCSS}
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                                            title="Copy CSS to editor"
+                                        >
+                                            {copyStatus.css ? (
+                                                <>
+                                                    <Check className="w-3 h-3" />
+                                                    Copied!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-3 h-3" />
+                                                    Copy
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                    <pre className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono">
+                                        {currentScenario.css}
+                                    </pre>
+                                </div>
+
+                                {/* Mustache Syntax Reminder */}
+                                <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                                    <strong>⚠️ Important:</strong> Use triple braces <code className="bg-white px-1 rounded">{'{{{content}}}'}</code> for HTML content to avoid escaping!
                                 </div>
                             </div>
                         </div>

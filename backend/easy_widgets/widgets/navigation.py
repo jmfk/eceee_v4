@@ -228,19 +228,15 @@ class NavigationWidget(BaseWidget):
 
         # Support both snake_case and camelCase
         style_name = config.get("navigation_style") or config.get("navigationStyle")
-        print(f"style_name: {style_name}")
         # Only render with custom style if a style is explicitly selected
         if not style_name or style_name == "default":
             return None
-
-        print(f"theme: {theme}")
 
         # Get style from theme
         style = None
         if theme:
             styles = theme.component_styles or {}
             style = styles.get(style_name)
-        print(f"style: {style}")
 
         # If style not found, return None to use default template
         if not style:
@@ -271,9 +267,6 @@ class NavigationWidget(BaseWidget):
         }
 
         # Render template
-        print("Render template")
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")
-        print("html")
-        print(html)
         return html, css
