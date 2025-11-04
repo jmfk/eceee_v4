@@ -17,8 +17,8 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
 
     let localMenu = []
     if (children && children.length > 0 && menus.activeGroup === "pageSections") {
-        const slotName = menus.formData.pageSections.slotName
-        const slotWidgets = (pageVersionData?.widgets[slotName] || []).filter(widget => {
+        const slotName = menus.formData?.pageSections?.slotName || menus.formData?.pageSections?.slot_name || "main"
+        const slotWidgets = (pageVersionData?.widgets?.[slotName] || []).filter(widget => {
             const anchor = widget.config?.anchor
             return anchor && typeof anchor === 'string' && anchor.trim() !== ''
         })

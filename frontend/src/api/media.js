@@ -479,7 +479,9 @@ export const mediaCollectionsApi = {
     getFiles: (id, params = {}) => wrapApiCall(() => {
         // Use our custom buildQueryParams to handle Django-style array parameters
         const queryString = buildQueryParams(params);
-        return apiClient.get(`${endpoints.media.collection(id)}/files/${queryString}`);
+        // Remove trailing slash from collection URL to avoid double slash
+        const collectionUrl = endpoints.media.collection(id).replace(/\/$/, '');
+        return apiClient.get(`${collectionUrl}/files${queryString}`);
     }),
 };
 

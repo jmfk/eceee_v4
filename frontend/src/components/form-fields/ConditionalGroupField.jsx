@@ -6,6 +6,7 @@ import { lookupWidget } from '../../utils/widgetUtils'
 import { getFieldComponent } from './index'
 import SegmentedControlInput from './SegmentedControlInput'
 import SelectInput from './SelectInput'
+import { api } from '../../api/client.js'
 
 /**
  * ConditionalGroupField Component
@@ -101,15 +102,12 @@ const ConditionalGroupField = ({
         setSchemaErrors(prev => ({ ...prev, [groupKey]: null }))
 
         try {
-            const response = await fetch(`/api/v1/webpages/pydantic-models/${modelName}/schema/`)
-            if (!response.ok) {
-                throw new Error(`Failed to fetch schema for ${modelName}`)
-            }
-            const data = await response.json()
-            setSchemas(prev => ({ ...prev, [groupKey]: data.schema }))
+            const response = await api.get(`/api/v1/webpages/pydantic-models/${modelName}/schema/`)
+            setSchemas(prev => ({ ...prev, [groupKey]: response.data.schema }))
         } catch (error) {
             console.error(`Error fetching schema for ${modelName}:`, error)
-            setSchemaErrors(prev => ({ ...prev, [groupKey]: error.message }))
+            const errorMessage = error.response?.data?.error || error.message || `Failed to fetch schema for ${modelName}`
+            setSchemaErrors(prev => ({ ...prev, [groupKey]: errorMessage }))
         } finally {
             setSchemaLoading(prev => ({ ...prev, [groupKey]: false }))
         }
