@@ -107,7 +107,7 @@ const GalleryStyleEditPage = () => {
             template,
             css,
             variables,
-            imgproxy_config: imgproxyConfig,
+            imgproxyConfig: imgproxyConfig,
         });
     };
 
@@ -275,10 +275,10 @@ const GalleryStyleEditPage = () => {
                                         </label>
                                         <input
                                             type="number"
-                                            value={imgproxyConfig.max_width || ''}
+                                            value={imgproxyConfig.max_width || imgproxyConfig.maxWidth || ''}
                                             onChange={(e) => setImgproxyConfig({
                                                 ...imgproxyConfig,
-                                                max_width: parseInt(e.target.value) || null,
+                                                maxWidth: parseInt(e.target.value) || null,
                                             })}
                                             placeholder="1600"
                                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
@@ -291,10 +291,10 @@ const GalleryStyleEditPage = () => {
                                         </label>
                                         <input
                                             type="number"
-                                            value={imgproxyConfig.max_height || ''}
+                                            value={imgproxyConfig.max_height || imgproxyConfig.maxHeight || ''}
                                             onChange={(e) => setImgproxyConfig({
                                                 ...imgproxyConfig,
-                                                max_height: parseInt(e.target.value) || null,
+                                                maxHeight: parseInt(e.target.value) || null,
                                             })}
                                             placeholder="1200"
                                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded"

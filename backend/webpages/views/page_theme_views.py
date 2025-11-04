@@ -43,6 +43,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
+            "gallery_styles",
+            "carousel_styles",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
@@ -76,6 +78,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
+            "gallery_styles",
+            "carousel_styles",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):

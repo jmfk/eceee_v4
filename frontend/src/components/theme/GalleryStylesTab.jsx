@@ -51,10 +51,10 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
             template: '<div class="image-gallery">\n  {{#images}}\n    <div class="gallery-item">\n      <img src="{{url}}" alt="{{alt}}" loading="lazy">\n    </div>\n  {{/images}}\n</div>',
             css: '.image-gallery {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 1rem;\n}\n.gallery-item img {\n  width: 100%;\n  height: auto;\n}',
             variables: {},
-            imgproxy_config: {
+            imgproxyConfig: {
                 width: 800,
                 height: 600,
-                resize_type: 'fill',
+                resizeType: 'fill',
                 gravity: 'sm'
             }
         };
@@ -341,7 +341,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                             type="number"
                                             value={styles[editingStyle].imgproxy_config?.width || styles[editingStyle].imgproxyConfig?.width || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
+                                                imgproxyConfig: {
                                                     ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
                                                     width: parseInt(e.target.value) || null
                                                 }
@@ -356,7 +356,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                             type="number"
                                             value={styles[editingStyle].imgproxy_config?.height || styles[editingStyle].imgproxyConfig?.height || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
+                                                imgproxyConfig: {
                                                     ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
                                                     height: parseInt(e.target.value) || null
                                                 }
@@ -371,9 +371,9 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                             type="number"
                                             value={styles[editingStyle].imgproxy_config?.max_width || styles[editingStyle].imgproxyConfig?.maxWidth || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
+                                                imgproxyConfig: {
                                                     ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
-                                                    max_width: parseInt(e.target.value) || null
+                                                    maxWidth: parseInt(e.target.value) || null
                                                 }
                                             })}
                                             placeholder="1600"
@@ -387,9 +387,9 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                             type="number"
                                             value={styles[editingStyle].imgproxy_config?.max_height || styles[editingStyle].imgproxyConfig?.maxHeight || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
+                                                imgproxyConfig: {
                                                     ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
-                                                    max_height: parseInt(e.target.value) || null
+                                                    maxHeight: parseInt(e.target.value) || null
                                                 }
                                             })}
                                             placeholder="1200"
@@ -402,9 +402,9 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                         <select
                                             value={styles[editingStyle].imgproxy_config?.resize_type || styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
+                                                imgproxyConfig: {
                                                     ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
-                                                    resize_type: e.target.value
+                                                    resizeType: e.target.value
                                                 }
                                             })}
                                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -420,7 +420,7 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                         <select
                                             value={styles[editingStyle].imgproxy_config?.gravity || styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
+                                                imgproxyConfig: {
                                                     ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
                                                     gravity: e.target.value
                                                 }
