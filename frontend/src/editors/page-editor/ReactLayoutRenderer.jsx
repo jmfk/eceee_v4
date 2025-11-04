@@ -224,8 +224,10 @@ const ReactLayoutRenderer = forwardRef(({
 
                     // Publish to Unified Data Context
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
-                        //id: widget.id,
+                        id: widget.id,
+                        slot: slotName,
                         contextType: contextType,
+                        pageId: context?.pageId || webpageData?.id,
                         widgets: updatedWidgetsUp
                     });
                 }
@@ -248,11 +250,12 @@ const ReactLayoutRenderer = forwardRef(({
                         onWidgetChange(updatedWidgetsDown, { sourceId: widget.id });
                     }
 
-
                     // Publish to Unified Data Context
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
-                        //id: widget.id,
+                        id: widget.id,
+                        slot: slotName,
                         contextType: contextType,
+                        pageId: context?.pageId || webpageData?.id,
                         widgets: updatedWidgetsDown
                     });
                 }
@@ -286,7 +289,7 @@ const ReactLayoutRenderer = forwardRef(({
             default:
                 break;
         }
-    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange]);
+    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange, context, webpageData, contextType]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName, slotMetadata = null, replacementInfo = null) => {
