@@ -148,6 +148,9 @@ class NavigationWidget(BaseWidget):
         """
         from webpages.structure_helpers import get_structure_helpers
         from dataclasses import asdict
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         # Start with base config
         template_config = super().prepare_template_context(config, context)
@@ -185,32 +188,11 @@ class NavigationWidget(BaseWidget):
                     )
 
         elif active_group in ["page_submenu", "pageSubmenu"]:
-            # Get child pages using structure helpers
-            current_page = context.get("page") or context.get("current_page")
+            # NOTE: pageSubmenu will be generated AFTER owner_page is determined
+            # Skip for now, will be generated below
+            pass
 
-            if current_page:
-                helpers = get_structure_helpers()
-                try:
-                    children = helpers.get_active_children(
-                        current_page.id, include_unpublished=False
-                    )
-
-                    for child_info in children:
-                        # child_info is a ChildPageInfo dataclass
-                        page_metadata = child_info.page
-                        dynamic_menu_items.append(
-                            {
-                                "label": page_metadata.title,
-                                "url": page_metadata.path,
-                                "is_active": True,
-                                "target_blank": False,
-                            }
-                        )
-                except Exception as e:
-                    # Silently fail if children can't be loaded
-                    pass
-
-        # Add dynamic menu items to config
+        # Add dynamic menu items to config (will be updated later if pageSubmenu)
         template_config["dynamic_menu_items"] = dynamic_menu_items
 
         # Enhanced page context for Component Style templates
@@ -219,20 +201,33 @@ class NavigationWidget(BaseWidget):
         parent_page_obj = context.get("parent")
 
         # Determine if widget is inherited and owner page
-        widget_inherited_from = context.get('widget_inherited_from')
+        widget_inherited_from = context.get("widget_inherited_from")
         is_inherited = widget_inherited_from is not None
         owner_page_obj = current_page_obj  # Default to current page
-        
+
         # If widget is inherited, fetch the actual owner page
         if is_inherited and widget_inherited_from:
             try:
-                # inherited_from is a dict with {id, title, slug}
-                owner_page_id = widget_inherited_from.get('id')
-                if owner_page_id:
-                    from webpages.models import WebPage
+                from webpages.models import WebPage
+
+                # Handle different formats of inherited_from
+                if isinstance(widget_inherited_from, dict):
+                    # It's a dict with {id, title, slug}
+                    owner_page_id = widget_inherited_from.get("id")
                     owner_page_obj = WebPage.objects.get(id=owner_page_id)
-            except Exception:
+                elif isinstance(widget_inherited_from, str):
+                    # It's a slug string - fetch page by slug
+                    owner_page_obj = WebPage.objects.get(slug=widget_inherited_from)
+                elif isinstance(widget_inherited_from, WebPage):
+                    # It's already a WebPage object
+                    owner_page_obj = widget_inherited_from
+
+                logger.info(
+                    f"[NAV] Inherited widget using owner page: {owner_page_obj.title}"
+                )
+            except Exception as e:
                 # Fallback to current page if owner not found
+                logger.error(f"[NAV] Error fetching owner page: {e}")
                 pass
 
         # Convert pages to metadata dicts for template context
@@ -299,6 +294,40 @@ class NavigationWidget(BaseWidget):
             else:
                 owner_page_meta = page_to_dict(owner_page_obj)
 
+        # NOW generate pageSubmenu if needed (after owner_page_obj is determined)
+        if active_group in ["page_submenu", "pageSubmenu"]:
+            # Use OWNER PAGE for inherited widgets, not current page
+            page_for_submenu = owner_page_obj if owner_page_obj else current_page_obj
+
+            if page_for_submenu and hasattr(page_for_submenu, "id"):
+                try:
+                    children = helpers.get_active_children(
+                        page_for_submenu.id, include_unpublished=False
+                    )
+
+                    for child_info in children:
+                        # child_info is a ChildPageInfo dataclass
+                        page_metadata = child_info.page
+                        dynamic_menu_items.append(
+                            {
+                                "label": page_metadata.title,
+                                "url": page_metadata.path,
+                                "is_active": True,
+                                "target_blank": False,
+                            }
+                        )
+
+                    logger.info(
+                        f"[NAV] Generated pageSubmenu: {len(dynamic_menu_items)} items from {page_for_submenu.title}"
+                    )
+                except Exception as e:
+                    # Silently fail if children can't be loaded
+                    logger.error(f"[NAV] Error generating pageSubmenu: {e}")
+                    pass
+
+        # Update dynamic menu items after pageSubmenu generation
+        template_config["dynamic_menu_items"] = dynamic_menu_items
+
         # Get parent page metadata and children
         parent_page_meta = None
         parent_children = []
@@ -350,10 +379,13 @@ class NavigationWidget(BaseWidget):
             Tuple of (html, css) or None if no custom style
         """
         from webpages.utils.mustache_renderer import render_mustache
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         # Support both snake_case and camelCase
         style_name = config.get("navigation_style") or config.get("navigationStyle")
-        
+
         # Only render with custom style if a style is explicitly selected
         if not style_name or style_name == "default":
             return None
@@ -378,6 +410,10 @@ class NavigationWidget(BaseWidget):
         # Add static menu items
         static_items = config.get("menu_items", [])
         all_items.extend(static_items)
+
+        logger.info(
+            f"[NAV] Rendering Component Style '{style_name}' with {len(all_items)} items (owner: {config.get('owner_page', {}).get('title') if config.get('owner_page') else 'N/A'})"
+        )
 
         if not all_items:
             return None
