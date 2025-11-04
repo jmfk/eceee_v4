@@ -315,6 +315,334 @@
         </section>
 
         <section>
+            <h2>Navigation Widget Variables</h2>
+            <p>The Navigation widget provides special variables for building dynamic navigation menus:</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>items</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>All navigation items (combines dynamic + static items)</td>
+                    </tr>
+                    <tr>
+                        <td><code>dynamic_items</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Auto-generated items from page sections or submenu configuration</td>
+                    </tr>
+                    <tr>
+                        <td><code>static_items</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Manually configured menu items</td>
+                    </tr>
+                    <tr>
+                        <td><code>itemCount</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Total number of navigation items</td>
+                    </tr>
+                    <tr>
+                        <td><code>hasItems</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if there are any navigation items</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <strong>Note:</strong> Navigation items have the structure: <code>{label, url, is_active, target_blank}</code>
+            </div>
+        </section>
+
+        <section>
+            <h2>Page Context Variables</h2>
+            <p>Navigation component styles have access to page hierarchy information for building contextual menus:</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>parent_page</code></td>
+                        <td><span class="badge badge-type">Object</span></td>
+                        <td>PageMetadata object for the parent page (id, title, slug, path, description)</td>
+                    </tr>
+                    <tr>
+                        <td><code>parent_children</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Array of child pages of the parent page</td>
+                    </tr>
+                    <tr>
+                        <td><code>hasParentChildren</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if parent page has children</td>
+                    </tr>
+                    <tr>
+                        <td><code>current_page</code></td>
+                        <td><span class="badge badge-type">Object</span></td>
+                        <td>PageMetadata object for the current page being viewed</td>
+                    </tr>
+                    <tr>
+                        <td><code>current_children</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Array of child pages of the current page</td>
+                    </tr>
+                    <tr>
+                        <td><code>hasCurrentChildren</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if current page has children</td>
+                    </tr>
+                    <tr>
+                        <td><code>owner_page</code></td>
+                        <td><span class="badge badge-type">Object</span></td>
+                        <td>PageMetadata object for the page where widget was originally created</td>
+                    </tr>
+                    <tr>
+                        <td><code>owner_children</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Array of child pages of the owner page (useful for inherited widgets)</td>
+                    </tr>
+                    <tr>
+                        <td><code>hasOwnerChildren</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if owner page has children</td>
+                    </tr>
+                    <tr>
+                        <td><code>isInherited</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if widget is inherited from a parent page</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Child Page Object Structure</h2>
+            <p>Each child page in <code>parent_children</code>, <code>current_children</code>, or <code>owner_children</code> arrays has the following structure:</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>id</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Unique page ID</td>
+                    </tr>
+                    <tr>
+                        <td><code>title</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Page title</td>
+                    </tr>
+                    <tr>
+                        <td><code>slug</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>URL slug for the page</td>
+                    </tr>
+                    <tr>
+                        <td><code>path</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Full URL path to the page (e.g., "/about/team/")</td>
+                    </tr>
+                    <tr>
+                        <td><code>description</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Page description (may be empty)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="example">
+                <h3>Example Usage:</h3>
+                <pre><code>{{#parent_children}}
+  &lt;li&gt;
+    &lt;a href="{{path}}"&gt;{{title}}&lt;/a&gt;
+    {{#description}}
+      &lt;span class="description"&gt;{{description}}&lt;/span&gt;
+    {{/description}}
+  &lt;/li&gt;
+{{/parent_children}}</code></pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>Example: Parent Children Navigation</h2>
+            <div class="example">
+                <h3>Template:</h3>
+                <pre><code>&lt;nav class="parent-children-nav"&gt;
+  {{#hasParentChildren}}
+    &lt;h3 class="nav-title"&gt;{{parent_page.title}} Sections&lt;/h3&gt;
+    &lt;ul class="nav-list"&gt;
+      {{#parent_children}}
+      &lt;li class="nav-item"&gt;
+        &lt;a href="{{path}}" class="nav-link"&gt;{{title}}&lt;/a&gt;
+      &lt;/li&gt;
+      {{/parent_children}}
+    &lt;/ul&gt;
+  {{/hasParentChildren}}
+  {{^hasParentChildren}}
+    &lt;p class="no-children"&gt;No sub-pages available&lt;/p&gt;
+  {{/hasParentChildren}}
+&lt;/nav&gt;</code></pre>
+
+                <h3>CSS:</h3>
+                <pre><code>.parent-children-nav {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.nav-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-item {
+  margin: 0.5rem 0;
+}
+
+.nav-link {
+  color: #3b82f6;
+  text-decoration: none;
+  padding: 0.5rem;
+  display: block;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.nav-link:hover {
+  background-color: #e5e7eb;
+  color: #2563eb;
+}
+
+.no-children {
+  color: #6b7280;
+  font-style: italic;
+  margin: 0;
+}</code></pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>Example: Smart Fallback Menu</h2>
+            <p>This example shows how to create a navigation menu that intelligently falls back through different levels of the page hierarchy:</p>
+            <div class="example">
+                <h3>Template:</h3>
+                <pre><code>&lt;nav class="smart-fallback-menu"&gt;
+  {{#hasCurrentChildren}}
+  &lt;!-- Show current page children --&gt;
+  &lt;ul class="menu-list"&gt;
+    {{#current_children}}
+    &lt;li class="menu-item"&gt;
+      &lt;a href="{{path}}"&gt;{{title}}&lt;/a&gt;
+    &lt;/li&gt;
+    {{/current_children}}
+  &lt;/ul&gt;
+  {{/hasCurrentChildren}}
+  
+  {{^hasCurrentChildren}}
+  {{#hasParentChildren}}
+  &lt;!-- Fallback: Show parent page children --&gt;
+  &lt;ul class="menu-list"&gt;
+    {{#parent_children}}
+    &lt;li class="menu-item"&gt;
+      &lt;a href="{{path}}"&gt;{{title}}&lt;/a&gt;
+    &lt;/li&gt;
+    {{/parent_children}}
+  &lt;/ul&gt;
+  {{/hasParentChildren}}
+  
+  {{^hasParentChildren}}
+  &lt;!-- Fallback: Show parent link if no children anywhere --&gt;
+  {{#parent_page}}
+  &lt;div class="parent-link"&gt;
+    &lt;a href="{{parent_page.path}}"&gt;← Back to {{parent_page.title}}&lt;/a&gt;
+  &lt;/div&gt;
+  {{/parent_page}}
+  {{/hasParentChildren}}
+  {{/hasCurrentChildren}}
+&lt;/nav&gt;</code></pre>
+
+                <h3>CSS:</h3>
+                <pre><code>.smart-fallback-menu {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-item {
+  margin: 0.5rem 0;
+}
+
+.menu-item a {
+  color: #1f2937;
+  text-decoration: none;
+  padding: 0.5rem;
+  display: block;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.menu-item a:hover {
+  background-color: #e5e7eb;
+}
+
+.parent-link {
+  padding: 0.5rem 0;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.parent-link a {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.parent-link a:hover {
+  text-decoration: underline;
+}</code></pre>
+
+                <div class="note">
+                    <strong>How it works:</strong> This menu first tries to show children of the current page. If the current page has no children, it falls back to showing the parent page's children. If neither has children, it shows a "back to parent" link.
+                </div>
+            </div>
+        </section>
+
+        <section>
             <h2>Mustache Syntax Reference</h2>
             <table>
                 <thead>
