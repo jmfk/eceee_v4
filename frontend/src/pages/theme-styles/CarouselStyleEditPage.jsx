@@ -39,14 +39,14 @@ const CarouselStyleEditPage = () => {
     // Load style data when theme loads
     useEffect(() => {
         if (themeData) {
-            const styles = themeData.carousel_styles || themeData.carouselStyles || {};
+            const styles = themeData.carouselStyles || {};
             const style = styles[styleKey];
             if (style) {
                 const initialStyle = {
                     template: style.template || '',
                     css: style.css || '',
                     variables: style.variables || {},
-                    imgproxyConfig: style.imgproxy_config || style.imgproxyConfig || {},
+                    imgproxyConfig: style.imgproxyConfig || {},
                     name: style.name || styleKey,
                     description: style.description || '',
                 };
@@ -73,12 +73,12 @@ const CarouselStyleEditPage = () => {
     // Update mutation
     const updateMutation = useMutation({
         mutationFn: (updatedStyle) => {
-            const styles = themeData.carousel_styles || themeData.carouselStyles || {};
+            const styles = themeData.carouselStyles || {};
             // Exclude image field to avoid file upload error
             const { image, ...themeDataWithoutImage } = themeData;
             return themesApi.update(themeId, {
                 ...themeDataWithoutImage,
-                carousel_styles: {
+                carouselStyles: {
                     ...styles,
                     [styleKey]: updatedStyle,
                 },
@@ -107,7 +107,7 @@ const CarouselStyleEditPage = () => {
             template,
             css,
             variables,
-            imgproxy_config: imgproxyConfig,
+            imgproxyConfig: imgproxyConfig,
         });
     };
 
@@ -279,10 +279,10 @@ const CarouselStyleEditPage = () => {
                                         </label>
                                         <input
                                             type="number"
-                                            value={imgproxyConfig.max_width || ''}
+                                            value={imgproxyConfig.maxWidth || ''}
                                             onChange={(e) => setImgproxyConfig({
                                                 ...imgproxyConfig,
-                                                max_width: parseInt(e.target.value) || null,
+                                                maxWidth: parseInt(e.target.value) || null,
                                             })}
                                             placeholder="2400"
                                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
@@ -295,10 +295,10 @@ const CarouselStyleEditPage = () => {
                                         </label>
                                         <input
                                             type="number"
-                                            value={imgproxyConfig.max_height || ''}
+                                            value={imgproxyConfig.maxHeight || ''}
                                             onChange={(e) => setImgproxyConfig({
                                                 ...imgproxyConfig,
-                                                max_height: parseInt(e.target.value) || null,
+                                                maxHeight: parseInt(e.target.value) || null,
                                             })}
                                             placeholder="800"
                                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded"

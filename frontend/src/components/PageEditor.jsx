@@ -257,7 +257,7 @@ const PageEditor = () => {
 
     // Initialize simulated path when path pattern changes
     useEffect(() => {
-        const pathPatternKey = webpageData?.pathPatternKey || webpageData?.path_pattern_key;
+        const pathPatternKey = webpageData?.pathPatternKey;
 
         if (pathPatternKey && !simulatedPath) {
             // Load default example path for the pattern
@@ -271,7 +271,7 @@ const PageEditor = () => {
             setSimulatedPath('');
             setPathVariables({});
         }
-    }, [webpageData?.pathPatternKey, webpageData?.path_pattern_key]);
+    }, [webpageData?.pathPatternKey]);
 
     // Parse path and extract variables whenever simulatedPath or pathPatternKey changes
     useEffect(() => {

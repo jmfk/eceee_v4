@@ -51,10 +51,10 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
             css: '.image-carousel {\n  position: relative;\n  overflow: hidden;\n}\n.carousel-track {\n  display: flex;\n  transition: transform 0.5s ease;\n}\n.carousel-slide {\n  min-width: 100%;\n}\n.carousel-slide img {\n  width: 100%;\n  height: auto;\n}\n.carousel-prev, .carousel-next {\n  position: absolute;\n  top: 50%;\n  transform: translateY(-50%);\n  background: rgba(255,255,255,0.9);\n  border: none;\n  padding: 1rem;\n  cursor: pointer;\n}\n.carousel-prev { left: 1rem; }\n.carousel-next { right: 1rem; }',
             variables: {},
             alpine: true,
-            imgproxy_config: {
+            imgproxyConfig: {
                 width: 1200,
                 height: 400,
-                resize_type: 'fill',
+                resizeType: 'fill',
                 gravity: 'sm'
             }
         };
@@ -342,10 +342,10 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Width (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.width || styles[editingStyle].imgproxyConfig?.width || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.width || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                imgproxyConfig: {
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     width: parseInt(e.target.value) || null
                                                 }
                                             })}
@@ -357,10 +357,10 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Height (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.height || styles[editingStyle].imgproxyConfig?.height || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.height || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                imgproxyConfig: {
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     height: parseInt(e.target.value) || null
                                                 }
                                             })}
@@ -372,11 +372,11 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Max Width (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.max_width || styles[editingStyle].imgproxyConfig?.maxWidth || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.maxWidth || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
-                                                    max_width: parseInt(e.target.value) || null
+                                                imgproxyConfig: {
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
+                                                    maxWidth: parseInt(e.target.value) || null
                                                 }
                                             })}
                                             placeholder="2400"
@@ -388,11 +388,11 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Max Height (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.max_height || styles[editingStyle].imgproxyConfig?.maxHeight || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.maxHeight || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
-                                                    max_height: parseInt(e.target.value) || null
+                                                imgproxyConfig: {
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
+                                                    maxHeight: parseInt(e.target.value) || null
                                                 }
                                             })}
                                             placeholder="800"
@@ -403,11 +403,11 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Resize Type</label>
                                         <select
-                                            value={styles[editingStyle].imgproxy_config?.resize_type || styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
+                                            value={styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
-                                                    resize_type: e.target.value
+                                                imgproxyConfig: {
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
+                                                    resizeType: e.target.value
                                                 }
                                             })}
                                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -421,10 +421,10 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Gravity</label>
                                         <select
-                                            value={styles[editingStyle].imgproxy_config?.gravity || styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
+                                            value={styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxy_config: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                imgproxyConfig: {
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     gravity: e.target.value
                                                 }
                                             })}

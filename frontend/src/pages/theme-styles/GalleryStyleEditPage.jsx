@@ -46,7 +46,7 @@ const GalleryStyleEditPage = () => {
                     template: style.template || '',
                     css: style.css || '',
                     variables: style.variables || {},
-                    imgproxyConfig: style.imgproxy_config || style.imgproxyConfig || {},
+                    imgproxyConfig: style.imgproxyConfig || {},
                     name: style.name || styleKey,
                     description: style.description || '',
                 };

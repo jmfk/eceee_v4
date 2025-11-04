@@ -620,7 +620,7 @@ export class DataManager {
                                     ...data,
                                     id: id, // Ensure ID is set
                                     pageId: data.pageId, // Ensure pageId is set
-                                    updated_at: data.updated_at || new Date().toISOString()
+                                    updatedAt: data.updatedAt || new Date().toISOString()
                                 }
                             },
                             metadata: {
@@ -650,7 +650,7 @@ export class DataManager {
                                 [id]: {
                                     ...data,
                                     id: id, // Ensure ID is set
-                                    updated_at: data.updated_at || new Date().toISOString()
+                                    updatedAt: data.updatedAt || new Date().toISOString()
                                 }
                             },
                             metadata: {
@@ -757,7 +757,7 @@ export class DataManager {
                                         ...widget,
                                         ...(payload.config && { config: { ...widget.config, ...payload.config } }),
                                         ...(payload.widgetUpdates || {}),
-                                        updated_at: now
+                                        updatedAt: now
                                     })
                                 );
                                 
@@ -800,7 +800,7 @@ export class DataManager {
                                     ...existingNestedWidget,
                                     ...(payload.config && { config: { ...existingNestedWidget.config, ...payload.config } }),
                                     ...(payload.widgetUpdates || {}),
-                                    updated_at: now
+                                    updatedAt: now
                                 };
                                 
                                 // Update parent widget's config with updated nested widgets
@@ -813,7 +813,7 @@ export class DataManager {
                                             [slotName]: updatedNestedWidgets
                                         }
                                     },
-                                    updated_at: now
+                                    updatedAt: now
                                 };
                                 
                                 // Update parent in top-level slots
@@ -846,7 +846,7 @@ export class DataManager {
                             const widgetUpdate: any = {
                                 ...existingWidget,
                                 ...(payload.widgetUpdates || {}),
-                                updated_at: now
+                                updatedAt: now
                             };
                             if (payload.config !== undefined) {
                                 widgetUpdate.config = { ...existingWidget.config, ...payload.config };
@@ -880,7 +880,7 @@ export class DataManager {
                             updatedWidgets[widgetIndex] = {
                                 ...existingObjectWidget,
                                 config: { ...existingObjectWidget.config, ...payload.config }, // Merge config instead of replacing
-                                updated_at: now
+                                updatedAt: now
                             };
                             return {
                                 objects: {
@@ -1000,7 +1000,7 @@ export class DataManager {
                                 [pageId]: {
                                     ...(state.pages[pageId] || {}),
                                     ...operation.payload.updates,
-                                    updated_at: new Date().toISOString()
+                                    updatedAt: new Date().toISOString()
                                 }
                             },
                             metadata: {
@@ -1022,7 +1022,7 @@ export class DataManager {
                                 [versionId]: {
                                     ...(state.versions[versionId] || {}),
                                     ...operation.payload.updates,
-                                    updated_at: new Date().toISOString()
+                                    updatedAt: new Date().toISOString()
                                 }
                             },
                             metadata: {
@@ -1043,7 +1043,7 @@ export class DataManager {
                                 [objectId]: {
                                     ...((state as any).objects?.[objectId] || {}),
                                     ...(operation.payload as any).updates,
-                                    updated_at: new Date().toISOString()
+                                    updatedAt: new Date().toISOString()
                                 }
                             }
                         } as any;
@@ -1060,7 +1060,7 @@ export class DataManager {
                                 [objectId]: {
                                     ...((state as any).objects?.[objectId] || {}),
                                     ...(operation.payload as any).updates,
-                                    updated_at: new Date().toISOString()
+                                    updatedAt: new Date().toISOString()
                                 }
                             },
                             metadata: { ...state.metadata, isDirty: true }
@@ -1081,7 +1081,7 @@ export class DataManager {
                         return {
                             objects: {
                                 ...(state as any).objects,
-                                [id]: { ...data, id, updated_at: data.updated_at || new Date().toISOString() }
+                                [id]: { ...data, id, updatedAt: data.updatedAt || new Date().toISOString() }
                             },
                             metadata: {
                                 ...state.metadata,
@@ -1129,7 +1129,7 @@ export class DataManager {
                                 [id]: {
                                     ...data,
                                     id: id,
-                                    updated_at: data.updated_at || new Date().toISOString()
+                                    updatedAt: data.updatedAt || new Date().toISOString()
                                 }
                             },
                             metadata: {
@@ -1187,7 +1187,7 @@ export class DataManager {
                                 [currentThemeId]: {
                                     ...theme,
                                     ...updates,
-                                    updated_at: new Date().toISOString()
+                                    updatedAt: new Date().toISOString()
                                 }
                             },
                             metadata: {
@@ -1224,7 +1224,7 @@ export class DataManager {
                                 [currentThemeId]: {
                                     ...theme,
                                     [field]: value,
-                                    updated_at: new Date().toISOString()
+                                    updatedAt: new Date().toISOString()
                                 }
                             },
                             metadata: {
@@ -1524,7 +1524,7 @@ export class DataManager {
 
         // Additional check for widget properties that shouldn't be in config
         if (cleanConfig && typeof cleanConfig === 'object') {
-            const widgetProperties = ['id', 'name', 'type', 'widget_type', 'order', 'created_at', 'updated_at', 'slotName'];
+            const widgetProperties = ['id', 'name', 'type', 'widgetType', 'order', 'createdAt', 'updatedAt', 'slotName'];
             const foundWidgetProps = widgetProperties.filter(prop => cleanConfig.hasOwnProperty(prop));
             
             if (foundWidgetProps.length > 2) { // Allow some overlap but not full widget

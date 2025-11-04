@@ -46,11 +46,11 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
         title: webpageData?.title || '',
         slug: webpageData?.slug || '',
         description: webpageData?.description || '',
-        pathPatternKey: webpageData?.pathPatternKey || webpageData?.path_pattern_key || webpageData?.path_pattern || '',
+        pathPatternKey: webpageData?.pathPatternKey || '',
         hostnames: webpageData?.hostnames || [],
-        metaTitle: pageVersionData?.metaTitle || pageVersionData?.meta_title || '',
-        metaDescription: pageVersionData?.metaDescription || pageVersionData?.meta_description || '',
-        codeLayout: pageVersionData?.codeLayout || pageVersionData?.code_layout || '',
+        metaTitle: pageVersionData?.metaTitle || '',
+        metaDescription: pageVersionData?.metaDescription || '',
+        codeLayout: pageVersionData?.codeLayout || '',
         tags: pageVersionData?.tags || []
     })
 
@@ -67,13 +67,13 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                     title: updatedPageData.title || prev.title,
                     slug: updatedPageData.slug || prev.slug,
                     description: updatedPageData.description || prev.description,
-                    pathPatternKey: updatedPageData.pathPatternKey || updatedPageData.path_pattern_key || updatedPageData.path_pattern || prev.pathPatternKey,
+                    pathPatternKey: updatedPageData.pathPatternKey || prev.pathPatternKey,
                     hostnames: updatedPageData.hostnames || prev.hostnames,
                 }),
                 ...(updatedVersionData && {
-                    metaTitle: updatedVersionData.metaTitle || updatedVersionData.meta_title || prev.metaTitle,
-                    metaDescription: updatedVersionData.metaDescription || updatedVersionData.meta_description || prev.metaDescription,
-                    codeLayout: updatedVersionData.codeLayout || updatedVersionData.code_layout || prev.codeLayout,
+                    metaTitle: updatedVersionData.metaTitle || prev.metaTitle,
+                    metaDescription: updatedVersionData.metaDescription || prev.metaDescription,
+                    codeLayout: updatedVersionData.codeLayout || prev.codeLayout,
                     tags: updatedVersionData.tags || prev.tags,
                 })
             }))

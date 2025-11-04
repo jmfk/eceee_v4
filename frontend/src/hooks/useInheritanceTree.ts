@@ -196,7 +196,7 @@ function convertLegacyDataToTree(legacyData: any): InheritanceTreeNode | null {
             id: legacyData.pageId || 0,
             title: 'Current Page',
             slug: 'current',
-            parent_id: legacyData.parentId
+            parentId: legacyData.parentId
         },
         slots,
         parent: null  // Simplified - legacy data doesn't include full tree

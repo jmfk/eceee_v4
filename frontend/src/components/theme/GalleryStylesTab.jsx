@@ -339,10 +339,10 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Width (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.width || styles[editingStyle].imgproxyConfig?.width || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.width || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
                                                 imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     width: parseInt(e.target.value) || null
                                                 }
                                             })}
@@ -354,10 +354,10 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Height (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.height || styles[editingStyle].imgproxyConfig?.height || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.height || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
                                                 imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     height: parseInt(e.target.value) || null
                                                 }
                                             })}
@@ -369,10 +369,10 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Max Width (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.max_width || styles[editingStyle].imgproxyConfig?.maxWidth || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.maxWidth || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
                                                 imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     maxWidth: parseInt(e.target.value) || null
                                                 }
                                             })}
@@ -385,10 +385,10 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Max Height (px)</label>
                                         <input
                                             type="number"
-                                            value={styles[editingStyle].imgproxy_config?.max_height || styles[editingStyle].imgproxyConfig?.maxHeight || ''}
+                                            value={styles[editingStyle].imgproxyConfig?.maxHeight || ''}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
                                                 imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     maxHeight: parseInt(e.target.value) || null
                                                 }
                                             })}
@@ -400,10 +400,10 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Resize Type</label>
                                         <select
-                                            value={styles[editingStyle].imgproxy_config?.resize_type || styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
+                                            value={styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
                                                 imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     resizeType: e.target.value
                                                 }
                                             })}
@@ -418,10 +418,10 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">Gravity</label>
                                         <select
-                                            value={styles[editingStyle].imgproxy_config?.gravity || styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
+                                            value={styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
                                             onChange={(e) => handleUpdateStyle(editingStyle, {
                                                 imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxy_config || styles[editingStyle].imgproxyConfig || {}),
+                                                    ...(styles[editingStyle].imgproxyConfig || {}),
                                                     gravity: e.target.value
                                                 }
                                             })}

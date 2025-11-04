@@ -358,12 +358,12 @@ export default function SettingsTabs() {
                                                                 )}
                                                                 {item.isTheme && (
                                                                     <div className="flex items-center space-x-1 ml-2">
-                                                                        {(item.themeData?.isActive ?? item.themeData?.is_active) && (
+                                                                        {item.themeData?.isActive && (
                                                                             <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded">
                                                                                 Active
                                                                             </span>
                                                                         )}
-                                                                        {(item.themeData?.isDefault ?? item.themeData?.is_default) && (
+                                                                        {item.themeData?.isDefault && (
                                                                             <span className="px-1.5 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">
                                                                                 Default
                                                                             </span>
@@ -372,14 +372,14 @@ export default function SettingsTabs() {
                                                                 )}
                                                                 {item.isValueList && (
                                                                     <div className="flex items-center space-x-1 ml-2">
-                                                                        <span className={`px-1.5 py-0.5 text-xs rounded ${item.valueListData?.is_active
+                                                                        <span className={`px-1.5 py-0.5 text-xs rounded ${item.valueListData?.isActive
                                                                             ? 'bg-green-100 text-green-700'
                                                                             : 'bg-gray-100 text-gray-700'
                                                                             }`}>
-                                                                            {item.valueListData?.value_type}
+                                                                            {item.valueListData?.valueType}
                                                                         </span>
                                                                         <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
-                                                                            {item.valueListData?.item_count || 0}
+                                                                            {item.valueListData?.itemCount || 0}
                                                                         </span>
                                                                     </div>
                                                                 )}

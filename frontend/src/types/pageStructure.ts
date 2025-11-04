@@ -33,97 +33,97 @@ export interface PageMetadata {
     slug: string
     description: string
     path: string  // Full path from root
-    parent_id: number | null
-    is_root: boolean
-    created_at: string
-    updated_at: string
-    created_by: string
-    last_modified_by: string
+    parentId: number | null
+    isRoot: boolean
+    createdAt: string
+    updatedAt: string
+    createdBy: string
+    lastModifiedBy: string
     // Optional version information (included when requested)
     version?: VersionMetadata | null
 }
 
 export interface VersionMetadata {
     id: number
-    version_number: number
-    version_title: string
-    meta_title: string
-    meta_description: string
-    code_layout: string | null
-    theme_id: number | null
-    theme_name: string | null
-    effective_date: string | null
-    expiry_date: string | null
-    created_at: string
-    created_by: string
+    versionNumber: number
+    versionTitle: string
+    metaTitle: string
+    metaDescription: string
+    codeLayout: string | null
+    themeId: number | null
+    themeName: string | null
+    effectiveDate: string | null
+    expiryDate: string | null
+    createdAt: string
+    createdBy: string
     status: VersionStatus
 }
 
 export interface PageWithVersion {
     page: PageMetadata
-    current_version: VersionMetadata | null
-    published_version: VersionMetadata | null
-    latest_version: VersionMetadata | null
-    version_count: number
-    has_draft: boolean
+    currentVersion: VersionMetadata | null
+    publishedVersion: VersionMetadata | null
+    latestVersion: VersionMetadata | null
+    versionCount: number
+    hasDraft: boolean
 }
 
 export interface ChildPageInfo {
     page: PageMetadata
-    current_version: VersionMetadata | null
-    child_count: number  // Number of children this page has
-    sort_order: number
+    currentVersion: VersionMetadata | null
+    childCount: number  // Number of children this page has
+    sortOrder: number
 }
 
 export interface PageTreeNode {
     page: PageMetadata
-    current_version: VersionMetadata | null
+    currentVersion: VersionMetadata | null
     children: PageTreeNode[]
-    child_count: number
+    childCount: number
     depth: number
 }
 
 export interface WidgetSummary {
-    slot_name: string
-    widget_count: number
-    widget_types: string[]
-    has_inherited: boolean
-    has_local: boolean
+    slotName: string
+    widgetCount: number
+    widgetTypes: string[]
+    hasInherited: boolean
+    hasLocal: boolean
 }
 
 export interface PageStructureSummary {
     page: PageMetadata
-    current_version: VersionMetadata | null
-    ancestor_count: number
-    ancestor_ids: number[]
-    child_count: number
-    descendant_count: number
-    widget_summary: WidgetSummary[]
+    currentVersion: VersionMetadata | null
+    ancestorCount: number
+    ancestorIds: number[]
+    childCount: number
+    descendantCount: number
+    widgetSummary: WidgetSummary[]
     hostnames: string[]
 }
 
 export interface PageSearchOptions {
-    include_drafts?: boolean
-    include_unpublished?: boolean
-    parent_id?: number | null
-    root_only?: boolean
-    has_published_version?: boolean | null
-    layout_type?: string | null
-    theme_id?: number | null
+    includeDrafts?: boolean
+    includeUnpublished?: boolean
+    parentId?: number | null
+    rootOnly?: boolean
+    hasPublishedVersion?: boolean | null
+    layoutType?: string | null
+    themeId?: number | null
     hostname?: string | null
 }
 
 export interface VersionSearchOptions {
-    page_id?: number | null
+    pageId?: number | null
     status?: VersionStatus | null
-    has_layout?: boolean | null
-    has_theme?: boolean | null
-    created_after?: string | null
-    created_before?: string | null
+    hasLayout?: boolean | null
+    hasTheme?: boolean | null
+    createdAfter?: string | null
+    createdBefore?: string | null
 }
 
 export interface BreadcrumbItem {
-    page_id: number
+    pageId: number
     title: string
     slug: string
     path: string
@@ -163,7 +163,7 @@ export function isVersionMetadata(obj: any): obj is VersionMetadata {
     return obj && 
            typeof obj === 'object' && 
            typeof obj.id === 'number' &&
-           typeof obj.version_number === 'number' &&
+           typeof obj.versionNumber === 'number' &&
            typeof obj.status === 'string'
 }
 
@@ -171,7 +171,7 @@ export function isPageWithVersion(obj: any): obj is PageWithVersion {
     return obj && 
            typeof obj === 'object' && 
            isPageMetadata(obj.page) &&
-           typeof obj.version_count === 'number'
+           typeof obj.versionCount === 'number'
 }
 
 export function isPageTreeNode(obj: any): obj is PageTreeNode {

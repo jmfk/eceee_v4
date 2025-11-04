@@ -11,11 +11,11 @@ export interface PageData {
   currentVersionId: string;
   availableVersions: string[];
   metadata: PageMetadata;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  published_at?: string;
-  scheduled_for?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  publishedAt?: string;
+  scheduledFor?: string;
 }
 
 export interface PageMetadata {
@@ -56,24 +56,24 @@ export interface ThemeData {
   fonts?: Record<string, any>;         // Google Fonts configuration
   colors?: Record<string, string>;     // Named color palette
   typography?: Record<string, any>;    // Grouped HTML element styles
-  component_styles?: Record<string, any>;  // HTML templates + CSS
-  table_templates?: Record<string, any>;   // Table widget templates
+  componentStyles?: Record<string, any>;  // HTML templates + CSS
+  tableTemplates?: Record<string, any>;   // Table widget templates
   // Legacy fields (deprecated)
   variables?: Record<string, string>;  // DEPRECATED: Use colors
   styles?: Record<string, any>;        // DEPRECATED: Component-specific styles
-  css_variables?: Record<string, string>;
-  html_elements?: Record<string, any>;
-  image_styles?: Record<string, any>;
-  custom_css?: string;
+  cssVariables?: Record<string, string>;
+  htmlElements?: Record<string, any>;
+  imageStyles?: Record<string, any>;
+  customCss?: string;
   // Metadata
   image?: string;
-  is_active?: boolean;
-  is_default?: boolean;
+  isActive?: boolean;
+  isDefault?: boolean;
   parentTheme?: string;               // For theme inheritance
   metadata?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
 }
 
 export interface LayoutData {
@@ -82,8 +82,8 @@ export interface LayoutData {
   slots: LayoutSlot[];
   defaultThemeId?: string;  // Default theme for this layout
   metadata?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LayoutSlot {
@@ -104,10 +104,10 @@ export interface VersionData {
   effectiveTheme?: ThemeData;  // Resolved theme (explicit or inherited from parent)
   content: Record<string, ContentData>;
   metadata: PageMetadata;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  published_at?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  publishedAt?: string;
   changesDescription?: string;
 }
 
@@ -124,11 +124,11 @@ export interface ObjectData {
   currentVersionId: string;
   availableVersions: string[];
   metadata?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  published_at?: string;
-  scheduled_for?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  publishedAt?: string;
+  scheduledFor?: string;
   // Optional relationship context
   parentId?: string | null;
 }

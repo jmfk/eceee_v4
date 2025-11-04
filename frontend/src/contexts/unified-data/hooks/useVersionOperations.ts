@@ -35,8 +35,8 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
     // Subscribe to external changes
     useExternalChanges(`version-ops-${pageId}`, state => {
         const pageVersions = Object.values(state.versions)
-            .filter(version => version.page_id === pageId)
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            .filter(version => version.pageId === pageId)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setVersions(pageVersions);
 
         const page = state.pages[pageId];

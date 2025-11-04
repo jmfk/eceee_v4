@@ -100,10 +100,10 @@ const MediaSpecialEditor = ({
 
     // Get available image styles from current theme
     const availableImageStyles = useMemo(() => {
-        if (!currentTheme?.image_styles) return []
-        return Object.keys(currentTheme.image_styles).map(styleName => ({
+        if (!currentTheme?.imageStyles) return []
+        return Object.keys(currentTheme.imageStyles).map(styleName => ({
             name: styleName,
-            config: currentTheme.image_styles[styleName]
+            config: currentTheme.imageStyles[styleName]
         }))
     }, [currentTheme])
 
@@ -611,8 +611,8 @@ const MediaSpecialEditor = ({
                     const approvalData = {
                         title: originalUpload.metadata.title,
                         description: originalUpload.metadata.caption,
-                        tag_ids: originalUpload.metadata.tags,
-                        access_level: 'public',
+                        tagIds: originalUpload.metadata.tags,
+                        accessLevel: 'public',
                         slug: ''
                     }
 
@@ -659,8 +659,8 @@ const MediaSpecialEditor = ({
                     const approvalData = {
                         title: originalUpload.metadata.title,
                         description: originalUpload.metadata.caption,
-                        tag_ids: originalUpload.metadata.tags,
-                        access_level: 'public',
+                        tagIds: originalUpload.metadata.tags,
+                        accessLevel: 'public',
                         slug: ''
                     }
                     try {
@@ -713,16 +713,16 @@ const MediaSpecialEditor = ({
                 const allFileDetails = await Promise.all(fileDetailsPromises)
                 const newMediaItems = allFileDetails.map(mediaFile => ({
                     id: mediaFile.id,
-                    url: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl || mediaFile.file_url,
+                    url: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl,
                     type: 'image',
                     title: mediaFile.title || '',
-                    altText: mediaFile.altText || mediaFile.alt_text || mediaFile.title || '',
+                    altText: mediaFile.altText || mediaFile.title || '',
                     caption: mediaFile.description || '',
                     photographer: mediaFile.photographer || '',
                     source: mediaFile.source || '',
                     width: mediaFile.width,
                     height: mediaFile.height,
-                    thumbnailUrl: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl || mediaFile.file_url,
+                    thumbnailUrl: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl,
                     tags: mediaFile.tags || [] // Include tags
                 }))
 
@@ -746,7 +746,7 @@ const MediaSpecialEditor = ({
                     const uniqueTagIds = [...new Set(allTagIds)]
 
                     // Get existing tags
-                    const existingTags = await mediaApi.tags.list({ tag_ids: uniqueTagIds })()
+                    const existingTags = await mediaApi.tags.list({ tag_ids: uniqueTagIds })() // Query param, keep snake_case
                     const existingTagIds = new Set(existingTags.results.map(tag => tag.id))
 
                     // Create any missing tags and map old IDs to new UUIDs
@@ -782,7 +782,7 @@ const MediaSpecialEditor = ({
 
                     // Now update the files with the tags
                     await Promise.all(duplicateFiles.map(file =>
-                        mediaApi.files.update(file.id, { tag_ids: file.tags })()
+                        mediaApi.files.update(file.id, { tagIds: file.tags })()
                     ))
                 }
             }
@@ -839,7 +839,7 @@ const MediaSpecialEditor = ({
                 if (responseData.errors?.length > 0) {
                     responseData.errors.forEach(error => {
                         const message = error.error || 'Upload failed'
-                        const details = error.technical_details ? `: ${error.technical_details}` : ''
+                        const details = error.technicalDetails ? `: ${error.technicalDetails}` : ''
                         addNotification(`${error.filename}: ${message}${details}`, 'error')
                     })
                 }
@@ -947,9 +947,9 @@ const MediaSpecialEditor = ({
                         <div className="grid grid-cols-4 gap-2">
                             {collectionImages.map((image, index) => (
                                 <div key={image.id || index} className="relative aspect-square bg-gray-100 rounded overflow-hidden border">
-                                    {image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl ? (
+                                    {image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl ? (
                                         <img
-                                            src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
+                                            src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
                                             alt={image.title}
                                             className="w-full h-full object-cover"
                                         />
@@ -1324,7 +1324,7 @@ const MediaSpecialEditor = ({
                             <div key={image.id} className="relative flex-shrink-0">
                                 <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden border-2 border-blue-300">
                                     <img
-                                        src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
+                                        src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
                                         alt={image.title}
                                         className="w-full h-full object-cover"
                                     />
@@ -1405,9 +1405,9 @@ const MediaSpecialEditor = ({
                                     className={`relative cursor-pointer bg-gray-100 rounded overflow-hidden aspect-square hover:shadow-md transition-shadow border-2 ${isSelected ? 'border-blue-500' : 'border-gray-200'
                                         }`}
                                 >
-                                    {image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl ? (
+                                    {image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl ? (
                                         <img
-                                            src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
+                                            src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
                                             alt={image.title}
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
@@ -1676,9 +1676,9 @@ const MediaSpecialEditor = ({
                                 key={image.id || index}
                                 className="relative bg-gray-100 rounded overflow-hidden aspect-square border"
                             >
-                                {image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl ? (
+                                {image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl ? (
                                     <img
-                                        src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
+                                        src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
                                         alt={image.title}
                                         className="w-full h-full object-cover"
                                     />
@@ -1834,7 +1834,7 @@ const MediaSpecialEditor = ({
                         <div className="space-y-4">
                             <div className="aspect-video bg-gray-100 rounded overflow-hidden">
                                 <img
-                                    src={showDeleteConfirm.thumbnailUrl || showDeleteConfirm.thumbnail_url || showDeleteConfirm.imgproxyBaseUrl || showDeleteConfirm.fileUrl}
+                                    src={showDeleteConfirm.thumbnailUrl || showDeleteConfirm.imgproxyBaseUrl || showDeleteConfirm.fileUrl}
                                     alt={showDeleteConfirm.title || 'Image'}
                                     className="w-full h-full object-cover"
                                 />

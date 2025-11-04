@@ -38,7 +38,7 @@ const ComponentStyleEditPage = () => {
     // Load style data when theme loads
     useEffect(() => {
         if (themeData) {
-            const styles = themeData.component_styles || themeData.componentStyles || {};
+            const styles = themeData.componentStyles || {};
             const style = styles[styleKey];
             if (style) {
                 const initialStyle = {
@@ -69,12 +69,12 @@ const ComponentStyleEditPage = () => {
     // Update mutation
     const updateMutation = useMutation({
         mutationFn: (updatedStyle) => {
-            const styles = themeData.component_styles || themeData.componentStyles || {};
+            const styles = themeData.componentStyles || {};
             // Exclude image field to avoid file upload error
             const { image, ...themeDataWithoutImage } = themeData;
             return themesApi.update(themeId, {
                 ...themeDataWithoutImage,
-                component_styles: {
+                componentStyles: {
                     ...styles,
                     [styleKey]: updatedStyle,
                 },

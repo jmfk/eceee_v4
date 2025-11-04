@@ -62,9 +62,9 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
         },
         onSuccess: (data) => {
             // Check if we got subpage publishing results
-            if (data.subpages_published_count !== undefined) {
-                const totalCount = data.total_published_count || 0
-                const subpageCount = data.subpages_published_count || 0
+            if (data.subpagesPublishedCount !== undefined) {
+                const totalCount = data.totalPublishedCount || 0
+                const subpageCount = data.subpagesPublishedCount || 0
                 if (subpageCount > 0) {
                     addNotification(
                         `Page and ${subpageCount} subpage${subpageCount !== 1 ? 's' : ''} published successfully (${totalCount} total)`,

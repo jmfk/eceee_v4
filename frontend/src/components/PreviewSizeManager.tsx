@@ -96,8 +96,8 @@ const PreviewSizeManager: React.FC<PreviewSizeManagerProps> = ({
             name: formData.name,
             width: formData.width,
             height: formData.height || null,
-            sort_order: formData.sortOrder,
-            is_default: false,
+            sortOrder: formData.sortOrder,
+            isDefault: false,
         };
 
         if (editingId) {

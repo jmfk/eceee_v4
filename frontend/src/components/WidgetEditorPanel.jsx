@@ -128,7 +128,6 @@ const WidgetEditorPanel = forwardRef(({
         if (widgetData) {
             const resolvedWidgetTypeName = widgetData.name ||
                 widgetData.widgetType?.name ||
-                widgetData.widget_type?.name ||
                 widgetData.type
 
             setWidgetTypeName(resolvedWidgetTypeName)
@@ -145,8 +144,7 @@ const WidgetEditorPanel = forwardRef(({
             const fetchSchemaForWidget = async () => {
                 try {
                     let resolvedWidgetTypeName = widgetData.name ||
-                        widgetData.widgetType?.name ||
-                        widgetData.widget_type?.name
+                        widgetData.widgetType?.name
 
                     if (!resolvedWidgetTypeName && widgetData.type) {
                         // Use the widget type directly

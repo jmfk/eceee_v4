@@ -15,7 +15,7 @@ export interface TreePageData {
     id: number
     title: string
     slug: string
-    parent_id: number | null
+    parentId: number | null
     
     // Optional metadata
     description?: string
