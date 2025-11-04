@@ -77,6 +77,11 @@ const ThemeEditor = ({ onSave }) => {
     // Ref to store auto-save cancel function
     const cancelAutoSaveRef = useRef(null);
 
+    // Refs for style tab components to flush pending changes before save
+    const componentStylesTabRef = useRef(null);
+    const galleryStylesTabRef = useRef(null);
+    const carouselStylesTabRef = useRef(null);
+
     // Fetch themes list
     const { data: themes = [], isLoading } = useQuery({
         queryKey: ['themes'],
@@ -271,6 +276,16 @@ const ThemeEditor = ({ onSave }) => {
         // Cancel auto-save countdown when manually saving
         if (cancelAutoSaveRef.current) {
             cancelAutoSaveRef.current();
+        }
+
+        // Flush pending changes from style tabs before saving
+        // This ensures all uncontrolled textarea refs are saved to state
+        if (activeTab === 'component-styles' && componentStylesTabRef.current) {
+            componentStylesTabRef.current.flushPendingChanges();
+        } else if (activeTab === 'gallery-styles' && galleryStylesTabRef.current) {
+            galleryStylesTabRef.current.flushPendingChanges();
+        } else if (activeTab === 'carousel-styles' && carouselStylesTabRef.current) {
+            carouselStylesTabRef.current.flushPendingChanges();
         }
 
         try {
@@ -788,6 +803,7 @@ const ThemeEditor = ({ onSave }) => {
 
                     {activeTab === 'component-styles' && (
                         <ComponentStylesTab
+                            ref={componentStylesTabRef}
                             componentStyles={themeData?.componentStyles || {}}
                             onChange={(componentStyles) => updateThemeField('componentStyles', componentStyles)}
                             onDirty={() => setThemeDirty(true)}
@@ -797,6 +813,7 @@ const ThemeEditor = ({ onSave }) => {
 
                     {activeTab === 'gallery-styles' && (
                         <GalleryStylesTab
+                            ref={galleryStylesTabRef}
                             galleryStyles={themeData?.galleryStyles || {}}
                             onChange={(galleryStyles) => updateThemeField('galleryStyles', galleryStyles)}
                             onDirty={() => setThemeDirty(true)}
@@ -806,6 +823,7 @@ const ThemeEditor = ({ onSave }) => {
 
                     {activeTab === 'carousel-styles' && (
                         <CarouselStylesTab
+                            ref={carouselStylesTabRef}
                             carouselStyles={themeData?.carouselStyles || {}}
                             onChange={(carouselStyles) => updateThemeField('carouselStyles', carouselStyles)}
                             onDirty={() => setThemeDirty(true)}

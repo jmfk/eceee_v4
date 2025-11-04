@@ -4,7 +4,7 @@
  * HTML template + CSS editor for component styles (renamed from Image Styles).
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Code, Eye, BookOpen, Edit, Sparkles } from 'lucide-react';
 import { createEmptyComponentStyle } from '../../utils/themeUtils';
@@ -15,7 +15,7 @@ import PresetSelector from './PresetSelector';
 import { smartInsert } from '../../utils/codeInsertion';
 import StyleAIHelper from './StyleAIHelper';
 
-const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => {
+const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, themeId }, ref) => {
     const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
@@ -72,6 +72,25 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => 
             handleUpdateStyle(key, updates);
         }
     };
+
+    const flushPendingChanges = () => {
+        // Iterate through all styles that have refs and save their current values to state
+        const allStyleKeys = new Set([
+            ...Object.keys(templateRefs.current),
+            ...Object.keys(cssRefs.current)
+        ]);
+
+        allStyleKeys.forEach((key) => {
+            if (styles[key]) {
+                handleSaveFromRefs(key);
+            }
+        });
+    };
+
+    // Expose flushPendingChanges via ref
+    useImperativeHandle(ref, () => ({
+        flushPendingChanges
+    }));
 
     const handleRemoveStyle = (key) => {
         const updatedStyles = { ...styles };
@@ -279,7 +298,7 @@ const ComponentStylesTab = ({ componentStyles, onChange, onDirty, themeId }) => 
             )}
         </div>
     );
-};
+});
 
 // Component Style Editor
 const ComponentStyleEditor = ({ themeId, styleKey, style, onUpdate, onSave, onDirty, onShowPresetSelector, templateRef, cssRef }) => {
@@ -419,6 +438,8 @@ const ComponentStyleEditor = ({ themeId, styleKey, style, onUpdate, onSave, onDi
         </div>
     );
 };
+
+ComponentStylesTab.displayName = 'ComponentStylesTab';
 
 export default ComponentStylesTab;
 

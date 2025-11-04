@@ -4,7 +4,7 @@
  * Mustache template + CSS editor for gallery styles.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Grid3X3, Eye, Code, X, BookOpen, Edit, Sparkles } from 'lucide-react';
 import { renderMustache, prepareGalleryContext } from '../../utils/mustacheRenderer';
@@ -15,7 +15,7 @@ import PresetSelector from './PresetSelector';
 import { smartInsert } from '../../utils/codeInsertion';
 import StyleAIHelper from './StyleAIHelper';
 
-const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
+const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId }, ref) => {
     const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
@@ -93,6 +93,25 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
             handleUpdateStyle(key, updates);
         }
     };
+
+    const flushPendingChanges = () => {
+        // Iterate through all styles that have refs and save their current values to state
+        const allStyleKeys = new Set([
+            ...Object.keys(templateRefs.current),
+            ...Object.keys(cssRefs.current)
+        ]);
+
+        allStyleKeys.forEach((key) => {
+            if (styles[key]) {
+                handleSaveFromRefs(key);
+            }
+        });
+    };
+
+    // Expose flushPendingChanges via ref
+    useImperativeHandle(ref, () => ({
+        flushPendingChanges
+    }));
 
     const handleRemoveStyle = (key) => {
         const updatedStyles = { ...styles };
@@ -554,7 +573,9 @@ const GalleryStylesTab = ({ galleryStyles, onChange, onDirty, themeId }) => {
             )}
         </div>
     );
-};
+});
+
+GalleryStylesTab.displayName = 'GalleryStylesTab';
 
 export default GalleryStylesTab;
 

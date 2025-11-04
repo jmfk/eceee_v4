@@ -4,7 +4,7 @@
  * Mustache template + CSS editor for carousel styles with Alpine.js support.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Play, Eye, Code, X, BookOpen, Edit, Sparkles } from 'lucide-react';
 import { renderMustache, prepareCarouselContext } from '../../utils/mustacheRenderer';
@@ -14,7 +14,7 @@ import PresetSelector from './PresetSelector';
 import { smartInsert } from '../../utils/codeInsertion';
 import StyleAIHelper from './StyleAIHelper';
 
-const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
+const CarouselStylesTab = forwardRef(({ carouselStyles, onChange, onDirty, themeId }, ref) => {
     const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
     const [newStyleKey, setNewStyleKey] = useState('');
@@ -93,6 +93,25 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
             handleUpdateStyle(key, updates);
         }
     };
+
+    const flushPendingChanges = () => {
+        // Iterate through all styles that have refs and save their current values to state
+        const allStyleKeys = new Set([
+            ...Object.keys(templateRefs.current),
+            ...Object.keys(cssRefs.current)
+        ]);
+
+        allStyleKeys.forEach((key) => {
+            if (styles[key]) {
+                handleSaveFromRefs(key);
+            }
+        });
+    };
+
+    // Expose flushPendingChanges via ref
+    useImperativeHandle(ref, () => ({
+        flushPendingChanges
+    }));
 
     const handleRemoveStyle = (key) => {
         const updatedStyles = { ...styles };
@@ -559,7 +578,9 @@ const CarouselStylesTab = ({ carouselStyles, onChange, onDirty, themeId }) => {
             )}
         </div>
     );
-};
+});
+
+CarouselStylesTab.displayName = 'CarouselStylesTab';
 
 export default CarouselStylesTab;
 
