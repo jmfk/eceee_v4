@@ -82,6 +82,34 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
         if (onDirty) onDirty();
     };
 
+    const handleRenameKey = (oldKey, newKey) => {
+        const sanitizedKey = newKey.trim().toLowerCase().replace(/\s+/g, '-');
+        
+        if (!sanitizedKey) {
+            addNotification({ type: 'error', message: 'Key cannot be empty' });
+            return false;
+        }
+
+        if (sanitizedKey === oldKey) {
+            return true; // No change needed
+        }
+
+        if (styles[sanitizedKey]) {
+            addNotification({ type: 'error', message: 'A style with this key already exists' });
+            return false;
+        }
+
+        const updatedStyles = { ...styles };
+        updatedStyles[sanitizedKey] = { ...styles[oldKey] };
+        delete updatedStyles[oldKey];
+
+        onChange(updatedStyles);
+        if (onDirty) onDirty();
+        setEditingStyle(sanitizedKey);
+        addNotification({ type: 'success', message: `Renamed to "${sanitizedKey}"` });
+        return true;
+    };
+
     const handleSaveFromRefs = (key) => {
         const templateRef = templateRefs.current[key];
         const cssRef = cssRefs.current[key];
@@ -320,10 +348,30 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                                 </div>
                             </div>
 
-                            {/* Name and Description */}
+                            {/* Key, Name and Description */}
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Key (Technical Identifier)</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={editingStyle}
+                                        onBlur={(e) => {
+                                            if (e.target.value !== editingStyle) {
+                                                const success = handleRenameKey(editingStyle, e.target.value);
+                                                if (!success) {
+                                                    e.target.value = editingStyle; // Reset on failure
+                                                }
+                                            }
+                                        }}
+                                        placeholder="unique-key-name"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Lowercase letters, numbers, and hyphens only
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Display Name</label>
                                     <input
                                         type="text"
                                         value={styles[editingStyle].name || ''}

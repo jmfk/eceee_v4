@@ -1,12 +1,25 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { usePageChildren } from '../../hooks/usePageStructure'
 import { Menu, X, ChevronDown } from 'lucide-react'
+import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
+import { prepareNavigationContext } from '../../utils/mustacheRenderer'
+import { pagesApi } from '../../api'
 
 /**
  * EASY Navigation Widget Component
  * Renders navigation menus with dropdowns, mobile support, and branding
  */
 const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
+    console.log('[NavigationWidget] RENDER CALLED', {
+        mode,
+        config,
+        context,
+        hasMenus: !!config.menus,
+        hasMenuItems: !!config.menuItems,
+        navigationStyle: config.navigationStyle,
+        inheritedFrom: context?.inheritedFrom
+    })
+
     const {
         menuItems = [],
         menus = {},
@@ -14,6 +27,33 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     const pageId = context?.pageId
     const pageVersionData = context?.pageVersionData
     const { data: children, isLoading, error } = usePageChildren(pageId)
+
+    // State for owner page data (for inherited widgets)
+    const [ownerPageData, setOwnerPageData] = useState(null)
+    const [loadingOwnerPage, setLoadingOwnerPage] = useState(false)
+
+    // Fetch owner page data if this widget is inherited
+    useEffect(() => {
+        const fetchOwnerPage = async () => {
+            if (!context?.inheritedFrom?.id) {
+                setOwnerPageData(null)
+                return
+            }
+
+            try {
+                setLoadingOwnerPage(true)
+                const response = await pagesApi.get(context.inheritedFrom.id)
+                setOwnerPageData(response)
+            } catch (error) {
+                console.error('[NavigationWidget] Failed to fetch owner page:', error)
+                setOwnerPageData(null)
+            } finally {
+                setLoadingOwnerPage(false)
+            }
+        }
+
+        fetchOwnerPage()
+    }, [context?.inheritedFrom?.id])
 
     let localMenu = []
     if (children && children.length > 0 && menus.activeGroup === "pageSections") {
@@ -37,6 +77,45 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
         ))
     }
 
+    // Check for Component Style rendering
+    const navigationStyle = config.navigationStyle || config.navigation_style
+    const theme = context?.pageVersionData?.effectiveTheme || context?.theme
+
+    const hasComponentStyle = navigationStyle &&
+        navigationStyle !== 'default' &&
+        navigationStyle !== 'Default' &&
+        theme?.componentStyles?.[navigationStyle]
+
+    // If Component Style is selected, use Mustache rendering
+    if (hasComponentStyle) {
+        const style = theme.componentStyles[navigationStyle]
+
+        // Prepare context for Mustache template
+        const mustacheContext = prepareNavigationContext(
+            { ...config, menuItems, dynamicMenuItems: localMenu },
+            { ...context, children, pageData: context?.pageData },
+            ownerPageData
+        )
+
+        console.log('[NavigationWidget] Rendering with Component Style:', {
+            navigationStyle,
+            items: mustacheContext.items?.length || 0,
+            ownerPage: ownerPageData?.title || 'current',
+            inheritedFrom: context?.inheritedFrom?.title
+        })
+
+        return (
+            <ComponentStyleRenderer
+                template={style.template}
+                context={mustacheContext}
+                css={style.css}
+                styleId={`nav-${navigationStyle}`}
+                className="navigation-widget-component-style"
+            />
+        )
+    }
+
+    // Otherwise, use React rendering (existing code)
     if (mode === 'editor') {
         return (
             <nav className="navigation-widget">

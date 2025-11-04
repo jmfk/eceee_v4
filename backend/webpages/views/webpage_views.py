@@ -462,6 +462,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
             "slots": {},
         }
 
+        # Build depth-to-node mapping for finding widget source pages
+        depth_to_node = {}
+        current = tree
+        depth = 0
+        while current:
+            depth_to_node[depth] = current
+            current = current.parent
+            depth += 1
+
         # Get all slots from tree
         all_slots = set()
         current = tree
@@ -481,9 +490,21 @@ class WebPageViewSet(viewsets.ModelViewSet):
                         "type": widget.type,
                         "config": widget.config,
                         "inherited_from": {
-                            "id": tree.parent.page_id if tree.parent else None,
-                            "title": tree.parent.page.title if tree.parent else None,
-                            "slug": tree.parent.page.slug if tree.parent else None,
+                            "id": (
+                                depth_to_node[widget.depth].page_id
+                                if widget.depth in depth_to_node
+                                else None
+                            ),
+                            "title": (
+                                depth_to_node[widget.depth].page.title
+                                if widget.depth in depth_to_node
+                                else None
+                            ),
+                            "slug": (
+                                depth_to_node[widget.depth].page.slug
+                                if widget.depth in depth_to_node
+                                else None
+                            ),
                         },
                         "is_inherited": True,
                         "can_override": widget.can_be_overridden,

@@ -1252,12 +1252,10 @@ class WidgetUpdateSerializer(serializers.ModelSerializer):
                         f"Widget {i} in slot '{slot_name}' missing 'type' or 'widget_type' field"
                     )
 
-                # Convert widget configuration from camelCase to snake_case
-                converted_widget = widget.copy()
-                if "config" in widget:
-                    converted_widget["config"] = self._convert_camel_to_snake(
-                        widget["config"]
-                    )
+                # Convert entire widget object from camelCase to snake_case
+                # This includes metadata fields (inheritanceLevel, isPublished, etc.)
+                # AND the config field
+                converted_widget = self._convert_camel_to_snake(widget)
 
                 converted_widgets[slot_name].append(converted_widget)
 

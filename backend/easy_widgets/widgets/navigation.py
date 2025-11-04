@@ -217,37 +217,43 @@ class NavigationWidget(BaseWidget):
         helpers = get_structure_helpers()
         current_page_obj = context.get("page") or context.get("current_page")
         parent_page_obj = context.get("parent")
-        
+
         # Determine if widget is inherited and owner page
-        # Check _context for inheritance info from base widget
-        widget_context = template_config.get("_context", {})
-        is_inherited = False
+        widget_inherited_from = context.get('widget_inherited_from')
+        is_inherited = widget_inherited_from is not None
         owner_page_obj = current_page_obj  # Default to current page
         
-        # Try to determine inheritance from context
-        # If there's an inherited_from field in the widget data, this is inherited
-        # For now, we'll use current_page as owner, but this could be enhanced
-        # to track the actual owner page from inheritance metadata
-        
+        # If widget is inherited, fetch the actual owner page
+        if is_inherited and widget_inherited_from:
+            try:
+                # inherited_from is a dict with {id, title, slug}
+                owner_page_id = widget_inherited_from.get('id')
+                if owner_page_id:
+                    from webpages.models import WebPage
+                    owner_page_obj = WebPage.objects.get(id=owner_page_id)
+            except Exception:
+                # Fallback to current page if owner not found
+                pass
+
         # Convert pages to metadata dicts for template context
         def page_to_dict(page):
             """Convert WebPage model or PageMetadata to dict"""
             if page is None:
                 return None
-            if hasattr(page, 'id'):
+            if hasattr(page, "id"):
                 # It's a WebPage model, convert to metadata
                 metadata = helpers._page_to_metadata(page)
                 return asdict(metadata)
-            elif hasattr(page, '__dict__'):
+            elif hasattr(page, "__dict__"):
                 # It's already a PageMetadata dataclass
                 return asdict(page)
             return None
-        
+
         # Get current page metadata
         current_page_meta = None
         current_children = []
         if current_page_obj:
-            if hasattr(current_page_obj, 'id'):
+            if hasattr(current_page_obj, "id"):
                 current_page_meta = asdict(helpers._page_to_metadata(current_page_obj))
                 try:
                     children_info = helpers.get_active_children(
@@ -267,16 +273,37 @@ class NavigationWidget(BaseWidget):
                     pass
             else:
                 current_page_meta = page_to_dict(current_page_obj)
-        
-        # Get owner page (same as current for now, can be enhanced with inheritance tracking)
-        owner_page_meta = current_page_meta
-        owner_children = current_children
-        
+
+        # Get owner page metadata and children (the page where this widget was defined)
+        owner_page_meta = None
+        owner_children = []
+        if owner_page_obj:
+            if hasattr(owner_page_obj, "id"):
+                owner_page_meta = asdict(helpers._page_to_metadata(owner_page_obj))
+                try:
+                    children_info = helpers.get_active_children(
+                        owner_page_obj.id, include_unpublished=False
+                    )
+                    owner_children = [
+                        {
+                            "id": child.page.id,
+                            "title": child.page.title,
+                            "slug": child.page.slug,
+                            "path": child.page.path,
+                            "description": child.page.description,
+                        }
+                        for child in children_info
+                    ]
+                except Exception:
+                    pass
+            else:
+                owner_page_meta = page_to_dict(owner_page_obj)
+
         # Get parent page metadata and children
         parent_page_meta = None
         parent_children = []
         if parent_page_obj:
-            if hasattr(parent_page_obj, 'id'):
+            if hasattr(parent_page_obj, "id"):
                 parent_page_meta = asdict(helpers._page_to_metadata(parent_page_obj))
                 try:
                     children_info = helpers.get_active_children(
@@ -296,7 +323,7 @@ class NavigationWidget(BaseWidget):
                     pass
             else:
                 parent_page_meta = page_to_dict(parent_page_obj)
-        
+
         # Add enhanced context for Component Style templates
         template_config["owner_page"] = owner_page_meta
         template_config["owner_children"] = owner_children
@@ -326,6 +353,7 @@ class NavigationWidget(BaseWidget):
 
         # Support both snake_case and camelCase
         style_name = config.get("navigation_style") or config.get("navigationStyle")
+        
         # Only render with custom style if a style is explicitly selected
         if not style_name or style_name == "default":
             return None

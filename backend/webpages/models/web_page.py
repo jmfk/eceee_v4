@@ -916,7 +916,7 @@ class WebPage(models.Model):
         while current:
             current_version = current.get_current_published_version()
             current_theme = current_version.theme if current_version else None
-            
+
             inheritance_info["inheritance_chain"].append(
                 {
                     "page": current,
@@ -1246,12 +1246,17 @@ class WebPage(models.Model):
         published = []
 
         for widget in widgets:
-            # Check is_published flag (default to True for backward compatibility)
-            if not widget.get("is_published", True):
+            # Check is_published flag (check both snake_case and camelCase, default to True for backward compatibility)
+            is_published = widget.get("is_published")
+            if is_published is None:
+                is_published = widget.get("isPublished", True)
+            if not is_published:
                 continue
 
-            # Check effective date
-            effective_date = widget.get("publish_effective_date")
+            # Check effective date (check both snake_case and camelCase)
+            effective_date = widget.get("publish_effective_date") or widget.get(
+                "publishEffectiveDate"
+            )
             if effective_date:
                 from datetime import datetime
 
@@ -1262,8 +1267,10 @@ class WebPage(models.Model):
                 if effective_date > now:
                     continue
 
-            # Check expire date
-            expire_date = widget.get("publish_expire_date")
+            # Check expire date (check both snake_case and camelCase)
+            expire_date = widget.get("publish_expire_date") or widget.get(
+                "publishExpireDate"
+            )
             if expire_date:
                 from datetime import datetime
 
@@ -1283,11 +1290,19 @@ class WebPage(models.Model):
         from ..json_models import WidgetInheritanceBehavior
 
         # Get inheritance behavior (with backward compatibility)
-        inheritance_behavior = widget.get("inheritance_behavior")
+        inheritance_behavior = widget.get("inheritance_behavior") or widget.get(
+            "inheritanceBehavior"
+        )
         if not inheritance_behavior:
-            # Backward compatibility: convert old boolean fields
-            inherit_from_parent = widget.get("inherit_from_parent", True)
-            override_parent = widget.get("override_parent", False)
+            # Backward compatibility: convert old boolean fields (check both snake_case and camelCase)
+            inherit_from_parent = widget.get("inherit_from_parent") or widget.get(
+                "inheritFromParent"
+            )
+            if inherit_from_parent is None:
+                inherit_from_parent = True
+            override_parent = widget.get("override_parent") or widget.get(
+                "overrideParent", False
+            )
 
             if not inherit_from_parent:
                 return depth == 0  # Only on its own page
@@ -1296,8 +1311,10 @@ class WebPage(models.Model):
             else:
                 inheritance_behavior = WidgetInheritanceBehavior.INSERT_AFTER_PARENT
 
-        # Check inheritance_level depth limits
-        inheritance_level = widget.get("inheritance_level", 0)
+        # Check inheritance_level depth limits (check both snake_case and camelCase)
+        inheritance_level = widget.get("inheritance_level")
+        if inheritance_level is None:
+            inheritance_level = widget.get("inheritanceLevel", 0)
 
         # -1 means infinite inheritance
         if inheritance_level == -1:

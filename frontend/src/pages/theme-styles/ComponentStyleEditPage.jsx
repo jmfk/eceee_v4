@@ -30,6 +30,7 @@ const ComponentStyleEditPage = () => {
     const [initialData, setInitialData] = useState(null);
     const [selectedScenario, setSelectedScenario] = useState('manual-menu');
     const [copyStatus, setCopyStatus] = useState({ template: false, css: false });
+    const [newKey, setNewKey] = useState(styleKey);
 
     // Fetch theme data
     const { data: themeData, isLoading } = useQuery({
@@ -57,39 +58,53 @@ const ComponentStyleEditPage = () => {
                 setName(initialStyle.name);
                 setDescription(initialStyle.description);
                 setInitialData(initialStyle);
+                setNewKey(styleKey);
             }
         }
     }, [themeData, styleKey]);
 
     // Check if dirty
+    const keyChanged = newKey !== styleKey;
     const isDirty = initialData && (
         template !== initialData.template ||
         css !== initialData.css ||
         name !== initialData.name ||
-        description !== initialData.description
+        description !== initialData.description ||
+        keyChanged
     );
 
     // Update mutation
     const updateMutation = useMutation({
-        mutationFn: (updatedStyle) => {
-            const styles = themeData.componentStyles || {};
+        mutationFn: ({ updatedStyle, targetKey }) => {
+            const styles = { ...(themeData.componentStyles || {}) };
+            
+            // If key changed, delete old key
+            if (targetKey !== styleKey) {
+                delete styles[styleKey];
+            }
+            
+            // Set new/updated style
+            styles[targetKey] = updatedStyle;
+            
             // Exclude image field to avoid file upload error
             const { image, ...themeDataWithoutImage } = themeData;
             return themesApi.update(themeId, {
                 ...themeDataWithoutImage,
-                componentStyles: {
-                    ...styles,
-                    [styleKey]: updatedStyle,
-                },
+                componentStyles: styles,
             });
         },
-        onSuccess: () => {
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries(['theme', themeId]);
             queryClient.invalidateQueries(['themes']);
             addNotification({
                 type: 'success',
                 message: 'Component style saved successfully',
             });
+            
+            // If key changed, navigate to new URL
+            if (variables.targetKey !== styleKey) {
+                navigate(`/settings/themes/${themeId}/component-styles/${variables.targetKey}`);
+            }
         },
         onError: (error) => {
             addNotification({
@@ -100,12 +115,33 @@ const ComponentStyleEditPage = () => {
     });
 
     const handleSave = () => {
+        if (!name.trim()) {
+            addNotification({ type: 'error', message: 'Display name is required' });
+            return;
+        }
+        
+        const sanitizedKey = (newKey.trim() || name.trim()).toLowerCase().replace(/\s+/g, '-');
+        
+        if (!sanitizedKey) {
+            addNotification({ type: 'error', message: 'Key cannot be empty' });
+            return;
+        }
+        
+        const styles = themeData.componentStyles || {};
+        if (sanitizedKey !== styleKey && styles[sanitizedKey]) {
+            addNotification({ type: 'error', message: 'A style with this key already exists' });
+            return;
+        }
+        
         updateMutation.mutate({
-            name,
-            description,
-            template,
-            css,
-            variables,
+            updatedStyle: {
+                name,
+                description,
+                template,
+                css,
+                variables,
+            },
+            targetKey: sanitizedKey,
         });
     };
 
@@ -242,14 +278,31 @@ const ComponentStyleEditPage = () => {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Style Name
+                                        Display Name <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
+                                        required
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Key (Technical Identifier) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newKey}
+                                        onChange={(e) => setNewKey(e.target.value)}
+                                        placeholder={name ? name.toLowerCase().replace(/\s+/g, '-') : 'unique-key-name'}
+                                        required
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Lowercase letters, numbers, and hyphens only
+                                    </p>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">

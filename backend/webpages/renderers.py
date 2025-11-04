@@ -87,6 +87,9 @@ class WebPageRenderer:
         """
         from django.template.loader import render_to_string
         from .widget_registry import widget_type_registry
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         # Get widget type from registry - support both old and new formats
         widget_type_name = widget_data.get("widget_type") or widget_data.get("type")
@@ -104,6 +107,12 @@ class WebPageRenderer:
 
         # Enhanced context
         enhanced_context = dict(context or {})
+        
+        # Add widget inheritance metadata if available (for Component Style templates)
+        if 'inherited_from' in widget_data:
+            enhanced_context['widget_inherited_from'] = widget_data['inherited_from']
+        if 'inheritance_depth' in widget_data:
+            enhanced_context['widget_inheritance_depth'] = widget_data['inheritance_depth']
 
         # Prepare template context with widget-specific logic (e.g., collection resolution)
         # All widgets now have prepare_template_context (default implementation in BaseWidget)
@@ -114,9 +123,6 @@ class WebPageRenderer:
             )
         except Exception as e:
             # Log error but continue with base config to prevent crashes
-            import logging
-
-            logger = logging.getLogger(__name__)
             logger.error(
                 f"Error preparing template context for {widget_type.name}: {e}"
             )
@@ -153,9 +159,6 @@ class WebPageRenderer:
                             # Normal custom style
                             custom_style_html, custom_style_css = html_part, css_part
                 except Exception as e:
-                    import logging
-
-                    logger = logging.getLogger(__name__)
                     logger.error(f"Error rendering widget with custom style: {e}")
 
         # If we have custom style HTML, use it directly (with CSS if present)
@@ -304,6 +307,9 @@ class WebPageRenderer:
 
     def _render_widgets_by_slot(self, page, page_version, context):
         """Render widgets organized by slot using inheritance tree for better performance."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         widgets_by_slot = {}
 
         # NEW: Build inheritance tree (replaces complex slot-by-slot inheritance logic)
@@ -342,6 +348,22 @@ class WebPageRenderer:
                         "config": widget.config,
                         "order": widget.order,
                     }
+                    
+                    # Add inheritance metadata for Component Style templates
+                    if not widget.is_local:
+                        # Build inherited_from dict by finding the source page
+                        source_depth = widget.depth
+                        source_node = tree
+                        for _ in range(source_depth):
+                            if source_node.parent:
+                                source_node = source_node.parent
+                        
+                        widget_data["inherited_from"] = {
+                            "id": source_node.page_id,
+                            "title": source_node.page.title,
+                            "slug": source_node.page.slug,
+                        }
+                        widget_data["inheritance_depth"] = widget.depth
 
                     widget_html = self.render_widget_json(widget_data, context)
                     rendered_widgets.append(
@@ -392,11 +414,17 @@ class WebPageRenderer:
             slot_config = slot_config_map.get(slot_name, {})
 
             for widget_info in slot_info.get("widgets", []):
-                widget_data = widget_info["widget"]
+                widget_data = widget_info["widget"].copy()  # Copy to avoid modifying original
                 context["layout_name"] = context["layout"].name
                 context["slot_name"] = slot_name
                 # Pass entire slot configuration in context
                 context["slot"] = slot_config
+                
+                # Add inheritance metadata to widget_data for Component Style templates
+                if widget_info.get("inherited_from"):
+                    widget_data["inherited_from"] = widget_info["inherited_from"]
+                if widget_info.get("inheritance_depth"):
+                    widget_data["inheritance_depth"] = widget_info["inheritance_depth"]
 
                 # Render the widget with slot config in context
                 widget_html = self.render_widget_json(widget_data, context)

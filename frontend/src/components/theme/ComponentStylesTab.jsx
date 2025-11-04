@@ -61,6 +61,34 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
         if (onDirty) onDirty();
     };
 
+    const handleRenameKey = (oldKey, newKey) => {
+        const sanitizedKey = newKey.trim().toLowerCase().replace(/\s+/g, '-');
+        
+        if (!sanitizedKey) {
+            addNotification({ type: 'error', message: 'Key cannot be empty' });
+            return false;
+        }
+
+        if (sanitizedKey === oldKey) {
+            return true; // No change needed
+        }
+
+        if (styles[sanitizedKey]) {
+            addNotification({ type: 'error', message: 'A style with this key already exists' });
+            return false;
+        }
+
+        const updatedStyles = { ...styles };
+        updatedStyles[sanitizedKey] = { ...styles[oldKey] };
+        delete updatedStyles[oldKey];
+
+        onChange(updatedStyles);
+        if (onDirty) onDirty();
+        setEditingStyle(sanitizedKey);
+        addNotification({ type: 'success', message: `Renamed to "${sanitizedKey}"` });
+        return true;
+    };
+
     const handleSaveFromRefs = (key) => {
         const templateRef = templateRefs.current[key];
         const cssRef = cssRefs.current[key];
@@ -216,7 +244,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                                     }`}
                             >
                                 <div className="flex-1 px-3 py-2 min-w-0">
-                                    <div className="font-medium text-gray-900 truncate">{key}</div>
+                                    <div className="font-medium text-gray-900 truncate">{style.name || key}</div>
                                     {style.description && (
                                         <div className="text-xs text-gray-500 truncate">{style.description}</div>
                                     )}
@@ -266,6 +294,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                             onSave={() => handleSaveFromRefs(editingStyle)}
                             onDirty={onDirty}
                             onShowPresetSelector={() => setShowPresetSelector(true)}
+                            onRenameKey={handleRenameKey}
                             templateRef={(el) => {
                                 if (el) templateRefs.current[editingStyle] = el;
                             }}
@@ -301,7 +330,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
 });
 
 // Component Style Editor
-const ComponentStyleEditor = ({ themeId, styleKey, style, onUpdate, onSave, onDirty, onShowPresetSelector, templateRef, cssRef }) => {
+const ComponentStyleEditor = ({ themeId, styleKey, style, onUpdate, onSave, onDirty, onShowPresetSelector, onRenameKey, templateRef, cssRef }) => {
     const [showPreview, setShowPreview] = useState(false);
     const [previewHTML, setPreviewHTML] = useState('');
 
@@ -349,6 +378,30 @@ const ComponentStyleEditor = ({ themeId, styleKey, style, onUpdate, onSave, onDi
                         {showPreview ? 'Hide' : 'Show'} Preview
                     </button>
                 </div>
+            </div>
+
+            {/* Key */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Key (Technical Identifier)
+                </label>
+                <input
+                    type="text"
+                    defaultValue={styleKey}
+                    onBlur={(e) => {
+                        if (e.target.value !== styleKey) {
+                            const success = onRenameKey(styleKey, e.target.value);
+                            if (!success) {
+                                e.target.value = styleKey; // Reset on failure
+                            }
+                        }
+                    }}
+                    placeholder="unique-key-name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                    Lowercase letters, numbers, and hyphens only
+                </p>
             </div>
 
             {/* Name */}
