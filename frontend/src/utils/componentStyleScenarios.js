@@ -357,6 +357,278 @@ export const scenarios = [
             anchor: '',
         },
     },
+    {
+        id: 'owner-page-menu',
+        name: 'Owner Page Menu',
+        description: 'Always show children of the page where the widget was originally created (regardless of inheritance)',
+        variables: [
+            { name: 'owner_page', type: 'Object', description: 'PageMetadata object for the page where widget was created (id, title, slug, path)' },
+            { name: 'owner_children', type: 'Array', description: 'Child pages of the owner page' },
+            { name: 'hasOwnerChildren', type: 'Boolean', description: 'True if owner page has children' },
+            { name: 'isInherited', type: 'Boolean', description: 'True if widget is inherited from a parent page' },
+        ],
+        itemProperties: [
+            { name: 'id', type: 'Number', description: 'Page ID' },
+            { name: 'title', type: 'String', description: 'Page title' },
+            { name: 'slug', type: 'String', description: 'Page slug' },
+            { name: 'path', type: 'String', description: 'Full URL path to the page' },
+            { name: 'description', type: 'String', description: 'Page description' },
+        ],
+        template: `<nav class="owner-page-menu">
+  {{#hasOwnerChildren}}
+  <ul class="owner-menu-list">
+    {{#owner_children}}
+    <li class="owner-menu-item">
+      <a href="{{path}}">{{title}}</a>
+    </li>
+    {{/owner_children}}
+  </ul>
+  {{/hasOwnerChildren}}
+  {{^hasOwnerChildren}}
+  <p class="no-children-message">No sub-pages available</p>
+  {{/hasOwnerChildren}}
+</nav>`,
+        css: `.owner-page-menu {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.owner-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.owner-menu-item {
+  margin: 0.5rem 0;
+}
+
+.owner-menu-item a {
+  color: #1f2937;
+  text-decoration: none;
+  padding: 0.5rem;
+  display: block;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.owner-menu-item a:hover {
+  background-color: #e5e7eb;
+}
+
+.no-children-message {
+  color: #6b7280;
+  font-style: italic;
+  margin: 0;
+}`,
+        sampleContext: {
+            owner_page: { id: 1, title: 'About', slug: 'about', path: '/about/' },
+            owner_children: [
+                { id: 2, title: 'Introduction', slug: 'introduction', path: '/about/introduction/', description: '' },
+                { id: 3, title: 'Our Team', slug: 'team', path: '/about/team/', description: '' },
+                { id: 4, title: 'History', slug: 'history', path: '/about/history/', description: '' },
+            ],
+            hasOwnerChildren: true,
+            isInherited: false,
+        },
+    },
+    {
+        id: 'current-page-menu',
+        name: 'Current Page Menu',
+        description: 'Show children of the current viewing page (inheritance-aware, adapts to current context)',
+        variables: [
+            { name: 'current_page', type: 'Object', description: 'PageMetadata object for the current viewing page' },
+            { name: 'current_children', type: 'Array', description: 'Child pages of the current page' },
+            { name: 'hasCurrentChildren', type: 'Boolean', description: 'True if current page has children' },
+            { name: 'parent_page', type: 'Object', description: 'PageMetadata object for parent page (or null)' },
+        ],
+        itemProperties: [
+            { name: 'id', type: 'Number', description: 'Page ID' },
+            { name: 'title', type: 'String', description: 'Page title' },
+            { name: 'slug', type: 'String', description: 'Page slug' },
+            { name: 'path', type: 'String', description: 'Full URL path to the page' },
+            { name: 'description', type: 'String', description: 'Page description' },
+        ],
+        template: `<nav class="current-page-menu">
+  {{#hasCurrentChildren}}
+  <ul class="current-menu-list">
+    {{#current_children}}
+    <li class="current-menu-item">
+      <a href="{{path}}">{{title}}</a>
+    </li>
+    {{/current_children}}
+  </ul>
+  {{/hasCurrentChildren}}
+  {{^hasCurrentChildren}}
+  {{#parent_page}}
+  <div class="fallback-link">
+    <a href="{{parent_page.path}}">← Back to {{parent_page.title}}</a>
+  </div>
+  {{/parent_page}}
+  {{/hasCurrentChildren}}
+</nav>`,
+        css: `.current-page-menu {
+  background: #ffffff;
+  border-left: 4px solid #3b82f6;
+  padding: 1rem;
+}
+
+.current-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.current-menu-item {
+  margin: 0.5rem 0;
+}
+
+.current-menu-item a {
+  color: #1f2937;
+  text-decoration: none;
+  padding: 0.5rem;
+  display: block;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.current-menu-item a:hover {
+  background-color: #f3f4f6;
+}
+
+.fallback-link {
+  padding: 0.5rem 0;
+}
+
+.fallback-link a {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.fallback-link a:hover {
+  text-decoration: underline;
+}`,
+        sampleContext: {
+            current_page: { id: 5, title: 'Services', slug: 'services', path: '/services/' },
+            current_children: [
+                { id: 6, title: 'Web Development', slug: 'web-development', path: '/services/web-development/', description: '' },
+                { id: 7, title: 'Consulting', slug: 'consulting', path: '/services/consulting/', description: '' },
+            ],
+            hasCurrentChildren: true,
+            parent_page: { id: 1, title: 'Home', slug: 'home', path: '/' },
+        },
+    },
+    {
+        id: 'smart-fallback-menu',
+        name: 'Smart Fallback Menu',
+        description: 'Smart navigation with fallback logic: show current children, or parent children, or hide menu',
+        variables: [
+            { name: 'current_children', type: 'Array', description: 'Child pages of the current page' },
+            { name: 'hasCurrentChildren', type: 'Boolean', description: 'True if current page has children' },
+            { name: 'parent_children', type: 'Array', description: 'Child pages of the parent page' },
+            { name: 'hasParentChildren', type: 'Boolean', description: 'True if parent page has children' },
+            { name: 'parent_page', type: 'Object', description: 'PageMetadata object for parent page (or null)' },
+        ],
+        itemProperties: [
+            { name: 'id', type: 'Number', description: 'Page ID' },
+            { name: 'title', type: 'String', description: 'Page title' },
+            { name: 'slug', type: 'String', description: 'Page slug' },
+            { name: 'path', type: 'String', description: 'Full URL path to the page' },
+            { name: 'description', type: 'String', description: 'Page description' },
+        ],
+        template: `<nav class="smart-fallback-menu">
+  {{#hasCurrentChildren}}
+  <!-- Show current page children -->
+  <ul class="menu-list">
+    {{#current_children}}
+    <li class="menu-item">
+      <a href="{{path}}">{{title}}</a>
+    </li>
+    {{/current_children}}
+  </ul>
+  {{/hasCurrentChildren}}
+  {{^hasCurrentChildren}}
+  {{#hasParentChildren}}
+  <!-- Fallback: Show parent page children -->
+  <ul class="menu-list">
+    {{#parent_children}}
+    <li class="menu-item">
+      <a href="{{path}}">{{title}}</a>
+    </li>
+    {{/parent_children}}
+  </ul>
+  {{/hasParentChildren}}
+  {{^hasParentChildren}}
+  <!-- Fallback: Show parent link if no children anywhere -->
+  {{#parent_page}}
+  <div class="parent-link">
+    <a href="{{parent_page.path}}">← Back to {{parent_page.title}}</a>
+  </div>
+  {{/parent_page}}
+  {{/hasParentChildren}}
+  {{/hasCurrentChildren}}
+</nav>`,
+        css: `.smart-fallback-menu {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-item {
+  margin: 0.5rem 0;
+}
+
+.menu-item a {
+  color: #1f2937;
+  text-decoration: none;
+  padding: 0.5rem;
+  display: block;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.menu-item a:hover {
+  background-color: #e5e7eb;
+}
+
+.parent-link {
+  padding: 0.5rem 0;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.parent-link a {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.parent-link a:hover {
+  text-decoration: underline;
+}`,
+        sampleContext: {
+            current_children: [],
+            hasCurrentChildren: false,
+            parent_children: [
+                { id: 2, title: 'About', slug: 'about', path: '/about/', description: '' },
+                { id: 3, title: 'Services', slug: 'services', path: '/services/', description: '' },
+                { id: 4, title: 'Contact', slug: 'contact', path: '/contact/', description: '' },
+            ],
+            hasParentChildren: true,
+            parent_page: { id: 1, title: 'Home', slug: 'home', path: '/' },
+        },
+    },
 ];
 
 export function getScenarioById(id) {

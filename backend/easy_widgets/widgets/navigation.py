@@ -144,8 +144,10 @@ class NavigationWidget(BaseWidget):
         """
         Prepare navigation menu items based on configuration.
         Handles dynamic menu generation from page sections and child pages.
+        Also prepares enhanced page context for Component Style templates.
         """
         from webpages.structure_helpers import get_structure_helpers
+        from dataclasses import asdict
 
         # Start with base config
         template_config = super().prepare_template_context(config, context)
@@ -211,6 +213,102 @@ class NavigationWidget(BaseWidget):
         # Add dynamic menu items to config
         template_config["dynamic_menu_items"] = dynamic_menu_items
 
+        # Enhanced page context for Component Style templates
+        helpers = get_structure_helpers()
+        current_page_obj = context.get("page") or context.get("current_page")
+        parent_page_obj = context.get("parent")
+        
+        # Determine if widget is inherited and owner page
+        # Check _context for inheritance info from base widget
+        widget_context = template_config.get("_context", {})
+        is_inherited = False
+        owner_page_obj = current_page_obj  # Default to current page
+        
+        # Try to determine inheritance from context
+        # If there's an inherited_from field in the widget data, this is inherited
+        # For now, we'll use current_page as owner, but this could be enhanced
+        # to track the actual owner page from inheritance metadata
+        
+        # Convert pages to metadata dicts for template context
+        def page_to_dict(page):
+            """Convert WebPage model or PageMetadata to dict"""
+            if page is None:
+                return None
+            if hasattr(page, 'id'):
+                # It's a WebPage model, convert to metadata
+                metadata = helpers._page_to_metadata(page)
+                return asdict(metadata)
+            elif hasattr(page, '__dict__'):
+                # It's already a PageMetadata dataclass
+                return asdict(page)
+            return None
+        
+        # Get current page metadata
+        current_page_meta = None
+        current_children = []
+        if current_page_obj:
+            if hasattr(current_page_obj, 'id'):
+                current_page_meta = asdict(helpers._page_to_metadata(current_page_obj))
+                try:
+                    children_info = helpers.get_active_children(
+                        current_page_obj.id, include_unpublished=False
+                    )
+                    current_children = [
+                        {
+                            "id": child.page.id,
+                            "title": child.page.title,
+                            "slug": child.page.slug,
+                            "path": child.page.path,
+                            "description": child.page.description,
+                        }
+                        for child in children_info
+                    ]
+                except Exception:
+                    pass
+            else:
+                current_page_meta = page_to_dict(current_page_obj)
+        
+        # Get owner page (same as current for now, can be enhanced with inheritance tracking)
+        owner_page_meta = current_page_meta
+        owner_children = current_children
+        
+        # Get parent page metadata and children
+        parent_page_meta = None
+        parent_children = []
+        if parent_page_obj:
+            if hasattr(parent_page_obj, 'id'):
+                parent_page_meta = asdict(helpers._page_to_metadata(parent_page_obj))
+                try:
+                    children_info = helpers.get_active_children(
+                        parent_page_obj.id, include_unpublished=False
+                    )
+                    parent_children = [
+                        {
+                            "id": child.page.id,
+                            "title": child.page.title,
+                            "slug": child.page.slug,
+                            "path": child.page.path,
+                            "description": child.page.description,
+                        }
+                        for child in children_info
+                    ]
+                except Exception:
+                    pass
+            else:
+                parent_page_meta = page_to_dict(parent_page_obj)
+        
+        # Add enhanced context for Component Style templates
+        template_config["owner_page"] = owner_page_meta
+        template_config["owner_children"] = owner_children
+        template_config["hasOwnerChildren"] = len(owner_children) > 0
+        template_config["current_page"] = current_page_meta
+        template_config["current_children"] = current_children
+        template_config["hasCurrentChildren"] = len(current_children) > 0
+        template_config["parent_page"] = parent_page_meta
+        template_config["parent_children"] = parent_children
+        template_config["hasParentChildren"] = len(parent_children) > 0
+        template_config["isInherited"] = is_inherited
+
         return template_config
 
     def render_with_style(self, config, theme=None):
@@ -257,12 +355,25 @@ class NavigationWidget(BaseWidget):
             return None
 
         # Prepare context for Mustache rendering
+        # Include all enhanced page context variables from prepare_template_context
         context = {
             "items": all_items,
             "dynamic_items": dynamic_items,
             "static_items": static_items,
             "itemCount": len(all_items),
             "hasItems": len(all_items) > 0,
+            # Enhanced page context for Component Style templates
+            "owner_page": config.get("owner_page"),
+            "owner_children": config.get("owner_children", []),
+            "hasOwnerChildren": config.get("hasOwnerChildren", False),
+            "current_page": config.get("current_page"),
+            "current_children": config.get("current_children", []),
+            "hasCurrentChildren": config.get("hasCurrentChildren", False),
+            "parent_page": config.get("parent_page"),
+            "parent_children": config.get("parent_children", []),
+            "hasParentChildren": config.get("hasParentChildren", False),
+            "isInherited": config.get("isInherited", False),
+            # Style-specific variables
             **(style.get("variables") or {}),
         }
 
