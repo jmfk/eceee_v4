@@ -369,18 +369,12 @@ class WebPageRenderer:
                             if source_node.parent:
                                 source_node = source_node.parent
                         
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.info(f"[RENDERER] Widget {widget.type} - is_local: {widget.is_local}, depth: {widget.depth}")
-                        
                         widget_data["inherited_from"] = {
                             "id": source_node.page_id,
                             "title": source_node.page.title,
                             "slug": source_node.page.slug,
                         }
                         widget_data["inheritance_depth"] = widget.depth
-                        
-                        logger.info(f"[RENDERER] Set inheritance_depth in widget_data: {widget_data['inheritance_depth']}")
 
                     widget_html = self.render_widget_json(widget_data, context)
                     rendered_widgets.append(

@@ -367,15 +367,6 @@ class NavigationWidget(BaseWidget):
         
         # Inheritance depth and helper booleans for Mustache templates
         depth = context.get("widget_inheritance_depth", 0)
-        
-        # DEBUG: Log everything in context related to inheritance
-        logger.info(f"[NAV] Full context keys: {list(context.keys())}")
-        logger.info(f"[NAV] widget_inheritance_depth from context: {context.get('widget_inheritance_depth')}")
-        logger.info(f"[NAV] widget_inherited_from from context: {context.get('widget_inherited_from')}")
-        logger.info(f"[NAV] is_inherited flag: {is_inherited}")
-        logger.info(f"[NAV] Current page: {current_page_obj.title if current_page_obj and hasattr(current_page_obj, 'title') else 'None'}")
-        logger.info(f"[NAV] Owner page: {owner_page_obj.title if owner_page_obj and hasattr(owner_page_obj, 'title') else 'None'}")
-        
         template_config["inheritanceDepth"] = depth
         template_config["isRoot"] = depth == 0
         template_config["isLevel1"] = depth == 1
@@ -385,8 +376,6 @@ class NavigationWidget(BaseWidget):
         template_config["isLevel2AndBelow"] = depth >= 2
         template_config["isLevel3AndBelow"] = depth >= 3
         template_config["isDeepLevel"] = depth >= 4
-        
-        logger.info(f"[NAV] Depth helpers - depth: {depth}, isRoot: {depth == 0}, isLevel1: {depth == 1}, isLevel2AndBelow: {depth >= 2}")
 
         return template_config
 
@@ -433,16 +422,6 @@ class NavigationWidget(BaseWidget):
         # Add static menu items
         static_items = config.get("menu_items", [])
         all_items.extend(static_items)
-
-        logger.info(
-            f"[NAV] Rendering Component Style '{style_name}' with {len(all_items)} items (owner: {config.get('owner_page', {}).get('title') if config.get('owner_page') else 'N/A'})"
-        )
-        
-        logger.info(
-            f"[NAV] Mustache render - depth: {config.get('inheritanceDepth', 0)}, "
-            f"isRoot: {config.get('isRoot', False)}, isLevel1: {config.get('isLevel1', False)}, "
-            f"isLevel2AndBelow: {config.get('isLevel2AndBelow', False)}"
-        )
 
         if not all_items:
             return None
