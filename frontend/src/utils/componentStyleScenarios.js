@@ -12,21 +12,21 @@ export const scenarios = [
         description: 'Static menu items configured manually in the widget',
         variables: [
             { name: 'items', type: 'Array', description: 'All menu items (combined static and dynamic)' },
-            { name: 'static_items', type: 'Array', description: 'Manually configured menu items' },
+            { name: 'staticItems', type: 'Array', description: 'Manually configured menu items' },
             { name: 'itemCount', type: 'Number', description: 'Total number of menu items' },
             { name: 'hasItems', type: 'Boolean', description: 'True if there are any menu items' },
         ],
         itemProperties: [
             { name: 'label', type: 'String', description: 'Display text for the menu item' },
             { name: 'url', type: 'String', description: 'URL or path for the menu item' },
-            { name: 'target_blank', type: 'Boolean', description: 'Open link in new tab' },
-            { name: 'is_active', type: 'Boolean', description: 'Whether the item is active/enabled' },
+            { name: 'targetBlank', type: 'Boolean', description: 'Open link in new tab' },
+            { name: 'isActive', type: 'Boolean', description: 'Whether the item is active/enabled' },
         ],
         template: `<nav class="manual-menu">
   <ul class="menu-list">
     {{#items}}
     <li class="menu-item">
-      <a href="{{url}}"{{#target_blank}} target="_blank" rel="noopener noreferrer"{{/target_blank}}>
+      <a href="{{url}}"{{#targetBlank}} target="_blank" rel="noopener noreferrer"{{/targetBlank}}>
         {{label}}
       </a>
     </li>
@@ -63,14 +63,14 @@ export const scenarios = [
 }`,
         sampleContext: {
             items: [
-                { label: 'Home', url: '/', target_blank: false, is_active: true },
-                { label: 'About', url: '/about/', target_blank: false, is_active: true },
-                { label: 'Contact', url: '/contact/', target_blank: false, is_active: true },
+                { label: 'Home', url: '/', targetBlank: false, isActive: true },
+                { label: 'About', url: '/about/', targetBlank: false, isActive: true },
+                { label: 'Contact', url: '/contact/', targetBlank: false, isActive: true },
             ],
-            static_items: [
-                { label: 'Home', url: '/', target_blank: false, is_active: true },
-                { label: 'About', url: '/about/', target_blank: false, is_active: true },
-                { label: 'Contact', url: '/contact/', target_blank: false, is_active: true },
+            staticItems: [
+                { label: 'Home', url: '/', targetBlank: false, isActive: true },
+                { label: 'About', url: '/about/', targetBlank: false, isActive: true },
+                { label: 'Contact', url: '/contact/', targetBlank: false, isActive: true },
             ],
             itemCount: 3,
             hasItems: true,
@@ -82,24 +82,24 @@ export const scenarios = [
         description: 'Dynamic menu generated from child pages of the current page',
         variables: [
             { name: 'items', type: 'Array', description: 'All menu items (combined static and dynamic)' },
-            { name: 'dynamic_items', type: 'Array', description: 'Dynamically generated items from child pages' },
-            { name: 'static_items', type: 'Array', description: 'Manually configured menu items' },
+            { name: 'dynamicItems', type: 'Array', description: 'Dynamically generated items from child pages' },
+            { name: 'staticItems', type: 'Array', description: 'Manually configured menu items' },
             { name: 'itemCount', type: 'Number', description: 'Total number of menu items' },
             { name: 'hasItems', type: 'Boolean', description: 'True if there are any menu items' },
         ],
         itemProperties: [
             { name: 'label', type: 'String', description: 'Page title (from child page)' },
             { name: 'url', type: 'String', description: 'Page path (from child page)' },
-            { name: 'target_blank', type: 'Boolean', description: 'Always false for subpage items' },
-            { name: 'is_active', type: 'Boolean', description: 'Always true for subpage items' },
+            { name: 'targetBlank', type: 'Boolean', description: 'Always false for subpage items' },
+            { name: 'isActive', type: 'Boolean', description: 'Always true for subpage items' },
         ],
         template: `<nav class="subpage-menu">
   <ul class="submenu-list">
-    {{#dynamic_items}}
+    {{#dynamicItems}}
     <li class="submenu-item">
       <a href="{{url}}">{{label}}</a>
     </li>
-    {{/dynamic_items}}
+    {{/dynamicItems}}
   </ul>
 </nav>`,
         css: `.subpage-menu {
@@ -132,16 +132,16 @@ export const scenarios = [
 }`,
         sampleContext: {
             items: [
-                { label: 'Introduction', url: '/about/introduction/', target_blank: false, is_active: true },
-                { label: 'Our Team', url: '/about/team/', target_blank: false, is_active: true },
-                { label: 'History', url: '/about/history/', target_blank: false, is_active: true },
+                { label: 'Introduction', url: '/about/introduction/', targetBlank: false, isActive: true },
+                { label: 'Our Team', url: '/about/team/', targetBlank: false, isActive: true },
+                { label: 'History', url: '/about/history/', targetBlank: false, isActive: true },
             ],
-            dynamic_items: [
-                { label: 'Introduction', url: '/about/introduction/', target_blank: false, is_active: true },
-                { label: 'Our Team', url: '/about/team/', target_blank: false, is_active: true },
-                { label: 'History', url: '/about/history/', target_blank: false, is_active: true },
+            dynamicItems: [
+                { label: 'Introduction', url: '/about/introduction/', targetBlank: false, isActive: true },
+                { label: 'Our Team', url: '/about/team/', targetBlank: false, isActive: true },
+                { label: 'History', url: '/about/history/', targetBlank: false, isActive: true },
             ],
-            static_items: [],
+            staticItems: [],
             itemCount: 3,
             hasItems: true,
         },

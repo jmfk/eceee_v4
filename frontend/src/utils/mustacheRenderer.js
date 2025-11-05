@@ -61,6 +61,7 @@ export function prepareComponentContext(content, styleVars = {}) {
 /**
  * Prepare navigation context for Mustache rendering
  * Matches the backend logic in NavigationWidget.prepare_template_context()
+ * All variables use camelCase for consistency
  */
 export function prepareNavigationContext(config, context = {}, ownerPageData = null) {
     const currentPage = context?.pageData || context?.currentPage || {}
@@ -86,10 +87,13 @@ export function prepareNavigationContext(config, context = {}, ownerPageData = n
         // Individual arrays (for templates that need them separately)
         menuItems,
         dynamicMenuItems,
-        menu_items: menuItems,  // snake_case for backend compatibility
-        dynamic_menu_items: dynamicMenuItems,
+        staticItems: menuItems,
 
-        // Page context (camelCase for Mustache templates)
+        // Counts and flags
+        itemCount: allItems.length,
+        hasItems: allItems.length > 0,
+
+        // Page context (all camelCase)
         ownerPage: ownerPage,
         ownerChildren: ownerChildren,
         hasOwnerChildren: ownerChildren.length > 0,
@@ -102,17 +106,8 @@ export function prepareNavigationContext(config, context = {}, ownerPageData = n
         parentChildren: parentChildren,
         hasParentChildren: parentChildren.length > 0,
 
-        // Also provide snake_case versions for backend template compatibility
-        owner_page: ownerPage,
-        owner_children: ownerChildren,
-        current_page: currentPage,
-        current_children: currentChildren,
-        parent_page: parentPage,
-        parent_children: parentChildren,
-
         // Inheritance flag
-        isInherited: !!context?.inheritedFrom,
-        is_inherited: !!context?.inheritedFrom
+        isInherited: !!context?.inheritedFrom
     }
 
     return result

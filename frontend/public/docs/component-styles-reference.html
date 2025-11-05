@@ -333,12 +333,12 @@
                         <td>All navigation items (combines dynamic + static items)</td>
                     </tr>
                     <tr>
-                        <td><code>dynamic_items</code></td>
+                        <td><code>dynamicItems</code></td>
                         <td><span class="badge badge-type">Array</span></td>
                         <td>Auto-generated items from page sections or submenu configuration</td>
                     </tr>
                     <tr>
-                        <td><code>static_items</code></td>
+                        <td><code>staticItems</code></td>
                         <td><span class="badge badge-type">Array</span></td>
                         <td>Manually configured menu items</td>
                     </tr>
@@ -356,7 +356,7 @@
             </table>
 
             <div class="note">
-                <strong>Note:</strong> Navigation items have the structure: <code>{label, url, is_active, target_blank}</code>
+                <strong>Note:</strong> Navigation items have the structure: <code>{label, url, isActive, targetBlank}</code>
             </div>
         </section>
 
@@ -374,12 +374,12 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><code>parent_page</code></td>
+                        <td><code>parentPage</code></td>
                         <td><span class="badge badge-type">Object</span></td>
                         <td>PageMetadata object for the parent page (id, title, slug, path, description)</td>
                     </tr>
                     <tr>
-                        <td><code>parent_children</code></td>
+                        <td><code>parentChildren</code></td>
                         <td><span class="badge badge-type">Array</span></td>
                         <td>Array of child pages of the parent page</td>
                     </tr>
@@ -389,12 +389,12 @@
                         <td>True if parent page has children</td>
                     </tr>
                     <tr>
-                        <td><code>current_page</code></td>
+                        <td><code>currentPage</code></td>
                         <td><span class="badge badge-type">Object</span></td>
                         <td>PageMetadata object for the current page being viewed</td>
                     </tr>
                     <tr>
-                        <td><code>current_children</code></td>
+                        <td><code>currentChildren</code></td>
                         <td><span class="badge badge-type">Array</span></td>
                         <td>Array of child pages of the current page</td>
                     </tr>
@@ -404,12 +404,12 @@
                         <td>True if current page has children</td>
                     </tr>
                     <tr>
-                        <td><code>owner_page</code></td>
+                        <td><code>ownerPage</code></td>
                         <td><span class="badge badge-type">Object</span></td>
                         <td>PageMetadata object for the page where widget was originally created</td>
                     </tr>
                     <tr>
-                        <td><code>owner_children</code></td>
+                        <td><code>ownerChildren</code></td>
                         <td><span class="badge badge-type">Array</span></td>
                         <td>Array of child pages of the owner page (useful for inherited widgets)</td>
                     </tr>
@@ -429,7 +429,7 @@
 
         <section>
             <h2>Child Page Object Structure</h2>
-            <p>Each child page in <code>parent_children</code>, <code>current_children</code>, or <code>owner_children</code> arrays has the following structure:</p>
+            <p>Each child page in <code>parentChildren</code>, <code>currentChildren</code>, or <code>ownerChildren</code> arrays has the following structure:</p>
             
             <table>
                 <thead>
@@ -470,14 +470,14 @@
 
             <div class="example">
                 <h3>Example Usage:</h3>
-                <pre><code>{{#parent_children}}
+                <pre><code>{{#parentChildren}}
   &lt;li&gt;
     &lt;a href="{{path}}"&gt;{{title}}&lt;/a&gt;
     {{#description}}
       &lt;span class="description"&gt;{{description}}&lt;/span&gt;
     {{/description}}
   &lt;/li&gt;
-{{/parent_children}}</code></pre>
+{{/parentChildren}}</code></pre>
             </div>
         </section>
 
@@ -487,13 +487,13 @@
                 <h3>Template:</h3>
                 <pre><code>&lt;nav class="parent-children-nav"&gt;
   {{#hasParentChildren}}
-    &lt;h3 class="nav-title"&gt;{{parent_page.title}} Sections&lt;/h3&gt;
+    &lt;h3 class="nav-title"&gt;{{parentPage.title}} Sections&lt;/h3&gt;
     &lt;ul class="nav-list"&gt;
-      {{#parent_children}}
+      {{#parentChildren}}
       &lt;li class="nav-item"&gt;
         &lt;a href="{{path}}" class="nav-link"&gt;{{title}}&lt;/a&gt;
       &lt;/li&gt;
-      {{/parent_children}}
+      {{/parentChildren}}
     &lt;/ul&gt;
   {{/hasParentChildren}}
   {{^hasParentChildren}}
@@ -557,11 +557,11 @@
   {{#hasCurrentChildren}}
   &lt;!-- Show current page children --&gt;
   &lt;ul class="menu-list"&gt;
-    {{#current_children}}
+    {{#currentChildren}}
     &lt;li class="menu-item"&gt;
       &lt;a href="{{path}}"&gt;{{title}}&lt;/a&gt;
     &lt;/li&gt;
-    {{/current_children}}
+    {{/currentChildren}}
   &lt;/ul&gt;
   {{/hasCurrentChildren}}
   
@@ -569,21 +569,21 @@
   {{#hasParentChildren}}
   &lt;!-- Fallback: Show parent page children --&gt;
   &lt;ul class="menu-list"&gt;
-    {{#parent_children}}
+    {{#parentChildren}}
     &lt;li class="menu-item"&gt;
       &lt;a href="{{path}}"&gt;{{title}}&lt;/a&gt;
     &lt;/li&gt;
-    {{/parent_children}}
+    {{/parentChildren}}
   &lt;/ul&gt;
   {{/hasParentChildren}}
   
   {{^hasParentChildren}}
   &lt;!-- Fallback: Show parent link if no children anywhere --&gt;
-  {{#parent_page}}
+  {{#parentPage}}
   &lt;div class="parent-link"&gt;
-    &lt;a href="{{parent_page.path}}"&gt;← Back to {{parent_page.title}}&lt;/a&gt;
+    &lt;a href="{{parentPage.path}}"&gt;← Back to {{parentPage.title}}&lt;/a&gt;
   &lt;/div&gt;
-  {{/parent_page}}
+  {{/parentPage}}
   {{/hasParentChildren}}
   {{/hasCurrentChildren}}
 &lt;/nav&gt;</code></pre>

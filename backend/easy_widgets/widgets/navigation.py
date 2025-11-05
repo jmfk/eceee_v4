@@ -182,8 +182,8 @@ class NavigationWidget(BaseWidget):
                         {
                             "label": anchor,
                             "url": f"#{anchor}",
-                            "is_active": True,
-                            "target_blank": False,
+                            "isActive": True,
+                            "targetBlank": False,
                         }
                     )
 
@@ -312,8 +312,8 @@ class NavigationWidget(BaseWidget):
                             {
                                 "label": page_metadata.title,
                                 "url": page_metadata.path,
-                                "is_active": True,
-                                "target_blank": False,
+                                "isActive": True,
+                                "targetBlank": False,
                             }
                         )
 
@@ -420,21 +420,22 @@ class NavigationWidget(BaseWidget):
 
         # Prepare context for Mustache rendering
         # Include all enhanced page context variables from prepare_template_context
+        # All variables use camelCase for consistency
         context = {
             "items": all_items,
-            "dynamic_items": dynamic_items,
-            "static_items": static_items,
+            "dynamicItems": dynamic_items,
+            "staticItems": static_items,
             "itemCount": len(all_items),
             "hasItems": len(all_items) > 0,
             # Enhanced page context for Component Style templates
-            "owner_page": config.get("owner_page"),
-            "owner_children": config.get("owner_children", []),
+            "ownerPage": config.get("owner_page"),
+            "ownerChildren": config.get("owner_children", []),
             "hasOwnerChildren": config.get("hasOwnerChildren", False),
-            "current_page": config.get("current_page"),
-            "current_children": config.get("current_children", []),
+            "currentPage": config.get("current_page"),
+            "currentChildren": config.get("current_children", []),
             "hasCurrentChildren": config.get("hasCurrentChildren", False),
-            "parent_page": config.get("parent_page"),
-            "parent_children": config.get("parent_children", []),
+            "parentPage": config.get("parent_page"),
+            "parentChildren": config.get("parent_children", []),
             "hasParentChildren": config.get("hasParentChildren", False),
             "isInherited": config.get("isInherited", False),
             # Style-specific variables

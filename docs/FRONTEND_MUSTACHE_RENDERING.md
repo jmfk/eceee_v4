@@ -92,6 +92,26 @@ For inherited widgets:
 3. Passes owner page data to `prepareNavigationContext()`
 4. Owner page children are used for menu generation
 
+## Template Variables (camelCase)
+
+All Mustache template variables use camelCase for consistency:
+
+**Navigation Variables:**
+- `items` - Combined array of all menu items
+- `dynamicItems` - Auto-generated items
+- `staticItems` - Manually configured items
+- `itemCount` - Total number of items
+- `hasItems` - Boolean flag
+
+**Page Context:**
+- `ownerPage`, `ownerChildren`, `hasOwnerChildren`
+- `currentPage`, `currentChildren`, `hasCurrentChildren`
+- `parentPage`, `parentChildren`, `hasParentChildren`
+- `isInherited` - Boolean flag
+
+**Menu Item Properties:**
+- `label`, `url`, `isActive`, `targetBlank`
+
 ## Console Logging
 
 Added comprehensive logging to debug:
