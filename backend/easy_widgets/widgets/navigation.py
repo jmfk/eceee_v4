@@ -428,6 +428,12 @@ class NavigationWidget(BaseWidget):
         logger.info(
             f"[NAV] Rendering Component Style '{style_name}' with {len(all_items)} items (owner: {config.get('owner_page', {}).get('title') if config.get('owner_page') else 'N/A'})"
         )
+        
+        logger.info(
+            f"[NAV] Mustache render - depth: {config.get('inheritanceDepth', 0)}, "
+            f"isRoot: {config.get('isRoot', False)}, isLevel1: {config.get('isLevel1', False)}, "
+            f"isLevel2AndBelow: {config.get('isLevel2AndBelow', False)}"
+        )
 
         if not all_items:
             return None
