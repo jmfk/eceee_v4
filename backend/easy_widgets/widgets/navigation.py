@@ -367,6 +367,15 @@ class NavigationWidget(BaseWidget):
         
         # Inheritance depth and helper booleans for Mustache templates
         depth = context.get("widget_inheritance_depth", 0)
+        
+        # DEBUG: Log everything in context related to inheritance
+        logger.info(f"[NAV] Full context keys: {list(context.keys())}")
+        logger.info(f"[NAV] widget_inheritance_depth from context: {context.get('widget_inheritance_depth')}")
+        logger.info(f"[NAV] widget_inherited_from from context: {context.get('widget_inherited_from')}")
+        logger.info(f"[NAV] is_inherited flag: {is_inherited}")
+        logger.info(f"[NAV] Current page: {current_page_obj.title if current_page_obj and hasattr(current_page_obj, 'title') else 'None'}")
+        logger.info(f"[NAV] Owner page: {owner_page_obj.title if owner_page_obj and hasattr(owner_page_obj, 'title') else 'None'}")
+        
         template_config["inheritanceDepth"] = depth
         template_config["isRoot"] = depth == 0
         template_config["isLevel1"] = depth == 1
