@@ -77,13 +77,13 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
                     format=final_imgproxy_config.get("format"),
                 )
                 
-                # Update image with responsive data
+                # Update image with responsive data (all camelCase)
                 if responsive_data and "1x" in responsive_data:
                     img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
-                    img_copy["display_width"] = responsive_data["1x"]["width"]
-                    img_copy["display_height"] = responsive_data["1x"]["height"]
+                    img_copy["displayWidth"] = responsive_data["1x"]["width"]
+                    img_copy["displayHeight"] = responsive_data["1x"]["height"]
                     img_copy["srcset"] = responsive_data.get("srcset", "")
-                    img_copy["responsive_sizes"] = responsive_data.get("sizes", [])
+                    img_copy["responsiveSizes"] = responsive_data.get("sizes", [])
             except Exception as e:
                 # Log error but continue with original URL
                 import logging
@@ -156,13 +156,13 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
                     format=final_imgproxy_config.get("format"),
                 )
                 
-                # Update image with responsive data
+                # Update image with responsive data (all camelCase)
                 if responsive_data and "1x" in responsive_data:
                     img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
-                    img_copy["display_width"] = responsive_data["1x"]["width"]
-                    img_copy["display_height"] = responsive_data["1x"]["height"]
+                    img_copy["displayWidth"] = responsive_data["1x"]["width"]
+                    img_copy["displayHeight"] = responsive_data["1x"]["height"]
                     img_copy["srcset"] = responsive_data.get("srcset", "")
-                    img_copy["responsive_sizes"] = responsive_data.get("sizes", [])
+                    img_copy["responsiveSizes"] = responsive_data.get("sizes", [])
             except Exception as e:
                 # Log error but continue with original URL
                 import logging
