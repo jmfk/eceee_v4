@@ -364,6 +364,7 @@ class NavigationWidget(BaseWidget):
         template_config["parent_children"] = parent_children
         template_config["hasParentChildren"] = len(parent_children) > 0
         template_config["isInherited"] = is_inherited
+        template_config["inheritanceDepth"] = context.get("widget_inheritance_depth", 0)
 
         return template_config
 
@@ -438,6 +439,7 @@ class NavigationWidget(BaseWidget):
             "parentChildren": config.get("parent_children", []),
             "hasParentChildren": config.get("hasParentChildren", False),
             "isInherited": config.get("isInherited", False),
+            "inheritanceDepth": config.get("inheritanceDepth", 0),
             # Style-specific variables
             **(style.get("variables") or {}),
         }

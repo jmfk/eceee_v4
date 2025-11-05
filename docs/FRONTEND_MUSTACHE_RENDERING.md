@@ -108,6 +108,7 @@ All Mustache template variables use camelCase for consistency:
 - `currentPage`, `currentChildren`, `hasCurrentChildren`
 - `parentPage`, `parentChildren`, `hasParentChildren`
 - `isInherited` - Boolean flag
+- `inheritanceDepth` - Number (0 = owner page, 1 = one level down, etc.)
 
 **Menu Item Properties:**
 - `label`, `url`, `isActive`, `targetBlank`

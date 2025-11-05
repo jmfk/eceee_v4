@@ -106,8 +106,9 @@ export function prepareNavigationContext(config, context = {}, ownerPageData = n
         parentChildren: parentChildren,
         hasParentChildren: parentChildren.length > 0,
 
-        // Inheritance flag
-        isInherited: !!context?.inheritedFrom
+        // Inheritance info
+        isInherited: !!context?.inheritedFrom,
+        inheritanceDepth: context?.inheritanceDepth || context?.inheritance_depth || 0
     }
 
     return result
