@@ -5,6 +5,8 @@ Backend page and widget rendering system
 from django.template.loader import get_template
 from django.template import Context
 from django.utils.safestring import mark_safe
+from .inheritance_tree import InheritanceTreeBuilder
+from .inheritance_helpers import InheritanceTreeHelpers
 
 
 class WebPageRenderer:
@@ -391,8 +393,7 @@ class WebPageRenderer:
 
         except Exception as e:
             logger.error(f"[RENDERER] Tree rendering failed: {e}", exc_info=True)
-            # Fallback to old system if tree generation fails
-            return self._render_widgets_by_slot_legacy(page, page_version, context)
+            raise  # No fallback - fail loudly to surface issues
 
     def _render_widgets_by_slot_legacy(self, page, page_version, context):
         """Legacy rendering method (backup)"""
