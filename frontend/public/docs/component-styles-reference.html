@@ -683,6 +683,198 @@
         </section>
 
         <section>
+            <h2>Creating Component Styles - Complete Guide</h2>
+            
+            <p>Component styles consist of two parts: a <strong>Mustache template</strong> for HTML structure and <strong>CSS</strong> for styling. Both work together to create reusable, customizable components.</p>
+
+            <h3>Part 1: Template (Mustache)</h3>
+            
+            <p>The template defines your component's HTML structure using Mustache syntax. Templates have access to all variables listed in the sections above.</p>
+
+            <div class="example">
+                <h4>Template Structure:</h4>
+                <pre><code>&lt;div class="my-component"&gt;
+  {{! Optional sections - only shown if variable exists }}
+  {{#anchor}}
+    &lt;h2 class="my-component__heading"&gt;{{anchor}}&lt;/h2&gt;
+  {{/anchor}}
+  
+  {{! Main content - always use triple braces for HTML }}
+  &lt;div class="my-component__content"&gt;
+    {{{content}}}
+  &lt;/div&gt;
+  
+  {{! Conditional rendering based on custom variables }}
+  {{#showFooter}}
+    &lt;div class="my-component__footer"&gt;
+      &lt;button class="my-component__button"&gt;{{buttonText}}&lt;/button&gt;
+    &lt;/div&gt;
+  {{/showFooter}}
+  
+  {{! Loop through arrays }}
+  {{#items}}
+    &lt;a href="{{url}}" class="my-component__link"&gt;{{label}}&lt;/a&gt;
+  {{/items}}
+&lt;/div&gt;</code></pre>
+            </div>
+
+            <div class="note">
+                <h4>Template Tips:</h4>
+                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    <li><strong>Use BEM naming</strong>: <code>block__element--modifier</code> for CSS classes</li>
+                    <li><strong>Triple braces</strong> <code>{{{content}}}</code> for HTML (prevents escaping)</li>
+                    <li><strong>Double braces</strong> <code>{{text}}</code> for plain text (escapes HTML)</li>
+                    <li><strong>Sections</strong> <code>{{#var}}...{{/var}}</code> for conditionals and loops</li>
+                    <li><strong>Inverted sections</strong> <code>{{^var}}...{{/var}}</code> for "if not" conditions</li>
+                    <li><strong>Comments</strong> <code>{{! comment text }}</code> won't appear in output</li>
+                </ul>
+            </div>
+
+            <h3>Part 2: CSS</h3>
+            
+            <p>CSS styles your template and can use custom variables for dynamic theming. CSS is automatically scoped to your component.</p>
+
+            <div class="example">
+                <h4>CSS Structure:</h4>
+                <pre><code>/* Base component styles */
+.my-component {
+  background: {{backgroundColor}};
+  border: 1px solid {{borderColor}};
+  border-radius: 8px;
+  padding: {{padding}};
+  margin: 1rem 0;
+}
+
+/* BEM element styles */
+.my-component__heading {
+  font-size: {{headingSize}};
+  font-weight: 600;
+  color: {{headingColor}};
+  margin-bottom: 1rem;
+}
+
+.my-component__content {
+  line-height: 1.6;
+  color: {{textColor}};
+}
+
+.my-component__footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid {{borderColor}};
+  text-align: right;
+}
+
+.my-component__button {
+  background: {{buttonBg}};
+  color: {{buttonColor}};
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.my-component__button:hover {
+  opacity: 0.85;
+}
+
+/* Modifier classes */
+.my-component--featured {
+  border-width: 2px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .my-component {
+    padding: 1rem;
+  }
+  
+  .my-component__heading {
+    font-size: 1.25rem;
+  }
+}</code></pre>
+            </div>
+
+            <div class="note">
+                <h4>CSS Tips:</h4>
+                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    <li><strong>Use Mustache variables</strong> <code>{{variableName}}</code> for customizable values</li>
+                    <li><strong>Follow BEM methodology</strong> for maintainable class names</li>
+                    <li><strong>Include responsive breakpoints</strong> for mobile-first design</li>
+                    <li><strong>Add transition effects</strong> for smooth interactions</li>
+                    <li><strong>Use semantic spacing</strong> (rem units preferred over px)</li>
+                    <li><strong>Include hover/focus states</strong> for interactive elements</li>
+                    <li><strong>Consider dark mode</strong> using variable colors</li>
+                </ul>
+            </div>
+
+            <h3>Defining Custom Variables</h3>
+            
+            <p>Custom variables make your component styles reusable and customizable. Define them in your component style's "variables" section:</p>
+
+            <div class="example">
+                <h4>Variable Definition (JSON):</h4>
+                <pre><code>{
+  "backgroundColor": {
+    "type": "color",
+    "default": "#ffffff",
+    "description": "Component background color"
+  },
+  "borderColor": {
+    "type": "color",
+    "default": "#e2e8f0"
+  },
+  "padding": {
+    "type": "text",
+    "default": "1.5rem"
+  },
+  "headingSize": {
+    "type": "text",
+    "default": "1.5rem"
+  },
+  "headingColor": {
+    "type": "color",
+    "default": "#1a202c"
+  },
+  "textColor": {
+    "type": "color",
+    "default": "#4a5568"
+  },
+  "buttonBg": {
+    "type": "color",
+    "default": "#667eea"
+  },
+  "buttonColor": {
+    "type": "color",
+    "default": "#ffffff"
+  },
+  "buttonText": {
+    "type": "text",
+    "default": "Learn More"
+  },
+  "showFooter": {
+    "type": "boolean",
+    "default": true
+  }
+}</code></pre>
+            </div>
+
+            <div class="note">
+                <h4>Variable Types:</h4>
+                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    <li><strong>color</strong>: Color picker in UI (hex, rgb, rgba values)</li>
+                    <li><strong>text</strong>: Free-form text input (for strings, sizes, etc.)</li>
+                    <li><strong>boolean</strong>: Toggle switch (true/false)</li>
+                    <li>All variables can be used in both template and CSS</li>
+                    <li>Always provide sensible defaults</li>
+                    <li>Use descriptive names in camelCase</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
             <h2>Best Practices</h2>
             <ul style="margin-left: 2rem;">
                 <li>Always use <code>{{{content}}}</code> (triple braces) for HTML content</li>
