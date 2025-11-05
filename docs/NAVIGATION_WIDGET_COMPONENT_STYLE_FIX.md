@@ -6,7 +6,7 @@ Navigation widgets using Component Style templates were not appearing 2+ steps d
 
 ## Root Cause
 
-The NavigationWidget's `prepare_template_context()` method couldn't determine the actual owner page (where the widget was originally defined) for inherited widgets. It was defaulting to using the current page, which caused template variables like `owner_children` and `owner_page` to be incorrect at depth 2+.
+The NavigationWidget's `prepare_template_context()` method couldn't determine the actual owner page (where the widget was originally defined) for inherited widgets. It was defaulting to using the current page, which caused template variables like `ownerChildren` and `ownerPage` to be incorrect at depth 2+.
 
 The widget rendering system wasn't passing the `inherited_from` metadata through to the widget's template context preparation, so Component Style templates had no way to know where the widget actually came from.
 
@@ -114,7 +114,7 @@ if owner_page_obj:
 ## Impact
 
 - Navigation widgets with Component Style templates now correctly identify their owner page at any inheritance depth
-- Template variables like `owner_children`, `owner_page`, `hasOwnerChildren` work correctly at depth 2+
+- Template variables like `ownerChildren`, `ownerPage`, `hasOwnerChildren` work correctly at depth 2+
 - This fix applies to all widgets that use Component Style templates and need owner page information
 
 ## Testing
