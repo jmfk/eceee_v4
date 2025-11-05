@@ -438,7 +438,15 @@ const ImageWidget = ({
                 )
             } catch (error) {
                 console.error('Error rendering custom image style:', error)
-                // Fall through to default rendering
+                // Still return early - don't fall back to default rendering
+                const wrapperClass = mode === 'editor'
+                    ? 'image-widget-editor p-4 custom-style'
+                    : 'image-widget custom-style'
+                return (
+                    <div className={wrapperClass}>
+                        <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
+                    </div>
+                )
             }
         }
     }

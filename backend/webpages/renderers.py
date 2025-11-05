@@ -163,7 +163,8 @@ class WebPageRenderer:
 
         # If we have custom style HTML, use it directly (with CSS if present)
         # This must return immediately to prevent the default template from also rendering
-        if custom_style_html is not None and custom_style_html != "":
+        # Allow empty strings - if Component Style is selected, respect the template output
+        if custom_style_html is not None:
             if custom_style_css:
                 return f"<style>{custom_style_css}</style>\n{custom_style_html}"
             return custom_style_html
