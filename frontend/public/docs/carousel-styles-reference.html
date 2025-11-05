@@ -149,7 +149,7 @@
             </table>
 
             <h3>Image Object Properties</h3>
-            <p>Each image has the same properties as gallery images: <code>url</code>, <code>srcset</code>, <code>display_width</code>, <code>display_height</code>, <code>alt_text</code>, <code>caption</code>, <code>title</code>, etc.</p>
+            <p>Each image has the same properties as gallery images: <code>url</code>, <code>srcset</code>, <code>displayWidth</code>, <code>displayHeight</code>, <code>altText</code>, <code>caption</code>, <code>title</code>, etc.</p>
         </section>
 
         <section>
@@ -161,9 +161,9 @@
         &lt;img 
           src="{{url}}" 
           srcset="{{srcset}}"
-          width="{{display_width}}"
-          height="{{display_height}}"
-          alt="{{alt_text}}"&gt;
+          width="{{displayWidth}}"
+          height="{{displayHeight}}"
+          alt="{{altText}}"&gt;
         {{#caption}}
           &lt;p class="caption"&gt;{{caption}}&lt;/p&gt;
         {{/caption}}
@@ -268,8 +268,8 @@
            x-transition:enter-start="opacity-0 transform scale-95"
            x-transition:enter-end="opacity-100 transform scale-100"&gt;
         &lt;img src="{{url}}" srcset="{{srcset}}" 
-             width="{{display_width}}" height="{{display_height}}"
-             alt="{{alt_text}}"&gt;
+             width="{{displayWidth}}" height="{{displayHeight}}"
+             alt="{{altText}}"&gt;
         {{#showCaptions}}
           {{#caption}}
             &lt;div class="caption"&gt;{{caption}}&lt;/div&gt;
