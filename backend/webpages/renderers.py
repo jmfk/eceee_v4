@@ -339,7 +339,15 @@ class WebPageRenderer:
                 # Render each widget
                 rendered_widgets = []
                 for widget in merged_widgets:
-                    context["layout_name"] = context.get("layout", {}).get("name", "")
+                    # Get layout name (handle both dict and Layout object)
+                    layout = context.get("layout")
+                    if hasattr(layout, "name"):
+                        context["layout_name"] = layout.name
+                    elif isinstance(layout, dict):
+                        context["layout_name"] = layout.get("name", "")
+                    else:
+                        context["layout_name"] = ""
+                    
                     context["slot_name"] = slot_name
                     # Pass entire slot configuration in context
                     context["slot"] = slot_config
