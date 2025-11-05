@@ -6,6 +6,7 @@ Navigation widgets can test inheritance depth in Mustache templates to render di
 
 ## Available Variables
 
+### Core Variables
 - `inheritanceDepth` (Number): How many levels deep the widget is inherited
   - `0` = Widget is on its owner page (root level)
   - `1` = Inherited one level down
@@ -13,49 +14,23 @@ Navigation widgets can test inheritance depth in Mustache templates to render di
   - etc.
 - `isInherited` (Boolean): True if widget is inherited from a parent page
 
+### Helper Booleans (for Mustache templates)
+These boolean helpers make it easy to test depth without numeric comparisons:
+
+- `isRoot` - True when `inheritanceDepth === 0` (widget on owner page)
+- `isLevel1` - True when `inheritanceDepth === 1` (one level down)
+- `isLevel2` - True when `inheritanceDepth === 2` (two levels down)
+- `isLevel3` - True when `inheritanceDepth === 3` (three levels down)
+- `isLevel1AndBelow` - True when `inheritanceDepth >= 1` (level 1 or deeper)
+- `isLevel2AndBelow` - True when `inheritanceDepth >= 2` (level 2 or deeper)
+- `isLevel3AndBelow` - True when `inheritanceDepth >= 3` (level 3 or deeper)
+- `isDeepLevel` - True when `inheritanceDepth >= 4` (very deep nesting)
+
 ## Example Template: Depth-Based Navigation
 
-This template shows different navigation styles based on inheritance depth:
+With the built-in helper variables, creating depth-based navigation is simple:
 
-### Template
-
-```html
-{{#items}}
-  {{! Root level (depth 0) - Full navigation with icons }}
-  {{^inheritanceDepth}}
-  <div class="nav-item nav-root">
-    <span class="nav-icon">🏠</span>
-    <a href="{{url}}" class="nav-link-root">{{label}}</a>
-  </div>
-  {{/inheritanceDepth}}
-  
-  {{! Level 1 - Medium style }}
-  {{#inheritanceDepth}}
-    {{! Check if depth is exactly 1 by comparing with context }}
-    <div class="nav-item nav-level1">
-      <a href="{{url}}" class="nav-link-level1">→ {{label}}</a>
-    </div>
-  {{/inheritanceDepth}}
-{{/items}}
-```
-
-### Better Approach: Using Helper Sections
-
-Since Mustache doesn't support numeric comparisons directly, create helper boolean flags in the context:
-
-**Backend Addition (navigation.py):**
-```python
-context = {
-    # ... existing context ...
-    "inheritanceDepth": config.get("inheritanceDepth", 0),
-    "isRoot": config.get("inheritanceDepth", 0) == 0,
-    "isLevel1": config.get("inheritanceDepth", 0) == 1,
-    "isLevel2": config.get("inheritanceDepth", 0) == 2,
-    "isDeepLevel": config.get("inheritanceDepth", 0) >= 3,
-}
-```
-
-**Template with Helper Flags:**
+### Simple Template Example
 ```html
 <nav class="depth-nav">
   {{#isRoot}}

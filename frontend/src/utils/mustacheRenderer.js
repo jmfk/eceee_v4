@@ -80,6 +80,9 @@ export function prepareNavigationContext(config, context = {}, ownerPageData = n
     // Combine all menu items for template (dynamic first, then static)
     const allItems = [...dynamicMenuItems, ...menuItems]
 
+    // Calculate inheritance depth
+    const depth = context?.inheritanceDepth || context?.inheritance_depth || 0
+
     const result = {
         // Combined items array for Mustache template
         items: allItems,
@@ -106,9 +109,17 @@ export function prepareNavigationContext(config, context = {}, ownerPageData = n
         parentChildren: parentChildren,
         hasParentChildren: parentChildren.length > 0,
 
-        // Inheritance info
+        // Inheritance info with depth helpers for Mustache
         isInherited: !!context?.inheritedFrom,
-        inheritanceDepth: context?.inheritanceDepth || context?.inheritance_depth || 0
+        inheritanceDepth: depth,
+        isRoot: depth === 0,
+        isLevel1: depth === 1,
+        isLevel2: depth === 2,
+        isLevel3: depth === 3,
+        isLevel1AndBelow: depth >= 1,
+        isLevel2AndBelow: depth >= 2,
+        isLevel3AndBelow: depth >= 3,
+        isDeepLevel: depth >= 4
     }
 
     return result

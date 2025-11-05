@@ -430,6 +430,60 @@
                     </tr>
                 </tbody>
             </table>
+
+            <h3>Inheritance Depth Helper Booleans</h3>
+            <p>These boolean helpers make it easy to test inheritance depth in Mustache templates (which don't support numeric comparisons):</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>isRoot</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth === 0 (widget on owner page)</td>
+                    </tr>
+                    <tr>
+                        <td><code>isLevel1</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth === 1 (one level down)</td>
+                    </tr>
+                    <tr>
+                        <td><code>isLevel2</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth === 2 (two levels down)</td>
+                    </tr>
+                    <tr>
+                        <td><code>isLevel3</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth === 3 (three levels down)</td>
+                    </tr>
+                    <tr>
+                        <td><code>isLevel1AndBelow</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth >= 1 (level 1 or deeper)</td>
+                    </tr>
+                    <tr>
+                        <td><code>isLevel2AndBelow</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth >= 2 (level 2 or deeper)</td>
+                    </tr>
+                    <tr>
+                        <td><code>isLevel3AndBelow</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth >= 3 (level 3 or deeper)</td>
+                    </tr>
+                    <tr>
+                        <td><code>isDeepLevel</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True when inheritanceDepth >= 4 (very deep nesting)</td>
+                    </tr>
+                </tbody>
+            </table>
         </section>
 
         <section>

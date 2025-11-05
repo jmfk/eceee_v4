@@ -364,7 +364,18 @@ class NavigationWidget(BaseWidget):
         template_config["parent_children"] = parent_children
         template_config["hasParentChildren"] = len(parent_children) > 0
         template_config["isInherited"] = is_inherited
-        template_config["inheritanceDepth"] = context.get("widget_inheritance_depth", 0)
+        
+        # Inheritance depth and helper booleans for Mustache templates
+        depth = context.get("widget_inheritance_depth", 0)
+        template_config["inheritanceDepth"] = depth
+        template_config["isRoot"] = depth == 0
+        template_config["isLevel1"] = depth == 1
+        template_config["isLevel2"] = depth == 2
+        template_config["isLevel3"] = depth == 3
+        template_config["isLevel1AndBelow"] = depth >= 1
+        template_config["isLevel2AndBelow"] = depth >= 2
+        template_config["isLevel3AndBelow"] = depth >= 3
+        template_config["isDeepLevel"] = depth >= 4
 
         return template_config
 
@@ -439,7 +450,16 @@ class NavigationWidget(BaseWidget):
             "parentChildren": config.get("parent_children", []),
             "hasParentChildren": config.get("hasParentChildren", False),
             "isInherited": config.get("isInherited", False),
+            # Inheritance depth helpers
             "inheritanceDepth": config.get("inheritanceDepth", 0),
+            "isRoot": config.get("isRoot", False),
+            "isLevel1": config.get("isLevel1", False),
+            "isLevel2": config.get("isLevel2", False),
+            "isLevel3": config.get("isLevel3", False),
+            "isLevel1AndBelow": config.get("isLevel1AndBelow", False),
+            "isLevel2AndBelow": config.get("isLevel2AndBelow", False),
+            "isLevel3AndBelow": config.get("isLevel3AndBelow", False),
+            "isDeepLevel": config.get("isDeepLevel", False),
             # Style-specific variables
             **(style.get("variables") or {}),
         }
