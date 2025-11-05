@@ -376,6 +376,8 @@ class NavigationWidget(BaseWidget):
         template_config["isLevel2AndBelow"] = depth >= 2
         template_config["isLevel3AndBelow"] = depth >= 3
         template_config["isDeepLevel"] = depth >= 4
+        
+        logger.info(f"[NAV] Depth helpers - depth: {depth}, isRoot: {depth == 0}, isLevel1: {depth == 1}, isLevel2AndBelow: {depth >= 2}")
 
         return template_config
 
