@@ -390,6 +390,7 @@ class WebPageRenderer:
             return widgets_by_slot
 
         except Exception as e:
+            logger.error(f"[RENDERER] Tree rendering failed: {e}", exc_info=True)
             # Fallback to old system if tree generation fails
             return self._render_widgets_by_slot_legacy(page, page_version, context)
 
