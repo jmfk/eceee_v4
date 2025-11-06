@@ -25,6 +25,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 
 # Import hostname-aware views for multi-site functionality
 from webpages.public_views import HostnamePageView
+from webpages.views.lightbox import lightbox_item_view, lightbox_group_view
 
 
 def health_check(request):
@@ -65,6 +66,9 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     # Web Page Publishing System (admin/API functions)
     path("webpages/", include("webpages.urls")),
+    # Lightbox (HTMX endpoints)
+    path("lb/item", lightbox_item_view, name="lightbox-item"),
+    path("lb/group", lightbox_group_view, name="lightbox-group"),
     # Monitoring and metrics
     path("metrics/", include("django_prometheus.urls")),
     # CSRF token endpoint for frontend

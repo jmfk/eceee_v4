@@ -21,6 +21,8 @@
     
     <!-- Tailwind CSS -->
     <link href="{% static 'css/tailwind.output.css' %}" rel="stylesheet">
+    <!-- Lightbox base CSS -->
+    <link href="{% static 'css/lightbox.css' %}" rel="stylesheet">
     
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.1" 
@@ -31,11 +33,16 @@
     <script src="{% static 'js/htmx-ext-json-enc.js' %}"></script>
     <script src="{% static 'js/htmx-ext-response-targets.js' %}"></script>
     
-    <!-- Alpine.js for additional interactivity -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>    
+    <!-- Alpine.js for navbar interactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Lightbox JS -->
+    <script defer src="{% static 'js/lightbox.js' %}"></script>
 </head>
 <body>
     {% block content %}{% endblock %}
+
+    {% include 'includes/lightbox.html' %}
 </body>
 </html>
 

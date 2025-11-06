@@ -20,11 +20,25 @@
                     <div class="carousel-track" id="carousel-track">
                         {% for image in config.images %}
                             <div class="carousel-slide" data-index="{{ forloop.counter0 }}">
-                                                                 <img src="{{ image.thumbnail|default:image.url }}" 
-                                     alt="{{ image.alt_text }}"
-                                     class="carousel-image{% if config.enable_lightbox %} lightbox-trigger{% endif %}"
-                                     data-index="{{ forloop.counter0 }}"
-                                     {% if config.enable_lightbox %}style="cursor: pointer;"{% endif %}>
+                                {% if config.enable_lightbox %}
+                                    <a data-lightbox
+                                       data-lightbox-group="gallery-{{ widget.id }}"
+                                       data-lightbox-src="{{ image.url }}"
+                                       data-lightbox-caption="{{ image.caption|default:'' }}"
+                                       data-lightbox-alt="{{ image.alt_text }}"
+                                       href="{{ image.url }}"
+                                       style="cursor: pointer;">
+                                        <img src="{{ image.thumbnail|default:image.url }}" 
+                                             alt="{{ image.alt_text }}"
+                                             class="carousel-image"
+                                             data-index="{{ forloop.counter0 }}">
+                                    </a>
+                                {% else %}
+                                    <img src="{{ image.thumbnail|default:image.url }}" 
+                                         alt="{{ image.alt_text }}"
+                                         class="carousel-image"
+                                         data-index="{{ forloop.counter0 }}">
+                                {% endif %}
                                 {% if config.show_captions and image.caption %}
                                     <div class="carousel-caption">{{ image.caption }}</div>
                                 {% endif %}
@@ -57,19 +71,27 @@
                 {% for image in config.images %}
                     <div class="gallery-item" data-index="{{ forloop.counter0 }}">
                         <div class="image-container">
-                            <img src="{{ image.thumbnail|default:image.url }}" 
-                                 alt="{{ image.alt_text }}"
-                                 class="gallery-image"
-                                 loading="lazy"
-                                 {% if config.enable_lightbox %}
-                                     onclick="openLightbox({{ forloop.counter0 }})"
-                                     style="cursor: pointer;"
-                                 {% endif %}>
-                            
                             {% if config.enable_lightbox %}
-                                <div class="image-overlay">
-                                    <i class="icon-expand" aria-hidden="true"></i>
-                                </div>
+                                <a data-lightbox
+                                   data-lightbox-group="gallery-{{ widget.id }}"
+                                   data-lightbox-src="{{ image.url }}"
+                                   data-lightbox-caption="{{ image.caption|default:'' }}"
+                                   data-lightbox-alt="{{ image.alt_text }}"
+                                   href="{{ image.url }}"
+                                   style="cursor: pointer;">
+                                    <img src="{{ image.thumbnail|default:image.url }}" 
+                                         alt="{{ image.alt_text }}"
+                                         class="gallery-image"
+                                         loading="lazy">
+                                    <div class="image-overlay">
+                                        <i class="icon-expand" aria-hidden="true"></i>
+                                    </div>
+                                </a>
+                            {% else %}
+                                <img src="{{ image.thumbnail|default:image.url }}" 
+                                     alt="{{ image.alt_text }}"
+                                     class="gallery-image"
+                                     loading="lazy">
                             {% endif %}
                         </div>
                         
@@ -87,63 +109,27 @@
         {% endif %}
     </div>
 
-    {% if config.enable_lightbox %}
-        <!-- Lightbox Modal -->
-        <div class="lightbox-modal" id="lightbox-modal" style="display: none;" onclick="closeLightbox(event)">
-            <div class="lightbox-content">
-                <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
-                
-                <div class="lightbox-image-container">
-                    <img id="lightbox-image" src="" alt="" class="lightbox-image">
-                    
-                    {% if config.images|length > 1 %}
-                        <button class="lightbox-btn lightbox-prev" onclick="lightboxChangeSlide(-1)">
-                            <i class="icon-prev" aria-hidden="true"></i>
-                        </button>
-                        <button class="lightbox-btn lightbox-next" onclick="lightboxChangeSlide(1)">
-                            <i class="icon-next" aria-hidden="true"></i>
-                        </button>
-                    {% endif %}
-                </div>
-                
-                <div class="lightbox-info" id="lightbox-info">
-                    <h3 id="lightbox-caption"></h3>
-                    <p id="lightbox-description"></p>
-                </div>
-                
-                {% if config.images|length > 1 %}
-                    <div class="lightbox-counter" id="lightbox-counter"></div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Store image data for lightbox -->
-        <script type="application/json" id="gallery-images-data">
-            {{ config.images|safe }}
-        </script>
-    {% endif %}
 </div>
 
 <script>
 let currentSlide = 0;
-let currentLightboxIndex = 0;
-let galleryImages = [];
 let autoPlayInterval = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     const galleryWidget = document.querySelector('.gallery-widget');
-    const imagesDataEl = document.getElementById('gallery-images-data');
+    const galleryContainer = galleryWidget?.querySelector('.gallery-container');
     
-    if (imagesDataEl) {
-        galleryImages = JSON.parse(imagesDataEl.textContent || '[]');
-    }
+    if (!galleryContainer) return;
     
-    const autoPlay = galleryWidget?.querySelector('.gallery-container')?.dataset.autoPlay === 'true';
-    const layout = galleryWidget?.querySelector('.gallery-container')?.dataset.layout;
+    const autoPlay = galleryContainer.dataset.autoPlay === 'true';
+    const layout = galleryContainer.dataset.layout;
     
     // Initialize carousel auto-play if enabled
-    if (autoPlay && layout === 'carousel' && galleryImages.length > 1) {
-        startAutoPlay();
+    if (autoPlay && layout === 'carousel') {
+        const slides = document.querySelectorAll('.carousel-slide');
+        if (slides.length > 1) {
+            startAutoPlay();
+        }
     }
     
     // Initialize masonry layout if needed
@@ -155,9 +141,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // Carousel functionality
 function changeSlide(direction) {
     const track = document.getElementById('carousel-track');
-    const slides = track.querySelectorAll('.carousel-slide');
-    const totalSlides = slides.length;
+    const slides = track?.querySelectorAll('.carousel-slide');
+    if (!slides || slides.length === 0) return;
     
+    const totalSlides = slides.length;
     currentSlide = (currentSlide + direction + totalSlides) % totalSlides;
     updateCarousel();
     resetAutoPlay();
@@ -196,62 +183,6 @@ function resetAutoPlay() {
     }
 }
 
-// Lightbox functionality
-function openLightbox(index) {
-    const modal = document.getElementById('lightbox-modal');
-    const lightboxImage = document.getElementById('lightbox-image');
-    const lightboxCaption = document.getElementById('lightbox-caption');
-    const lightboxDescription = document.getElementById('lightbox-description');
-    const lightboxCounter = document.getElementById('lightbox-counter');
-    
-    if (!modal || !galleryImages[index]) return;
-    
-    currentLightboxIndex = index;
-    const image = galleryImages[index];
-    
-    lightboxImage.src = image.url;
-    lightboxImage.alt = image.alt_text;
-    
-    if (lightboxCaption) lightboxCaption.textContent = image.caption || '';
-    if (lightboxDescription) lightboxDescription.textContent = image.description || '';
-    
-    if (lightboxCounter && galleryImages.length > 1) {
-        lightboxCounter.textContent = `${index + 1} / ${galleryImages.length}`;
-    }
-    
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    
-    // Stop carousel auto-play when lightbox opens
-    if (autoPlayInterval) {
-        clearInterval(autoPlayInterval);
-    }
-}
-
-function closeLightbox(event) {
-    if (event && event.target !== event.currentTarget && !event.target.classList.contains('lightbox-close')) {
-        return;
-    }
-    
-    const modal = document.getElementById('lightbox-modal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
-        
-        // Restart auto-play if it was enabled
-        const galleryContainer = document.querySelector('.gallery-container');
-        if (galleryContainer?.dataset.autoPlay === 'true') {
-            startAutoPlay();
-        }
-    }
-}
-
-function lightboxChangeSlide(direction) {
-    const totalImages = galleryImages.length;
-    currentLightboxIndex = (currentLightboxIndex + direction + totalImages) % totalImages;
-    openLightbox(currentLightboxIndex);
-}
-
 // Masonry layout (basic implementation)
 function initMasonryLayout() {
     const grid = document.querySelector('.gallery-grid');
@@ -262,24 +193,6 @@ function initMasonryLayout() {
     grid.style.display = 'columns';
     grid.style.columnGap = '1rem';
 }
-
-// Keyboard navigation for lightbox
-document.addEventListener('keydown', function(event) {
-    const modal = document.getElementById('lightbox-modal');
-    if (modal && modal.style.display === 'flex') {
-        switch(event.key) {
-            case 'Escape':
-                closeLightbox();
-                break;
-            case 'ArrowLeft':
-                lightboxChangeSlide(-1);
-                break;
-            case 'ArrowRight':
-                lightboxChangeSlide(1);
-                break;
-        }
-    }
-});
 </script>
 
 <!-- 

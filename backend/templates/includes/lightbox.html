@@ -1,0 +1,35 @@
+{% load static %}
+<!-- Lightbox Overlay - Vanilla JS -->
+<div id="lightbox-overlay">
+    <!-- Close Button - Upper Right Corner -->
+    <button id="lightbox-close" class="lightbox-btn" aria-label="Close lightbox">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+    </button>
+
+    <div class="lightbox-container">
+        <!-- Previous Button -->
+        <button id="lightbox-prev" class="lightbox-btn" aria-label="Previous image">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </button>
+
+        <!-- Next Button -->
+        <button id="lightbox-next" class="lightbox-btn" aria-label="Next image">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+        </button>
+
+        <!-- Main Image -->
+        <img id="lightbox-image" src="" alt="" />
+
+        <!-- Caption -->
+        <div id="lightbox-caption"></div>
+
+        <!-- Counter -->
+        <div id="lightbox-counter"></div>
+    </div>
+</div>

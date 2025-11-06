@@ -1,0 +1,11 @@
+<div id="lb-oob" hx-swap-oob="true">
+    <script>
+        (function(){
+            var payload = {{ payload_json|safe }};
+            if (window.__lb && typeof window.__lb.openFromParams === 'function') {
+                window.__lb.openFromParams(payload);
+            }
+        })();
+    </script>
+</div>
+

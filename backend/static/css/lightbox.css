@@ -1,0 +1,228 @@
+/**
+ * Lightweight Lightbox Styles
+ * Modern, responsive, accessible
+ */
+
+/* Overlay */
+#lightbox-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#lightbox-overlay.lightbox-active {
+  opacity: 1;
+}
+
+/* Container */
+.lightbox-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Image */
+#lightbox-image {
+  max-width: 100%;
+  max-height: 75vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Controls */
+.lightbox-btn {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 24px;
+  line-height: 1;
+  padding: 0;
+}
+
+.lightbox-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+}
+
+.lightbox-btn:active {
+  transform: scale(0.95);
+}
+
+/* Close button - Upper right corner of overlay */
+#lightbox-close {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  z-index: 10000;
+}
+
+/* Navigation buttons */
+#lightbox-prev {
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#lightbox-next {
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#lightbox-prev:hover,
+#lightbox-next:hover {
+  transform: translateY(-50%) scale(1.1);
+}
+
+#lightbox-prev:active,
+#lightbox-next:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Caption */
+#lightbox-caption {
+  color: white;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  margin: 0.5rem 0 0 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Counter */
+#lightbox-counter {
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .lightbox-container {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+
+  #lightbox-image {
+    max-height: 70vh;
+  }
+
+  .lightbox-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+
+  #lightbox-close {
+    top: 1rem;
+    right: 1rem;
+  }
+
+  #lightbox-prev {
+    left: 0.5rem;
+  }
+
+  #lightbox-next {
+    right: 0.5rem;
+  }
+
+  #lightbox-caption {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+  .lightbox-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    border-width: 1px;
+  }
+
+  #lightbox-image {
+    max-height: 65vh;
+  }
+
+  #lightbox-caption {
+    font-size: 0.8125rem;
+  }
+}
+
+/* Print - hide lightbox */
+@media print {
+  #lightbox-overlay {
+    display: none !important;
+  }
+}
+
+/* Loading state */
+#lightbox-image:not([src]),
+#lightbox-image[src=""] {
+  min-width: 200px;
+  min-height: 200px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Accessibility - focus visible */
+.lightbox-btn:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+/* Smooth image transitions */
+#lightbox-image {
+  transition: opacity 0.2s ease;
+}
+
+/* Icon styles for SVG buttons */
+.lightbox-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+@media (max-width: 768px) {
+  .lightbox-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
