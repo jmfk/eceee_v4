@@ -10,16 +10,6 @@ import { pagesApi } from '../../api'
  * Renders navigation menus with dropdowns, mobile support, and branding
  */
 const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
-    console.log('[NavigationWidget] RENDER CALLED', {
-        mode,
-        config,
-        context,
-        hasMenus: !!config.menus,
-        hasMenuItems: !!config.menuItems,
-        navigationStyle: config.navigationStyle,
-        inheritedFrom: context?.inheritedFrom
-    })
-
     const {
         menuItems = [],
         menus = {},
@@ -96,13 +86,6 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
             { ...context, children, pageData: context?.pageData },
             ownerPageData
         )
-
-        console.log('[NavigationWidget] Rendering with Component Style:', {
-            navigationStyle,
-            items: mustacheContext.items?.length || 0,
-            ownerPage: ownerPageData?.title || 'current',
-            inheritedFrom: context?.inheritedFrom?.title
-        })
 
         return (
             <ComponentStyleRenderer
