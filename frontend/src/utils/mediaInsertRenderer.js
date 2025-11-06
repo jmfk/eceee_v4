@@ -89,12 +89,23 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
     // These will be defined to use percentages: 100%, 50%, ~33%
     const widthClass = `img-width-${width}`;
 
-    return `<img 
+    const imgEl = `<img 
         src="${imageUrl}" 
         alt="${escapeHtml(alt)}" 
         class="${widthClass}"
         loading="lazy" 
     />`;
+
+    // Wrap with lightbox anchor if enabled
+    if (config.enableLightbox) {
+        const lbStyle = config.lightboxStyle || 'default';
+        const lbGroup = config.lightboxGroup || '';
+        const fullSrc = mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl || imageUrl;
+        const caption = config.caption || mediaData.title || '';
+        return `<a data-lightbox data-lightbox-style="${escapeHtml(lbStyle)}"${lbGroup ? ` data-lightbox-group="${escapeHtml(lbGroup)}"` : ''} data-lightbox-src="${escapeHtml(fullSrc)}" data-lightbox-caption="${escapeHtml(caption)}">${imgEl}</a>`;
+    }
+
+    return imgEl;
 }
 
 /**
@@ -270,6 +281,36 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
 
     // Update innerHTML
     element.innerHTML = innerContent + captionHtml;
+    
+    // If single image with lightbox enabled, annotate the inner anchor
+    if (mediaData && config.mediaType === 'image') {
+        const a = element.querySelector('[data-lightbox]');
+        if (config.enableLightbox) {
+            const fullSrc = mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl;
+            if (a) {
+                a.setAttribute('data-lightbox', '');
+                a.setAttribute('data-lightbox-style', config.lightboxStyle || 'default');
+                if (config.lightboxGroup) {
+                    a.setAttribute('data-lightbox-group', config.lightboxGroup);
+                } else {
+                    a.removeAttribute('data-lightbox-group');
+                }
+                a.setAttribute('data-lightbox-src', fullSrc || '');
+                if (config.caption) {
+                    a.setAttribute('data-lightbox-caption', config.caption);
+                } else {
+                    a.removeAttribute('data-lightbox-caption');
+                }
+            }
+        } else if (a) {
+            // Remove lightbox attributes if disabled
+            a.removeAttribute('data-lightbox');
+            a.removeAttribute('data-lightbox-style');
+            a.removeAttribute('data-lightbox-group');
+            a.removeAttribute('data-lightbox-src');
+            a.removeAttribute('data-lightbox-caption');
+        }
+    }
 
     return element.outerHTML;
 }

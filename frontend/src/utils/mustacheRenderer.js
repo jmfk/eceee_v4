@@ -16,7 +16,7 @@ export function renderMustache(template, context) {
 /**
  * Prepare gallery context for rendering
  */
-export function prepareGalleryContext(images, config, styleVars = {}) {
+export function prepareGalleryContext(images, config, styleVars = {}, lightboxConfig = {}) {
     // Add index to images
     const indexedImages = images.map((img, i) => ({ ...img, index: i }))
 
@@ -26,6 +26,10 @@ export function prepareGalleryContext(images, config, styleVars = {}) {
         multipleImages: images.length > 1,
         showCaptions: config.showCaptions ?? true,
         enableLightbox: config.enableLightbox ?? true,
+        lightboxButtonClass: lightboxConfig.buttonClass || '',
+        lightboxCloseIcon: lightboxConfig.closeIcon || '',
+        lightboxPrevIcon: lightboxConfig.prevIcon || '',
+        lightboxNextIcon: lightboxConfig.nextIcon || '',
         columns: styleVars.columns ?? 3,
         ...styleVars
     }

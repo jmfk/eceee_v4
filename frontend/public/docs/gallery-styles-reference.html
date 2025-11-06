@@ -134,6 +134,26 @@
                         <td>Whether lightbox functionality is enabled</td>
                     </tr>
                     <tr>
+                        <td><code>lightboxButtonClass</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Custom CSS classes for lightbox buttons (close, prev, next)</td>
+                    </tr>
+                    <tr>
+                        <td><code>lightboxCloseIcon</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Custom HTML for close button icon (SVG or HTML)</td>
+                    </tr>
+                    <tr>
+                        <td><code>lightboxPrevIcon</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Custom HTML for previous button icon (SVG or HTML)</td>
+                    </tr>
+                    <tr>
+                        <td><code>lightboxNextIcon</code></td>
+                        <td><span class="badge badge-type">String</span></td>
+                        <td>Custom HTML for next button icon (SVG or HTML)</td>
+                    </tr>
+                    <tr>
                         <td><code>columns</code></td>
                         <td><span class="badge badge-type">Number</span></td>
                         <td>Number of grid columns (default: 3, customizable via style variables)</td>
@@ -226,6 +246,95 @@
     {{/images}}
   &lt;/div&gt;
 &lt;/div&gt;</code></pre>
+        </section>
+
+        <section>
+            <h2>Common Scenarios</h2>
+            <h3>1) Simple Grid</h3>
+            <pre><code>&lt;div class="gallery"&gt;
+  &lt;div class="gallery-grid" style="grid-template-columns: repeat({{columns}}, 1fr);"&gt;
+    {{#images}}
+      &lt;div class="gallery-item" data-index="{{index}}"&gt;
+        &lt;img src="{{url}}" srcset="{{srcset}}" width="{{display_width}}" height="{{display_height}}" alt="{{alt_text}}" loading="lazy"&gt;
+        {{#showCaptions}}{{#caption}}&lt;p class="caption"&gt;{{caption}}&lt;/p&gt;{{/caption}}{{/showCaptions}}
+      &lt;/div&gt;
+    {{/images}}
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+            <pre><code>.gallery-grid { display: grid; gap: 1rem; }
+.gallery-item img { width: 100%; height: auto; display: block; }</code></pre>
+
+            <h3>2) Masonry (CSS Grid)</h3>
+            <pre><code>&lt;div class="masonry"&gt;
+  &lt;div class="masonry-grid" style="grid-template-columns: repeat({{columns}}, 1fr);"&gt;
+    {{#images}}
+      &lt;div class="masonry-item"&gt;
+        &lt;img src="{{url}}" width="{{display_width}}" height="{{display_height}}" alt="{{alt_text}}"&gt;
+      &lt;/div&gt;
+    {{/images}}
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+            <pre><code>.masonry-grid { display: grid; grid-auto-rows: 8px; gap: 8px; }
+.masonry-item { border-radius: 6px; overflow: hidden; }
+.masonry-item img { width: 100%; height: auto; display: block; }</code></pre>
+
+            <h3>3) Caption Overlay</h3>
+            <pre><code>&lt;div class="overlay-gallery"&gt;
+  &lt;div class="overlay-grid" style="grid-template-columns: repeat({{columns}}, 1fr);"&gt;
+    {{#images}}
+      &lt;div class="overlay-item"&gt;
+        &lt;img src="{{url}}" alt="{{alt_text}}" loading="lazy"&gt;
+        {{#showCaptions}}
+        &lt;div class="overlay"&gt;
+          {{#title}}&lt;h4&gt;{{title}}&lt;/h4&gt;{{/title}}
+          {{#caption}}&lt;p&gt;{{caption}}&lt;/p&gt;{{/caption}}
+        &lt;/div&gt;
+        {{/showCaptions}}
+      &lt;/div&gt;
+    {{/images}}
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+            <pre><code>.overlay-grid { display: grid; gap: 1rem; }
+.overlay-item { position: relative; overflow: hidden; border-radius: 8px; }
+.overlay-item img { width: 100%; height: auto; display: block; transition: transform 0.3s; }
+.overlay-item:hover img { transform: scale(1.05); }
+.overlay { position: absolute; inset: auto 0 0 0; background: rgba(0,0,0,0.6); color: #fff; padding: 0.75rem; transform: translateY(100%); transition: transform 0.3s; }
+.overlay-item:hover .overlay { transform: translateY(0); }</code></pre>
+
+            <h3>4) Lightbox Ready with Custom Buttons</h3>
+            <pre><code>&lt;div class="lb-gallery"&gt;
+  &lt;div class="lb-grid" style="grid-template-columns: repeat({{columns}}, 1fr);"&gt;
+    {{#images}}
+      &lt;a class="lb-item"
+         data-lightbox
+         data-lightbox-group="{{galleryGroup}}"
+         data-lightbox-style="{{lightboxStyle}}"
+         data-lightbox-src="{{lightboxUrl}}"
+         data-lightbox-caption="{{caption}}"
+         data-lightbox-alt="{{altText}}"
+         {{#lightboxButtonClass}}data-lightbox-button-class="{{lightboxButtonClass}}"{{/lightboxButtonClass}}
+         {{#lightboxCloseIcon}}data-lightbox-close-html="{{lightboxCloseIcon}}"{{/lightboxCloseIcon}}
+         {{#lightboxPrevIcon}}data-lightbox-prev-html="{{lightboxPrevIcon}}"{{/lightboxPrevIcon}}
+         {{#lightboxNextIcon}}data-lightbox-next-html="{{lightboxNextIcon}}"{{/lightboxNextIcon}}
+         href="{{lightboxUrl}}"&gt;
+        &lt;img src="{{url}}" srcset="{{srcset}}" 
+             width="{{displayWidth}}" height="{{displayHeight}}"
+             alt="{{altText}}" loading="lazy"&gt;
+      &lt;/a&gt;
+    {{/images}}
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+            <pre><code>.lb-grid { display: grid; gap: 8px; }
+.lb-item { cursor: pointer; }
+.lb-item img { width: 100%; height: auto; display: block; border-radius: 6px; transition: opacity 0.2s; }
+.lb-item:hover img { opacity: 0.9; }</code></pre>
+            
+            <div class="note">
+                <strong>📌 Lightbox Button Customization:</strong>
+                <p>The lightbox button config (buttonClass, closeIcon, prevIcon, nextIcon) is set in the gallery style's <strong>Lightbox Configuration</strong> section. These values are automatically passed to all lightbox triggers in your template via the <code>lightboxButtonClass</code>, <code>lightboxCloseIcon</code>, <code>lightboxPrevIcon</code>, and <code>lightboxNextIcon</code> variables.</p>
+                <p>Example button class: <code>p-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white</code></p>
+                <p>Example icon HTML: <code>&lt;svg class="w-5 h-5" fill="none" stroke="currentColor"...&gt;&lt;/svg&gt;</code></p>
+            </div>
         </section>
 
         <section>

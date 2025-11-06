@@ -419,12 +419,12 @@ div[style*="z-index"] {
 .content-editor-theme {
   /* Apply theme to content editor areas */
   color: var(--text, #1f2937);
-  background-color: var(--editor-bg, var(--surface, #ffffff));
+  background-color: #ffffff;
 }
 
 .content-editor-theme [contenteditable="true"] {
   color: var(--text, #1f2937);
-  background-color: var(--editor-content-bg, var(--background, #ffffff));
+  background-color: #ffffff;
   border-color: var(--editor-border, #d1d5db);
 }
 

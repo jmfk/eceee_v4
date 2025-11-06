@@ -104,6 +104,26 @@ class ImageConfig(BaseModel):
             "variant": "toggle",
         },
     )
+    lightboxStyle: Optional[str] = Field(
+        None,
+        description="Named lightbox style from theme (defaults to 'default')",
+        json_schema_extra={
+            "component": "LightboxStyleSelect",
+            "order": 8,
+            "group": "Display Options",
+            "placeholder": "Default",
+        },
+    )
+    lightboxGroup: Optional[str] = Field(
+        None,
+        description="Group key to navigate between images in lightbox",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 9,
+            "group": "Display Options",
+            "placeholder": "widget-{{id}}",
+        },
+    )
     autoPlay: bool = Field(
         False,
         description="Auto-play videos (if applicable)",
@@ -419,6 +439,12 @@ class ImageWidget(BaseWidget):
         template_config["enable_lightbox"] = template_config.get(
             "enableLightbox", template_config.get("enable_lightbox", True)
         )
+        template_config["lightbox_style"] = template_config.get(
+            "lightboxStyle", template_config.get("lightbox_style", None)
+        )
+        template_config["lightbox_group"] = template_config.get(
+            "lightboxGroup", template_config.get("lightbox_group", None)
+        )
         template_config["auto_play"] = template_config.get(
             "autoPlay", template_config.get("auto_play", False)
         )
@@ -494,6 +520,7 @@ class ImageWidget(BaseWidget):
 
         # Get imgproxy config from style (can be overridden by widget config)
         imgproxy_config = style.get("imgproxy_config")
+        lightbox_config = style.get("lightbox_config")
 
         if display_type == "carousel":
             context = prepare_carousel_context(
@@ -501,7 +528,7 @@ class ImageWidget(BaseWidget):
             )
         else:
             context = prepare_gallery_context(
-                images, config, style.get("variables"), imgproxy_config
+                images, config, style.get("variables"), imgproxy_config, lightbox_config
             )
 
         # Render template

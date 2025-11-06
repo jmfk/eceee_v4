@@ -420,7 +420,7 @@ const ImageWidget = ({
                 // Prepare context for Mustache rendering
                 const context = displayType === 'carousel'
                     ? prepareCarouselContext(items, localConfig, style.variables)
-                    : prepareGalleryContext(items, localConfig, style.variables)
+                    : prepareGalleryContext(items, localConfig, style.variables, style.lightboxConfig)
 
                 // Render template
                 const html = renderMustache(style.template, context)

@@ -19,18 +19,29 @@
                                     loading="lazy">
                                 </video>
                             {% else %}
-                                <img 
-                                    src="{{ item.thumbnail_url|default:item.url }}" 
-                                    {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
-                                    {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
-                                    {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
-                                    alt="{{ item.alt_text }}"
-                                    class="gallery-image"
-                                    loading="lazy"
+                                <a 
                                     {% if config.enable_lightbox %}
-                                        onclick="openLightbox({{ forloop.counter0 }})"
-                                        style="cursor: pointer;"
-                                    {% endif %}>
+                                        data-lightbox
+                                        data-lightbox-group="{{ config.lightbox_group|default:'widget-'|add:widget.id }}"
+                                        data-lightbox-src="{{ item.url }}"
+                                        data-lightbox-caption="{{ item.caption|default:'' }}"
+                                        data-lightbox-alt="{{ item.alt_text|default:'' }}"
+                                        data-lightbox-style="{{ config.lightbox_style|default:config.image_style|default:'default' }}"
+                                    {% endif %}
+                                >
+                                    <img 
+                                        src="{{ item.thumbnail_url|default:item.url }}" 
+                                        {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                        {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                        {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
+                                        alt="{{ item.alt_text }}"
+                                        class="gallery-image"
+                                        loading="lazy"
+                                        {% if config.enable_lightbox %}
+                                            style="cursor: pointer;"
+                                        {% endif %}
+                                    >
+                                </a>
                             {% endif %}
                             
                             {% if config.enable_lightbox %}
@@ -50,109 +61,7 @@
             </div>
         </div>
 
-        {% if config.enable_lightbox %}
-            <!-- Lightbox Modal -->
-            <div class="lightbox-modal" id="lightbox-modal-{{ widget.id }}" style="display: none;" onclick="closeLightbox(event)">
-                <div class="lightbox-content">
-                    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
-                    
-                    <div class="lightbox-image-container">
-                        <img id="lightbox-image-{{ widget.id }}" src="" alt="" class="lightbox-image">
-                        
-                        {% if config.media_items|length > 1 %}
-                            <button class="lightbox-btn lightbox-prev" onclick="lightboxChangeSlide(-1)">◀</button>
-                            <button class="lightbox-btn lightbox-next" onclick="lightboxChangeSlide(1)">▶</button>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="lightbox-info" id="lightbox-info-{{ widget.id }}">
-                        <h3 id="lightbox-caption-{{ widget.id }}"></h3>
-                    </div>
-                    
-                    {% if config.media_items|length > 1 %}
-                        <div class="lightbox-counter" id="lightbox-counter-{{ widget.id }}"></div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <script type="application/json" id="gallery-images-data-{{ widget.id }}">
-                {{ config.media_items|safe }}
-            </script>
-            
-            <script>
-            (function() {
-                let currentLightboxIndex = 0;
-                let galleryImages = [];
-
-                document.addEventListener('DOMContentLoaded', function() {
-                    const imagesDataEl = document.getElementById('gallery-images-data-{{ widget.id }}');
-                    if (imagesDataEl) {
-                        galleryImages = JSON.parse(imagesDataEl.textContent || '[]');
-                    }
-                });
-
-                window.openLightbox = function(index) {
-                    const modal = document.getElementById('lightbox-modal-{{ widget.id }}');
-                    const lightboxImage = document.getElementById('lightbox-image-{{ widget.id }}');
-                    const lightboxCaption = document.getElementById('lightbox-caption-{{ widget.id }}');
-                    const lightboxCounter = document.getElementById('lightbox-counter-{{ widget.id }}');
-                    
-                    if (!modal || !galleryImages[index]) return;
-                    
-                    currentLightboxIndex = index;
-                    const image = galleryImages[index];
-                    
-                    lightboxImage.src = image.url;
-                    lightboxImage.alt = image.alt_text;
-                    
-                    if (lightboxCaption) lightboxCaption.textContent = image.caption || '';
-                    
-                    if (lightboxCounter && galleryImages.length > 1) {
-                        lightboxCounter.textContent = `${index + 1} / ${galleryImages.length}`;
-                    }
-                    
-                    modal.style.display = 'flex';
-                    document.body.style.overflow = 'hidden';
-                };
-
-                window.closeLightbox = function(event) {
-                    if (event && event.target !== event.currentTarget && !event.target.classList.contains('lightbox-close')) {
-                        return;
-                    }
-                    
-                    const modal = document.getElementById('lightbox-modal-{{ widget.id }}');
-                    if (modal) {
-                        modal.style.display = 'none';
-                        document.body.style.overflow = '';
-                    }
-                };
-
-                window.lightboxChangeSlide = function(direction) {
-                    const totalImages = galleryImages.length;
-                    currentLightboxIndex = (currentLightboxIndex + direction + totalImages) % totalImages;
-                    openLightbox(currentLightboxIndex);
-                };
-
-                // Keyboard navigation
-                document.addEventListener('keydown', function(event) {
-                    const modal = document.getElementById('lightbox-modal-{{ widget.id }}');
-                    if (modal && modal.style.display === 'flex') {
-                        switch(event.key) {
-                            case 'Escape':
-                                closeLightbox();
-                                break;
-                            case 'ArrowLeft':
-                                lightboxChangeSlide(-1);
-                                break;
-                            case 'ArrowRight':
-                                lightboxChangeSlide(1);
-                                break;
-                        }
-                    }
-                });
-            })();
-            </script>
-        {% endif %}
+        {% comment %} Global lightbox is handled system-wide via HTMX + Alpine {% endcomment %}
     </div>
 
 {% elif config.display_type == 'carousel' and config.media_items %}
@@ -169,13 +78,24 @@
                                 {% if config.auto_play %}autoplay loop muted{% endif %}>
                             </video>
                         {% else %}
-                            <img 
-                                src="{{ item.thumbnail_url|default:item.url }}" 
-                                {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
-                                {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
-                                {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
-                                alt="{{ item.alt_text }}"
-                                class="carousel-image">
+                            <a 
+                                {% if config.enable_lightbox %}
+                                    data-lightbox
+                                    data-lightbox-group="{{ config.lightbox_group|default:'widget-'|add:widget.id }}"
+                                    data-lightbox-src="{{ item.url }}"
+                                    data-lightbox-caption="{{ item.caption|default:'' }}"
+                                    data-lightbox-alt="{{ item.alt_text|default:'' }}"
+                                    data-lightbox-style="{{ config.lightbox_style|default:config.image_style|default:'default' }}"
+                                {% endif %}
+                            >
+                                <img 
+                                    src="{{ item.thumbnail_url|default:item.url }}" 
+                                    {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                    {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                    {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
+                                    alt="{{ item.alt_text }}"
+                                    class="carousel-image">
+                            </a>
                         {% endif %}
                         {% if config.show_captions and item.caption %}
                             <div class="carousel-caption">{{ item.caption }}</div>
@@ -253,15 +173,26 @@
                             loading="lazy">
                         </video>
                     {% else %}
-                        <img 
-                            src="{{ item.url }}" 
-                            {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
-                            {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
-                            {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
-                            alt="{{ item.alt_text }}"
-                            class="widget-image"
-                            loading="lazy"
-                        />
+                        <a 
+                            {% if config.enable_lightbox %}
+                                data-lightbox
+                                data-lightbox-group="{{ config.lightbox_group|default:'widget-'|add:widget.id }}"
+                                data-lightbox-src="{{ item.url }}"
+                                data-lightbox-caption="{{ item.caption|default:'' }}"
+                                data-lightbox-alt="{{ item.alt_text|default:'' }}"
+                                data-lightbox-style="{{ config.lightbox_style|default:config.image_style|default:'default' }}"
+                            {% endif %}
+                        >
+                            <img 
+                                src="{{ item.url }}" 
+                                {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
+                                alt="{{ item.alt_text }}"
+                                class="widget-image"
+                                loading="lazy"
+                            />
+                        </a>
                     {% endif %}
                 </div>
                 

@@ -5,48 +5,38 @@
  */
 
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Grid3X3, Eye, Code, X, BookOpen, Edit, Sparkles } from 'lucide-react';
-import { renderMustache, prepareGalleryContext } from '../../utils/mustacheRenderer';
-import CodeEditorPanel from './CodeEditorPanel';
+import { Plus, Trash2, Grid3X3, BookOpen, Edit } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
-import PresetSelector from './PresetSelector';
-import { smartInsert } from '../../utils/codeInsertion';
-import StyleAIHelper from './StyleAIHelper';
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 
 const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId }, ref) => {
     const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
-    const [newStyleKey, setNewStyleKey] = useState('');
     const [showPreview, setShowPreview] = useState(false);
-    const [showPresetSelector, setShowPresetSelector] = useState(false);
     const templateRefs = useRef({});
     const cssRefs = useRef({});
     const { addNotification } = useGlobalNotifications();
+    const queryClient = useQueryClient();
+    const { updateThemeField, saveCurrentTheme, switchTheme, getState } = useUnifiedData();
 
     const styles = galleryStyles || {};
     const styleEntries = Object.entries(styles);
 
-    // Sample data for preview
-    const sampleImages = [
-        { url: 'https://via.placeholder.com/400x300', alt: 'Sample 1', caption: 'Gallery Image 1', width: 400, height: 300 },
-        { url: 'https://via.placeholder.com/400x300', alt: 'Sample 2', caption: 'Gallery Image 2', width: 400, height: 300 },
-        { url: 'https://via.placeholder.com/400x300', alt: 'Sample 3', caption: 'Gallery Image 3', width: 400, height: 300 }
-    ];
-
-    const handleAddStyle = () => {
-        if (!newStyleKey.trim()) return;
-
-        const styleKey = newStyleKey.trim().toLowerCase().replace(/\s+/g, '-');
-
-        if (styles[styleKey]) {
-            alert('A style with this name already exists');
-            return;
+    const handleAddStyle = async () => {
+        // Generate a unique key without showing a form
+        const base = 'gallery-style';
+        let idx = 1;
+        let styleKey = base;
+        while (styles[styleKey]) {
+            idx += 1;
+            styleKey = `${base}-${idx}`;
         }
 
         const newStyle = {
-            name: newStyleKey.trim(),
+            name: 'New Gallery Style',
             description: '',
             template: '<div class="image-gallery">\n  {{#images}}\n    <div class="gallery-item">\n      <img src="{{url}}" alt="{{alt}}" loading="lazy">\n    </div>\n  {{/images}}\n</div>',
             css: '.image-gallery {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 1rem;\n}\n.gallery-item img {\n  width: 100%;\n  height: auto;\n}',
@@ -55,19 +45,38 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                 width: 800,
                 height: 600,
                 resizeType: 'fill',
-                gravity: 'sm'
-            }
+                gravity: 'sm',
+            },
+            lightboxConfig: {
+                width: 1920,
+                height: 1080,
+                maxWidth: 2560,
+                maxHeight: 1440,
+            },
         };
 
-        const updatedStyles = {
-            ...styles,
-            [styleKey]: newStyle,
-        };
+        const updatedStyles = { ...styles, [styleKey]: newStyle };
 
+        // Update parent/UDC state first
         onChange(updatedStyles);
         if (onDirty) onDirty();
-        setNewStyleKey('');
-        setEditingStyle(styleKey);
+
+        // Ensure UDC currentThemeId is set
+        try {
+            const udcState = getState();
+            if (udcState.metadata.currentThemeId !== String(themeId)) {
+                switchTheme(String(themeId));
+            }
+        } catch (_) {}
+
+        // Save via UDC and then navigate to edit view
+        try {
+            await saveCurrentTheme();
+            addNotification({ type: 'success', message: 'New gallery style created' });
+            navigate(`/settings/themes/${themeId}/gallery-styles/${styleKey}`);
+        } catch (_) {
+            // Error already notified by onError
+        }
     };
 
     const handleUpdateStyle = (key, updates) => {
@@ -151,67 +160,7 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
         }
     };
 
-    const handlePreviewImageUpload = (file) => {
-        if (!file || !editingStyle) return;
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            handleUpdateStyle(editingStyle, { previewImage: reader.result });
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handlePresetInsert = (template, css, mode) => {
-        if (!editingStyle) return;
-
-        const currentTemplate = templateRefs.current[editingStyle]?.value || styles[editingStyle]?.template || '';
-        const currentCSS = cssRefs.current[editingStyle]?.value || styles[editingStyle]?.css || '';
-
-        const { template: newTemplate, css: newCSS } = smartInsert({
-            existingTemplate: currentTemplate,
-            existingCSS: currentCSS,
-            newTemplate: template,
-            newCSS: css,
-            mode,
-            presetCategory: 'gallery'
-        });
-
-        // Update refs directly
-        if (templateRefs.current[editingStyle]) {
-            templateRefs.current[editingStyle].value = newTemplate;
-        }
-        if (cssRefs.current[editingStyle]) {
-            cssRefs.current[editingStyle].value = newCSS;
-        }
-
-        // Update state
-        handleUpdateStyle(editingStyle, {
-            template: newTemplate,
-            css: newCSS
-        });
-
-        setShowPresetSelector(false);
-        addNotification({ type: 'success', message: 'Preset inserted successfully' });
-    };
-
-    const renderPreview = (style) => {
-        try {
-            const context = prepareGalleryContext(
-                sampleImages,
-                { showCaptions: true, enableLightbox: false },
-                style.variables
-            );
-            const html = renderMustache(style.template, context);
-            return (
-                <div>
-                    {style.css && <style>{style.css}</style>}
-                    <div dangerouslySetInnerHTML={{ __html: html }} />
-                </div>
-            );
-        } catch (error) {
-            return <div className="text-red-600 text-sm">Preview error: {error.message}</div>;
-        }
-    };
+    // Removed preview and preset insertion from list view; editing happens in dedicated page
 
     return (
         <div className="space-y-6">
@@ -221,6 +170,15 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                     <p className="text-sm text-gray-500 mt-1">Define custom gallery templates using Mustache syntax</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={handleAddStyle}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                        title="Create new gallery style"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Style
+                    </button>
                     <button
                         onClick={() => window.open('/docs/gallery-styles-reference.html', '_blank')}
                         className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
@@ -247,30 +205,7 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">showCaptions</code>
             </div>
 
-            {/* Add Style Form */}
-            <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Add Gallery Style</h4>
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={newStyleKey}
-                        onChange={(e) => setNewStyleKey(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddStyle();
-                        }}
-                        placeholder="e.g., masonry-grid, photo-wall"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                        type="button"
-                        onClick={handleAddStyle}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add
-                    </button>
-                </div>
-            </div>
+            {/* Add Style Form removed: creation happens via header button with auto-save and redirect */}
 
             {/* Styles List */}
             {styleEntries.length > 0 ? (
@@ -325,278 +260,7 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                         ))}
                     </div>
 
-                    {/* Editor panel */}
-                    {editingStyle && styles[editingStyle] && (
-                        <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-white">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold text-gray-700">Edit: {styles[editingStyle].name || editingStyle}</h4>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setShowPresetSelector(true)}
-                                        className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
-                                        title="Insert preset template"
-                                    >
-                                        <Sparkles className="w-3 h-3" />
-                                        Insert Preset
-                                    </button>
-                                    <button
-                                        onClick={() => setEditingStyle(null)}
-                                        className="p-1 text-gray-400 hover:text-gray-600"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Key, Name and Description */}
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Key (Technical Identifier)</label>
-                                    <input
-                                        type="text"
-                                        defaultValue={editingStyle}
-                                        onBlur={(e) => {
-                                            if (e.target.value !== editingStyle) {
-                                                const success = handleRenameKey(editingStyle, e.target.value);
-                                                if (!success) {
-                                                    e.target.value = editingStyle; // Reset on failure
-                                                }
-                                            }
-                                        }}
-                                        placeholder="unique-key-name"
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Lowercase letters, numbers, and hyphens only
-                                    </p>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Display Name</label>
-                                    <input
-                                        type="text"
-                                        value={styles[editingStyle].name || ''}
-                                        onChange={(e) => handleUpdateStyle(editingStyle, { name: e.target.value })}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-                                    <input
-                                        type="text"
-                                        value={styles[editingStyle].description || ''}
-                                        onChange={(e) => handleUpdateStyle(editingStyle, { description: e.target.value })}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* AI Helper */}
-                            <StyleAIHelper
-                                themeId={themeId}
-                                styleType="gallery"
-                                currentStyle={styles[editingStyle]}
-                                onUpdateStyle={(updates) => handleUpdateStyle(editingStyle, updates)}
-                            />
-
-                            {/* Imgproxy Configuration */}
-                            <div className="bg-blue-50 border border-blue-200 rounded p-3 space-y-3">
-                                <h5 className="text-xs font-semibold text-gray-700">Image Processing (imgproxy)</h5>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Width (px)</label>
-                                        <input
-                                            type="number"
-                                            value={styles[editingStyle].imgproxyConfig?.width || ''}
-                                            onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxyConfig || {}),
-                                                    width: parseInt(e.target.value) || null
-                                                }
-                                            })}
-                                            placeholder="800"
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Height (px)</label>
-                                        <input
-                                            type="number"
-                                            value={styles[editingStyle].imgproxyConfig?.height || ''}
-                                            onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxyConfig || {}),
-                                                    height: parseInt(e.target.value) || null
-                                                }
-                                            })}
-                                            placeholder="600"
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Max Width (px)</label>
-                                        <input
-                                            type="number"
-                                            value={styles[editingStyle].imgproxyConfig?.maxWidth || ''}
-                                            onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxyConfig || {}),
-                                                    maxWidth: parseInt(e.target.value) || null
-                                                }
-                                            })}
-                                            placeholder="1600"
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Prevents upscaling beyond original</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Max Height (px)</label>
-                                        <input
-                                            type="number"
-                                            value={styles[editingStyle].imgproxyConfig?.maxHeight || ''}
-                                            onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxyConfig || {}),
-                                                    maxHeight: parseInt(e.target.value) || null
-                                                }
-                                            })}
-                                            placeholder="1200"
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Prevents upscaling beyond original</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Resize Type</label>
-                                        <select
-                                            value={styles[editingStyle].imgproxyConfig?.resizeType || 'fill'}
-                                            onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxyConfig || {}),
-                                                    resizeType: e.target.value
-                                                }
-                                            })}
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                            <option value="fit">Fit</option>
-                                            <option value="fill">Fill</option>
-                                            <option value="crop">Crop</option>
-                                            <option value="force">Force</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Gravity</label>
-                                        <select
-                                            value={styles[editingStyle].imgproxyConfig?.gravity || 'sm'}
-                                            onChange={(e) => handleUpdateStyle(editingStyle, {
-                                                imgproxyConfig: {
-                                                    ...(styles[editingStyle].imgproxyConfig || {}),
-                                                    gravity: e.target.value
-                                                }
-                                            })}
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                            <option value="sm">Smart</option>
-                                            <option value="face">Face</option>
-                                            <option value="ce">Center</option>
-                                            <option value="no">North (Top)</option>
-                                            <option value="so">South (Bottom)</option>
-                                            <option value="ea">East (Right)</option>
-                                            <option value="we">West (Left)</option>
-                                            <option value="noea">North-East</option>
-                                            <option value="nowe">North-West</option>
-                                            <option value="soea">South-East</option>
-                                            <option value="sowe">South-West</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-600">
-                                    Controls how images are processed and cropped. Widget instances can override these settings.
-                                </p>
-                            </div>
-
-                            {/* Template Editor */}
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Mustache Template</label>
-                                <textarea
-                                    ref={(el) => {
-                                        if (el) templateRefs.current[editingStyle] = el;
-                                    }}
-                                    defaultValue={styles[editingStyle].template}
-                                    onChange={() => { if (onDirty) onDirty(); }}
-                                    onBlur={() => handleSaveFromRefs(editingStyle)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                                    rows={8}
-                                />
-                            </div>
-
-                            {/* CSS Editor */}
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">CSS</label>
-                                <textarea
-                                    ref={(el) => {
-                                        if (el) cssRefs.current[editingStyle] = el;
-                                    }}
-                                    defaultValue={styles[editingStyle].css}
-                                    onChange={() => { if (onDirty) onDirty(); }}
-                                    onBlur={() => handleSaveFromRefs(editingStyle)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                                    rows={6}
-                                />
-                            </div>
-
-                            {/* Preview Image Upload */}
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                    Preview Image (for selector)
-                                </label>
-                                {styles[editingStyle].previewImage ? (
-                                    <div className="relative inline-block">
-                                        <img
-                                            src={styles[editingStyle].previewImage}
-                                            alt="Style preview"
-                                            className="w-32 h-20 object-cover rounded border"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => handleUpdateStyle(editingStyle, { previewImage: null })}
-                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                        >
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors text-sm">
-                                        <Grid3X3 className="w-4 h-4" />
-                                        Upload Preview
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handlePreviewImageUpload(e.target.files[0])}
-                                            className="hidden"
-                                        />
-                                    </label>
-                                )}
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Optional: Upload a custom preview thumbnail for the style selector
-                                </p>
-                            </div>
-
-                            {/* Preview */}
-                            <div>
-                                <button
-                                    onClick={() => setShowPreview(!showPreview)}
-                                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                    {showPreview ? 'Hide Preview' : 'Show Preview'}
-                                </button>
-                                {showPreview && (
-                                    <div className="mt-2 p-3 border border-gray-200 rounded bg-gray-50 max-h-64 overflow-auto">
-                                        {renderPreview(styles[editingStyle])}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    {/* Inline editor removed; use dedicated edit page instead */}
                 </div>
             ) : (
                 <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
@@ -607,18 +271,7 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                 </div>
             )}
 
-            {/* Preset Selector Modal */}
-            {showPresetSelector && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                        <PresetSelector
-                            categories={['gallery', 'lightbox']}
-                            onInsert={handlePresetInsert}
-                            onClose={() => setShowPresetSelector(false)}
-                        />
-                    </div>
-                </div>
-            )}
+            {/* Preset Selector Modal removed in list view */}
         </div>
     );
 });

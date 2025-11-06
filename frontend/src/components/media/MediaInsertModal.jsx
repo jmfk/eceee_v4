@@ -17,7 +17,10 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
         width: 'full',
         align: 'center',
         caption: '',
-        galleryStyle: null
+        galleryStyle: null,
+        enableLightbox: false,
+        lightboxStyle: 'default',
+        lightboxGroup: ''
     });
 
     // Get available gallery styles from theme
@@ -41,7 +44,10 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                 width: 'full',
                 align: 'center',
                 caption: '',
-                galleryStyle: null
+                galleryStyle: null,
+                enableLightbox: false,
+                lightboxStyle: 'default',
+                lightboxGroup: ''
             });
         }
     }, [isOpen]);
@@ -243,7 +249,7 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                                     />
                                 </div>
 
-                                {/* Gallery Style () */}
+                                {/* Gallery Style */}
                                 {availableGalleryStyles.length > 0 && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-900 mb-2">
@@ -267,6 +273,43 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                                         </p>
                                     </div>
                                 )}
+
+                                {/* Lightbox */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                                            <input
+                                                type="checkbox"
+                                                checked={config.enableLightbox}
+                                                onChange={(e) => handleConfigChange('enableLightbox', e.target.checked)}
+                                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                            />
+                                            Open in lightbox
+                                        </label>
+                                        <p className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Style</label>
+                                        <input
+                                            type="text"
+                                            value={config.lightboxStyle}
+                                            onChange={(e) => handleConfigChange('lightboxStyle', e.target.value)}
+                                            placeholder="default"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Group</label>
+                                        <input
+                                            type="text"
+                                            value={config.lightboxGroup}
+                                            onChange={(e) => handleConfigChange('lightboxGroup', e.target.value)}
+                                            placeholder="optional group key"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                        <p className="mt-1 text-xs text-gray-500">Images sharing a group key can be navigated in the lightbox.</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

@@ -21,6 +21,8 @@
     
     <!-- Tailwind CSS -->
     <link href="{% static 'css/tailwind.output.css' %}" rel="stylesheet">
+    <!-- Lightbox base CSS -->
+    <link href="{% static 'css/lightbox.css' %}" rel="stylesheet">
     
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.1" 
@@ -33,6 +35,9 @@
     
     <!-- Alpine.js for additional interactivity -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Lightbox JS - loads after Alpine -->
+    <script defer src="{% static 'js/lightbox.js' %}"></script>
     
     {% block extra_head %}{% endblock %}
 </head>
@@ -157,7 +162,7 @@
         // Make toast function globally available
         window.showToast = showToast;
     </script>
-    
+
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

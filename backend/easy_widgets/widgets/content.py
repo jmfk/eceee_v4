@@ -63,6 +63,33 @@ class ContentConfig(BaseModel):
             "component": "ComponentStyleSelector",
         },
     )
+    enableLightbox: bool = Field(
+        False,
+        description="Enable lightbox on images inside content",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "group": "Display Options",
+        },
+    )
+    lightboxStyle: str = Field(
+        "default",
+        description="Lightbox style key",
+        json_schema_extra={
+            "component": "LightboxStyleSelect",
+            "group": "Display Options",
+            "placeholder": "Default",
+        },
+    )
+    lightboxGroup: str = Field(
+        "",
+        description="Group key for images in lightbox",
+        json_schema_extra={
+            "component": "TextInput",
+            "group": "Display Options",
+            "placeholder": "optional group",
+        },
+    )
 
 
 @register_widget_type
@@ -262,6 +289,26 @@ class ContentWidget(BaseWidget):
                     new_tag = BeautifulSoup(styled_html, "html.parser")
                     media_insert.replace_with(new_tag)
 
+        # Auto-apply lightbox attributes to images if enabled
+        enable_lb = config.get("enable_lightbox") or config.get("enableLightbox", False)
+        if enable_lb:
+            style_key = config.get("lightbox_style") or config.get("lightboxStyle", "default")
+            group_key = config.get("lightbox_group") or config.get("lightboxGroup", "")
+            # Add data-lightbox to anchors wrapping images
+            for a in soup.find_all("a"):
+                img = a.find("img")
+                href = a.get("href", "")
+                if img and href and any(href.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]):
+                    a["data-lightbox"] = ""
+                    if group_key:
+                        a["data-lightbox-group"] = group_key
+                    a["data-lightbox-style"] = style_key or "default"
+                    a["data-lightbox-src"] = href
+                    if img.get("alt"):
+                        a["data-lightbox-alt"] = img.get("alt")
+                    if img.get("title"):
+                        a["data-lightbox-caption"] = img.get("title")
+
         # Always store processed content (even if no theme or no processing was done)
         template_config["processed_content"] = str(soup)
 
@@ -358,10 +405,11 @@ class ContentWidget(BaseWidget):
 
         # Get imgproxy config from style
         imgproxy_config = style.get("imgproxy_config")
+        lightbox_config = style.get("lightbox_config")
 
         # Prepare context for Mustache rendering
         context = prepare_gallery_context(
-            items, gallery_config, style.get("variables"), imgproxy_config
+            items, gallery_config, style.get("variables"), imgproxy_config, lightbox_config
         )
 
         # Render template
