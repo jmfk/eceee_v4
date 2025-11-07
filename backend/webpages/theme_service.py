@@ -112,8 +112,8 @@ class ThemeFallbackService:
         return cls.FALLBACK_COLORS.get(color_name, "#000000")
 
     @classmethod
-    def get_fallback_typography(cls) -> Dict[str, Any]:
-        """Get fallback typography configuration"""
+    def get_fallback_design_groups(cls) -> Dict[str, Any]:
+        """Get fallback design groups configuration"""
         return cls.FALLBACK_TYPOGRAPHY.copy()
 
     @classmethod
@@ -183,8 +183,8 @@ class ThemeService:
         Args:
             page_id: The page ID
             scope: CSS scope selector
-            widget_type: Optional widget type for targeted typography
-            slot: Optional slot name for targeted typography
+            widget_type: Optional widget type for targeted design groups
+            slot: Optional slot name for targeted design groups
         """
         cache_key = (
             f"{cls.CACHE_PREFIX}:css:page:{page_id}:{scope}:{widget_type}:{slot}"

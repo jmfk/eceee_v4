@@ -37,7 +37,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         json_fields = [
             "fonts",
             "colors",
-            "typography",
+            "design_groups",
             "component_styles",
             "table_templates",
             "css_variables",
@@ -72,7 +72,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         json_fields = [
             "fonts",
             "colors",
-            "typography",
+            "design_groups",
             "component_styles",
             "table_templates",
             "css_variables",

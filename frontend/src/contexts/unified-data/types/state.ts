@@ -55,7 +55,7 @@ export interface ThemeData {
   // New 5-part structure
   fonts?: Record<string, any>;         // Google Fonts configuration
   colors?: Record<string, string>;     // Named color palette
-  typography?: Record<string, any>;    // Grouped HTML element styles
+  designGroups?: Record<string, any>;  // Grouped HTML element styles with color schemes
   componentStyles?: Record<string, any>;  // HTML templates + CSS
   tableTemplates?: Record<string, any>;   // Table widget templates
   // Legacy fields (deprecated)

@@ -125,7 +125,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             # New fields
             "fonts",
             "colors",
-            "typography",
+            "design_groups",
             "component_styles",
             "gallery_styles",
             "carousel_styles",

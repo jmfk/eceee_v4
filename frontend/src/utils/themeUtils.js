@@ -5,23 +5,23 @@
  */
 
 /**
- * Generate CSS from typography configuration
- * @param {Object} typography - Typography configuration
+ * Generate CSS from design groups configuration
+ * @param {Object} designGroups - Design groups configuration
  * @param {Object} colors - Named colors palette
  * @param {string} scope - CSS scope selector
  * @param {string} widgetType - Optional widget type for filtering
  * @param {string} slot - Optional slot name for filtering
  * @returns {string} Generated CSS
  */
-export function generateTypographyCSS(typography, colors = {}, scope = '.theme-content', widgetType = null, slot = null) {
-    if (!typography || !typography.groups) {
+export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '.theme-content', widgetType = null, slot = null) {
+    if (!designGroups || !designGroups.groups) {
         return '';
     }
 
     const cssParts = [];
 
     // Find applicable groups
-    const applicableGroups = typography.groups.filter(group => {
+    const applicableGroups = designGroups.groups.filter(group => {
         const groupWidgetType = group.widget_type || group.widgetType;
         const groupSlot = group.slot;
 
@@ -51,7 +51,10 @@ export function generateTypographyCSS(typography, colors = {}, scope = '.theme-c
                 let value = propertyValue;
 
                 // Handle color references (named colors from palette)
-                if (propertyName === 'color' && colors[propertyValue]) {
+                // Check for any color-related property
+                const colorProperties = ['color', 'backgroundColor', 'borderColor', 'borderLeftColor', 
+                                       'borderRightColor', 'borderTopColor', 'borderBottomColor'];
+                if (colorProperties.includes(propertyName) && colors[propertyValue]) {
                     value = `var(--${propertyValue})`;
                 }
 
@@ -177,12 +180,12 @@ export function getThemeFallback(type, name) {
 }
 
 /**
- * Merge typography groups (for inheritance or overrides)
- * @param {Array} baseGroups - Base typography groups
- * @param {Array} overrideGroups - Override typography groups
+ * Merge design groups (for inheritance or overrides)
+ * @param {Array} baseGroups - Base design groups
+ * @param {Array} overrideGroups - Override design groups
  * @returns {Array} Merged groups
  */
-export function mergeTypographyGroups(baseGroups = [], overrideGroups = []) {
+export function mergeDesignGroups(baseGroups = [], overrideGroups = []) {
     const merged = [...baseGroups];
 
     for (const overrideGroup of overrideGroups) {
@@ -269,12 +272,12 @@ export function generateClassName(name) {
 }
 
 /**
- * Create pre-populated typography group with default HTML elements
+ * Create pre-populated design group with default HTML elements
  * @param {string} name - Group name
  * @param {string} baseFont - Base font family (optional)
  * @returns {Object} Pre-populated group with all default elements
  */
-export function createTypographyGroup(name = 'New Group', baseFont = 'Inter, sans-serif') {
+export function createDesignGroup(name = 'New Group', baseFont = 'Inter, sans-serif') {
     return {
         name,
         className: generateClassName(name),

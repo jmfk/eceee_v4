@@ -32,7 +32,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
     const tabToSection = {
         'fonts': 'fonts',
         'colors': 'colors',
-        'typography': 'typography',
+        'typography': 'designGroups',
         'component-styles': 'componentStyles',
         'gallery-styles': 'galleryStyles',
         'carousel-styles': 'carouselStyles',
@@ -43,7 +43,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         const data = {
             fonts: themeData?.fonts || {},
             colors: themeData?.colors || {},
-            typography: themeData?.typography || { groups: [] },
+            designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
             galleryStyles: themeData?.galleryStyles || {},
             carouselStyles: themeData?.carouselStyles || {},
@@ -98,7 +98,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         const data = {
             fonts: themeData?.fonts || {},
             colors: themeData?.colors || {},
-            typography: themeData?.typography || { groups: [] },
+            designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
             galleryStyles: themeData?.galleryStyles || {},
             carouselStyles: themeData?.carouselStyles || {},
@@ -168,7 +168,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             existingData = {
                 fonts: themeData?.fonts || {},
                 colors: themeData?.colors || {},
-                typography: themeData?.typography || { groups: [] },
+                designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
                 galleryStyles: themeData?.galleryStyles || {},
                 carouselStyles: themeData?.carouselStyles || {},
@@ -198,7 +198,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             existingData = {
                 fonts: themeData?.fonts || {},
                 colors: themeData?.colors || {},
-                typography: themeData?.typography || { groups: [] },
+                designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
                 galleryStyles: themeData?.galleryStyles || {},
                 carouselStyles: themeData?.carouselStyles || {},
@@ -247,7 +247,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         const labels = {
             fonts: 'Fonts',
             colors: 'Colors',
-            typography: 'Typography',
+            designGroups: 'Design Groups',
             componentStyles: 'Component Styles',
             galleryStyles: 'Gallery Styles',
             carouselStyles: 'Carousel Styles',

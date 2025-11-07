@@ -4,7 +4,7 @@
  * Complete redesign with 5-part theme system:
  * 1. Fonts - Google Fonts integration
  * 2. Colors - Named color palette
- * 3. Typography - Grouped HTML element styles with targeting
+ * 3. Design Groups - Grouped HTML element styles with targeting and color schemes
  * 4. Component Styles - HTML templates + CSS
  * 5. Table Templates - Predefined table templates
  */
@@ -25,7 +25,7 @@ import {
 // Import tab components
 import FontsTab from './theme/FontsTab';
 import ColorsTab from './theme/ColorsTab';
-import TypographyTab from './theme/TypographyTab';
+import DesignGroupsTab from './theme/DesignGroupsTab';
 import ComponentStylesTab from './theme/ComponentStylesTab';
 import GalleryStylesTab from './theme/GalleryStylesTab';
 import CarouselStylesTab from './theme/CarouselStylesTab';
@@ -128,7 +128,7 @@ const ThemeEditor = ({ onSave }) => {
                 description: '',
                 fonts: {},
                 colors: {},
-                typography: { groups: [] },
+                designGroups: { groups: [] },
                 componentStyles: {},
                 tableTemplates: {},
                 isActive: true,
@@ -145,7 +145,7 @@ const ThemeEditor = ({ onSave }) => {
                 description: selectedThemeData.description || '',
                 fonts: selectedThemeData.fonts || {},
                 colors: selectedThemeData.colors || {},
-                typography: selectedThemeData.typography || { groups: [] },
+                designGroups: selectedThemeData.designGroups || selectedThemeData.typography || { groups: [] },
                 componentStyles: selectedThemeData.componentStyles || {},
                 galleryStyles: selectedThemeData.galleryStyles || {},
                 carouselStyles: selectedThemeData.carouselStyles || {},
@@ -472,7 +472,7 @@ const ThemeEditor = ({ onSave }) => {
         { id: 'basic', label: 'Basic Info' },
         { id: 'fonts', label: 'Fonts' },
         { id: 'colors', label: 'Colors' },
-        { id: 'typography', label: 'Typography' },
+        { id: 'typography', label: 'Design Groups' },
         { id: 'component-styles', label: 'Component Styles' },
         { id: 'gallery-styles', label: 'Galleries' },
         { id: 'carousel-styles', label: 'Carousels' },
@@ -792,11 +792,11 @@ const ThemeEditor = ({ onSave }) => {
                     )}
 
                     {activeTab === 'typography' && (
-                        <TypographyTab
-                            typography={themeData?.typography || { groups: [] }}
+                        <DesignGroupsTab
+                            designGroups={themeData?.designGroups || themeData?.typography || { groups: [] }}
                             colors={themeData?.colors || {}}
                             fonts={themeData?.fonts || {}}
-                            onChange={(typography) => updateThemeField('typography', typography)}
+                            onChange={(designGroups) => updateThemeField('designGroups', designGroups)}
                             onDirty={() => setThemeDirty(true)}
                         />
                     )}

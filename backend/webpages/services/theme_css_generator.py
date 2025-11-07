@@ -90,11 +90,11 @@ class ThemeCSSGenerator:
             if variables_css:
                 css_parts.append(variables_css)
 
-        # 3. Typography (HTML element styles)
-        if theme.typography and theme.typography.get("groups"):
-            typography_css = self._generate_typography_css(theme.typography)
-            if typography_css:
-                css_parts.append(typography_css)
+        # 3. Design Groups (HTML element styles)
+        if theme.design_groups and theme.design_groups.get("groups"):
+            design_groups_css = self._generate_design_groups_css(theme.design_groups)
+            if design_groups_css:
+                css_parts.append(design_groups_css)
 
         # 4. Component Styles CSS
         if theme.component_styles:
@@ -156,14 +156,14 @@ class ThemeCSSGenerator:
 
         return css
 
-    def _generate_typography_css(self, typography):
-        """Generate CSS from typography groups with optional class scoping"""
-        if not typography or not typography.get("groups"):
+    def _generate_design_groups_css(self, design_groups):
+        """Generate CSS from design groups with optional class scoping"""
+        if not design_groups or not design_groups.get("groups"):
             return ""
 
         css_parts = []
 
-        for group in typography["groups"]:
+        for group in design_groups["groups"]:
             group_name = group.get("name", "")
             class_name = group.get("className", None)
             elements = group.get("elements", {})

@@ -13,10 +13,11 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
     // Get current color for display
     const getCurrentColor = () => {
         if (!value) return '#cccccc';
-        if (value.startsWith('var(--')) {
-            const colorName = value.match(/var\(--([^)]+)\)/)?.[1];
-            return colors[colorName] || '#cccccc';
+        // Check if value is a named color from palette
+        if (colors[value]) {
+            return colors[value];
         }
+        // Otherwise it's a direct hex/rgb value
         return value;
     };
 
@@ -62,13 +63,13 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
                     <div className="text-xs font-semibold text-gray-700 mb-2">Theme Colors</div>
                     <div className="grid grid-cols-4 gap-2">
                         {themeColors.map(([name, color]) => {
-                            const isSelected = value === `var(--${name})` || value === color;
+                            const isSelected = value === name || value === color;
                             return (
                                 <button
                                     key={name}
                                     type="button"
                                     onClick={() => {
-                                        onChange(`var(--${name})`);
+                                        onChange(name);
                                         setShowPalette(false);
                                     }}
                                     className={`group relative w-10 h-10 rounded border-2 transition-all ${isSelected

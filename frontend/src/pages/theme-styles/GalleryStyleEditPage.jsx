@@ -62,7 +62,7 @@ const GalleryStyleEditPage = () => {
                         description: themeData.description || '',
                         fonts: themeData.fonts || {},
                         colors: themeData.colors || {},
-                        typography: themeData.typography || { groups: [] },
+                        designGroups: themeData.designGroups || { groups: [] },
                         componentStyles: themeData.componentStyles || {},
                         galleryStyles: themeData.galleryStyles || themeData.gallery_styles || {},
                         carouselStyles: themeData.carouselStyles || themeData.carousel_styles || {},

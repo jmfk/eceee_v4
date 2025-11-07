@@ -1,32 +1,32 @@
 /**
- * Typography Preview Component
+ * Design Groups Preview Component
  * 
- * Shows live preview of all HTML elements with current typography styling.
+ * Shows live preview of all HTML elements with current design group styling.
  */
 
 import React, { useMemo } from 'react';
-import { generateTypographyCSS, generateColorsCSS } from '../../utils/themeUtils';
+import { generateDesignGroupsCSS, generateColorsCSS } from '../../utils/themeUtils';
 
-const TypographyPreview = ({ typography, colors, widgetType = null, slot = null }) => {
+const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = null }) => {
     // Generate CSS for the preview
     const previewCSS = useMemo(() => {
-        const colorCSS = generateColorsCSS(colors || {}, '.typography-preview');
-        const typographyCSS = generateTypographyCSS(
-            typography || {},
+        const colorCSS = generateColorsCSS(colors || {}, '.design-groups-preview');
+        const designGroupsCSS = generateDesignGroupsCSS(
+            designGroups || {},
             colors || {},
-            '.typography-preview',
+            '.design-groups-preview',
             widgetType,
             slot
         );
 
-        return `${colorCSS}\n\n${typographyCSS}`;
-    }, [typography, colors, widgetType, slot]);
+        return `${colorCSS}\n\n${designGroupsCSS}`;
+    }, [designGroups, colors, widgetType, slot]);
 
     return (
-        <div className="typography-preview-container">
+        <div className="design-groups-preview-container">
             <style>{previewCSS}</style>
 
-            <div className="typography-preview bg-white border border-gray-300 rounded-lg p-6 space-y-4">
+            <div className="design-groups-preview bg-white border border-gray-300 rounded-lg p-6 space-y-4">
                 <h1>Heading 1 - The Quick Brown Fox</h1>
                 <h2>Heading 2 - Jumps Over the Lazy Dog</h2>
                 <h3>Heading 3 - Typography Preview</h3>
@@ -74,5 +74,5 @@ const TypographyPreview = ({ typography, colors, widgetType = null, slot = null 
     );
 };
 
-export default TypographyPreview;
+export default DesignGroupsPreview;
 

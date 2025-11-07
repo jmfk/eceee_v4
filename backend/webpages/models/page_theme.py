@@ -27,9 +27,9 @@ class PageTheme(models.Model):
         default=dict,
         help_text="Named color palette (key-value pairs of color names and hex/rgb values)",
     )
-    typography = models.JSONField(
+    design_groups = models.JSONField(
         default=dict,
-        help_text="Grouped HTML element styles with optional widget_type/slot targeting",
+        help_text="Grouped HTML element styles with color schemes and optional widget_type/slot targeting",
     )
     component_styles = models.JSONField(
         default=dict,
@@ -53,7 +53,7 @@ class PageTheme(models.Model):
     )
     html_elements = models.JSONField(
         default=dict,
-        help_text="DEPRECATED: Use 'typography' field instead",
+        help_text="DEPRECATED: Use 'design_groups' field instead",
     )
     image_styles = models.JSONField(
         default=dict,
@@ -98,7 +98,7 @@ class PageTheme(models.Model):
             # New fields
             "fonts": self.fonts,
             "colors": self.colors,
-            "typography": self.typography,
+            "design_groups": self.design_groups,
             "component_styles": self.component_styles,
             "gallery_styles": self.gallery_styles,
             "carousel_styles": self.carousel_styles,
@@ -1154,13 +1154,13 @@ class PageTheme(models.Model):
 
     def generate_css(self, scope=".theme-content", widget_type=None, slot=None):
         """
-        Generate complete CSS for this theme including colors, typography, and custom CSS.
-        Supports both new typography structure and legacy html_elements for backwards compatibility.
+        Generate complete CSS for this theme including colors, design groups, and custom CSS.
+        Supports both new design_groups structure and legacy html_elements for backwards compatibility.
 
         Args:
             scope: CSS scope selector (default: ".theme-content")
-            widget_type: Optional widget type for targeted typography
-            slot: Optional slot name for targeted typography
+            widget_type: Optional widget type for targeted design groups
+            slot: Optional slot name for targeted design groups
         """
         css_parts = []
 
@@ -1173,11 +1173,11 @@ class PageTheme(models.Model):
             variables_css += "}"
             css_parts.append(variables_css)
 
-        # Typography styling (new structure with groups)
-        if self.typography and self.typography.get("groups"):
-            typography_css = self._generate_typography_css(scope, widget_type, slot)
-            if typography_css:
-                css_parts.append(typography_css)
+        # Design groups styling (new structure with groups)
+        if self.design_groups and self.design_groups.get("groups"):
+            design_groups_css = self._generate_design_groups_css(scope, widget_type, slot)
+            if design_groups_css:
+                css_parts.append(design_groups_css)
         # Fallback to legacy html_elements
         elif self.html_elements:
             element_css = self._generate_element_css(scope)
@@ -1191,16 +1191,17 @@ class PageTheme(models.Model):
 
         return "\n\n".join(css_parts)
 
-    def _generate_typography_css(self, scope, widget_type=None, slot=None):
+    def _generate_design_groups_css(self, scope, widget_type=None, slot=None):
         """
-        Generate CSS for typography groups with optional targeting by widget_type/slot.
+        Generate CSS for design groups with optional targeting by widget_type/slot.
         Groups are applied in order, with more specific groups overriding general ones.
+        Converts named color references to CSS variables.
         """
         css_parts = []
 
         # Find applicable groups
         applicable_groups = []
-        for group in self.typography.get("groups", []):
+        for group in self.design_groups.get("groups", []):
             group_widget_type = group.get("widget_type")
             group_slot = group.get("slot")
 
@@ -1228,7 +1229,10 @@ class PageTheme(models.Model):
                     css_property = self._camel_to_kebab(property_name)
 
                     # Handle color references (named colors from palette)
-                    if property_name == "color" and property_value in self.colors:
+                    # Check for any color-related property
+                    color_properties = ["color", "backgroundColor", "borderColor", "borderLeftColor", 
+                                       "borderRightColor", "borderTopColor", "borderBottomColor"]
+                    if property_name in color_properties and property_value in self.colors:
                         property_value = f"var(--{property_value})"
 
                     # Handle list-specific properties
@@ -1358,7 +1362,7 @@ class PageTheme(models.Model):
             description=self.description,
             fonts=self.fonts.copy() if self.fonts else {},
             colors=self.colors.copy() if self.colors else {},
-            typography=self.typography.copy() if self.typography else {},
+            design_groups=self.design_groups.copy() if self.design_groups else {},
             component_styles=(
                 self.component_styles.copy() if self.component_styles else {}
             ),

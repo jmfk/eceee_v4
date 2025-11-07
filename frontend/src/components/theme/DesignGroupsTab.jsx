@@ -1,8 +1,8 @@
 /**
- * Typography Tab Component - Polished Editor
+ * Design Groups Tab Component - Polished Editor
  * 
  * Features:
- * - Expandable typography groups (all can be open simultaneously)
+ * - Expandable design groups (all can be open simultaneously)
  * - Form with theme-based selectors (colors, fonts)
  * - Numeric inputs with steppers and unit selectors
  * - Smart copy/paste (full set → all tags, single tag → selected tag)
@@ -11,9 +11,9 @@
 
 import React, { useState, useRef } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp } from 'lucide-react';
-import { createTypographyGroup, generateClassName } from '../../utils/themeUtils';
+import { createDesignGroup, generateClassName } from '../../utils/themeUtils';
 import { parseCSSRules, cssToGroupElements, cssToElementProperties, groupElementsToCSS, isValidClassName } from '../../utils/cssParser';
-import TypographyPreview from './TypographyPreview';
+import DesignGroupsPreview from './DesignGroupsPreview';
 import ColorSelector from './form-fields/ColorSelector';
 import FontSelector from './form-fields/FontSelector';
 import NumericInput from './form-fields/NumericInput';
@@ -81,8 +81,8 @@ const CSS_PROPERTIES = {
   textTransform: { type: 'select', label: 'Text Transform', options: ['none', 'uppercase', 'lowercase', 'capitalize'] },
 };
 
-const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
-  const groups = typography?.groups || [];
+const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => {
+  const groups = designGroups?.groups || [];
   const [expandedGroups, setExpandedGroups] = useState({});
   const [expandedTags, setExpandedTags] = useState({});
   const [clipboard, setClipboard] = useState(null); // { type: 'tag' | 'group', data: {...} }
@@ -98,18 +98,18 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
 
   const handleAddGroup = () => {
     const baseFont = fonts?.googleFonts?.[0]?.family || 'Inter';
-    const newGroup = createTypographyGroup(`Group ${groups.length + 1}`, `${baseFont}, sans-serif`);
-    const updatedTypography = {
-      ...typography,
+    const newGroup = createDesignGroup(`Group ${groups.length + 1}`, `${baseFont}, sans-serif`);
+    const updatedDesignGroups = {
+      ...(designGroups || {}),
       groups: [...groups, newGroup],
     };
-    onChange(updatedTypography);
+    onChange(updatedDesignGroups);
     setExpandedGroups({ ...expandedGroups, [groups.length]: true });
   };
 
   const handleRemoveGroup = (index) => {
     const updatedGroups = groups.filter((_, i) => i !== index);
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
   const toggleGroup = (index) => {
@@ -133,7 +133,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
       ...updatedGroups[index],
       name: newName,
     };
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
   const handleUpdateGroupClassName = (index, className) => {
@@ -142,7 +142,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
       ...updatedGroups[index],
       className: className,
     };
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
   // CSS Import Handlers
@@ -194,7 +194,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
           elements,
         };
 
-        onChange({ ...typography, groups: [...groups, newGroup] });
+        onChange({ ...(designGroups || {}), groups: [...groups, newGroup] });
         setExpandedGroups({ ...expandedGroups, [groups.length]: true });
 
         let message = `Created new group with ${Object.keys(elements).length} elements`;
@@ -218,7 +218,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
           ...updatedGroups[importModal.groupIndex],
           elements,
         };
-        onChange({ ...typography, groups: updatedGroups });
+        onChange({ ...(designGroups || {}), groups: updatedGroups });
 
         let message = `Updated group with ${Object.keys(elements).length} elements`;
         if (warnings.length > 0) {
@@ -245,7 +245,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
             [importModal.elementKey]: { ...currentStyles, ...properties },
           },
         };
-        onChange({ ...typography, groups: updatedGroups });
+        onChange({ ...(designGroups || {}), groups: updatedGroups });
 
         addNotification({
           type: 'success',
@@ -273,7 +273,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
         },
       },
     };
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
   const handleRemoveProperty = (groupIndex, element, property) => {
@@ -288,7 +288,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
         [element]: newStyles,
       },
     };
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
   const toggleEditMode = (groupIndex, tagBase, variant) => {
@@ -312,7 +312,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
             [variant]: styles,
           },
         };
-        onChange({ ...typography, groups: updatedGroups });
+        onChange({ ...(designGroups || {}), groups: updatedGroups });
       }
     }
 
@@ -339,7 +339,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
           [variant]: styles,
         },
       };
-      onChange({ ...typography, groups: updatedGroups });
+      onChange({ ...(designGroups || {}), groups: updatedGroups });
     }
   };
 
@@ -353,7 +353,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
         [tagGroup.base]: updatedGroups[groupIndex].elements[tagGroup.base] || {},
       },
     };
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
 
     // Auto-expand the new tag
     setExpandedTags({ ...expandedTags, [`${groupIndex}-${tagGroup.base}`]: true });
@@ -372,7 +372,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
       ...updatedGroups[groupIndex],
       elements: newElements,
     };
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
   const handleCopyTag = (element, styles) => {
@@ -407,7 +407,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
       ...updatedGroups[groupIndex],
       elements: currentElements,
     };
-    onChange({ ...typography, groups: updatedGroups });
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
   const handleCloneGroup = (groupIndex) => {
@@ -419,7 +419,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
     };
 
     const updatedTypography = {
-      ...typography,
+      ...designGroups,
       groups: [...groups, newGroup],
     };
     onChange(updatedTypography);
@@ -524,14 +524,14 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Typography Groups</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Design Groups</h3>
         <div className="flex gap-2">
           <CopyButton
-            data={typography}
+            data={designGroups}
             level="section"
-            section="typography"
-            label="Copy Typography"
-            onSuccess={() => addNotification({ type: 'success', message: 'Typography settings copied to clipboard' })}
+            section="designGroups"
+            label="Copy Design Groups"
+            onSuccess={() => addNotification({ type: 'success', message: 'Design groups copied to clipboard' })}
             onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
           />
           <button
@@ -887,7 +887,7 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
         <div className="lg:sticky lg:top-6 lg:self-start">
           <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
             <h4 className="text-sm font-semibold text-gray-900 mb-3">Live Preview</h4>
-            <TypographyPreview typography={typography} colors={colors} />
+            <DesignGroupsPreview designGroups={designGroups} colors={colors} />
           </div>
         </div>
       </div>
@@ -1005,4 +1005,4 @@ const TypographyTab = ({ typography, colors, fonts, onChange, onDirty }) => {
   );
 };
 
-export default TypographyTab;
+export default DesignGroupsTab;
