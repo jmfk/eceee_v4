@@ -10,6 +10,12 @@ import { getWidgetComponent, getWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import PageWidgetHeader from './PageWidgetHeader'
 
+// Normalize widget type for CSS class (matches backend logic)
+const normalizeForCSS = (value) => {
+    if (!value) return '';
+    return value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+}
+
 /**
  * PageEditor Widget Factory - Layout-based widget rendering
  * 
@@ -203,7 +209,7 @@ const PageWidgetFactory = ({
 
             return (
                 <div
-                    className={`widget-item page-editor-widget-inherited relative group ${className}`}
+                    className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget-inherited relative group ${className}`}
                     data-widget-type={widget.type}
                     data-widget-id={widget.id}
                     data-version-id={versionId}
@@ -237,36 +243,38 @@ const PageWidgetFactory = ({
                     )}
 
                     {/* Core Widget Content - render the actual widget in display mode */}
-                    <CoreWidgetComponent
-                        config={widget.config || {}}
-                        mode="display"
-                        themeId={widget.config?.themeId}
-                        widgetId={actualWidgetId}
-                        slotName={actualSlotName}
-                        widgetType={widget.type}
-                        layoutRenderer={layoutRenderer}
-                        versionId={versionId}
-                        isPublished={isPublished}
-                        parentComponentId={parentComponentId}
-                        contextType={contextType}
-                        pageId={pageId}
-                        widgetPath={widgetPath}
-                        nestedParentWidgetId={nestedParentWidgetId}
-                        nestedParentSlotName={nestedParentSlotName}
-                        context={{
-                            widgetId: actualWidgetId,
-                            slotName: actualSlotName,
-                            contextType,
-                            pageId,
-                            versionId,
-                            webpageData,
-                            pageVersionData,
-                            widgetPath,
-                            pathVariables: pathVariables || {},
-                            simulatedPath: simulatedPath,
-                            onSimulatedPathChange: onSimulatedPathChange
-                        }}
-                    />
+                    <div className="cms-content">
+                        <CoreWidgetComponent
+                            config={widget.config || {}}
+                            mode="display"
+                            themeId={widget.config?.themeId}
+                            widgetId={actualWidgetId}
+                            slotName={actualSlotName}
+                            widgetType={widget.type}
+                            layoutRenderer={layoutRenderer}
+                            versionId={versionId}
+                            isPublished={isPublished}
+                            parentComponentId={parentComponentId}
+                            contextType={contextType}
+                            pageId={pageId}
+                            widgetPath={widgetPath}
+                            nestedParentWidgetId={nestedParentWidgetId}
+                            nestedParentSlotName={nestedParentSlotName}
+                            context={{
+                                widgetId: actualWidgetId,
+                                slotName: actualSlotName,
+                                contextType,
+                                pageId,
+                                versionId,
+                                webpageData,
+                                pageVersionData,
+                                widgetPath,
+                                pathVariables: pathVariables || {},
+                                simulatedPath: simulatedPath,
+                                onSimulatedPathChange: onSimulatedPathChange
+                            }}
+                        />
+                    </div>
                 </div>
             )
         }
@@ -274,7 +282,7 @@ const PageWidgetFactory = ({
         // Normal local widget rendering with full header
         return (
             <div
-                className={`widget-item page-editor-widget relative group ${className} ${isPublished ? 'published-widget' : ''}`}
+                className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget relative group ${className} ${isPublished ? 'published-widget' : ''}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-version-id={versionId}
@@ -295,7 +303,7 @@ const PageWidgetFactory = ({
                 />
 
                 {/* Core Widget Content */}
-                <div className="widget-content overflow-hidden border border-gray-200 border-t-0">
+                <div className="widget-content cms-content overflow-hidden border border-gray-200 border-t-0">
                     <CoreWidgetComponent
                         config={widget.config || {}}
                         mode="editor"
@@ -367,11 +375,13 @@ const PageWidgetFactory = ({
                                         <p className="mt-2 text-sm text-gray-600">Rendering preview...</p>
                                     </div>
                                 ) : previewContent ? (
-                                    <div
-                                        ref={previewContainerRef}
-                                        className="widget-preview-content"
-                                        dangerouslySetInnerHTML={{ __html: previewContent.html }}
-                                    />
+                                    <div className="cms-content">
+                                        <div
+                                            ref={previewContainerRef}
+                                            className="widget-preview-content"
+                                            dangerouslySetInnerHTML={{ __html: previewContent.html }}
+                                        />
+                                    </div>
                                 ) : (
                                     <div className="text-center py-12 text-gray-500">
                                         <p>No preview available</p>
@@ -392,48 +402,50 @@ const PageWidgetFactory = ({
     // Simple widget renderer without controls (for display mode)
     return (
         <div
-            className={`widget-item page-editor-display ${className}`}
+            className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-display ${className}`}
             data-widget-type={widget.type}
             data-widget-id={widget.id}
             data-version-id={versionId}
         >
-            <CoreWidgetComponent
-                config={widget.config || {}}
-                mode={mode}
-                onConfigChange={stableConfigChangeHandler}
-                themeId={widget.config?.themeId}
-                widgetId={actualWidgetId}
-                slotName={actualSlotName}
-                widgetType={widget.type}
-                // PageEditor-specific props
-                layoutRenderer={layoutRenderer}
-                versionId={versionId}
-                isPublished={isPublished}
-                // Context props for container widgets
-                parentComponentId={parentComponentId}
-                contextType={contextType}
-                pageId={pageId}
-                onWidgetEdit={onEdit}
-                onOpenWidgetEditor={onOpenWidgetEditor}
-                // Widget path for infinite nesting
-                widgetPath={widgetPath}
-                // Legacy nested widget context (deprecated)
-                nestedParentWidgetId={nestedParentWidgetId}
-                nestedParentSlotName={nestedParentSlotName}
-                context={{
-                    widgetId: actualWidgetId,
-                    slotName: actualSlotName,
-                    contextType,
-                    pageId,
-                    versionId,
-                    webpageData,
-                    pageVersionData,
-                    widgetPath,
-                    pathVariables: pathVariables || {},
-                    simulatedPath: simulatedPath,
-                    onSimulatedPathChange: onSimulatedPathChange
-                }}
-            />
+            <div className="cms-content">
+                <CoreWidgetComponent
+                    config={widget.config || {}}
+                    mode={mode}
+                    onConfigChange={stableConfigChangeHandler}
+                    themeId={widget.config?.themeId}
+                    widgetId={actualWidgetId}
+                    slotName={actualSlotName}
+                    widgetType={widget.type}
+                    // PageEditor-specific props
+                    layoutRenderer={layoutRenderer}
+                    versionId={versionId}
+                    isPublished={isPublished}
+                    // Context props for container widgets
+                    parentComponentId={parentComponentId}
+                    contextType={contextType}
+                    pageId={pageId}
+                    onWidgetEdit={onEdit}
+                    onOpenWidgetEditor={onOpenWidgetEditor}
+                    // Widget path for infinite nesting
+                    widgetPath={widgetPath}
+                    // Legacy nested widget context (deprecated)
+                    nestedParentWidgetId={nestedParentWidgetId}
+                    nestedParentSlotName={nestedParentSlotName}
+                    context={{
+                        widgetId: actualWidgetId,
+                        slotName: actualSlotName,
+                        contextType,
+                        pageId,
+                        versionId,
+                        webpageData,
+                        pageVersionData,
+                        widgetPath,
+                        pathVariables: pathVariables || {},
+                        simulatedPath: simulatedPath,
+                        onSimulatedPathChange: onSimulatedPathChange
+                    }}
+                />
+            </div>
         </div>
     )
 }

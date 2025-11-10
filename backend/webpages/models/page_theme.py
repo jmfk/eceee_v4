@@ -1155,7 +1155,7 @@ class PageTheme(models.Model):
             },
         }
 
-    def generate_css(self, scope="", widget_type=None, slot=None):
+    def generate_css(self, scope="", widget_type=None, slot=None, frontend_scoped=False):
         """
         Generate complete CSS for this theme including colors, design groups, and custom CSS.
         Supports both new design_groups structure and legacy html_elements for backwards compatibility.
@@ -1164,6 +1164,7 @@ class PageTheme(models.Model):
             scope: CSS scope selector (default: "" for root, uses data attributes for targeting)
             widget_type: Optional widget type for targeted design groups
             slot: Optional slot name for targeted design groups
+            frontend_scoped: If True, prepend .cms-content to design group selectors (for frontend editor)
         """
         css_parts = []
 
@@ -1181,7 +1182,7 @@ class PageTheme(models.Model):
         # Design groups styling (new structure with groups)
         if self.design_groups and self.design_groups.get("groups"):
             design_groups_css = self._generate_design_groups_css(
-                scope, widget_type, slot
+                scope, widget_type, slot, frontend_scoped
             )
             if design_groups_css:
                 css_parts.append(design_groups_css)
@@ -1198,11 +1199,17 @@ class PageTheme(models.Model):
 
         return "\n\n".join(css_parts)
 
-    def _generate_design_groups_css(self, scope, widget_type=None, slot=None):
+    def _generate_design_groups_css(self, scope, widget_type=None, slot=None, frontend_scoped=False):
         """
         Generate CSS for design groups with optional targeting by widget_type/slot.
         Groups are applied in order, with more specific groups overriding general ones.
         Converts named color references to CSS variables.
+        
+        Args:
+            scope: CSS scope selector
+            widget_type: Optional widget type for filtering
+            slot: Optional slot name for filtering
+            frontend_scoped: If True, prepend .cms-content to all selectors
         """
         css_parts = []
 
@@ -1273,6 +1280,13 @@ class PageTheme(models.Model):
                             base_selectors.append(
                                 f".slot-{slot_normalized} .widget-type-{wt_normalized}"
                             )
+            
+            # Apply frontend scoping if requested
+            if frontend_scoped:
+                base_selectors = [
+                    f".cms-content {sel}".strip() if sel else ".cms-content"
+                    for sel in base_selectors
+                ]
 
             # Apply group-level color scheme if defined
             color_scheme = group.get("colorScheme", {})

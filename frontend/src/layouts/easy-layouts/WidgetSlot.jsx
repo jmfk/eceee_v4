@@ -10,6 +10,13 @@ import { Layout, Plus, Eye, EyeOff } from 'lucide-react';
 import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import PageSlotIconMenu from '../../editors/page-editor/PageSlotIconMenu';
 import { getSlotWidgetsForMode, shouldSlotDefaultToPreview, hasInheritedContent } from '../../utils/widgetMerging';
+
+// Normalize slot name for CSS class (matches backend logic)
+const normalizeForCSS = (value) => {
+    if (!value) return '';
+    return value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+};
+
 const WidgetSlot = ({
     name,
     label,
@@ -340,7 +347,7 @@ const WidgetSlot = ({
 
         return (
             <div
-                className="widget-slot group relative"
+                className={`widget-slot slot-${normalizeForCSS(name)} group relative`}
                 data-slot-name={name}
                 data-widget-slot={name}
                 data-slot-title={label}

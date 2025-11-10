@@ -16,24 +16,26 @@ class ThemeCSSGenerator:
         settings, "THEME_CSS_CACHE_TIMEOUT", 3600 * 24
     )  # 24 hours default
 
-    def get_cache_key(self, theme_id):
+    def get_cache_key(self, theme_id, frontend_scoped=False):
         """Generate cache key for theme CSS"""
-        return f"{self.CACHE_PREFIX}{theme_id}"
+        suffix = "_frontend" if frontend_scoped else ""
+        return f"{self.CACHE_PREFIX}{theme_id}{suffix}"
 
-    def get_cached_css(self, theme_id):
+    def get_cached_css(self, theme_id, frontend_scoped=False):
         """
         Retrieve cached CSS from Redis.
 
         Args:
             theme_id: Theme ID
+            frontend_scoped: If True, get frontend-scoped CSS cache
 
         Returns:
             Cached CSS string or None if not cached
         """
-        cache_key = self.get_cache_key(theme_id)
+        cache_key = self.get_cache_key(theme_id, frontend_scoped)
         return cache.get(cache_key)
 
-    def set_cached_css(self, theme_id, css, timeout=None):
+    def set_cached_css(self, theme_id, css, timeout=None, frontend_scoped=False):
         """
         Store CSS in Redis cache.
 
@@ -41,8 +43,9 @@ class ThemeCSSGenerator:
             theme_id: Theme ID
             css: Generated CSS string
             timeout: Cache timeout in seconds (None = use default)
+            frontend_scoped: If True, cache frontend-scoped CSS separately
         """
-        cache_key = self.get_cache_key(theme_id)
+        cache_key = self.get_cache_key(theme_id, frontend_scoped)
         timeout = timeout if timeout is not None else self.CACHE_TIMEOUT
         cache.set(cache_key, css, timeout)
 
@@ -56,7 +59,7 @@ class ThemeCSSGenerator:
         cache_key = self.get_cache_key(theme_id)
         cache.delete(cache_key)
 
-    def generate_complete_css(self, theme):
+    def generate_complete_css(self, theme, frontend_scoped=False):
         """
         Generate complete CSS from all theme components.
 
@@ -71,6 +74,7 @@ class ThemeCSSGenerator:
 
         Args:
             theme: PageTheme instance
+            frontend_scoped: If True, prepend .cms-content to design group selectors
 
         Returns:
             Complete CSS string
@@ -85,7 +89,7 @@ class ThemeCSSGenerator:
 
         # 2-3. Use theme's generate_css method for colors and design groups
         # This ensures proper widget_type/slot targeting with data attributes
-        theme_css = theme.generate_css(scope="", widget_type=None, slot=None)
+        theme_css = theme.generate_css(scope="", widget_type=None, slot=None, frontend_scoped=frontend_scoped)
         if theme_css:
             css_parts.append(theme_css)
 

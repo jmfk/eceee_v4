@@ -22,9 +22,10 @@ function normalizeForCSS(value) {
  * @param {string} scope - CSS scope selector
  * @param {string} widgetType - Optional widget type for filtering
  * @param {string} slot - Optional slot name for filtering
+ * @param {boolean} frontendScoped - If true, prepend .cms-content to all selectors
  * @returns {string} Generated CSS
  */
-export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = null, slot = null) {
+export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = null, slot = null, frontendScoped = false) {
     if (!designGroups || !designGroups.groups) {
         return '';
     }
@@ -55,7 +56,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             : (group.slot ? [group.slot] : []);
 
         // Build all selector combinations using CSS classes
-        const baseSelectors = [];
+        let baseSelectors = [];
         
         if (widgetTypes.length === 0 && slots.length === 0) {
             // Global - no targeting
@@ -94,6 +95,13 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     }
                 });
             });
+        }
+        
+        // Apply frontend scoping if requested
+        if (frontendScoped) {
+            baseSelectors = baseSelectors.map(sel => 
+                sel ? `.cms-content ${sel}`.trim() : '.cms-content'
+            );
         }
 
         // Apply group-level color scheme for each base selector

@@ -106,12 +106,12 @@ export const useTheme = ({
 
     // Fetch complete CSS from backend's ThemeCSSGenerator
     const { data: themeCSS, isLoading: fetchingCSS, error: cssError } = useQuery({
-        queryKey: ['theme-css', theme?.id],
+        queryKey: ['theme-css', theme?.id, 'frontend-scoped'],
         queryFn: async () => {
             if (!theme?.id) return null
 
-            // Fetch complete CSS from backend endpoint
-            const url = `/api/v1/webpages/themes/${theme.id}/styles.css`
+            // Fetch complete CSS from backend endpoint with frontend scoping
+            const url = `/api/v1/webpages/themes/${theme.id}/styles.css?frontend_scoped=true`
             const response = await fetch(url)
             if (!response.ok) {
                 throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
@@ -252,7 +252,7 @@ export const useTheme = ({
         generateThemeCSS: async (themeData) => {
             if (!themeData?.id) return ''
             try {
-                const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css`)
+                const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?frontend_scoped=true`)
                 if (!response.ok) return ''
                 return await response.text()
             } catch {

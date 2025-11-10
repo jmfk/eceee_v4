@@ -31,11 +31,17 @@ class ThemeCSSView(View):
             request: HTTP request
             theme_id: Theme ID
 
+        Query Parameters:
+            frontend_scoped: If 'true', prepend .cms-content to design group selectors
+
         Returns:
             CSS response with proper headers
         """
         # Get theme
         theme = get_object_or_404(PageTheme, id=theme_id)
+
+        # Parse frontend_scoped query parameter
+        frontend_scoped = request.GET.get('frontend_scoped', '').lower() == 'true'
 
         # Initialize generator
         generator = ThemeCSSGenerator()
@@ -43,19 +49,19 @@ class ThemeCSSView(View):
         # Skip cache entirely in development (when CACHE_TIMEOUT is 0)
         if generator.CACHE_TIMEOUT == 0:
             # Development mode - always generate fresh CSS
-            css = generator.generate_complete_css(theme)
+            css = generator.generate_complete_css(theme, frontend_scoped=frontend_scoped)
         else:
-            # Production mode - use cache
-            cached_css = generator.get_cached_css(theme_id)
+            # Production mode - use cache (include frontend_scoped in cache key)
+            cached_css = generator.get_cached_css(theme_id, frontend_scoped=frontend_scoped)
 
             if cached_css is not None:
                 css = cached_css
             else:
                 # Generate CSS
-                css = generator.generate_complete_css(theme)
+                css = generator.generate_complete_css(theme, frontend_scoped=frontend_scoped)
 
                 # Cache it
-                generator.set_cached_css(theme_id, css)
+                generator.set_cached_css(theme_id, css, frontend_scoped=frontend_scoped)
 
         # Return CSS with proper headers
         response = HttpResponse(css, content_type="text/css; charset=utf-8")
