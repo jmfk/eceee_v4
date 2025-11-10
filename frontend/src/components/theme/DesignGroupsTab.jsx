@@ -7,11 +7,13 @@
  * - Numeric inputs with steppers and unit selectors
  * - Smart copy/paste (full set → all tags, single tag → selected tag)
  * - Tags grouped with pseudo-classes
+ * - Group-level CSS editor (edit all CSS at once)
+ * - Clipboard paste support for CSS snippets (Ctrl+V/Cmd+V)
  */
 
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp } from 'lucide-react';
-import { createDesignGroup, generateClassName } from '../../utils/themeUtils';
+import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp, Globe, Package } from 'lucide-react';
+import { createDesignGroup, generateClassName, getWidgetTypes } from '../../utils/themeUtils';
 import { parseCSSRules, cssToGroupElements, cssToElementProperties, groupElementsToCSS, isValidClassName } from '../../utils/cssParser';
 import DesignGroupsPreview from './DesignGroupsPreview';
 import ColorSelector from './form-fields/ColorSelector';
@@ -88,6 +90,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   const [clipboard, setClipboard] = useState(null); // { type: 'tag' | 'group', data: {...} }
   const [copiedIndicator, setCopiedIndicator] = useState(null);
   const [editMode, setEditMode] = useState({}); // { groupIndex-tagBase-variant: 'form' | 'css' }
+  const [groupEditMode, setGroupEditMode] = useState({}); // { groupIndex: 'tags' | 'css' }
   const [importModal, setImportModal] = useState(null); // { type: 'global' | 'group' | 'element', groupIndex?: number, elementKey?: string }
   const [importCSSText, setImportCSSText] = useState('');
   const { addNotification } = useGlobalNotifications();
@@ -98,7 +101,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
 
   const handleAddGroup = () => {
     const baseFont = fonts?.googleFonts?.[0]?.family || 'Inter';
-    const newGroup = createDesignGroup(`Group ${groups.length + 1}`, `${baseFont}, sans-serif`);
+    // Name first group "Default", others sequentially
+    const groupName = groups.length === 0 ? 'Default' : `Group ${groups.length + 1}`;
+    const newGroup = createDesignGroup(groupName, `${baseFont}, sans-serif`);
     const updatedDesignGroups = {
       ...(designGroups || {}),
       groups: [...groups, newGroup],
@@ -141,6 +146,42 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     updatedGroups[index] = {
       ...updatedGroups[index],
       className: className,
+    };
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+  };
+
+  const handleUpdateWidgetTypes = (index, selectedTypes) => {
+    const updatedGroups = [...groups];
+    updatedGroups[index] = {
+      ...updatedGroups[index],
+      widget_types: selectedTypes,
+      // Keep old field for backward compatibility
+      widget_type: selectedTypes.length === 1 ? selectedTypes[0] : null,
+    };
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+  };
+
+  const handleUpdateSlots = (index, slotsString) => {
+    const updatedGroups = [...groups];
+    // Parse comma-separated slots
+    const slotsArray = slotsString ? slotsString.split(',').map(s => s.trim()).filter(Boolean) : [];
+    updatedGroups[index] = {
+      ...updatedGroups[index],
+      slots: slotsArray,
+      // Keep old field for backward compatibility
+      slot: slotsArray.length === 1 ? slotsArray[0] : null,
+    };
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+  };
+
+  const handleUpdateColorScheme = (index, field, value) => {
+    const updatedGroups = [...groups];
+    updatedGroups[index] = {
+      ...updatedGroups[index],
+      colorScheme: {
+        ...(updatedGroups[index].colorScheme || {}),
+        [field]: value === '' ? null : value,
+      },
     };
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
@@ -340,6 +381,98 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         },
       };
       onChange({ ...(designGroups || {}), groups: updatedGroups });
+    }
+  };
+
+  // Toggle group edit mode between 'tags' and 'css'
+  const toggleGroupEditMode = (groupIndex) => {
+    const currentMode = groupEditMode[groupIndex] || 'tags';
+    
+    // If switching from CSS to tags, save the CSS first
+    if (currentMode === 'css') {
+      const ref = cssTextareaRefs.current[`group-${groupIndex}`];
+      if (ref) {
+        handleGroupCSSBlur(groupIndex);
+      }
+    }
+    
+    setGroupEditMode({
+      ...groupEditMode,
+      [groupIndex]: currentMode === 'css' ? 'tags' : 'css',
+    });
+  };
+
+  // Handle group CSS blur (save changes)
+  const handleGroupCSSBlur = (groupIndex) => {
+    const ref = cssTextareaRefs.current[`group-${groupIndex}`];
+    if (!ref) return;
+    
+    const cssText = ref.value;
+    try {
+      const rules = parseCSSRules(cssText);
+      const { elements, warnings } = cssToGroupElements(rules);
+      
+      // Replace entire elements object
+      const updatedGroups = [...groups];
+      updatedGroups[groupIndex] = {
+        ...updatedGroups[groupIndex],
+        elements: elements,
+      };
+      onChange({ ...(designGroups || {}), groups: updatedGroups });
+      
+      if (warnings.length > 0) {
+        addNotification({
+          type: 'warning',
+          message: `Updated group CSS (${warnings.length} selectors skipped)`
+        });
+      }
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        message: `Failed to parse CSS: ${error.message}`
+      });
+    }
+  };
+
+  // Tag/Element-level paste handler  
+  const handleElementPaste = async (e, groupIndex, elementKey) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain').trim();
+    
+    if (!text) return;
+    
+    try {
+      // Parse as CSS properties (no selector)
+      const properties = cssToElementProperties(text);
+      
+      if (Object.keys(properties).length > 0) {
+        const updatedGroups = [...groups];
+        const currentStyles = updatedGroups[groupIndex].elements[elementKey] || {};
+        
+        updatedGroups[groupIndex] = {
+          ...updatedGroups[groupIndex],
+          elements: {
+            ...updatedGroups[groupIndex].elements,
+            [elementKey]: { ...currentStyles, ...properties }
+          }
+        };
+        onChange({ ...(designGroups || {}), groups: updatedGroups });
+        
+        addNotification({
+          type: 'success', 
+          message: `Pasted ${Object.keys(properties).length} properties to ${elementKey}`
+        });
+      } else {
+        addNotification({
+          type: 'warning',
+          message: 'No valid CSS properties found in clipboard'
+        });
+      }
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        message: `Failed to paste: ${error.message}`
+      });
     }
   };
 
@@ -592,11 +725,63 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                         placeholder="Group name"
                       />
 
+                      {/* Targeting Badge */}
+                      {(group.widget_types?.length > 0 || group.widget_type || group.slots?.length > 0 || group.slot) ? (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-md border border-blue-200">
+                          <Package className="w-3 h-3" />
+                          <span>
+                            {(() => {
+                              const types = group.widget_types?.length > 0 ? group.widget_types : (group.widget_type ? [group.widget_type] : []);
+                              const slots = group.slots?.length > 0 ? group.slots : (group.slot ? [group.slot] : []);
+                              
+                              let text = types.length > 0 
+                                ? types.map(t => getWidgetTypes().find(w => w.value === t)?.label || t).join(', ')
+                                : 'Any';
+                              
+                              if (slots.length > 0) {
+                                text += ` > ${slots.join(', ')}`;
+                              }
+                              
+                              return text;
+                            })()}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-600 text-xs rounded-md border border-gray-200">
+                          <Globe className="w-3 h-3" />
+                          <span>Global</span>
+                        </div>
+                      )}
+
                       <div className="text-xs text-gray-500 font-medium">
                         {tagGroupsInGroup.length} tags
                       </div>
 
                       <div className="flex gap-1">
+                        {/* Toggle between Tags and CSS mode */}
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupEditMode(groupIndex)}
+                          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                            (groupEditMode[groupIndex] || 'tags') === 'css'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                          title={(groupEditMode[groupIndex] || 'tags') === 'css' ? 'Switch to tag editor' : 'Edit all CSS'}
+                        >
+                          {(groupEditMode[groupIndex] || 'tags') === 'css' ? (
+                            <>
+                              <FileText className="w-3 h-3 mr-1" />
+                              Tags
+                            </>
+                          ) : (
+                            <>
+                              <Code className="w-3 h-3 mr-1" />
+                              CSS
+                            </>
+                          )}
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => openImportModal('group', groupIndex)}
@@ -665,37 +850,120 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                         {group.className ? `.${group.className}` : '(global scope)'}
                       </span>
                     </div>
+
+                    {/* Targeting & Color Scheme */}
+                    <div className="ml-11 mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Widget Types (multi-select) */}
+                        <div>
+                          <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
+                          <select
+                            multiple
+                            value={group.widget_types || (group.widget_type ? [group.widget_type] : [])}
+                            onChange={(e) => {
+                              const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
+                              handleUpdateWidgetTypes(groupIndex, selectedOptions);
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                          >
+                            {getWidgetTypes().filter(wt => wt.value !== null).map(wt => (
+                              <option key={wt.value} value={wt.value}>{wt.label}</option>
+                            ))}
+                          </select>
+                          <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
+                        </div>
+
+                        {/* Slots (comma-separated) */}
+                        <div>
+                          <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
+                          <input
+                            type="text"
+                            value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
+                            onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="main, sidebar, footer (comma-separated)"
+                          />
+                          <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
+                        </div>
+                      </div>
+
+                      {/* Color Scheme */}
+                      <div className="mt-3 pt-3 border-t border-gray-300">
+                        <div className="text-xs text-gray-700 font-semibold mb-2">Color Scheme (for this widget/slot):</div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <ColorSelector
+                            label="Background Color"
+                            value={group.colorScheme?.background || ''}
+                            onChange={(value) => handleUpdateColorScheme(groupIndex, 'background', value)}
+                            colors={colors}
+                          />
+                          <ColorSelector
+                            label="Text Color"
+                            value={group.colorScheme?.text || ''}
+                            onChange={(value) => handleUpdateColorScheme(groupIndex, 'text', value)}
+                            colors={colors}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Group Content */}
                   {isExpanded && (
                     <div className="p-4 space-y-4">
-                      {/* Add Tag Buttons */}
-                      {availableTagGroups.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {availableTagGroups.map(tagGroup => (
-                            <button
-                              key={tagGroup.base}
-                              type="button"
-                              onClick={() => handleAddTagGroup(groupIndex, tagGroup)}
-                              className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                              title={`Add ${tagGroup.label}`}
-                            >
-                              + {tagGroup.label}
-                            </button>
-                          ))}
+                      {(groupEditMode[groupIndex] || 'tags') === 'css' ? (
+                        /* CSS Editor Mode - Edit all group CSS at once */
+                        <div className="space-y-3">
+                          <div className="text-sm text-gray-600 mb-2">
+                            Edit all CSS for this group. Changes are saved when you click away or switch back to Tags mode.
+                          </div>
+                          <textarea
+                            ref={(el) => {
+                              if (el) cssTextareaRefs.current[`group-${groupIndex}`] = el;
+                            }}
+                            defaultValue={groupElementsToCSS(group.elements || {})}
+                            onChange={() => {
+                              if (onDirty) onDirty();
+                            }}
+                            onBlur={() => handleGroupCSSBlur(groupIndex)}
+                            className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            rows={Math.max(10, Object.keys(group.elements || {}).length * 5)}
+                            placeholder="h1 {&#10;  font-size: 2.5rem;&#10;  font-weight: 700;&#10;}&#10;&#10;p {&#10;  font-size: 1rem;&#10;  line-height: 1.6;&#10;}"
+                          />
                         </div>
-                      )}
+                      ) : (
+                        /* Tags Mode - Individual tag editors */
+                        <>
+                          {/* Add Tag Buttons */}
+                          {availableTagGroups.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {availableTagGroups.map(tagGroup => (
+                                <button
+                                  key={tagGroup.base}
+                                  type="button"
+                                  onClick={() => handleAddTagGroup(groupIndex, tagGroup)}
+                                  className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                  title={`Add ${tagGroup.label}`}
+                                >
+                                  + {tagGroup.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
 
-                      {/* Tag Groups */}
-                      {tagGroupsInGroup.map((tagGroup) => {
+                          {/* Tag Groups */}
+                          {tagGroupsInGroup.map((tagGroup) => {
                         const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? !tagGroup.hasGroup;
                         const baseStyles = group.elements[tagGroup.base] || {};
 
                         return (
                           <div key={tagGroup.base} className="border border-gray-200 rounded-lg overflow-hidden">
                             {/* Tag Header */}
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200">
+                            <div 
+                              className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200"
+                              onPaste={(e) => handleElementPaste(e, groupIndex, tagGroup.base)}
+                              tabIndex={-1}
+                            >
                               {/* Only show toggle for links */}
                               {tagGroup.hasGroup && (
                                 <button
@@ -871,6 +1139,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                           </div>
                         );
                       })}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
