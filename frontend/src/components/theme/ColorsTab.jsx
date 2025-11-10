@@ -3,13 +3,15 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Palette } from 'lucide-react';
+import { Plus, Trash2, Palette, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
+import ImageColorExtractor from './ImageColorExtractor';
 
 const ColorsTab = ({ colors, onChange, onDirty }) => {
   const [newColorName, setNewColorName] = useState('');
   const [newColorValue, setNewColorValue] = useState('#000000');
+  const [showExtractor, setShowExtractor] = useState(false);
   const { addNotification } = useGlobalNotifications();
 
   const colorEntries = Object.entries(colors || {});
@@ -66,6 +68,22 @@ const ColorsTab = ({ colors, onChange, onDirty }) => {
     if (onDirty) onDirty();
   };
 
+  const handleColorsExtracted = (extractedColors, mode) => {
+    let updatedColors;
+    
+    if (mode === 'replace') {
+      updatedColors = extractedColors;
+      addNotification({ type: 'success', message: `Replaced all colors with ${Object.keys(extractedColors).length} extracted colors` });
+    } else {
+      // Add mode - merge with existing
+      updatedColors = { ...colors, ...extractedColors };
+      addNotification({ type: 'success', message: `Added ${Object.keys(extractedColors).length} colors from image` });
+    }
+    
+    onChange(updatedColors);
+    if (onDirty) onDirty();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -78,6 +96,31 @@ const ColorsTab = ({ colors, onChange, onDirty }) => {
           onSuccess={() => addNotification({ type: 'success', message: 'Colors copied to clipboard' })}
           onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
         />
+      </div>
+
+      {/* Extract from Image Section */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowExtractor(!showExtractor)}
+          className="w-full flex items-center justify-between p-4 text-left hover:bg-blue-100 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-blue-600" />
+            <span className="font-semibold text-gray-900">Extract Colors from Image</span>
+          </div>
+          {showExtractor ? (
+            <ChevronUp className="w-5 h-5 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-500" />
+          )}
+        </button>
+        
+        {showExtractor && (
+          <div className="p-4 border-t border-blue-200 bg-white">
+            <ImageColorExtractor onColorsExtracted={handleColorsExtracted} />
+          </div>
+        )}
       </div>
 
       {/* Add Color Form */}

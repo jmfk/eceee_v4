@@ -10,11 +10,11 @@ import { generateDesignGroupsCSS, generateColorsCSS } from '../../utils/themeUti
 const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = null }) => {
     // Generate CSS for the preview
     const previewCSS = useMemo(() => {
-        const colorCSS = generateColorsCSS(colors || {}, '.design-groups-preview');
+        const colorCSS = generateColorsCSS(colors || {}, ':root');
         const designGroupsCSS = generateDesignGroupsCSS(
             designGroups || {},
             colors || {},
-            '.design-groups-preview',
+            '',  // No scope - use data attributes
             widgetType,
             slot
         );
@@ -26,7 +26,11 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
         <div className="design-groups-preview-container">
             <style>{previewCSS}</style>
 
-            <div className="design-groups-preview bg-white border border-gray-300 rounded-lg p-6 space-y-4">
+            <div 
+                className="design-groups-preview default bg-white border border-gray-300 rounded-lg p-6 space-y-4"
+                data-widget-type="text_block"
+                data-slot-name="preview"
+            >
                 <h1>Heading 1 - The Quick Brown Fox</h1>
                 <h2>Heading 2 - Jumps Over the Lazy Dog</h2>
                 <h3>Heading 3 - Typography Preview</h3>
