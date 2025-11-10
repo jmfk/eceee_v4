@@ -203,7 +203,28 @@ export function groupElementsToCSS(elements, className = null) {
 
         // Build declarations
         const declarations = Object.entries(properties)
-            .map(([prop, value]) => `  ${camelToKebab(prop)}: ${value};`)
+            .map(([prop, value]) => {
+                let cssValue = value;
+                
+                // Handle font-family - wrap fonts with spaces in quotes
+                if (prop === 'fontFamily') {
+                    cssValue = value.split(',').map(font => {
+                        const trimmed = font.trim();
+                        // If already quoted or is a generic family, leave as-is
+                        if (trimmed.startsWith('"') || trimmed.startsWith("'") || 
+                            ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui'].includes(trimmed)) {
+                            return trimmed;
+                        }
+                        // If contains spaces, wrap in quotes
+                        if (trimmed.includes(' ')) {
+                            return `"${trimmed}"`;
+                        }
+                        return trimmed;
+                    }).join(', ');
+                }
+                
+                return `  ${camelToKebab(prop)}: ${cssValue};`;
+            })
             .join('\n');
 
         cssRules.push(`${selector} {\n${declarations}\n}`);

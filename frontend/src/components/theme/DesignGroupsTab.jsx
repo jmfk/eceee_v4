@@ -88,6 +88,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   const groups = designGroups?.groups || [];
   const [expandedGroups, setExpandedGroups] = useState({});
   const [expandedTags, setExpandedTags] = useState({});
+  const [expandedTargeting, setExpandedTargeting] = useState({});
   const [clipboard, setClipboard] = useState(null); // { type: 'tag' | 'group', data: {...} }
   const [copiedIndicator, setCopiedIndicator] = useState(null);
   const [editMode, setEditMode] = useState({}); // { groupIndex-tagBase-variant: 'form' | 'css' }
@@ -136,6 +137,13 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     });
   };
 
+  const toggleTargeting = (groupIndex) => {
+    setExpandedTargeting({
+      ...expandedTargeting,
+      [groupIndex]: !expandedTargeting[groupIndex],
+    });
+  };
+
   const handleUpdateGroupName = (index, newName) => {
     const updatedGroups = [...groups];
     updatedGroups[index] = {
@@ -158,9 +166,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     const updatedGroups = [...groups];
     updatedGroups[index] = {
       ...updatedGroups[index],
-      widget_types: selectedTypes,
+      widgetTypes: selectedTypes,
       // Keep old field for backward compatibility
-      widget_type: selectedTypes.length === 1 ? selectedTypes[0] : null,
+      widgetType: selectedTypes.length === 1 ? selectedTypes[0] : null,
     };
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
@@ -856,64 +864,84 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                     </div>
 
                     {/* Targeting & Color Scheme */}
-                    <div className="ml-11 mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Widget Types (multi-select) */}
-                        <div>
-                          <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
-                          <select
-                            multiple
-                            value={group.widget_types || (group.widget_type ? [group.widget_type] : [])}
-                            onChange={(e) => {
-                              const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
-                              handleUpdateWidgetTypes(groupIndex, selectedOptions);
-                            }}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                            disabled={isLoadingTypes}
-                          >
-                            {isLoadingTypes ? (
-                              <option disabled>Loading widget types...</option>
-                            ) : (
-                              widgetTypes.map(wt => (
-                                <option key={wt.type} value={wt.type}>{wt.name}</option>
-                              ))
-                            )}
-                          </select>
-                          <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
-                        </div>
+                    <div className="ml-11 mt-3 bg-gray-50 rounded-md border border-gray-200">
+                      {/* Collapsible Header */}
+                      <button
+                        onClick={() => toggleTargeting(groupIndex)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 rounded-t-md transition-colors"
+                      >
+                        {expandedTargeting[groupIndex] ? (
+                          <ChevronDown size={16} className="text-gray-600" />
+                        ) : (
+                          <ChevronRight size={16} className="text-gray-600" />
+                        )}
+                        <span className="text-xs font-medium text-gray-700">
+                          Targeting & Color Scheme
+                        </span>
+                      </button>
 
-                        {/* Slots (comma-separated) */}
-                        <div>
-                          <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
-                          <input
-                            type="text"
-                            value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
-                            onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="main, sidebar, footer (comma-separated)"
-                          />
-                          <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
-                        </div>
-                      </div>
+                      {/* Collapsible Content */}
+                      {expandedTargeting[groupIndex] && (
+                        <div className="p-3 border-t border-gray-200">
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Widget Types (multi-select) */}
+                            <div>
+                              <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
+                              <select
+                                multiple
+                                value={group.widget_types || (group.widget_type ? [group.widget_type] : [])}
+                                onChange={(e) => {
+                                  const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
+                                  handleUpdateWidgetTypes(groupIndex, selectedOptions);
+                                }}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                                disabled={isLoadingTypes}
+                              >
+                                {isLoadingTypes ? (
+                                  <option disabled>Loading widget types...</option>
+                                ) : (
+                                  widgetTypes.map(wt => (
+                                    <option key={wt.type} value={wt.type}>{wt.name}</option>
+                                  ))
+                                )}
+                              </select>
+                              <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
+                            </div>
 
-                      {/* Color Scheme */}
-                      <div className="mt-3 pt-3 border-t border-gray-300">
-                        <div className="text-xs text-gray-700 font-semibold mb-2">Color Scheme (for this widget/slot):</div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <ColorSelector
-                            label="Background Color"
-                            value={group.colorScheme?.background || ''}
-                            onChange={(value) => handleUpdateColorScheme(groupIndex, 'background', value)}
-                            colors={colors}
-                          />
-                          <ColorSelector
-                            label="Text Color"
-                            value={group.colorScheme?.text || ''}
-                            onChange={(value) => handleUpdateColorScheme(groupIndex, 'text', value)}
-                            colors={colors}
-                          />
+                            {/* Slots (comma-separated) */}
+                            <div>
+                              <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
+                              <input
+                                type="text"
+                                value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
+                                onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="main, sidebar, footer (comma-separated)"
+                              />
+                              <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
+                            </div>
+                          </div>
+
+                          {/* Color Scheme */}
+                          <div className="mt-3 pt-3 border-t border-gray-300">
+                            <div className="text-xs text-gray-700 font-semibold mb-2">Color Scheme (for this widget/slot):</div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <ColorSelector
+                                label="Background Color"
+                                value={group.colorScheme?.background || ''}
+                                onChange={(value) => handleUpdateColorScheme(groupIndex, 'background', value)}
+                                colors={colors}
+                              />
+                              <ColorSelector
+                                label="Text Color"
+                                value={group.colorScheme?.text || ''}
+                                onChange={(value) => handleUpdateColorScheme(groupIndex, 'text', value)}
+                                colors={colors}
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
 

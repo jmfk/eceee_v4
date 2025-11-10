@@ -1242,7 +1242,7 @@ class PageTheme(models.Model):
                     ]
                 else:
                     base_selectors = [
-                        f".default.slot-{normalize_for_css(slot)}" for slot in slots
+                        f".slot-{normalize_for_css(slot)}" for slot in slots
                     ]
             elif widget_types and not slots:
                 # Widget type targeting only
@@ -1253,8 +1253,7 @@ class PageTheme(models.Model):
                     ]
                 else:
                     base_selectors = [
-                        f".default.widget-type-{normalize_for_css(wt)}"
-                        for wt in widget_types
+                        f".widget-type-{normalize_for_css(wt)}" for wt in widget_types
                     ]
             else:
                 # Both widget type and slot targeting (all combinations)
@@ -1268,7 +1267,7 @@ class PageTheme(models.Model):
                             )
                         else:
                             base_selectors.append(
-                                f".default.widget-type-{wt_normalized}.slot-{slot_normalized}"
+                                f".widget-type-{wt_normalized}.slot-{slot_normalized}"
                             )
 
             # Apply group-level color scheme if defined

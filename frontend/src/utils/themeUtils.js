@@ -118,6 +118,24 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     value = `var(--${propertyValue})`;
                 }
 
+                // Handle font-family - wrap in quotes if contains spaces
+                if (propertyName === 'fontFamily') {
+                    // Split by comma to handle font stacks
+                    value = value.split(',').map(font => {
+                        const trimmed = font.trim();
+                        // If already quoted or is a generic family, leave as-is
+                        if (trimmed.startsWith('"') || trimmed.startsWith("'") || 
+                            ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui'].includes(trimmed)) {
+                            return trimmed;
+                        }
+                        // If contains spaces, wrap in quotes
+                        if (trimmed.includes(' ')) {
+                            return `"${trimmed}"`;
+                        }
+                        return trimmed;
+                    }).join(', ');
+                }
+
                 // Handle list-specific properties
                 if ((element === 'ul' || element === 'ol') && propertyName === 'bulletType') {
                     cssRule += `  list-style-type: ${value};\n`;

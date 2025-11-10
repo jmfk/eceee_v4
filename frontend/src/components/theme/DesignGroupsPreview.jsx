@@ -9,19 +9,27 @@ import { generateDesignGroupsCSS, generateColorsCSS } from '../../utils/themeUti
 
 const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = null }) => {
     const groups = designGroups?.groups || [];
-    const [selectedGroupIndex, setSelectedGroupIndex] = useState('all');
+    const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
 
     // Generate CSS for the preview
     const previewCSS = useMemo(() => {
         const colorCSS = generateColorsCSS(colors || {}, ':root');
 
-        // Filter to selected group if not "all"
-        const filteredDesignGroups = selectedGroupIndex === 'all'
-            ? designGroups
-            : { groups: [groups[selectedGroupIndex]] };
+        // Find the default group (has className "default")
+        const defaultGroup = groups.find(g => g.className === 'default');
+        const selectedGroup = groups[selectedGroupIndex];
+
+        // Always apply default group first, then override with selected group
+        const groupsToApply = [];
+        if (defaultGroup && defaultGroup !== selectedGroup) {
+            groupsToApply.push(defaultGroup);
+        }
+        if (selectedGroup) {
+            groupsToApply.push(selectedGroup);
+        }
 
         const designGroupsCSS = generateDesignGroupsCSS(
-            filteredDesignGroups || {},
+            { groups: groupsToApply },
             colors || {},
             '',  // No scope - use data attributes
             widgetType,
@@ -44,10 +52,9 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
                     <select
                         id="group-selector"
                         value={selectedGroupIndex}
-                        onChange={(e) => setSelectedGroupIndex(e.target.value)}
+                        onChange={(e) => setSelectedGroupIndex(Number(e.target.value))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                        <option value="all">All Groups</option>
                         {groups.map((group, index) => (
                             <option key={index} value={index}>
                                 {group.name || `Group ${index + 1}`}
@@ -59,8 +66,8 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
 
             <div
                 className="design-groups-preview default bg-white border border-gray-300 rounded-lg p-6 space-y-4"
-                data-widget-type="text_block"
-                data-slot-name="preview"
+                {...(widgetType && { 'data-widget-type': widgetType })}
+                {...(slot && { 'data-slot-name': slot })}
             >
                 <h1>Heading 1 - The Quick Brown Fox</h1>
                 <h2>Heading 2 - Jumps Over the Lazy Dog</h2>
