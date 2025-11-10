@@ -1152,13 +1152,13 @@ class PageTheme(models.Model):
             },
         }
 
-    def generate_css(self, scope=".theme-content", widget_type=None, slot=None):
+    def generate_css(self, scope="", widget_type=None, slot=None):
         """
         Generate complete CSS for this theme including colors, design groups, and custom CSS.
         Supports both new design_groups structure and legacy html_elements for backwards compatibility.
 
         Args:
-            scope: CSS scope selector (default: ".theme-content")
+            scope: CSS scope selector (default: "" for root, uses data attributes for targeting)
             widget_type: Optional widget type for targeted design groups
             slot: Optional slot name for targeted design groups
         """
@@ -1167,7 +1167,9 @@ class PageTheme(models.Model):
         # CSS Variables from colors (new) or css_variables (legacy)
         colors = self.colors or self.css_variables
         if colors:
-            variables_css = f"{scope} {{\n"
+            # Use :root for CSS variables when no scope, otherwise scope them
+            var_scope = ":root" if not scope else scope
+            variables_css = f"{var_scope} {{\n"
             for var_name, var_value in colors.items():
                 variables_css += f"  --{var_name}: {var_value};\n"
             variables_css += "}"
@@ -1216,12 +1218,68 @@ class PageTheme(models.Model):
 
         # Generate CSS for each applicable group
         for group in applicable_groups:
+            # Get widget types and slots (handle both new array format and old single value)
+            widget_types = group.get("widget_types", [])
+            if not widget_types and group.get("widget_type"):
+                widget_types = [group["widget_type"]]
+            
+            slots = group.get("slots", [])
+            if not slots and group.get("slot"):
+                slots = [group["slot"]]
+
+            # Build all selector combinations
+            base_selectors = []
+            
+            if not widget_types and not slots:
+                # Global - no targeting, use .default class
+                base_selectors.append(scope if scope else '.default')
+            elif not widget_types and slots:
+                # Slot targeting only
+                if scope:
+                    base_selectors = [f'{scope}[data-slot-name="{slot}"]' for slot in slots]
+                else:
+                    base_selectors = [f'.default[data-slot-name="{slot}"]' for slot in slots]
+            elif widget_types and not slots:
+                # Widget type targeting only
+                if scope:
+                    base_selectors = [f'{scope}[data-widget-type="{wt}"]' for wt in widget_types]
+                else:
+                    base_selectors = [f'.default[data-widget-type="{wt}"]' for wt in widget_types]
+            else:
+                # Both widget type and slot targeting (all combinations)
+                for wt in widget_types:
+                    for slot in slots:
+                        if scope:
+                            base_selectors.append(f'{scope}[data-widget-type="{wt}"][data-slot-name="{slot}"]')
+                        else:
+                            base_selectors.append(f'.default[data-widget-type="{wt}"][data-slot-name="{slot}"]')
+
+            # Apply group-level color scheme if defined
+            color_scheme = group.get("colorScheme", {})
+            if color_scheme and (color_scheme.get("background") or color_scheme.get("text")):
+                selectors_str = ",\n".join(base_selectors)
+                color_scheme_rule = f"{selectors_str} {{\n"
+                if color_scheme.get("background"):
+                    bg_value = color_scheme["background"]
+                    if bg_value in self.colors:
+                        bg_value = f"var(--{bg_value})"
+                    color_scheme_rule += f"  background-color: {bg_value};\n"
+                if color_scheme.get("text"):
+                    text_value = color_scheme["text"]
+                    if text_value in self.colors:
+                        text_value = f"var(--{text_value})"
+                    color_scheme_rule += f"  color: {text_value};\n"
+                color_scheme_rule += "}"
+                css_parts.append(color_scheme_rule)
+
             elements = group.get("elements", {})
             for element, styles in elements.items():
                 if not styles:
                     continue
 
-                selector = f"{scope} {element}"
+                # Generate element rules for all base selectors
+                element_selectors = [f"{base} {element}" for base in base_selectors]
+                selector = ",\n".join(element_selectors)
                 css_rule = f"{selector} {{\n"
 
                 # Convert camelCase to kebab-case and handle special properties

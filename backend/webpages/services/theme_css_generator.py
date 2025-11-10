@@ -63,11 +63,10 @@ class ThemeCSSGenerator:
         Includes:
         - Google Fonts imports
         - CSS variables from colors
-        - Typography styles
+        - Design groups (from PageTheme.generate_css for proper data attribute targeting)
         - Component styles CSS
         - Gallery styles CSS
         - Carousel styles CSS
-        - Lightbox styles (from component_styles)
         - Custom CSS
 
         Args:
@@ -84,17 +83,11 @@ class ThemeCSSGenerator:
             if fonts_import:
                 css_parts.append(fonts_import)
 
-        # 2. CSS Variables from colors
-        if theme.colors:
-            variables_css = self._generate_color_variables(theme.colors)
-            if variables_css:
-                css_parts.append(variables_css)
-
-        # 3. Design Groups (HTML element styles)
-        if theme.design_groups and theme.design_groups.get("groups"):
-            design_groups_css = self._generate_design_groups_css(theme.design_groups)
-            if design_groups_css:
-                css_parts.append(design_groups_css)
+        # 2-3. Use theme's generate_css method for colors and design groups
+        # This ensures proper widget_type/slot targeting with data attributes
+        theme_css = theme.generate_css(scope="", widget_type=None, slot=None)
+        if theme_css:
+            css_parts.append(theme_css)
 
         # 4. Component Styles CSS
         if theme.component_styles:
@@ -113,10 +106,6 @@ class ThemeCSSGenerator:
             carousel_css = self._generate_carousel_css(theme.carousel_styles)
             if carousel_css:
                 css_parts.append(carousel_css)
-
-        # 7. Custom CSS
-        if theme.custom_css:
-            css_parts.append(f"/* Custom CSS */\n{theme.custom_css}")
 
         return "\n\n".join(css_parts)
 
@@ -143,89 +132,6 @@ class ThemeCSSGenerator:
                 )
 
         return "\n".join(imports) if imports else ""
-
-    def _generate_color_variables(self, colors):
-        """Generate CSS custom properties from color definitions"""
-        if not colors:
-            return ""
-
-        css = ":root {\n"
-        for name, value in colors.items():
-            css += f"  --{name}: {value};\n"
-        css += "}"
-
-        return css
-
-    def _generate_design_groups_css(self, design_groups):
-        """Generate CSS from design groups with optional class scoping"""
-        if not design_groups or not design_groups.get("groups"):
-            return ""
-
-        css_parts = []
-
-        for group in design_groups["groups"]:
-            group_name = group.get("name", "")
-            class_name = group.get("className", None)
-            elements = group.get("elements", {})
-
-            if elements:
-                scope_info = f" (scoped: .{class_name})" if class_name else " (global)"
-                css_parts.append(f"/* Typography: {group_name}{scope_info} */")
-
-                for element, styles in elements.items():
-                    if not styles:
-                        continue
-
-                    # Build selector with optional class scope
-                    if class_name:
-                        selector = f".{class_name} {element}"
-                    else:
-                        selector = element
-
-                    css = f"{selector} {{\n"
-
-                    # Handle font
-                    if "font" in styles:
-                        css += f"  font-family: '{styles['font']}', sans-serif;\n"
-
-                    # Handle other properties with expanded property map
-                    property_map = {
-                        "size": "font-size",
-                        "fontSize": "font-size",
-                        "lineHeight": "line-height",
-                        "fontWeight": "font-weight",
-                        "fontStyle": "font-style",
-                        "marginBottom": "margin-bottom",
-                        "marginTop": "margin-top",
-                        "marginLeft": "margin-left",
-                        "marginRight": "margin-right",
-                        "paddingTop": "padding-top",
-                        "paddingBottom": "padding-bottom",
-                        "paddingLeft": "padding-left",
-                        "paddingRight": "padding-right",
-                        "color": "color",
-                        "backgroundColor": "background-color",
-                        "textDecoration": "text-decoration",
-                        "textTransform": "text-transform",
-                        "letterSpacing": "letter-spacing",
-                        "bulletType": "list-style-type",
-                    }
-
-                    for style_key, css_prop in property_map.items():
-                        if style_key in styles:
-                            value = styles[style_key]
-                            # If it's a color variable reference, use var()
-                            if style_key in (
-                                "color",
-                                "backgroundColor",
-                            ) and not value.startswith(("#", "rgb", "var")):
-                                value = f"var(--{value})"
-                            css += f"  {css_prop}: {value};\n"
-
-                    css += "}"
-                    css_parts.append(css)
-
-        return "\n\n".join(css_parts)
 
     def _generate_component_css(self, component_styles):
         """Generate CSS from component styles"""
