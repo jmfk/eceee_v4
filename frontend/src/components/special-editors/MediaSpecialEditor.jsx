@@ -28,7 +28,7 @@ const MediaSpecialEditor = ({
     context = {}
 }) => {
     // Get current theme for image styles and notifications
-    const { currentTheme } = useTheme({ pageId: context?.pageId })
+    const { currentTheme } = useTheme({ pageId: context?.pageId, enabled: false }) // Disable CSS injection
     const { addNotification } = useGlobalNotifications()
 
     // Core state

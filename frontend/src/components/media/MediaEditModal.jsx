@@ -9,7 +9,7 @@ import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 
 const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, namespace, pageId }) => {
-    const { currentTheme } = useTheme({ pageId });
+    const { currentTheme } = useTheme({ pageId, enabled: false }); // Disable CSS injection
     const [config, setConfig] = useState({
         width: 'full',
         align: 'center',

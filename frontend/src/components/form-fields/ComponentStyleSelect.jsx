@@ -15,7 +15,7 @@ const ComponentStyleSelect = ({
     const pageId = context?.pageId;
     
     // Get theme using pageId to fetch effectiveTheme (includes inheritance)
-    const { currentTheme } = useTheme({ pageId });
+    const { currentTheme } = useTheme({ pageId, enabled: false }); // Disable CSS injection
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 

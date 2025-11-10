@@ -9,7 +9,7 @@ import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 
 const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
-    const { currentTheme } = useTheme({ pageId });
+    const { currentTheme } = useTheme({ pageId, enabled: false }); // Disable CSS injection
     const [step, setStep] = useState('select'); // 'select' or 'configure'
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'

@@ -57,7 +57,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
             {showPalette && (
                 <div
                     ref={paletteRef}
-                    className="absolute z-50 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg"
+                    className="absolute z-[100] mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg"
                     style={{ minWidth: '200px' }}
                 >
                     <div className="text-xs font-semibold text-gray-700 mb-2">Theme Colors</div>
