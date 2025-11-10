@@ -13,7 +13,7 @@
  * @param {string} slot - Optional slot name for filtering
  * @returns {string} Generated CSS
  */
-export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '.theme-content', widgetType = null, slot = null) {
+export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = null, slot = null) {
     if (!designGroups || !designGroups.groups) {
         return '';
     }
@@ -35,6 +35,65 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '.the
 
     // Generate CSS for each applicable group
     for (const group of applicableGroups) {
+        // Get widget types and slots (handle both new array format and old single value)
+        const widgetTypes = group.widget_types?.length > 0 
+            ? group.widget_types 
+            : (group.widget_type ? [group.widget_type] : []);
+        const slots = group.slots?.length > 0 
+            ? group.slots 
+            : (group.slot ? [group.slot] : []);
+
+        // Build all selector combinations
+        const baseSelectors = [];
+        
+        if (widgetTypes.length === 0 && slots.length === 0) {
+            // Global - no targeting, use .default class
+            baseSelectors.push(scope || '.default');
+        } else if (widgetTypes.length === 0 && slots.length > 0) {
+            // Slot targeting only
+            slots.forEach(slot => {
+                baseSelectors.push(scope 
+                    ? `${scope}[data-slot-name="${slot}"]` 
+                    : `.default[data-slot-name="${slot}"]`);
+            });
+        } else if (widgetTypes.length > 0 && slots.length === 0) {
+            // Widget type targeting only
+            widgetTypes.forEach(type => {
+                baseSelectors.push(scope 
+                    ? `${scope}[data-widget-type="${type}"]` 
+                    : `.default[data-widget-type="${type}"]`);
+            });
+        } else {
+            // Both widget type and slot targeting (all combinations)
+            widgetTypes.forEach(type => {
+                slots.forEach(slot => {
+                    baseSelectors.push(scope 
+                        ? `${scope}[data-widget-type="${type}"][data-slot-name="${slot}"]`
+                        : `.default[data-widget-type="${type}"][data-slot-name="${slot}"]`);
+                });
+            });
+        }
+
+        // Apply group-level color scheme for each base selector
+        if (group.colorScheme && (group.colorScheme.background || group.colorScheme.text)) {
+            const colorSchemeSelectors = baseSelectors.join(',\n');
+            let colorSchemeRule = `${colorSchemeSelectors} {\n`;
+            if (group.colorScheme.background) {
+                const bgValue = colors[group.colorScheme.background] 
+                    ? `var(--${group.colorScheme.background})` 
+                    : group.colorScheme.background;
+                colorSchemeRule += `  background-color: ${bgValue};\n`;
+            }
+            if (group.colorScheme.text) {
+                const textValue = colors[group.colorScheme.text] 
+                    ? `var(--${group.colorScheme.text})` 
+                    : group.colorScheme.text;
+                colorSchemeRule += `  color: ${textValue};\n`;
+            }
+            colorSchemeRule += '}';
+            cssParts.push(colorSchemeRule);
+        }
+
         const elements = group.elements || {};
 
         for (const [element, styles] of Object.entries(elements)) {
@@ -42,8 +101,9 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '.the
                 continue;
             }
 
-            const selector = `${scope} ${element}`;
-            let cssRule = `${selector} {\n`;
+            // Generate element rules for all base selectors
+            const elementSelectors = baseSelectors.map(base => `${base} ${element}`).join(',\n');
+            let cssRule = `${elementSelectors} {\n`;
 
             // Convert camelCase to kebab-case and handle special properties
             for (const [propertyName, propertyValue] of Object.entries(styles)) {
@@ -81,7 +141,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '.the
  * @param {string} scope - CSS scope selector
  * @returns {string} Generated CSS
  */
-export function generateColorsCSS(colors, scope = '.theme-content') {
+export function generateColorsCSS(colors, scope = ':root') {
     if (!colors || Object.keys(colors).length === 0) {
         return '';
     }
@@ -281,8 +341,12 @@ export function createDesignGroup(name = 'New Group', baseFont = 'Inter, sans-se
     return {
         name,
         className: generateClassName(name),
-        widget_type: null,
-        slot: null,
+        widget_types: [],  // Array for multiple widget types
+        slots: [],         // Array for multiple slots
+        colorScheme: {
+            background: null,
+            text: null,
+        },
         elements: {
             h1: {
                 font: baseFont,
