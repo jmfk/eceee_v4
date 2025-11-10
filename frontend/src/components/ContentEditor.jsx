@@ -11,6 +11,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import { useNotificationContext } from './NotificationManager';
 import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
 import ImportDialog from './ImportDialog';
+import { useTheme } from '../hooks/useTheme';
 
 const ContentEditor = forwardRef(({
   layoutJson,
@@ -45,6 +46,13 @@ const ContentEditor = forwardRef(({
 
   // Get notification context for confirmation dialogs
   const { showConfirm } = useNotificationContext();
+
+  // Apply theme CSS using the useTheme hook
+  const themeId = pageVersionData?.theme || pageVersionData?.effectiveTheme?.id;
+  useTheme({
+    themeId: themeId,
+    enabled: !!themeId
+  });
 
   // Get current widgets from pageVersionData (only source of widgets)
   const currentWidgets = useMemo(() => {
@@ -147,29 +155,6 @@ const ContentEditor = forwardRef(({
     layoutRenderer.currentVersion = currentVersion;
     layoutRenderer.updateVersionSelector();
   }, [layoutRenderer, pageVersionData?.versionId, pageVersionData?.versionNumber, pageVersionData?.versionTitle, pageVersionData?.publicationStatus]);
-
-  // Apply theme to layout renderer when pageVersionData theme changes
-  useEffect(() => {
-    if (!layoutRenderer) return;
-
-    // Use effective theme (explicit or inherited)
-    const themeId = pageVersionData?.theme || pageVersionData?.effectiveTheme?.id;
-
-    if (!themeId) return;
-
-    // Fetch and apply theme
-    const applyTheme = async () => {
-      try {
-        const { themesApi } = await import('../api');
-        const theme = await themesApi.get(themeId);
-        layoutRenderer.applyTheme(theme);
-      } catch (error) {
-        console.error('ContentEditor: Error applying theme', error);
-      }
-    };
-
-    applyTheme();
-  }, [layoutRenderer, pageVersionData?.theme, pageVersionData?.effectiveTheme?.id]);
 
   // Set up dirty state communication with LayoutRenderer
   useEffect(() => {

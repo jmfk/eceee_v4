@@ -2278,7 +2278,7 @@ class LayoutRenderer {
    */
   createWidgetContainer(id, type) {
     const widget = document.createElement('div');
-    widget.className = 'rendered-widget relative';
+    widget.className = 'rendered-widget relative default';
     widget.setAttribute('data-widget-id', id);
     widget.setAttribute('data-widget-type', type);
     return widget;
@@ -5268,95 +5268,29 @@ class LayoutRenderer {
   }
 
   /**
-   * Apply theme CSS to content areas
-   * @param {Object} theme - Theme data with cssVariables and customCss
+   * DEPRECATED: Theme CSS is now loaded via link tags from backend
+   * This method is kept for backward compatibility but does nothing
+   * @deprecated Use link tag loading from /api/webpages/themes/{id}/styles.css
    */
   applyTheme(theme) {
-    try {
-      if (!theme) {
-        this.removeTheme()
-        return
-      }
-
-      // Remove existing theme styles
-      this.removeTheme()
-
-      // Generate theme CSS
-      const cssContent = this.generateThemeCSS(theme)
-
-      if (!cssContent) {
-        return
-      }
-
-      // Create unique style ID
-      this.themeStyleId = `layout-theme-${theme.id || 'default'}`
-
-      // Inject theme styles
-      this.injectWidgetStyles(cssContent, null, 0) // Use existing injection method
-
-      this.currentTheme = theme
-
-
-    } catch (error) {
-      console.error('LayoutRenderer: Error applying theme', error)
-    }
+    console.warn('LayoutRenderer.applyTheme() is deprecated. Theme CSS is now loaded via link tags.');
   }
 
   /**
-   * Generate CSS content from theme data
-   * @param {Object} theme - Theme data
-   * @returns {string} Generated CSS content
+   * DEPRECATED: CSS generation moved to backend
+   * @deprecated
    */
   generateThemeCSS(theme) {
-    if (!theme) return ''
-
-    const { cssVariables = {}, customCss = '' } = theme
-
-    // Generate CSS variables for content areas
-    const variablesCSS = Object.keys(cssVariables).length > 0 ? `
-.theme-content, .widget-content, .content-editor-theme {
-${Object.entries(cssVariables)
-        .map(([key, value]) => `  --${key}: ${value};`)
-        .join('\n')}
-}` : ''
-
-    // Generate scoped custom CSS for content areas
-    const scopedCustomCSS = customCss ?
-      customCss.split('}').map(rule => {
-        if (rule.trim() && !rule.includes('@')) {
-          const selector = rule.split('{')[0].trim()
-          const styles = rule.split('{')[1] || ''
-
-          if (selector && styles) {
-            // Scope to content areas only
-            const scopedSelectors = [
-              `.theme-content ${selector}`,
-              `.widget-content ${selector}`,
-              `.content-editor-theme ${selector}`
-            ].join(', ')
-
-            return `${scopedSelectors} { ${styles} }`
-          }
-        }
-        return rule.includes('@') ? rule + '}' : ''
-      }).filter(Boolean).join('\n') : ''
-
-    return [variablesCSS, scopedCustomCSS].filter(Boolean).join('\n\n')
+    console.warn('LayoutRenderer.generateThemeCSS() is deprecated. Use backend CSS endpoint.');
+    return '';
   }
 
   /**
-   * Remove theme CSS from document
+   * DEPRECATED: Theme removal handled by link tag management
+   * @deprecated
    */
   removeTheme() {
-    if (this.themeStyleId) {
-      const styleElement = document.getElementById(this.themeStyleId)
-      if (styleElement) {
-        styleElement.remove()
-        this.injectedStyles.delete(this.themeStyleId)
-      }
-      this.themeStyleId = null
-    }
-    this.currentTheme = null
+    console.warn('LayoutRenderer.removeTheme() is deprecated.');
   }
 
   /**
