@@ -275,26 +275,6 @@ export function mergeDesignGroups(baseGroups = [], overrideGroups = []) {
 }
 
 /**
- * Get available widget types (for typography targeting)
- * @returns {Array} Widget type options
- */
-export function getWidgetTypes() {
-    return [
-        { value: null, label: 'All Widgets' },
-        { value: 'text_block', label: 'Text Block' },
-        { value: 'html_block', label: 'HTML Block' },
-        { value: 'image', label: 'Image' },
-        { value: 'gallery', label: 'Gallery' },
-        { value: 'button', label: 'Button' },
-        { value: 'events', label: 'Events' },
-        { value: 'news', label: 'News' },
-        { value: 'calendar', label: 'Calendar' },
-        { value: 'table', label: 'Table' },
-        { value: 'form', label: 'Form' },
-    ];
-}
-
-/**
  * Get supported HTML elements
  * @returns {Array} HTML element options
  */

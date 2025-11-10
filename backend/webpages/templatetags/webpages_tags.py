@@ -149,7 +149,7 @@ def child_pages_nav(page, limit=None):
 @register.simple_tag(takes_context=True)
 def render_slot(context, slot_name):
     """
-    Render widgets for the specified slot
+    Render widgets for the specified slot wrapped in a slot container
     Usage: {% render_slot "slot_name" %}
     """
     from django.utils.safestring import mark_safe
@@ -161,35 +161,44 @@ def render_slot(context, slot_name):
     # Get widgets for this specific slot
     slot_widgets = widgets_by_slot.get(slot_name, [])
     if not slot_widgets:
-        # No widgets for this slot - return empty string or placeholder
-        return mark_safe("")
+        # No widgets for this slot - return empty slot container
+        return mark_safe(
+            f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}"></div>'
+        )
 
     # Check if we have new-style rendered widgets (from WebPageRenderer)
     if slot_widgets and isinstance(slot_widgets[0], dict) and "html" in slot_widgets[0]:
         # New format from WebPageRenderer
         rendered_widgets = [widget_info["html"] for widget_info in slot_widgets]
-        return mark_safe("".join(rendered_widgets))
+        widgets_html = "".join(rendered_widgets)
+    else:
+        # Legacy format - render widgets manually
+        rendered_widgets = []
+        for widget_data in slot_widgets:
+            try:
+                widget_html = render_to_string(
+                    "webpages/widgets/widget_wrapper.html",
+                    {
+                        "widget": widget_data.widget,
+                        "config": widget_data.widget.configuration,
+                        "inherited_from": widget_data.inherited_from,
+                        "is_override": widget_data.is_override,
+                        "slot_name": slot_name,
+                    },
+                    request=context.get("request"),
+                )
+                rendered_widgets.append(widget_html)
+            except Exception as e:
+                # Log error and continue with other widgets
+                continue
+        widgets_html = "".join(rendered_widgets)
 
-    # Legacy format - render widgets manually
-    rendered_widgets = []
-    for widget_data in slot_widgets:
-        try:
-            widget_html = render_to_string(
-                "webpages/widgets/widget_wrapper.html",
-                {
-                    "widget": widget_data.widget,
-                    "config": widget_data.widget.configuration,
-                    "inherited_from": widget_data.inherited_from,
-                    "is_override": widget_data.is_override,
-                },
-                request=context.get("request"),
-            )
-            rendered_widgets.append(widget_html)
-        except Exception as e:
-            # Log error and continue with other widgets
-            continue
-
-    return mark_safe("".join(rendered_widgets))
+    # Wrap in slot container with slot class
+    return mark_safe(
+        f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}">'
+        f'{widgets_html}'
+        f'</div>'
+    )
 
 
 @register.simple_tag(takes_context=True)

@@ -1,7 +1,7 @@
 {% load static %}
 {% load security_filters %}
 
-<div class="content-widget">
+<div class="widget-type-content">
     {% if config.processed_content %}
         {{ config.processed_content|safe }}
     {% else %}

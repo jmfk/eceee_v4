@@ -3,7 +3,7 @@
 
 
 {% if should_render and config.news_object %}
-<article class="news-detail-widget" data-widget-type="news-detail" data-object-id="{{ news_object.id }}">
+<article class="widget-type-news-detail" data-widget-type="news-detail" data-object-id="{{ news_object.id }}">
     
     <header class="news-header">
         {% if config.show_object_type %}
@@ -69,7 +69,7 @@
 {% elif should_render == False %}
     <!-- Widget not rendering: slug not in path_variables or doesn't match configured ObjectTypes -->
 {% elif error %}
-<div class="news-detail-widget">
+<div class="widget-type-news-detail">
     <div class="not-found-message">
         <p>{{ error }}</p>
     </div>

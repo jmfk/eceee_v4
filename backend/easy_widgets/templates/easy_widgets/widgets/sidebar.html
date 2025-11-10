@@ -1,7 +1,7 @@
 {% load static %}
 {% load security_filters %}
 
-<aside class="sidebar-widget position-{{ config.position|default:'right' }} {% if config.collapsible %}collapsible{% endif %} {% if config.css_class %}{{ config.css_class }}{% endif %}"
+<aside class="widget-type-sidebar position-{{ config.position|default:'right' }} {% if config.collapsible %}collapsible{% endif %} {% if config.css_class %}{{ config.css_class }}{% endif %}"
        {% if config.background_color or config.background_image or config.text_color or config.padding or config.margin or config.width %}
            style="
                {% if config.background_color %}background-color: {{ config.background_color }};{% endif %}

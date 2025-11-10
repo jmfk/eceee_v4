@@ -1177,7 +1177,9 @@ class PageTheme(models.Model):
 
         # Design groups styling (new structure with groups)
         if self.design_groups and self.design_groups.get("groups"):
-            design_groups_css = self._generate_design_groups_css(scope, widget_type, slot)
+            design_groups_css = self._generate_design_groups_css(
+                scope, widget_type, slot
+            )
             if design_groups_css:
                 css_parts.append(design_groups_css)
         # Fallback to legacy html_elements
@@ -1201,62 +1203,79 @@ class PageTheme(models.Model):
         """
         css_parts = []
 
-        # Find applicable groups
-        applicable_groups = []
-        for group in self.design_groups.get("groups", []):
-            group_widget_type = group.get("widget_type")
-            group_slot = group.get("slot")
-
-            # Check if group applies to the current context
-            # None means "applies to all"
-            widget_match = group_widget_type is None or group_widget_type == widget_type
-            slot_match = group_slot is None or group_slot == slot
-
-            # AND relationship: both must match if specified
-            if widget_match and slot_match:
-                applicable_groups.append(group)
+        # When generating complete CSS, include ALL groups (don't filter)
+        # The groups themselves define their targeting via widgetTypes/slots arrays
+        # So we just process all groups and let them generate their own selectors
+        applicable_groups = self.design_groups.get("groups", [])
 
         # Generate CSS for each applicable group
         for group in applicable_groups:
-            # Get widget types and slots (handle both new array format and old single value)
-            widget_types = group.get("widget_types", [])
-            if not widget_types and group.get("widget_type"):
-                widget_types = [group["widget_type"]]
-            
+            # Get widget types and slots (handle both camelCase and snake_case, array and single value)
+            widget_types = group.get("widgetTypes", []) or group.get("widget_types", [])
+            if not widget_types:
+                # Check for single value (both camelCase and snake_case)
+                single_wt = group.get("widgetType") or group.get("widget_type")
+                if single_wt:
+                    widget_types = [single_wt]
+
             slots = group.get("slots", [])
             if not slots and group.get("slot"):
                 slots = [group["slot"]]
 
-            # Build all selector combinations
+            # Build all selector combinations using CSS classes
             base_selectors = []
-            
+
+            # Helper to normalize names for CSS class names (lowercase, replace spaces/dots with hyphens)
+            def normalize_for_css(name):
+                import re
+
+                return re.sub(r"[^a-z0-9-]", "-", name.lower())
+
             if not widget_types and not slots:
-                # Global - no targeting, use .default class
-                base_selectors.append(scope if scope else '.default')
+                # Global - no targeting, no class prefix (applies to all elements globally)
+                base_selectors.append(scope if scope else "")
             elif not widget_types and slots:
                 # Slot targeting only
                 if scope:
-                    base_selectors = [f'{scope}[data-slot-name="{slot}"]' for slot in slots]
+                    base_selectors = [
+                        f"{scope}.slot-{normalize_for_css(slot)}" for slot in slots
+                    ]
                 else:
-                    base_selectors = [f'.default[data-slot-name="{slot}"]' for slot in slots]
+                    base_selectors = [
+                        f".default.slot-{normalize_for_css(slot)}" for slot in slots
+                    ]
             elif widget_types and not slots:
                 # Widget type targeting only
                 if scope:
-                    base_selectors = [f'{scope}[data-widget-type="{wt}"]' for wt in widget_types]
+                    base_selectors = [
+                        f"{scope}.widget-type-{normalize_for_css(wt)}"
+                        for wt in widget_types
+                    ]
                 else:
-                    base_selectors = [f'.default[data-widget-type="{wt}"]' for wt in widget_types]
+                    base_selectors = [
+                        f".default.widget-type-{normalize_for_css(wt)}"
+                        for wt in widget_types
+                    ]
             else:
                 # Both widget type and slot targeting (all combinations)
                 for wt in widget_types:
                     for slot in slots:
+                        wt_normalized = normalize_for_css(wt)
+                        slot_normalized = normalize_for_css(slot)
                         if scope:
-                            base_selectors.append(f'{scope}[data-widget-type="{wt}"][data-slot-name="{slot}"]')
+                            base_selectors.append(
+                                f"{scope}.widget-type-{wt_normalized}.slot-{slot_normalized}"
+                            )
                         else:
-                            base_selectors.append(f'.default[data-widget-type="{wt}"][data-slot-name="{slot}"]')
+                            base_selectors.append(
+                                f".default.widget-type-{wt_normalized}.slot-{slot_normalized}"
+                            )
 
             # Apply group-level color scheme if defined
             color_scheme = group.get("colorScheme", {})
-            if color_scheme and (color_scheme.get("background") or color_scheme.get("text")):
+            if color_scheme and (
+                color_scheme.get("background") or color_scheme.get("text")
+            ):
                 selectors_str = ",\n".join(base_selectors)
                 color_scheme_rule = f"{selectors_str} {{\n"
                 if color_scheme.get("background"):
@@ -1278,19 +1297,39 @@ class PageTheme(models.Model):
                     continue
 
                 # Generate element rules for all base selectors
-                element_selectors = [f"{base} {element}" for base in base_selectors]
+                # If base is empty (global styles), use element directly without space
+                element_selectors = [
+                    f"{base} {element}".strip() if base else element
+                    for base in base_selectors
+                ]
                 selector = ",\n".join(element_selectors)
                 css_rule = f"{selector} {{\n"
 
-                # Convert camelCase to kebab-case and handle special properties
+                # Convert camelCase (or snake_case) to kebab-case for CSS properties
                 for property_name, property_value in styles.items():
-                    css_property = self._camel_to_kebab(property_name)
+                    # Handle both camelCase and snake_case input
+                    # If already snake_case, just replace underscores with hyphens
+                    if "_" in property_name:
+                        css_property = property_name.replace("_", "-")
+                    else:
+                        # Convert camelCase to kebab-case
+                        css_property = self._camel_to_kebab(property_name)
 
                     # Handle color references (named colors from palette)
                     # Check for any color-related property
-                    color_properties = ["color", "backgroundColor", "borderColor", "borderLeftColor", 
-                                       "borderRightColor", "borderTopColor", "borderBottomColor"]
-                    if property_name in color_properties and property_value in self.colors:
+                    color_properties = [
+                        "color",
+                        "backgroundColor",
+                        "borderColor",
+                        "borderLeftColor",
+                        "borderRightColor",
+                        "borderTopColor",
+                        "borderBottomColor",
+                    ]
+                    if (
+                        property_name in color_properties
+                        and property_value in self.colors
+                    ):
                         property_value = f"var(--{property_value})"
 
                     # Handle list-specific properties

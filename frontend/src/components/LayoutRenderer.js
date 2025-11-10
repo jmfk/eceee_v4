@@ -2252,10 +2252,17 @@ class LayoutRenderer {
    * @returns {HTMLElement} Rendered widget element
    */
   async renderWidgetInstance(widgetInstance) {
-    const { id, type, name, config } = widgetInstance;
+    const { id, type, name, config, slotName } = widgetInstance;
 
     // Create main widget container
     const widget = this.createWidgetContainer(id, type);
+
+    // Add slot class if widget is in a slot
+    if (slotName) {
+      const normalizedSlotName = slotName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      widget.classList.add(`slot-${normalizedSlotName}`);
+      widget.setAttribute('data-slot-name', slotName);
+    }
 
     // Add widget header with name and controls (only in editable mode)
     if (this.editable) {
@@ -2278,7 +2285,9 @@ class LayoutRenderer {
    */
   createWidgetContainer(id, type) {
     const widget = document.createElement('div');
-    widget.className = 'rendered-widget relative default';
+    // Normalize widget type for CSS class (lowercase, replace dots/spaces with hyphens)
+    const normalizedType = type.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    widget.className = `rendered-widget relative widget-type-${normalizedType} default`;
     widget.setAttribute('data-widget-id', id);
     widget.setAttribute('data-widget-type', type);
     return widget;
@@ -2957,14 +2966,17 @@ class LayoutRenderer {
 
       const element = document.createElement(tagName);
 
-      // Apply CSS classes
+      // Apply CSS classes and add slot class
+      const normalizedSlotName = slotName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      let classNames = `layout-slot slot-${normalizedSlotName}`;
       if (node.classes) {
         if (typeof node.classes === 'string') {
-          element.className = node.classes;
+          classNames += ` ${node.classes}`;
         } else {
           console.warn('LayoutRenderer: Classes must be a string');
         }
       }
+      element.className = classNames;
 
       // Apply attributes (excluding widget slot attributes)
       if (node.attributes && typeof node.attributes === 'object') {

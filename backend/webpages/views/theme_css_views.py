@@ -40,17 +40,22 @@ class ThemeCSSView(View):
         # Initialize generator
         generator = ThemeCSSGenerator()
 
-        # Check cache first
-        cached_css = generator.get_cached_css(theme_id)
-
-        if cached_css is not None:
-            css = cached_css
-        else:
-            # Generate CSS
+        # Skip cache entirely in development (when CACHE_TIMEOUT is 0)
+        if generator.CACHE_TIMEOUT == 0:
+            # Development mode - always generate fresh CSS
             css = generator.generate_complete_css(theme)
+        else:
+            # Production mode - use cache
+            cached_css = generator.get_cached_css(theme_id)
 
-            # Cache it
-            generator.set_cached_css(theme_id, css)
+            if cached_css is not None:
+                css = cached_css
+            else:
+                # Generate CSS
+                css = generator.generate_complete_css(theme)
+
+                # Cache it
+                generator.set_cached_css(theme_id, css)
 
         # Return CSS with proper headers
         response = HttpResponse(css, content_type="text/css; charset=utf-8")

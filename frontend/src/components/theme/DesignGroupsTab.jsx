@@ -13,7 +13,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp, Globe, Package } from 'lucide-react';
-import { createDesignGroup, generateClassName, getWidgetTypes } from '../../utils/themeUtils';
+import { createDesignGroup, generateClassName } from '../../utils/themeUtils';
 import { parseCSSRules, cssToGroupElements, cssToElementProperties, groupElementsToCSS, isValidClassName } from '../../utils/cssParser';
 import DesignGroupsPreview from './DesignGroupsPreview';
 import ColorSelector from './form-fields/ColorSelector';
@@ -21,6 +21,7 @@ import FontSelector from './form-fields/FontSelector';
 import NumericInput from './form-fields/NumericInput';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
+import { useWidgets } from '../../hooks/useWidgets';
 
 // Convert camelCase CSS properties to kebab-case
 const cssPropertyToKebab = (prop) => {
@@ -94,6 +95,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   const [importModal, setImportModal] = useState(null); // { type: 'global' | 'group' | 'element', groupIndex?: number, elementKey?: string }
   const [importCSSText, setImportCSSText] = useState('');
   const { addNotification } = useGlobalNotifications();
+  
+  // Fetch widget types from API
+  const { widgetTypes = [], isLoadingTypes } = useWidgets();
 
   // Refs for CSS textarea to prevent re-rendering
   const cssTextareaRefs = useRef({});
@@ -735,7 +739,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                               const slots = group.slots?.length > 0 ? group.slots : (group.slot ? [group.slot] : []);
                               
                               let text = types.length > 0 
-                                ? types.map(t => getWidgetTypes().find(w => w.value === t)?.label || t).join(', ')
+                                ? types.map(t => widgetTypes.find(w => w.type === t)?.name || t).join(', ')
                                 : 'Any';
                               
                               if (slots.length > 0) {
@@ -865,10 +869,15 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                               handleUpdateWidgetTypes(groupIndex, selectedOptions);
                             }}
                             className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                            disabled={isLoadingTypes}
                           >
-                            {getWidgetTypes().filter(wt => wt.value !== null).map(wt => (
-                              <option key={wt.value} value={wt.value}>{wt.label}</option>
-                            ))}
+                            {isLoadingTypes ? (
+                              <option disabled>Loading widget types...</option>
+                            ) : (
+                              widgetTypes.map(wt => (
+                                <option key={wt.type} value={wt.type}>{wt.name}</option>
+                              ))
+                            )}
                           </select>
                           <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
                         </div>

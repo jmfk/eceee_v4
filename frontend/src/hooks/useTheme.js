@@ -108,35 +108,20 @@ export const useTheme = ({
     const { data: themeCSS, isLoading: fetchingCSS, error: cssError } = useQuery({
         queryKey: ['theme-css', theme?.id],
         queryFn: async () => {
-            if (!theme?.id) {
-                console.log('useTheme: No theme ID, skipping CSS fetch')
-                return null
-            }
+            if (!theme?.id) return null
 
-            console.log('useTheme: Fetching CSS for theme', theme.id)
             // Fetch complete CSS from backend endpoint
             const url = `/api/v1/webpages/themes/${theme.id}/styles.css`
-            console.log('useTheme: Fetching from URL:', url)
             const response = await fetch(url)
             if (!response.ok) {
-                console.error('useTheme: Failed to fetch theme CSS:', response.status, response.statusText)
                 throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
             }
-            const css = await response.text()
-            console.log('useTheme: Successfully fetched CSS, length:', css.length)
-            return css
+            return await response.text()
         },
         enabled: enabled && !!theme?.id,
         staleTime: 10 * 60 * 1000, // 10 minutes
         cacheTime: 30 * 60 * 1000, // 30 minutes
     })
-
-    // Log any CSS fetch errors
-    useEffect(() => {
-        if (cssError) {
-            console.error('useTheme: CSS fetch error:', cssError)
-        }
-    }, [cssError])
 
     /**
      * Inject theme CSS into document
@@ -191,29 +176,14 @@ export const useTheme = ({
      * Apply theme CSS when theme CSS is loaded
      */
     useEffect(() => {
-        console.log('useTheme: Apply effect triggered', {
-            enabled,
-            hasTheme: !!theme,
-            themeId: theme?.id,
-            hasCss: !!themeCSS,
-            cssLength: themeCSS?.length,
-            isLoading,
-            fetchingCSS,
-            currentThemeId: currentThemeIdRef.current
-        })
-
         if (!enabled || !theme || !themeCSS || isLoading || fetchingCSS) {
-            console.log('useTheme: Skipping CSS injection - conditions not met')
             return
         }
 
         // Skip if same theme is already applied
         if (currentThemeIdRef.current === theme.id) {
-            console.log('useTheme: Theme already applied, skipping')
             return
         }
-
-        console.log('useTheme: Applying theme CSS for theme ID:', theme.id)
 
         // Remove previous theme CSS
         removeThemeCSS()
@@ -221,8 +191,6 @@ export const useTheme = ({
         // Inject new theme CSS
         injectThemeCSS(themeCSS, theme.id)
         currentThemeIdRef.current = theme.id
-
-        console.log('useTheme: Theme CSS applied successfully')
 
     }, [theme, themeCSS, enabled, isLoading, fetchingCSS, injectThemeCSS, removeThemeCSS])
 
@@ -260,7 +228,7 @@ export const useTheme = ({
             injectThemeCSS(css, themeData.id)
             currentThemeIdRef.current = themeData.id
         } catch (error) {
-            console.error('Error applying theme:', error)
+            // Silent fail - error already logged by React Query
         }
     }, [enabled, injectThemeCSS, removeThemeCSS])
 
