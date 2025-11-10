@@ -74,7 +74,7 @@
             <div>slug_parts: {{slug_parts}}</div>
             <div>request: {{request}}</div>
             {% for slot in slots %}
-                <div class="layout-slot" data-slot="{{ slot.name }}">
+                <div class="layout-slot" data-slot-name="{{ slot.name }}">
                     {{slot}}
                 </div>
             {% endfor %}
@@ -85,10 +85,10 @@
         {% if effective_layout %}
             <div class="page-layout layout-{{ effective_layout.name|lower }}">
                 {% for slot in effective_layout.slot_configuration.slots %}
-                    <div class="layout-slot" data-slot="{{ slot.name }}">
+                    <div class="layout-slot" data-slot-name="{{ slot.name }}">
                         {% if slot.name in widgets_by_slot %}
                             {% for widget_data in widgets_by_slot|lookup:slot.name %}
-                                {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override %}
+                                {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override slot_name=slot.name %}
                             {% endfor %}
                         {% endif %}
                     </div>
@@ -97,10 +97,10 @@
         {% else %}
             <!-- Default layout when no layout is specified -->
             <div class="page-layout layout-default">
-                <div class="layout-slot" data-slot="main">
+                <div class="layout-slot" data-slot-name="main">
                     {% if "main" in widgets_by_slot %}
                         {% for widget_data in widgets_by_slot.main %}
-                            {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override %}
+                            {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override slot_name="main" %}
                         {% endfor %}
                     {% else %}
                         <p>No content available for this page.</p>

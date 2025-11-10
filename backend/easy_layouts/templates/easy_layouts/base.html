@@ -24,6 +24,11 @@
     <!-- Lightbox base CSS -->
     <link href="{% static 'css/lightbox.css' %}" rel="stylesheet">
     
+    <!-- Theme CSS (dynamically generated from database) -->
+    {% if theme_css_url %}
+    <link rel="stylesheet" href="{{ theme_css_url }}" />
+    {% endif %}
+    
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.1" 
             integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/" 

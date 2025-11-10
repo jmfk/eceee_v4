@@ -1,6 +1,7 @@
-<div class="widget widget-{{ widget.widget_type.name|lower }}" 
+<div class="widget widget-{{ widget.widget_type.name|lower }} default" 
      data-widget-id="{{ widget.id }}" 
      data-widget-type="{{ widget.widget_type.name }}"
+     data-slot-name="{{ slot_name|default:'' }}"
      {% if inherited_from %}data-inherited-from="{{ inherited_from.id }}"{% endif %}
      {% if is_override %}data-is-override="true"{% endif %}>
      
