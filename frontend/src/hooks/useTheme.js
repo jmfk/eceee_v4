@@ -2,8 +2,7 @@
  * Theme Application Hook
  * 
  * Provides theme CSS injection for content editors and widget previews.
- * Applies theme CSS variables and custom CSS only to content areas,
- * not affecting the admin interface styling.
+ * Loads complete CSS from backend's ThemeCSSGenerator instead of generating client-side.
  */
 
 import { useEffect, useRef, useCallback } from 'react'
@@ -105,63 +104,50 @@ export const useTheme = ({
     const theme = fetchedTheme || pageTheme || udcTheme || defaultTheme
     const isLoading = fetchingTheme || fetchingPage || fetchingDefault
 
-    /**
-     * Generate CSS content from theme data
-     */
-    const generateThemeCSS = useCallback((themeData, scope = '.theme-content') => {
-        if (!themeData) return ''
+    // Fetch complete CSS from backend's ThemeCSSGenerator
+    const { data: themeCSS, isLoading: fetchingCSS, error: cssError } = useQuery({
+        queryKey: ['theme-css', theme?.id],
+        queryFn: async () => {
+            if (!theme?.id) {
+                console.log('useTheme: No theme ID, skipping CSS fetch')
+                return null
+            }
 
-        const { cssVariables = {}, customCss = '' } = themeData
+            console.log('useTheme: Fetching CSS for theme', theme.id)
+            // Fetch complete CSS from backend endpoint
+            const url = `/api/v1/webpages/themes/${theme.id}/styles.css`
+            console.log('useTheme: Fetching from URL:', url)
+            const response = await fetch(url)
+            if (!response.ok) {
+                console.error('useTheme: Failed to fetch theme CSS:', response.status, response.statusText)
+                throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
+            }
+            const css = await response.text()
+            console.log('useTheme: Successfully fetched CSS, length:', css.length)
+            return css
+        },
+        enabled: enabled && !!theme?.id,
+        staleTime: 10 * 60 * 1000, // 10 minutes
+        cacheTime: 30 * 60 * 1000, // 30 minutes
+    })
 
-        // Generate CSS variables scoped to content areas
-        const variablesCSS = Object.keys(cssVariables).length > 0 ? `
-${scope} {
-${Object.entries(cssVariables)
-                .map(([key, value]) => `  --${key}: ${value};`)
-                .join('\n')}
-}` : ''
-
-        // Generate custom CSS scoped to content areas
-        const scopedCustomCSS = customCss ?
-            customCss.split('}').map(rule => {
-                if (rule.trim() && !rule.includes('@')) {
-                    // Add scope to regular CSS rules
-                    const selector = rule.split('{')[0].trim()
-                    const styles = rule.split('{')[1] || ''
-
-                    if (selector && styles) {
-                        // Scope the selector to content areas only
-                        const scopedSelector = selector.split(',')
-                            .map(s => s.trim())
-                            .map(s => {
-                                // Don't double-scope if already scoped
-                                if (s.includes(scope.replace('.', ''))) return s
-                                // Add scope prefix
-                                return `${scope} ${s}`
-                            })
-                            .join(', ')
-
-                        return `${scopedSelector} { ${styles} }`
-                    }
-                }
-                return rule.includes('@') ? rule + '}' : '' // Keep @rules as-is
-            }).filter(Boolean).join('\n') : ''
-
-        return [variablesCSS, scopedCustomCSS].filter(Boolean).join('\n\n')
-    }, [])
+    // Log any CSS fetch errors
+    useEffect(() => {
+        if (cssError) {
+            console.error('useTheme: CSS fetch error:', cssError)
+        }
+    }, [cssError])
 
     /**
      * Inject theme CSS into document
      */
-    const injectThemeCSS = useCallback((themeData, scope) => {
-        const cssContent = generateThemeCSS(themeData, scope)
-
-        if (!cssContent) {
+    const injectThemeCSS = useCallback((css, themeId) => {
+        if (!css) {
             return
         }
 
         // Create unique style element ID
-        const styleId = `theme-content-${themeData.id || 'default'}`
+        const styleId = `theme-content-${themeId || 'default'}`
 
         // Remove existing theme styles
         const existingStyle = document.getElementById(styleId)
@@ -173,14 +159,14 @@ ${Object.entries(cssVariables)
         const styleElement = document.createElement('style')
         styleElement.id = styleId
         styleElement.setAttribute('data-theme-styles', 'true')
-        styleElement.setAttribute('data-theme-id', String(themeData.id || 'default'))
-        styleElement.setAttribute('data-scope', scope)
-        styleElement.textContent = cssContent
+        styleElement.setAttribute('data-theme-id', String(themeId || 'default'))
+        styleElement.setAttribute('data-scope', scopeSelector)
+        styleElement.textContent = css
 
         document.head.appendChild(styleElement)
         injectedStyleRef.current = styleElement
 
-    }, [generateThemeCSS])
+    }, [scopeSelector])
 
     /**
      * Remove theme CSS from document
@@ -202,26 +188,43 @@ ${Object.entries(cssVariables)
     }, [])
 
     /**
-     * Apply theme CSS when theme data changes
+     * Apply theme CSS when theme CSS is loaded
      */
     useEffect(() => {
-        if (!enabled || !theme || isLoading) {
+        console.log('useTheme: Apply effect triggered', {
+            enabled,
+            hasTheme: !!theme,
+            themeId: theme?.id,
+            hasCss: !!themeCSS,
+            cssLength: themeCSS?.length,
+            isLoading,
+            fetchingCSS,
+            currentThemeId: currentThemeIdRef.current
+        })
+
+        if (!enabled || !theme || !themeCSS || isLoading || fetchingCSS) {
+            console.log('useTheme: Skipping CSS injection - conditions not met')
             return
         }
 
         // Skip if same theme is already applied
         if (currentThemeIdRef.current === theme.id) {
+            console.log('useTheme: Theme already applied, skipping')
             return
         }
+
+        console.log('useTheme: Applying theme CSS for theme ID:', theme.id)
 
         // Remove previous theme CSS
         removeThemeCSS()
 
         // Inject new theme CSS
-        injectThemeCSS(theme, scopeSelector)
+        injectThemeCSS(themeCSS, theme.id)
         currentThemeIdRef.current = theme.id
 
-    }, [theme, scopeSelector, enabled, isLoading, injectThemeCSS, removeThemeCSS])
+        console.log('useTheme: Theme CSS applied successfully')
+
+    }, [theme, themeCSS, enabled, isLoading, fetchingCSS, injectThemeCSS, removeThemeCSS])
 
     /**
      * Cleanup on unmount or when disabled
@@ -240,14 +243,26 @@ ${Object.entries(cssVariables)
 
     /**
      * Manual theme application (for dynamic theme switching)
+     * Fetches CSS from backend and applies it
      */
-    const applyTheme = useCallback((themeData) => {
-        if (!enabled || !themeData) return
+    const applyTheme = useCallback(async (themeData) => {
+        if (!enabled || !themeData?.id) return
 
-        removeThemeCSS()
-        injectThemeCSS(themeData, scopeSelector)
-        currentThemeIdRef.current = themeData.id
-    }, [enabled, scopeSelector, injectThemeCSS, removeThemeCSS])
+        try {
+            // Fetch complete CSS from backend
+            const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css`)
+            if (!response.ok) {
+                throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
+            }
+            const css = await response.text()
+
+            removeThemeCSS()
+            injectThemeCSS(css, themeData.id)
+            currentThemeIdRef.current = themeData.id
+        } catch (error) {
+            console.error('Error applying theme:', error)
+        }
+    }, [enabled, injectThemeCSS, removeThemeCSS])
 
     /**
      * Get CSS class name for theme content areas
@@ -259,13 +274,23 @@ ${Object.entries(cssVariables)
     return {
         theme,
         currentTheme: theme,  // Alias for backward compatibility
-        isLoading: isLoading && enabled,
+        isLoading: (isLoading || fetchingCSS) && enabled,
         error: error && enabled ? error : null,
         applyTheme,
         removeTheme: removeThemeCSS,
         getThemeClassName,
         isThemeApplied: !!injectedStyleRef.current,
-        generateThemeCSS: (themeData) => generateThemeCSS(themeData, scopeSelector)
+        // Keep for backward compatibility but fetch from backend instead
+        generateThemeCSS: async (themeData) => {
+            if (!themeData?.id) return ''
+            try {
+                const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css`)
+                if (!response.ok) return ''
+                return await response.text()
+            } catch {
+                return ''
+            }
+        }
     }
 }
 
