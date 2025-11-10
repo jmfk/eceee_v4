@@ -1,7 +1,7 @@
 {% load static %}
 
 <nav 
-    class="widget-type-navbar" 
+    class="widget-type-{{ widget_type.css_class_name }}" 
     style="{{ navbar_style }} position: relative;"
     x-data="{
         isMobileMenuOpen: false,

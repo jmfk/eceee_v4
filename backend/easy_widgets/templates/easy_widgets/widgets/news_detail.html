@@ -3,7 +3,7 @@
 
 
 {% if should_render and config.news_object %}
-<article class="widget-type-news-detail" data-widget-type="news-detail" data-object-id="{{ news_object.id }}">
+<article class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="news-detail" data-object-id="{{ news_object.id }}">
     
     <header class="news-header">
         {% if config.show_object_type %}

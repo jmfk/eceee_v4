@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { generateDesignGroupsCSS, generateColorsCSS } from '../../utils/themeUtils';
+import { generateDesignGroupsCSS, generateColorsCSS, mergeGroupElements } from '../../utils/themeUtils';
 
 const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = null }) => {
     const groups = designGroups?.groups || [];
@@ -15,21 +15,34 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
     const previewCSS = useMemo(() => {
         const colorCSS = generateColorsCSS(colors || {}, ':root');
 
-        // Find the default group (has className "default")
-        const defaultGroup = groups.find(g => g.className === 'default');
+        // Find the default group (marked with isDefault: true)
+        const defaultGroup = groups.find(g => g.isDefault === true);
         const selectedGroup = groups[selectedGroupIndex];
 
-        // Always apply default group first, then override with selected group
-        const groupsToApply = [];
-        if (defaultGroup && defaultGroup !== selectedGroup) {
-            groupsToApply.push(defaultGroup);
-        }
-        if (selectedGroup) {
-            groupsToApply.push(selectedGroup);
+        // Merge default group elements with selected group elements
+        let mergedElements = {};
+        if (defaultGroup && selectedGroup && defaultGroup !== selectedGroup) {
+            // Merge default + selected
+            mergedElements = mergeGroupElements(
+                defaultGroup.elements || {},
+                selectedGroup.elements || {}
+            );
+        } else if (selectedGroup) {
+            // Only selected group
+            mergedElements = selectedGroup.elements || {};
         }
 
+        // Create a temporary group with merged elements for CSS generation
+        const mergedGroup = {
+            name: selectedGroup?.name || 'Preview',
+            className: selectedGroup?.className || 'default',
+            elements: mergedElements,
+            widgetTypes: [],
+            slots: []
+        };
+
         const designGroupsCSS = generateDesignGroupsCSS(
-            { groups: groupsToApply },
+            { groups: [mergedGroup] },
             colors || {},
             '',  // No scope - use data attributes
             widgetType,
@@ -65,7 +78,7 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
             )}
 
             <div
-                className="design-groups-preview default bg-white border border-gray-300 rounded-lg p-6 space-y-4"
+                className={`design-groups-preview ${groups[selectedGroupIndex]?.className || 'default'} bg-white border border-gray-300 rounded-lg p-6 space-y-4`}
                 {...(widgetType && { 'data-widget-type': widgetType })}
                 {...(slot && { 'data-slot-name': slot })}
             >

@@ -1,6 +1,6 @@
 {% load static %}
 
-<article class="widget-type-events" data-widget-type="events">
+<article class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="events">
     <header class="event-header">
         <h2 class="event-title">{{ config.event_title }}</h2>
         {% if config.event_type %}

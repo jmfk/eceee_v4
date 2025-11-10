@@ -283,6 +283,16 @@ class BaseWidget(ABC):
         class_id = self.__class__.__name__
         return f"{app_label}.{class_id}"
 
+    @property
+    def css_class_name(self):
+        """
+        Generate normalized CSS class name from widget type identifier.
+        Converts 'easy_widgets.ContentWidget' to 'easy-widgets-contentwidget'.
+        This matches the normalization used by the theme CSS generator.
+        """
+        import re
+        return re.sub(r"[^a-z0-9-]", "-", self.type.lower())
+
     def get_css_for_injection(
         self, widget_instance=None, scope_id: str = None
     ) -> Dict[str, str]:

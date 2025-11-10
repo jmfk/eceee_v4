@@ -1,6 +1,6 @@
 {% load static %}
 
-<div class="widget-type-news-list" data-widget-type="news-list">
+<div class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="news-list">
     {% if hidden %}
         <!-- Widget hidden on detail view -->
     {% elif error %}

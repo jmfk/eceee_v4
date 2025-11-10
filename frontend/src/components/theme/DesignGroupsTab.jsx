@@ -108,7 +108,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     const baseFont = fonts?.googleFonts?.[0]?.family || 'Inter';
     // Name first group "Default", others sequentially
     const groupName = groups.length === 0 ? 'Default' : `Group ${groups.length + 1}`;
-    const newGroup = createDesignGroup(groupName, `${baseFont}, sans-serif`);
+    // First group is default
+    const isDefault = groups.length === 0;
+    const newGroup = createDesignGroup(groupName, `${baseFont}, sans-serif`, isDefault);
     const updatedDesignGroups = {
       ...(designGroups || {}),
       groups: [...groups, newGroup],
@@ -186,6 +188,14 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
+  const handleToggleDefault = (index) => {
+    const updatedGroups = groups.map((group, i) => ({
+      ...group,
+      isDefault: i === index
+    }));
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+  };
+
   const handleUpdateColorScheme = (index, field, value) => {
     const updatedGroups = [...groups];
     updatedGroups[index] = {
@@ -242,7 +252,10 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         const newGroup = {
           name,
           className: generateClassName(name),
-          widget_type: null,
+          isDefault: false,
+          widgetTypes: [],
+          slots: [],
+          widgetType: null,
           slot: null,
           elements,
         };
@@ -560,6 +573,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     const newGroup = {
       ...groupToClone,
       name: `${groupToClone.name} (Copy)`,
+      isDefault: false, // Clones are never default
       elements: JSON.parse(JSON.stringify(groupToClone.elements)), // Deep clone
     };
 
@@ -729,6 +743,24 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                         )}
                       </button>
 
+                      {/* Default Group Radio Button */}
+                      <div className="flex items-center gap-1" title="Mark as default/base group">
+                        <input
+                          type="radio"
+                          id={`default-group-${groupIndex}`}
+                          name="default-group"
+                          checked={group.isDefault === true}
+                          onChange={() => handleToggleDefault(groupIndex)}
+                          className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <label
+                          htmlFor={`default-group-${groupIndex}`}
+                          className="text-xs text-gray-600 font-medium cursor-pointer"
+                        >
+                          Default
+                        </label>
+                      </div>
+
                       <input
                         type="text"
                         value={group.name}
@@ -738,12 +770,12 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                       />
 
                       {/* Targeting Badge */}
-                      {(group.widget_types?.length > 0 || group.widget_type || group.slots?.length > 0 || group.slot) ? (
+                      {(group.widgetTypes?.length > 0 || group.widgetType || group.slots?.length > 0 || group.slot) ? (
                         <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-md border border-blue-200">
                           <Package className="w-3 h-3" />
                           <span>
                             {(() => {
-                              const types = group.widget_types?.length > 0 ? group.widget_types : (group.widget_type ? [group.widget_type] : []);
+                              const types = group.widgetTypes?.length > 0 ? group.widgetTypes : (group.widgetType ? [group.widgetType] : []);
                               const slots = group.slots?.length > 0 ? group.slots : (group.slot ? [group.slot] : []);
                               
                               let text = types.length > 0 
@@ -889,7 +921,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                               <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
                               <select
                                 multiple
-                                value={group.widget_types || (group.widget_type ? [group.widget_type] : [])}
+                                value={group.widgetTypes || (group.widgetType ? [group.widgetType] : [])}
                                 onChange={(e) => {
                                   const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
                                   handleUpdateWidgetTypes(groupIndex, selectedOptions);

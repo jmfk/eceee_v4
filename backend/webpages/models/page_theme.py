@@ -29,7 +29,10 @@ class PageTheme(models.Model):
     )
     design_groups = models.JSONField(
         default=dict,
-        help_text="Grouped HTML element styles with color schemes and optional widget_type/slot targeting",
+        help_text=(
+            "Grouped HTML element styles with color schemes and optional widget_type/slot targeting. "
+            "Each group can have an 'isDefault' boolean field to mark it as the base/default group for style inheritance."
+        ),
     )
     component_styles = models.JSONField(
         default=dict,
@@ -1257,17 +1260,18 @@ class PageTheme(models.Model):
                     ]
             else:
                 # Both widget type and slot targeting (all combinations)
+                # Use descendant selector since slot is on outer div, widget-type on inner div
                 for wt in widget_types:
                     for slot in slots:
                         wt_normalized = normalize_for_css(wt)
                         slot_normalized = normalize_for_css(slot)
                         if scope:
                             base_selectors.append(
-                                f"{scope}.widget-type-{wt_normalized}.slot-{slot_normalized}"
+                                f"{scope}.slot-{slot_normalized} .widget-type-{wt_normalized}"
                             )
                         else:
                             base_selectors.append(
-                                f".widget-type-{wt_normalized}.slot-{slot_normalized}"
+                                f".slot-{slot_normalized} .widget-type-{wt_normalized}"
                             )
 
             # Apply group-level color scheme if defined

@@ -1,6 +1,6 @@
 {% if config.display_type == 'gallery' and config.media_items %}
     <!-- Gallery Display -->
-    <div class="widget-type-image widget-type-gallery" data-widget-type="gallery">
+    <div class="widget-type-{{ widget_type.css_class_name }} widget-type-gallery" data-widget-type="gallery">
         <div class="gallery-container" 
              data-columns="{{ config.gallery_columns|default:3 }}"
              data-show-captions="{{ config.show_captions|yesno:'true,false' }}"
@@ -66,7 +66,7 @@
 
 {% elif config.display_type == 'carousel' and config.media_items %}
     <!-- Carousel Display -->
-    <div class="widget-type-image widget-type-carousel" data-widget-type="carousel">
+    <div class="widget-type-{{ widget_type.css_class_name }} widget-type-carousel" data-widget-type="carousel">
         <div class="carousel-container">
             <div class="carousel-track" id="carousel-track-{{ widget.id }}">
                 {% for item in config.media_items %}
@@ -161,7 +161,7 @@
 
 {% else %}
     <!-- Single Image Display -->
-    <div class="widget-type-image image-size-{{ config.size|default:'medium' }} image-align-{{ config.alignment|default:'center' }}">
+    <div class="widget-type-{{ widget_type.css_class_name }} image-size-{{ config.size|default:'medium' }} image-align-{{ config.alignment|default:'center' }}">
         {% if config.media_items and config.media_items|length > 0 %}
             {% with item=config.media_items.0 %}
                 <div class="image-container">

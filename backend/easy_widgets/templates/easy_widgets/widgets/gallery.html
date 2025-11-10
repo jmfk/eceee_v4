@@ -1,6 +1,6 @@
 {% load static %}
 
-<div class="widget-type-gallery" data-widget-type="gallery">
+<div class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="gallery">
     {% if config.title %}
         <header class="gallery-header">
             <h2 class="gallery-title">{{ config.title }}</h2>

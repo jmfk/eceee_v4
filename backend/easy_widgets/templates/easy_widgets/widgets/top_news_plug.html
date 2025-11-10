@@ -1,6 +1,6 @@
 {% load static %}
 
-<div class="widget-type-top-news-plug {{ layout_class }}" data-widget-type="top-news-plug">
+<div class="widget-type-{{ widget_type.css_class_name }} {{ layout_class }}" data-widget-type="top-news-plug">
     {% if error %}
         <div class="error-message">
             {{ error }}

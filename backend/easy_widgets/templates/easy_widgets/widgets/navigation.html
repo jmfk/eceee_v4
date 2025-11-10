@@ -1,6 +1,6 @@
 {% load static %}
 
-<nav class="widget-type-navigation">
+<nav class="widget-type-{{ widget_type.css_class_name }}">
     <ul class="nav-container">
         {# Dynamic menu items (calculated in prepare_template_context) #}
         {% for item in config.dynamic_menu_items %}

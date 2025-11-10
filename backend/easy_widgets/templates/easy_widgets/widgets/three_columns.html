@@ -1,6 +1,6 @@
 {% load security_filters %}
 
-<div class="widget-type-three-columns" data-widget-type="three-columns">
+<div class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="three-columns">
     <div class="column-slot left" data-slot="left">
         {% if rendered_slots.left %}
             {% for widget in rendered_slots.left %}

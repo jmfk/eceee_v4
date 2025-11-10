@@ -5,6 +5,17 @@
  */
 
 /**
+ * Normalize a value for use as a CSS class name
+ * Converts to lowercase and replaces non-alphanumeric characters with hyphens
+ * @param {string} value - Value to normalize
+ * @returns {string} Normalized CSS class name
+ */
+function normalizeForCSS(value) {
+    if (!value) return '';
+    return value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+}
+
+/**
  * Generate CSS from design groups configuration
  * @param {Object} designGroups - Design groups configuration
  * @param {Object} colors - Named colors palette
@@ -43,33 +54,44 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             ? group.slots 
             : (group.slot ? [group.slot] : []);
 
-        // Build all selector combinations
+        // Build all selector combinations using CSS classes
         const baseSelectors = [];
         
         if (widgetTypes.length === 0 && slots.length === 0) {
-            // Global - no targeting, use .default class
-            baseSelectors.push(scope || '.default');
+            // Global - no targeting
+            baseSelectors.push(scope || '');
         } else if (widgetTypes.length === 0 && slots.length > 0) {
             // Slot targeting only
             slots.forEach(slot => {
-                baseSelectors.push(scope 
-                    ? `${scope}[data-slot-name="${slot}"]` 
-                    : `.default[data-slot-name="${slot}"]`);
+                const slotNormalized = normalizeForCSS(slot);
+                if (scope) {
+                    baseSelectors.push(`${scope}.slot-${slotNormalized}`);
+                } else {
+                    baseSelectors.push(`.slot-${slotNormalized}`);
+                }
             });
         } else if (widgetTypes.length > 0 && slots.length === 0) {
             // Widget type targeting only
             widgetTypes.forEach(type => {
-                baseSelectors.push(scope 
-                    ? `${scope}[data-widget-type="${type}"]` 
-                    : `.default[data-widget-type="${type}"]`);
+                const typeNormalized = normalizeForCSS(type);
+                if (scope) {
+                    baseSelectors.push(`${scope}.widget-type-${typeNormalized}`);
+                } else {
+                    baseSelectors.push(`.widget-type-${typeNormalized}`);
+                }
             });
         } else {
             // Both widget type and slot targeting (all combinations)
+            // Use descendant selector since slot is on outer div, widget-type on inner div
             widgetTypes.forEach(type => {
                 slots.forEach(slot => {
-                    baseSelectors.push(scope 
-                        ? `${scope}[data-widget-type="${type}"][data-slot-name="${slot}"]`
-                        : `.default[data-widget-type="${type}"][data-slot-name="${slot}"]`);
+                    const typeNormalized = normalizeForCSS(type);
+                    const slotNormalized = normalizeForCSS(slot);
+                    if (scope) {
+                        baseSelectors.push(`${scope}.slot-${slotNormalized} .widget-type-${typeNormalized}`);
+                    } else {
+                        baseSelectors.push(`.slot-${slotNormalized} .widget-type-${typeNormalized}`);
+                    }
                 });
             });
         }
@@ -293,6 +315,36 @@ export function mergeDesignGroups(baseGroups = [], overrideGroups = []) {
 }
 
 /**
+ * Merge elements from two design groups programmatically
+ * @param {Object} defaultElements - Base/default group elements
+ * @param {Object} specificElements - Specific group elements to layer on top
+ * @returns {Object} Merged elements with specific overriding default
+ */
+export function mergeGroupElements(defaultElements = {}, specificElements = {}) {
+    const merged = {};
+    
+    // Get all unique element tags from both groups
+    const allTags = new Set([
+        ...Object.keys(defaultElements),
+        ...Object.keys(specificElements)
+    ]);
+    
+    // Merge styles for each tag
+    for (const tag of allTags) {
+        const defaultStyles = defaultElements[tag] || {};
+        const specificStyles = specificElements[tag] || {};
+        
+        // Merge properties, with specific overriding default
+        merged[tag] = {
+            ...defaultStyles,
+            ...specificStyles
+        };
+    }
+    
+    return merged;
+}
+
+/**
  * Get supported HTML elements
  * @returns {Array} HTML element options
  */
@@ -333,13 +385,15 @@ export function generateClassName(name) {
  * Create pre-populated design group with default HTML elements
  * @param {string} name - Group name
  * @param {string} baseFont - Base font family (optional)
+ * @param {boolean} isDefault - Whether this is the default/base group
  * @returns {Object} Pre-populated group with all default elements
  */
-export function createDesignGroup(name = 'New Group', baseFont = 'Inter, sans-serif') {
+export function createDesignGroup(name = 'New Group', baseFont = 'Inter, sans-serif', isDefault = false) {
     return {
         name,
         className: generateClassName(name),
-        widget_types: [],  // Array for multiple widget types
+        isDefault,
+        widgetTypes: [],  // Array for multiple widget types
         slots: [],         // Array for multiple slots
         colorScheme: {
             background: null,
@@ -467,7 +521,7 @@ export function createDesignGroup(name = 'New Group', baseFont = 'Inter, sans-se
 export function createEmptyTypographyGroup(name = 'New Group') {
     return {
         name,
-        widget_type: null,
+        widgetType: null,
         slot: null,
         elements: {},
     };

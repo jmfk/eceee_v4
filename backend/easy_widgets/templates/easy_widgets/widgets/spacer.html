@@ -1,10 +1,10 @@
 {% load static %}
 
 {% if config.height == 'custom' and config.custom_height %}
-<div class="widget-type-spacer spacer-custom" style="height: {{ config.custom_height }};">
+<div class="widget-type-{{ widget_type.css_class_name }} spacer-custom" style="height: {{ config.custom_height }};">
 </div>
 {% else %}
-<div class="widget-type-spacer spacer-{{ config.height|default:'medium' }}">
+<div class="widget-type-{{ widget_type.css_class_name }} spacer-{{ config.height|default:'medium' }}">
 </div>
 {% endif %}
 

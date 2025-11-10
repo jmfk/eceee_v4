@@ -1,6 +1,6 @@
 {% load security_filters %}
 
-<div class="widget-type-html-block">
+<div class="widget-type-{{ widget_type.css_class_name }}">
     {{ config.html_content|sanitize_html:config.allow_scripts }}
 </div>
 

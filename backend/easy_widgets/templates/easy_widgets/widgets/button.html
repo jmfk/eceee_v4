@@ -1,4 +1,4 @@
-<div class="widget-type-button">
+<div class="widget-type-{{ widget_type.css_class_name }}">
     <a 
         href="{{ config.url }}" 
         class="widget-button btn-{{ config.style|default:'primary' }} btn-{{ config.size|default:'medium' }}"
