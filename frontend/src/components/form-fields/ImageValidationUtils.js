@@ -110,12 +110,13 @@ export const getImageUrl = (image) => {
 }
 
 /**
- * Get accept attribute for file input (images only)
+ * Get accept attribute for file input (images and ZIP files)
  */
 export const getImageAcceptAttribute = (constraints = {}) => {
     const defaultTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     const allowedTypes = constraints.allowedTypes || defaultTypes
-    return allowedTypes.join(',')
+    // Add ZIP support for bulk image uploads
+    return [...allowedTypes, '.zip', 'application/zip'].join(',')
 }
 
 /**

@@ -45,7 +45,8 @@ import {
     SortAsc,
     SortDesc,
     Upload,
-    Save
+    Save,
+    Download
 } from 'lucide-react';
 import { mediaCollectionsApi, mediaTagsApi, mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
@@ -1624,6 +1625,25 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         setSelectedCollection(collection);
         setShowDeleteModal(true);
     };
+    
+    // Handle download collection as ZIP
+    const handleDownloadZip = async (collection) => {
+        try {
+            const blob = await mediaCollectionsApi.downloadZip(collection.id)();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${collection.slug || collection.title}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            addNotification(`Downloading ${collection.title} as ZIP...`, 'success');
+        } catch (error) {
+            console.error('Failed to download collection:', error);
+            addNotification('Failed to download collection', 'error');
+        }
+    };
 
     // Handle view collection files
     const handleViewFiles = (collection) => {
@@ -1984,6 +2004,16 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
+                                handleDownloadZip(collection);
+                            }}
+                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                            title="Download as ZIP"
+                        >
+                            <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
                                 handleEdit(collection);
                             }}
                             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -2045,6 +2075,16 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                 title="View Files"
                             >
                                 <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadZip(collection);
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Download as ZIP"
+                            >
+                                <Download className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={(e) => {

@@ -913,7 +913,7 @@ const MediaBrowser = ({
                             id="file-input"
                             type="file"
                             multiple
-                            accept="image/*,application/pdf,.doc,.docx,video/*,audio/*"
+                            accept="image/*,application/pdf,.doc,.docx,video/*,audio/*,.zip,application/zip"
                             onChange={handleFileInputChange}
                             className="hidden"
                         />
