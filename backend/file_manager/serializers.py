@@ -484,6 +484,40 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         # This will be implemented with the storage service
         return f"/api/media/files/{obj.id}/download/"
 
+    def validate_slug(self, value):
+        """Validate slug format and uniqueness within namespace."""
+        import re
+        from django.utils.text import slugify
+
+        if not value:
+            return value
+
+        # Clean and normalize the slug
+        cleaned_slug = slugify(value)
+
+        # Validate format (lowercase, alphanumeric, hyphens only)
+        if not re.match(r'^[a-z0-9-]+$', cleaned_slug):
+            raise serializers.ValidationError(
+                "Slug must contain only lowercase letters, numbers, and hyphens."
+            )
+
+        # Check uniqueness within namespace (excluding current instance)
+        instance = self.instance
+        if instance:
+            from content.models import Namespace
+            
+            # Check if slug exists in the same namespace (excluding this file)
+            existing = MediaFile.objects.filter(
+                namespace=instance.namespace, slug=cleaned_slug
+            ).exclude(pk=instance.pk).first()
+
+            if existing:
+                raise serializers.ValidationError(
+                    f"A file with slug '{cleaned_slug}' already exists in this namespace."
+                )
+
+        return cleaned_slug
+
     def update(self, instance, validated_data):
         """Update media file with tags and collections."""
         tag_ids = validated_data.pop("tag_ids", None)

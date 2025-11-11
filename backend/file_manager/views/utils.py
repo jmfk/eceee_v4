@@ -29,14 +29,18 @@ class MediaSlugValidationView(APIView):
 
         Expected payload:
         {
-            "title": "My Article Title",
+            "slug": "my-custom-slug",  # Optional: slug to validate
+            "title": "My Article Title",  # Optional: generate slug from title if slug not provided
             "namespace": "blog",
+            "file_id": "uuid-string",  # Optional: exclude this file from uniqueness check
             "current_slugs": ["existing-slug-1", "existing-slug-2"]  # Optional: current session slugs
         }
 
         Returns:
         {
-            "slug": "my-article-title-2"  # Original or alternative if conflict
+            "slug": "my-article-title-2",  # Original or alternative if conflict
+            "is_valid": true,  # Whether the slug is valid and unique
+            "message": "Slug is available"  # Status message
         }
         """
         try:
@@ -51,13 +55,17 @@ class MediaSlugValidationView(APIView):
                 except (json.JSONDecodeError, AttributeError):
                     data = request.POST
 
+            slug = str(data.get("slug", "")).strip()
             title = str(data.get("title", "")).strip()
             namespace_slug = str(data.get("namespace", "")).strip()
+            file_id = data.get("file_id")
             current_slugs = data.get("current_slugs", [])
 
-            if not title:
+            # Either slug or title must be provided
+            if not slug and not title:
                 return Response(
-                    {"error": "Title is required"}, status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Either 'slug' or 'title' is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
             if not namespace_slug:
@@ -81,13 +89,24 @@ class MediaSlugValidationView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # Generate base slug from title
-            base_slug = self._generate_slug(title)
+            # Generate base slug from slug or title
+            if slug:
+                base_slug = self._generate_slug(slug)
+            else:
+                base_slug = self._generate_slug(title)
 
             # Check for uniqueness and generate alternative if needed
-            unique_slug = self._get_unique_slug(base_slug, namespace, current_slugs)
+            unique_slug = self._get_unique_slug(base_slug, namespace, current_slugs, file_id)
 
-            return Response({"slug": unique_slug}, status=status.HTTP_200_OK)
+            # Check if the provided slug is valid and unique
+            is_valid = base_slug == unique_slug
+            message = "Slug is available" if is_valid else f"Slug is taken. Suggestion: {unique_slug}"
+
+            return Response({
+                "slug": unique_slug,
+                "is_valid": is_valid,
+                "message": message
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(f"Error validating slug: {str(e)}")
@@ -104,15 +123,19 @@ class MediaSlugValidationView(APIView):
         slug = slug.strip("-")
         return slug
 
-    def _get_unique_slug(self, base_slug, namespace, current_slugs=None):
+    def _get_unique_slug(self, base_slug, namespace, current_slugs=None, file_id=None):
         """Get a unique slug by checking existing media files and current session slugs."""
         if current_slugs is None:
             current_slugs = []
 
         # Check against existing media files in database
-        db_slugs = set(
-            MediaFile.objects.filter(namespace=namespace).values_list("slug", flat=True)
-        )
+        queryset = MediaFile.objects.filter(namespace=namespace)
+        
+        # Exclude the current file if file_id is provided
+        if file_id:
+            queryset = queryset.exclude(id=file_id)
+        
+        db_slugs = set(queryset.values_list("slug", flat=True))
 
         # Combine database slugs with current session slugs
         all_existing_slugs = db_slugs | set(current_slugs)

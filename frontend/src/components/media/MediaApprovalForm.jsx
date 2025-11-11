@@ -39,6 +39,8 @@ const MediaApprovalForm = ({
     const [processing, setProcessing] = useState(false);
     const [availableTags, setAvailableTags] = useState([]);
     const [showAdvanced, setShowAdvanced] = useState({});
+    const [slugValidation, setSlugValidation] = useState({});
+    const [slugValidating, setSlugValidating] = useState({});
 
     const { addNotification } = useGlobalNotifications();
 
@@ -144,6 +146,54 @@ const MediaApprovalForm = ({
         return Object.keys(fileErrors).length === 0;
     };
 
+    // Debounced slug validation
+    const validateSlugAsync = async (fileId, slug) => {
+        if (!slug || !namespace) return;
+
+        setSlugValidating(prev => ({ ...prev, [fileId]: true }));
+
+        try {
+            const response = await fetch('/api/media/validate-slug/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    slug: slug,
+                    namespace: namespace
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setSlugValidation(prev => ({
+                    ...prev,
+                    [fileId]: {
+                        isValid: data.isValid,
+                        message: data.message,
+                        suggestion: data.isValid ? null : data.slug
+                    }
+                }));
+            }
+        } catch (error) {
+            console.error('Slug validation error:', error);
+        } finally {
+            setSlugValidating(prev => ({ ...prev, [fileId]: false }));
+        }
+    };
+
+    // Helper to generate slug from title
+    const generateSlugFromTitle = (title) => {
+        return title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim();
+    };
+
     // Update approval data with validation
     const updateFileApproval = (fileId, field, value) => {
         setFileApprovals(prev => ({
@@ -156,12 +206,7 @@ const MediaApprovalForm = ({
 
         // Auto-generate slug from title if title is being updated and slug is empty
         if (field === 'title' && value && (!fileApprovals[fileId]?.slug || fileApprovals[fileId].slug === '')) {
-            const slug = value
-                .toLowerCase()
-                .replace(/[^a-z0-9\s-]/g, '')
-                .replace(/\s+/g, '-')
-                .replace(/-+/g, '-')
-                .trim();
+            const slug = generateSlugFromTitle(value);
 
             setFileApprovals(prev => ({
                 ...prev,
@@ -171,6 +216,24 @@ const MediaApprovalForm = ({
                 }
             }));
             validateField(fileId, 'slug', slug);
+            
+            // Debounced slug validation
+            if (window.slugValidationTimeout) {
+                clearTimeout(window.slugValidationTimeout);
+            }
+            window.slugValidationTimeout = setTimeout(() => {
+                validateSlugAsync(fileId, slug);
+            }, 300);
+        }
+
+        // Validate slug in real-time
+        if (field === 'slug' && value) {
+            if (window.slugValidationTimeout) {
+                clearTimeout(window.slugValidationTimeout);
+            }
+            window.slugValidationTimeout = setTimeout(() => {
+                validateSlugAsync(fileId, value);
+            }, 300);
         }
 
         validateField(fileId, field, value);
@@ -541,23 +604,82 @@ const MediaApprovalForm = ({
 
                                             {/* Slug */}
                                             <div>
-                                                <label htmlFor={`slug-${file.id}`} className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Slug
-                                                </label>
-                                                <input
-                                                    id={`slug-${file.id}`}
-                                                    type="text"
-                                                    value={currentApproval.slug || ''}
-                                                    onChange={(e) => updateFileApproval(file.id, 'slug', e.target.value)}
-                                                    placeholder="auto-generated-from-title"
-                                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${fileErrors.slug ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label htmlFor={`slug-${file.id}`} className="block text-sm font-medium text-gray-700">
+                                                        Slug
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const slug = generateSlugFromTitle(currentApproval.title || '');
+                                                            updateFileApproval(file.id, 'slug', slug);
+                                                        }}
+                                                        className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                                        disabled={!currentApproval.title}
+                                                    >
+                                                        <RefreshCw className="w-3 h-3" />
+                                                        Generate from title
+                                                    </button>
+                                                </div>
+                                                <div className="relative">
+                                                    <input
+                                                        id={`slug-${file.id}`}
+                                                        type="text"
+                                                        value={currentApproval.slug || ''}
+                                                        onChange={(e) => updateFileApproval(file.id, 'slug', e.target.value)}
+                                                        placeholder="auto-generated-from-title"
+                                                        className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                            fileErrors.slug 
+                                                                ? 'border-red-300 bg-red-50' 
+                                                                : slugValidation[file.id]?.isValid === false
+                                                                    ? 'border-yellow-300 bg-yellow-50'
+                                                                    : slugValidation[file.id]?.isValid === true
+                                                                        ? 'border-green-300 bg-green-50'
+                                                                        : 'border-gray-300'
                                                         }`}
-                                                />
+                                                    />
+                                                    {slugValidating[file.id] && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+                                                        </div>
+                                                    )}
+                                                    {!slugValidating[file.id] && slugValidation[file.id]?.isValid === true && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <CheckCircle className="w-4 h-4 text-green-600" />
+                                                        </div>
+                                                    )}
+                                                    {!slugValidating[file.id] && slugValidation[file.id]?.isValid === false && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <AlertCircle className="w-4 h-4 text-yellow-600" />
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 {fileErrors.slug && (
                                                     <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
                                                         <AlertCircle className="w-4 h-4" />
                                                         {fileErrors.slug}
                                                     </div>
+                                                )}
+                                                {!fileErrors.slug && slugValidation[file.id]?.message && (
+                                                    <div className={`flex items-center gap-2 text-sm mt-1 ${
+                                                        slugValidation[file.id].isValid ? 'text-green-600' : 'text-yellow-600'
+                                                    }`}>
+                                                        {slugValidation[file.id].isValid ? (
+                                                            <CheckCircle className="w-4 h-4" />
+                                                        ) : (
+                                                            <AlertCircle className="w-4 h-4" />
+                                                        )}
+                                                        {slugValidation[file.id].message}
+                                                    </div>
+                                                )}
+                                                {!fileErrors.slug && slugValidation[file.id]?.suggestion && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateFileApproval(file.id, 'slug', slugValidation[file.id].suggestion)}
+                                                        className="text-xs text-blue-600 hover:text-blue-700 mt-1 flex items-center gap-1"
+                                                    >
+                                                        Use suggestion: {slugValidation[file.id].suggestion}
+                                                    </button>
                                                 )}
                                                 <p className="text-xs text-gray-500 mt-1">
                                                     URL-friendly identifier (lowercase, alphanumeric, hyphens only)

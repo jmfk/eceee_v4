@@ -602,7 +602,8 @@ class MediaFile(models.Model):
             return new_file
 
     def save(self, *args, **kwargs):
-        if not self.slug:
+        # Only auto-generate slug on creation (not on updates)
+        if not self.slug and self.pk is None:
             self.slug = self._generate_unique_slug()
         super().save(*args, **kwargs)
 
