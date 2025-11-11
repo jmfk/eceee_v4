@@ -251,18 +251,18 @@ class PageTheme(models.Model):
         """Default image styles (unified gallery and carousel) with styleType"""
         gallery_styles = PageTheme.get_default_gallery_styles()
         carousel_styles = PageTheme.get_default_carousel_styles()
-        
+
         # Merge and add styleType
         image_styles = {}
-        
+
         # Add gallery styles with styleType
         for key, style in gallery_styles.items():
             image_styles[key] = {**style, "styleType": "gallery"}
-        
+
         # Add carousel styles with styleType
         for key, style in carousel_styles.items():
             image_styles[key] = {**style, "styleType": "carousel"}
-        
+
         return image_styles
 
     @staticmethod
@@ -1175,7 +1175,9 @@ class PageTheme(models.Model):
             },
         }
 
-    def generate_css(self, scope="", widget_type=None, slot=None, frontend_scoped=False):
+    def generate_css(
+        self, scope="", widget_type=None, slot=None, frontend_scoped=False
+    ):
         """
         Generate complete CSS for this theme including colors, design groups, and custom CSS.
         Supports both new design_groups structure and legacy html_elements for backwards compatibility.
@@ -1219,12 +1221,14 @@ class PageTheme(models.Model):
 
         return "\n\n".join(css_parts)
 
-    def _generate_design_groups_css(self, scope, widget_type=None, slot=None, frontend_scoped=False):
+    def _generate_design_groups_css(
+        self, scope, widget_type=None, slot=None, frontend_scoped=False
+    ):
         """
         Generate CSS for design groups with optional targeting by widget_type/slot.
         Groups are applied in order, with more specific groups overriding general ones.
         Converts named color references to CSS variables.
-        
+
         Args:
             scope: CSS scope selector
             widget_type: Optional widget type for filtering
@@ -1300,7 +1304,7 @@ class PageTheme(models.Model):
                             base_selectors.append(
                                 f".slot-{slot_normalized} .widget-type-{wt_normalized}"
                             )
-            
+
             # Apply frontend scoping if requested
             if frontend_scoped:
                 base_selectors = [
@@ -1369,6 +1373,37 @@ class PageTheme(models.Model):
                     ):
                         property_value = f"var(--{property_value})"
 
+                    # Handle font-family - wrap fonts with spaces in quotes
+                    # Check both camelCase and snake_case variants
+                    if property_name in ["fontFamily", "font_family"]:
+                        # Split by comma to handle font stacks
+                        fonts = property_value.split(",")
+                        quoted_fonts = []
+                        generic_families = [
+                            "serif",
+                            "sans-serif",
+                            "monospace",
+                            "cursive",
+                            "fantasy",
+                            "system-ui",
+                        ]
+
+                        for font in fonts:
+                            trimmed = font.strip()
+                            # If already quoted or is a generic family, leave as-is
+                            if (
+                                trimmed.startswith('"')
+                                or trimmed.startswith("'")
+                                or trimmed in generic_families
+                            ):
+                                quoted_fonts.append(trimmed)
+                            # If contains spaces, wrap in quotes
+                            elif " " in trimmed:
+                                quoted_fonts.append(f'"{trimmed}"')
+                            else:
+                                quoted_fonts.append(trimmed)
+
+                        property_value = ", ".join(quoted_fonts)
                     # Handle list-specific properties
                     if element in ["ul", "ol"] and property_name == "bulletType":
                         css_property = "list-style-type"
