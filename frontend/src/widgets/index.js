@@ -95,6 +95,7 @@ export {
     ImageWidget,
     TableWidget,
     HeaderWidget,
+    HeroWidget,
     FooterWidget,
     NavigationWidget,
     NavbarWidget,
