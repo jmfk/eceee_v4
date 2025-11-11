@@ -24,7 +24,7 @@ const cleanHTML = (html) => {
     const allowedAttributes = ['href', 'target']
     const mediaInsertAttributes = [
         'class', 'data-media-insert', 'data-media-type', 'data-media-id',
-        'data-width', 'data-align', 'data-gallery-style', 'data-caption', 'data-title',
+        'data-width', 'data-align', 'data-gallery-style', 'data-caption', 'data-alt-text', 'data-title',
         'contenteditable', 'draggable',
         'src', 'alt', 'width', 'height', 'loading'
     ]
@@ -1987,22 +1987,26 @@ class ContentWidgetEditorRenderer {
         const { extractMediaConfig, fetchMediaData } = await import('@/utils/mediaInsertRenderer.js')
         const config = extractMediaConfig(mediaElement)
 
+        let mediaData = null
+        let mediaLoadError = null
+
         try {
             // Fetch media data
-            const mediaData = await fetchMediaData(config.mediaId, config.mediaType)
-
-            // Open edit modal
-            this.openMediaEditModal(mediaElement, config, mediaData)
+            mediaData = await fetchMediaData(config.mediaId, config.mediaType)
         } catch (error) {
             console.error('Failed to load media data:', error)
-            alert('Failed to load media data. Please try again.')
+            mediaLoadError = error
+            // Continue to open modal with error state
         }
+
+        // Open edit modal (even if media failed to load)
+        this.openMediaEditModal(mediaElement, config, mediaData, mediaLoadError)
     }
 
     /**
      * Open media edit modal
      */
-    async openMediaEditModal(mediaElement, initialConfig, mediaData) {
+    async openMediaEditModal(mediaElement, initialConfig, mediaData, mediaLoadError = null) {
         const React = await import('react')
         const ReactDOM = await import('react-dom/client')
         const { default: MediaEditModal } = await import('@/components/media/MediaEditModal.jsx')
@@ -2061,6 +2065,7 @@ class ContentWidgetEditorRenderer {
                         onDelete: handleDelete,
                         initialConfig: { ...initialConfig, mediaType: initialConfig.mediaType },
                         mediaData: mediaData,
+                        mediaLoadError: mediaLoadError,
                         namespace: namespace,
                         pageId: this.pageId
                     })

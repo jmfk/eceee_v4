@@ -8,25 +8,34 @@ import { X, Trash2, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 
-const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, namespace, pageId }) => {
+const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, mediaLoadError, namespace, pageId }) => {
     const { currentTheme } = useTheme({ pageId, enabled: false }); // Disable CSS injection
     const [config, setConfig] = useState({
         width: 'full',
         align: 'center',
         caption: '',
+        altText: '',
         galleryStyle: null
     });
     const [mediaData, setMediaData] = useState(initialMediaData);
     const [isChangingMedia, setIsChangingMedia] = useState(false);
+    const [errorMessage, setErrorMessage] = useState(null);
 
-    // Get available gallery styles from theme
-    const availableGalleryStyles = useMemo(() => {
-        if (!currentTheme || !currentTheme.galleryStyles) return [];
+    // Get available image styles from theme (unified gallery and carousel styles)
+    const availableImageStyles = useMemo(() => {
+        if (!currentTheme || !currentTheme.imageStyles) {
+            console.log('MediaEditModal: No theme or imageStyles available', { currentTheme });
+            return [];
+        }
 
-        return Object.entries(currentTheme.galleryStyles).map(([key, style]) => ({
+        const imageStyles = currentTheme.imageStyles;
+        console.log('MediaEditModal: Available image styles:', imageStyles);
+
+        return Object.entries(imageStyles).map(([key, style]) => ({
             value: key,
             label: style.name || key,
-            description: style.description
+            description: style.description,
+            styleType: style.styleType || 'gallery'
         }));
     }, [currentTheme]);
 
@@ -37,12 +46,21 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                 width: initialConfig.width || 'full',
                 align: initialConfig.align || 'center',
                 caption: initialConfig.caption || '',
+                altText: initialConfig.altText || '',
                 galleryStyle: initialConfig.galleryStyle || null
             });
             setMediaData(initialMediaData);
-            setIsChangingMedia(false);
+            
+            // If there was an error loading the media, open the image selector immediately
+            if (mediaLoadError && !initialMediaData) {
+                setIsChangingMedia(true);
+                setErrorMessage('The original image could not be found. Please select a new image.');
+            } else {
+                setIsChangingMedia(false);
+                setErrorMessage(null);
+            }
         }
-    }, [isOpen, initialConfig, initialMediaData]);
+    }, [isOpen, initialConfig, initialMediaData, mediaLoadError]);
 
     const handleConfigChange = (field, value) => {
         setConfig(prev => ({
@@ -82,9 +100,14 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
             }));
         }
         setIsChangingMedia(false);
+        setErrorMessage(null); // Clear error message after selection
     };
 
     const handleCancelChange = () => {
+        // Don't allow canceling if there's no media data (must select an image)
+        if (!mediaData && errorMessage) {
+            return;
+        }
         setIsChangingMedia(false);
     };
 
@@ -125,8 +148,15 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                             <div className="mb-4">
                                 <h3 className="text-lg font-medium text-gray-900">Select New Image or Collection</h3>
                                 <p className="text-sm text-gray-600 mt-1">
-                                    Choose a different image or collection to replace the current one.
+                                    {errorMessage || 'Choose a different image or collection to replace the current one.'}
                                 </p>
+                                {errorMessage && (
+                                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <p className="text-sm text-yellow-800">
+                                            {errorMessage}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                             <MediaBrowser
                                 onFileSelect={handleMediaSelect}
@@ -237,6 +267,23 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                                     </div>
                                 </div>
 
+                                {/* Alt Text */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                                        Alt Text
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={config.altText}
+                                        onChange={(e) => handleConfigChange('altText', e.target.value)}
+                                        placeholder="Describe image for screen readers"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Describe the image for visually impaired users (required for accessibility)
+                                    </p>
+                                </div>
+
                                 {/* Caption */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 mb-2">
@@ -249,13 +296,16 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                                         placeholder="Enter image caption (optional)"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Optional caption displayed below the image
+                                    </p>
                                 </div>
 
-                                {/* Gallery Style () */}
-                                {availableGalleryStyles.length > 0 && (
+                                {/* Image Style (Gallery/Carousel) */}
+                                {availableImageStyles.length > 0 && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-900 mb-2">
-                                            Gallery Style
+                                            Image Style
                                         </label>
                                         <select
                                             value={config.galleryStyle || ''}
@@ -263,15 +313,16 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         >
                                             <option value="">Default</option>
-                                            {availableGalleryStyles.map(style => (
+                                            {availableImageStyles.map(style => (
                                                 <option key={style.value} value={style.value}>
                                                     {style.label}
+                                                    {style.styleType && ` (${style.styleType})`}
                                                     {style.description ? ` - ${style.description}` : ''}
                                                 </option>
                                             ))}
                                         </select>
                                         <p className="mt-1 text-xs text-gray-500">
-                                            Choose a custom gallery style from the theme
+                                            Choose a custom image style from the theme (includes gallery and carousel styles)
                                         </p>
                                     </div>
                                 )}
@@ -286,12 +337,21 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                     {isChangingMedia ? (
                         <>
                             <div></div>
-                            <button
-                                onClick={handleCancelChange}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                            >
-                                Cancel
-                            </button>
+                            {mediaData || !errorMessage ? (
+                                <button
+                                    onClick={handleCancelChange}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={onClose}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                                >
+                                    Close
+                                </button>
+                            )}
                         </>
                     ) : (
                         <>
