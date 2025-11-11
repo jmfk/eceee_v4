@@ -1101,6 +1101,16 @@ const MediaSpecialEditor = ({
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
+                                                setEditingItem({ type: 'editImage', data: image, index })
+                                            }}
+                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                            title="Edit image metadata"
+                                        >
+                                            <Edit3 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
                                                 handleRemoveImage(image.id)
                                             }}
                                             className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
@@ -2057,6 +2067,125 @@ const MediaSpecialEditor = ({
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                                 >
                                     Save Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Image Metadata Edit Modal */}
+            {editingItem && editingItem.type === 'editImage' && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h5 className="font-medium text-gray-900">
+                                Edit Image Metadata
+                            </h5>
+                            <button
+                                onClick={() => setEditingItem(null)}
+                                className="p-1 text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {/* Image Preview */}
+                            <div className="aspect-video bg-gray-100 rounded overflow-hidden">
+                                <img
+                                    src={editingItem.data.thumbnailUrl || editingItem.data.url}
+                                    alt={editingItem.data.altText || 'Image'}
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
+
+                            {/* Title (read-only) */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Title
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editingItem.data.title || ''}
+                                    readOnly
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Title is read-only (from media library)
+                                </p>
+                            </div>
+
+                            {/* Alt Text */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Alt Text
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editingItem.data.altText || ''}
+                                    onChange={(e) => setEditingItem(prev => ({
+                                        ...prev,
+                                        data: { ...prev.data, altText: e.target.value }
+                                    }))}
+                                    placeholder="Describe image for screen readers"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Describe the image for visually impaired users (required for accessibility)
+                                </p>
+                            </div>
+
+                            {/* Caption */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Caption
+                                </label>
+                                <textarea
+                                    value={editingItem.data.caption || ''}
+                                    onChange={(e) => setEditingItem(prev => ({
+                                        ...prev,
+                                        data: { ...prev.data, caption: e.target.value }
+                                    }))}
+                                    placeholder="Enter image caption (optional)"
+                                    rows={2}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Optional caption displayed below the image
+                                </p>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        // Update the image in mediaItems array
+                                        const updatedMediaItems = [...currentImages]
+                                        updatedMediaItems[editingItem.index] = {
+                                            ...updatedMediaItems[editingItem.index],
+                                            altText: editingItem.data.altText,
+                                            caption: editingItem.data.caption
+                                        }
+                                        
+                                        const updatedConfig = {
+                                            ...currentConfig,
+                                            mediaItems: updatedMediaItems
+                                        }
+                                        
+                                        setLocalConfig(updatedConfig)
+                                        onConfigChange(updatedConfig)
+                                        setEditingItem(null)
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                    Save Changes
                                 </button>
                             </div>
                         </div>

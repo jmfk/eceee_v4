@@ -757,7 +757,7 @@ class LayoutRenderer {
 
     // Create menu dropdown
     const menuDropdown = document.createElement('div');
-    menuDropdown.className = 'slot-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48 hidden';
+    menuDropdown.className = 'slot-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48 hidden z-10';
     menuDropdown.setAttribute('data-menu-dropdown', slotName);
 
     // Add menu items
@@ -2354,7 +2354,7 @@ class LayoutRenderer {
    */
   createWidgetMenuDropdown(id, name, widgetInstance) {
     const menuDropdown = document.createElement('div');
-    menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden z-30';
+    menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden z-10';
     menuDropdown.setAttribute('data-widget-menu', id);
 
     // Get widget-specific menu items from metadata

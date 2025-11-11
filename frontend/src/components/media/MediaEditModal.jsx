@@ -9,7 +9,7 @@ import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 
 const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, mediaLoadError, namespace, pageId }) => {
-    const { currentTheme } = useTheme({ pageId, enabled: false }); // Disable CSS injection
+    const { currentTheme } = useTheme({ pageId, enabled: true }); // Enable to get theme data including imageStyles
     const [config, setConfig] = useState({
         width: 'full',
         align: 'center',
@@ -23,20 +23,27 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
 
     // Get available image styles from theme (unified gallery and carousel styles)
     const availableImageStyles = useMemo(() => {
+        console.log('MediaEditModal: currentTheme =', currentTheme);
+        console.log('MediaEditModal: currentTheme?.imageStyles =', currentTheme?.imageStyles);
+        
         if (!currentTheme || !currentTheme.imageStyles) {
-            console.log('MediaEditModal: No theme or imageStyles available', { currentTheme });
+            console.warn('MediaEditModal: No theme or imageStyles available');
             return [];
         }
 
         const imageStyles = currentTheme.imageStyles;
-        console.log('MediaEditModal: Available image styles:', imageStyles);
-
-        return Object.entries(imageStyles).map(([key, style]) => ({
+        const entries = Object.entries(imageStyles);
+        console.log('MediaEditModal: imageStyles entries =', entries);
+        
+        const mapped = entries.map(([key, style]) => ({
             value: key,
             label: style.name || key,
             description: style.description,
             styleType: style.styleType || 'gallery'
         }));
+        
+        console.log('MediaEditModal: availableImageStyles result =', mapped);
+        return mapped;
     }, [currentTheme]);
 
     // Initialize config when modal opens
@@ -46,7 +53,7 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                 width: initialConfig.width || 'full',
                 align: initialConfig.align || 'center',
                 caption: initialConfig.caption || '',
-                altText: initialConfig.altText || '',
+                altText: initialConfig.altText || initialMediaData?.title || '',
                 galleryStyle: initialConfig.galleryStyle || null
             });
             setMediaData(initialMediaData);
@@ -92,11 +99,18 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
 
     const handleMediaSelect = (newMedia) => {
         setMediaData(newMedia);
-        // Update caption to new media title if current caption matches old media title
+        // Update caption and altText to new media title if current values match old media title
+        const updates = {};
         if (config.caption === initialMediaData?.title) {
+            updates.caption = newMedia.title || '';
+        }
+        if (config.altText === initialMediaData?.title || !config.altText) {
+            updates.altText = newMedia.title || '';
+        }
+        if (Object.keys(updates).length > 0) {
             setConfig(prev => ({
                 ...prev,
-                caption: newMedia.title || ''
+                ...updates
             }));
         }
         setIsChangingMedia(false);
@@ -209,63 +223,31 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
 
                             {/* Configuration Form */}
                             <div className="space-y-6">
-                                {/* Width */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-3">
-                                        Width
-                                    </label>
-                                    <div className="flex gap-4">
-                                        {[
-                                            { value: 'full', label: 'Full Width' },
-                                            { value: 'half', label: 'Half Width' },
-                                            { value: 'third', label: 'Third Width' }
-                                        ].map(option => (
-                                            <label
-                                                key={option.value}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="width"
-                                                    value={option.value}
-                                                    checked={config.width === option.value}
-                                                    onChange={(e) => handleConfigChange('width', e.target.value)}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm text-gray-700">{option.label}</span>
-                                            </label>
-                                        ))}
+                                {/* Image Style (Gallery/Carousel) */}
+                                {availableImageStyles.length > 0 && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-900 mb-2">
+                                            Image Style
+                                        </label>
+                                        <select
+                                            value={config.galleryStyle || ''}
+                                            onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                            <option value="">Default</option>
+                                            {availableImageStyles.map(style => (
+                                                <option key={style.value} value={style.value}>
+                                                    {style.label}
+                                                    {style.styleType && ` (${style.styleType})`}
+                                                    {style.description ? ` - ${style.description}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            Choose a custom image style from the theme (includes gallery and carousel styles)
+                                        </p>
                                     </div>
-                                </div>
-
-                                {/* Alignment */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-3">
-                                        Alignment
-                                    </label>
-                                    <div className="flex gap-4">
-                                        {[
-                                            { value: 'left', label: 'Left' },
-                                            { value: 'center', label: 'Center' },
-                                            { value: 'right', label: 'Right' }
-                                        ].map(option => (
-                                            <label
-                                                key={option.value}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="align"
-                                                    value={option.value}
-                                                    checked={config.align === option.value}
-                                                    onChange={(e) => handleConfigChange('align', e.target.value)}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm text-gray-700">{option.label}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
+                                )}
 
                                 {/* Alt Text */}
                                 <div>
@@ -300,32 +282,6 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                                         Optional caption displayed below the image
                                     </p>
                                 </div>
-
-                                {/* Image Style (Gallery/Carousel) */}
-                                {availableImageStyles.length > 0 && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-2">
-                                            Image Style
-                                        </label>
-                                        <select
-                                            value={config.galleryStyle || ''}
-                                            onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                            <option value="">Default</option>
-                                            {availableImageStyles.map(style => (
-                                                <option key={style.value} value={style.value}>
-                                                    {style.label}
-                                                    {style.styleType && ` (${style.styleType})`}
-                                                    {style.description ? ` - ${style.description}` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            Choose a custom image style from the theme (includes gallery and carousel styles)
-                                        </p>
-                                    </div>
-                                )}
 
                             </div>
                         </>

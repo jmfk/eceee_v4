@@ -9,7 +9,7 @@ import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 
 const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
-    const { currentTheme } = useTheme({ pageId, enabled: false }); // Disable CSS injection
+    const { currentTheme } = useTheme({ pageId, enabled: true }); // Enable to get theme data including imageStyles
     const [step, setStep] = useState('select'); // 'select' or 'configure'
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'
@@ -17,21 +17,36 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
         width: 'full',
         align: 'center',
         caption: '',
+        altText: '',
         galleryStyle: null,
         enableLightbox: false,
         lightboxStyle: 'default',
         lightboxGroup: ''
     });
 
-    // Get available gallery styles from theme
-    const availableGalleryStyles = useMemo(() => {
-        if (!currentTheme || !currentTheme.galleryStyles) return [];
+    // Get available image styles from theme (unified gallery and carousel styles)
+    const availableImageStyles = useMemo(() => {
+        console.log('MediaInsertModal: currentTheme =', currentTheme);
+        console.log('MediaInsertModal: currentTheme?.imageStyles =', currentTheme?.imageStyles);
+        
+        if (!currentTheme || !currentTheme.imageStyles) {
+            console.warn('MediaInsertModal: No theme or imageStyles available');
+            return [];
+        }
 
-        return Object.entries(currentTheme.galleryStyles).map(([key, style]) => ({
+        const imageStyles = currentTheme.imageStyles;
+        const entries = Object.entries(imageStyles);
+        console.log('MediaInsertModal: imageStyles entries =', entries);
+        
+        const mapped = entries.map(([key, style]) => ({
             value: key,
             label: style.name || key,
-            description: style.description
+            description: style.description,
+            styleType: style.styleType || 'gallery'
         }));
+        
+        console.log('MediaInsertModal: availableImageStyles result =', mapped);
+        return mapped;
     }, [currentTheme]);
 
     // Reset state when modal opens
@@ -44,6 +59,7 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                 width: 'full',
                 align: 'center',
                 caption: '',
+                altText: '',
                 galleryStyle: null,
                 enableLightbox: false,
                 lightboxStyle: 'default',
@@ -61,10 +77,11 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
         const type = media.files ? 'collection' : 'image';
         setMediaType(type);
 
-        // Set default caption to media title
+        // Set default caption and altText to media title
         setConfig(prev => ({
             ...prev,
-            caption: media.title || ''
+            caption: media.title || '',
+            altText: media.title || ''
         }));
 
         // Move to configure step
@@ -177,62 +194,47 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
 
                             {/* Configuration Form */}
                             <div className="space-y-6">
-                                {/* Width */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-3">
-                                        Width
-                                    </label>
-                                    <div className="flex gap-4">
-                                        {[
-                                            { value: 'full', label: 'Full Width' },
-                                            { value: 'half', label: 'Half Width' },
-                                            { value: 'third', label: 'Third Width' }
-                                        ].map(option => (
-                                            <label
-                                                key={option.value}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="width"
-                                                    value={option.value}
-                                                    checked={config.width === option.value}
-                                                    onChange={(e) => handleConfigChange('width', e.target.value)}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm text-gray-700">{option.label}</span>
-                                            </label>
-                                        ))}
+                                {/* Image Style (Gallery/Carousel) */}
+                                {availableImageStyles.length > 0 && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-900 mb-2">
+                                            Image Style
+                                        </label>
+                                        <select
+                                            value={config.galleryStyle || ''}
+                                            onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                            <option value="">Default</option>
+                                            {availableImageStyles.map(style => (
+                                                <option key={style.value} value={style.value}>
+                                                    {style.label}
+                                                    {style.styleType && ` (${style.styleType})`}
+                                                    {style.description ? ` - ${style.description}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            Choose a custom image style from the theme (includes gallery and carousel styles)
+                                        </p>
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Alignment */}
+                                {/* Alt Text */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-3">
-                                        Alignment
+                                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                                        Alt Text
                                     </label>
-                                    <div className="flex gap-4">
-                                        {[
-                                            { value: 'left', label: 'Left' },
-                                            { value: 'center', label: 'Center' },
-                                            { value: 'right', label: 'Right' }
-                                        ].map(option => (
-                                            <label
-                                                key={option.value}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="align"
-                                                    value={option.value}
-                                                    checked={config.align === option.value}
-                                                    onChange={(e) => handleConfigChange('align', e.target.value)}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm text-gray-700">{option.label}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                    <input
+                                        type="text"
+                                        value={config.altText}
+                                        onChange={(e) => handleConfigChange('altText', e.target.value)}
+                                        placeholder="Describe image for screen readers"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Describe the image for visually impaired users (required for accessibility)
+                                    </p>
                                 </div>
 
                                 {/* Caption */}
@@ -247,32 +249,10 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                                         placeholder="Enter image caption (optional)"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Optional caption displayed below the image
+                                    </p>
                                 </div>
-
-                                {/* Gallery Style */}
-                                {availableGalleryStyles.length > 0 && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-2">
-                                            Gallery Style
-                                        </label>
-                                        <select
-                                            value={config.galleryStyle || ''}
-                                            onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                            <option value="">Default</option>
-                                            {availableGalleryStyles.map(style => (
-                                                <option key={style.value} value={style.value}>
-                                                    {style.label}
-                                                    {style.description ? ` - ${style.description}` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            Choose a custom gallery style from the theme
-                                        </p>
-                                    </div>
-                                )}
 
                                 {/* Lightbox */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

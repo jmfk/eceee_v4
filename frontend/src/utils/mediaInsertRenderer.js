@@ -56,7 +56,7 @@ export function generateImgproxyUrl(baseUrl, width, height = null) {
  * @returns {string} HTML string for image element
  */
 export function renderMediaImage(mediaData, config, slotDimensions = null) {
-    const { width = 'full', align = 'center' } = config;
+    const { width = 'full', align = 'center', altText = '' } = config;
 
     // Get desktop slot width (default to 896px if not available)
     const slotWidth = slotDimensions?.desktop?.width || 896;
@@ -83,7 +83,8 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
         imgHeight
     );
 
-    const alt = mediaData.alt || mediaData.title || mediaData.original_filename || 'Image';
+    // Use altText from config if provided, otherwise fallback to media data
+    const alt = altText || mediaData.alt || mediaData.title || mediaData.original_filename || 'Image';
 
     // Add CSS class for responsive width (full/half/third)
     // These will be defined to use percentages: 100%, 50%, ~33%
@@ -165,6 +166,7 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         width = 'full',
         align = 'center',
         caption = '',
+        altText = '',
         galleryStyle = null
     } = config;
 
@@ -191,6 +193,7 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
     // Create the complete media insert div
     const galleryStyleAttr = galleryStyle ? `data-gallery-style="${galleryStyle}"` : '';
     const captionAttr = caption ? `data-caption="${escapeHtml(caption)}"` : '';
+    const altTextAttr = altText ? `data-alt-text="${escapeHtml(altText)}"` : '';
     const titleAttr = mediaTitle ? `data-title="${escapeHtml(mediaTitle)}"` : '';
     const html = `<div 
         class="media-insert ${widthClass} ${alignClass}" 
@@ -201,6 +204,7 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         data-align="${align}"
         ${galleryStyleAttr}
         ${captionAttr}
+        ${altTextAttr}
         ${titleAttr}
         contenteditable="false"
         draggable="true"
@@ -223,6 +227,7 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
         width = 'full',
         align = 'center',
         caption = '',
+        altText = '',
         galleryStyle = null
     } = config;
 
@@ -265,11 +270,17 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
         element.removeAttribute('data-gallery-style');
     }
     
-    // Update caption and title attributes
+    // Update caption, altText and title attributes
     if (caption) {
         element.setAttribute('data-caption', caption);
     } else {
         element.removeAttribute('data-caption');
+    }
+    
+    if (altText) {
+        element.setAttribute('data-alt-text', altText);
+    } else {
+        element.removeAttribute('data-alt-text');
     }
     
     const mediaTitle = mediaData?.title || mediaData?.original_filename || '';
@@ -329,6 +340,7 @@ export function extractMediaConfig(element) {
         width: element.getAttribute('data-width') || 'full',
         align: element.getAttribute('data-align') || 'center',
         caption: caption,
+        altText: element.getAttribute('data-alt-text') || '',
         galleryStyle: element.getAttribute('data-gallery-style') || null
     };
 }

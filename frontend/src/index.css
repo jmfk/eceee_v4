@@ -247,6 +247,20 @@ div[style*="z-index"] {
   transition: all 0.2s ease-in-out;
 }
 
+/* Ensure all rendered content stays below editor UI */
+.rendered-widget {
+  position: relative;
+  z-index: 1;
+}
+
+/* Editor UI elements should always be on top of content */
+.widget-menu-dropdown,
+.slot-menu-dropdown,
+.slot-icon-menu,
+.widget-menu-container {
+  z-index: 100 !important;
+}
+
 .widget-slot-empty {
   border: 2px dashed #d1d5db;
   border-radius: 0.5rem;
