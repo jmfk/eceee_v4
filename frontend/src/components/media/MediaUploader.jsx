@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
-import MediaApprovalForm from './MediaApprovalForm';
+import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import DuplicateResolveDialog from './DuplicateResolveDialog';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
@@ -307,7 +307,7 @@ const MediaUploader = ({
     // Render approval state
     if (uploadState === 'approval') {
         return (
-            <MediaApprovalForm
+            <SimplifiedApprovalForm
                 pendingFiles={uploadResults}
                 namespace={namespace}
                 onComplete={handleApprovalComplete}
