@@ -134,12 +134,20 @@ const MediaTagManager = ({ namespace, onTagSelect }) => {
         }
     };
 
-    // Handle sort change
-    const handleSortChange = (newSortBy) => {
-        if (sortBy === newSortBy) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    // Handle sort change with 3-state sorting (asc -> desc -> null)
+    const handleSortChange = (field) => {
+        if (sortBy === field) {
+            // Cycle through: asc -> desc -> null (default)
+            if (sortOrder === 'asc') {
+                setSortOrder('desc');
+            } else {
+                // Reset to default (no sort)
+                setSortBy('name');
+                setSortOrder('asc');
+            }
         } else {
-            setSortBy(newSortBy);
+            // New field, start with asc
+            setSortBy(field);
             setSortOrder('asc');
         }
         setPage(1);
@@ -251,17 +259,6 @@ const MediaTagManager = ({ namespace, onTagSelect }) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* Sort dropdown */}
-                    <select
-                        value={sortBy}
-                        onChange={(e) => handleSortChange(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                        <option value="name">Name</option>
-                        <option value="usage_count">Usage Count</option>
-                        <option value="created_at">Created Date</option>
-                    </select>
-
                     {/* Create tag button */}
                     <button
                         onClick={handleCreateNew}
@@ -348,10 +345,40 @@ const MediaTagManager = ({ namespace, onTagSelect }) => {
                                     )}
                                 </button>
                             </div>
-                            <div className="col-span-4">Tag Name</div>
+                            <button
+                                onClick={() => handleSortChange('name')}
+                                className="col-span-4 flex items-center gap-1 hover:text-blue-600 transition-colors text-left"
+                            >
+                                Tag Name
+                                {sortBy === 'name' && (
+                                    <span className="text-blue-600">
+                                        {sortOrder === 'asc' ? '↑' : '↓'}
+                                    </span>
+                                )}
+                            </button>
                             <div className="col-span-3">Description</div>
-                            <div className="col-span-2 text-center">Files</div>
-                            <div className="col-span-1 text-center">Created</div>
+                            <button
+                                onClick={() => handleSortChange('file_count')}
+                                className="col-span-2 flex items-center justify-center gap-1 hover:text-blue-600 transition-colors"
+                            >
+                                Files
+                                {sortBy === 'file_count' && (
+                                    <span className="text-blue-600">
+                                        {sortOrder === 'asc' ? '↑' : '↓'}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => handleSortChange('created_at')}
+                                className="col-span-1 flex items-center justify-center gap-1 hover:text-blue-600 transition-colors"
+                            >
+                                Created
+                                {sortBy === 'created_at' && (
+                                    <span className="text-blue-600">
+                                        {sortOrder === 'asc' ? '↑' : '↓'}
+                                    </span>
+                                )}
+                            </button>
                             <div className="col-span-1 text-right">Actions</div>
                         </div>
 
@@ -493,13 +520,19 @@ const CreateTagModal = ({ tag, namespace, onClose, onSuccess }) => {
     const [saving, setSaving] = useState(false);
     const { addNotification } = useGlobalNotifications();
 
-    // Auto-generate slug from name
+    // Auto-generate slug from name (only for new tags)
     const handleNameChange = (e) => {
         const name = e.target.value;
+        const updates = { name };
+        
+        // Only auto-generate slug for new tags, not when editing
+        if (!tag) {
+            updates.slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        }
+        
         setFormData({
             ...formData,
-            name,
-            slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+            ...updates
         });
     };
 

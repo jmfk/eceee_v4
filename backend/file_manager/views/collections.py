@@ -26,7 +26,7 @@ class MediaTagViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["created_by"]
     search_fields = ["name", "slug"]
-    ordering_fields = ["name", "created_at"]
+    ordering_fields = ["name", "created_at", "file_count"]
     ordering = ["name"]
 
     def get_queryset(self):
@@ -123,9 +123,9 @@ class MediaTagViewSet(viewsets.ModelViewSet):
         # Annotate with file count
         queryset = queryset.annotate(file_count=Count("mediafile"))
 
-        # Apply ordering by usage if requested
-        ordering = request.query_params.get("ordering", "-file_count")
-        queryset = queryset.order_by(ordering)
+        # Apply search filter using the filter backends
+        for backend in self.filter_backends:
+            queryset = backend().filter_queryset(request, queryset, self)
 
         # Paginate
         page = self.paginate_queryset(queryset)
