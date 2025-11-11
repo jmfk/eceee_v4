@@ -98,7 +98,7 @@ class FooterWidget(BaseWidget):
     template_name = "easy_widgets/widgets/footer.html"
 
     widget_css = """
-    .widget-type-footer {
+    .widget-type-easy-widgets-footerwidget {
         background-color: var(--footer-bg-color, #1f2937);
         background-image: var(--footer-bg-image, none);
         background-size: var(--footer-bg-size, cover);
@@ -109,77 +109,77 @@ class FooterWidget(BaseWidget):
         margin-top: auto;
     }
     
-    .widget-type-footer .footer-content {
+    .widget-type-easy-widgets-footerwidget .footer-content {
         max-width: var(--footer-max-width, 1200px);
         margin: 0 auto;
     }
     
-    .widget-type-footer .footer-columns {
+    .widget-type-easy-widgets-footerwidget .footer-columns {
         display: grid;
         grid-template-columns: repeat(var(--footer-column-count, 3), 1fr);
         gap: var(--footer-column-gap, 2rem);
         margin-bottom: var(--footer-section-margin, 2rem);
     }
     
-    .widget-type-footer .footer-column {
+    .widget-type-easy-widgets-footerwidget .footer-column {
         text-align: var(--footer-text-align, left);
     }
     
-    .widget-type-footer .footer-column-title {
+    .widget-type-easy-widgets-footerwidget .footer-column-title {
         color: var(--footer-heading-color, inherit);
         font-size: var(--footer-heading-size, 1.125rem);
         font-weight: var(--footer-heading-weight, 600);
         margin-bottom: var(--footer-heading-margin, 1rem);
     }
     
-    .widget-type-footer .footer-column-items {
+    .widget-type-easy-widgets-footerwidget .footer-column-items {
         list-style: none;
         padding: 0;
         margin: 0;
     }
     
-    .widget-type-footer .footer-column-item {
+    .widget-type-easy-widgets-footerwidget .footer-column-item {
         margin-bottom: var(--footer-list-item-margin, 0.5rem);
         line-height: var(--footer-line-height, 1.6);
     }
     
-    .widget-type-footer .footer-column-item a {
+    .widget-type-easy-widgets-footerwidget .footer-column-item a {
         color: var(--footer-link-color, #60a5fa);
         text-decoration: none;
         transition: color 0.2s ease-in-out;
     }
     
-    .widget-type-footer .footer-column-item a:hover {
+    .widget-type-easy-widgets-footerwidget .footer-column-item a:hover {
         color: var(--footer-link-hover-color, #93c5fd);
         text-decoration: underline;
     }
     
-    .widget-type-footer .footer-social-links,
-    .widget-type-footer .footer-copyright {
+    .widget-type-easy-widgets-footerwidget .footer-social-links,
+    .widget-type-easy-widgets-footerwidget .footer-copyright {
         text-align: center;
         margin-top: var(--footer-section-margin, 2rem);
     }
     
-    .widget-type-footer .footer-social-link {
+    .widget-type-easy-widgets-footerwidget .footer-social-link {
         display: inline-block;
         margin: 0 0.5rem;
         color: var(--footer-link-color, #60a5fa);
         transition: color 0.2s ease-in-out;
     }
     
-    .widget-type-footer .footer-social-link:hover {
+    .widget-type-easy-widgets-footerwidget .footer-social-link:hover {
         color: var(--footer-link-hover-color, #93c5fd);
     }
     
     /* Responsive design */
     @media (max-width: 1024px) {
-        .widget-type-footer .footer-columns {
+        .widget-type-easy-widgets-footerwidget .footer-columns {
             grid-template-columns: repeat(2, 1fr);
         }
     }
     
     @media (max-width: 640px) {
-        .widget-type-footer .footer-columns {
+        .widget-type-easy-widgets-footerwidget .footer-columns {
             grid-template-columns: 1fr;
         }
     }

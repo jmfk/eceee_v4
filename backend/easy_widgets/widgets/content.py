@@ -100,60 +100,7 @@ class ContentWidget(BaseWidget):
     description = "Content widget that contains HTML"
     template_name = "easy_widgets/widgets/content.html"
 
-    widget_css = """
-    .content-widget {
-        font-family: var(--content-font, inherit);
-        line-height: var(--content-line-height, 1.6);
-        color: var(--content-color, inherit);
-    }
-    
-    .content-widget h1, .content-widget h2, .content-widget h3,
-    .content-widget h4, .content-widget h5, .content-widget h6 {
-        margin-top: var(--heading-margin-top, 1.5rem);
-        margin-bottom: var(--heading-margin-bottom, 0.5rem);
-        font-weight: var(--heading-font-weight, 600);
-    }
-    
-    .content-widget p {
-        margin-bottom: var(--paragraph-margin, 1rem);
-    }
-    
-    .content-widget ul, .content-widget ol {
-        margin-bottom: var(--list-margin, 1rem);
-        padding-left: var(--list-padding, 1.5rem);
-    }
-    
-    .content-widget blockquote {
-        border-left: var(--blockquote-border, 4px solid #e5e7eb);
-        padding-left: var(--blockquote-padding, 1rem);
-        margin: var(--blockquote-margin, 1.5rem 0);
-        font-style: italic;
-        color: var(--blockquote-color, #6b7280);
-    }
-    
-    .content-widget code {
-        background-color: var(--code-bg, #f3f4f6);
-        padding: var(--code-padding, 0.125rem 0.25rem);
-        border-radius: var(--code-radius, 0.25rem);
-        font-family: var(--code-font, monospace);
-        font-size: var(--code-font-size, 0.875rem);
-    }
-    
-    .content-widget pre {
-        background-color: var(--pre-bg, #1f2937);
-        color: var(--pre-color, #f9fafb);
-        padding: var(--pre-padding, 1rem);
-        border-radius: var(--pre-radius, 0.5rem);
-        overflow-x: auto;
-        margin: var(--pre-margin, 1.5rem 0);
-    }
-    
-    .content-widget pre code {
-        background-color: transparent;
-        padding: 0;
-        color: inherit;
-    }
-    """
+    widget_css = ""
 
     css_variables = {
         "content-font": "inherit",
@@ -292,13 +239,22 @@ class ContentWidget(BaseWidget):
         # Auto-apply lightbox attributes to images if enabled
         enable_lb = config.get("enable_lightbox") or config.get("enableLightbox", False)
         if enable_lb:
-            style_key = config.get("lightbox_style") or config.get("lightboxStyle", "default")
+            style_key = config.get("lightbox_style") or config.get(
+                "lightboxStyle", "default"
+            )
             group_key = config.get("lightbox_group") or config.get("lightboxGroup", "")
             # Add data-lightbox to anchors wrapping images
             for a in soup.find_all("a"):
                 img = a.find("img")
                 href = a.get("href", "")
-                if img and href and any(href.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]):
+                if (
+                    img
+                    and href
+                    and any(
+                        href.lower().endswith(ext)
+                        for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]
+                    )
+                ):
                     a["data-lightbox"] = ""
                     if group_key:
                         a["data-lightbox-group"] = group_key
@@ -409,7 +365,11 @@ class ContentWidget(BaseWidget):
 
         # Prepare context for Mustache rendering
         context = prepare_gallery_context(
-            items, gallery_config, style.get("variables"), imgproxy_config, lightbox_config
+            items,
+            gallery_config,
+            style.get("variables"),
+            imgproxy_config,
+            lightbox_config,
         )
 
         # Render template

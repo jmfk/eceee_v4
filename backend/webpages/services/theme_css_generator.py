@@ -63,14 +63,17 @@ class ThemeCSSGenerator:
         """
         Generate complete CSS from all theme components.
 
-        Includes:
-        - Google Fonts imports
-        - CSS variables from colors
-        - Design groups (from PageTheme.generate_css for proper data attribute targeting)
-        - Component styles CSS
-        - Gallery styles CSS
-        - Carousel styles CSS
-        - Custom CSS
+        CSS is generated in a specific order where later rules override earlier ones:
+        1. Google Fonts imports
+        2. CSS variables from colors
+        3. Widget type styles CSS (defaults that can be overridden)
+        4. Design groups (overrides widget defaults with theme-specific styles)
+        5. Component styles CSS
+        6. Gallery styles CSS
+        7. Carousel styles CSS
+
+        Widget CSS loads before design groups so it acts as defaults.
+        Design groups can then override widget styles for specific widgets/slots.
 
         Args:
             theme: PageTheme instance
@@ -87,25 +90,31 @@ class ThemeCSSGenerator:
             if fonts_import:
                 css_parts.append(fonts_import)
 
-        # 2-3. Use theme's generate_css method for colors and design groups
-        # This ensures proper widget_type/slot targeting with data attributes
+        # 2-3. Widget Type Styles CSS (defaults from registered widgets)
+        # These provide baseline styles that design groups can override
+        widget_css = self._generate_widget_css()
+        if widget_css:
+            css_parts.append(widget_css)
+
+        # 4. Use theme's generate_css method for colors and design groups
+        # Design groups override widget defaults with theme-specific element styles
         theme_css = theme.generate_css(scope="", widget_type=None, slot=None, frontend_scoped=frontend_scoped)
         if theme_css:
             css_parts.append(theme_css)
 
-        # 4. Component Styles CSS
+        # 5. Component Styles CSS
         if theme.component_styles:
             component_css = self._generate_component_css(theme.component_styles)
             if component_css:
                 css_parts.append(component_css)
 
-        # 5. Gallery Styles CSS
+        # 6. Gallery Styles CSS
         if theme.gallery_styles:
             gallery_css = self._generate_gallery_css(theme.gallery_styles)
             if gallery_css:
                 css_parts.append(gallery_css)
 
-        # 6. Carousel Styles CSS
+        # 7. Carousel Styles CSS
         if theme.carousel_styles:
             carousel_css = self._generate_carousel_css(theme.carousel_styles)
             if carousel_css:
@@ -179,5 +188,41 @@ class ThemeCSSGenerator:
             if css_content:
                 css_parts.append(f"/* Carousel: {style.get('name', key)} */")
                 css_parts.append(css_content)
+
+        return "\n\n".join(css_parts) if len(css_parts) > 1 else ""
+
+    def _generate_widget_css(self):
+        """Generate CSS from all registered widget types"""
+        from webpages.widget_registry import widget_type_registry
+
+        css_parts = ["/* Widget Type Styles */"]
+        css_variables = {}
+
+        # Get all registered widget types
+        widget_types = widget_type_registry.list_widget_types(active_only=True)
+
+        for widget_type in widget_types:
+            # Skip widgets without CSS
+            if not widget_type.widget_css:
+                continue
+
+            # Add widget CSS
+            css_parts.append(f"/* Widget: {widget_type.name} ({widget_type.type}) */")
+            css_parts.append(widget_type.widget_css)
+
+            # Collect widget CSS variables
+            if hasattr(widget_type, "css_variables") and widget_type.css_variables:
+                css_variables.update(widget_type.css_variables)
+
+        # Prepend CSS variables if any were collected
+        if css_variables:
+            variables_css = ":root {\n"
+            for var_name, var_value in css_variables.items():
+                # Add -- prefix if not already present
+                if not var_name.startswith("--"):
+                    var_name = f"--{var_name}"
+                variables_css += f"  {var_name}: {var_value};\n"
+            variables_css += "}"
+            css_parts.insert(1, variables_css)
 
         return "\n\n".join(css_parts) if len(css_parts) > 1 else ""

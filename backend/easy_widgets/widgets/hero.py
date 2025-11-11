@@ -109,7 +109,7 @@ class HeroWidget(BaseWidget):
     template_name = "easy_widgets/widgets/hero.html"
 
     widget_css = """
-    .widget-type-hero {
+    .widget-type-easy-widgets-herowidget {
         position: relative;
         padding: var(--hero-padding, 4rem 2rem);
         background-color: var(--hero-bg-color);
@@ -117,7 +117,7 @@ class HeroWidget(BaseWidget):
         overflow: hidden;
     }
     
-    .widget-type-hero .hero-background {
+    .widget-type-easy-widgets-herowidget .hero-background {
         position: absolute;
         top: 0;
         left: 0;
@@ -129,7 +129,7 @@ class HeroWidget(BaseWidget):
         z-index: 0;
     }
     
-    .widget-type-hero .hero-content {
+    .widget-type-easy-widgets-herowidget .hero-content {
         position: relative;
         z-index: 1;
         max-width: var(--hero-max-width, 1200px);
@@ -137,39 +137,28 @@ class HeroWidget(BaseWidget):
         text-align: center;
     }
     
-    .widget-type-hero .before-text {
+    .widget-type-easy-widgets-herowidget .before-text {
         font-size: var(--hero-before-text-size, 1.125rem);
         margin-bottom: var(--hero-before-text-margin, 1rem);
         color: var(--hero-decor-color);
     }
     
-    .widget-type-hero h1 {
-        font-size: var(--hero-header-size, 3rem);
-        font-weight: var(--hero-header-weight, 700);
-        margin: var(--hero-header-margin, 1rem 0);
-        line-height: var(--hero-header-line-height, 1.2);
-    }
-    
-    .widget-type-hero .after-text {
+    .widget-type-easy-widgets-herowidget .after-text {
         font-size: var(--hero-after-text-size, 1.25rem);
         margin-top: var(--hero-after-text-margin, 1rem);
         color: var(--hero-text-color);
     }
     
     @media (max-width: 768px) {
-        .widget-type-hero {
+        .widget-type-easy-widgets-herowidget {
             padding: var(--hero-padding-mobile, 2rem 1rem);
         }
         
-        .widget-type-hero h1 {
-            font-size: var(--hero-header-size-mobile, 2rem);
-        }
-        
-        .widget-type-hero .before-text {
+        .widget-type-easy-widgets-herowidget .before-text {
             font-size: var(--hero-before-text-size-mobile, 1rem);
         }
         
-        .widget-type-hero .after-text {
+        .widget-type-easy-widgets-herowidget .after-text {
             font-size: var(--hero-after-text-size-mobile, 1.125rem);
         }
     }
@@ -201,42 +190,40 @@ class HeroWidget(BaseWidget):
     def render_with_style(self, config, theme):
         """
         Render hero with custom component style from theme.
-        
+
         Args:
             config: Widget configuration
             theme: PageTheme instance
-            
+
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
         from django.template.loader import render_to_string
-        
+
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
             return None
-        
+
         styles = theme.component_styles or {}
         style = styles.get(style_name)
         if not style:
             return None
-        
+
         # Prepare template context first
         prepared_config = self.prepare_template_context(config, {"theme": theme})
-        
+
         # Render the hero HTML using the default template first
-        hero_html = render_to_string(
-            self.template_name,
-            {"config": prepared_config}
-        )
-        
+        hero_html = render_to_string(self.template_name, {"config": prepared_config})
+
         # Prepare context with rendered hero as content
         context = prepare_component_context(
-            content=hero_html,
-            anchor="",
-            style_vars=style.get("variables", {})
+            content=hero_html, anchor="", style_vars=style.get("variables", {})
         )
-        
+
         # Render with style template
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")
@@ -250,11 +237,11 @@ class HeroWidget(BaseWidget):
 
         # Build CSS variables for colors
         style_parts = []
-        
+
         text_color = config.get("text_color", "#ffffff")
         decor_color = config.get("decor_color", "#cccccc")
         background_color = config.get("background_color", "#000000")
-        
+
         style_parts.append(f"--hero-text-color: {text_color};")
         style_parts.append(f"--hero-decor-color: {decor_color};")
         style_parts.append(f"--hero-bg-color: {background_color};")
@@ -278,4 +265,3 @@ class HeroWidget(BaseWidget):
         template_config["hero_style"] = " ".join(style_parts)
 
         return template_config
-
