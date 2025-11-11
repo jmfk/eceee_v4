@@ -1828,7 +1828,7 @@ const MediaSpecialEditor = ({
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                         <div className="flex items-center justify-between mb-4">
                             <h5 className="font-medium text-gray-900">
@@ -1873,7 +1873,7 @@ const MediaSpecialEditor = ({
 
             {/* Collection Configuration Modal */}
             {editingItem && editingItem.type === 'editCollection' && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
                             <h5 className="font-medium text-gray-900">
@@ -2076,7 +2076,7 @@ const MediaSpecialEditor = ({
 
             {/* Image Metadata Edit Modal */}
             {editingItem && editingItem.type === 'editImage' && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                         <div className="flex items-center justify-between mb-4">
                             <h5 className="font-medium text-gray-900">

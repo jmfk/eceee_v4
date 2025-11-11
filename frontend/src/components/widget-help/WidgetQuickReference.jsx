@@ -50,7 +50,7 @@ const WidgetQuickReference = ({ widgetType, onClose, isOpen }) => {
     ]
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-5/6 flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
