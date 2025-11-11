@@ -27,7 +27,7 @@ def render_mustache(template, context):
         return f"<!-- Template render error: {str(e)} -->"
 
 
-def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=None, lightbox_config=None):
+def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=None, lightbox_config=None, style_defaults=None):
     """
     Prepare context for gallery template rendering.
 
@@ -37,6 +37,7 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
         style_vars: Style-specific variables
         imgproxy_config: Imgproxy configuration from style (can be overridden by widget config)
         lightbox_config: Lightbox-specific imgproxy configuration from style
+        style_defaults: Style default values (enableLightbox, defaultShowCaptions, etc.)
 
     Returns:
         Dictionary ready for Mustache rendering
@@ -151,6 +152,7 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
     lightbox_close_icon = ""
     lightbox_prev_icon = ""
     lightbox_next_icon = ""
+    lightbox_template = ""
     
     if final_lightbox_config:
         lightbox_button_class = final_lightbox_config.get("button_class") or final_lightbox_config.get("buttonClass", "")
@@ -158,12 +160,37 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
         lightbox_prev_icon = final_lightbox_config.get("prev_icon") or final_lightbox_config.get("prevIcon", "")
         lightbox_next_icon = final_lightbox_config.get("next_icon") or final_lightbox_config.get("nextIcon", "")
 
+    # Apply style defaults with widget overrides
+    style_defaults = style_defaults or {}
+    
+    # Widget config overrides take precedence, then style defaults, then hardcoded defaults
+    show_captions = config.get("show_captions")
+    if show_captions is None:
+        show_captions = style_defaults.get("defaultShowCaptions", True)
+    
+    enable_lightbox = style_defaults.get("enableLightbox", True)
+    
+    lightbox_group = config.get("lightbox_group")
+    if lightbox_group is None:
+        lightbox_group = style_defaults.get("defaultLightboxGroup", "")
+    
+    randomize = config.get("randomize")
+    if randomize is None:
+        randomize = style_defaults.get("defaultRandomize", False)
+    
+    # Get lightbox template from style
+    if style_defaults.get("lightboxTemplate"):
+        lightbox_template = style_defaults["lightboxTemplate"]
+
     return {
         "images": indexed_images,
         "imageCount": len(images),
         "multipleImages": len(images) > 1,
-        "showCaptions": config.get("show_captions", True),
-        "enableLightbox": config.get("enable_lightbox", True),
+        "showCaptions": show_captions,
+        "enableLightbox": enable_lightbox,
+        "lightboxGroup": lightbox_group,
+        "randomize": randomize,
+        "lightboxTemplate": lightbox_template,
         "lightboxButtonClass": lightbox_button_class,
         "lightboxCloseIcon": lightbox_close_icon,
         "lightboxPrevIcon": lightbox_prev_icon,
@@ -173,7 +200,7 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
     }
 
 
-def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=None):
+def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=None, style_defaults=None):
     """
     Prepare context for carousel template rendering.
 
@@ -182,6 +209,7 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
         config: Widget configuration
         style_vars: Style-specific variables
         imgproxy_config: Imgproxy configuration from style (can be overridden by widget config)
+        style_defaults: Style default values (defaultShowCaptions, defaultAutoPlay, etc.)
 
     Returns:
         Dictionary ready for Mustache rendering
@@ -241,13 +269,34 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
 
         indexed_images.append(img_copy)
 
+    # Apply style defaults with widget overrides
+    style_defaults = style_defaults or {}
+    
+    # Widget config overrides take precedence, then style defaults, then hardcoded defaults
+    show_captions = config.get("show_captions")
+    if show_captions is None:
+        show_captions = style_defaults.get("defaultShowCaptions", True)
+    
+    auto_play = config.get("auto_play")
+    if auto_play is None:
+        auto_play = style_defaults.get("defaultAutoPlay", False)
+    
+    auto_play_interval = config.get("auto_play_interval")
+    if auto_play_interval is None:
+        auto_play_interval = style_defaults.get("defaultAutoPlayInterval", 3)
+    
+    randomize = config.get("randomize")
+    if randomize is None:
+        randomize = style_defaults.get("defaultRandomize", False)
+
     return {
         "images": indexed_images,
         "imageCount": len(images),
         "multipleImages": len(images) > 1,
-        "showCaptions": config.get("show_captions", True),
-        "autoPlay": config.get("auto_play", False),
-        "autoPlayInterval": config.get("auto_play_interval", 3),
+        "showCaptions": show_captions,
+        "autoPlay": auto_play,
+        "autoPlayInterval": auto_play_interval,
+        "randomize": randomize,
         **(style_vars or {}),
     }
 

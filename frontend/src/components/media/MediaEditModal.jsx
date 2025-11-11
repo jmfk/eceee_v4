@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Trash2, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { X, Trash2, Image as ImageIcon, RefreshCw, Settings } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
+import OverrideSettingsModal from './OverrideSettingsModal';
 
 const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, mediaData: initialMediaData, mediaLoadError, namespace, pageId }) => {
     const { currentTheme } = useTheme({ pageId, enabled: true }); // Enable to get theme data including imageStyles
@@ -15,11 +16,18 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
         align: 'center',
         caption: '',
         altText: '',
-        galleryStyle: null
+        galleryStyle: null,
+        // Override settings
+        showCaptions: undefined,
+        lightboxGroup: undefined,
+        randomize: undefined,
+        autoPlay: undefined,
+        autoPlayInterval: undefined
     });
     const [mediaData, setMediaData] = useState(initialMediaData);
     const [isChangingMedia, setIsChangingMedia] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [showOverrideSettings, setShowOverrideSettings] = useState(false);
 
     // Get available image styles from theme (unified gallery and carousel styles)
     const availableImageStyles = useMemo(() => {
@@ -38,6 +46,16 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
         }));
     }, [currentTheme]);
 
+    // Get selected style info
+    const selectedStyle = useMemo(() => {
+        if (!config.galleryStyle || !currentTheme?.imageStyles) {
+            return null;
+        }
+        return currentTheme.imageStyles[config.galleryStyle];
+    }, [config.galleryStyle, currentTheme]);
+
+    const isCarouselStyle = selectedStyle?.styleType === 'carousel';
+
     // Initialize config when modal opens
     useEffect(() => {
         if (isOpen && initialConfig) {
@@ -46,7 +64,13 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                 align: initialConfig.align || 'center',
                 caption: initialConfig.caption || '',
                 altText: initialConfig.altText || initialMediaData?.title || '',
-                galleryStyle: initialConfig.galleryStyle || null
+                galleryStyle: initialConfig.galleryStyle || null,
+                // Override settings (preserve undefined if not set)
+                showCaptions: initialConfig.showCaptions,
+                lightboxGroup: initialConfig.lightboxGroup,
+                randomize: initialConfig.randomize,
+                autoPlay: initialConfig.autoPlay,
+                autoPlayInterval: initialConfig.autoPlayInterval
             });
             setMediaData(initialMediaData);
             
@@ -167,9 +191,11 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                             <MediaBrowser
                                 onFileSelect={handleMediaSelect}
                                 selectionMode="single"
-                                fileTypes={[]}
+                                fileTypes={['image', 'collection']}
                                 namespace={namespace}
                                 showUploader={false}
+                                hideShowDeleted={true}
+                                hideTypeFilter={true}
                             />
                         </div>
                     ) : (
@@ -218,9 +244,21 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                                 {/* Image Style (Gallery/Carousel) */}
                                 {availableImageStyles.length > 0 && (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-2">
-                                            Image Style
-                                        </label>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-sm font-medium text-gray-900">
+                                                Image Style
+                                            </label>
+                                            {config.galleryStyle && selectedStyle && (
+                                                <button
+                                                    onClick={() => setShowOverrideSettings(true)}
+                                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-md transition-colors"
+                                                    title="Configure override settings"
+                                                >
+                                                    <Settings className="w-3.5 h-3.5" />
+                                                    Override Settings
+                                                </button>
+                                            )}
+                                        </div>
                                         <select
                                             value={config.galleryStyle || ''}
                                             onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
@@ -328,6 +366,15 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
                     )}
                 </div>
             </div>
+
+            {/* Override Settings Modal */}
+            <OverrideSettingsModal
+                isOpen={showOverrideSettings}
+                onClose={() => setShowOverrideSettings(false)}
+                config={config}
+                onConfigChange={handleConfigChange}
+                selectedStyle={selectedStyle}
+            />
         </div>
     );
 };

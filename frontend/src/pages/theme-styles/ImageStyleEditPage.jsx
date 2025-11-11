@@ -41,6 +41,15 @@ const ImageStyleEditPage = () => {
     const [copyStatus, setCopyStatus] = useState({ template: false, css: false });
     const [isSaving, setIsSaving] = useState(false);
     const [lightboxExpanded, setLightboxExpanded] = useState(false);
+    
+    // New lightbox and default settings
+    const [enableLightbox, setEnableLightbox] = useState(true);
+    const [lightboxTemplate, setLightboxTemplate] = useState('');
+    const [defaultShowCaptions, setDefaultShowCaptions] = useState(true);
+    const [defaultLightboxGroup, setDefaultLightboxGroup] = useState('');
+    const [defaultRandomize, setDefaultRandomize] = useState(false);
+    const [defaultAutoPlay, setDefaultAutoPlay] = useState(false);
+    const [defaultAutoPlayInterval, setDefaultAutoPlayInterval] = useState(3);
 
     // Fetch theme data
     const { data: themeData, isLoading } = useQuery({
@@ -96,6 +105,13 @@ const ImageStyleEditPage = () => {
                     alpine: style.alpine || false,
                     name: style.name || styleKey,
                     description: style.description || '',
+                    enableLightbox: style.enableLightbox !== undefined ? style.enableLightbox : true,
+                    lightboxTemplate: style.lightboxTemplate || '',
+                    defaultShowCaptions: style.defaultShowCaptions !== undefined ? style.defaultShowCaptions : true,
+                    defaultLightboxGroup: style.defaultLightboxGroup || '',
+                    defaultRandomize: style.defaultRandomize || false,
+                    defaultAutoPlay: style.defaultAutoPlay || false,
+                    defaultAutoPlayInterval: style.defaultAutoPlayInterval || 3,
                 };
                 setTemplate(initialStyle.template);
                 setCss(initialStyle.css);
@@ -106,6 +122,13 @@ const ImageStyleEditPage = () => {
                 setAlpine(initialStyle.alpine);
                 setName(initialStyle.name);
                 setDescription(initialStyle.description);
+                setEnableLightbox(initialStyle.enableLightbox);
+                setLightboxTemplate(initialStyle.lightboxTemplate);
+                setDefaultShowCaptions(initialStyle.defaultShowCaptions);
+                setDefaultLightboxGroup(initialStyle.defaultLightboxGroup);
+                setDefaultRandomize(initialStyle.defaultRandomize);
+                setDefaultAutoPlay(initialStyle.defaultAutoPlay);
+                setDefaultAutoPlayInterval(initialStyle.defaultAutoPlayInterval);
                 setInitialData(initialStyle);
                 setNewKey(styleKey);
             }
@@ -121,6 +144,13 @@ const ImageStyleEditPage = () => {
         description !== initialData.description ||
         styleType !== initialData.styleType ||
         alpine !== initialData.alpine ||
+        enableLightbox !== initialData.enableLightbox ||
+        lightboxTemplate !== initialData.lightboxTemplate ||
+        defaultShowCaptions !== initialData.defaultShowCaptions ||
+        defaultLightboxGroup !== initialData.defaultLightboxGroup ||
+        defaultRandomize !== initialData.defaultRandomize ||
+        defaultAutoPlay !== initialData.defaultAutoPlay ||
+        defaultAutoPlayInterval !== initialData.defaultAutoPlayInterval ||
         JSON.stringify(imgproxyConfig) !== JSON.stringify(initialData.imgproxyConfig) ||
         JSON.stringify(lightboxConfig) !== JSON.stringify(initialData.lightboxConfig) ||
         keyChanged
@@ -160,6 +190,15 @@ const ImageStyleEditPage = () => {
             lightboxConfig,
             styleType,
             alpine,
+            enableLightbox,
+            lightboxTemplate,
+            defaultShowCaptions,
+            defaultLightboxGroup,
+            defaultRandomize,
+            ...(styleType === 'carousel' ? {
+                defaultAutoPlay,
+                defaultAutoPlayInterval,
+            } : {}),
         };
         
         setIsSaving(true);
@@ -186,6 +225,13 @@ const ImageStyleEditPage = () => {
                 lightboxConfig,
                 styleType,
                 alpine,
+                enableLightbox,
+                lightboxTemplate,
+                defaultShowCaptions,
+                defaultLightboxGroup,
+                defaultRandomize,
+                defaultAutoPlay,
+                defaultAutoPlayInterval,
                 name,
                 description,
             };
@@ -523,6 +569,120 @@ const ImageStyleEditPage = () => {
                                         <option value="we">West</option>
                                     </select>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Lightbox Settings */}
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                            <h3 className="font-semibold text-gray-900 mb-4">Lightbox Settings</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="enableLightbox"
+                                        checked={enableLightbox}
+                                        onChange={(e) => setEnableLightbox(e.target.checked)}
+                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                    />
+                                    <label htmlFor="enableLightbox" className="text-sm font-medium text-gray-700">
+                                        Enable Lightbox
+                                    </label>
+                                </div>
+                                {enableLightbox && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Lightbox Template (Optional)
+                                        </label>
+                                        <textarea
+                                            value={lightboxTemplate}
+                                            onChange={(e) => setLightboxTemplate(e.target.value)}
+                                            rows={4}
+                                            placeholder="Custom Mustache template for lightbox UI"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono text-sm"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Leave empty to use default lightbox
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Default Values */}
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                            <h3 className="font-semibold text-gray-900 mb-4">Default Values</h3>
+                            <p className="text-xs text-gray-600 mb-4">
+                                These defaults can be overridden by individual widgets
+                            </p>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="defaultShowCaptions"
+                                        checked={defaultShowCaptions}
+                                        onChange={(e) => setDefaultShowCaptions(e.target.checked)}
+                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    <label htmlFor="defaultShowCaptions" className="text-sm text-gray-700">
+                                        Show Captions
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Lightbox Group (Optional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={defaultLightboxGroup}
+                                        onChange={(e) => setDefaultLightboxGroup(e.target.value)}
+                                        placeholder="my-gallery"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Group images for lightbox navigation
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="defaultRandomize"
+                                        checked={defaultRandomize}
+                                        onChange={(e) => setDefaultRandomize(e.target.checked)}
+                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    <label htmlFor="defaultRandomize" className="text-sm text-gray-700">
+                                        Randomize Image Order
+                                    </label>
+                                </div>
+                                {styleType === 'carousel' && (
+                                    <>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="defaultAutoPlay"
+                                                checked={defaultAutoPlay}
+                                                onChange={(e) => setDefaultAutoPlay(e.target.checked)}
+                                                className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                            />
+                                            <label htmlFor="defaultAutoPlay" className="text-sm text-gray-700">
+                                                Auto Play
+                                            </label>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Auto Play Interval (seconds)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="30"
+                                                value={defaultAutoPlayInterval}
+                                                onChange={(e) => setDefaultAutoPlayInterval(parseInt(e.target.value) || 3)}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                            />
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 

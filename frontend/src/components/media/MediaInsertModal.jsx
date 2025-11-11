@@ -4,15 +4,17 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Image as ImageIcon, ChevronDown } from 'lucide-react';
+import { X, Image as ImageIcon, ChevronDown, Settings } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
+import OverrideSettingsModal from './OverrideSettingsModal';
 
 const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
     const { currentTheme } = useTheme({ pageId, enabled: true }); // Enable to get theme data including imageStyles
     const [step, setStep] = useState('select'); // 'select' or 'configure'
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'
+    const [showOverrideSettings, setShowOverrideSettings] = useState(false);
     const [config, setConfig] = useState({
         width: 'full',
         align: 'center',
@@ -21,7 +23,12 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
         galleryStyle: null,
         enableLightbox: false,
         lightboxStyle: 'default',
-        lightboxGroup: ''
+        lightboxGroup: '',
+        // Override settings
+        showCaptions: undefined,
+        randomize: undefined,
+        autoPlay: undefined,
+        autoPlayInterval: undefined
     });
 
     // Get available image styles from theme (unified gallery and carousel styles)
@@ -41,6 +48,16 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
         }));
     }, [currentTheme]);
 
+    // Get selected style info
+    const selectedStyle = useMemo(() => {
+        if (!config.galleryStyle || !currentTheme?.imageStyles) {
+            return null;
+        }
+        return currentTheme.imageStyles[config.galleryStyle];
+    }, [config.galleryStyle, currentTheme]);
+
+    const isCarouselStyle = selectedStyle?.styleType === 'carousel';
+
     // Reset state when modal opens
     useEffect(() => {
         if (isOpen) {
@@ -55,7 +72,12 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                 galleryStyle: null,
                 enableLightbox: false,
                 lightboxStyle: 'default',
-                lightboxGroup: ''
+                lightboxGroup: '',
+                // Override settings
+                showCaptions: undefined,
+                randomize: undefined,
+                autoPlay: undefined,
+                autoPlayInterval: undefined
             });
         }
     }, [isOpen]);
@@ -144,9 +166,11 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                             <MediaBrowser
                                 onFileSelect={handleMediaSelect}
                                 selectionMode="single"
-                                fileTypes={[]}
+                                fileTypes={['image', 'collection']}
                                 namespace={namespace}
                                 showUploader={true}
+                                hideShowDeleted={true}
+                                hideTypeFilter={true}
                             />
                         </div>
                     ) : (
@@ -189,9 +213,21 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                                 {/* Image Style (Gallery/Carousel) */}
                                 {availableImageStyles.length > 0 && (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-2">
-                                            Image Style
-                                        </label>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-sm font-medium text-gray-900">
+                                                Image Style
+                                            </label>
+                                            {config.galleryStyle && selectedStyle && (
+                                                <button
+                                                    onClick={() => setShowOverrideSettings(true)}
+                                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-md transition-colors"
+                                                    title="Configure override settings"
+                                                >
+                                                    <Settings className="w-3.5 h-3.5" />
+                                                    Override Settings
+                                                </button>
+                                            )}
+                                        </div>
                                         <select
                                             value={config.galleryStyle || ''}
                                             onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
@@ -317,6 +353,15 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Override Settings Modal */}
+            <OverrideSettingsModal
+                isOpen={showOverrideSettings}
+                onClose={() => setShowOverrideSettings(false)}
+                config={config}
+                onConfigChange={handleConfigChange}
+                selectedStyle={selectedStyle}
+            />
         </div>
     );
 };

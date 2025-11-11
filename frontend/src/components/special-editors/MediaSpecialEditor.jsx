@@ -1021,6 +1021,212 @@ const MediaSpecialEditor = ({
                                 />
                             </div>
 
+                            {/* Override Settings */}
+                            {currentConfig.imageStyle && currentTheme && (
+                                <div className="p-3 border border-green-200 rounded-lg bg-green-50 space-y-3">
+                                    <label className="text-sm font-medium text-gray-700">Override Defaults</label>
+                                    <p className="text-xs text-gray-600">Override the image style's default values for this widget</p>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="overrideShowCaptions"
+                                                checked={currentConfig.showCaptions !== undefined}
+                                                onChange={(e) => {
+                                                    const updatedConfig = { ...currentConfig }
+                                                    if (e.target.checked) {
+                                                        updatedConfig.showCaptions = true
+                                                    } else {
+                                                        delete updatedConfig.showCaptions
+                                                    }
+                                                    setLocalConfig(updatedConfig)
+                                                    onConfigChange(updatedConfig)
+                                                }}
+                                                className="rounded border-gray-300 text-green-600"
+                                            />
+                                            <label htmlFor="overrideShowCaptions" className="text-xs text-gray-700 flex-1">
+                                                Show Captions
+                                            </label>
+                                            {currentConfig.showCaptions !== undefined && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={currentConfig.showCaptions}
+                                                    onChange={(e) => {
+                                                        const updatedConfig = {
+                                                            ...currentConfig,
+                                                            showCaptions: e.target.checked
+                                                        }
+                                                        setLocalConfig(updatedConfig)
+                                                        onConfigChange(updatedConfig)
+                                                    }}
+                                                    className="rounded border-gray-300 text-blue-600"
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="overrideRandomize"
+                                                checked={currentConfig.randomize !== undefined}
+                                                onChange={(e) => {
+                                                    const updatedConfig = { ...currentConfig }
+                                                    if (e.target.checked) {
+                                                        updatedConfig.randomize = false
+                                                    } else {
+                                                        delete updatedConfig.randomize
+                                                    }
+                                                    setLocalConfig(updatedConfig)
+                                                    onConfigChange(updatedConfig)
+                                                }}
+                                                className="rounded border-gray-300 text-green-600"
+                                            />
+                                            <label htmlFor="overrideRandomize" className="text-xs text-gray-700 flex-1">
+                                                Randomize Order
+                                            </label>
+                                            {currentConfig.randomize !== undefined && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={currentConfig.randomize}
+                                                    onChange={(e) => {
+                                                        const updatedConfig = {
+                                                            ...currentConfig,
+                                                            randomize: e.target.checked
+                                                        }
+                                                        setLocalConfig(updatedConfig)
+                                                        onConfigChange(updatedConfig)
+                                                    }}
+                                                    className="rounded border-gray-300 text-blue-600"
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-start gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="overrideLightboxGroup"
+                                                checked={currentConfig.lightboxGroup !== undefined}
+                                                onChange={(e) => {
+                                                    const updatedConfig = { ...currentConfig }
+                                                    if (e.target.checked) {
+                                                        updatedConfig.lightboxGroup = ''
+                                                    } else {
+                                                        delete updatedConfig.lightboxGroup
+                                                    }
+                                                    setLocalConfig(updatedConfig)
+                                                    onConfigChange(updatedConfig)
+                                                }}
+                                                className="rounded border-gray-300 text-green-600 mt-1"
+                                            />
+                                            <div className="flex-1">
+                                                <label htmlFor="overrideLightboxGroup" className="text-xs text-gray-700">
+                                                    Lightbox Group
+                                                </label>
+                                                {currentConfig.lightboxGroup !== undefined && (
+                                                    <input
+                                                        type="text"
+                                                        value={currentConfig.lightboxGroup || ''}
+                                                        onChange={(e) => {
+                                                            const updatedConfig = {
+                                                                ...currentConfig,
+                                                                lightboxGroup: e.target.value
+                                                            }
+                                                            setLocalConfig(updatedConfig)
+                                                            onConfigChange(updatedConfig)
+                                                        }}
+                                                        placeholder="gallery-group"
+                                                        className="mt-1 w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {currentConfig.displayType === 'carousel' && (
+                                            <>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="overrideAutoPlay"
+                                                        checked={currentConfig.autoPlay !== undefined}
+                                                        onChange={(e) => {
+                                                            const updatedConfig = { ...currentConfig }
+                                                            if (e.target.checked) {
+                                                                updatedConfig.autoPlay = false
+                                                            } else {
+                                                                delete updatedConfig.autoPlay
+                                                            }
+                                                            setLocalConfig(updatedConfig)
+                                                            onConfigChange(updatedConfig)
+                                                        }}
+                                                        className="rounded border-gray-300 text-green-600"
+                                                    />
+                                                    <label htmlFor="overrideAutoPlay" className="text-xs text-gray-700 flex-1">
+                                                        Auto Play
+                                                    </label>
+                                                    {currentConfig.autoPlay !== undefined && (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={currentConfig.autoPlay}
+                                                            onChange={(e) => {
+                                                                const updatedConfig = {
+                                                                    ...currentConfig,
+                                                                    autoPlay: e.target.checked
+                                                                }
+                                                                setLocalConfig(updatedConfig)
+                                                                onConfigChange(updatedConfig)
+                                                            }}
+                                                            className="rounded border-gray-300 text-blue-600"
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-start gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="overrideAutoPlayInterval"
+                                                        checked={currentConfig.autoPlayInterval !== undefined}
+                                                        onChange={(e) => {
+                                                            const updatedConfig = { ...currentConfig }
+                                                            if (e.target.checked) {
+                                                                updatedConfig.autoPlayInterval = 3
+                                                            } else {
+                                                                delete updatedConfig.autoPlayInterval
+                                                            }
+                                                            setLocalConfig(updatedConfig)
+                                                            onConfigChange(updatedConfig)
+                                                        }}
+                                                        className="rounded border-gray-300 text-green-600 mt-1"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <label htmlFor="overrideAutoPlayInterval" className="text-xs text-gray-700">
+                                                            Auto Play Interval (sec)
+                                                        </label>
+                                                        {currentConfig.autoPlayInterval !== undefined && (
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max="30"
+                                                                value={currentConfig.autoPlayInterval || 3}
+                                                                onChange={(e) => {
+                                                                    const updatedConfig = {
+                                                                        ...currentConfig,
+                                                                        autoPlayInterval: parseInt(e.target.value) || 3
+                                                                    }
+                                                                    setLocalConfig(updatedConfig)
+                                                                    onConfigChange(updatedConfig)
+                                                                }}
+                                                                className="mt-1 w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Warning about global collection modifications */}
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                                 <div className="flex items-start gap-2">
@@ -1164,6 +1370,212 @@ const MediaSpecialEditor = ({
                                     displayType={currentConfig.displayType || 'gallery'}
                                 />
                             </div>
+
+                            {/* Override Settings */}
+                            {currentConfig.imageStyle && currentTheme && (
+                                <div className="p-3 border border-green-200 rounded-lg bg-green-50 space-y-3">
+                                    <label className="text-sm font-medium text-gray-700">Override Defaults</label>
+                                    <p className="text-xs text-gray-600">Override the image style's default values for this widget</p>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="overrideShowCaptionsFree"
+                                                checked={currentConfig.showCaptions !== undefined}
+                                                onChange={(e) => {
+                                                    const updatedConfig = { ...currentConfig }
+                                                    if (e.target.checked) {
+                                                        updatedConfig.showCaptions = true
+                                                    } else {
+                                                        delete updatedConfig.showCaptions
+                                                    }
+                                                    setLocalConfig(updatedConfig)
+                                                    onConfigChange(updatedConfig)
+                                                }}
+                                                className="rounded border-gray-300 text-green-600"
+                                            />
+                                            <label htmlFor="overrideShowCaptionsFree" className="text-xs text-gray-700 flex-1">
+                                                Show Captions
+                                            </label>
+                                            {currentConfig.showCaptions !== undefined && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={currentConfig.showCaptions}
+                                                    onChange={(e) => {
+                                                        const updatedConfig = {
+                                                            ...currentConfig,
+                                                            showCaptions: e.target.checked
+                                                        }
+                                                        setLocalConfig(updatedConfig)
+                                                        onConfigChange(updatedConfig)
+                                                    }}
+                                                    className="rounded border-gray-300 text-blue-600"
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="overrideRandomizeFree"
+                                                checked={currentConfig.randomize !== undefined}
+                                                onChange={(e) => {
+                                                    const updatedConfig = { ...currentConfig }
+                                                    if (e.target.checked) {
+                                                        updatedConfig.randomize = false
+                                                    } else {
+                                                        delete updatedConfig.randomize
+                                                    }
+                                                    setLocalConfig(updatedConfig)
+                                                    onConfigChange(updatedConfig)
+                                                }}
+                                                className="rounded border-gray-300 text-green-600"
+                                            />
+                                            <label htmlFor="overrideRandomizeFree" className="text-xs text-gray-700 flex-1">
+                                                Randomize Order
+                                            </label>
+                                            {currentConfig.randomize !== undefined && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={currentConfig.randomize}
+                                                    onChange={(e) => {
+                                                        const updatedConfig = {
+                                                            ...currentConfig,
+                                                            randomize: e.target.checked
+                                                        }
+                                                        setLocalConfig(updatedConfig)
+                                                        onConfigChange(updatedConfig)
+                                                    }}
+                                                    className="rounded border-gray-300 text-blue-600"
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-start gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="overrideLightboxGroupFree"
+                                                checked={currentConfig.lightboxGroup !== undefined}
+                                                onChange={(e) => {
+                                                    const updatedConfig = { ...currentConfig }
+                                                    if (e.target.checked) {
+                                                        updatedConfig.lightboxGroup = ''
+                                                    } else {
+                                                        delete updatedConfig.lightboxGroup
+                                                    }
+                                                    setLocalConfig(updatedConfig)
+                                                    onConfigChange(updatedConfig)
+                                                }}
+                                                className="rounded border-gray-300 text-green-600 mt-1"
+                                            />
+                                            <div className="flex-1">
+                                                <label htmlFor="overrideLightboxGroupFree" className="text-xs text-gray-700">
+                                                    Lightbox Group
+                                                </label>
+                                                {currentConfig.lightboxGroup !== undefined && (
+                                                    <input
+                                                        type="text"
+                                                        value={currentConfig.lightboxGroup || ''}
+                                                        onChange={(e) => {
+                                                            const updatedConfig = {
+                                                                ...currentConfig,
+                                                                lightboxGroup: e.target.value
+                                                            }
+                                                            setLocalConfig(updatedConfig)
+                                                            onConfigChange(updatedConfig)
+                                                        }}
+                                                        placeholder="gallery-group"
+                                                        className="mt-1 w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {currentConfig.displayType === 'carousel' && (
+                                            <>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="overrideAutoPlayFree"
+                                                        checked={currentConfig.autoPlay !== undefined}
+                                                        onChange={(e) => {
+                                                            const updatedConfig = { ...currentConfig }
+                                                            if (e.target.checked) {
+                                                                updatedConfig.autoPlay = false
+                                                            } else {
+                                                                delete updatedConfig.autoPlay
+                                                            }
+                                                            setLocalConfig(updatedConfig)
+                                                            onConfigChange(updatedConfig)
+                                                        }}
+                                                        className="rounded border-gray-300 text-green-600"
+                                                    />
+                                                    <label htmlFor="overrideAutoPlayFree" className="text-xs text-gray-700 flex-1">
+                                                        Auto Play
+                                                    </label>
+                                                    {currentConfig.autoPlay !== undefined && (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={currentConfig.autoPlay}
+                                                            onChange={(e) => {
+                                                                const updatedConfig = {
+                                                                    ...currentConfig,
+                                                                    autoPlay: e.target.checked
+                                                                }
+                                                                setLocalConfig(updatedConfig)
+                                                                onConfigChange(updatedConfig)
+                                                            }}
+                                                            className="rounded border-gray-300 text-blue-600"
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-start gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="overrideAutoPlayIntervalFree"
+                                                        checked={currentConfig.autoPlayInterval !== undefined}
+                                                        onChange={(e) => {
+                                                            const updatedConfig = { ...currentConfig }
+                                                            if (e.target.checked) {
+                                                                updatedConfig.autoPlayInterval = 3
+                                                            } else {
+                                                                delete updatedConfig.autoPlayInterval
+                                                            }
+                                                            setLocalConfig(updatedConfig)
+                                                            onConfigChange(updatedConfig)
+                                                        }}
+                                                        className="rounded border-gray-300 text-green-600 mt-1"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <label htmlFor="overrideAutoPlayIntervalFree" className="text-xs text-gray-700">
+                                                            Auto Play Interval (sec)
+                                                        </label>
+                                                        {currentConfig.autoPlayInterval !== undefined && (
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max="30"
+                                                                value={currentConfig.autoPlayInterval || 3}
+                                                                onChange={(e) => {
+                                                                    const updatedConfig = {
+                                                                        ...currentConfig,
+                                                                        autoPlayInterval: parseInt(e.target.value) || 3
+                                                                    }
+                                                                    setLocalConfig(updatedConfig)
+                                                                    onConfigChange(updatedConfig)
+                                                                }}
+                                                                className="mt-1 w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Create Collection Form */}
                             {showCreateCollectionForm ? (
@@ -2077,10 +2489,10 @@ const MediaSpecialEditor = ({
             {/* Image Metadata Edit Modal */}
             {editingItem && editingItem.type === 'editImage' && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
                             <h5 className="font-medium text-gray-900">
-                                Edit Image Metadata
+                                Edit Media Insert
                             </h5>
                             <button
                                 onClick={() => setEditingItem(null)}
@@ -2089,7 +2501,7 @@ const MediaSpecialEditor = ({
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        
+
                         <div className="space-y-4">
                             {/* Image Preview */}
                             <div className="aspect-video bg-gray-100 rounded overflow-hidden">
@@ -2156,6 +2568,52 @@ const MediaSpecialEditor = ({
                                 </p>
                             </div>
 
+                            {/* Lightbox Settings */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                                        <input
+                                            type="checkbox"
+                                            checked={editingItem.data.enableLightbox || false}
+                                            onChange={(e) => setEditingItem(prev => ({
+                                                ...prev,
+                                                data: { ...prev.data, enableLightbox: e.target.checked }
+                                            }))}
+                                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                        />
+                                        Open in lightbox
+                                    </label>
+                                    <p className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Style</label>
+                                    <input
+                                        type="text"
+                                        value={editingItem.data.lightboxStyle || 'default'}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            data: { ...prev.data, lightboxStyle: e.target.value }
+                                        }))}
+                                        placeholder="default"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Group</label>
+                                    <input
+                                        type="text"
+                                        value={editingItem.data.lightboxGroup || ''}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            data: { ...prev.data, lightboxGroup: e.target.value }
+                                        }))}
+                                        placeholder="optional group key"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">Images sharing a group key can be navigated in the lightbox.</p>
+                                </div>
+                            </div>
+
                             {/* Action Buttons */}
                             <div className="flex gap-3 pt-2">
                                 <button
@@ -2171,14 +2629,17 @@ const MediaSpecialEditor = ({
                                         updatedMediaItems[editingItem.index] = {
                                             ...updatedMediaItems[editingItem.index],
                                             altText: editingItem.data.altText,
-                                            caption: editingItem.data.caption
+                                            caption: editingItem.data.caption,
+                                            enableLightbox: editingItem.data.enableLightbox,
+                                            lightboxStyle: editingItem.data.lightboxStyle,
+                                            lightboxGroup: editingItem.data.lightboxGroup
                                         }
-                                        
+
                                         const updatedConfig = {
                                             ...currentConfig,
                                             mediaItems: updatedMediaItems
                                         }
-                                        
+
                                         setLocalConfig(updatedConfig)
                                         onConfigChange(updatedConfig)
                                         setEditingItem(null)

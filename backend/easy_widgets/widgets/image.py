@@ -69,58 +69,62 @@ class ImageConfig(BaseModel):
             "placeholder": "Default",
         },
     )
-    enableLightbox: bool = Field(
-        True,
-        description="Enable lightbox for full-size viewing",
+    showCaptions: Optional[bool] = Field(
+        None,
+        description="Override style default: Display captions",
         json_schema_extra={
             "component": "BooleanInput",
-            "group": "Display Options",
+            "group": "Override Settings",
             "order": 2,
             "variant": "toggle",
-        },
-    )
-    showCaptions: bool = Field(
-        True,
-        description="Display captions",
-        json_schema_extra={
-            "component": "BooleanInput",
-            "group": "Display Options",
-            "order": 3,
-            "variant": "toggle",
+            "isOverride": True,
         },
     )
     lightboxGroup: Optional[str] = Field(
         None,
-        description="Group key to navigate between images in lightbox",
+        description="Override style default: Group key to navigate between images in lightbox",
         json_schema_extra={
             "component": "TextInput",
-            "order": 4,
-            "group": "Display Options",
+            "order": 3,
+            "group": "Override Settings",
             "placeholder": "widget-{{id}}",
+            "isOverride": True,
         },
     )
-    autoPlay: bool = Field(
-        False,
-        description="Auto-play carousel (only shown for carousel-type image styles)",
+    randomize: Optional[bool] = Field(
+        None,
+        description="Override style default: Randomize image order on each page load",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "order": 4,
+            "group": "Override Settings",
+            "variant": "toggle",
+            "isOverride": True,
+        },
+    )
+    autoPlay: Optional[bool] = Field(
+        None,
+        description="Override style default: Auto-play carousel (only for carousel-type image styles)",
         json_schema_extra={
             "component": "BooleanInput",
             "order": 5,
-            "group": "Advanced Settings",
+            "group": "Override Settings",
             "variant": "toggle",
             "conditionalOn": {
                 "imageStyle": "carousel"
-            },  # Show only for carousel styles
+            },
+            "isOverride": True,
         },
     )
-    autoPlayInterval: int = Field(
-        3,
+    autoPlayInterval: Optional[int] = Field(
+        None,
         ge=1,
         le=30,
-        description="Auto-play interval in seconds for carousel",
+        description="Override style default: Auto-play interval in seconds for carousel",
         json_schema_extra={
             "component": "SliderInput",
             "order": 6,
-            "group": "Advanced Settings",
+            "group": "Override Settings",
             "min": 1,
             "max": 30,
             "step": 1,
@@ -128,17 +132,8 @@ class ImageConfig(BaseModel):
             "showValue": True,
             "conditionalOn": {
                 "imageStyle": "carousel"
-            },  # Show only for carousel styles
-        },
-    )
-    randomize: bool = Field(
-        False,
-        description="Randomize image order on each page load",
-        json_schema_extra={
-            "component": "BooleanInput",
-            "order": 7,
-            "group": "Advanced Settings",
-            "variant": "toggle",
+            },
+            "isOverride": True,
         },
     )
 
@@ -357,6 +352,20 @@ class ImageWidget(BaseWidget):
         # Start with the base configuration
         template_config = config.copy() if config else {}
         context = context if context else {}
+        
+        # Get theme and style for applying defaults (context may contain theme)
+        theme = context.get("theme")
+        style = None
+        style_name = config.get("image_style") or config.get("imageStyle")
+        
+        if theme and style_name:
+            image_styles = theme.image_styles or {}
+            style = image_styles.get(style_name)
+            if not style:
+                # Fallback to legacy
+                gallery_styles = theme.gallery_styles or {}
+                carousel_styles = theme.carousel_styles or {}
+                style = gallery_styles.get(style_name) or carousel_styles.get(style_name)
 
         # Check if we have a collection to resolve
         collection_id = config.get("collection_id") or config.get("collectionId")
@@ -417,32 +426,67 @@ class ImageWidget(BaseWidget):
         template_config["gallery_columns"] = template_config.get(
             "galleryColumns", template_config.get("gallery_columns", 3)
         )
-        template_config["enable_lightbox"] = template_config.get(
-            "enableLightbox", template_config.get("enable_lightbox", True)
-        )
+        
+        # Apply style defaults with widget overrides
+        # enableLightbox now comes from style only
+        template_config["enable_lightbox"] = style.get("enableLightbox", True) if style else True
+        
+        # Apply widget overrides or style defaults for other settings
+        # showCaptions
+        show_captions_override = template_config.get("showCaptions") or template_config.get("show_captions")
+        if show_captions_override is not None:
+            template_config["show_captions"] = show_captions_override
+        elif style and "defaultShowCaptions" in style:
+            template_config["show_captions"] = style["defaultShowCaptions"]
+        else:
+            template_config["show_captions"] = True
+        
+        # lightboxGroup
+        lightbox_group_override = template_config.get("lightboxGroup") or template_config.get("lightbox_group")
+        if lightbox_group_override is not None:
+            template_config["lightbox_group"] = lightbox_group_override
+        elif style and "defaultLightboxGroup" in style:
+            template_config["lightbox_group"] = style["defaultLightboxGroup"]
+        else:
+            template_config["lightbox_group"] = None
+        
+        # autoPlay (carousel only)
+        auto_play_override = template_config.get("autoPlay")
+        if auto_play_override is not None:
+            template_config["auto_play"] = auto_play_override
+        elif style and "defaultAutoPlay" in style:
+            template_config["auto_play"] = style["defaultAutoPlay"]
+        else:
+            template_config["auto_play"] = False
+        
+        # autoPlayInterval (carousel only)  
+        auto_play_interval_override = template_config.get("autoPlayInterval")
+        if auto_play_interval_override is not None:
+            template_config["auto_play_interval"] = auto_play_interval_override
+        elif style and "defaultAutoPlayInterval" in style:
+            template_config["auto_play_interval"] = style["defaultAutoPlayInterval"]
+        else:
+            template_config["auto_play_interval"] = 3
+        
         template_config["lightbox_style"] = template_config.get(
             "lightboxStyle", template_config.get("lightbox_style", None)
-        )
-        template_config["lightbox_group"] = template_config.get(
-            "lightboxGroup", template_config.get("lightbox_group", None)
-        )
-        template_config["auto_play"] = template_config.get(
-            "autoPlay", template_config.get("auto_play", False)
-        )
-        template_config["show_captions"] = template_config.get(
-            "showCaptions", template_config.get("show_captions", True)
         )
         template_config["imgproxy_override"] = template_config.get(
             "imgproxyOverride", template_config.get("imgproxy_override", None)
         )
 
-        # Apply randomization if enabled (check widget-level first, then collection config)
-        collection_config = config.get("collection_config") or config.get(
-            "collectionConfig", {}
-        )
-        should_randomize = config.get("randomize", False) or (
-            collection_config and collection_config.get("randomize", False)
-        )
+        # Apply randomization if enabled (widget override, then style default, then collection config)
+        randomize_override = config.get("randomize")
+        if randomize_override is not None:
+            should_randomize = randomize_override
+        elif style and "defaultRandomize" in style:
+            should_randomize = style["defaultRandomize"]
+        else:
+            # Check collection config as fallback
+            collection_config = config.get("collection_config") or config.get(
+                "collectionConfig", {}
+            )
+            should_randomize = collection_config.get("randomize", False) if collection_config else False
         if should_randomize and template_config.get("media_items"):
             import random
 
@@ -507,15 +551,29 @@ class ImageWidget(BaseWidget):
         # Get imgproxy config from style (can be overridden by widget config)
         imgproxy_config = style.get("imgproxy_config")
         lightbox_config = style.get("lightbox_config")
+        
+        # Extract style defaults for overrides
+        style_defaults = {
+            "enableLightbox": style.get("enableLightbox", True),
+            "lightboxTemplate": style.get("lightboxTemplate", ""),
+            "defaultShowCaptions": style.get("defaultShowCaptions", True),
+            "defaultLightboxGroup": style.get("defaultLightboxGroup", ""),
+            "defaultRandomize": style.get("defaultRandomize", False),
+        }
+        
+        # Add carousel-specific defaults if carousel type
+        if style_type == "carousel":
+            style_defaults["defaultAutoPlay"] = style.get("defaultAutoPlay", False)
+            style_defaults["defaultAutoPlayInterval"] = style.get("defaultAutoPlayInterval", 3)
 
         # Use styleType to determine which context to prepare
         if style_type == "carousel":
             context = prepare_carousel_context(
-                images, config, style.get("variables"), imgproxy_config
+                images, config, style.get("variables"), imgproxy_config, style_defaults
             )
         else:
             context = prepare_gallery_context(
-                images, config, style.get("variables"), imgproxy_config, lightbox_config
+                images, config, style.get("variables"), imgproxy_config, lightbox_config, style_defaults
             )
 
         # Render template

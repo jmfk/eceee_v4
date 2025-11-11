@@ -50,7 +50,9 @@ const MediaBrowser = ({
     namespace,
     showUploader = true,
     refreshTrigger = 0, // External trigger to force refresh
-    prefilterTags = [] // Initial tag filter (array of tag IDs)
+    prefilterTags = [], // Initial tag filter (array of tag IDs)
+    hideShowDeleted = false, // Hide the "Show Deleted" button
+    hideTypeFilter = false // Hide the type filter dropdown
 }) => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -780,32 +782,36 @@ const MediaBrowser = ({
                     </div>
 
                     <div className="flex items-start gap-2 flex-shrink-0">
-                        <select
-                            value={filters.fileType}
-                            onChange={(e) => handleFilterChange('fileType', e.target.value)}
-                            className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[38px]"
-                        >
-                            <option value="">All Types</option>
-                            <option value="image">Images</option>
-                            <option value="video">Videos</option>
-                            <option value="audio">Audio</option>
-                            <option value="document">Documents</option>
-                            <option value="other">Other</option>
-                        </select>
+                        {!hideTypeFilter && (
+                            <select
+                                value={filters.fileType}
+                                onChange={(e) => handleFilterChange('fileType', e.target.value)}
+                                className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[38px]"
+                            >
+                                <option value="">All Types</option>
+                                <option value="image">Images</option>
+                                <option value="video">Videos</option>
+                                <option value="audio">Audio</option>
+                                <option value="document">Documents</option>
+                                <option value="other">Other</option>
+                            </select>
+                        )}
 
-                        <button
-                            onClick={() => handleFilterChange('showDeleted', !filters.showDeleted)}
-                            className={`
-                                flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-md transition-colors whitespace-nowrap
-                                ${filters.showDeleted
-                                    ? 'bg-red-600 text-white border-red-600'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }
-                            `}
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Show Deleted
-                        </button>
+                        {!hideShowDeleted && (
+                            <button
+                                onClick={() => handleFilterChange('showDeleted', !filters.showDeleted)}
+                                className={`
+                                    flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-md transition-colors whitespace-nowrap
+                                    ${filters.showDeleted
+                                        ? 'bg-red-600 text-white border-red-600'
+                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                    }
+                                `}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Show Deleted
+                            </button>
+                        )}
 
                         {/* Select All / Deselect All Button */}
                         {selectionMode === 'multiple' && files.length > 0 && (

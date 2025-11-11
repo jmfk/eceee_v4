@@ -242,6 +242,58 @@ class PageThemeSerializer(serializers.ModelSerializer):
                     f"Image style '{style_name}' has invalid styleType: {style_config['styleType']}. Must be 'gallery' or 'carousel'"
                 )
 
+            # Validate lightbox configuration
+            if "enableLightbox" in style_config and not isinstance(style_config["enableLightbox"], bool):
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' enableLightbox must be a boolean"
+                )
+
+            if "lightboxTemplate" in style_config and not isinstance(style_config["lightboxTemplate"], str):
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' lightboxTemplate must be a string"
+                )
+
+            # Validate default values
+            if "defaultShowCaptions" in style_config and not isinstance(style_config["defaultShowCaptions"], bool):
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' defaultShowCaptions must be a boolean"
+                )
+
+            if "defaultLightboxGroup" in style_config and not isinstance(style_config["defaultLightboxGroup"], str):
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' defaultLightboxGroup must be a string"
+                )
+
+            if "defaultRandomize" in style_config and not isinstance(style_config["defaultRandomize"], bool):
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' defaultRandomize must be a boolean"
+                )
+
+            # Validate carousel-specific defaults only for carousel styles
+            style_type = style_config["styleType"]
+            if style_type == "carousel":
+                if "defaultAutoPlay" in style_config and not isinstance(style_config["defaultAutoPlay"], bool):
+                    raise serializers.ValidationError(
+                        f"Carousel style '{style_name}' defaultAutoPlay must be a boolean"
+                    )
+
+                if "defaultAutoPlayInterval" in style_config:
+                    interval = style_config["defaultAutoPlayInterval"]
+                    if not isinstance(interval, (int, float)) or interval < 1 or interval > 30:
+                        raise serializers.ValidationError(
+                            f"Carousel style '{style_name}' defaultAutoPlayInterval must be a number between 1 and 30"
+                        )
+            else:
+                # Gallery styles should not have carousel-specific defaults
+                if "defaultAutoPlay" in style_config:
+                    raise serializers.ValidationError(
+                        f"Gallery style '{style_name}' should not have defaultAutoPlay (carousel only)"
+                    )
+                if "defaultAutoPlayInterval" in style_config:
+                    raise serializers.ValidationError(
+                        f"Gallery style '{style_name}' should not have defaultAutoPlayInterval (carousel only)"
+                    )
+
         return value
 
     def validate_table_templates(self, value):

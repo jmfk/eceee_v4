@@ -40,7 +40,14 @@ class PageTheme(models.Model):
     )
     image_styles = models.JSONField(
         default=dict,
-        help_text="Unified image styles (gallery and carousel) with Mustache templates and CSS",
+        help_text=(
+            "Unified image styles (gallery and carousel) with Mustache templates and CSS. "
+            "Each style supports: template (required), styleType (gallery|carousel, required), "
+            "css, variables, imgproxy_config, lightbox_config, enableLightbox (boolean), "
+            "lightboxTemplate (string), defaultShowCaptions (boolean), defaultLightboxGroup (string), "
+            "defaultRandomize (boolean). Carousel styles also support: defaultAutoPlay (boolean), "
+            "defaultAutoPlayInterval (number 1-30)."
+        ),
     )
     gallery_styles = models.JSONField(
         default=dict,
