@@ -205,7 +205,10 @@ class NewsListWidget(BaseWidget):
 
         except Exception as e:
             # Log error in production
-            print(f"Error in _get_news_items: {e}")
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in _get_news_items: {e}")
             return []
 
     def _get_excerpt(self, data: dict, max_length: int) -> str:

@@ -174,7 +174,9 @@ class ThreeColumnsWidget(BaseWidget):
         context = prepare_component_context(
             content=widget_html,
             anchor="",
-            style_vars=style.get("variables", {})
+            style_vars=style.get("variables", {}),
+            config=prepared_config,  # Pass processed config for granular control
+            slots=prepared_config.get("rendered_slots"),  # Pass slot data for custom rendering
         )
         
         # Render with style template

@@ -34,6 +34,10 @@ from .views.page_import_views import (
     ImportStatusView,
     ImportSinglePageView,
 )
+from .views.widget_quick_reference_views import (
+    widget_quick_reference_list,
+    widget_quick_reference_detail,
+)
 from .api_structure_views import (
     page_metadata_view,
     page_by_path_view,
@@ -222,6 +226,17 @@ urlpatterns = [
         r"^pydantic-models/(?P<model_name>[A-Za-z0-9_]+)/schema/$",
         pydantic_model_schema,
         name="pydantic-model-schema",
+    ),
+    # Widget Quick Reference endpoints
+    path(
+        "widget-quick-reference/",
+        widget_quick_reference_list,
+        name="widget-quick-reference-list",
+    ),
+    re_path(
+        r"^widget-quick-reference/(?P<widget_type>[^/]+)/$",
+        widget_quick_reference_detail,
+        name="widget-quick-reference-detail",
     ),
     path("", include(router.urls)),
 ] + widget_type_patterns

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { X, RefreshCw, Save } from 'lucide-react'
+import { X, RefreshCw, Save, HelpCircle } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
@@ -8,6 +8,7 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 import WidgetPublishingInheritanceFields from './WidgetPublishingInheritanceFields.jsx'
+import WidgetQuickReference from './widget-help/WidgetQuickReference'
 
 
 /**
@@ -46,6 +47,7 @@ const WidgetEditorPanel = forwardRef(({
     const [specialEditorWidth, setSpecialEditorWidth] = useState(60) // Percentage of total width
     const [isAnimatingSpecialEditor, setIsAnimatingSpecialEditor] = useState(false) // Animation state
     const [isClosingSpecialEditor, setIsClosingSpecialEditor] = useState(false) // Closing animation state
+    const [showQuickReference, setShowQuickReference] = useState(false) // Quick Reference modal
 
     const panelRef = useRef(null)
     const resizeRef = useRef(null)
@@ -443,13 +445,25 @@ const WidgetEditorPanel = forwardRef(({
                                 </span>
                             )}
                         </div>
-                        <button
-                            onClick={handleClose}
-                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-                        >
-                            <X className={`w-4 h-4 transition-all duration-300 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-bounce-in delay-200' : ''
-                                }`} />
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Help Button */}
+                            {widgetData?.type && (
+                                <button
+                                    onClick={() => setShowQuickReference(true)}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="Quick Reference & Examples"
+                                >
+                                    <HelpCircle className="w-4 h-4" />
+                                </button>
+                            )}
+                            <button
+                                onClick={handleClose}
+                                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X className={`w-4 h-4 transition-all duration-300 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-bounce-in delay-200' : ''
+                                    }`} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Form content - scrollable */}
@@ -521,6 +535,13 @@ const WidgetEditorPanel = forwardRef(({
                     </div>
                 </div>
             </div>
+
+            {/* Quick Reference Modal */}
+            <WidgetQuickReference
+                widgetType={widgetData?.type}
+                isOpen={showQuickReference}
+                onClose={() => setShowQuickReference(false)}
+            />
         </>
     )
 })

@@ -252,7 +252,7 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
     }
 
 
-def prepare_component_context(content, anchor="", style_vars=None):
+def prepare_component_context(content, anchor="", style_vars=None, config=None, slots=None):
     """
     Prepare context for component style template rendering.
 
@@ -260,6 +260,8 @@ def prepare_component_context(content, anchor="", style_vars=None):
         content: The content to render (HTML string or dict)
         anchor: Optional anchor/heading text
         style_vars: Style-specific variables
+        config: Raw widget configuration (snake_case) - NEW
+        slots: Slot data for container widgets - NEW
 
     Returns:
         Dictionary ready for Mustache rendering
@@ -267,5 +269,7 @@ def prepare_component_context(content, anchor="", style_vars=None):
     return {
         "content": content,
         "anchor": anchor,
+        "config": config or {},     # NEW: Widget configuration (snake_case)
+        "slots": slots or {},       # NEW: Slot data for container widgets
         **(style_vars or {}),
     }

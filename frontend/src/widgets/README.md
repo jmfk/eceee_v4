@@ -166,6 +166,70 @@ import { CUSTOM_WIDGET_REGISTRY } from './my-custom-widgets/registry'
 registerWidgetRegistry(CUSTOM_WIDGET_REGISTRY, 'my-custom-widgets', 400)
 ```
 
+## Quick Reference & Help System
+
+The widget system includes comprehensive in-app documentation:
+
+### Accessing Widget Help
+
+When editing a widget in the PageEditor:
+1. Click the help icon (?) in the widget editor header
+2. Browse documentation tabs:
+   - **Overview** - Widget description and special features
+   - **Template Parameters** - All available parameters for templates
+   - **Examples** - Basic and advanced configuration examples
+   - **CSS Variables** - Theme customization options
+
+### Parameter Naming Conventions
+
+**IMPORTANT:** Frontend uses camelCase, backend/templates use snake_case:
+
+```javascript
+// Frontend (camelCase)
+{
+  backgroundColor: "#3b82f6",
+  enableLightbox: true,
+  menuItems: [...]
+}
+```
+
+```django
+{# Backend Templates (snake_case) #}
+{{ config.background_color }}
+{{ config.enable_lightbox }}
+{% for item in config.menu_items %}
+```
+
+The API automatically converts between the two naming conventions.
+
+### Quick Reference API
+
+Get widget documentation programmatically:
+
+```javascript
+import { 
+  getWidgetQuickReference,
+  getAllWidgetReferences,
+  searchWidgets
+} from '../../api/widgetQuickReference'
+
+// Get specific widget docs
+const widgetDocs = await getWidgetQuickReference('easy_widgets.ContentWidget')
+
+// Get all widgets
+const allWidgets = await getAllWidgetReferences()
+
+// Search widgets
+const results = await searchWidgets('navigation')
+```
+
+### Components
+
+Help panel components are in `src/components/widget-help/`:
+- `WidgetQuickReference.jsx` - Main help panel modal
+- `WidgetParameterReference.jsx` - Parameter table with search
+- `WidgetExamples.jsx` - Code examples with copy/apply
+
 ## Migration Notes
 
 The default-widgets and default-layouts packages have been removed from the system. All functionality is now provided by easy-widgets and easy-layouts.

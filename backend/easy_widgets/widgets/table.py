@@ -308,7 +308,8 @@ class TableWidget(BaseWidget):
         context = prepare_component_context(
             content=table_html,
             anchor=config.get("caption", ""),
-            style_vars=style.get("variables", {})
+            style_vars=style.get("variables", {}),
+            config=config,  # Pass raw config for granular control
         )
         
         # Render with style template

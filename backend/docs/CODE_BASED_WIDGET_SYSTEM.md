@@ -456,3 +456,123 @@ python manage.py shell -c "from default_widgets.widgets.content import TextBlock
 3. **Template caching** - Django template caching applies to widget templates
 4. **Lazy loading** - Widget discovery happens during Django startup
 5. **Memory usage** - Widget registry kept in memory for fast access 
+## Template Parameter Availability
+
+### How Parameters Reach Templates
+
+All widget configuration parameters are accessible in templates through the `prepare_template_context()` method:
+
+1. **Frontend sends camelCase:** `backgroundColor`, `enableLightbox`
+2. **API converts to snake_case:** `background_color`, `enable_lightbox`
+3. **`prepare_template_context()` processes config:** Adds computed parameters
+4. **Template accesses via snake_case:** `{{ config.background_color }}`
+
+### The prepare_template_context() Method
+
+Every widget can override this method to add computed parameters:
+
+```python
+def prepare_template_context(self, config, context=None):
+    """
+    Prepare template context with processed parameters.
+    
+    Args:
+        config: Widget configuration (snake_case from API)
+        context: Rendering context (page, theme, etc.)
+    
+    Returns:
+        dict: Configuration ready for template rendering
+    """
+    # Always call super to get base context
+    template_config = super().prepare_template_context(config, context)
+    
+    # Add widget-specific computed parameters
+    template_config["computed_value"] = self._compute_value(config)
+    
+    return template_config
+```
+
+### Common Computed Parameters
+
+Many widgets add computed parameters for convenience:
+
+- **Image widgets:** Process imgproxy URLs, resolve collections
+- **Navigation widgets:** Filter menu items, generate dynamic menus  
+- **Content widgets:** Process media inserts, apply lightbox
+- **Style widgets:** Generate CSS variable strings
+
+### Accessing in Templates
+
+**Django/Mustache templates use snake_case:**
+
+```django
+{# Basic config parameters #}
+{{ config.background_color }}
+{{ config.menu_items }}
+
+{# Computed parameters #}
+{{ config.processed_content }}
+{{ config.background_image_url }}
+
+{# Context data #}
+{{ config._context.page.title }}
+{{ config._context.theme.name }}
+{{ config._context.path_variables.slug }}
+```
+
+**IMPORTANT:** Always use snake_case in templates, even though frontend sends camelCase.
+
+## Quick Reference & Documentation
+
+The widget system includes comprehensive documentation accessible from the widget editor:
+
+### In-App Quick Reference
+
+1. Open any widget in the widget editor
+2. Click the help icon (?) in the header
+3. Browse documentation tabs:
+   - **Overview:** Widget description and special features
+   - **Template Parameters:** All available parameters with types
+   - **Examples:** Basic and advanced configurations
+   - **CSS Variables:** Theme customization variables
+
+### API Endpoints
+
+```
+GET /api/webpages/widget-quick-reference/
+GET /api/webpages/widget-quick-reference/{widget_type}/
+```
+
+Returns comprehensive documentation including:
+- Configuration schema (Pydantic JSON schema)
+- Template parameters with descriptions
+- Code examples (basic and advanced)
+- CSS variables and their defaults
+- Special features (container, special editor, etc.)
+
+### Example Data
+
+All widgets include basic and advanced examples in `easy_widgets/widget_examples.py`:
+
+```python
+CONTENT_WIDGET_EXAMPLES = {
+    "basic": {
+        "config": {"content": "<p>Text</p>"},
+        "description": "Simple content"
+    },
+    "advanced": {
+        "config": {
+            "content": "<h2>Rich Content</h2>",
+            "enableLightbox": True,
+            "componentStyle": "card"
+        },
+        "description": "Advanced features"
+    }
+}
+```
+
+## Further Reading
+
+- [Widget Quick Reference](./WIDGET_QUICK_REFERENCE.md) - Complete widget documentation
+- [Widget Template Parameters](./WIDGET_TEMPLATE_PARAMETERS.md) - Parameter passing details
+- [Widget Examples](../easy_widgets/widget_examples.py) - Configuration examples

@@ -245,7 +245,10 @@ class FooterWidget(BaseWidget):
 
         # Prepare context with rendered footer as content
         context = prepare_component_context(
-            content=footer_html, anchor="", style_vars=style.get("variables", {})
+            content=footer_html, 
+            anchor="", 
+            style_vars=style.get("variables", {}),
+            config=config,  # Pass raw config for granular control
         )
 
         # Render with style template

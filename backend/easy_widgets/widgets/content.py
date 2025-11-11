@@ -172,6 +172,7 @@ class ContentWidget(BaseWidget):
             content=config.get("content", ""),
             anchor=config.get("anchor", ""),
             style_vars=style.get("variables", {}),
+            config=config,  # Pass raw config for granular control
         )
 
         # Render template

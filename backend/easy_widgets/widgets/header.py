@@ -234,7 +234,10 @@ class HeaderWidget(BaseWidget):
 
         # Prepare context with rendered header as content
         context = prepare_component_context(
-            content=header_html, anchor="", style_vars=style.get("variables", {})
+            content=header_html, 
+            anchor="", 
+            style_vars=style.get("variables", {}),
+            config=prepared_config,  # Pass processed config for granular control
         )
 
         # Render with style template

@@ -195,7 +195,8 @@ class NavbarWidget(BaseWidget):
         context = prepare_component_context(
             content=navbar_html,
             anchor="",
-            style_vars=style.get("variables", {})
+            style_vars=style.get("variables", {}),
+            config=prepared_config,  # Pass processed config for granular control
         )
         
         # Render with style template
