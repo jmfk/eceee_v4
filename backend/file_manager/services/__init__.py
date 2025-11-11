@@ -7,6 +7,7 @@ from .duplicate_handler import DuplicateFileHandler, DuplicateCheckResult
 from .validation_service import FileValidationService, ValidationResult
 from .response_builder import UploadResponseBuilder, UploadResponseData
 from .namespace_service import NamespaceAccessService, NamespaceResult
+from .zip_service import ZipExtractionService, ZipExtractionResult
 
 __all__ = [
     "FileUploadService",
@@ -19,4 +20,6 @@ __all__ = [
     "UploadResponseData",
     "NamespaceAccessService",
     "NamespaceResult",
+    "ZipExtractionService",
+    "ZipExtractionResult",
 ]

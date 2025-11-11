@@ -134,6 +134,20 @@ class MediaCollection(models.Model):
 
         return slug
 
+    @property
+    def has_tags(self):
+        """Check if collection has at least one tag."""
+        return self.tags.exists()
+
+    def can_accept_uploads(self):
+        """
+        Check if collection can accept file uploads.
+        
+        Returns:
+            bool: True if collection has at least one tag, False otherwise.
+        """
+        return self.has_tags
+
 
 class PendingMediaFile(models.Model):
     """Temporary storage for uploaded files awaiting approval."""

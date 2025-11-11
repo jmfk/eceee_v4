@@ -8,14 +8,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
-from ..models import MediaFile, PendingMediaFile
-from ..serializers import MediaUploadSerializer
+from ..models import MediaFile, PendingMediaFile, MediaCollection
+from ..serializers import MediaUploadSerializer, MediaFileDetailSerializer
 from ..services import (
     FileUploadService,
     DuplicateFileHandler,
     FileValidationService,
     UploadResponseBuilder,
     NamespaceAccessService,
+    ZipExtractionService,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ class MediaUploadView(APIView):
         self.validation_service = FileValidationService()
         self.response_builder = UploadResponseBuilder()
         self.namespace_service = NamespaceAccessService()
+        self.zip_service = ZipExtractionService()
 
     def post(self, request):
         """
@@ -62,9 +64,88 @@ class MediaUploadView(APIView):
         uploaded_files = []
         errors = []
         replace_files = serializer.validated_data.get("replace_files", {})
-
-        # Process each file
+        
+        # Check for ZIP files and extract if enabled
+        extract_zip = serializer.validated_data.get("extract_zip", True)
+        collection_id = serializer.validated_data.get("collection_id")
+        max_zip_size = serializer.validated_data.get("max_zip_size")
+        
+        zip_files = []
+        regular_files = []
+        
         for uploaded_file in serializer.validated_data["files"]:
+            is_zip = uploaded_file.content_type in [
+                "application/zip",
+                "application/x-zip-compressed"
+            ] or uploaded_file.name.endswith('.zip')
+            
+            if is_zip and extract_zip:
+                zip_files.append(uploaded_file)
+            else:
+                regular_files.append(uploaded_file)
+        
+        # Process ZIP files first
+        for zip_file in zip_files:
+            try:
+                # Get collection if specified
+                collection = None
+                if collection_id:
+                    try:
+                        collection = MediaCollection.objects.get(
+                            id=collection_id,
+                            namespace=namespace
+                        )
+                    except MediaCollection.DoesNotExist:
+                        errors.append({
+                            "filename": zip_file.name,
+                            "error": "Collection not found",
+                            "status": "error"
+                        })
+                        continue
+                
+                # Create collection slug from ZIP filename if not providing existing collection
+                collection_slug = None
+                if not collection:
+                    import os
+                    from django.utils.text import slugify
+                    base_name = os.path.splitext(zip_file.name)[0]
+                    collection_slug = slugify(base_name)
+                
+                # Extract ZIP
+                extraction_result = self.zip_service.extract_zip(
+                    zip_file,
+                    namespace,
+                    request.user,
+                    collection=collection,
+                    collection_slug=collection_slug,
+                    tags=None,  # Tags from collection will be used if available
+                    max_size=max_zip_size
+                )
+                
+                if extraction_result.success:
+                    uploaded_files.extend(extraction_result.files)
+                    
+                if extraction_result.errors:
+                    errors.extend(extraction_result.errors)
+                
+                # Add warnings as info messages
+                for warning in extraction_result.warnings:
+                    errors.append({
+                        "filename": zip_file.name,
+                        "error": warning,
+                        "status": "warning"
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error extracting ZIP {zip_file.name}: {e}")
+                errors.append({
+                    "filename": zip_file.name,
+                    "error": f"Failed to extract ZIP: {str(e)}",
+                    "status": "error"
+                })
+
+        # Process regular files (non-ZIP or extract_zip=False)
+        for uploaded_file in regular_files:
             try:
                 # Validate file
                 validation_result = self.validation_service.validate(

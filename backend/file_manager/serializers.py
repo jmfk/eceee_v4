@@ -573,6 +573,23 @@ class MediaUploadSerializer(serializers.Serializer):
         default=dict,
         help_text="Map of filename to action: 'replace' or 'keep'. For replace, also include existing file ID.",
     )
+    
+    # ZIP extraction fields
+    collection_id = serializers.UUIDField(
+        required=False,
+        allow_null=True,
+        help_text="Collection ID to add extracted files to (for ZIP uploads)"
+    )
+    extract_zip = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="Whether to extract ZIP files or upload as-is"
+    )
+    max_zip_size = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Override maximum ZIP file size in bytes"
+    )
 
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""
@@ -607,14 +624,19 @@ class MediaUploadSerializer(serializers.Serializer):
                 "video/webm",
                 "audio/mpeg",
                 "audio/wav",
+                "application/zip",  # Allow ZIP files
+                "application/x-zip-compressed",  # Alternative ZIP MIME type
             ],
         )
 
         for file in files:
-            # Check file size
-            if file.size > max_file_size:
+            # Check file size (allow larger for ZIP files)
+            is_zip = file.content_type in ["application/zip", "application/x-zip-compressed"]
+            file_max_size = max_file_size if not is_zip else max_file_size
+            
+            if file.size > file_max_size:
                 raise serializers.ValidationError(
-                    f"File {file.name} is too large. Maximum size is {max_file_size // (1024*1024)}MB."
+                    f"File {file.name} is too large. Maximum size is {file_max_size // (1024*1024)}MB."
                 )
 
             # Check content type

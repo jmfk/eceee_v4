@@ -169,6 +169,17 @@ export const mediaUploadApi = {
                 // Continue without replaceFiles if serialization fails
             }
         }
+        
+        // ZIP extraction options
+        if (uploadData.collectionId) {
+            formData.append('collection_id', uploadData.collectionId);
+        }
+        if (uploadData.extractZip !== undefined) {
+            formData.append('extract_zip', uploadData.extractZip ? 'true' : 'false');
+        }
+        if (uploadData.maxZipSize) {
+            formData.append('max_zip_size', uploadData.maxZipSize);
+        }
 
         try {
             const wrappedCall = wrapApiCall(() =>
@@ -482,6 +493,55 @@ export const mediaCollectionsApi = {
         // Remove trailing slash from collection URL to avoid double slash
         const collectionUrl = endpoints.media.collection(id).replace(/\/$/, '');
         return apiClient.get(`${collectionUrl}/files${queryString}`);
+    }),
+
+    /**
+     * Upload files directly to a collection (auto-approved with collection tags)
+     * @param {string} id - Collection ID
+     * @param {File[]} files - Files to upload
+     * @param {Function} onProgress - Progress callback function
+     * @returns {Promise} API response with uploaded files
+     */
+    uploadFiles: (id, files, onProgress = null) => {
+        const formData = new FormData();
+        
+        // Append all files
+        files.forEach(file => {
+            formData.append('files', file);
+        });
+
+        const config = {};
+        
+        // Add progress tracking if callback provided
+        if (onProgress) {
+            config.onUploadProgress = (progressEvent) => {
+                const percentCompleted = Math.round(
+                    (progressEvent.loaded * 100) / progressEvent.total
+                );
+                onProgress(percentCompleted, progressEvent);
+            };
+        }
+
+        return wrapApiCall(() => {
+            const collectionUrl = endpoints.media.collection(id).replace(/\/$/, '');
+            return apiClient.post(
+                `${collectionUrl}/upload_to_collection/`,
+                formData,
+                config
+            );
+        });
+    },
+    
+    /**
+     * Download all files in a collection as a ZIP archive
+     * @param {string} id - Collection ID
+     * @returns {Promise<Blob>} ZIP file blob
+     */
+    downloadZip: (id) => wrapApiCall(() => {
+        const collectionUrl = endpoints.media.collection(id).replace(/\/$/, '');
+        return apiClient.get(`${collectionUrl}/download_zip/`, {
+            responseType: 'blob'
+        });
     }),
 };
 

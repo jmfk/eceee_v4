@@ -2,20 +2,36 @@
 ViewSets for managing media tags and collections.
 """
 
+import os
+import zipfile
+import tempfile
 from django.db import models
 from django.db.models import Count
+from django.conf import settings
+from django.http import HttpResponse, FileResponse
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+import logging
 
 from ..models import MediaTag, MediaCollection, MediaFile
 from ..serializers import (
     MediaTagSerializer,
     MediaCollectionSerializer,
     MediaFileListSerializer,
+    MediaFileDetailSerializer,
 )
+from ..services import (
+    FileUploadService,
+    FileValidationService,
+    UploadResponseBuilder,
+)
+from ..storage import storage
+
+logger = logging.getLogger(__name__)
 
 
 class MediaTagViewSet(viewsets.ModelViewSet):
@@ -283,6 +299,21 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(namespace=default_namespace)
         return queryset
 
+    def create(self, request, *args, **kwargs):
+        """Create a new collection with tag validation."""
+        # Validate that at least one tag is provided
+        tag_ids = request.data.get('tag_ids', [])
+        if not tag_ids or len(tag_ids) == 0:
+            return Response(
+                {
+                    "error": "At least one tag is required to create a collection",
+                    "detail": "Collections must have tags to accept uploads."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         """Set user fields when creating collection."""
         serializer.save(
@@ -413,3 +444,219 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
                 "removed_count": files.count(),
             }
         )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def upload_to_collection(self, request, pk=None):
+        """
+        Upload files directly to a collection with auto-approval.
+        
+        Files uploaded through this endpoint:
+        - Are automatically approved (skip pending workflow)
+        - Inherit all tags from the collection
+        - Are added to the collection
+        - Require the collection to have at least one tag
+        """
+        collection = self.get_object()
+        
+        # Validate collection has tags
+        if not collection.tags.exists():
+            return Response(
+                {
+                    "error": "Collection must have at least one tag before uploading files",
+                    "detail": "Please add tags to the collection first."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Get uploaded files from request
+        files = request.FILES.getlist('files')
+        if not files:
+            return Response(
+                {"error": "No files provided"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file count (use same limit as regular uploads)
+        max_files = getattr(settings, "MEDIA_MAX_FILES_PER_UPLOAD", 50)
+        if len(files) > max_files:
+            return Response(
+                {"error": f"Maximum {max_files} files allowed per upload"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Initialize services
+        validation_service = FileValidationService()
+        upload_service = FileUploadService()
+        
+        uploaded_files = []
+        errors = []
+        
+        # Get collection tags for auto-assignment
+        collection_tag_ids = list(collection.tags.values_list('id', flat=True))
+        
+        # Process each file
+        for uploaded_file in files:
+            try:
+                # Validate file
+                validation_result = validation_service.validate(
+                    uploaded_file,
+                    request.user,
+                    force_upload=False,
+                )
+                if not validation_result.is_valid:
+                    errors.extend(validation_result.errors)
+                    continue
+                
+                # Upload file to pending (for initial storage and processing)
+                upload_result = upload_service.upload(
+                    uploaded_file,
+                    "",  # No folder path for collection uploads
+                    collection.namespace,
+                    request.user,
+                )
+                
+                if upload_result.errors:
+                    errors.extend(upload_result.errors)
+                    continue
+                
+                # Auto-approve each pending file
+                for pending_file in upload_result.files:
+                    try:
+                        # Create approved MediaFile from pending file
+                        media_file = pending_file.approve_and_create_media_file(
+                            title=pending_file.ai_suggested_title or pending_file.original_filename,
+                            slug=None,  # Auto-generate slug
+                            description="",
+                            tags=collection_tag_ids,
+                            access_level="public",
+                        )
+                        
+                        # Add to collection
+                        collection.mediafile_set.add(media_file)
+                        
+                        uploaded_files.append(media_file)
+                        
+                    except Exception as e:
+                        logger.error(f"Error auto-approving file {pending_file.original_filename}: {e}")
+                        errors.append({
+                            "filename": pending_file.original_filename,
+                            "error": f"Failed to approve file: {str(e)}",
+                            "status": "error"
+                        })
+                
+            except Exception as e:
+                logger.error(f"Error processing file {uploaded_file.name}: {e}")
+                errors.append({
+                    "filename": uploaded_file.name,
+                    "error": str(e),
+                    "status": "error"
+                })
+        
+        # Build response
+        response_data = {
+            "success": len(uploaded_files) > 0,
+            "uploaded_count": len(uploaded_files),
+            "error_count": len(errors),
+            "message": f"Successfully uploaded {len(uploaded_files)} file(s) to collection",
+        }
+        
+        if uploaded_files:
+            # Serialize uploaded files
+            serializer = MediaFileDetailSerializer(
+                uploaded_files, 
+                many=True, 
+                context={"request": request}
+            )
+            response_data["files"] = serializer.data
+        
+        if errors:
+            response_data["errors"] = errors
+        
+        response_status = status.HTTP_200_OK if len(uploaded_files) > 0 else status.HTTP_400_BAD_REQUEST
+        
+        return Response(response_data, status=response_status)
+
+    @action(detail=True, methods=["get"])
+    def download_zip(self, request, pk=None):
+        """
+        Download all files in a collection as a ZIP archive.
+        
+        Creates a temporary ZIP file containing all files in the collection,
+        then streams it to the client with proper headers.
+        """
+        collection = self.get_object()
+        
+        # Get all files in the collection
+        files = MediaFile.objects.filter(
+            collections=collection,
+            namespace=collection.namespace,
+            is_deleted=False
+        ).select_related("namespace")
+        
+        if not files.exists():
+            return Response(
+                {"error": "Collection has no files to download"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create a temporary file for the ZIP
+        temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+        temp_zip_path = temp_zip.name
+        temp_zip.close()
+        
+        try:
+            # Create ZIP file
+            with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for media_file in files:
+                    try:
+                        # Get the file from storage
+                        file_path = media_file.file_path
+                        
+                        # Download file content from storage
+                        file_content = storage.download_file(file_path)
+                        
+                        # Use original filename in the ZIP
+                        # Add file type subdirectory to organize files
+                        archive_name = f"{media_file.file_type}/{media_file.original_filename}"
+                        
+                        # Write to ZIP
+                        zip_file.writestr(archive_name, file_content)
+                        
+                    except Exception as e:
+                        logger.error(f"Error adding file {media_file.id} to ZIP: {e}")
+                        # Continue with other files even if one fails
+                        continue
+            
+            # Open the ZIP file for reading
+            zip_file_handle = open(temp_zip_path, 'rb')
+            
+            # Create response with ZIP file
+            response = FileResponse(
+                zip_file_handle,
+                content_type='application/zip'
+            )
+            
+            # Set download filename
+            safe_filename = collection.slug or f"collection-{collection.id}"
+            response['Content-Disposition'] = f'attachment; filename="{safe_filename}.zip"'
+            
+            # Clean up temp file after response is sent
+            # Note: The temp file will be cleaned up by the OS eventually,
+            # but we could use a post-response cleanup mechanism if needed
+            
+            return response
+            
+        except Exception as e:
+            # Clean up temp file on error
+            if os.path.exists(temp_zip_path):
+                os.unlink(temp_zip_path)
+            
+            logger.error(f"Error creating ZIP for collection {collection.id}: {e}")
+            return Response(
+                {"error": f"Failed to create ZIP archive: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

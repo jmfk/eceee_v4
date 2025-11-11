@@ -4,10 +4,12 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Image as ImageIcon, ChevronDown, Settings } from 'lucide-react';
+import { X, Image as ImageIcon, ChevronDown, Settings, FolderOpen, Loader2 } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 import OverrideSettingsModal from './OverrideSettingsModal';
+import CollectionThumbnailGrid from './CollectionThumbnailGrid';
+import { mediaCollectionsApi } from '../../api';
 
 const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
     const { currentTheme } = useTheme({ pageId, enabled: true }); // Enable to get theme data including imageStyles
@@ -15,6 +17,9 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'
     const [showOverrideSettings, setShowOverrideSettings] = useState(false);
+    const [mediaSelectionType, setMediaSelectionType] = useState('image');
+    const [collections, setCollections] = useState([]);
+    const [loadingCollections, setLoadingCollections] = useState(false);
     const [config, setConfig] = useState({
         width: 'full',
         align: 'center',
@@ -64,6 +69,7 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
             setStep('select');
             setSelectedMedia(null);
             setMediaType('image');
+            setMediaSelectionType('image');
             setConfig({
                 width: 'full',
                 align: 'center',
@@ -81,6 +87,30 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
             });
         }
     }, [isOpen]);
+
+    // Load collections when step is select and collection tab is selected
+    useEffect(() => {
+        if (isOpen && step === 'select' && mediaSelectionType === 'collection' && namespace) {
+            loadCollections();
+        }
+    }, [isOpen, step, mediaSelectionType, namespace]);
+
+    const loadCollections = async () => {
+        setLoadingCollections(true);
+        try {
+            const result = await mediaCollectionsApi.list({ 
+                namespace, 
+                page_size: 100,
+                ordering: '-created_at'
+            })();
+            setCollections(result.results || result || []);
+        } catch (error) {
+            console.error('Failed to load collections:', error);
+            setCollections([]);
+        } finally {
+            setLoadingCollections(false);
+        }
+    };
 
     // When media is selected from browser
     const handleMediaSelect = (media) => {
@@ -163,47 +193,113 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
                             <p className="text-sm text-gray-600 mb-4">
                                 Select an image or collection from the media library to insert into your content.
                             </p>
-                            <MediaBrowser
-                                onFileSelect={handleMediaSelect}
-                                selectionMode="single"
-                                fileTypes={['image', 'collection']}
-                                namespace={namespace}
-                                showUploader={true}
-                                hideShowDeleted={true}
-                                hideTypeFilter={true}
-                            />
+
+                            {/* Tab Toggle */}
+                            <div className="flex gap-2 mb-4 border-b border-gray-200">
+                                <button
+                                    onClick={() => setMediaSelectionType('image')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        mediaSelectionType === 'image'
+                                            ? 'border-blue-600 text-blue-600'
+                                            : 'border-transparent text-gray-600 hover:text-gray-900'
+                                    }`}
+                                >
+                                    Select Image
+                                </button>
+                                <button
+                                    onClick={() => setMediaSelectionType('collection')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        mediaSelectionType === 'collection'
+                                            ? 'border-blue-600 text-blue-600'
+                                            : 'border-transparent text-gray-600 hover:text-gray-900'
+                                    }`}
+                                >
+                                    Select Collection
+                                </button>
+                            </div>
+
+                            {/* Content based on selection type */}
+                            {mediaSelectionType === 'collection' ? (
+                                loadingCollections ? (
+                                    <div className="flex items-center justify-center h-64">
+                                        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                                    </div>
+                                ) : collections.length === 0 ? (
+                                    <div className="flex items-center justify-center h-64">
+                                        <div className="text-center">
+                                            <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                                            <p className="text-gray-600">No collections found</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {collections.map(collection => (
+                                            <div
+                                                key={collection.id}
+                                                onClick={() => handleMediaSelect(collection)}
+                                                className="cursor-pointer border border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 hover:shadow-md transition-all"
+                                            >
+                                                <CollectionThumbnailGrid 
+                                                    collection={collection} 
+                                                    className="aspect-square"
+                                                />
+                                                <div className="p-3">
+                                                    <h4 className="font-medium text-sm text-gray-900 truncate">{collection.title}</h4>
+                                                    <p className="text-xs text-gray-600">{collection.fileCount || collection.file_count || 0} images</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            ) : (
+                                <MediaBrowser
+                                    onFileSelect={handleMediaSelect}
+                                    selectionMode="single"
+                                    fileTypes={['image']}
+                                    namespace={namespace}
+                                    showUploader={true}
+                                    hideShowDeleted={true}
+                                    hideTypeFilter={true}
+                                />
+                            )}
                         </div>
                     ) : (
                         <div className="p-6">
                             {/* Preview */}
                             <div className="mb-6">
                                 <h3 className="text-sm font-medium text-gray-900 mb-3">Preview</h3>
-                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
                                     {selectedMedia && (
-                                        <div className="flex items-center gap-4">
-                                            {selectedMedia.imgproxyBaseUrl || selectedMedia.fileUrl ? (
-                                                <img
-                                                    src={selectedMedia.imgproxyBaseUrl || selectedMedia.fileUrl}
-                                                    alt={selectedMedia.title}
-                                                    className="w-24 h-24 object-cover rounded"
-                                                />
-                                            ) : (
-                                                <div className="w-24 h-24 bg-gray-200 rounded flex items-center justify-center">
-                                                    <ImageIcon className="w-8 h-8 text-gray-400" />
-                                                </div>
-                                            )}
+                                        mediaType === 'collection' ? (
                                             <div>
-                                                <p className="font-medium text-gray-900">
-                                                    {selectedMedia.title || selectedMedia.original_filename}
-                                                </p>
-                                                <p className="text-sm text-gray-600">
-                                                    {mediaType === 'collection'
-                                                        ? `Collection (${selectedMedia.files?.length || 0} files)`
-                                                        : 'Single Image'
-                                                    }
-                                                </p>
+                                                <CollectionThumbnailGrid 
+                                                    collection={selectedMedia} 
+                                                    className="h-32"
+                                                />
+                                                <div className="p-4">
+                                                    <p className="font-medium text-gray-900">{selectedMedia.title || selectedMedia.original_filename}</p>
+                                                    <p className="text-sm text-gray-600">Collection ({selectedMedia.files?.length || 0} files)</p>
+                                                </div>
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <div className="flex items-center gap-4 p-4">
+                                                {selectedMedia.imgproxyBaseUrl || selectedMedia.fileUrl ? (
+                                                    <img 
+                                                        src={selectedMedia.imgproxyBaseUrl || selectedMedia.fileUrl} 
+                                                        alt={selectedMedia.title} 
+                                                        className="w-24 h-24 object-cover rounded" 
+                                                    />
+                                                ) : (
+                                                    <div className="w-24 h-24 bg-gray-200 rounded flex items-center justify-center">
+                                                        <ImageIcon className="w-8 h-8 text-gray-400" />
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <p className="font-medium text-gray-900">{selectedMedia.title || selectedMedia.original_filename}</p>
+                                                    <p className="text-sm text-gray-600">Single Image</p>
+                                                </div>
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             </div>

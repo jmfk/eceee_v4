@@ -43,7 +43,9 @@ import {
     List as ListIcon,
     Filter,
     SortAsc,
-    SortDesc
+    SortDesc,
+    Upload,
+    Save
 } from 'lucide-react';
 import { mediaCollectionsApi, mediaTagsApi, mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
@@ -193,8 +195,495 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
 
 
 
-// Collection Files View Component (inline, not modal)
-const CollectionFilesView = ({ collection, namespace, onBack }) => {
+// Unified Collection Editor View Component (metadata + upload + files)
+const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
+    // Form data for metadata
+    const [formData, setFormData] = useState({
+        title: collection.title,
+        description: collection.description || '',
+        accessLevel: 'public',
+        tagIds: collection.tags?.map(tag => tag.id) || []
+    });
+    const [availableTags, setAvailableTags] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [metadataExpanded, setMetadataExpanded] = useState(true);
+
+    // Upload state
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    const [isDragOver, setIsDragOver] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const fileInputRef = useRef(null);
+
+    // Collection Files View State (from old CollectionFilesView)
+    const [existingFiles, setExistingFiles] = useState([]);
+    const [existingLoading, setExistingLoading] = useState(true);
+    const [existingError, setExistingError] = useState(null);
+    const [viewMode, setViewMode] = useState('grid');
+
+    const { addNotification } = useGlobalNotifications();
+
+    // Load available tags
+    useEffect(() => {
+        const loadTags = async () => {
+            if (!namespace) return;
+            try {
+                const result = await mediaTagsApi.list({ namespace })();
+                const tagsData = result.results || result || [];
+                setAvailableTags(Array.isArray(tagsData) ? tagsData : []);
+            } catch (error) {
+                console.error('Failed to load tags:', error);
+                setAvailableTags([]);
+            }
+        };
+        loadTags();
+    }, [namespace]);
+
+    // Load existing files in collection
+    const loadExistingFiles = useCallback(async () => {
+        if (!collection || !namespace) return;
+
+        try {
+            setExistingLoading(true);
+            setExistingError(null);
+
+            const params = { page_size: 100 };
+            const result = await mediaCollectionsApi.getFiles(collection.id, params)();
+            const existingFilesData = result.results || result || [];
+            setExistingFiles(Array.isArray(existingFilesData) ? existingFilesData : []);
+        } catch (error) {
+            console.error('Failed to load existing files:', error);
+            setExistingError(extractErrorMessage(error));
+            setExistingFiles([]);
+            addNotification('Failed to load existing files', 'error');
+        } finally {
+            setExistingLoading(false);
+        }
+    }, [collection, namespace, addNotification]);
+
+    useEffect(() => {
+        loadExistingFiles();
+    }, [loadExistingFiles]);
+
+    // Handle metadata form submission
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.title.trim()) {
+            addNotification('Collection title is required', 'error');
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            const updateData = {
+                title: formData.title.trim(),
+                description: formData.description.trim(),
+                tag_ids: formData.tagIds
+            };
+
+            await mediaCollectionsApi.update(collection.id, updateData)();
+            addNotification('Collection updated successfully', 'success');
+            if (onSave) onSave();
+        } catch (error) {
+            console.error('Failed to update collection:', error);
+            addNotification(extractErrorMessage(error), 'error');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // File upload handlers
+    const handleFileSelect = useCallback((files) => {
+        const fileArray = Array.from(files);
+        setSelectedFiles(fileArray);
+    }, []);
+
+    const handleFileInputChange = (event) => {
+        handleFileSelect(event.target.files);
+    };
+
+    const handleDrop = useCallback((event) => {
+        event.preventDefault();
+        setIsDragOver(false);
+        handleFileSelect(event.dataTransfer.files);
+    }, [handleFileSelect]);
+
+    const handleDragOver = useCallback((event) => {
+        event.preventDefault();
+        setIsDragOver(true);
+    }, []);
+
+    const handleDragLeave = useCallback((event) => {
+        event.preventDefault();
+        setIsDragOver(false);
+    }, []);
+
+    const handleRemoveSelectedFile = (index) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleUpload = async () => {
+        if (selectedFiles.length === 0) return;
+
+        try {
+            setUploading(true);
+            setUploadProgress(0);
+
+            const result = await mediaCollectionsApi.uploadFiles(
+                collection.id,
+                selectedFiles,
+                (progress) => setUploadProgress(progress)
+            )();
+
+            addNotification(
+                `Successfully uploaded ${result.uploadedCount || 0} file(s)`,
+                'success'
+            );
+
+            // Clear selected files and reload collection files
+            setSelectedFiles([]);
+            setUploadProgress(0);
+            await loadExistingFiles();
+        } catch (error) {
+            console.error('Upload error:', error);
+            addNotification(extractErrorMessage(error), 'error');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // Handle removing a file from collection
+    const handleRemoveFile = async (fileId) => {
+        try {
+            await mediaCollectionsApi.removeFiles(collection.id, [fileId])();
+            addNotification('File removed from collection', 'success');
+            await loadExistingFiles();
+        } catch (error) {
+            console.error('Failed to remove file from collection:', error);
+            addNotification('Failed to remove file from collection', 'error');
+        }
+    };
+
+    // File type icon helper
+    const getFileTypeIcon = (fileType) => {
+        switch (fileType) {
+            case 'image': return Image;
+            case 'video': return Video;
+            case 'audio': return Music;
+            case 'document': return FileText;
+            case 'archive': return Archive;
+            default: return File;
+        }
+    };
+
+    // Format file size
+    const formatFileSize = (bytes) => {
+        if (!bytes) return '0 B';
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+    };
+
+    // Render file card
+    const renderFileCard = (file) => {
+        const FileIcon = getFileTypeIcon(file.fileType);
+        
+        return (
+            <div key={file.id} className="relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group">
+                {file.fileType === 'image' && file.thumbnailUrl ? (
+                    <div className="aspect-square bg-gray-100 overflow-hidden">
+                        <img 
+                            src={file.thumbnailUrl} 
+                            alt={file.title}
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                ) : (
+                    <div className="aspect-square bg-gray-50 flex items-center justify-center">
+                        <FileIcon className="w-12 h-12 text-gray-400" />
+                    </div>
+                )}
+                <div className="p-3">
+                    <p className="text-sm font-medium text-gray-900 truncate" title={file.title}>
+                        {file.title}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                        {formatFileSize(file.fileSize)}
+                    </p>
+                </div>
+                <button
+                    onClick={() => handleRemoveFile(file.id)}
+                    className="absolute top-2 right-2 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                    title="Remove from collection"
+                >
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+        );
+    };
+
+    const canUpload = formData.tagIds.length > 0;
+
+    return (
+        <div className="h-full flex flex-col bg-gray-50">
+            {/* Header */}
+            <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 bg-white">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={onBack}
+                            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                        >
+                            <X className="w-5 h-5 text-gray-500" />
+                        </button>
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-900">Edit Collection</h2>
+                            <p className="text-sm text-gray-600 mt-0.5">{collection.title}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto">
+                <div className="p-6 space-y-6">
+                    {/* Metadata Section (Collapsible) */}
+                    <div className="bg-white rounded-lg border border-gray-200">
+                        <button
+                            onClick={() => setMetadataExpanded(!metadataExpanded)}
+                            className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                        >
+                            <h3 className="text-lg font-semibold text-gray-900">Collection Details</h3>
+                            {metadataExpanded ? (
+                                <ChevronUp className="w-5 h-5 text-gray-400" />
+                            ) : (
+                                <ChevronDown className="w-5 h-5 text-gray-400" />
+                            )}
+                        </button>
+                        
+                        {metadataExpanded && (
+                            <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
+                                {/* Title Field */}
+                                <div>
+                                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                                        Title *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="title"
+                                        value={formData.title}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter collection title"
+                                        required
+                                    />
+                                </div>
+
+                                {/* Description Field */}
+                                <div>
+                                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        id="description"
+                                        value={formData.description}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter collection description"
+                                        rows={3}
+                                    />
+                                </div>
+
+                                {/* Tags Field */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Tags * <span className="text-xs text-gray-500">(Required for uploads)</span>
+                                    </label>
+                                    <MediaTagWidget
+                                        selectedTagIds={formData.tagIds}
+                                        onChange={(tagIds) => setFormData(prev => ({ ...prev, tagIds }))}
+                                        availableTags={availableTags}
+                                        namespace={namespace}
+                                    />
+                                </div>
+
+                                {/* Form Actions */}
+                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {isSubmitting ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Save className="w-4 h-4" />
+                                        )}
+                                        {isSubmitting ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+
+                    {/* Upload Section */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Files</h3>
+                        
+                        {!canUpload ? (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium text-amber-900">Upload Disabled</p>
+                                        <p className="text-sm text-amber-700 mt-1">
+                                            Please add at least one tag to this collection before uploading files.
+                                            Files uploaded to a collection automatically inherit all collection tags.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div
+                                    className={`
+                                        border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
+                                        ${isDragOver
+                                            ? 'border-blue-500 bg-blue-50 scale-[1.02]'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+                                        }
+                                        ${uploading ? 'pointer-events-none opacity-50' : ''}
+                                    `}
+                                    onDrop={handleDrop}
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                    <p className="text-sm text-gray-700 mb-1">
+                                        Drag and drop files here, or click to browse
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        Files will be auto-approved with collection tags
+                                    </p>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        multiple
+                                        accept="image/*,application/pdf,.doc,.docx,video/*,audio/*"
+                                        onChange={handleFileInputChange}
+                                        className="hidden"
+                                        disabled={uploading}
+                                    />
+                                </div>
+
+                                {selectedFiles.length > 0 && (
+                                    <div className="mt-4 space-y-2">
+                                        <p className="text-sm font-medium text-gray-700">
+                                            Selected Files ({selectedFiles.length})
+                                        </p>
+                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {selectedFiles.map((file, index) => (
+                                                <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
+                                                    <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                                                    <button
+                                                        onClick={() => handleRemoveSelectedFile(index)}
+                                                        className="text-red-600 hover:text-red-700"
+                                                        disabled={uploading}
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        
+                                        {uploading ? (
+                                            <div className="mt-4">
+                                                <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                                                    <span>Uploading...</span>
+                                                    <span>{uploadProgress}%</span>
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                                    <div 
+                                                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                                        style={{ width: `${uploadProgress}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={handleUpload}
+                                                className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <Upload className="w-4 h-4" />
+                                                Upload {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Collection Files Section */}
+                    <div className="bg-white rounded-lg border border-gray-200">
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900">Files in Collection</h3>
+                                <p className="text-sm text-gray-600 mt-0.5">{existingFiles.length} files</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                >
+                                    <Grid3X3 className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`p-2 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                >
+                                    <ListIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-6">
+                            {existingLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                                </div>
+                            ) : existingError ? (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <div className="flex items-center gap-2 text-red-800">
+                                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                        <span className="font-medium text-sm">Error loading files</span>
+                                    </div>
+                                    <p className="text-red-700 text-sm mt-1">{existingError}</p>
+                                </div>
+                            ) : existingFiles.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <h4 className="text-sm font-medium text-gray-900 mb-1">No files in collection</h4>
+                                    <p className="text-sm text-gray-600">
+                                        {canUpload ? 'Upload files using the form above.' : 'Add tags to enable uploads.'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-2'}>
+                                    {existingFiles.map(file => renderFileCard(file))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Old Collection Files View Component (to be removed after migration)
+const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
     // Available files (right column - files that can be added)
     const [availableFiles, setAvailableFiles] = useState([]);
     const [availableLoading, setAvailableLoading] = useState(true);
@@ -1151,6 +1640,17 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
 
     // Submit create/edit form
     const handleSubmit = async (isEdit = false) => {
+        // Validate required fields
+        if (!formData.title.trim()) {
+            addNotification('Collection title is required', 'error');
+            return;
+        }
+
+        if (!formData.tagIds || formData.tagIds.length === 0) {
+            addNotification('At least one tag is required to create a collection', 'error');
+            return;
+        }
+
         try {
             setIsSubmitting(true);
 
@@ -1290,7 +1790,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                         {/* Tags */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Tags (optional)
+                                Tags * <span className="text-xs text-gray-500">(Required)</span>
                             </label>
                             <CompactTagInput
                                 namespace={namespace}
@@ -1298,6 +1798,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                 onTagsChange={(tagIds) => setFormData(prev => ({ ...prev, tagIds }))}
                                 availableTags={availableTags}
                             />
+                            {formData.tagIds.length === 0 && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                    At least one tag is required to enable file uploads
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -1613,20 +2118,12 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
     }
 
     // Conditional rendering based on current view
-    if (currentView === 'files' && viewingCollection) {
+    // Both 'files' and 'edit' views now use the unified CollectionEditorView
+    if ((currentView === 'files' && viewingCollection) || (currentView === 'edit' && editingCollection)) {
+        const collection = viewingCollection || editingCollection;
         return (
-            <CollectionFilesView
-                collection={viewingCollection}
-                namespace={namespace}
-                onBack={handleBackToCollections}
-            />
-        );
-    }
-
-    if (currentView === 'edit' && editingCollection) {
-        return (
-            <EditCollectionView
-                collection={editingCollection}
+            <CollectionEditorView
+                collection={collection}
                 namespace={namespace}
                 onBack={handleBackToCollections}
                 onSave={() => {
