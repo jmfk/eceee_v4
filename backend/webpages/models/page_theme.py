@@ -319,7 +319,7 @@ class PageTheme(models.Model):
   overflow: hidden;
 }
 .gallery-image {
-  width: 100%;
+  max-width: 100%;
   height: auto;
   display: block;
   transition: transform 0.3s;
@@ -412,7 +412,7 @@ class PageTheme(models.Model):
   overflow: hidden;
 }
 .gallery-image {
-  width: 100%;
+  max-width: 100%;
   height: auto;
   display: block;
   transition: transform 0.3s;
@@ -514,7 +514,7 @@ class PageTheme(models.Model):
   position: relative;
 }
 .carousel-image {
-  width: 100%;
+  max-width: 100%;
   height: 400px;
   object-fit: cover;
   display: block;
@@ -619,7 +619,7 @@ class PageTheme(models.Model):
   position: relative;
 }
 .carousel-image {
-  width: 100%;
+  max-width: 100%;
   height: 400px;
   object-fit: cover;
   display: block;
@@ -750,7 +750,7 @@ class PageTheme(models.Model):
   position: relative;
 }
 .carousel-image {
-  width: 100%;
+  max-width: 100%;
   height: 400px;
   object-fit: cover;
   display: block;
