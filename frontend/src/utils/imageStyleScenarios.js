@@ -36,7 +36,7 @@ export const imageStyleScenarios = [
 </div>`,
         css: `.gallery { margin: 1rem 0; }
 .gallery-grid { display: grid; gap: 1rem; }
-.gallery-item img { width: 100%; height: auto; display: block; }`
+.gallery-item img { max-width: 100%; height: auto; display: block; }`
     },
     {
         id: 'caption-overlay',
@@ -71,7 +71,7 @@ export const imageStyleScenarios = [
 </div>`,
         css: `.overlay-gallery .grid { display: grid; gap: 1rem; }
 .item { position: relative; overflow: hidden; }
-.item img { width: 100%; height: auto; display: block; transition: transform 0.3s; }
+.item img { max-width: 100%; height: auto; display: block; transition: transform 0.3s; }
 .item:hover img { transform: scale(1.05); }
 .overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.8)); color: white; padding: 1rem; opacity: 0; transition: opacity 0.3s; }
 .item:hover .overlay { opacity: 1; }`
@@ -112,7 +112,7 @@ export const imageStyleScenarios = [
         css: `.carousel { position: relative; overflow: hidden; border-radius: 8px; }
 .carousel-track { display: flex; transition: transform 0.5s ease; }
 .carousel-slide { min-width: 100%; }
-.carousel-slide img { width: 100%; height: auto; display: block; }
+.carousel-slide img { max-width: 100%; height: auto; display: block; }
 .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.9); border: none; padding: 1rem; cursor: pointer; font-size: 1.5rem; }
 .nav-btn.prev { left: 1rem; }
 .nav-btn.next { right: 1rem; }`
@@ -152,7 +152,7 @@ export const imageStyleScenarios = [
         css: `.carousel-dots { position: relative; overflow: hidden; }
 .track { display: flex; transition: transform 0.5s ease; }
 .slide { min-width: 100%; }
-.slide img { width: 100%; height: auto; display: block; }
+.slide img { max-width: 100%; height: auto; display: block; }
 .indicators { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; gap: 0.5rem; }
 .dot { width: 0.75rem; height: 0.75rem; border-radius: 50%; background: rgba(255,255,255,0.5); border: none; cursor: pointer; transition: background 0.2s; }
 .dot.active { background: white; }`
@@ -191,7 +191,7 @@ export const imageStyleScenarios = [
         css: `.fade-carousel { position: relative; width: 100%; }
 .slides { position: relative; width: 100%; aspect-ratio: 16/9; }
 .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-.slide img { width: 100%; height: 100%; object-fit: cover; }
+.slide img { max-width: 100%; height: 100%; object-fit: cover; }
 .btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: white; border: none; padding: 1rem; cursor: pointer; }
 .btn.prev { left: 1rem; }
 .btn.next { right: 1rem; }`
