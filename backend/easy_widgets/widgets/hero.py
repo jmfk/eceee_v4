@@ -109,7 +109,7 @@ class HeroWidget(BaseWidget):
     template_name = "easy_widgets/widgets/hero.html"
 
     widget_css = """
-    .hero-widget {
+    .widget-type-hero {
         position: relative;
         padding: var(--hero-padding, 4rem 2rem);
         background-color: var(--hero-bg-color);
@@ -117,7 +117,7 @@ class HeroWidget(BaseWidget):
         overflow: hidden;
     }
     
-    .hero-widget .hero-background {
+    .widget-type-hero .hero-background {
         position: absolute;
         top: 0;
         left: 0;
@@ -129,7 +129,7 @@ class HeroWidget(BaseWidget):
         z-index: 0;
     }
     
-    .hero-widget .hero-content {
+    .widget-type-hero .hero-content {
         position: relative;
         z-index: 1;
         max-width: var(--hero-max-width, 1200px);
@@ -137,39 +137,39 @@ class HeroWidget(BaseWidget):
         text-align: center;
     }
     
-    .hero-widget .before-text {
+    .widget-type-hero .before-text {
         font-size: var(--hero-before-text-size, 1.125rem);
         margin-bottom: var(--hero-before-text-margin, 1rem);
         color: var(--hero-decor-color);
     }
     
-    .hero-widget h1 {
+    .widget-type-hero h1 {
         font-size: var(--hero-header-size, 3rem);
         font-weight: var(--hero-header-weight, 700);
         margin: var(--hero-header-margin, 1rem 0);
         line-height: var(--hero-header-line-height, 1.2);
     }
     
-    .hero-widget .after-text {
+    .widget-type-hero .after-text {
         font-size: var(--hero-after-text-size, 1.25rem);
         margin-top: var(--hero-after-text-margin, 1rem);
         color: var(--hero-text-color);
     }
     
     @media (max-width: 768px) {
-        .hero-widget {
+        .widget-type-hero {
             padding: var(--hero-padding-mobile, 2rem 1rem);
         }
         
-        .hero-widget h1 {
+        .widget-type-hero h1 {
             font-size: var(--hero-header-size-mobile, 2rem);
         }
         
-        .hero-widget .before-text {
+        .widget-type-hero .before-text {
             font-size: var(--hero-before-text-size-mobile, 1rem);
         }
         
-        .hero-widget .after-text {
+        .widget-type-hero .after-text {
             font-size: var(--hero-after-text-size-mobile, 1.125rem);
         }
     }

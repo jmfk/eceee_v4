@@ -1,7 +1,7 @@
 {% load static %}
 
 <style>
-.header-widget {
+.widget-type-header {
     background-image: var(--mobile-bg-image);
     background-size: cover;
     background-position: var(--mobile-alignment);
@@ -11,7 +11,7 @@
 }
 
 @media (min-width: {{ mobile_width }}px) {
-    .header-widget {
+    .widget-type-header {
         background-image: var(--tablet-bg-image);
         background-position: var(--tablet-alignment);
         height: var(--tablet-height);
@@ -19,7 +19,7 @@
 }
 
 @media (min-width: {{ tablet_width }}px) {
-    .header-widget {
+    .widget-type-header {
         background-image: var(--desktop-bg-image);
         background-position: var(--desktop-alignment);
         height: var(--desktop-height);
