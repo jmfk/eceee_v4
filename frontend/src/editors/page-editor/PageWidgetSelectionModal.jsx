@@ -98,25 +98,6 @@ const PageWidgetSelectionModal = ({
         return isAllowed && matchesSearch && matchesCategory;
     });
 
-    // Debug: Log filtering info when modal opens
-    if (isOpen && availableWidgets.length > 0) {
-        console.log(`[PageWidgetSelectionModal] Filtering widgets for slot "${slotName}":`, {
-            allowedWidgetTypes,
-            totalAvailable: availableWidgets.length,
-            afterTypeFilter: availableWidgets.filter(w =>
-                allowedWidgetTypes.includes('*') ||
-                allowedWidgetTypes.some(allowedType => {
-                    if (allowedType.endsWith('.*')) {
-                        const prefix = allowedType.slice(0, -2);
-                        return w.type.startsWith(prefix);
-                    }
-                    return w.type === allowedType;
-                })
-            ).length,
-            finalFiltered: filteredWidgets.length
-        });
-    }
-
     // Get unique categories
     const categories = [
         { id: 'all', label: 'All Widgets' },
@@ -140,7 +121,7 @@ const PageWidgetSelectionModal = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col">
                 {/* Modal Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
