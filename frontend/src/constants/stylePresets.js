@@ -39,7 +39,7 @@ export const STYLE_PRESETS = {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.95);
-  z-index: 9999;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -161,7 +161,7 @@ export const STYLE_PRESETS = {
   position: fixed;
   inset: 0;
   background: #000;
-  z-index: 9999;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -248,7 +248,7 @@ export const STYLE_PRESETS = {
     css: `.lightbox-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 1000;
 }
 .lightbox-fs-overlay {
   position: absolute;

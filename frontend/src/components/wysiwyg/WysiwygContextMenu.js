@@ -24,7 +24,7 @@ export class WysiwygContextMenu {
         this.menu.className = 'wysiwyg-context-menu'
         this.menu.style.display = 'none'
         this.menu.style.position = 'fixed'
-        this.menu.style.zIndex = '10000'
+        this.menu.style.zIndex = '10001'
 
         document.body.appendChild(this.menu)
     }

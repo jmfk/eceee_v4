@@ -258,7 +258,7 @@ div[style*="z-index"] {
 .slot-menu-dropdown,
 .slot-icon-menu,
 .widget-menu-container {
-  z-index: 100 !important;
+  z-index: 10000 !important;
 }
 
 .widget-slot-empty {

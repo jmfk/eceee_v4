@@ -1528,7 +1528,7 @@ const PageEditor = () => {
 
     if (isLoading && !isNewPage) {
         return (
-            <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-gray-50 flex items-center justify-center" style={{ zIndex: 10000 }}>
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                     <p className="text-gray-600">Loading page editor...</p>
@@ -1538,7 +1538,7 @@ const PageEditor = () => {
     }
 
     return (
-        <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col">
+        <div className="fixed inset-0 bg-gray-50 flex flex-col" style={{ zIndex: 10000 }}>
             {/* Top Menu Bar */}
             <div className="bg-white border-b border-gray-200 shadow-sm">
                 <div className="px-4 py-3">

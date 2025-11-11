@@ -757,7 +757,8 @@ class LayoutRenderer {
 
     // Create menu dropdown
     const menuDropdown = document.createElement('div');
-    menuDropdown.className = 'slot-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48 hidden z-10';
+    menuDropdown.className = 'slot-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48 hidden';
+    menuDropdown.style.zIndex = '10000';
     menuDropdown.setAttribute('data-menu-dropdown', slotName);
 
     // Add menu items
@@ -1060,7 +1061,8 @@ class LayoutRenderer {
 
     // Create modal overlay
     const overlay = document.createElement('div');
-    overlay.className = 'widget-edit-modal fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+    overlay.className = 'widget-edit-modal fixed inset-0 bg-black/50 flex items-center justify-center';
+    overlay.style.zIndex = '10000';
 
     // Create modal content
     const modal = document.createElement('div');
@@ -2354,7 +2356,8 @@ class LayoutRenderer {
    */
   createWidgetMenuDropdown(id, name, widgetInstance) {
     const menuDropdown = document.createElement('div');
-    menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden z-10';
+    menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden';
+    menuDropdown.style.zIndex = '10000';
     menuDropdown.setAttribute('data-widget-menu', id);
 
     // Get widget-specific menu items from metadata

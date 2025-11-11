@@ -374,20 +374,22 @@ const WidgetEditorPanel = forwardRef(({
         <>
             {/* Backdrop overlay for mobile */}
             <div
-                className={`absolute inset-0 bg-black transition-opacity duration-300 z-40 lg:hidden ${isOpen ? 'opacity-25' : 'opacity-0 pointer-events-none'
+                className={`absolute inset-0 bg-black transition-opacity duration-300 lg:hidden ${isOpen ? 'opacity-25' : 'opacity-0 pointer-events-none'
                     }`}
+                style={{ zIndex: 9999 }}
                 onClick={handleClose}
             />
 
             {/* Slide-out panel - positioned to extend from header to footer */}
             <div
                 ref={panelRef}
-                className={`absolute top-0 right-0 bottom-0 bg-white transform transition-all duration-300 ease-in-out z-50 flex ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`absolute top-0 right-0 bottom-0 bg-white transform transition-all duration-300 ease-in-out flex ${isOpen ? 'translate-x-0' : 'translate-x-full'
                     } ${showSpecialEditor ? 'left-0' : ''
                     }`}
                 style={{
                     // Width controlled purely via DOM manipulation (see useEffect below)
-                    boxShadow: '-4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06)'
+                    boxShadow: '-4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06)',
+                    zIndex: 10000
                 }}
             >
                 {/* Resize handle - hidden in special editor mode */}

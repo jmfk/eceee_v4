@@ -117,7 +117,7 @@ export const HtmlEditor: React.FC<HtmlEditorProps> = ({
                 top: position.y,
                 width: size.width,
                 height: size.height,
-                zIndex: 1000,
+                zIndex: 10000,
                 backgroundColor: '#000000',
                 border: '1px solid var(--color-border)',
                 borderRadius: '4px',
