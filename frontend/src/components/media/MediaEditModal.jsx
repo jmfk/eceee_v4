@@ -23,27 +23,19 @@ const MediaEditModal = ({ isOpen, onClose, onSave, onDelete, initialConfig, medi
 
     // Get available image styles from theme (unified gallery and carousel styles)
     const availableImageStyles = useMemo(() => {
-        console.log('MediaEditModal: currentTheme =', currentTheme);
-        console.log('MediaEditModal: currentTheme?.imageStyles =', currentTheme?.imageStyles);
-        
         if (!currentTheme || !currentTheme.imageStyles) {
-            console.warn('MediaEditModal: No theme or imageStyles available');
             return [];
         }
 
         const imageStyles = currentTheme.imageStyles;
         const entries = Object.entries(imageStyles);
-        console.log('MediaEditModal: imageStyles entries =', entries);
         
-        const mapped = entries.map(([key, style]) => ({
+        return entries.map(([key, style]) => ({
             value: key,
             label: style.name || key,
             description: style.description,
             styleType: style.styleType || 'gallery'
         }));
-        
-        console.log('MediaEditModal: availableImageStyles result =', mapped);
-        return mapped;
     }, [currentTheme]);
 
     // Initialize config when modal opens

@@ -26,27 +26,19 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
 
     // Get available image styles from theme (unified gallery and carousel styles)
     const availableImageStyles = useMemo(() => {
-        console.log('MediaInsertModal: currentTheme =', currentTheme);
-        console.log('MediaInsertModal: currentTheme?.imageStyles =', currentTheme?.imageStyles);
-        
         if (!currentTheme || !currentTheme.imageStyles) {
-            console.warn('MediaInsertModal: No theme or imageStyles available');
             return [];
         }
 
         const imageStyles = currentTheme.imageStyles;
         const entries = Object.entries(imageStyles);
-        console.log('MediaInsertModal: imageStyles entries =', entries);
         
-        const mapped = entries.map(([key, style]) => ({
+        return entries.map(([key, style]) => ({
             value: key,
             label: style.name || key,
             description: style.description,
             styleType: style.styleType || 'gallery'
         }));
-        
-        console.log('MediaInsertModal: availableImageStyles result =', mapped);
-        return mapped;
     }, [currentTheme]);
 
     // Reset state when modal opens
