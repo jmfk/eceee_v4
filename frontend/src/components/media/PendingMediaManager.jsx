@@ -59,6 +59,10 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
     const [autoUpdatedSlugs, setAutoUpdatedSlugs] = useState({}); // Track files with automatically updated slugs
     const [validatingSlugs, setValidatingSlugs] = useState({}); // Track files with slugs being validated
     const [fieldErrors, setFieldErrors] = useState({}); // Track validation errors for each field
+    
+    // Bulk selection state
+    const [selectedFiles, setSelectedFiles] = useState(new Set()); // Track selected files for bulk operations
+    const [bulkTags, setBulkTags] = useState([]); // Tags to apply to selected files
 
     const { addNotification } = useGlobalNotifications();
 
@@ -313,6 +317,116 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
             return generateSlug(title);
         }
     }, [namespace, fileFormData]);
+
+    // Bulk selection handlers
+    const toggleFileSelection = (fileId) => {
+        setSelectedFiles(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(fileId)) {
+                newSet.delete(fileId);
+            } else {
+                newSet.add(fileId);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedFiles.size === pendingFiles.length) {
+            // Deselect all
+            setSelectedFiles(new Set());
+        } else {
+            // Select all pending review files (not marked)
+            const pendingReviewFiles = pendingFiles.filter(file => !markedFiles[file.id]);
+            setSelectedFiles(new Set(pendingReviewFiles.map(file => file.id)));
+        }
+    };
+
+    const handleApplyBulkTags = () => {
+        if (selectedFiles.size === 0) {
+            addNotification('No files selected', 'warning');
+            return;
+        }
+
+        if (bulkTags.length === 0) {
+            addNotification('Please select at least one tag to apply', 'warning');
+            return;
+        }
+
+        // Apply tags to all selected files
+        setFileFormData(prev => {
+            const updated = { ...prev };
+            selectedFiles.forEach(fileId => {
+                if (updated[fileId]) {
+                    // Merge with existing tags (avoid duplicates)
+                    const existingTags = updated[fileId].tags || [];
+                    const existingTagNames = existingTags.map(t => 
+                        typeof t === 'string' ? t : t.name
+                    );
+                    
+                    const newTags = bulkTags.filter(tag => {
+                        const tagName = typeof tag === 'string' ? tag : tag.name;
+                        return !existingTagNames.includes(tagName);
+                    });
+
+                    updated[fileId] = {
+                        ...updated[fileId],
+                        tags: [...existingTags, ...newTags]
+                    };
+
+                    // Validate tags for this file
+                    validateField(fileId, 'tags', [...existingTags, ...newTags]);
+                }
+            });
+            return updated;
+        });
+
+        addNotification(`Tags applied to ${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''}`, 'success');
+    };
+
+    const handleBulkApprove = async () => {
+        if (selectedFiles.size === 0) {
+            addNotification('No files selected', 'warning');
+            return;
+        }
+
+        // Validate all selected files
+        let hasErrors = false;
+        const validationErrors = {};
+
+        selectedFiles.forEach(fileId => {
+            const formData = fileFormData[fileId];
+            if (!formData || !formData.title || !formData.title.trim()) {
+                if (!validationErrors[fileId]) validationErrors[fileId] = {};
+                validationErrors[fileId].title = 'Title is required';
+                hasErrors = true;
+            }
+            if (!formData || !formData.tags || formData.tags.length === 0) {
+                if (!validationErrors[fileId]) validationErrors[fileId] = {};
+                validationErrors[fileId].tags = 'At least one tag is required';
+                hasErrors = true;
+            }
+        });
+
+        if (hasErrors) {
+            setFieldErrors(prev => ({
+                ...prev,
+                ...validationErrors
+            }));
+            addNotification('Some files are missing required fields (title or tags)', 'error');
+            return;
+        }
+
+        // Mark all selected files for approval
+        selectedFiles.forEach(fileId => {
+            markFileForProcessing(fileId, 'approve');
+        });
+
+        addNotification(`${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''} marked for approval`, 'success');
+        
+        // Clear selection
+        setSelectedFiles(new Set());
+    };
 
     // Mark file for processing
     const markFileForProcessing = (fileId, action) => {
@@ -672,6 +786,8 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
             setValidatingSlugs({});
             setSelectedCollection('');
             setNewCollectionName('');
+            setSelectedFiles(new Set());
+            setBulkTags([]);
 
             // Reload the list
             loadPendingFiles();
@@ -721,15 +837,89 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                     </p>
                 </div>
             ) : (
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                    {/* Table Header */}
-                    <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                        <div className="flex items-center">
-                            <span className="text-sm font-medium text-gray-700">
-                                {Array.isArray(pendingFiles) ? pendingFiles.length : 0} file{(Array.isArray(pendingFiles) ? pendingFiles.length : 0) !== 1 ? 's' : ''}
-                            </span>
+                <div className="space-y-4">
+                    {/* Bulk Actions Section */}
+                    {pendingFiles.filter(file => !markedFiles[file.id]).length > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedFiles.size > 0 && selectedFiles.size === pendingFiles.filter(file => !markedFiles[file.id]).length}
+                                        onChange={toggleSelectAll}
+                                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <h3 className="text-lg font-semibold text-blue-900">
+                                        Bulk Actions
+                                    </h3>
+                                    {selectedFiles.size > 0 && (
+                                        <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-600 text-white rounded-full">
+                                            {selectedFiles.size} selected
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {selectedFiles.size > 0 && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Apply Tags to Selected Files
+                                        </label>
+                                        <MediaTagWidget
+                                            tags={bulkTags}
+                                            onChange={setBulkTags}
+                                            namespace={namespace}
+                                            disabled={false}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={handleApplyBulkTags}
+                                            disabled={bulkTags.length === 0}
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <Tag className="w-4 h-4" />
+                                            Apply Tags to {selectedFiles.size} File{selectedFiles.size > 1 ? 's' : ''}
+                                        </button>
+
+                                        <button
+                                            onClick={handleBulkApprove}
+                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                                        >
+                                            <Check className="w-4 h-4" />
+                                            Approve {selectedFiles.size} Selected
+                                        </button>
+
+                                        <button
+                                            onClick={() => setSelectedFiles(new Set())}
+                                            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                            Clear Selection
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedFiles.size === 0 && (
+                                <p className="text-sm text-blue-800">
+                                    Select files using the checkboxes below to apply tags and approve multiple files at once.
+                                </p>
+                            )}
                         </div>
-                    </div>
+                    )}
+
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        {/* Table Header */}
+                        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                            <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-700">
+                                    {Array.isArray(pendingFiles) ? pendingFiles.length : 0} file{(Array.isArray(pendingFiles) ? pendingFiles.length : 0) !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                        </div>
 
                     {/* Separate the files into approved, rejected, and pending lists */}
                     {(() => {
@@ -1002,10 +1192,36 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                 return (
                                                     <div
                                                         key={file.id}
-                                                        className="m-4 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden"
+                                                        className={`m-4 bg-white border rounded-lg shadow-sm overflow-hidden ${
+                                                            selectedFiles.has(file.id) 
+                                                                ? 'border-blue-500 border-2 bg-blue-50' 
+                                                                : 'border-gray-200'
+                                                        }`}
                                                     >
                                                         {/* Unmarked files - integrated header with approval form */}
                                                         <div className="px-6 py-6">
+                                                            {/* Selection Checkbox */}
+                                                            <div className="flex items-start gap-4 mb-4">
+                                                                <div className="flex items-center pt-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selectedFiles.has(file.id)}
+                                                                        onChange={() => toggleFileSelection(file.id)}
+                                                                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <h4 className="text-base font-semibold text-gray-900">
+                                                                        {file.originalFilename}
+                                                                    </h4>
+                                                                    {selectedFiles.has(file.id) && (
+                                                                        <p className="text-sm text-blue-600 mt-1">
+                                                                            Selected for bulk actions
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
                                                             {/* Form Section */}
                                                             <div className="flex gap-6">
                                                                 {/* Thumbnail */}
@@ -1190,7 +1406,8 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                             </>
                         );
                     })()}
-                </div >
+                    </div>
+                </div>
             )}
         </div>
     );
