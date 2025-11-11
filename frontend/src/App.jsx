@@ -34,8 +34,7 @@ import NotFoundPage from '@pages/NotFoundPage'
 import SelfContainedFormDemo from '@components/demos/SelfContainedFormDemo'
 import SimpleFormDemo from '@components/demos/SimpleFormDemo'
 import SettingsTabs from '@components/SettingsTabs'
-import GalleryStyleEditPage from '@pages/theme-styles/GalleryStyleEditPage'
-import CarouselStyleEditPage from '@pages/theme-styles/CarouselStyleEditPage'
+import ImageStyleEditPage from '@pages/theme-styles/ImageStyleEditPage'
 import ComponentStyleEditPage from '@pages/theme-styles/ComponentStyleEditPage'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
@@ -234,29 +233,16 @@ const AppRoutes = () => {
             </div>
           </PrivateRoute>
         } />
-                  <Route path="/settings/themes/:themeId/gallery-styles/:styleKey" element={
+                  <Route path="/settings/themes/:themeId/image-styles/:styleKey" element={
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
                         <Navbar />
                         <main className="flex-1 overflow-hidden">
                           <div className="h-full overflow-y-auto">
-                            <GalleryStyleEditPage />
+                            <ImageStyleEditPage />
                           </div>
                         </main>
-                        <StatusBar customStatusContent={<span>Edit Gallery Style</span>} />
-                      </div>
-                    </PrivateRoute>
-                  } />
-                  <Route path="/settings/themes/:themeId/carousel-styles/:styleKey" element={
-                    <PrivateRoute>
-                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                        <Navbar />
-                        <main className="flex-1 overflow-hidden">
-                          <div className="h-full overflow-y-auto">
-                            <CarouselStyleEditPage />
-                          </div>
-                        </main>
-                        <StatusBar customStatusContent={<span>Edit Carousel Style</span>} />
+                        <StatusBar customStatusContent={<span>Edit Image Style</span>} />
                       </div>
                     </PrivateRoute>
                   } />

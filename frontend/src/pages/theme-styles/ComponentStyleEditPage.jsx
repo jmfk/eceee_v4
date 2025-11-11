@@ -31,6 +31,7 @@ const ComponentStyleEditPage = () => {
     const [selectedScenario, setSelectedScenario] = useState('manual-menu');
     const [copyStatus, setCopyStatus] = useState({ template: false, css: false });
     const [newKey, setNewKey] = useState(styleKey);
+    const [manualKeyEdit, setManualKeyEdit] = useState(false);
 
     // Fetch theme data
     const { data: themeData, isLoading } = useQuery({
@@ -283,7 +284,14 @@ const ComponentStyleEditPage = () => {
                                     <input
                                         type="text"
                                         value={name}
-                                        onChange={(e) => setName(e.target.value)}
+                                        onChange={(e) => {
+                                            setName(e.target.value);
+                                            // Auto-update key if not manually edited
+                                            if (!manualKeyEdit) {
+                                                const sluggedKey = e.target.value.trim().toLowerCase().replace(/\s+/g, '-');
+                                                setNewKey(sluggedKey);
+                                            }
+                                        }}
                                         required
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
@@ -295,13 +303,16 @@ const ComponentStyleEditPage = () => {
                                     <input
                                         type="text"
                                         value={newKey}
-                                        onChange={(e) => setNewKey(e.target.value)}
+                                        onChange={(e) => {
+                                            setNewKey(e.target.value);
+                                            setManualKeyEdit(true);
+                                        }}
                                         placeholder={name ? name.toLowerCase().replace(/\s+/g, '-') : 'unique-key-name'}
                                         required
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">
-                                        Lowercase letters, numbers, and hyphens only
+                                        Auto-generated from display name (edit to customize)
                                     </p>
                                 </div>
                                 <div>
@@ -476,10 +487,11 @@ const ComponentStyleEditPage = () => {
                         {showPreview && (
                             <div className="bg-white border border-gray-200 rounded-lg p-6">
                                 <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                                    Preview
+                                    Live Preview
                                 </h3>
-                                <div className="border border-gray-300 rounded p-4 bg-gray-50">
-                                    {renderPreview()}
+                                <style dangerouslySetInnerHTML={{ __html: css }} />
+                                <div className="border border-gray-300 rounded p-4 bg-gray-50 overflow-auto">
+                                    <div dangerouslySetInnerHTML={{ __html: renderPreview() }} />
                                 </div>
                             </div>
                         )}

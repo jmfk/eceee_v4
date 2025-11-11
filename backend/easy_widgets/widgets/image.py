@@ -59,29 +59,14 @@ class ImageConfig(BaseModel):
             "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
         },
     )
-    displayType: Literal["gallery", "carousel"] = Field(
-        "gallery",
-        description="How to display multiple items (single image display is automatic)",
-        json_schema_extra={
-            "component": "SegmentedControlInput",
-            "variant": "default",
-            "order": 1,
-            "group": "Display Options",
-            "options": [
-                {"value": "gallery", "label": "Gallery", "icon": "Grid"},
-                {"value": "carousel", "label": "Carousel", "icon": "Play"},
-            ],
-        },
-    )
     imageStyle: Optional[str] = Field(
         None,
-        description="Named image style from the current theme (gallery or carousel styles based on displayType)",
+        description="Named image style from the current theme (includes both gallery and carousel types)",
         json_schema_extra={
             "component": "ImageStyleSelect",
-            "order": 2,
+            "order": 1,
             "group": "Display Options",
             "placeholder": "Default",
-            "dependsOn": ["displayType"],
         },
     )
     enableLightbox: bool = Field(
@@ -90,7 +75,7 @@ class ImageConfig(BaseModel):
         json_schema_extra={
             "component": "BooleanInput",
             "group": "Display Options",
-            "order": 3,
+            "order": 2,
             "variant": "toggle",
         },
     )
@@ -100,18 +85,8 @@ class ImageConfig(BaseModel):
         json_schema_extra={
             "component": "BooleanInput",
             "group": "Display Options",
-            "order": 4,
+            "order": 3,
             "variant": "toggle",
-        },
-    )
-    lightboxStyle: Optional[str] = Field(
-        None,
-        description="Named lightbox style from theme (defaults to 'default')",
-        json_schema_extra={
-            "component": "LightboxStyleSelect",
-            "order": 8,
-            "group": "Display Options",
-            "placeholder": "Default",
         },
     )
     lightboxGroup: Optional[str] = Field(
@@ -119,19 +94,22 @@ class ImageConfig(BaseModel):
         description="Group key to navigate between images in lightbox",
         json_schema_extra={
             "component": "TextInput",
-            "order": 9,
+            "order": 4,
             "group": "Display Options",
             "placeholder": "widget-{{id}}",
         },
     )
     autoPlay: bool = Field(
         False,
-        description="Auto-play videos (if applicable)",
+        description="Auto-play carousel (only shown for carousel-type image styles)",
         json_schema_extra={
             "component": "BooleanInput",
             "order": 5,
             "group": "Advanced Settings",
             "variant": "toggle",
+            "conditionalOn": {
+                "imageStyle": "carousel"
+            },  # Show only for carousel styles
         },
     )
     autoPlayInterval: int = Field(
@@ -148,6 +126,9 @@ class ImageConfig(BaseModel):
             "step": 1,
             "unit": "seconds",
             "showValue": True,
+            "conditionalOn": {
+                "imageStyle": "carousel"
+            },  # Show only for carousel styles
         },
     )
     randomize: bool = Field(
@@ -474,7 +455,7 @@ class ImageWidget(BaseWidget):
 
     def render_with_style(self, config, theme=None):
         """
-        Render images using theme's gallery or carousel style with Mustache templates.
+        Render images using theme's image style with Mustache templates.
 
         Args:
             config: Widget configuration (already prepared via prepare_template_context)
@@ -489,29 +470,34 @@ class ImageWidget(BaseWidget):
             prepare_carousel_context,
         )
 
-        # Support both snake_case and camelCase (config might not be converted yet)
-        display_type = config.get("display_type") or config.get(
-            "displayType", "gallery"
-        )
+        # Get style name (support both snake_case and camelCase)
         style_name = config.get("image_style") or config.get("imageStyle")
 
         # Only render with custom style if a style is explicitly selected
         if not style_name or style_name == "default":
             return None
 
-        # Get style from theme
+        # Get style from theme's unified image_styles
         style = None
         if theme:
-            if display_type == "carousel":
-                styles = theme.carousel_styles or {}
-            else:
-                styles = theme.gallery_styles or {}
+            # Use unified image_styles with fallback to legacy fields
+            image_styles = theme.image_styles or {}
+            style = image_styles.get(style_name)
 
-            style = styles.get(style_name)
+            # Fallback to legacy gallery_styles and carousel_styles if not found
+            if not style:
+                gallery_styles = theme.gallery_styles or {}
+                carousel_styles = theme.carousel_styles or {}
+                style = gallery_styles.get(style_name) or carousel_styles.get(
+                    style_name
+                )
 
         # If style not found, return None to use default template
         if not style:
             return None
+
+        # Get styleType from the style (defaults to 'gallery' for backward compatibility)
+        style_type = style.get("styleType", "gallery")
 
         # Prepare context for Mustache rendering
         images = config.get("media_items", [])
@@ -522,7 +508,8 @@ class ImageWidget(BaseWidget):
         imgproxy_config = style.get("imgproxy_config")
         lightbox_config = style.get("lightbox_config")
 
-        if display_type == "carousel":
+        # Use styleType to determine which context to prepare
+        if style_type == "carousel":
             context = prepare_carousel_context(
                 images, config, style.get("variables"), imgproxy_config
             )

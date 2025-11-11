@@ -1,38 +1,34 @@
 /**
- * Component Styles Tab Component
+ * Image Styles Tab Component
  * 
- * HTML template + CSS editor for component styles (renamed from Image Styles).
+ * Unified editor for both gallery and carousel image styles.
+ * Each style has a styleType field ('gallery' or 'carousel').
  */
 
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Code, Eye, BookOpen, Edit, Sparkles } from 'lucide-react';
-import { createEmptyComponentStyle } from '../../utils/themeUtils';
-import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Grid3X3, Play, BookOpen, Edit } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
-import PresetSelector from './PresetSelector';
-import { smartInsert } from '../../utils/codeInsertion';
-import StyleAIHelper from './StyleAIHelper';
 
-const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, themeId }, ref) => {
+const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, ref) => {
     const navigate = useNavigate();
     const [editingStyle, setEditingStyle] = useState(null);
-    const [showPresetSelector, setShowPresetSelector] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
     const templateRefs = useRef({});
     const cssRefs = useRef({});
     const { addNotification } = useGlobalNotifications();
-    const { updateThemeField, saveCurrentTheme, switchTheme, getState } = useUnifiedData();
     const queryClient = useQueryClient();
+    const { updateThemeField, saveCurrentTheme, switchTheme, getState } = useUnifiedData();
 
-    const styles = componentStyles || {};
+    const styles = imageStyles || {};
     const styleEntries = Object.entries(styles);
 
     const handleAddStyle = async () => {
         // Generate a unique key without showing a form
-        const base = 'component-style';
+        const base = 'image-style';
         let idx = 1;
         let styleKey = base;
         while (styles[styleKey]) {
@@ -40,8 +36,27 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
             styleKey = `${base}-${idx}`;
         }
 
-        const newStyle = createEmptyComponentStyle(styleKey);
-        newStyle.name = 'New Component Style';
+        const newStyle = {
+            name: 'New Image Style',
+            description: '',
+            styleType: 'gallery',  // Default to gallery
+            template: '<div class="image-gallery">\n  {{#images}}\n    <div class="gallery-item">\n      <img src="{{url}}" alt="{{alt}}" loading="lazy">\n    </div>\n  {{/images}}\n</div>',
+            css: '.image-gallery {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 1rem;\n}\n.gallery-item img {\n  width: 100%;\n  height: auto;\n}',
+            variables: {},
+            alpine: false,
+            imgproxyConfig: {
+                width: 800,
+                height: 600,
+                resizeType: 'fill',
+                gravity: 'sm',
+            },
+            lightboxConfig: {
+                width: 1920,
+                height: 1080,
+                maxWidth: 2560,
+                maxHeight: 1440,
+            },
+        };
 
         const updatedStyles = { ...styles, [styleKey]: newStyle };
 
@@ -54,7 +69,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
         } catch (_) {}
 
         // Update UDC with new style
-        updateThemeField('componentStyles', updatedStyles);
+        updateThemeField('imageStyles', updatedStyles);
 
         // Auto-save the new style and then navigate to edit view
         try {
@@ -63,20 +78,71 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
             // Invalidate React Query cache to refresh the theme data
             queryClient.invalidateQueries(['theme', themeId]);
             
-            addNotification({ type: 'success', message: 'New component style created and saved' });
-            navigate(`/settings/themes/${themeId}/component-styles/${styleKey}`);
+            addNotification({ type: 'success', message: 'New image style created and saved' });
+            navigate(`/settings/themes/${themeId}/image-styles/${styleKey}`);
         } catch (error) {
-            addNotification({ type: 'error', message: 'Failed to save new component style' });
+            addNotification({ type: 'error', message: 'Failed to save new image style' });
         }
     };
 
-    const handleRemoveStyle = (key) => {
-        if (!window.confirm(`Delete style "${styles[key]?.name || key}"?`)) return;
+    const handleUpdateStyle = (key, updates) => {
+        const updatedStyles = {
+            ...styles,
+            [key]: {
+                ...styles[key],
+                ...updates,
+            },
+        };
+        onChange(updatedStyles);
+        if (onDirty) onDirty();
+    };
+
+    const handleRenameKey = (oldKey, newKey) => {
+        const sanitizedKey = newKey.trim().toLowerCase().replace(/\s+/g, '-');
+        
+        if (!sanitizedKey) {
+            addNotification({ type: 'error', message: 'Key cannot be empty' });
+            return false;
+        }
+
+        if (sanitizedKey === oldKey) {
+            return true; // No change needed
+        }
+
+        if (styles[sanitizedKey]) {
+            addNotification({ type: 'error', message: 'A style with this key already exists' });
+            return false;
+        }
+
+        // Create new object with renamed key
+        const updatedStyles = {};
+        for (const [k, v] of Object.entries(styles)) {
+            if (k === oldKey) {
+                updatedStyles[sanitizedKey] = v;
+            } else {
+                updatedStyles[k] = v;
+            }
+        }
+
+        onChange(updatedStyles);
+        if (onDirty) onDirty();
+        setEditingStyle(sanitizedKey);
+        return true;
+    };
+
+    const handleDeleteStyle = (key) => {
+        if (!confirm(`Delete style "${styles[key]?.name || key}"?`)) return;
 
         const updatedStyles = { ...styles };
         delete updatedStyles[key];
+
         onChange(updatedStyles);
         if (onDirty) onDirty();
+
+        if (editingStyle === key) {
+            setEditingStyle(null);
+        }
+
         addNotification({ type: 'success', message: 'Style deleted' });
     };
 
@@ -93,9 +159,9 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Component Styles</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Image Styles</h3>
                     <p className="text-sm text-gray-600 mt-1">
-                        Custom component templates using Mustache syntax
+                        Unified gallery and carousel styles with Mustache templates
                     </p>
                 </div>
                 <button
@@ -110,8 +176,8 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
             {/* Styles List */}
             {styleEntries.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <Code className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                    <p className="text-gray-600 mb-4">No component styles defined yet</p>
+                    <Grid3X3 className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-gray-600 mb-4">No image styles defined yet</p>
                     <button
                         onClick={handleAddStyle}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -126,17 +192,21 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                         <div
                             key={key}
                             className="border rounded-lg p-4 hover:shadow-md transition cursor-pointer bg-white"
-                            onClick={() => navigate(`/settings/themes/${themeId}/component-styles/${key}`)}
+                            onClick={() => navigate(`/settings/themes/${themeId}/image-styles/${key}`)}
                         >
                             <div className="flex items-start justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                    <Code className="h-5 w-5 text-blue-600" />
+                                    {style.styleType === 'carousel' ? (
+                                        <Play className="h-5 w-5 text-purple-600" />
+                                    ) : (
+                                        <Grid3X3 className="h-5 w-5 text-blue-600" />
+                                    )}
                                     <h4 className="font-semibold text-gray-900">{style.name || key}</h4>
                                 </div>
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleRemoveStyle(key);
+                                        handleDeleteStyle(key);
                                     }}
                                     className="p-1 text-gray-400 hover:text-red-600 transition"
                                 >
@@ -146,6 +216,20 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                             {style.description && (
                                 <p className="text-sm text-gray-600 mb-2">{style.description}</p>
                             )}
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <span className={`px-2 py-1 rounded ${
+                                    style.styleType === 'carousel' 
+                                        ? 'bg-purple-100 text-purple-700' 
+                                        : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                    {style.styleType === 'carousel' ? 'Carousel' : 'Gallery'}
+                                </span>
+                                {style.alpine && (
+                                    <span className="px-2 py-1 rounded bg-green-100 text-green-700">
+                                        Alpine.js
+                                    </span>
+                                )}
+                            </div>
                             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                                 <span>Key: {key}</span>
                                 <Edit className="h-3 w-3" />
@@ -160,12 +244,12 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                 <div className="flex items-start gap-3">
                     <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
                     <div>
-                        <h4 className="font-medium text-blue-900 mb-1">Component Styles Documentation</h4>
+                        <h4 className="font-medium text-blue-900 mb-1">Image Styles Documentation</h4>
                         <p className="text-sm text-blue-700 mb-2">
-                            Learn how to create custom component templates with Mustache.
+                            Learn how to create custom gallery and carousel templates with Mustache.
                         </p>
                         <a
-                            href="/docs/component-styles-reference.html"
+                            href="/docs/image-styles-reference.html"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-blue-600 hover:text-blue-800 underline"
@@ -179,7 +263,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
     );
 });
 
-ComponentStylesTab.displayName = 'ComponentStylesTab';
+ImageStylesTab.displayName = 'ImageStylesTab';
 
-export default ComponentStylesTab;
+export default ImageStylesTab;
 

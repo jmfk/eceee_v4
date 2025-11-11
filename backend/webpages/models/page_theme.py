@@ -38,13 +38,17 @@ class PageTheme(models.Model):
         default=dict,
         help_text="Named component styles with HTML templates and optional CSS",
     )
+    image_styles = models.JSONField(
+        default=dict,
+        help_text="Unified image styles (gallery and carousel) with Mustache templates and CSS",
+    )
     gallery_styles = models.JSONField(
         default=dict,
-        help_text="Mustache templates for image gallery rendering with CSS",
+        help_text="DEPRECATED: Use 'image_styles' field instead",
     )
     carousel_styles = models.JSONField(
         default=dict,
-        help_text="Mustache templates for image carousel rendering with CSS and Alpine.js",
+        help_text="DEPRECATED: Use 'image_styles' field instead",
     )
     table_templates = models.JSONField(
         default=dict, help_text="Predefined table templates for the Table widget"
@@ -57,10 +61,6 @@ class PageTheme(models.Model):
     html_elements = models.JSONField(
         default=dict,
         help_text="DEPRECATED: Use 'design_groups' field instead",
-    )
-    image_styles = models.JSONField(
-        default=dict,
-        help_text="DEPRECATED: Use 'component_styles' field instead",
     )
     custom_css = models.TextField(
         blank=True, help_text="Additional custom CSS for this theme"
@@ -103,13 +103,13 @@ class PageTheme(models.Model):
             "colors": self.colors,
             "design_groups": self.design_groups,
             "component_styles": self.component_styles,
-            "gallery_styles": self.gallery_styles,
-            "carousel_styles": self.carousel_styles,
+            "image_styles": self.image_styles,
+            "gallery_styles": self.gallery_styles,  # Deprecated
+            "carousel_styles": self.carousel_styles,  # Deprecated
             "table_templates": self.table_templates,
             # Deprecated fields (for backwards compatibility)
             "css_variables": self.css_variables,
             "html_elements": self.html_elements,
-            "image_styles": self.image_styles,
             "custom_css": self.custom_css,
             "image": self.image.url if self.image else None,
             "is_active": self.is_active,
@@ -236,14 +236,34 @@ class PageTheme(models.Model):
                     ]
                 },
                 component_styles=cls.get_default_component_styles(),
-                gallery_styles=cls.get_default_gallery_styles(),
-                carousel_styles=cls.get_default_carousel_styles(),
+                image_styles=cls.get_default_image_styles(),
+                gallery_styles={},  # Deprecated
+                carousel_styles={},  # Deprecated
                 table_templates={},
                 is_active=True,
                 is_default=True,
                 created_by=admin_user,
             )
             return default_theme
+
+    @staticmethod
+    def get_default_image_styles():
+        """Default image styles (unified gallery and carousel) with styleType"""
+        gallery_styles = PageTheme.get_default_gallery_styles()
+        carousel_styles = PageTheme.get_default_carousel_styles()
+        
+        # Merge and add styleType
+        image_styles = {}
+        
+        # Add gallery styles with styleType
+        for key, style in gallery_styles.items():
+            image_styles[key] = {**style, "styleType": "gallery"}
+        
+        # Add carousel styles with styleType
+        for key, style in carousel_styles.items():
+            image_styles[key] = {**style, "styleType": "carousel"}
+        
+        return image_styles
 
     @staticmethod
     def get_default_gallery_styles():
@@ -1480,12 +1500,12 @@ class PageTheme(models.Model):
             component_styles=(
                 self.component_styles.copy() if self.component_styles else {}
             ),
+            image_styles=self.image_styles.copy() if self.image_styles else {},
             gallery_styles=self.gallery_styles.copy() if self.gallery_styles else {},
             carousel_styles=self.carousel_styles.copy() if self.carousel_styles else {},
             table_templates=self.table_templates.copy() if self.table_templates else {},
             css_variables=self.css_variables.copy() if self.css_variables else {},
             html_elements=self.html_elements.copy() if self.html_elements else {},
-            image_styles=self.image_styles.copy() if self.image_styles else {},
             custom_css=self.custom_css,
             is_active=True,
             is_default=False,  # Clones are never default

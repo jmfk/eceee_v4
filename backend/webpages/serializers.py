@@ -127,13 +127,13 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "colors",
             "design_groups",
             "component_styles",
-            "gallery_styles",
-            "carousel_styles",
+            "image_styles",
+            "gallery_styles",  # Deprecated
+            "carousel_styles",  # Deprecated
             "table_templates",
             # Legacy fields (deprecated)
             "css_variables",
             "html_elements",
-            "image_styles",
             "custom_css",
             "image",
             "is_active",
@@ -211,6 +211,35 @@ class PageThemeSerializer(serializers.ModelSerializer):
             if "template" not in style_config:
                 raise serializers.ValidationError(
                     f"Component style '{style_name}' must have a 'template' field"
+                )
+
+        return value
+
+    def validate_image_styles(self, value):
+        """Validate image_styles configuration (unified gallery and carousel)"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Image styles must be a JSON object")
+
+        # Validate each style has required fields
+        for style_name, style_config in value.items():
+            if not isinstance(style_config, dict):
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' must be an object"
+                )
+
+            if "template" not in style_config:
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' must have a 'template' field"
+                )
+
+            if "styleType" not in style_config:
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' must have a 'styleType' field"
+                )
+
+            if style_config["styleType"] not in ["gallery", "carousel"]:
+                raise serializers.ValidationError(
+                    f"Image style '{style_name}' has invalid styleType: {style_config['styleType']}. Must be 'gallery' or 'carousel'"
                 )
 
         return value

@@ -27,8 +27,7 @@ import FontsTab from './theme/FontsTab';
 import ColorsTab from './theme/ColorsTab';
 import DesignGroupsTab from './theme/DesignGroupsTab';
 import ComponentStylesTab from './theme/ComponentStylesTab';
-import GalleryStylesTab from './theme/GalleryStylesTab';
-import CarouselStylesTab from './theme/CarouselStylesTab';
+import ImageStylesTab from './theme/ImageStylesTab';
 import TableTemplatesTab from './theme/TableTemplatesTab';
 import ImageUpload from './theme/ImageUpload';
 import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
@@ -79,8 +78,7 @@ const ThemeEditor = ({ onSave }) => {
 
     // Refs for style tab components to flush pending changes before save
     const componentStylesTabRef = useRef(null);
-    const galleryStylesTabRef = useRef(null);
-    const carouselStylesTabRef = useRef(null);
+    const imageStylesTabRef = useRef(null);
 
     // Fetch themes list
     const { data: themes = [], isLoading } = useQuery({
@@ -130,6 +128,7 @@ const ThemeEditor = ({ onSave }) => {
                 colors: {},
                 designGroups: { groups: [] },
                 componentStyles: {},
+                imageStyles: {},
                 tableTemplates: {},
                 isActive: true,
                 isDefault: false,
@@ -147,8 +146,9 @@ const ThemeEditor = ({ onSave }) => {
                 colors: selectedThemeData.colors || {},
                 designGroups: selectedThemeData.designGroups || selectedThemeData.typography || { groups: [] },
                 componentStyles: selectedThemeData.componentStyles || {},
-                galleryStyles: selectedThemeData.galleryStyles || {},
-                carouselStyles: selectedThemeData.carouselStyles || {},
+                imageStyles: selectedThemeData.imageStyles || {},
+                galleryStyles: selectedThemeData.galleryStyles || {},  // Deprecated
+                carouselStyles: selectedThemeData.carouselStyles || {},  // Deprecated
                 tableTemplates: selectedThemeData.tableTemplates || {},
                 image: selectedThemeData.image || null,
                 isActive: selectedThemeData.isActive ?? true,
@@ -474,8 +474,7 @@ const ThemeEditor = ({ onSave }) => {
         { id: 'colors', label: 'Colors' },
         { id: 'typography', label: 'Design Groups' },
         { id: 'component-styles', label: 'Component Styles' },
-        { id: 'gallery-styles', label: 'Galleries' },
-        { id: 'carousel-styles', label: 'Carousels' },
+        { id: 'image-styles', label: 'Image Styles' },
         { id: 'table-templates', label: 'Table Templates' },
     ];
 
@@ -593,8 +592,7 @@ const ThemeEditor = ({ onSave }) => {
                                                 colors: theme.colors || {},
                                                 typography: theme.typography || { groups: [] },
                                                 componentStyles: theme.componentStyles || {},
-                                                galleryStyles: theme.galleryStyles || {},
-                                                carouselStyles: theme.carouselStyles || {},
+                                                imageStyles: theme.imageStyles || {},
                                                 tableTemplates: theme.tableTemplates || {},
                                             }}
                                             level="full"
@@ -811,21 +809,11 @@ const ThemeEditor = ({ onSave }) => {
                         />
                     )}
 
-                    {activeTab === 'gallery-styles' && (
-                        <GalleryStylesTab
-                            ref={galleryStylesTabRef}
-                            galleryStyles={themeData?.galleryStyles || {}}
-                            onChange={(galleryStyles) => updateThemeField('galleryStyles', galleryStyles)}
-                            onDirty={() => setThemeDirty(true)}
-                            themeId={themeId}
-                        />
-                    )}
-
-                    {activeTab === 'carousel-styles' && (
-                        <CarouselStylesTab
-                            ref={carouselStylesTabRef}
-                            carouselStyles={themeData?.carouselStyles || {}}
-                            onChange={(carouselStyles) => updateThemeField('carouselStyles', carouselStyles)}
+                    {activeTab === 'image-styles' && (
+                        <ImageStylesTab
+                            ref={imageStylesTabRef}
+                            imageStyles={themeData?.imageStyles || {}}
+                            onChange={(imageStyles) => updateThemeField('imageStyles', imageStyles)}
                             onDirty={() => setThemeDirty(true)}
                             themeId={themeId}
                         />

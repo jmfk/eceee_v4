@@ -7,12 +7,12 @@ import { lookupWidget } from '../../utils/widgetUtils';
 
 /**
  * Smart visual selector for image styles with preview thumbnails
- * Shows only applicable styles based on displayType (gallery or carousel)
+ * Shows all image styles (both gallery and carousel types)
  */
 const ImageStyleSelect = ({
     value,
     onChange,
-    displayType,
+    displayType,  // Deprecated - no longer used
     formData,
     context,
     ...props
@@ -30,62 +30,52 @@ const ImageStyleSelect = ({
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
-    // State to track current displayType from UDC
-    const [udcDisplayType, setUdcDisplayType] = useState(() => {
-        // Initialize from current widget config
-        if (widgetId && slotName && contextType && getState) {
-            try {
-                const state = getState();
-                const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath);
-                return widget?.config?.displayType || null;
-            } catch (e) {
-                return null;
-            }
-        }
-        return null;
-    });
-
-    // Subscribe to UDC changes to get updated displayType
-    useExternalChanges(`imagestyle-${widgetId || 'preview'}`, (state) => {
-        if (widgetId && slotName && contextType) {
-            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath);
-            if (widget && widget.config) {
-                setUdcDisplayType(widget.config.displayType);
-            }
-        }
-    });
-
-    // Get displayType from prop, UDC, or formData (recalculate when any changes)
-    const effectiveDisplayType = useMemo(() => {
-        return displayType || udcDisplayType || formData?.displayType || 'gallery';
-    }, [displayType, udcDisplayType, formData?.displayType]);
-
-    // Get appropriate styles based on display type
+    // Get all available image styles (unified gallery and carousel)
     const availableStyles = useMemo(() => {
         if (!currentTheme) return [];
 
-        const styles = effectiveDisplayType === 'carousel'
-            ? currentTheme.carouselStyles || {}
-            : currentTheme.galleryStyles || {};
+        // Use unified imageStyles with fallback to legacy fields
+        const imageStyles = currentTheme.imageStyles || {};
+        
+        // Fallback to legacy gallery_styles and carousel_styles if no unified styles
+        if (Object.keys(imageStyles).length === 0) {
+            const galleryStyles = currentTheme.galleryStyles || {};
+            const carouselStyles = currentTheme.carouselStyles || {};
+            
+            const combined = {};
+            Object.entries(galleryStyles).forEach(([key, style]) => {
+                combined[key] = { ...style, styleType: 'gallery' };
+            });
+            Object.entries(carouselStyles).forEach(([key, style]) => {
+                combined[key] = { ...style, styleType: 'carousel' };
+            });
+            
+            return Object.entries(combined).map(([key, style]) => ({
+                value: key,
+                label: style.name || key,
+                description: style.description,
+                template: style.template,
+                css: style.css,
+                variables: style.variables,
+                styleType: style.styleType || 'gallery',
+                previewImage: style.previewImage
+            }));
+        }
 
-        return Object.entries(styles).map(([key, style]) => ({
+        return Object.entries(imageStyles).map(([key, style]) => ({
             value: key,
             label: style.name || key,
             description: style.description,
             template: style.template,
             css: style.css,
             variables: style.variables,
+            styleType: style.styleType || 'gallery',
             previewImage: style.previewImage
         }));
-    }, [currentTheme, effectiveDisplayType]);
+    }, [currentTheme]);
 
     const hasStyles = availableStyles.length > 0;
     const selectedStyle = availableStyles.find(s => s.value === value);
-
-    // Close dropdown when displayType changes (so user sees updated options)
-    useEffect(() => {
-        setIsOpen(false);
-    }, [effectiveDisplayType]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -113,7 +103,8 @@ const ImageStyleSelect = ({
 
             const sampleConfig = { showCaptions: false, enableLightbox: false };
 
-            const previewContext = effectiveDisplayType === 'carousel'
+            // Use styleType from the style itself
+            const previewContext = style.styleType === 'carousel'
                 ? prepareCarouselContext(sampleImages, sampleConfig, style.variables || {})
                 : prepareGalleryContext(sampleImages, sampleConfig, style.variables || {});
 
@@ -178,11 +169,21 @@ const ImageStyleSelect = ({
                             <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                         )}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
-                        {isDefault
-                            ? `Built-in ${effectiveDisplayType} layout`
-                            : style.description || 'Custom style'
-                        }
+                    <div className="text-xs text-gray-500 truncate flex items-center gap-2">
+                        {isDefault ? (
+                            'Built-in layout'
+                        ) : (
+                            <>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                    style.styleType === 'carousel' 
+                                        ? 'bg-purple-100 text-purple-700' 
+                                        : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                    {style.styleType === 'carousel' ? 'Carousel' : 'Gallery'}
+                                </span>
+                                <span>{style.description || 'Custom style'}</span>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -192,7 +193,7 @@ const ImageStyleSelect = ({
     if (!hasStyles) {
         return (
             <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-600">
-                Default {effectiveDisplayType === 'carousel' ? 'Carousel' : 'Gallery'}
+                Default
             </div>
         );
     }
