@@ -1327,6 +1327,11 @@ class ContentWidgetEditorRenderer {
      * Handle context menu
      */
     handleContextMenu(e) {
+        // Check if context menu is enabled via LayoutRenderer
+        if (window.__layoutRenderer && !window.__layoutRenderer.uiConfig.enableContextMenu) {
+            return
+        }
+
         e.preventDefault()
 
         if (!this.contextMenu || this.isDestroyed) {
