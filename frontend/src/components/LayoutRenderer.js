@@ -93,6 +93,11 @@ class LayoutRenderer {
     // Initialize Django Template Renderer for template processing
     this.templateRenderer = new DjangoTemplateRenderer();
     this.templateRenderer.setDebugMode(this.isDevelopmentMode());
+
+    // Expose instance globally for console access
+    if (typeof window !== 'undefined') {
+      window.__layoutRenderer = this;
+    }
   }
 
   /**
@@ -703,6 +708,30 @@ class LayoutRenderer {
    */
   setUIConfig(config = {}) {
     this.uiConfig = { ...this.uiConfig, ...config };
+  }
+
+  /**
+   * Enable context menu
+   */
+  enableContextMenu() {
+    this.uiConfig.enableContextMenu = true;
+    console.log('LayoutRenderer: Context menu enabled');
+  }
+
+  /**
+   * Disable context menu
+   */
+  disableContextMenu() {
+    this.uiConfig.enableContextMenu = false;
+    console.log('LayoutRenderer: Context menu disabled');
+  }
+
+  /**
+   * Toggle context menu
+   */
+  toggleContextMenu() {
+    this.uiConfig.enableContextMenu = !this.uiConfig.enableContextMenu;
+    console.log(`LayoutRenderer: Context menu ${this.uiConfig.enableContextMenu ? 'enabled' : 'disabled'}`);
   }
 
   /**
