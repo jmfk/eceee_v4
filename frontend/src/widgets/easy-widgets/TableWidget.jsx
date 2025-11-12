@@ -97,7 +97,7 @@ const TableWidget = memo(({
 
     if (rows.length === 0) {
         return (
-            <div className="table-widget">
+            <div className="table-widget cms-content">
                 <div className="bg-gray-200 h-24 rounded flex items-center justify-center text-gray-500">
                     <Table className="h-8 w-8 mr-2" />
                     No table data
@@ -107,7 +107,7 @@ const TableWidget = memo(({
     }
 
     return (
-        <div className={`table-widget ${responsive ? 'overflow-x-auto' : ''}`}>
+        <div className={`table-widget cms-content ${responsive ? 'overflow-x-auto' : ''}`}>
             <table className={`border-collapse ${table_width === 'full' ? 'w-full' : 'w-auto'} ${show_borders ? 'border border-gray-300' : ''} ${css_class}`}>
                 {caption && (
                     <caption className="text-sm font-medium text-gray-700 mb-2">{caption}</caption>

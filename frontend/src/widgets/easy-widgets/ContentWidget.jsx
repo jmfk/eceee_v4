@@ -141,7 +141,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
         }
     }, [])
 
-    return <div ref={containerRef} />
+    return <div ref={containerRef} className="cms-content" />
 })
 
 /**

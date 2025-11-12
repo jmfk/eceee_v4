@@ -110,7 +110,7 @@ const TableWidgetEditor = memo(({ config, onChange, className, slotDimensions })
 
     return (
         <>
-            <div ref={containerRef} className={`table-editor-container ${className}`} />
+            <div ref={containerRef} className={`table-editor-container cms-content ${className}`} />
 
             {/* Import Modal */}
             <TableImportModal
