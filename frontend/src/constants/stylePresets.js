@@ -68,7 +68,7 @@ export const STYLE_PRESETS = {
   max-width: 100%;
   max-height: 70vh;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: 0;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 .lightbox-close {

@@ -383,7 +383,7 @@ class PageTheme(models.Model):
         <div class="image-container">
           <img src="{{url}}" alt="{{alt}}" class="gallery-image" loading="lazy">
           <div class="image-overlay">
-            <span class="expand-icon">🔍</span>
+            <span class="expand-icon"></span>
           </div>
         </div>
         {{#showCaptions}}
@@ -444,8 +444,16 @@ class PageTheme(models.Model):
   opacity: 1;
 }
 .expand-icon {
-  font-size: 1.5rem;
-  color: white;
+  width: 40px;
+  height: 40px;
+  border: 2px solid white;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  animation: expandPulse 1.5s ease-in-out infinite;
+}
+@keyframes expandPulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
 }
 .image-caption {
   padding: 0.5rem;
@@ -1049,7 +1057,7 @@ class PageTheme(models.Model):
 }
 .widget-image {
   height: auto;
-  border-radius: 4px;
+  border-radius: 0;
 }
 .image-caption {
   margin-top: 0.5rem;
@@ -1095,7 +1103,7 @@ class PageTheme(models.Model):
   max-width: 90vw;
   max-height: 90vh;
   background: white;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
 }
 .lightbox-close {
@@ -1124,6 +1132,7 @@ class PageTheme(models.Model):
   width: auto;
   height: auto;
   display: block;
+  border-radius: 0;
 }
 .lightbox-btn {
   position: absolute;
