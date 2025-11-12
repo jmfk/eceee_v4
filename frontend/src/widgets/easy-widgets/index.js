@@ -27,6 +27,7 @@ import NewsListWidget from './NewsListWidget';
 import NewsDetailWidget from './NewsDetailWidget';
 import TopNewsPlugWidget from './TopNewsPlugWidget';
 import SidebarTopNewsWidget from './SidebarTopNewsWidget';
+import SectionWidget from './SectionWidget';
 
 /**
  * EASY Widget Registry
@@ -54,6 +55,7 @@ export const EASY_WIDGET_REGISTRY = {
     'easy_widgets.NewsDetailWidget': registerWidget(NewsDetailWidget, 'easy_widgets.NewsDetailWidget'),
     'easy_widgets.TopNewsPlugWidget': registerWidget(TopNewsPlugWidget, 'easy_widgets.TopNewsPlugWidget'),
     'easy_widgets.SidebarTopNewsWidget': registerWidget(SidebarTopNewsWidget, 'easy_widgets.SidebarTopNewsWidget'),
+    'easy_widgets.SectionWidget': registerWidget(SectionWidget, 'easy_widgets.SectionWidget'),
 };
 
 /**
@@ -118,6 +120,7 @@ export { default as NewsDetailWidget } from './NewsDetailWidget';
 export { default as TopNewsPlugWidget } from './TopNewsPlugWidget';
 export { default as SidebarTopNewsWidget } from './SidebarTopNewsWidget';
 export { default as PathDebugWidget } from './PathDebugWidget';
+export { default as SectionWidget } from './SectionWidget';
 
 // Export utility components
 export { default as ContentWidgetEditorRenderer } from './ContentWidgetEditorRenderer';

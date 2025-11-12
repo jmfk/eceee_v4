@@ -16,13 +16,18 @@
         {% if config.image_count == 4 %}
             {# 4 images layout - no text, just images in a row #}
             <div class="content-card-images layout-4">
-                {% for item in config.media_items|slice:":4" %}
-                    {% if item.type == 'image' %}
-                        <img src="{% imgproxy_url item.url width=400 height=400 resize_type='fill' %}" 
-                             alt="{{ item.alt_text|default:'' }}" 
-                             {% if item.title %}title="{{ item.title }}"{% endif %} />
-                    {% endif %}
-                {% endfor %}
+                {% if config.image_1 %}
+                    <img src="{% imgproxy_url config.image_1 width=400 height=400 resize_type='fill' %}" alt="" />
+                {% endif %}
+                {% if config.image_2 %}
+                    <img src="{% imgproxy_url config.image_2 width=400 height=400 resize_type='fill' %}" alt="" />
+                {% endif %}
+                {% if config.image_3 %}
+                    <img src="{% imgproxy_url config.image_3 width=400 height=400 resize_type='fill' %}" alt="" />
+                {% endif %}
+                {% if config.image_4 %}
+                    <img src="{% imgproxy_url config.image_4 width=400 height=400 resize_type='fill' %}" alt="" />
+                {% endif %}
             </div>
         {% else %}
             {# 1 or 2 images layout - with text #}
@@ -31,19 +36,16 @@
             </div>
             
             <div class="content-card-images layout-{{ config.image_count|default:1 }}">
-                {% for item in config.media_items|slice:":"|add:config.image_count|default:1 %}
-                    {% if item.type == 'image' %}
-                        {% if config.image_count == 1 %}
-                            <img src="{% imgproxy_url item.url width=600 height=600 resize_type='fill' %}" 
-                                 alt="{{ item.alt_text|default:'' }}" 
-                                 {% if item.title %}title="{{ item.title }}"{% endif %} />
-                        {% else %}
-                            <img src="{% imgproxy_url item.url width=400 height=600 resize_type='fill' %}" 
-                                 alt="{{ item.alt_text|default:'' }}" 
-                                 {% if item.title %}title="{{ item.title }}"{% endif %} />
-                        {% endif %}
+                {% if config.image_1 %}
+                    {% if config.image_count == 1 %}
+                        <img src="{% imgproxy_url config.image_1 width=600 height=600 resize_type='fill' %}" alt="" />
+                    {% else %}
+                        <img src="{% imgproxy_url config.image_1 width=400 height=600 resize_type='fill' %}" alt="" />
                     {% endif %}
-                {% endfor %}
+                {% endif %}
+                {% if config.image_2 and config.image_count >= 2 %}
+                    <img src="{% imgproxy_url config.image_2 width=400 height=600 resize_type='fill' %}" alt="" />
+                {% endif %}
             </div>
         {% endif %}
     </div>

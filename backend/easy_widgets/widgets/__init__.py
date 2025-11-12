@@ -6,6 +6,7 @@ This module contains individual widget implementations organized into separate f
 
 # Import all widget classes to make them available when the module is imported
 from .content import ContentWidget
+from .content_card import ContentCardWidget
 from .image import ImageWidget
 from .table import TableWidget
 from .footer import FooterWidget
@@ -27,6 +28,7 @@ from .sidebar_top_news import SidebarTopNewsWidget
 # Make all widgets available at the package level
 __all__ = [
     "ContentWidget",
+    "ContentCardWidget",
     "ImageWidget",
     "TableWidget",
     "FooterWidget",

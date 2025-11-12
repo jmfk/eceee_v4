@@ -13,29 +13,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ImageMediaItem(BaseModel):
-    """Individual media item for Content Card widget"""
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-    id: Optional[str] = Field(None, description="Media file ID")
-    url: str = Field(..., description="Media URL (image or video)")
-    type: Literal["image", "video"] = Field("image", description="Media type")
-    altText: str = Field(
-        ..., min_length=1, description="Alternative text for accessibility"
-    )
-    caption: Optional[str] = Field(None, description="Optional caption")
-    title: Optional[str] = Field(None, description="Image title")
-    photographer: Optional[str] = Field(None, description="Photographer or source")
-    source: Optional[str] = Field(None, description="Image source")
-    thumbnailUrl: Optional[str] = Field(None, description="Thumbnail URL for videos")
-    width: Optional[int] = Field(None, description="Image width")
-    height: Optional[int] = Field(None, description="Image height")
-
-
 class ContentCardConfig(BaseModel):
     """Configuration for Content Card widget"""
 
@@ -100,11 +77,47 @@ class ContentCardConfig(BaseModel):
             "group": "Layout",
         },
     )
-    mediaItems: List[ImageMediaItem] = Field(
-        default_factory=list,
-        description="List of images to display",
+    image1: Optional[str] = Field(
+        None,
+        description="First image URL",
         json_schema_extra={
-            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "order": 5,
+            "group": "Images",
+        },
+    )
+    image2: Optional[str] = Field(
+        None,
+        description="Second image URL (for 2 or 4 image layouts)",
+        json_schema_extra={
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "order": 6,
+            "group": "Images",
+            "conditionalOn": {"imageCount": [2, 4]},
+        },
+    )
+    image3: Optional[str] = Field(
+        None,
+        description="Third image URL (for 4 image layout)",
+        json_schema_extra={
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "order": 7,
+            "group": "Images",
+            "conditionalOn": {"imageCount": [4]},
+        },
+    )
+    image4: Optional[str] = Field(
+        None,
+        description="Fourth image URL (for 4 image layout)",
+        json_schema_extra={
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "order": 8,
+            "group": "Images",
+            "conditionalOn": {"imageCount": [4]},
         },
     )
     componentStyle: str = Field(
@@ -112,7 +125,7 @@ class ContentCardConfig(BaseModel):
         description="Component style from theme",
         json_schema_extra={
             "component": "ComponentStyleSelector",
-            "order": 5,
+            "order": 9,
             "group": "Styling",
         },
     )
@@ -123,7 +136,9 @@ class ContentCardWidget(BaseWidget):
     """Content card widget with flexible header, text, and image layouts"""
 
     name = "Content Card"
-    description = "Flexible content card with header, text, and configurable image layouts"
+    description = (
+        "Flexible content card with header, text, and configurable image layouts"
+    )
     template_name = "easy_widgets/widgets/content_card.html"
 
     widget_css = """
@@ -331,15 +346,19 @@ class ContentCardWidget(BaseWidget):
             style_vars=style.get("variables", {}),
             config=config,  # Pass raw config for granular control
         )
-        
+
         # Add content card specific context
         context["header"] = config.get("header", "")
-        context["textPosition"] = config.get("text_position") or config.get("textPosition", "left")
+        context["textPosition"] = config.get("text_position") or config.get(
+            "textPosition", "left"
+        )
         context["imageCount"] = config.get("image_count") or config.get("imageCount", 1)
-        
-        # Convert media items from camelCase to snake_case if needed
-        media_items = config.get("media_items") or config.get("mediaItems", [])
-        context["mediaItems"] = media_items
+
+        # Add image URLs
+        context["image1"] = config.get("image1") or config.get("image_1")
+        context["image2"] = config.get("image2") or config.get("image_2")
+        context["image3"] = config.get("image3") or config.get("image_3")
+        context["image4"] = config.get("image4") or config.get("image_4")
 
         # Render template
         html = render_mustache(template, context)
@@ -350,35 +369,22 @@ class ContentCardWidget(BaseWidget):
         Prepare template context with snake_case field conversions.
         """
         template_config = config.copy() if config else {}
-        
-        # Ensure snake_case fields for template
-        template_config["text_position"] = config.get("textPosition") or config.get("text_position", "left")
-        template_config["image_count"] = config.get("imageCount") or config.get("image_count", 1)
-        template_config["component_style"] = config.get("componentStyle") or config.get("component_style", "default")
-        
-        # Convert media items from camelCase to snake_case for template
-        media_items = config.get("mediaItems") or config.get("media_items", [])
-        snake_case_items = []
-        for item in media_items:
-            if isinstance(item, dict):
-                snake_case_item = {
-                    "id": item.get("id"),
-                    "url": item.get("url"),
-                    "type": item.get("type", "image"),
-                    "alt_text": item.get("altText", ""),
-                    "caption": item.get("caption", ""),
-                    "title": item.get("title", ""),
-                    "photographer": item.get("photographer", ""),
-                    "source": item.get("source", ""),
-                    "width": item.get("width"),
-                    "height": item.get("height"),
-                    "thumbnail_url": item.get("thumbnailUrl"),
-                }
-                snake_case_items.append(snake_case_item)
-            else:
-                snake_case_items.append(item)
-        
-        template_config["media_items"] = snake_case_items
-        
-        return template_config
 
+        # Ensure snake_case fields for template
+        template_config["text_position"] = config.get("textPosition") or config.get(
+            "text_position", "left"
+        )
+        template_config["image_count"] = config.get("imageCount") or config.get(
+            "image_count", 1
+        )
+        template_config["component_style"] = config.get("componentStyle") or config.get(
+            "component_style", "default"
+        )
+
+        # Convert image fields from camelCase to snake_case for template
+        template_config["image_1"] = config.get("image1") or config.get("image_1")
+        template_config["image_2"] = config.get("image2") or config.get("image_2")
+        template_config["image_3"] = config.get("image3") or config.get("image_3")
+        template_config["image_4"] = config.get("image4") or config.get("image_4")
+
+        return template_config

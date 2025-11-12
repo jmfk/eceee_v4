@@ -41,10 +41,12 @@ const ContentCardWidget = ({
         }
     })
 
-    // Get effective media items (limit based on imageCount)
-    const mediaItems = localConfig.mediaItems || []
+    // Get image URLs
     const imageCount = localConfig.imageCount || 1
-    const effectiveMediaItems = mediaItems.slice(0, imageCount)
+    const image1 = localConfig.image1
+    const image2 = localConfig.image2
+    const image3 = localConfig.image3
+    const image4 = localConfig.image4
 
     // Determine text position
     const textPosition = localConfig.textPosition || 'left'
@@ -74,7 +76,10 @@ const ContentCardWidget = ({
                     mustacheContext.header = localConfig.header || ''
                     mustacheContext.textPosition = textPosition
                     mustacheContext.imageCount = imageCount
-                    mustacheContext.mediaItems = effectiveMediaItems
+                    mustacheContext.image1 = image1
+                    mustacheContext.image2 = image2
+                    mustacheContext.image3 = image3
+                    mustacheContext.image4 = image4
 
                     // Render template
                     const html = renderMustache(style.template, mustacheContext)
@@ -142,16 +147,10 @@ const ContentCardWidget = ({
                     {imageCount === 4 ? (
                         // 4 images layout - no text
                         <div className="content-card-images layout-4">
-                            {effectiveMediaItems.slice(0, 4).map((item, idx) => (
-                                item.type !== 'video' && (
-                                    <img
-                                        key={idx}
-                                        src={item.url}
-                                        alt={item.altText || ''}
-                                        title={item.title || ''}
-                                    />
-                                )
-                            ))}
+                            {image1 && <img src={image1} alt="" />}
+                            {image2 && <img src={image2} alt="" />}
+                            {image3 && <img src={image3} alt="" />}
+                            {image4 && <img src={image4} alt="" />}
                         </div>
                     ) : (
                         // 1 or 2 images layout - with text
@@ -161,16 +160,8 @@ const ContentCardWidget = ({
                             </div>
                             
                             <div className={`content-card-images layout-${imageCount}`}>
-                                {effectiveMediaItems.map((item, idx) => (
-                                    item.type !== 'video' && (
-                                        <img
-                                            key={idx}
-                                            src={item.url}
-                                            alt={item.altText || ''}
-                                            title={item.title || ''}
-                                        />
-                                    )
-                                ))}
+                                {image1 && <img src={image1} alt="" />}
+                                {image2 && imageCount >= 2 && <img src={image2} alt="" />}
                             </div>
                         </>
                     )}
@@ -180,10 +171,12 @@ const ContentCardWidget = ({
     }
 
     // Default rendering (no custom style)
+    const hasImages = image1 || image2 || image3 || image4
+    
     if (mode === 'editor') {
         return (
             <div className="content-card-widget-editor p-4">
-                {effectiveMediaItems.length === 0 && (
+                {!hasImages && (
                     <div className="bg-gray-200 h-48 rounded flex items-center justify-center text-gray-500 mb-4">
                         <FileText className="h-8 w-8 mr-2" />
                         Content Card placeholder - Add images to get started
@@ -195,7 +188,7 @@ const ContentCardWidget = ({
     }
 
     // Preview mode
-    if (effectiveMediaItems.length === 0) {
+    if (!hasImages) {
         return (
             <div className="content-card-widget">
                 <div className="bg-gray-200 h-48 rounded flex items-center justify-center text-gray-500">
@@ -220,7 +213,10 @@ ContentCardWidget.defaultConfig = {
     content: '',
     textPosition: 'left',
     imageCount: 1,
-    mediaItems: [],
+    image1: null,
+    image2: null,
+    image3: null,
+    image4: null,
     componentStyle: 'default'
 }
 
@@ -230,8 +226,7 @@ ContentCardWidget.metadata = {
     description: 'Flexible content card with header, text, and configurable image layouts',
     category: 'content',
     icon: FileText,
-    tags: ['eceee', 'card', 'content', 'images', 'layout'],
-    specialEditor: 'MediaSpecialEditor' // Use media editor for images
+    tags: ['eceee', 'card', 'content', 'images', 'layout']
 }
 
 export default ContentCardWidget
