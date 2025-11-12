@@ -5,5 +5,7 @@ export const WIDGET_ACTIONS = {
     EDIT: 'edit',
     CLEAR: 'clear',
     MOVE_UP: 'move_up',
-    MOVE_DOWN: 'move_down'
+    MOVE_DOWN: 'move_down',
+    CUT: 'cut',
+    PASTE: 'paste'
 };

@@ -47,14 +47,31 @@ const STEP_SIZES = {
 
 const parseValue = (value) => {
     if (!value) return { number: '', unit: '' };
-    const match = String(value).match(/^([-\d.]+)([a-z%]*)$/i);
+    const strValue = String(value).trim();
+    
+    // Match number and unit, handling cases where unit might be duplicated
+    // This regex matches: optional sign, digits/dots, then optional unit (letters or %)
+    const match = strValue.match(/^([-\d.]+)([a-z%]+)?$/i);
     if (match) {
+        const number = match[1];
+        let unit = (match[2] || '').toLowerCase();
+        
+        // If unit appears duplicated (e.g., "pxpx"), take only the first occurrence
+        // Check for common CSS units and extract the first valid one
+        const validUnits = ['px', 'em', 'rem', '%', 'vh', 'vw', 'pt', 's', 'ms'];
+        for (const validUnit of validUnits) {
+            if (unit.startsWith(validUnit)) {
+                unit = validUnit;
+                break;
+            }
+        }
+        
         return {
-            number: match[1],
-            unit: match[2] || '',
+            number,
+            unit,
         };
     }
-    return { number: value, unit: '' };
+    return { number: strValue, unit: '' };
 };
 
 const NumericInput = ({ value, onChange, property, label, className = '' }) => {

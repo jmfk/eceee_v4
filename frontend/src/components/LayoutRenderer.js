@@ -87,6 +87,9 @@ class LayoutRenderer {
     // NEW: Widget data change callbacks for single source of truth
     this.widgetDataCallbacks = new Map(); // Map of widget data change callbacks
 
+    // Cut/Paste clipboard for widgets
+    this.widgetClipboard = null; // Stores cut widget data
+
     // Initialize Django Template Renderer for template processing
     this.templateRenderer = new DjangoTemplateRenderer();
     this.templateRenderer.setDebugMode(this.isDevelopmentMode());
@@ -739,6 +742,15 @@ class LayoutRenderer {
       menuContainer.appendChild(importButton);
     }
 
+    // Add Paste button (if clipboard has widget)
+    if (this.widgetClipboard) {
+      const pasteButton = this.createIconButton('svg:clipboard', 'bg-purple-600 hover:bg-purple-700 text-white', () => {
+        this.pasteWidget(slotName);
+      });
+      pasteButton.title = 'Paste Widget';
+      menuContainer.appendChild(pasteButton);
+    }
+
     // Add Widget button (if enabled)
     if (this.uiConfig.showAddWidget || options.showAddWidget) {
       const addWidgetButton = this.createIconButton('svg:plus', 'bg-green-600 hover:bg-green-700 text-white', () => {
@@ -867,6 +879,15 @@ class LayoutRenderer {
       download: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+             </svg>`,
+      scissors: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+               <path d="M3.5 3.5c-.614-.884-.074-1.962.858-2.5L8 7.226 11.642 1c.932.538 1.472 1.616.858 2.5L8.81 8.61l1.556 2.661c.614.884.074 1.962-.858 2.5L8 10.774 4.358 17c-.932-.538-1.472-1.616-.858-2.5L5.09 12l1.556-2.661L3.5 3.5z"/>
+               <path d="M10.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+               <path d="M5.5 5.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+             </svg>`,
+      clipboard: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+               <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+               <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
              </svg>`
     };
 
@@ -2395,6 +2416,22 @@ class LayoutRenderer {
     }, 'text-blue-700 hover:bg-blue-50');
     menuDropdown.appendChild(editItem);
 
+    // Add cut menu item
+    const cutItem = this.createMenuItem('svg:scissors', 'Cut', () => {
+      this.cutWidget(id, widgetInstance);
+      this.hideWidgetMenu(id);
+    }, 'text-purple-700 hover:bg-purple-50');
+    menuDropdown.appendChild(cutItem);
+
+    // Add paste menu item (only show if clipboard has data)
+    if (this.widgetClipboard) {
+      const pasteItem = this.createMenuItem('svg:clipboard', 'Paste', () => {
+        this.pasteWidget(widgetInstance.slotName);
+        this.hideWidgetMenu(id);
+      }, 'text-green-700 hover:bg-green-50');
+      menuDropdown.appendChild(pasteItem);
+    }
+
     // Add standard remove menu item  
     const removeItem = this.createMenuItem(WIDGET_ICONS.TRASH, 'Remove', () => {
       // Direct removal without confirmation
@@ -2752,6 +2789,87 @@ class LayoutRenderer {
     } else {
       console.warn('LayoutRenderer: No widget element found for widgetId:', widgetId);
     }
+  }
+
+  /**
+   * Cut a widget to clipboard
+   * @param {string} widgetId - ID of the widget to cut
+   * @param {Object} widgetInstance - Widget instance data
+   */
+  cutWidget(widgetId, widgetInstance) {
+    const widgetElement = document.querySelector(`.rendered-widget[data-widget-id="${widgetId}"]`);
+    
+    if (!widgetElement) {
+      console.warn('LayoutRenderer: No widget element found for widgetId:', widgetId);
+      return;
+    }
+
+    const slotElement = widgetElement.closest('[data-slot-name]');
+    const slotName = slotElement?.getAttribute('data-slot-name');
+
+    if (!slotName) {
+      console.warn('LayoutRenderer: Could not determine slot for widget:', widgetId);
+      return;
+    }
+
+    // Store widget data in clipboard
+    this.widgetClipboard = {
+      widget: widgetInstance,
+      sourceSlot: slotName
+    };
+
+    // Remove from source slot
+    this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
+    
+    // Mark as dirty
+    this.markAsDirty(`widget cut from ${slotName}`);
+
+    // Refresh slot menus to show paste button
+    this.refreshSlotMenus();
+  }
+
+  /**
+   * Paste widget from clipboard to target slot
+   * @param {string} targetSlotName - Name of the slot to paste into
+   */
+  pasteWidget(targetSlotName) {
+    if (!this.widgetClipboard) {
+      console.warn('LayoutRenderer: No widget in clipboard to paste');
+      return;
+    }
+
+    const { widget, sourceSlot } = this.widgetClipboard;
+
+    // Create new widget instance with new ID
+    const newWidget = {
+      ...widget,
+      id: this.generateWidgetId(),
+      slotName: targetSlotName
+    };
+
+    // Add to target slot
+    this.executeWidgetDataCallback(WIDGET_ACTIONS.ADD, targetSlotName, newWidget);
+
+    // Clear clipboard
+    this.widgetClipboard = null;
+
+    // Mark as dirty
+    this.markAsDirty(`widget pasted to ${targetSlotName}`);
+
+    // Refresh slot menus to update paste button visibility
+    this.refreshSlotMenus();
+  }
+
+  /**
+   * Refresh all slot menus (used after clipboard state changes)
+   */
+  refreshSlotMenus() {
+    this.slotContainers.forEach((element, slotName) => {
+      this.addSlotIconMenu(slotName, {
+        showAddWidget: this.uiConfig.showAddWidget,
+        showClearSlot: true
+      });
+    });
   }
 
   /**

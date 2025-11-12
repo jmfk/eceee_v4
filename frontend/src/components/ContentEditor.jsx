@@ -221,6 +221,12 @@ const ContentEditor = forwardRef(({
             }
             break;
 
+          case WIDGET_ACTIONS.CUT:
+          case WIDGET_ACTIONS.PASTE:
+            // Cut and paste are handled internally by LayoutRenderer
+            // These actions don't need special handling here
+            return;
+
           default:
             console.warn('ContentEditor: Unknown widget data action', action);
             return;

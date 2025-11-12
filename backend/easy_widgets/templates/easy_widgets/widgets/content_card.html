@@ -1,0 +1,51 @@
+{% load static %}
+{% load imgproxy_tags %}
+
+{% if custom_style_css %}
+<style>{{ custom_style_css|safe }}</style>
+{% endif %}
+
+<div class="content-card-widget widget-type-{{ widget_type.css_class_name }}"{% if config.anchor %} id="{{ config.anchor }}"{% endif %}>
+    {% if config.header %}
+    <div class="content-card-header">
+        {{ config.header|linebreaksbr }}
+    </div>
+    {% endif %}
+    
+    <div class="content-card-body text-{{ config.text_position|default:'left' }} image-count-{{ config.image_count|default:1 }}">
+        {% if config.image_count == 4 %}
+            {# 4 images layout - no text, just images in a row #}
+            <div class="content-card-images layout-4">
+                {% for item in config.media_items|slice:":4" %}
+                    {% if item.type == 'image' %}
+                        <img src="{% imgproxy_url item.url width=400 height=400 resize_type='fill' %}" 
+                             alt="{{ item.alt_text|default:'' }}" 
+                             {% if item.title %}title="{{ item.title }}"{% endif %} />
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            {# 1 or 2 images layout - with text #}
+            <div class="content-card-text">
+                {{ config.content|safe }}
+            </div>
+            
+            <div class="content-card-images layout-{{ config.image_count|default:1 }}">
+                {% for item in config.media_items|slice:":"|add:config.image_count|default:1 %}
+                    {% if item.type == 'image' %}
+                        {% if config.image_count == 1 %}
+                            <img src="{% imgproxy_url item.url width=600 height=600 resize_type='fill' %}" 
+                                 alt="{{ item.alt_text|default:'' }}" 
+                                 {% if item.title %}title="{{ item.title }}"{% endif %} />
+                        {% else %}
+                            <img src="{% imgproxy_url item.url width=400 height=600 resize_type='fill' %}" 
+                                 alt="{{ item.alt_text|default:'' }}" 
+                                 {% if item.title %}title="{{ item.title }}"{% endif %} />
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
