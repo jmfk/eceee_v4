@@ -11,6 +11,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
+import { useState, useEffect } from 'react'
 // import './utils/rerenderInvestigation' // Initialize render investigation - DISABLED
 import Navbar from '@components/Navbar'
 import GlobalWysiwygToolbar from '@components/wysiwyg/GlobalWysiwygToolbar'
@@ -56,11 +57,43 @@ const queryClient = new QueryClient({
   },
 })
 
+const ContextMenuToggle = () => {
+  const [enabled, setEnabled] = useState(true)
+  const isDevelopment = import.meta.env.DEV
+
+  useEffect(() => {
+    if (window.__layoutRenderer) {
+      window.__layoutRenderer.uiConfig.enableContextMenu = enabled
+    }
+  }, [enabled])
+
+  if (!isDevelopment) return null
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[10020] bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-3">
+      <span className="text-sm font-medium">Context Menu</span>
+      <button
+        onClick={() => setEnabled(!enabled)}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          enabled ? 'bg-green-600' : 'bg-gray-600'
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            enabled ? 'translate-x-6' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
+
 const AppRoutes = () => {
   useAutoPageTitle()
 
   return (
     <>
+      <ContextMenuToggle />
       <Routes>
         {/* Login route - no authentication required */}
         <Route path="/login" element={<LoginPage />} />

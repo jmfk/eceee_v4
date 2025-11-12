@@ -387,12 +387,6 @@ div[style*="z-index"] {
   display: block;
 }
 
-/* Inside isolated area, cms-content works fresh */
-.cms-content-isolated > .cms-content {
-  display: block;
-  /* Theme CSS applies normally from here */
-}
-
 .theme-content code {
   background-color: var(--code-bg, #f3f4f6);
   color: var(--code-color, #1f2937);

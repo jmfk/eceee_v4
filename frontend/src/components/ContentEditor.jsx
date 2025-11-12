@@ -43,6 +43,8 @@ const ContentEditor = forwardRef(({
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importSlotName, setImportSlotName] = useState(null);
+  const [contextMenuEnabled, setContextMenuEnabled] = useState(true);
+  const isDevelopment = import.meta.env.DEV;
 
   // Get notification context for confirmation dialogs
   const { showConfirm } = useNotificationContext();

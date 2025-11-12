@@ -1,6 +1,6 @@
 {% load static %}
 
-<article class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="news">
+<article class="widget-type-{{ widget_type.css_class_name }} cms-content" data-widget-type="news">
     {% if config.title %}
         <header class="news-header">
             <h2 class="news-title">{{ config.title }}</h2>

@@ -244,38 +244,36 @@ const PageWidgetFactory = ({
 
                     {/* Core Widget Content - render the actual widget in display mode */}
                     <div className="cms-content-isolated">
-                        <div className="cms-content">
-                            <CoreWidgetComponent
-                                config={widget.config || {}}
-                                mode="display"
-                                themeId={widget.config?.themeId}
-                                widgetId={actualWidgetId}
-                                slotName={actualSlotName}
-                                widgetType={widget.type}
-                                layoutRenderer={layoutRenderer}
-                                versionId={versionId}
-                                isPublished={isPublished}
-                                parentComponentId={parentComponentId}
-                                contextType={contextType}
-                                pageId={pageId}
-                                widgetPath={widgetPath}
-                                nestedParentWidgetId={nestedParentWidgetId}
-                                nestedParentSlotName={nestedParentSlotName}
-                                context={{
-                                    widgetId: actualWidgetId,
-                                    slotName: actualSlotName,
-                                    contextType,
-                                    pageId,
-                                    versionId,
-                                    webpageData,
-                                    pageVersionData,
-                                    widgetPath,
-                                    pathVariables: pathVariables || {},
-                                    simulatedPath: simulatedPath,
-                                    onSimulatedPathChange: onSimulatedPathChange
-                                }}
-                            />
-                        </div>
+                        <CoreWidgetComponent
+                            config={widget.config || {}}
+                            mode="display"
+                            themeId={widget.config?.themeId}
+                            widgetId={actualWidgetId}
+                            slotName={actualSlotName}
+                            widgetType={widget.type}
+                            layoutRenderer={layoutRenderer}
+                            versionId={versionId}
+                            isPublished={isPublished}
+                            parentComponentId={parentComponentId}
+                            contextType={contextType}
+                            pageId={pageId}
+                            widgetPath={widgetPath}
+                            nestedParentWidgetId={nestedParentWidgetId}
+                            nestedParentSlotName={nestedParentSlotName}
+                            context={{
+                                widgetId: actualWidgetId,
+                                slotName: actualSlotName,
+                                contextType,
+                                pageId,
+                                versionId,
+                                webpageData,
+                                pageVersionData,
+                                widgetPath,
+                                pathVariables: pathVariables || {},
+                                simulatedPath: simulatedPath,
+                                onSimulatedPathChange: onSimulatedPathChange
+                            }}
+                        />
                     </div>
                 </div>
             )
@@ -307,44 +305,42 @@ const PageWidgetFactory = ({
                 {/* Core Widget Content */}
                 <div className="widget-content overflow-hidden border border-gray-200 border-t-0">
                     <div className="cms-content-isolated">
-                        <div className="cms-content">
-                            <CoreWidgetComponent
-                                config={widget.config || {}}
-                                mode="editor"
-                                onConfigChange={stableConfigChangeHandler}
-                                themeId={widget.config?.themeId}
-                                widgetId={actualWidgetId}
-                                slotName={actualSlotName}
-                                widgetType={widget.type}
-                                layoutRenderer={layoutRenderer}
-                                versionId={versionId}
-                                isPublished={isPublished}
-                                // Context props for container widgets
-                                parentComponentId={parentComponentId}
-                                contextType={contextType}
-                                pageId={pageId}
-                                onWidgetEdit={onEdit}
-                                onOpenWidgetEditor={onOpenWidgetEditor}
-                                // Widget path for infinite nesting
-                                widgetPath={widgetPath}
-                                // Legacy nested widget context (deprecated)
-                                nestedParentWidgetId={nestedParentWidgetId}
-                                nestedParentSlotName={nestedParentSlotName}
-                                context={{
-                                    widgetId: actualWidgetId,
-                                    slotName: actualSlotName,
-                                    contextType,
-                                    pageId,
-                                    versionId,
-                                    webpageData,
-                                    pageVersionData,
-                                    widgetPath,
-                                    pathVariables: pathVariables || {},
-                                    simulatedPath: simulatedPath,
-                                    onSimulatedPathChange: onSimulatedPathChange
-                                }}
-                            />
-                        </div>
+                        <CoreWidgetComponent
+                            config={widget.config || {}}
+                            mode="editor"
+                            onConfigChange={stableConfigChangeHandler}
+                            themeId={widget.config?.themeId}
+                            widgetId={actualWidgetId}
+                            slotName={actualSlotName}
+                            widgetType={widget.type}
+                            layoutRenderer={layoutRenderer}
+                            versionId={versionId}
+                            isPublished={isPublished}
+                            // Context props for container widgets
+                            parentComponentId={parentComponentId}
+                            contextType={contextType}
+                            pageId={pageId}
+                            onWidgetEdit={onEdit}
+                            onOpenWidgetEditor={onOpenWidgetEditor}
+                            // Widget path for infinite nesting
+                            widgetPath={widgetPath}
+                            // Legacy nested widget context (deprecated)
+                            nestedParentWidgetId={nestedParentWidgetId}
+                            nestedParentSlotName={nestedParentSlotName}
+                            context={{
+                                widgetId: actualWidgetId,
+                                slotName: actualSlotName,
+                                contextType,
+                                pageId,
+                                versionId,
+                                webpageData,
+                                pageVersionData,
+                                widgetPath,
+                                pathVariables: pathVariables || {},
+                                simulatedPath: simulatedPath,
+                                onSimulatedPathChange: onSimulatedPathChange
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -414,45 +410,43 @@ const PageWidgetFactory = ({
             data-version-id={versionId}
         >
             <div className="cms-content-isolated">
-                <div className="cms-content">
-                    <CoreWidgetComponent
-                        config={widget.config || {}}
-                        mode={mode}
-                        onConfigChange={stableConfigChangeHandler}
-                        themeId={widget.config?.themeId}
-                        widgetId={actualWidgetId}
-                        slotName={actualSlotName}
-                        widgetType={widget.type}
-                        // PageEditor-specific props
-                        layoutRenderer={layoutRenderer}
-                        versionId={versionId}
-                        isPublished={isPublished}
-                        // Context props for container widgets
-                        parentComponentId={parentComponentId}
-                        contextType={contextType}
-                        pageId={pageId}
-                        onWidgetEdit={onEdit}
-                        onOpenWidgetEditor={onOpenWidgetEditor}
-                        // Widget path for infinite nesting
-                        widgetPath={widgetPath}
-                        // Legacy nested widget context (deprecated)
-                        nestedParentWidgetId={nestedParentWidgetId}
-                        nestedParentSlotName={nestedParentSlotName}
-                        context={{
-                            widgetId: actualWidgetId,
-                            slotName: actualSlotName,
-                            contextType,
-                            pageId,
-                            versionId,
-                            webpageData,
-                            pageVersionData,
-                            widgetPath,
-                            pathVariables: pathVariables || {},
-                            simulatedPath: simulatedPath,
-                            onSimulatedPathChange: onSimulatedPathChange
-                        }}
-                    />
-                </div>
+                <CoreWidgetComponent
+                    config={widget.config || {}}
+                    mode={mode}
+                    onConfigChange={stableConfigChangeHandler}
+                    themeId={widget.config?.themeId}
+                    widgetId={actualWidgetId}
+                    slotName={actualSlotName}
+                    widgetType={widget.type}
+                    // PageEditor-specific props
+                    layoutRenderer={layoutRenderer}
+                    versionId={versionId}
+                    isPublished={isPublished}
+                    // Context props for container widgets
+                    parentComponentId={parentComponentId}
+                    contextType={contextType}
+                    pageId={pageId}
+                    onWidgetEdit={onEdit}
+                    onOpenWidgetEditor={onOpenWidgetEditor}
+                    // Widget path for infinite nesting
+                    widgetPath={widgetPath}
+                    // Legacy nested widget context (deprecated)
+                    nestedParentWidgetId={nestedParentWidgetId}
+                    nestedParentSlotName={nestedParentSlotName}
+                    context={{
+                        widgetId: actualWidgetId,
+                        slotName: actualSlotName,
+                        contextType,
+                        pageId,
+                        versionId,
+                        webpageData,
+                        pageVersionData,
+                        widgetPath,
+                        pathVariables: pathVariables || {},
+                        simulatedPath: simulatedPath,
+                        onSimulatedPathChange: onSimulatedPathChange
+                    }}
+                />
             </div>
         </div>
     )

@@ -116,7 +116,7 @@ const HeroWidget = ({ config = {}, mode = 'preview' }) => {
         }
 
         return (
-            <div className="hero-widget" style={containerStyle}>
+            <div className="hero-widget cms-content" style={containerStyle}>
                 {imageLoading && (
                     <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
                         Optimizing image...
@@ -163,7 +163,7 @@ const HeroWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     return (
-        <div className="hero-widget" style={containerStyle}>
+        <div className="hero-widget cms-content" style={containerStyle}>
             {backgroundStyle && <div style={backgroundStyle} />}
             <div style={contentStyle}>
                 {beforeText && (

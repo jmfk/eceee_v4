@@ -1,6 +1,6 @@
 {% load static %}
 
-<div class="widget-type-{{ widget_type.css_class_name }}" style="{{ hero_style }}">
+<div class="widget-type-{{ widget_type.css_class_name }} cms-content" style="{{ hero_style }}">
     {% if config.background_image_url %}
         <div class="hero-background" style="background-image: url('{{ config.background_image_url }}');"></div>
     {% endif %}
