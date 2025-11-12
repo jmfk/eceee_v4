@@ -59,18 +59,66 @@ const queryClient = new QueryClient({
 
 const ContextMenuToggle = () => {
   const [enabled, setEnabled] = useState(true)
+  const [position, setPosition] = useState({ x: window.innerWidth - 200, y: window.innerHeight - 80 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const isDevelopment = import.meta.env.DEV
 
   useEffect(() => {
-    if (window.__layoutRenderer) {
-      window.__layoutRenderer.uiConfig.enableContextMenu = enabled
+    const updateConfig = () => {
+      if (window.__layoutRenderer) {
+        window.__layoutRenderer.uiConfig.enableContextMenu = enabled
+      }
     }
+    
+    updateConfig()
+    const interval = setInterval(updateConfig, 100)
+    return () => clearInterval(interval)
   }, [enabled])
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e) => {
+      setPosition({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y
+      })
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, dragOffset])
+
+  const handleMouseDown = (e) => {
+    if (e.target.tagName === 'BUTTON') return
+    setIsDragging(true)
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    })
+  }
 
   if (!isDevelopment) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-[10020] bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-3">
+    <div
+      className="fixed z-[10020] bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-3 cursor-move select-none"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`
+      }}
+      onMouseDown={handleMouseDown}
+    >
       <span className="text-sm font-medium">Context Menu</span>
       <button
         onClick={() => setEnabled(!enabled)}
