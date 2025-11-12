@@ -379,6 +379,20 @@ div[style*="z-index"] {
   font-style: var(--blockquote-style, italic);
 }
 
+/* Theme CSS Isolation System */
+/* Prevent cms-content from being applied to nested structures accidentally */
+.cms-content-isolated {
+  /* Reset to create clean boundary - theme won't leak through */
+  all: revert;
+  display: block;
+}
+
+/* Inside isolated area, cms-content works fresh */
+.cms-content-isolated > .cms-content {
+  display: block;
+  /* Theme CSS applies normally from here */
+}
+
 .theme-content code {
   background-color: var(--code-bg, #f3f4f6);
   color: var(--code-color, #1f2937);
