@@ -1881,11 +1881,15 @@ class ContentWidgetEditorRenderer {
             await this.insertMediaAtCursor(config, this.slotDimensions)
             root.unmount()
             modalContainer.remove()
+            // Re-inject styles after React cleanup completes
+            setTimeout(() => injectMediaInsertStyles(), 100)
         }
 
         const handleClose = () => {
             root.unmount()
             modalContainer.remove()
+            // Re-inject styles after React cleanup completes
+            setTimeout(() => injectMediaInsertStyles(), 100)
         }
 
         // Wrap modal with required providers
@@ -2041,17 +2045,23 @@ class ContentWidgetEditorRenderer {
             await this.updateMediaInsert(mediaElement, updatedConfig.mediaData, updatedConfig, this.slotDimensions)
             root.unmount()
             modalContainer.remove()
+            // Re-inject styles after React cleanup completes
+            setTimeout(() => injectMediaInsertStyles(), 100)
         }
 
         const handleDelete = () => {
             this.deleteMediaInsert(mediaElement)
             root.unmount()
             modalContainer.remove()
+            // Re-inject styles after React cleanup completes
+            setTimeout(() => injectMediaInsertStyles(), 100)
         }
 
         const handleClose = () => {
             root.unmount()
             modalContainer.remove()
+            // Re-inject styles after React cleanup completes
+            setTimeout(() => injectMediaInsertStyles(), 100)
         }
 
         // Wrap modal with required providers

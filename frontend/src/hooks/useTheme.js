@@ -3,12 +3,14 @@
  * 
  * Provides theme CSS injection for content editors and widget previews.
  * Loads complete CSS from backend's ThemeCSSGenerator instead of generating client-side.
+ * Uses ThemeCSSManager for reference counting to prevent CSS removal conflicts.
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { themesApi, pagesApi } from '../api'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
+import { themeCSSManager } from '../utils/themeCSSManager'
 
 /**
  * Hook for applying themes to content areas
@@ -25,8 +27,8 @@ export const useTheme = ({
     scopeSelector = '.theme-content',
     enabled = true
 } = {}) => {
-    const injectedStyleRef = useRef(null)
     const currentThemeIdRef = useRef(null)
+    const componentIdRef = useRef(`theme-user-${Math.random().toString(36).substr(2, 9)}`)
 
     // Fetch page data to get effectiveTheme (includes inheritance)
     const { data: pageData, isLoading: fetchingPage } = useQuery({
@@ -123,91 +125,45 @@ export const useTheme = ({
         cacheTime: 30 * 60 * 1000, // 30 minutes
     })
 
-    /**
-     * Inject theme CSS into document
-     */
-    const injectThemeCSS = useCallback((css, themeId) => {
-        if (!css) {
-            return
-        }
-
-        // Create unique style element ID
-        const styleId = `theme-content-${themeId || 'default'}`
-
-        // Remove existing theme styles
-        const existingStyle = document.getElementById(styleId)
-        if (existingStyle) {
-            existingStyle.remove()
-        }
-
-        // Create and inject new style element
-        const styleElement = document.createElement('style')
-        styleElement.id = styleId
-        styleElement.setAttribute('data-theme-styles', 'true')
-        styleElement.setAttribute('data-theme-id', String(themeId || 'default'))
-        styleElement.setAttribute('data-scope', scopeSelector)
-        styleElement.textContent = css
-
-        document.head.appendChild(styleElement)
-        injectedStyleRef.current = styleElement
-
-    }, [scopeSelector])
+    // Generate component ID for reference tracking
+    const componentId = useMemo(() => componentIdRef.current, [])
 
     /**
-     * Remove theme CSS from document
-     */
-    const removeThemeCSS = useCallback(() => {
-        if (injectedStyleRef.current) {
-            injectedStyleRef.current.remove()
-            injectedStyleRef.current = null
-        }
-
-        // Also remove any orphaned theme styles
-        const orphanedStyles = document.querySelectorAll('[data-theme-styles="true"]')
-        orphanedStyles.forEach(style => {
-            const themeId = style.getAttribute('data-theme-id')
-            if (themeId && themeId !== String(currentThemeIdRef.current)) {
-                style.remove()
-            }
-        })
-    }, [])
-
-    /**
-     * Apply theme CSS when theme CSS is loaded
+     * Register/unregister theme with CSS manager when theme changes
      */
     useEffect(() => {
         if (!enabled || !theme || !themeCSS || isLoading || fetchingCSS) {
             return
         }
 
-        // Skip if same theme is already applied
-        if (currentThemeIdRef.current === theme.id) {
-            return
+        const newThemeId = theme.id
+
+        // If theme changed, unregister old theme first
+        if (currentThemeIdRef.current && currentThemeIdRef.current !== newThemeId) {
+            themeCSSManager.unregister(currentThemeIdRef.current, componentId)
         }
 
-        // Remove previous theme CSS
-        removeThemeCSS()
+        // Register new theme with CSS manager
+        themeCSSManager.register(newThemeId, themeCSS, scopeSelector, componentId)
+        currentThemeIdRef.current = newThemeId
 
-        // Inject new theme CSS
-        injectThemeCSS(themeCSS, theme.id)
-        currentThemeIdRef.current = theme.id
-
-    }, [theme, themeCSS, enabled, isLoading, fetchingCSS, injectThemeCSS, removeThemeCSS])
+        // Cleanup: unregister when component unmounts or theme changes
+        return () => {
+            if (currentThemeIdRef.current) {
+                themeCSSManager.unregister(currentThemeIdRef.current, componentId)
+            }
+        }
+    }, [theme, themeCSS, enabled, isLoading, fetchingCSS, scopeSelector, componentId])
 
     /**
-     * Cleanup on unmount or when disabled
+     * Cleanup on disable
      */
     useEffect(() => {
-        if (!enabled) {
-            removeThemeCSS()
+        if (!enabled && currentThemeIdRef.current) {
+            themeCSSManager.unregister(currentThemeIdRef.current, componentId)
             currentThemeIdRef.current = null
         }
-
-        return () => {
-            removeThemeCSS()
-            currentThemeIdRef.current = null
-        }
-    }, [enabled, removeThemeCSS])
+    }, [enabled, componentId])
 
     /**
      * Manual theme application (for dynamic theme switching)
@@ -218,19 +174,24 @@ export const useTheme = ({
 
         try {
             // Fetch complete CSS from backend
-            const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css`)
+            const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?frontend_scoped=true`)
             if (!response.ok) {
                 throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
             }
             const css = await response.text()
 
-            removeThemeCSS()
-            injectThemeCSS(css, themeData.id)
+            // Unregister old theme
+            if (currentThemeIdRef.current) {
+                themeCSSManager.unregister(currentThemeIdRef.current, componentId)
+            }
+
+            // Register new theme
+            themeCSSManager.register(themeData.id, css, scopeSelector, componentId)
             currentThemeIdRef.current = themeData.id
         } catch (error) {
-            // Silent fail - error already logged by React Query
+            console.error('Failed to apply theme:', error)
         }
-    }, [enabled, injectThemeCSS, removeThemeCSS])
+    }, [enabled, scopeSelector, componentId])
 
     /**
      * Get CSS class name for theme content areas
@@ -239,15 +200,25 @@ export const useTheme = ({
         return scopeSelector.replace('.', '')
     }, [scopeSelector])
 
+    /**
+     * Remove theme CSS (for backward compatibility)
+     */
+    const removeTheme = useCallback(() => {
+        if (currentThemeIdRef.current) {
+            themeCSSManager.unregister(currentThemeIdRef.current, componentId)
+            currentThemeIdRef.current = null
+        }
+    }, [componentId])
+
     return {
         theme,
         currentTheme: theme,  // Alias for backward compatibility
         isLoading: (isLoading || fetchingCSS) && enabled,
         error: error && enabled ? error : null,
         applyTheme,
-        removeTheme: removeThemeCSS,
+        removeTheme,
         getThemeClassName,
-        isThemeApplied: !!injectedStyleRef.current,
+        isThemeApplied: theme?.id ? themeCSSManager.isInjected(theme.id) : false,
         // Keep for backward compatibility but fetch from backend instead
         generateThemeCSS: async (themeData) => {
             if (!themeData?.id) return ''
