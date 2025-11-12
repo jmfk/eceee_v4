@@ -1,0 +1,101 @@
+{% load static %}
+{% load security_filters %}
+
+<div class="section-widget" 
+     data-section-id="{{ config.anchor|default:'' }}"
+     {% if config.accordion_mode %}data-accordion-mode="true"{% endif %}>
+    
+    {% if config.title %}
+    <div class="section-header {% if not config.enable_collapse %}non-collapsible{% endif %}" 
+         {% if config.anchor %}id="{{ config.anchor }}"{% endif %}
+         {% if config.enable_collapse %}
+         onclick="toggleSection(this)"
+         data-expanded="{{ config.start_expanded|default:true|yesno:'true,false' }}"
+         {% endif %}>
+        <span class="section-title">{{ config.title }}</span>
+        {% if config.enable_collapse %}
+        <span class="section-toggle {% if config.start_expanded %}expanded{% endif %}">▶</span>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="section-content {% if config.enable_collapse and not config.start_expanded %}collapsed{% else %}expanded{% endif %}"
+         {% if config.enable_collapse %}
+         style="max-height: {% if config.start_expanded %}5000px{% else %}0{% endif %};"
+         {% endif %}>
+        {% if config.rendered_slots.content %}
+            {% for widget in config.rendered_slots.content %}
+                <div class="widget-wrapper">
+                    {{ widget.html|sanitize_html }}
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-slot">
+                Section content
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if config.enable_collapse %}
+<script>
+(function() {
+    // Toggle section collapse/expand
+    window.toggleSection = function(headerElement) {
+        const sectionWidget = headerElement.closest('.section-widget');
+        const contentElement = sectionWidget.querySelector('.section-content');
+        const toggleIcon = headerElement.querySelector('.section-toggle');
+        const isExpanded = contentElement.classList.contains('expanded');
+        
+        // Handle accordion mode
+        if (sectionWidget.dataset.accordionMode === 'true') {
+            // Close all other sections with accordion mode
+            const allSections = document.querySelectorAll('.section-widget[data-accordion-mode="true"]');
+            allSections.forEach(section => {
+                if (section !== sectionWidget) {
+                    const otherContent = section.querySelector('.section-content');
+                    const otherToggle = section.querySelector('.section-toggle');
+                    if (otherContent && otherContent.classList.contains('expanded')) {
+                        otherContent.classList.remove('expanded');
+                        otherContent.classList.add('collapsed');
+                        otherContent.style.maxHeight = '0';
+                        if (otherToggle) {
+                            otherToggle.classList.remove('expanded');
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Toggle current section
+        if (isExpanded) {
+            // Collapse
+            contentElement.classList.remove('expanded');
+            contentElement.classList.add('collapsed');
+            contentElement.style.maxHeight = '0';
+            if (toggleIcon) {
+                toggleIcon.classList.remove('expanded');
+            }
+        } else {
+            // Expand
+            contentElement.classList.remove('collapsed');
+            contentElement.classList.add('expanded');
+            contentElement.style.maxHeight = contentElement.scrollHeight + 'px';
+            if (toggleIcon) {
+                toggleIcon.classList.add('expanded');
+            }
+        }
+    };
+    
+    // Initialize sections on load
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.section-content.expanded').forEach(function(content) {
+            if (content.closest('.section-widget').querySelector('.section-header[data-expanded]')) {
+                content.style.maxHeight = content.scrollHeight + 'px';
+            }
+        });
+    });
+})();
+</script>
+{% endif %}
+

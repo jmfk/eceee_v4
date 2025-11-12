@@ -17,6 +17,7 @@ from .sidebar import SidebarWidget
 from .forms import FormsWidget
 from .two_columns import TwoColumnsWidget
 from .three_columns import ThreeColumnsWidget
+from .section import SectionWidget
 from .path_debug import PathDebugWidget
 from .news_list import NewsListWidget
 from .news_detail import NewsDetailWidget
@@ -37,6 +38,7 @@ __all__ = [
     "FormsWidget",
     "TwoColumnsWidget",
     "ThreeColumnsWidget",
+    "SectionWidget",
     "PathDebugWidget",
     "NewsListWidget",
     "NewsDetailWidget",
