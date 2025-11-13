@@ -56,6 +56,30 @@ navbar = {
     },
 }
 
+hero = {
+    "name": "hero",
+    "title": "Hero",
+    "description": "The Hero space",
+    "max_widgets": 1,
+    "css_classes": "hero",
+    "allows_inheritance": True,
+    "allow_merge": False,
+    "collapse_behavior": "any",  # Collapse if any inherited widgets present
+    "default_widgets": [
+        {
+            "type": "hero",
+            "config": {},
+        },
+    ],
+    "inheritable_types": ["easy_widgets.HeroWidget"],
+    "allowed_types": ["easy_widgets.HeroWidget"],
+    "dimensions": {
+        "mobile": {"width": 640, "height": 28},
+        "tablet": {"width": 1024, "height": 28},
+        "desktop": {"width": 1280, "height": 28},
+    },
+}
+
 footer = {
     "name": "footer",
     "title": "Footer",

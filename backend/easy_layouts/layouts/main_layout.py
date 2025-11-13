@@ -2,7 +2,7 @@
 Main Layout implementation.
 """
 
-from easy_layouts.layouts.shared_slots import header, navbar, footer
+from easy_layouts.layouts.shared_slots import header, navbar, footer, hero
 from webpages.layout_registry import BaseLayout, register_layout
 
 
@@ -23,6 +23,7 @@ class MainLayoutLayout(BaseLayout):
             "slots": [
                 header,
                 navbar,
+                hero,
                 {
                     "name": "main",
                     "title": "Main Content",

@@ -62,6 +62,27 @@ export const MainLayout = ({
                     inheritedWidgets={inheritedWidgets}
                     slotInheritanceRules={slotInheritanceRules}
                 />
+                <div>
+                    <WidgetSlot
+                        name="hero"
+                        label="Hero slot"
+                        description="Place for placing the hero"
+                        widgets={widgets}
+                        onWidgetAction={onWidgetAction}
+                        editable={editable}
+                        pageContext={pageContext}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
+                        onImportContent={onImportContent}
+                        behavior={{
+                            maxWidgets: 1,
+                            required: false
+                        }}
+                        // Forward inheritance props
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
+                    />
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 bg-gray-50" style={{ gridTemplateRows: 'minmax(300px, auto)', gap: '30px' }}>
                     <main className="p-0 m-0 lg:col-span-2">
