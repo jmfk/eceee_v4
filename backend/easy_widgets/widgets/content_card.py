@@ -328,29 +328,35 @@ class ContentCardWidget(BaseWidget):
             theme: PageTheme instance
 
         Returns:
-            Tuple of (html, css) or None for default rendering
+            Tuple of (html, css) - always renders using template
         """
         from webpages.utils.mustache_renderer import (
             render_mustache,
             prepare_component_context,
         )
+        from django.template.loader import get_template
 
         style_name = config.get("component_style", "default")
-        if not style_name or style_name == "default":
-            return None
-
         styles = theme.component_styles or {}
         style = styles.get(style_name)
-        if not style:
-            return None
 
-        template = style.get("template", "")
+        # For default or missing style, render using Django template
+        if not style or style_name == "default":
+            prepared_config = self.prepare_template_context(config, {"theme": theme})
+            template = get_template(self.template_name)
+            html = template.render({"config": prepared_config})
+            return html, ""
+
+        template_str = style.get("template", "")
         css = style.get("css", "")
 
         # Check for passthru marker (must be only content in template after trimming)
-        if template.strip() == "{{passthru}}":
+        if template_str.strip() == "{{passthru}}":
             # Passthru mode: use default rendering but inject CSS
-            return None, css
+            prepared_config = self.prepare_template_context(config, {"theme": theme})
+            template = get_template(self.template_name)
+            html = template.render({"config": prepared_config})
+            return html, css
 
         # Prepare context with all widget data
         context = prepare_component_context(
@@ -374,7 +380,7 @@ class ContentCardWidget(BaseWidget):
         context["image4"] = config.get("image4") or config.get("image_4")
 
         # Render template
-        html = render_mustache(template, context)
+        html = render_mustache(template_str, context)
         return html, css
 
     def prepare_template_context(self, config, context=None):

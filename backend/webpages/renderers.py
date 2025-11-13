@@ -337,12 +337,6 @@ class WebPageRenderer:
                 # Use tree to get merged widgets for display (much simpler!)
                 merged_widgets = helpers.get_merged_widgets(slot_name)
 
-                # DEBUG: Log widgets before rendering
-                if merged_widgets:
-                    logger.info(f"[RENDER] Slot '{slot_name}' - rendering {len(merged_widgets)} widgets in order:")
-                    for idx, w in enumerate(merged_widgets):
-                        logger.info(f"  [{idx}] order={w.order}, type={w.type}, depth={w.depth}")
-
                 # Render each widget
                 rendered_widgets = []
                 for widget in merged_widgets:

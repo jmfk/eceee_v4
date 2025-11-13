@@ -226,10 +226,6 @@ class NavigationWidget(BaseWidget):
                 elif isinstance(widget_inherited_from, WebPage):
                     # It's already a WebPage object
                     owner_page_obj = widget_inherited_from
-
-                logger.info(
-                    f"[NAV] Inherited widget using owner page: {owner_page_obj.title}"
-                )
             except Exception as e:
                 # Fallback to current page if owner not found
                 logger.error(f"[NAV] Error fetching owner page: {e}")
@@ -321,10 +317,6 @@ class NavigationWidget(BaseWidget):
                                 "targetBlank": False,
                             }
                         )
-
-                    logger.info(
-                        f"[NAV] Generated pageSubmenu: {len(dynamic_menu_items)} items from {page_for_submenu.title}"
-                    )
                 except Exception as e:
                     # Silently fail if children can't be loaded
                     logger.error(f"[NAV] Error generating pageSubmenu: {e}")

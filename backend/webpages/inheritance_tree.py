@@ -167,17 +167,6 @@ class InheritanceTreeBuilder:
         # Get raw widgets for this slot
         raw_widgets = current_version.widgets.get(slot_name, [])
 
-        # DEBUG: Log raw widget order
-        import logging
-
-        logger = logging.getLogger(__name__)
-        if raw_widgets and depth == 0:
-            logger.info(f"[WIDGET ORDER] Slot '{slot_name}' raw order (depth={depth}):")
-            for idx, w in enumerate(raw_widgets):
-                logger.info(
-                    f"  [{idx}] type={w.get('type', 'NO_TYPE')}, sort_order={w.get('sort_order', 'MISSING')}, order={w.get('order', 'MISSING')}"
-                )
-
         # Process widgets in array order - array index IS the sort order
         for index, widget_data in enumerate(raw_widgets):
             # Apply filters
@@ -188,14 +177,6 @@ class InheritanceTreeBuilder:
             # Use current widget count as order to preserve array sequence after filtering
             tree_widget = self._create_tree_widget(widget_data, depth, len(widgets))
             widgets.append(tree_widget)
-
-        # DEBUG: Log final widget order
-        if widgets and depth == 0:
-            logger.info(
-                f"[WIDGET ORDER] Slot '{slot_name}' final order after filtering (depth={depth}):"
-            )
-            for w in widgets:
-                logger.info(f"  order={w.order}, type={w.type}, depth={w.depth}")
 
         # No sorting needed - widgets are already in correct array order
         return widgets
