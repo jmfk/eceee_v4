@@ -141,44 +141,46 @@ class ThreeColumnsWidget(BaseWidget):
     def render_with_style(self, config, theme):
         """
         Render three-column widget with custom component style from theme.
-        
+
         Args:
             config: Widget configuration
             theme: PageTheme instance
-            
+
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
         from django.template.loader import render_to_string
-        
+
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
             return None
-        
+
         styles = theme.component_styles or {}
         style = styles.get(style_name)
         if not style:
             return None
-        
+
         # Prepare template context first
         prepared_config = self.prepare_template_context(config, {"theme": theme})
-        
+
         # Render the widget HTML using the default template first
-        widget_html = render_to_string(
-            self.template_name,
-            {"config": prepared_config}
-        )
-        
+        widget_html = render_to_string(self.template_name, {"config": prepared_config})
+
         # Prepare context with rendered widget as content
         context = prepare_component_context(
             content=widget_html,
             anchor="",
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
-            slots=prepared_config.get("rendered_slots"),  # Pass slot data for custom rendering
+            slots=prepared_config.get(
+                "rendered_slots"
+            ),  # Pass slot data for custom rendering
         )
-        
+
         # Render with style template
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")
@@ -196,8 +198,15 @@ class ThreeColumnsWidget(BaseWidget):
         if context and "renderer" in context:
             for slot_name, widgets in slots_data.items():
                 rendered_widgets = []
-                for widget_data in widgets:
+                for index, widget_data in enumerate(widgets):
                     try:
+                        # Add sort_order if missing (use array index to preserve order)
+                        if (
+                            "sort_order" not in widget_data
+                            and "order" not in widget_data
+                        ):
+                            widget_data = {**widget_data, "sort_order": index}
+
                         widget_html = context["renderer"].render_widget_json(
                             widget_data, context
                         )

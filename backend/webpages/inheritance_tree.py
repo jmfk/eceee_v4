@@ -167,18 +167,37 @@ class InheritanceTreeBuilder:
         # Get raw widgets for this slot
         raw_widgets = current_version.widgets.get(slot_name, [])
 
-        for widget_data in raw_widgets:
+        # DEBUG: Log raw widget order
+        import logging
+
+        logger = logging.getLogger(__name__)
+        if raw_widgets and depth == 0:
+            logger.info(f"[WIDGET ORDER] Slot '{slot_name}' raw order (depth={depth}):")
+            for idx, w in enumerate(raw_widgets):
+                logger.info(
+                    f"  [{idx}] type={w.get('type', 'NO_TYPE')}, sort_order={w.get('sort_order', 'MISSING')}, order={w.get('order', 'MISSING')}"
+                )
+
+        # Process widgets in array order - array index IS the sort order
+        for index, widget_data in enumerate(raw_widgets):
             # Apply filters
             if not self._should_include_widget(widget_data, depth):
                 continue
 
             # Convert to TreeWidget
-            tree_widget = self._create_tree_widget(widget_data, depth)
+            # Use current widget count as order to preserve array sequence after filtering
+            tree_widget = self._create_tree_widget(widget_data, depth, len(widgets))
             widgets.append(tree_widget)
 
-        # Sort by order
-        widgets.sort(key=lambda w: w.order)
+        # DEBUG: Log final widget order
+        if widgets and depth == 0:
+            logger.info(
+                f"[WIDGET ORDER] Slot '{slot_name}' final order after filtering (depth={depth}):"
+            )
+            for w in widgets:
+                logger.info(f"  order={w.order}, type={w.type}, depth={w.depth}")
 
+        # No sorting needed - widgets are already in correct array order
         return widgets
 
     def _should_include_widget(self, widget_data: Dict, current_depth: int) -> bool:
@@ -238,7 +257,9 @@ class InheritanceTreeBuilder:
 
         return True
 
-    def _create_tree_widget(self, widget_data: Dict, depth: int) -> TreeWidget:
+    def _create_tree_widget(
+        self, widget_data: Dict, depth: int, index: int = 0
+    ) -> TreeWidget:
         """Convert raw widget data to TreeWidget with computed fields"""
 
         # Get inheritance behavior (with backward compatibility)
@@ -266,7 +287,9 @@ class InheritanceTreeBuilder:
             id=widget_data.get("id", ""),
             type=widget_data.get("type", ""),
             config=widget_data.get("config", {}),
-            order=widget_data.get("order", 0),
+            # ALWAYS use array index as order - ignore any stored order/sort_order
+            # Array position IS the definitive sort order
+            order=index,
             # Inheritance metadata
             depth=depth,
             inheritance_behavior=WidgetInheritanceBehavior(inheritance_behavior),

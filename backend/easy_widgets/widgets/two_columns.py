@@ -167,8 +167,12 @@ class TwoColumnsWidget(BaseWidget):
         if context and "renderer" in context:
             for slot_name, widgets in slots_data.items():
                 rendered_widgets = []
-                for widget_data in widgets:
+                for index, widget_data in enumerate(widgets):
                     try:
+                        # Add sort_order if missing (use array index to preserve order)
+                        if "sort_order" not in widget_data and "order" not in widget_data:
+                            widget_data = {**widget_data, "sort_order": index}
+                        
                         widget_html = context["renderer"].render_widget_json(
                             widget_data, context
                         )

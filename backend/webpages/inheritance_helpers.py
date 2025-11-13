@@ -193,17 +193,33 @@ class InheritanceTreeHelpers:
         # Apply inheritance behavior logic
         if override_widgets:
             # Override widgets replace ALL other widgets
-            return sorted(override_widgets, key=lambda w: (w.depth, w.order))
+            result = sorted(override_widgets, key=lambda w: (w.depth, w.order))
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"[MERGE] Override widgets in slot '{slot_name}' (sorted by depth, order):")
+            for w in result:
+                logger.info(f"  depth={w.depth}, order={w.order}, type={w.type}")
+            return result
 
         # Combine: before + inherited (after) widgets
         # Note: "inherited" widgets are those with INSERT_AFTER_PARENT behavior
         result = []
 
         # Add before widgets (sorted by depth, then order)
-        result.extend(sorted(before_widgets, key=lambda w: (w.depth, w.order)))
+        before_sorted = sorted(before_widgets, key=lambda w: (w.depth, w.order))
+        result.extend(before_sorted)
 
         # Add after widgets (sorted by depth, then order)
-        result.extend(sorted(after_widgets, key=lambda w: (w.depth, w.order)))
+        after_sorted = sorted(after_widgets, key=lambda w: (w.depth, w.order))
+        result.extend(after_sorted)
+
+        # DEBUG: Log merged result
+        import logging
+        logger = logging.getLogger(__name__)
+        if result:
+            logger.info(f"[MERGE] Final merged widgets for slot '{slot_name}':")
+            for w in result:
+                logger.info(f"  depth={w.depth}, order={w.order}, type={w.type}, behavior={w.inheritance_behavior.value}")
 
         return result
 
