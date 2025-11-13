@@ -1779,8 +1779,12 @@ export class TableEditorCore {
      * Handle context menu
      */
     handleContextMenu(e) {
-        // Check if context menu is enabled via LayoutRenderer
-        if (window.__layoutRenderer && !window.__layoutRenderer.uiConfig.enableContextMenu) {
+        // Check global context menu config first, then LayoutRenderer
+        const globalEnabled = window.__contextMenuConfig?.enabled ?? true
+        const layoutEnabled = window.__layoutRenderer?.uiConfig?.enableContextMenu ?? true
+        const enabled = globalEnabled && layoutEnabled
+        
+        if (!enabled) {
             return
         }
 

@@ -57,23 +57,41 @@ const queryClient = new QueryClient({
   },
 })
 
+// Initialize global context menu config
+if (typeof window !== 'undefined' && !window.__contextMenuConfig) {
+  window.__contextMenuConfig = { enabled: true }
+}
+
 const ContextMenuToggle = () => {
-  const [enabled, setEnabled] = useState(true)
-  const [position, setPosition] = useState({ x: window.innerWidth - 200, y: window.innerHeight - 80 })
+  const [enabled, setEnabled] = useState(() => window.__contextMenuConfig?.enabled ?? true)
+  const [visible, setVisible] = useState(false)
+  const [position, setPosition] = useState({ x: window.innerWidth / 2 - 75, y: window.innerHeight - 60 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const isDevelopment = import.meta.env.DEV
 
   useEffect(() => {
-    const updateConfig = () => {
-      if (window.__layoutRenderer) {
-        window.__layoutRenderer.uiConfig.enableContextMenu = enabled
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault()
+        setVisible(prev => !prev)
       }
     }
-    
-    updateConfig()
-    const interval = setInterval(updateConfig, 100)
-    return () => clearInterval(interval)
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    // Update global config
+    if (window.__contextMenuConfig) {
+      window.__contextMenuConfig.enabled = enabled
+    }
+
+    // Also update LayoutRenderer if it exists
+    if (window.__layoutRenderer) {
+      window.__layoutRenderer.uiConfig.enableContextMenu = enabled
+    }
   }, [enabled])
 
   useEffect(() => {
@@ -108,7 +126,7 @@ const ContextMenuToggle = () => {
     })
   }
 
-  if (!isDevelopment) return null
+  if (!isDevelopment || !visible) return null
 
   return (
     <div
@@ -122,14 +140,12 @@ const ContextMenuToggle = () => {
       <span className="text-sm font-medium">Context Menu</span>
       <button
         onClick={() => setEnabled(!enabled)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-          enabled ? 'bg-green-600' : 'bg-gray-600'
-        }`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-green-600' : 'bg-gray-600'
+          }`}
       >
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-            enabled ? 'translate-x-6' : 'translate-x-1'
-          }`}
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
         />
       </button>
     </div>
@@ -314,32 +330,32 @@ const AppRoutes = () => {
             </div>
           </PrivateRoute>
         } />
-                  <Route path="/settings/themes/:themeId/image-styles/:styleKey" element={
-                    <PrivateRoute>
-                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                        <Navbar />
-                        <main className="flex-1 overflow-hidden">
-                          <div className="h-full overflow-y-auto">
-                            <ImageStyleEditPage />
-                          </div>
-                        </main>
-                        <StatusBar customStatusContent={<span>Edit Image Style</span>} />
-                      </div>
-                    </PrivateRoute>
-                  } />
-                  <Route path="/settings/themes/:themeId/component-styles/:styleKey" element={
-                    <PrivateRoute>
-                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                        <Navbar />
-                        <main className="flex-1 overflow-hidden">
-                          <div className="h-full overflow-y-auto">
-                            <ComponentStyleEditPage />
-                          </div>
-                        </main>
-                        <StatusBar customStatusContent={<span>Edit Component Style</span>} />
-                      </div>
-                    </PrivateRoute>
-                  } />
+        <Route path="/settings/themes/:themeId/image-styles/:styleKey" element={
+          <PrivateRoute>
+            <div className="fixed inset-0 bg-gray-50 flex flex-col">
+              <Navbar />
+              <main className="flex-1 overflow-hidden">
+                <div className="h-full overflow-y-auto">
+                  <ImageStyleEditPage />
+                </div>
+              </main>
+              <StatusBar customStatusContent={<span>Edit Image Style</span>} />
+            </div>
+          </PrivateRoute>
+        } />
+        <Route path="/settings/themes/:themeId/component-styles/:styleKey" element={
+          <PrivateRoute>
+            <div className="fixed inset-0 bg-gray-50 flex flex-col">
+              <Navbar />
+              <main className="flex-1 overflow-hidden">
+                <div className="h-full overflow-y-auto">
+                  <ComponentStyleEditPage />
+                </div>
+              </main>
+              <StatusBar customStatusContent={<span>Edit Component Style</span>} />
+            </div>
+          </PrivateRoute>
+        } />
         <Route path="/settings/widgets" element={
           <PrivateRoute>
             <div className="fixed inset-0 bg-gray-50 flex flex-col">

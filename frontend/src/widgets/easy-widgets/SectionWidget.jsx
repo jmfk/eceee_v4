@@ -86,6 +86,31 @@ const SectionWidget = ({
         }
     }, [config.title, config.anchor, mode, onWidgetEdit]);
 
+    // Handle inline editing of title
+    const handleTitleClick = useCallback((e) => {
+        e.stopPropagation();
+        const newTitle = prompt('Enter section title:', config.title || '');
+        if (newTitle !== null && onWidgetEdit) {
+            onWidgetEdit({
+                ...config,
+                title: newTitle,
+                anchor: newTitle ? slugify(newTitle) : config.anchor
+            });
+        }
+    }, [config, onWidgetEdit]);
+
+    // Handle inline editing of anchor
+    const handleAnchorClick = useCallback((e) => {
+        e.stopPropagation();
+        const newAnchor = prompt('Enter section anchor/slug:', config.anchor || '');
+        if (newAnchor !== null && onWidgetEdit) {
+            onWidgetEdit({
+                ...config,
+                anchor: newAnchor ? slugify(newAnchor) : newAnchor
+            });
+        }
+    }, [config, onWidgetEdit]);
+
     // Subscribe to external UDC changes for this specific widget
     useExternalChanges(componentId, (state) => {
         // When UDC state changes, look for updates to our widget's config
@@ -254,61 +279,54 @@ const SectionWidget = ({
         );
     }
 
-    // In editor mode, show SlotEditor component with editable widgets
+    // Build custom slot label with editable title and anchor - render as string or component
+    let slotLabelText = 'Section';
+    if (config.title && config.anchor) {
+        slotLabelText = `Section • ${config.title} • #${config.anchor}`;
+    } else if (config.title) {
+        slotLabelText = `Section • ${config.title}`;
+    } else if (config.anchor) {
+        slotLabelText = `Section • #${config.anchor}`;
+    }
+
+    // In editor mode, show SlotEditor with custom header
     if (mode === 'editor') {
+        const widgets = slotsData.content || [];
+
         return (
-            <div className="section-widget border border-gray-200 rounded-lg mb-4">
-                {config.title && (
-                    <div className={`section-header p-4 bg-gray-50 border-b border-gray-200 ${config.enableCollapse ? 'cursor-pointer' : ''}`}
-                         onClick={toggleSection}
-                         id={config.anchor}>
-                        <div className="flex justify-between items-center">
-                            <span className="font-semibold text-lg">{config.title}</span>
-                            {config.enableCollapse && (
-                                <span className={`section-toggle transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
-                                    ▶
-                                </span>
-                            )}
-                        </div>
-                        {config.anchor && (
-                            <div className="text-xs text-gray-500 mt-1">Anchor: #{config.anchor}</div>
-                        )}
-                    </div>
-                )}
-                <div className={`section-content p-4 ${config.enableCollapse && !isExpanded ? 'hidden' : ''}`}>
-                    <SlotEditor
-                        slotName="content"
-                        slotLabel="Section Content"
-                        widgets={slotsData.content || []}
-                        availableWidgetTypes={filteredWidgetTypes}
-                        parentWidgetId={widgetId}
-                        contextType={contextType}
-                        onWidgetEdit={onWidgetEdit}
-                        onOpenWidgetEditor={onOpenWidgetEditor}
-                        onSlotChange={handleSlotChange}
-                        parentComponentId={parentComponentId}
-                        parentSlotName={slotName}
-                        widgetPath={widgetPath}
-                        emptyMessage="No content in section"
-                        className=""
-                        mode="editor"
-                        showClearButton={false}
-                        compactAddButton={true}
-                    />
-                </div>
+            <div className={`section-widget border border-gray-200 mb-4 ${config.enableCollapse && !isExpanded ? 'collapsed' : ''}`}>
+                <SlotEditor
+                    slotName="content"
+                    slotLabel={slotLabelText}
+                    widgets={widgets}
+                    availableWidgetTypes={filteredWidgetTypes}
+                    parentWidgetId={widgetId}
+                    contextType={contextType}
+                    onWidgetEdit={onWidgetEdit}
+                    onOpenWidgetEditor={onOpenWidgetEditor}
+                    onSlotChange={handleSlotChange}
+                    parentComponentId={parentComponentId}
+                    parentSlotName={slotName}
+                    widgetPath={widgetPath}
+                    emptyMessage="No content in section"
+                    className="[&_.slot-editor]:!p-0"
+                    mode="editor"
+                    showClearButton={false}
+                    compactAddButton={true}
+                />
             </div>
         );
     }
 
     // In display mode, render the widgets in the content slot
     return (
-        <div className="section-widget mb-6" 
-             data-section-id={config.anchor || ''}
-             data-accordion-mode={config.accordionMode ? 'true' : 'false'}>
+        <div className="section-widget mb-6"
+            data-section-id={config.anchor || ''}
+            data-accordion-mode={config.accordionMode ? 'true' : 'false'}>
             {config.title && (
                 <div className={`section-header ${config.enableCollapse ? 'cursor-pointer' : ''}`}
-                     onClick={toggleSection}
-                     id={config.anchor}>
+                    onClick={toggleSection}
+                    id={config.anchor}>
                     <div className="flex justify-between items-center">
                         <span className="font-semibold text-xl">{config.title}</span>
                         {config.enableCollapse && (

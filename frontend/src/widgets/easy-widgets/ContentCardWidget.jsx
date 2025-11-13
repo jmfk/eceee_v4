@@ -57,12 +57,12 @@ const ContentCardWidget = ({
 
     if (useCustomStyle) {
         const style = currentTheme.componentStyles[componentStyle]
-        
+
         if (style) {
             try {
                 // Check for passthru mode
                 const isPassthru = style.template?.trim() === '{{passthru}}'
-                
+
                 if (!isPassthru) {
                     // Prepare context for Mustache rendering
                     const mustacheContext = prepareComponentContext(
@@ -71,7 +71,7 @@ const ContentCardWidget = ({
                         style.variables || {},
                         localConfig
                     )
-                    
+
                     // Add content card specific context
                     mustacheContext.header = localConfig.header || ''
                     mustacheContext.textPosition = textPosition
@@ -86,24 +86,23 @@ const ContentCardWidget = ({
 
                     // Use ComponentStyleRenderer for consistent scoped rendering
                     const styleId = `content-card-${widgetId || 'preview'}-${componentStyle}`
-                    
+
                     return (
                         <ComponentStyleRenderer
                             template={style.template}
                             context={mustacheContext}
                             css={style.css}
                             styleId={styleId}
-                            className={mode === 'editor' ? 'p-4' : ''}
+                            className=""
                         />
                     )
                 }
-                
+
                 // Passthru mode: render default with custom CSS
                 const styleId = `content-card-${widgetId || 'preview'}-${componentStyle}`
-                const wrapperClass = mode === 'editor' ? 'p-4' : ''
-                
+
                 return (
-                    <div className={wrapperClass} data-style-id={styleId}>
+                    <div data-style-id={styleId}>
                         {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
                         {renderDefaultCard()}
                     </div>
@@ -111,7 +110,7 @@ const ContentCardWidget = ({
             } catch (error) {
                 console.error('Error rendering custom component style:', error)
                 return (
-                    <div className={mode === 'editor' ? 'p-4' : ''}>
+                    <div>
                         <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
                     </div>
                 )
@@ -128,8 +127,8 @@ const ContentCardWidget = ({
         ].join(' ')
 
         return (
-            <div 
-                className="content-card-widget" 
+            <div
+                className="content-card-widget"
                 id={localConfig.anchor || undefined}
             >
                 {localConfig.header && (
@@ -142,7 +141,7 @@ const ContentCardWidget = ({
                         ))}
                     </div>
                 )}
-                
+
                 <div className={bodyClasses}>
                     {imageCount === 4 ? (
                         // 4 images layout - no text
@@ -158,7 +157,7 @@ const ContentCardWidget = ({
                             <div className="content-card-text">
                                 <div dangerouslySetInnerHTML={{ __html: localConfig.content || '' }} />
                             </div>
-                            
+
                             <div className={`content-card-images layout-${imageCount}`}>
                                 {image1 && <img src={image1} alt="" />}
                                 {image2 && imageCount >= 2 && <img src={image2} alt="" />}
@@ -172,12 +171,12 @@ const ContentCardWidget = ({
 
     // Default rendering (no custom style)
     const hasImages = image1 || image2 || image3 || image4
-    
+
     if (mode === 'editor') {
         return (
-            <div className="content-card-widget-editor p-4">
+            <div className="content-card-widget-editor">
                 {!hasImages && (
-                    <div className="bg-gray-200 h-48 rounded flex items-center justify-center text-gray-500 mb-4">
+                    <div className="bg-gray-200 h-48 flex items-center justify-center text-gray-500 mb-4">
                         <FileText className="h-8 w-8 mr-2" />
                         Content Card placeholder - Add images to get started
                     </div>
@@ -191,7 +190,7 @@ const ContentCardWidget = ({
     if (!hasImages) {
         return (
             <div className="content-card-widget">
-                <div className="bg-gray-200 h-48 rounded flex items-center justify-center text-gray-500">
+                <div className="bg-gray-200 h-48 flex items-center justify-center text-gray-500">
                     <FileText className="h-8 w-8 mr-2" />
                     No media
                 </div>

@@ -196,49 +196,53 @@ const SelfContainedSlotEditor = ({
 
     return (
         <div className="slot-editor p-4 relative">
-            <div className="slot-header flex justify-between items-center mb-3">
-                <div className="slot-info">
-                    <h4 className="font-medium text-gray-800">{slotLabel}</h4>
-                    {maxWidgets && (
-                        <span className="text-xs text-gray-500">
-                            {widgets.length}/{maxWidgets} widgets
-                        </span>
-                    )}
-                </div>
-                <div className="slot-actions flex items-center space-x-2">
-                    {showAddButton && canAddWidget() && (
-                        <button
-                            className={compactAddButton
-                                ? "add-widget-btn bg-gray-200 hover:bg-gray-300 text-gray-700 p-1.5 rounded transition-colors flex items-center justify-center"
-                                : "add-widget-btn bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
-                            }
-                            onClick={handleShowWidgetModal}
-                            title="Add Widget"
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                            </svg>
-                            {!compactAddButton && <span>Add Widget</span>}
-                        </button>
-                    )}
-                    {showClearButton && widgets.length > 0 && (
-                        <button
-                            className="clear-slot-btn bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
-                            onClick={handleClearSlot}
-                            title="Clear Slot"
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                            <span>Clear Slot</span>
-                        </button>
-                    )}
+            <div className="slot-header border px-4 py-2 border-gray-200">
+                <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                        <div className="flex items-center">
+                            <h4 className="text-sm font-medium text-gray-900">{slotLabel}</h4>
+                            {maxWidgets && (
+                                <span className="ml-2 text-xs text-gray-500">
+                                    {widgets.length}/{maxWidgets}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        {showAddButton && canAddWidget() && (
+                            <button
+                                className={compactAddButton
+                                    ? "add-widget-btn bg-green-600 hover:bg-green-700 text-white p-1.5 rounded transition-colors flex items-center justify-center"
+                                    : "add-widget-btn bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
+                                }
+                                onClick={handleShowWidgetModal}
+                                title="Add Widget"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                {!compactAddButton && <span>Add Widget</span>}
+                            </button>
+                        )}
+                        {showClearButton && widgets.length > 0 && (
+                            <button
+                                className="clear-slot-btn bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
+                                onClick={handleClearSlot}
+                                title="Clear Slot"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                <span>Clear Slot</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            <div className="widgets-list space-y-2">
+            <div className="widgets-list">
                 {widgets.length === 0 ? (
-                    <div className="empty-slot text-center py-6 text-gray-500 border-2 border-dashed border-gray-300 rounded">
+                    <div className="empty-slot text-center py-6 text-gray-500 border-2 border-dashed border-gray-300">
                         <p className="mb-2">{defaultEmptyMessage}</p>
                         {showAddButton && canAddWidget() && (
                             <button
@@ -253,31 +257,33 @@ const SelfContainedSlotEditor = ({
                     widgets.map((widget, index) => {
                         // Build full path for this nested widget: append widget ID to slot path
                         const fullWidgetPath = [...slotPath, widget.id];
+                        const isLast = index === widgets.length - 1;
 
                         return (
-                            <PageWidgetFactory
-                                key={widget.id}
-                                widget={widget}
-                                slotName={slotName}
-                                index={index}
-                                onEdit={handleEditWidget}
-                                onDelete={() => handleRemoveWidget(index)}
-                                onMoveUp={() => handleMoveWidget(index, index - 1)}
-                                onMoveDown={() => handleMoveWidget(index, index + 1)}
-                                canMoveUp={index > 0}
-                                canMoveDown={index < widgets.length - 1}
-                                mode={mode}
-                                showControls={mode === 'editor'}
-                                widgetId={widget.id}
-                                contextType={contextType}
-                                // Pass parent context for nested widgets
-                                parentComponentId={parentComponentId}
-                                // Widget path for infinite nesting
-                                widgetPath={fullWidgetPath}
-                                // Legacy nested widget props (deprecated)
-                                nestedParentWidgetId={parentWidgetId}
-                                nestedParentSlotName={parentSlotName}
-                            />
+                            <div key={widget.id} className={isLast ? '' : 'mb-8'}>
+                                <PageWidgetFactory
+                                    widget={widget}
+                                    slotName={slotName}
+                                    index={index}
+                                    onEdit={handleEditWidget}
+                                    onDelete={() => handleRemoveWidget(index)}
+                                    onMoveUp={() => handleMoveWidget(index, index - 1)}
+                                    onMoveDown={() => handleMoveWidget(index, index + 1)}
+                                    canMoveUp={index > 0}
+                                    canMoveDown={index < widgets.length - 1}
+                                    mode={mode}
+                                    showControls={mode === 'editor'}
+                                    widgetId={widget.id}
+                                    contextType={contextType}
+                                    // Pass parent context for nested widgets
+                                    parentComponentId={parentComponentId}
+                                    // Widget path for infinite nesting
+                                    widgetPath={fullWidgetPath}
+                                    // Legacy nested widget props (deprecated)
+                                    nestedParentWidgetId={parentWidgetId}
+                                    nestedParentSlotName={parentSlotName}
+                                />
+                            </div>
                         );
                     })
                 )}

@@ -2,6 +2,12 @@
 
 /* Custom CSS for AI-integrated development environment */
 @layer base {
+  /* Remove rounded corners from widgets in editor */
+  .widget-item,
+  .page-editor-widget,
+  .widget-content {
+    border-radius: 0 !important;
+  }
   :root {
     /* Primary colors */
     --color-primary-50: #eff6ff;

@@ -568,6 +568,9 @@ class ContentWidgetEditorRenderer {
 
         // Media insert state
         this.mediaInsertModal = null
+
+        // Bind context menu handler
+        this.handleContextMenu = this.handleContextMenu.bind(this)
         this.mediaEditModal = null
         this.draggedElement = null
         this.dropIndicator = null
@@ -1327,8 +1330,19 @@ class ContentWidgetEditorRenderer {
      * Handle context menu
      */
     handleContextMenu(e) {
-        // Check if context menu is enabled via LayoutRenderer
-        if (window.__layoutRenderer && !window.__layoutRenderer.uiConfig.enableContextMenu) {
+        // Check global context menu config first, then LayoutRenderer
+        const globalEnabled = window.__contextMenuConfig?.enabled ?? true
+        const layoutEnabled = window.__layoutRenderer?.uiConfig?.enableContextMenu ?? true
+        const enabled = globalEnabled && layoutEnabled
+
+        console.log('ContentWidget context menu check:', {
+            globalEnabled,
+            layoutEnabled,
+            finalEnabled: enabled
+        })
+
+        if (!enabled) {
+            console.log('Context menu blocked by config')
             return
         }
 

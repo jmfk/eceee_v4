@@ -97,6 +97,7 @@ class LayoutRenderer {
     // Expose instance globally for console access
     if (typeof window !== 'undefined') {
       window.__layoutRenderer = this;
+      console.log('LayoutRenderer: Exposed to window.__layoutRenderer', this.uiConfig);
     }
   }
 
