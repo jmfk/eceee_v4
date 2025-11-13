@@ -255,6 +255,7 @@ class WebPageRenderer:
             "theme_css_url": theme_css_url,
             "parent": page.parent,
             "request": self.request,
+            "renderer": self,  # Allow widgets with slots to recursively render nested widgets
         }
 
         # Add effective layout slots

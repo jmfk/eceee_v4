@@ -52,7 +52,16 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
             const anchor = widget.config?.anchor
             return anchor && typeof anchor === 'string' && anchor.trim() !== ''
         })
-        localMenu = slotWidgets.map((child) => { return { id: `section-${child.config.anchor}`, label: child.config.anchor, url: child.config.anchor } })
+        localMenu = slotWidgets.map((child) => {
+            // Use anchor_title if available, fallback to title, then anchor
+            const label = child.config.anchorTitle || child.config.anchor_title || 
+                         child.config.title || child.config.header || child.config.anchor
+            return { 
+                id: `section-${child.config.anchor}`, 
+                label: label, 
+                url: `#${child.config.anchor}` 
+            }
+        })
     }
     if (children && children.length > 0 && menus.activeGroup === "pageSubmenu") {
         localMenu = children.map((child) => { return { id: `submenu-${child.page.id}`, label: child.page.title, url: child.page.path } })

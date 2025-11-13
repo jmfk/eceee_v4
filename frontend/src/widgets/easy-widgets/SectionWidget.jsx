@@ -279,15 +279,41 @@ const SectionWidget = ({
         );
     }
 
-    // Build custom slot label with editable title and anchor - render as string or component
-    let slotLabelText = 'Section';
-    if (config.title && config.anchor) {
-        slotLabelText = `Section • ${config.title} • #${config.anchor}`;
-    } else if (config.title) {
-        slotLabelText = `Section • ${config.title}`;
-    } else if (config.anchor) {
-        slotLabelText = `Section • #${config.anchor}`;
-    }
+    // Build custom slot label with editable title and anchor - render as JSX element
+    const slotLabel = (
+        <div className="flex items-center space-x-2">
+            <span>Section</span>
+            {config.title && (
+                <>
+                    <span className="text-gray-400">•</span>
+                    <span>{config.title}</span>
+                </>
+            )}
+            {config.anchor && (
+                <>
+                    <span className="text-gray-400">•</span>
+                    <span className="font-mono">#{config.anchor}</span>
+                </>
+            )}
+            {config.enableCollapse && (
+                <>
+                    <span className="text-gray-400">•</span>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSection();
+                        }}
+                        className="text-gray-600 hover:text-gray-900 transition-transform"
+                        title={isExpanded ? 'Collapse section' : 'Expand section'}
+                    >
+                        <span className={`inline-block transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                            ▶
+                        </span>
+                    </button>
+                </>
+            )}
+        </div>
+    );
 
     // In editor mode, show SlotEditor with custom header
     if (mode === 'editor') {
@@ -297,7 +323,7 @@ const SectionWidget = ({
             <div className={`section-widget border border-gray-200 mb-4 ${config.enableCollapse && !isExpanded ? 'collapsed' : ''}`}>
                 <SlotEditor
                     slotName="content"
-                    slotLabel={slotLabelText}
+                    slotLabel={slotLabel}
                     widgets={widgets}
                     availableWidgetTypes={filteredWidgetTypes}
                     parentWidgetId={widgetId}
@@ -309,7 +335,7 @@ const SectionWidget = ({
                     parentSlotName={slotName}
                     widgetPath={widgetPath}
                     emptyMessage="No content in section"
-                    className="[&_.slot-editor]:!p-0"
+                    className={`[&_.slot-editor]:!p-0 ${config.enableCollapse && !isExpanded ? '[&_.widgets-list]:hidden' : ''}`}
                     mode="editor"
                     showClearButton={false}
                     compactAddButton={true}

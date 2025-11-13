@@ -23,10 +23,23 @@ class ContentConfig(BaseModel):
 
     anchor: str = Field(
         "",
-        description="Anchor Title",
+        description="Anchor ID for linking to this section",
         json_schema_extra={
             "component": "TextInput",
             "placeholder": "section-name",
+            "order": 0,
+            "group": "Content",
+        },
+    )
+    anchor_title: str = Field(
+        "",
+        description="Anchor Title (for navigation menus)",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "Auto-generated from header",
+            "helpText": "Displayed in navigation menus when linking to this content",
+            "order": 0,
+            "group": "Content",
         },
     )
 

@@ -97,7 +97,6 @@ class LayoutRenderer {
     // Expose instance globally for console access
     if (typeof window !== 'undefined') {
       window.__layoutRenderer = this;
-      console.log('LayoutRenderer: Exposed to window.__layoutRenderer', this.uiConfig);
     }
   }
 
@@ -2828,7 +2827,7 @@ class LayoutRenderer {
    */
   cutWidget(widgetId, widgetInstance) {
     const widgetElement = document.querySelector(`.rendered-widget[data-widget-id="${widgetId}"]`);
-    
+
     if (!widgetElement) {
       console.warn('LayoutRenderer: No widget element found for widgetId:', widgetId);
       return;
@@ -2850,7 +2849,7 @@ class LayoutRenderer {
 
     // Remove from source slot
     this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
-    
+
     // Mark as dirty
     this.markAsDirty(`widget cut from ${slotName}`);
 

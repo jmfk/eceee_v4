@@ -64,11 +64,8 @@ class DevAutoLoginMiddleware:
                     is_staff=True,
                     is_superuser=True,
                 )
-                print(f"[DevAutoLoginMiddleware] Created dev user: {user.username}")
                 return user
             except Exception as e:
-                print(f"[DevAutoLoginMiddleware] Failed to create dev user: {e}")
                 return None
         except Exception as e:
-            print(f"[DevAutoLoginMiddleware] Error getting dev user: {e}")
             return None

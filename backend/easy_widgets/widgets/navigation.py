@@ -178,9 +178,14 @@ class NavigationWidget(BaseWidget):
                 widget_config = widget.get("config", {})
                 anchor = widget_config.get("anchor")
                 if anchor and anchor.strip():
+                    # Use anchor_title if available, fallback to title/header, then anchor
+                    label = (widget_config.get("anchor_title") or 
+                            widget_config.get("title") or 
+                            widget_config.get("header") or 
+                            anchor)
                     dynamic_menu_items.append(
                         {
-                            "label": anchor,
+                            "label": label,
                             "url": f"#{anchor}",
                             "isActive": True,
                             "targetBlank": False,

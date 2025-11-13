@@ -1,41 +1,49 @@
 {% load static %}
 {% load security_filters %}
 
-<div class="section-widget" 
-     data-section-id="{{ config.anchor|default:'' }}"
-     {% if config.accordion_mode %}data-accordion-mode="true"{% endif %}>
-    
-    {% if config.title %}
-    <div class="section-header {% if not config.enable_collapse %}non-collapsible{% endif %}" 
+{% comment %}
+Section Widget Template
+- Only renders if content exists (checked in render() method)
+- If enable_collapse: shows header + collapsible content
+- If NOT enable_collapse: shows content only (no wrapper, no header)
+- Accordion mode: only one section open at a time (except initial state)
+{% endcomment %}
+
+{% if config.enable_collapse %}
+    {# Collapsible section with header #}
+    <div class="section-widget" 
          {% if config.anchor %}id="{{ config.anchor }}"{% endif %}
-         {% if config.enable_collapse %}
-         onclick="toggleSection(this)"
-         data-expanded="{{ config.start_expanded|default:true|yesno:'true,false' }}"
-         {% endif %}>
-        <span class="section-title">{{ config.title }}</span>
-        {% if config.enable_collapse %}
-        <span class="section-toggle {% if config.start_expanded %}expanded{% endif %}">▶</span>
+         data-section-id="{{ config.anchor|default:'' }}"
+         {% if config.accordion_mode %}data-accordion-mode="true"{% endif %}>
+        
+        {% if config.title %}
+        <div class="section-header" 
+             onclick="toggleSection(this)"
+             data-expanded="{{ config.start_expanded|default:true|yesno:'true,false' }}">
+            <span class="section-title">{{ config.title }}</span>
+            <span class="section-toggle {% if config.start_expanded %}expanded{% endif %}">▶</span>
+        </div>
         {% endif %}
-    </div>
-    {% endif %}
-    
-    <div class="section-content {% if config.enable_collapse and not config.start_expanded %}collapsed{% else %}expanded{% endif %}"
-         {% if config.enable_collapse %}
-         style="max-height: {% if config.start_expanded %}5000px{% else %}0{% endif %};"
-         {% endif %}>
-        {% if config.rendered_slots.content %}
+        
+        <div class="section-content {% if config.start_expanded %}expanded{% else %}collapsed{% endif %}"
+             style="max-height: {% if config.start_expanded %}5000px{% else %}0{% endif %};">
             {% for widget in config.rendered_slots.content %}
                 <div class="widget-wrapper">
                     {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
-        {% else %}
-            <div class="empty-slot">
-                Section content
-            </div>
-        {% endif %}
+        </div>
     </div>
-</div>
+{% else %}
+    {# Non-collapsible: just render content directly with anchor #}
+    <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only">
+        {% for widget in config.rendered_slots.content %}
+            <div class="widget-wrapper">
+                {{ widget.html|sanitize_html }}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
 
 {% if config.enable_collapse %}
 <script>
@@ -98,4 +106,3 @@
 })();
 </script>
 {% endif %}
-

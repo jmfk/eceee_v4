@@ -1,6 +1,9 @@
 {% load static %}
 {% load imgproxy_tags %}
 
+{# Only render if there's content, header, or images #}
+{% if config.header or config.content or config.image_1 or config.image_2 or config.image_3 or config.image_4 %}
+
 {% if custom_style_css %}
 <style>{{ custom_style_css|safe }}</style>
 {% endif %}
@@ -51,3 +54,4 @@
     </div>
 </div>
 
+{% endif %}{# End check for empty content card #}

@@ -27,6 +27,19 @@ class ContentCardConfig(BaseModel):
         json_schema_extra={
             "component": "TextInput",
             "placeholder": "section-name",
+            "order": 0,
+            "group": "Content",
+        },
+    )
+    anchor_title: str = Field(
+        "",
+        description="Anchor Title (for navigation menus)",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "Auto-generated from header",
+            "helpText": "Displayed in navigation menus when linking to this content",
+            "order": 0,
+            "group": "Content",
         },
     )
     header: str = Field(

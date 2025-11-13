@@ -617,7 +617,7 @@ class HostnamePageView(View):
             context["widgets_by_slot"] = renderer._render_widgets_by_slot(
                 current_page, content, base_context
             )
-            
+
             # Add theme_css_url from renderer context
             context["theme_css_url"] = base_context.get("theme_css_url")
 
