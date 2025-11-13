@@ -149,7 +149,32 @@ class NavbarWidget(BaseWidget):
     description = "Navigation bar with configurable menu items"
     template_name = "easy_widgets/widgets/navbar.html"
 
-    widget_css = """"""
+    widget_css = """
+        /* Navbar Widget - Override only conflicting theme styles */
+        .navbar-menu-list {
+            list-style: none !important;
+            font-size: 16px;
+            margin-top: 0px;
+            font-family: "Source Sans 3", sans-serif;
+            font-weight: 300;
+            line-height: 22px;
+            margin-bottom: 0;          
+        }
+
+        .navbar-menu-item {
+            list-style: none !important;
+            font-size: 16px;
+            margin-top: 0px;
+            font-family: "Source Sans 3", sans-serif;
+            font-weight: 300;
+            line-height: 22px;
+            margin-bottom: 0px;            
+        }
+
+        .navbar-link {
+            text-decoration: none !important;
+        }
+        """
 
     css_variables = {}
 
@@ -162,35 +187,35 @@ class NavbarWidget(BaseWidget):
     def render_with_style(self, config, theme):
         """
         Render navbar with custom component style from theme.
-        
+
         Args:
             config: Widget configuration
             theme: PageTheme instance
-            
+
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
         from django.template.loader import render_to_string
-        
+
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
             return None
-        
+
         styles = theme.component_styles or {}
         style = styles.get(style_name)
         if not style:
             return None
-        
+
         # Prepare template context first
         prepared_config = self.prepare_template_context(config, {"theme": theme})
-        
+
         # Render the navbar HTML using the default template first
-        navbar_html = render_to_string(
-            self.template_name,
-            {"config": prepared_config}
-        )
-        
+        navbar_html = render_to_string(self.template_name, {"config": prepared_config})
+
         # Prepare context with rendered navbar as content
         context = prepare_component_context(
             content=navbar_html,
@@ -198,7 +223,7 @@ class NavbarWidget(BaseWidget):
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
         )
-        
+
         # Render with style template
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")

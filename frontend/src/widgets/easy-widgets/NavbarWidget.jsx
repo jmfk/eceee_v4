@@ -196,8 +196,8 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
 
     const renderMenuItem = (item, index, isInDropdown = false) => {
         const linkClasses = isInDropdown
-            ? "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
-            : "text-white text-sm font-medium no-underline hover:opacity-80 transition-opacity"
+            ? "navbar-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
+            : "navbar-link text-white text-sm font-medium no-underline hover:opacity-80 transition-opacity"
 
         return (
             <a
@@ -260,7 +260,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                 target={item.targetBlank ? '_blank' : undefined}
                 rel={item.targetBlank ? 'noopener noreferrer' : undefined}
                 style={itemStyle}
-                className="hover:opacity-80"
+                className="navbar-link navbar-secondary-link hover:opacity-80"
                 onClick={(e) => {
                     if (mode === 'editor') {
                         e.preventDefault()
@@ -364,12 +364,13 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             <div className="flex justify-between items-center h-full w-full">
                 {/* Primary menu (left-aligned) */}
                 <ul
-                    className="flex gap-6 m-0 p-0 pl-[20px] items-center"
+                    className="navbar-menu-list flex gap-6 m-0 p-0 pl-[20px] items-center"
                     style={{ listStyle: 'none' }}
                 >
                     {visibleItems.map((item, index) => (
                         <li
                             key={index}
+                            className="navbar-menu-item"
                             ref={(el) => (itemRefs.current[index] = el)}
                         >
                             {renderMenuItem(item, index, false)}
@@ -429,11 +430,11 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                 {/* Secondary menu (right-aligned) */}
                 {activeSecondaryMenuItems.length > 0 && showSecondaryMenu && (
                     <ul
-                        className="flex gap-1 m-0 p-0 pr-[20px] items-center ml-auto"
+                        className="navbar-menu-list navbar-secondary-menu flex gap-1 m-0 p-0 pr-[20px] items-center ml-auto"
                         style={{ listStyle: 'none' }}
                     >
                         {activeSecondaryMenuItems.map((item, index) => (
-                            <li key={index}>
+                            <li key={index} className="navbar-menu-item">
                                 {renderSecondaryMenuItem(item, index, false)}
                             </li>
                         ))}
