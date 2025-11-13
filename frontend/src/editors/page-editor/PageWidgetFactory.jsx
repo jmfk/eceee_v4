@@ -30,6 +30,7 @@ const PageWidgetFactory = ({
     onDelete,
     onMoveUp,
     onMoveDown,
+    onPaste,
     onConfigChange,
     canMoveUp = false,
     canMoveDown = false,
@@ -116,6 +117,13 @@ const PageWidgetFactory = ({
     const handleMoveDown = () => {
         if (onMoveDown && canMoveDown) {
             onMoveDown(slotName, index, widget)
+        }
+    }
+
+    // Handle pasting a widget after this one
+    const handlePaste = (pastedWidget) => {
+        if (onPaste) {
+            onPaste(slotName, index, pastedWidget);
         }
     }
 
@@ -300,6 +308,8 @@ const PageWidgetFactory = ({
                     showControls={true}
                     isInherited={false}
                     inheritedFrom={null}
+                    widget={widget}
+                    onPaste={onPaste ? handlePaste : undefined}
                 />
 
                 {/* Core Widget Content */}

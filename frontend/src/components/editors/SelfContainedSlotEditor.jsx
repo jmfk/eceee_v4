@@ -10,6 +10,7 @@ import PropTypes from 'prop-types';
 import PageWidgetSelectionModal from '../../editors/page-editor/PageWidgetSelectionModal.jsx';
 import { useWidgets, createDefaultWidgetConfig, getWidgetDisplayName } from '../../hooks/useWidgets.js';
 import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory.jsx';
+import PageWidgetHeaderWithSlots from '../../editors/page-editor/PageWidgetHeaderWithSlots.jsx';
 
 /**
  * Self-Contained Slot Editor React Component
@@ -180,6 +181,23 @@ const SelfContainedSlotEditor = ({
         notifySlotChange([]);
     }, [widgets.length, notifySlotChange]);
 
+    /**
+     * Handle pasting widgets to slot
+     */
+    const handlePasteToSlot = useCallback((pastedWidgets, mode) => {
+        if (!pastedWidgets || !Array.isArray(pastedWidgets)) return;
+
+        let newWidgets;
+        if (mode === 'replace') {
+            newWidgets = pastedWidgets;
+        } else {
+            newWidgets = [...widgets, ...pastedWidgets];
+        }
+
+        setWidgets(newWidgets);
+        notifySlotChange(newWidgets);
+    }, [widgets, notifySlotChange]);
+
     // Widget modal handlers
     const handleShowWidgetModal = useCallback(() => {
         setIsWidgetModalOpen(true);
@@ -196,49 +214,20 @@ const SelfContainedSlotEditor = ({
 
     return (
         <div className="slot-editor p-4 relative">
-            <div className="slot-header border px-4 py-2 border-gray-200">
-                <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                        <div className="flex items-center">
-                            <h4 className="text-sm font-medium text-gray-900">{slotLabel}</h4>
-                            {maxWidgets && (
-                                <span className="ml-2 text-xs text-gray-500">
-                                    {widgets.length}/{maxWidgets}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        {showAddButton && canAddWidget() && (
-                            <button
-                                className={compactAddButton
-                                    ? "add-widget-btn bg-green-600 hover:bg-green-700 text-white p-1.5 rounded transition-colors flex items-center justify-center"
-                                    : "add-widget-btn bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
-                                }
-                                onClick={handleShowWidgetModal}
-                                title="Add Widget"
-                            >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                </svg>
-                                {!compactAddButton && <span>Add Widget</span>}
-                            </button>
-                        )}
-                        {showClearButton && widgets.length > 0 && (
-                            <button
-                                className="clear-slot-btn bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
-                                onClick={handleClearSlot}
-                                title="Clear Slot"
-                            >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                                <span>Clear Slot</span>
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <PageWidgetHeaderWithSlots
+                widgetType={slotLabel}
+                showControls={true}
+                slotLabel={maxWidgets ? `${widgets.length}/${maxWidgets} widgets` : `${widgets.length} widgets`}
+                showAddButton={showAddButton}
+                showClearButton={showClearButton}
+                onAddWidget={canAddWidget() ? handleShowWidgetModal : null}
+                onClearSlot={handleClearSlot}
+                canAddWidget={canAddWidget()}
+                widgetCount={widgets.length}
+                maxWidgets={maxWidgets}
+                widgets={widgets}
+                onPasteToSlot={handlePasteToSlot}
+            />
 
             <div className="widgets-list">
                 {widgets.length === 0 ? (

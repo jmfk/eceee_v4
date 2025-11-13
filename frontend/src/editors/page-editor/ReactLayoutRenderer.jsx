@@ -262,6 +262,48 @@ const ReactLayoutRenderer = forwardRef(({
                 break;
             }
 
+            case 'paste': {
+                // widget is the pasted widget, args[0] is the index to insert after
+                const pastedWidget = widget;
+                const insertAfterIndex = args[0];
+                const insertPosition = insertAfterIndex + 1;
+
+                // Update local state for immediate UI feedback
+                const slotWidgetsPaste = [...(widgets[slotName] || [])];
+                slotWidgetsPaste.splice(insertPosition, 0, pastedWidget);
+
+                const updatedWidgetsPaste = {
+                    ...widgets,
+                    [slotName]: slotWidgetsPaste
+                };
+
+                if (onWidgetChange) {
+                    onWidgetChange(updatedWidgetsPaste, { sourceId: pastedWidget.id });
+                }
+
+                // Publish to UDC for external sync
+                if (publishWidgetOperation) {
+                    await publishWidgetOperation(OperationTypes.ADD_WIDGET, {
+                        id: pastedWidget.id,
+                        type: pastedWidget.type,
+                        config: pastedWidget.config,
+                        slot: slotName,
+                        order: insertPosition
+                    });
+                } else {
+                    await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                        id: pastedWidget.id,
+                        type: pastedWidget.type,
+                        config: pastedWidget.config,
+                        slot: slotName,
+                        contextType: contextType,
+                        order: insertPosition
+                    });
+                }
+
+                break;
+            }
+
             case 'configChange': {
                 const newConfig = args[0];
                 const updatedWidgetsConfig = { ...widgets };

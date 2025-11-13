@@ -287,6 +287,7 @@ const WidgetSlot = ({
                         onDelete={(slotName, idx, w) => handleWidgetAction('delete', w, idx)}
                         onMoveUp={(slotName, idx, w) => handleWidgetAction('moveUp', w, idx)}
                         onMoveDown={(slotName, idx, w) => handleWidgetAction('moveDown', w, idx)}
+                        onPaste={(slotName, idx, pastedWidget) => handleWidgetAction('paste', pastedWidget, idx)}
                         onConfigChange={(widgetId, slotName, newConfig) => handleWidgetAction('configChange', { id: widgetId }, newConfig)}
                         canMoveUp={index > 0}
                         canMoveDown={index < effectiveWidgets.length - 1}
