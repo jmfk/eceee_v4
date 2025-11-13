@@ -161,8 +161,8 @@ class ContentCardWidget(BaseWidget):
         width: 100%;
         overflow: hidden;
         background: var(--card-bg, #ffffff);
-        border-radius: var(--card-radius, 0.5rem);
-        box-shadow: var(--card-shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+        border-radius: var(--card-radius, 0);
+        box-shadow: var(--card-shadow, none);
     }
     
     .content-card-header {
@@ -171,7 +171,7 @@ class ContentCardWidget(BaseWidget):
         font-weight: var(--header-font-weight, 600);
         color: var(--header-color, #111827);
         line-height: var(--header-line-height, 1.3);
-        border-bottom: var(--header-border, 1px solid #e5e7eb);
+        border-bottom: var(--header-border, none);
     }
     
     .content-card-body {
@@ -297,14 +297,14 @@ class ContentCardWidget(BaseWidget):
 
     css_variables = {
         "card-bg": "#ffffff",
-        "card-radius": "0.5rem",
-        "card-shadow": "0 1px 3px rgba(0, 0, 0, 0.1)",
+        "card-radius": "0",
+        "card-shadow": "none",
         "header-padding": "1.5rem 1.5rem 1rem",
         "header-font-size": "1.5rem",
         "header-font-weight": "600",
         "header-color": "#111827",
         "header-line-height": "1.3",
-        "header-border": "1px solid #e5e7eb",
+        "header-border": "none",
         "text-padding": "1.5rem",
         "text-font-size": "1rem",
         "text-line-height": "1.6",
@@ -334,18 +334,19 @@ class ContentCardWidget(BaseWidget):
             render_mustache,
             prepare_component_context,
         )
-        from django.template.loader import get_template
 
         style_name = config.get("component_style", "default")
+
+        # For default style, return None to use standard Django template rendering
+        if not style_name or style_name == "default":
+            return None
+
         styles = theme.component_styles or {}
         style = styles.get(style_name)
 
-        # For default or missing style, render using Django template
-        if not style or style_name == "default":
-            prepared_config = self.prepare_template_context(config, {"theme": theme})
-            template = get_template(self.template_name)
-            html = template.render({"config": prepared_config})
-            return html, ""
+        # If style not found in theme, fall back to default rendering
+        if not style:
+            return None
 
         template_str = style.get("template", "")
         css = style.get("css", "")
@@ -353,10 +354,7 @@ class ContentCardWidget(BaseWidget):
         # Check for passthru marker (must be only content in template after trimming)
         if template_str.strip() == "{{passthru}}":
             # Passthru mode: use default rendering but inject CSS
-            prepared_config = self.prepare_template_context(config, {"theme": theme})
-            template = get_template(self.template_name)
-            html = template.render({"config": prepared_config})
-            return html, css
+            return None, css
 
         # Prepare context with all widget data
         context = prepare_component_context(

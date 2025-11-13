@@ -20,16 +20,16 @@
             {# 4 images layout - no text, just images in a row #}
             <div class="content-card-images layout-4">
                 {% if config.image_1 %}
-                    <img src="{% imgproxy_url config.image_1 width=400 height=400 resize_type='fill' %}" alt="" />
+                    <img src="{% imgproxy config.image_1 width=400 height=400 resize_type='fill' %}" alt="" />
                 {% endif %}
                 {% if config.image_2 %}
-                    <img src="{% imgproxy_url config.image_2 width=400 height=400 resize_type='fill' %}" alt="" />
+                    <img src="{% imgproxy config.image_2 width=400 height=400 resize_type='fill' %}" alt="" />
                 {% endif %}
                 {% if config.image_3 %}
-                    <img src="{% imgproxy_url config.image_3 width=400 height=400 resize_type='fill' %}" alt="" />
+                    <img src="{% imgproxy config.image_3 width=400 height=400 resize_type='fill' %}" alt="" />
                 {% endif %}
                 {% if config.image_4 %}
-                    <img src="{% imgproxy_url config.image_4 width=400 height=400 resize_type='fill' %}" alt="" />
+                    <img src="{% imgproxy config.image_4 width=400 height=400 resize_type='fill' %}" alt="" />
                 {% endif %}
             </div>
         {% else %}
@@ -41,13 +41,13 @@
             <div class="content-card-images layout-{{ config.image_count|default:1 }}">
                 {% if config.image_1 %}
                     {% if config.image_count == 1 %}
-                        <img src="{% imgproxy_url config.image_1 width=600 height=600 resize_type='fill' %}" alt="" />
+                        <img src="{% imgproxy config.image_1 width=600 height=600 resize_type='fill' %}" alt="" />
                     {% else %}
-                        <img src="{% imgproxy_url config.image_1 width=400 height=600 resize_type='fill' %}" alt="" />
+                        <img src="{% imgproxy config.image_1 width=400 height=600 resize_type='fill' %}" alt="" />
                     {% endif %}
                 {% endif %}
                 {% if config.image_2 and config.image_count >= 2 %}
-                    <img src="{% imgproxy_url config.image_2 width=400 height=600 resize_type='fill' %}" alt="" />
+                    <img src="{% imgproxy config.image_2 width=400 height=600 resize_type='fill' %}" alt="" />
                 {% endif %}
             </div>
         {% endif %}
