@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { lookupWidget } from '../../utils/widgetUtils'
 
 /**
  * LocalStateFieldWrapper Component
@@ -25,6 +27,11 @@ const LocalStateFieldWrapper = React.memo(({
     validateOnChange = true,
     validateOnBlur = true,
     context = null,
+    // UDC context for direct field-level subscription
+    widgetId = null,
+    slotName = null,
+    contextType = null,
+    widgetPath = null,
     ...wrapperProps
 }) => {
     // Local state for this field only
@@ -39,6 +46,27 @@ const LocalStateFieldWrapper = React.memo(({
     const validationTimeoutRef = useRef(null)
     const initializedRef = useRef(false)
     const lastSentValueRef = useRef(initialValue)
+
+    // UDC Integration - Subscribe to external changes for this specific field
+    const { useExternalChanges } = widgetId && slotName ? useUnifiedData() : { useExternalChanges: null }
+    const componentId = useMemo(() => 
+        widgetId && fieldName ? `field-${widgetId}-${fieldName}` : null, 
+        [widgetId, fieldName]
+    )
+
+    // Subscribe to UDC for smooth field-level updates
+    if (useExternalChanges && componentId && widgetId && slotName) {
+        useExternalChanges(componentId, (state) => {
+            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+            const newValue = widget?.config?.[fieldName]
+            
+            // Only update if value actually changed and it's not the value we just sent
+            if (newValue !== undefined && newValue !== localValue && newValue !== lastSentValueRef.current) {
+                setLocalValue(newValue)
+                setIsDirty(false)
+            }
+        })
+    }
 
     // Initialize local value when initialValue changes (e.g., form reset)
     useEffect(() => {

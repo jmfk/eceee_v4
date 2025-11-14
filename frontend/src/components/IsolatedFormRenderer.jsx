@@ -136,9 +136,6 @@ const IsolatedFormRenderer = React.memo(({
     // Ref to track current config for ODC synchronization
     const configRef = useRef(initWidgetData?.config || {})
 
-    // State for widget data - triggers re-renders when data changes
-    const [widgetData, setWidgetData] = useState(initWidgetData)
-
     // Use form data buffer to store changes without re-renders
     const formBuffer = useFormDataBuffer(initWidgetData)
 
@@ -164,19 +161,18 @@ const IsolatedFormRenderer = React.memo(({
     }, [schema, formBuffer])
 
     // ODC External Changes Subscription - Listen for updates from other components
+    // Note: Individual fields now handle their own UDC subscriptions
+    // This subscription is kept for tracking config changes in the ref
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName || !contextType) return
 
         const widgetPath = context?.widgetPath
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
-
             configRef.current = widget.config
-            const updatedData = { ...initWidgetData, config: widget.config }
             // Update form buffer with new config from ODC
-            formBuffer.resetTo(updatedData)
-            // Update state to trigger smooth re-render with new props
-            setWidgetData(updatedData)
+            formBuffer.resetTo({ ...initWidgetData, config: widget.config })
+            // No state update needed - fields subscribe directly to UDC
         }
     })
 
@@ -188,9 +184,6 @@ const IsolatedFormRenderer = React.memo(({
 
         // Get updated config for real-time updates
         const currentData = formBuffer.getCurrentData()
-        
-        // Update state to keep it in sync with buffer
-        setWidgetData(currentData)
 
         // Extract widgetPath from context for nested widget support
         const widgetPath = context?.widgetPath
@@ -242,8 +235,8 @@ const IsolatedFormRenderer = React.memo(({
                             key={fieldName}
                             fieldName={fieldName}
                             fieldSchema={fieldSchema}
-                            widgetData={widgetData}
-                            widgetType={widgetData?.type || ''}
+                            widgetData={formBuffer.getCurrentData()}
+                            widgetType={formBuffer.getCurrentData()?.type || ''}
                             isRequired={isRequired}
                             onFieldChange={handleFieldChange}
                             namespace={namespace}
