@@ -136,8 +136,8 @@ const IsolatedFormRenderer = React.memo(({
     // Ref to track current config for ODC synchronization
     const configRef = useRef(initWidgetData?.config || {})
 
-    // State to force field re-renders when external updates occur
-    const [externalUpdateKey, setExternalUpdateKey] = useState(0)
+    // State for widget data - triggers re-renders when data changes
+    const [widgetData, setWidgetData] = useState(initWidgetData)
 
     // Use form data buffer to store changes without re-renders
     const formBuffer = useFormDataBuffer(initWidgetData)
@@ -172,10 +172,11 @@ const IsolatedFormRenderer = React.memo(({
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
 
             configRef.current = widget.config
+            const updatedData = { ...initWidgetData, config: widget.config }
             // Update form buffer with new config from ODC
-            formBuffer.resetTo({ ...initWidgetData, config: widget.config })
-            // Force field re-render with new values
-            setExternalUpdateKey(prev => prev + 1)
+            formBuffer.resetTo(updatedData)
+            // Update state to trigger smooth re-render with new props
+            setWidgetData(updatedData)
         }
     })
 
@@ -187,6 +188,9 @@ const IsolatedFormRenderer = React.memo(({
 
         // Get updated config for real-time updates
         const currentData = formBuffer.getCurrentData()
+        
+        // Update state to keep it in sync with buffer
+        setWidgetData(currentData)
 
         // Extract widgetPath from context for nested widget support
         const widgetPath = context?.widgetPath
@@ -235,11 +239,11 @@ const IsolatedFormRenderer = React.memo(({
 
                     return (
                         <IsolatedFieldWrapper
-                            key={`${fieldName}-${externalUpdateKey}`}
+                            key={fieldName}
                             fieldName={fieldName}
                             fieldSchema={fieldSchema}
-                            widgetData={formBuffer.getCurrentData()}
-                            widgetType={formBuffer.getCurrentData()?.type || ''}
+                            widgetData={widgetData}
+                            widgetType={widgetData?.type || ''}
                             isRequired={isRequired}
                             onFieldChange={handleFieldChange}
                             namespace={namespace}
