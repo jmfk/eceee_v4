@@ -136,6 +136,9 @@ const IsolatedFormRenderer = React.memo(({
     // Ref to track current config for ODC synchronization
     const configRef = useRef(initWidgetData?.config || {})
 
+    // State to force field re-renders when external updates occur
+    const [externalUpdateKey, setExternalUpdateKey] = useState(0)
+
     // Use form data buffer to store changes without re-renders
     const formBuffer = useFormDataBuffer(initWidgetData)
 
@@ -171,6 +174,8 @@ const IsolatedFormRenderer = React.memo(({
             configRef.current = widget.config
             // Update form buffer with new config from ODC
             formBuffer.resetTo({ ...initWidgetData, config: widget.config })
+            // Force field re-render with new values
+            setExternalUpdateKey(prev => prev + 1)
         }
     })
 
@@ -230,7 +235,7 @@ const IsolatedFormRenderer = React.memo(({
 
                     return (
                         <IsolatedFieldWrapper
-                            key={fieldName}
+                            key={`${fieldName}-${externalUpdateKey}`}
                             fieldName={fieldName}
                             fieldSchema={fieldSchema}
                             widgetData={formBuffer.getCurrentData()}
