@@ -28,12 +28,17 @@ const ContentCardWidget = ({
     // Get current theme for component styles
     const { currentTheme } = useTheme({ pageId })
 
+    // Use configRef for stable reference (prevents callback recreation issues)
+    const configRef = useRef(config)
+    const [, forceRerender] = useState({})
+    const setConfig = (newConfig) => {
+        configRef.current = newConfig
+    }
+
     // UDC Integration
     const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `contentcardwidget-${widgetId || 'preview'}`, [widgetId])
     const contextType = useEditorContext()
-
-    const [localConfig, setLocalConfig] = useState(config)
 
     // Refs for editor renderers
     const headerEditorRef = useRef(null)
@@ -48,21 +53,37 @@ const ContentCardWidget = ({
     const [image4Url, setImage4Url] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
 
-    // UDC External Changes Subscription
+    // Initialize from UDC state on mount
+    useEffect(() => {
+        if (!widgetId || !slotName) {
+            return
+        }
+        const currentState = getState()
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath)
+        const udcConfig = widget?.config
+        if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
+            setConfig(udcConfig)
+            forceRerender({})
+        }
+    }, [])
+
+    // Subscribe to external changes via UDC
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        if (widget && widget.config && hasWidgetContentChanged(localConfig, widget.config)) {
-            setLocalConfig(widget.config)
+        const newConfig = widget?.config
+        if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
+            setConfig(newConfig)
+            forceRerender({})
         }
     })
 
     // Get image objects from config
-    const imageCount = localConfig.imageCount || 1
-    const image1 = localConfig.image1
-    const image2 = localConfig.image2
-    const image3 = localConfig.image3
-    const image4 = localConfig.image4
+    const imageCount = configRef.current.imageCount || 1
+    const image1 = configRef.current.image1
+    const image2 = configRef.current.image2
+    const image3 = configRef.current.image3
+    const image4 = configRef.current.image4
 
     // Load optimized image URLs from backend API
     useEffect(() => {
@@ -125,13 +146,13 @@ const ContentCardWidget = ({
     }, [image1, image2, image3, image4, imageCount])
 
     // Determine text position
-    const textPosition = localConfig.textPosition || 'left'
+    const textPosition = configRef.current.textPosition || 'left'
 
-    // Content change handlers
+    // Content change handlers - use configRef for stable references
     const handleHeaderChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            const updatedConfig = { ...localConfig, header: newContent }
-            setLocalConfig(updatedConfig)
+            const updatedConfig = { ...configRef.current, header: newContent }
+            setConfig(updatedConfig)
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: updatedConfig,
@@ -143,12 +164,12 @@ const ContentCardWidget = ({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, localConfig, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
     const handleContentChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            const updatedConfig = { ...localConfig, content: newContent }
-            setLocalConfig(updatedConfig)
+            const updatedConfig = { ...configRef.current, content: newContent }
+            setConfig(updatedConfig)
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: updatedConfig,
@@ -160,15 +181,15 @@ const ContentCardWidget = ({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, localConfig, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
-    // Initialize editors in editor mode
+    // Initialize editors in editor mode (only once)
     useEffect(() => {
         if (mode === 'editor') {
             // Initialize header editor
             if (headerContainerRef.current && !headerEditorRef.current) {
                 headerEditorRef.current = new SimpleTextEditorRenderer(headerContainerRef.current, {
-                    content: localConfig.header || '',
+                    content: configRef.current.header || '',
                     mode: 'text-only',
                     onChange: handleHeaderChange,
                     placeholder: 'Enter card header...',
@@ -180,7 +201,7 @@ const ContentCardWidget = ({
             // Initialize content editor
             if (contentContainerRef.current && !contentEditorRef.current && imageCount !== 4) {
                 contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
-                    content: localConfig.content || '',
+                    content: configRef.current.content || '',
                     mode: 'inline-rich',
                     onChange: handleContentChange,
                     placeholder: 'Enter card content...',
@@ -202,20 +223,32 @@ const ContentCardWidget = ({
         }
     }, [mode, imageCount])
 
+    // Update onChange callbacks when handlers change
+    useEffect(() => {
+        if (mode === 'editor') {
+            if (headerEditorRef.current) {
+                headerEditorRef.current.updateConfig({ onChange: handleHeaderChange })
+            }
+            if (contentEditorRef.current && imageCount !== 4) {
+                contentEditorRef.current.updateConfig({ onChange: handleContentChange })
+            }
+        }
+    }, [handleHeaderChange, handleContentChange, mode, imageCount])
+
     // Update editor content when config changes externally
     useEffect(() => {
         if (mode === 'editor') {
             if (headerEditorRef.current) {
-                headerEditorRef.current.updateConfig({ content: localConfig.header || '' })
+                headerEditorRef.current.updateConfig({ content: configRef.current.header || '' })
             }
             if (contentEditorRef.current && imageCount !== 4) {
-                contentEditorRef.current.updateConfig({ content: localConfig.content || '' })
+                contentEditorRef.current.updateConfig({ content: configRef.current.content || '' })
             }
         }
-    }, [localConfig.header, localConfig.content, mode, imageCount])
+    }, [configRef.current.header, configRef.current.content, mode, imageCount])
 
     // Check if using component style with Mustache template
-    const componentStyle = localConfig.componentStyle || 'default'
+    const componentStyle = configRef.current.componentStyle || 'default'
     const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles
 
     if (useCustomStyle) {
@@ -229,14 +262,14 @@ const ContentCardWidget = ({
                 if (!isPassthru) {
                     // Prepare context for Mustache rendering
                     const mustacheContext = prepareComponentContext(
-                        localConfig.content || '',
-                        localConfig.anchor || '',
+                        configRef.current.content || '',
+                        configRef.current.anchor || '',
                         style.variables || {},
-                        localConfig
+                        configRef.current
                     )
 
                     // Add content card specific context
-                    mustacheContext.header = localConfig.header || ''
+                    mustacheContext.header = configRef.current.header || ''
                     mustacheContext.textPosition = textPosition
                     mustacheContext.imageCount = imageCount
                     mustacheContext.image1 = image1Url
@@ -293,7 +326,7 @@ const ContentCardWidget = ({
             return (
                 <div
                     className="content-card-widget"
-                    id={localConfig.anchor || undefined}
+                    id={configRef.current.anchor || undefined}
                 >
                     <div className="content-card-header" ref={headerContainerRef} />
 
@@ -325,14 +358,14 @@ const ContentCardWidget = ({
         return (
             <div
                 className="content-card-widget"
-                id={localConfig.anchor || undefined}
+                id={configRef.current.anchor || undefined}
             >
-                {localConfig.header && (
+                {configRef.current.header && (
                     <div className="content-card-header">
-                        {localConfig.header.split('\n').map((line, idx) => (
+                        {configRef.current.header.split('\n').map((line, idx) => (
                             <React.Fragment key={idx}>
                                 {line}
-                                {idx < localConfig.header.split('\n').length - 1 && <br />}
+                                {idx < configRef.current.header.split('\n').length - 1 && <br />}
                             </React.Fragment>
                         ))}
                     </div>
@@ -351,7 +384,7 @@ const ContentCardWidget = ({
                         // 1 or 2 images layout - with text
                         <>
                             <div className="content-card-text">
-                                <div dangerouslySetInnerHTML={{ __html: localConfig.content || '' }} />
+                                <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
                             </div>
 
                             <div className={`content-card-images layout-${imageCount}`}>

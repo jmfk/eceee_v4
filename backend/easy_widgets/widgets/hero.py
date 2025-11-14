@@ -37,7 +37,7 @@ class HeroConfig(BaseModel):
         None,
         description="Text displayed before the header",
         json_schema_extra={
-            "component": "TextAreaInput",
+            "component": "TextareaInput",
             "order": 2,
             "placeholder": "Optional text before header",
             "rows": 3,
@@ -48,7 +48,7 @@ class HeroConfig(BaseModel):
         None,
         description="Text displayed after the header",
         json_schema_extra={
-            "component": "TextAreaInput",
+            "component": "TextareaInput",
             "order": 3,
             "placeholder": "Optional text after header",
             "rows": 3,

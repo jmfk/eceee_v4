@@ -73,6 +73,11 @@ export class SimpleTextEditorRenderer {
 
         this.editorElement = null
         this.isActive = false
+        
+        // Track last externally-provided content to prevent unnecessary updates
+        this.lastExternalContent = options.content || ''
+        // Track whether we're currently processing an internal change
+        this.isInternalChange = false
 
         // Bind methods
         this.handleContentChange = this.handleContentChange.bind(this)
@@ -81,6 +86,13 @@ export class SimpleTextEditorRenderer {
         this.handleCommand = this.handleCommand.bind(this)
         this.activate = this.activate.bind(this)
         this.deactivate = this.deactivate.bind(this)
+    }
+
+    /**
+     * Get current content property (for external access)
+     */
+    get content() {
+        return this.getContent()
     }
 
     /**
@@ -132,6 +144,16 @@ export class SimpleTextEditorRenderer {
     setContent(content) {
         if (!this.editorElement) return
 
+        // Check if content actually changed from current editor content
+        const currentContent = this.getContent()
+        if (content === currentContent) {
+            // No change needed
+            return
+        }
+
+        // Mark as internal change to prevent onChange from triggering
+        this.isInternalChange = true
+
         if (this.options.mode === 'text-only') {
             // Plain text only
             this.editorElement.textContent = stripHTML(content || '')
@@ -139,6 +161,14 @@ export class SimpleTextEditorRenderer {
             // Inline rich - clean and set HTML
             this.editorElement.innerHTML = cleanInlineHTML(content || '')
         }
+
+        // Update last external content
+        this.lastExternalContent = content || ''
+        
+        // Reset internal change flag after a tick
+        setTimeout(() => {
+            this.isInternalChange = false
+        }, 0)
     }
 
     /**
@@ -158,9 +188,18 @@ export class SimpleTextEditorRenderer {
      * Handle content change
      */
     handleContentChange() {
+        // Don't trigger onChange if this is an internal change (from setContent)
+        if (this.isInternalChange) {
+            return
+        }
+
         if (this.options.onChange) {
             const content = this.getContent()
-            this.options.onChange(content)
+            // Only call onChange if content actually changed from last external content
+            if (content !== this.lastExternalContent) {
+                this.lastExternalContent = content
+                this.options.onChange(content)
+            }
         }
     }
 
@@ -365,12 +404,31 @@ export class SimpleTextEditorRenderer {
      * Update configuration
      */
     updateConfig(newOptions) {
-        this.options = { ...this.options, ...newOptions }
+        // Update onChange callback without re-rendering
+        if (newOptions.onChange !== undefined) {
+            this.options.onChange = newOptions.onChange
+        }
         
-        // Update content if it changed
+        // Update other options
+        if (newOptions.mode !== undefined) {
+            this.options.mode = newOptions.mode
+        }
+        if (newOptions.element !== undefined) {
+            this.options.element = newOptions.element
+        }
+        if (newOptions.placeholder !== undefined) {
+            this.options.placeholder = newOptions.placeholder
+            if (this.editorElement) {
+                this.editorElement.setAttribute('data-placeholder', newOptions.placeholder)
+            }
+        }
+        
+        // Update content if it changed and is different from current editor content
         if (newOptions.content !== undefined) {
             const currentContent = this.getContent()
-            if (newOptions.content !== currentContent) {
+            // Only update if external content is different from what editor currently has
+            // AND it's different from what we last set externally
+            if (newOptions.content !== currentContent && newOptions.content !== this.lastExternalContent) {
                 this.setContent(newOptions.content)
             }
         }

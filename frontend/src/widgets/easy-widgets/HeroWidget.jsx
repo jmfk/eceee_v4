@@ -5,20 +5,37 @@ import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
+import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 /**
  * EASY Hero Widget Component
  * Hero section with header text, optional before/after text, background image, and customizable colors
  */
-const HeroWidget = ({ 
-    config = {}, 
+const HeroWidget = ({
+    config = {},
     mode = 'preview',
     widgetId = null,
     slotName = null,
     onConfigChange = null,
     widgetPath = []
 }) => {
-    // Extract configuration with defaults
+    // Use configRef for stable reference (prevents callback recreation issues)
+    const configRef = useRef(config)
+    const [, forceRerender] = useState({})
+    const setConfig = (newConfig) => {
+        configRef.current = newConfig
+    }
+
+    // State for optimized image URL
+    const [backgroundUrl, setBackgroundUrl] = useState('')
+    const [imageLoading, setImageLoading] = useState(false)
+
+    // UDC Integration
+    const { publishUpdate, getState, useExternalChanges } = useUnifiedData()
+    const contextType = useEditorContext()
+    const componentId = useMemo(() => `herowidget-${widgetId || 'preview'}`, [widgetId])
+
+    // Extract configuration with defaults from configRef
     const {
         header = '',
         beforeText = '',
@@ -28,16 +45,7 @@ const HeroWidget = ({
         textColor = '#ffffff',
         decorColor = '#cccccc',
         componentStyle = 'default'
-    } = config
-
-    // State for optimized image URL
-    const [backgroundUrl, setBackgroundUrl] = useState('')
-    const [imageLoading, setImageLoading] = useState(false)
-
-    // UDC Integration
-    const { publishUpdate } = useUnifiedData()
-    const contextType = useEditorContext()
-    const componentId = useMemo(() => `herowidget-${widgetId || 'preview'}`, [widgetId])
+    } = configRef.current
 
     // Refs for editor renderers
     const headerEditorRef = useRef(null)
@@ -46,6 +54,31 @@ const HeroWidget = ({
     const headerContainerRef = useRef(null)
     const beforeTextContainerRef = useRef(null)
     const afterTextContainerRef = useRef(null)
+
+    // Initialize from UDC state on mount
+    useEffect(() => {
+        if (!widgetId || !slotName) {
+            return
+        }
+        const currentState = getState()
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath)
+        const udcConfig = widget?.config
+        if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
+            setConfig(udcConfig)
+            forceRerender({})
+        }
+    }, [])
+
+    // Subscribe to external changes via UDC
+    useExternalChanges(componentId, (state) => {
+        if (!widgetId || !slotName) return
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+        const newConfig = widget?.config
+        if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
+            setConfig(newConfig)
+            forceRerender({})
+        }
+    })
 
     // Load optimized background image URL from backend API
     useEffect(() => {
@@ -127,10 +160,11 @@ const HeroWidget = ({
         color: textColor,
     }
 
-    // Content change handlers
+    // Content change handlers - use configRef for stable references
     const handleHeaderChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            const updatedConfig = { ...config, header: newContent }
+            const updatedConfig = { ...configRef.current, header: newContent }
+            setConfig(updatedConfig)
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: updatedConfig,
@@ -142,11 +176,12 @@ const HeroWidget = ({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, config, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
     const handleBeforeTextChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            const updatedConfig = { ...config, beforeText: newContent }
+            const updatedConfig = { ...configRef.current, beforeText: newContent }
+            setConfig(updatedConfig)
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: updatedConfig,
@@ -158,11 +193,12 @@ const HeroWidget = ({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, config, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
     const handleAfterTextChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            const updatedConfig = { ...config, afterText: newContent }
+            const updatedConfig = { ...configRef.current, afterText: newContent }
+            setConfig(updatedConfig)
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: updatedConfig,
@@ -174,15 +210,15 @@ const HeroWidget = ({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, config, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
-    // Initialize editors in editor mode
+    // Initialize editors in editor mode (only once)
     useEffect(() => {
         if (mode === 'editor') {
             // Initialize header editor
             if (headerContainerRef.current && !headerEditorRef.current) {
                 headerEditorRef.current = new SimpleTextEditorRenderer(headerContainerRef.current, {
-                    content: header,
+                    content: configRef.current.header,
                     mode: 'text-only',
                     onChange: handleHeaderChange,
                     placeholder: 'Enter hero header...',
@@ -192,31 +228,27 @@ const HeroWidget = ({
             }
 
             // Initialize beforeText editor if needed
-            if (beforeText || beforeTextContainerRef.current) {
-                if (beforeTextContainerRef.current && !beforeTextEditorRef.current) {
-                    beforeTextEditorRef.current = new SimpleTextEditorRenderer(beforeTextContainerRef.current, {
-                        content: beforeText,
-                        mode: 'text-only',
-                        onChange: handleBeforeTextChange,
-                        placeholder: 'Enter text before header...',
-                        element: 'h5'
-                    })
-                    beforeTextEditorRef.current.render()
-                }
+            if (beforeTextContainerRef.current && !beforeTextEditorRef.current) {
+                beforeTextEditorRef.current = new SimpleTextEditorRenderer(beforeTextContainerRef.current, {
+                    content: configRef.current.beforeText,
+                    mode: 'text-only',
+                    onChange: handleBeforeTextChange,
+                    placeholder: 'Enter text before header...',
+                    element: 'h5'
+                })
+                beforeTextEditorRef.current.render()
             }
 
             // Initialize afterText editor if needed
-            if (afterText || afterTextContainerRef.current) {
-                if (afterTextContainerRef.current && !afterTextEditorRef.current) {
-                    afterTextEditorRef.current = new SimpleTextEditorRenderer(afterTextContainerRef.current, {
-                        content: afterText,
-                        mode: 'text-only',
-                        onChange: handleAfterTextChange,
-                        placeholder: 'Enter text after header...',
-                        element: 'h6'
-                    })
-                    afterTextEditorRef.current.render()
-                }
+            if (afterTextContainerRef.current && !afterTextEditorRef.current) {
+                afterTextEditorRef.current = new SimpleTextEditorRenderer(afterTextContainerRef.current, {
+                    content: configRef.current.afterText,
+                    mode: 'text-only',
+                    onChange: handleAfterTextChange,
+                    placeholder: 'Enter text after header...',
+                    element: 'h6'
+                })
+                afterTextEditorRef.current.render()
             }
         }
 
@@ -236,20 +268,35 @@ const HeroWidget = ({
         }
     }, [mode])
 
-    // Update editor content when config changes externally
+    // Update onChange callbacks when handlers change
     useEffect(() => {
         if (mode === 'editor') {
             if (headerEditorRef.current) {
-                headerEditorRef.current.updateConfig({ content: header })
+                headerEditorRef.current.updateConfig({ onChange: handleHeaderChange })
             }
             if (beforeTextEditorRef.current) {
-                beforeTextEditorRef.current.updateConfig({ content: beforeText })
+                beforeTextEditorRef.current.updateConfig({ onChange: handleBeforeTextChange })
             }
             if (afterTextEditorRef.current) {
-                afterTextEditorRef.current.updateConfig({ content: afterText })
+                afterTextEditorRef.current.updateConfig({ onChange: handleAfterTextChange })
             }
         }
-    }, [header, beforeText, afterText, mode])
+    }, [handleHeaderChange, handleBeforeTextChange, handleAfterTextChange, mode])
+
+    // Update editor content when config changes externally (from UDC/widget form)
+    useEffect(() => {
+        if (mode === 'editor') {
+            if (headerEditorRef.current) {
+                headerEditorRef.current.updateConfig({ content: header, onChange: handleHeaderChange })
+            }
+            if (beforeTextEditorRef.current) {
+                beforeTextEditorRef.current.updateConfig({ content: beforeText, onChange: handleBeforeTextChange })
+            }
+            if (afterTextEditorRef.current) {
+                afterTextEditorRef.current.updateConfig({ content: afterText, onChange: handleAfterTextChange })
+            }
+        }
+    }, [header, beforeText, afterText, mode, handleHeaderChange, handleBeforeTextChange, handleAfterTextChange])
 
     // Editor mode: show placeholder if no header
     if (mode === 'editor') {

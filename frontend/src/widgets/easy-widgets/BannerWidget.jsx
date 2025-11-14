@@ -28,12 +28,17 @@ const BannerWidget = ({
     // Get current theme for component styles
     const { currentTheme } = useTheme({ pageId })
 
+    // Use configRef for stable reference (prevents callback recreation issues)
+    const configRef = useRef(config)
+    const [, forceRerender] = useState({})
+    const setConfig = (newConfig) => {
+        configRef.current = newConfig
+    }
+
     // UDC Integration
     const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `bannerwidget-${widgetId || 'preview'}`, [widgetId])
     const contextType = useEditorContext()
-
-    const [localConfig, setLocalConfig] = useState(config)
 
     // State for optimized image URLs
     const [image1Url, setImage1Url] = useState('')
@@ -47,23 +52,39 @@ const BannerWidget = ({
     const contentEditorRef = useRef(null)
     const contentContainerRef = useRef(null)
 
-    // UDC External Changes Subscription
+    // Initialize from UDC state on mount
+    useEffect(() => {
+        if (!widgetId || !slotName) {
+            return
+        }
+        const currentState = getState()
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath)
+        const udcConfig = widget?.config
+        if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
+            setConfig(udcConfig)
+            forceRerender({})
+        }
+    }, [])
+
+    // Subscribe to external changes via UDC
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        if (widget && widget.config && hasWidgetContentChanged(localConfig, widget.config)) {
-            setLocalConfig(widget.config)
+        const newConfig = widget?.config
+        if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
+            setConfig(newConfig)
+            forceRerender({})
         }
     })
 
     // Get image objects from config
-    const imageCount = localConfig.imageCount || 1
-    const bannerMode = localConfig.bannerMode || 'text'
-    const image1 = localConfig.image1
-    const image2 = localConfig.image2
-    const image3 = localConfig.image3
-    const image4 = localConfig.image4
-    const backgroundImage = localConfig.backgroundImage
+    const imageCount = configRef.current.imageCount || 1
+    const bannerMode = configRef.current.bannerMode || 'text'
+    const image1 = configRef.current.image1
+    const image2 = configRef.current.image2
+    const image3 = configRef.current.image3
+    const image4 = configRef.current.image4
+    const backgroundImage = configRef.current.backgroundImage
 
     // Load optimized image URLs from backend API
     useEffect(() => {
@@ -138,13 +159,13 @@ const BannerWidget = ({
     }, [image1, image2, image3, image4, imageCount, backgroundImage])
 
     // Determine text position
-    const textPosition = localConfig.textPosition || 'left'
+    const textPosition = configRef.current.textPosition || 'left'
 
-    // Content change handler
+    // Content change handler - use configRef for stable reference
     const handleContentChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            const updatedConfig = { ...localConfig, content: newContent }
-            setLocalConfig(updatedConfig)
+            const updatedConfig = { ...configRef.current, content: newContent }
+            setConfig(updatedConfig)
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: updatedConfig,
@@ -156,17 +177,17 @@ const BannerWidget = ({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, localConfig, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
-    // Initialize editor in editor mode
+    // Initialize editor in editor mode (only once)
     useEffect(() => {
         if (mode === 'editor' && imageCount !== 4) {
             if (contentContainerRef.current && !contentEditorRef.current) {
                 const editorMode = bannerMode === 'header' ? 'text-only' : 'inline-rich'
                 const element = bannerMode === 'header' ? 'h2' : 'div'
-                
+
                 contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
-                    content: localConfig.content || '',
+                    content: configRef.current.content || '',
                     mode: editorMode,
                     onChange: handleContentChange,
                     placeholder: bannerMode === 'header' ? 'Enter banner header...' : 'Enter banner content...',
@@ -184,24 +205,33 @@ const BannerWidget = ({
         }
     }, [mode, imageCount, bannerMode])
 
-    // Update editor content when config changes externally
+    // Update onChange callback when handler changes
+    useEffect(() => {
+        if (mode === 'editor' && imageCount !== 4) {
+            if (contentEditorRef.current) {
+                contentEditorRef.current.updateConfig({ onChange: handleContentChange })
+            }
+        }
+    }, [handleContentChange, mode, imageCount])
+
+    // Update editor content when config changes externally (from UDC/widget form)
     useEffect(() => {
         if (mode === 'editor' && imageCount !== 4) {
             if (contentEditorRef.current) {
                 const editorMode = bannerMode === 'header' ? 'text-only' : 'inline-rich'
                 const element = bannerMode === 'header' ? 'h2' : 'div'
-                
-                contentEditorRef.current.updateConfig({ 
-                    content: localConfig.content || '',
+
+                contentEditorRef.current.updateConfig({
+                    content: configRef.current.content || '',
                     mode: editorMode,
                     element: element
                 })
             }
         }
-    }, [localConfig.content, mode, imageCount, bannerMode])
+    }, [configRef.current.content, mode, imageCount, bannerMode])
 
     // Check if using component style with Mustache template
-    const componentStyle = localConfig.componentStyle || 'default'
+    const componentStyle = configRef.current.componentStyle || 'default'
     const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles
 
     if (useCustomStyle) {
@@ -215,10 +245,10 @@ const BannerWidget = ({
                 if (!isPassthru) {
                     // Prepare context for Mustache rendering
                     const mustacheContext = prepareComponentContext(
-                        localConfig.content || '',
-                        localConfig.anchor || '',
+                        configRef.current.content || '',
+                        configRef.current.anchor || '',
                         style.variables || {},
-                        localConfig
+                        configRef.current
                     )
 
                     // Add banner specific context
@@ -278,12 +308,12 @@ const BannerWidget = ({
             return (
                 <div
                     className="banner-widget"
-                    id={localConfig.anchor || undefined}
+                    id={configRef.current.anchor || undefined}
                     style={{ position: 'relative' }}
                 >
                     {backgroundImageUrl && (
-                        <div 
-                            className="banner-background" 
+                        <div
+                            className="banner-background"
                             style={{
                                 position: 'absolute',
                                 top: 0,
@@ -327,12 +357,12 @@ const BannerWidget = ({
         return (
             <div
                 className="banner-widget"
-                id={localConfig.anchor || undefined}
+                id={configRef.current.anchor || undefined}
                 style={{ position: 'relative' }}
             >
                 {backgroundImageUrl && (
-                    <div 
-                        className="banner-background" 
+                    <div
+                        className="banner-background"
                         style={{
                             position: 'absolute',
                             top: 0,
@@ -361,7 +391,7 @@ const BannerWidget = ({
                         // 1 or 2 images layout - with text
                         <>
                             <div className="banner-text">
-                                <div dangerouslySetInnerHTML={{ __html: localConfig.content || '' }} />
+                                <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
                             </div>
 
                             <div className={`banner-images layout-${imageCount}`}>
