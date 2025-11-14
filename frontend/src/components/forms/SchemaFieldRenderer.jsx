@@ -399,11 +399,6 @@ const SchemaFieldRenderer = ({
                 onFieldValidation={props.onValidation}
                 debounceMs={200}
                 validateOnChange={true}
-                context={context}
-                widgetId={context?.widgetId}
-                slotName={context?.slotName}
-                contextType={context?.contextType}
-                widgetPath={context?.widgetPath}
             />
         </Suspense>
     )
