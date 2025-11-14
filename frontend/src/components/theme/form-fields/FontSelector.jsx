@@ -8,7 +8,10 @@ const FontSelector = ({ fontFamily, fontWeight, onFontFamilyChange, onFontWeight
     const googleFonts = fonts?.googleFonts || [];
 
     // Parse current font family to extract base font
-    const currentFont = fontFamily?.split(',')[0]?.replace(/['"]/g, '').trim();
+    // Handle malformed values like 'Source Sans 3"", sans-serif' or "Source Sans 3"", sans-serif"
+    let currentFont = fontFamily?.split(',')[0]?.replace(/['"]/g, '').trim();
+    // Remove any remaining quotes that might be escaped or duplicated
+    currentFont = currentFont?.replace(/\\"/g, '').replace(/""/g, '').trim();
     const currentWeight = fontWeight || '400';
 
     // Get all available font+weight combinations from theme

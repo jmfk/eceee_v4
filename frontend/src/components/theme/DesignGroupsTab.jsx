@@ -32,7 +32,42 @@ const cssPropertyToKebab = (prop) => {
 const stylesToCSS = (styles) => {
   if (!styles || Object.keys(styles).length === 0) return '';
   return Object.entries(styles)
-    .map(([prop, value]) => `  ${cssPropertyToKebab(prop)}: ${value};`)
+    .map(([prop, value]) => {
+      let sanitizedValue = value;
+      
+      // Sanitize font-family: remove all quotes, then re-quote fonts with spaces
+      if (prop === 'fontFamily' && sanitizedValue) {
+        const fonts = sanitizedValue.split(',');
+        const quotedFonts = fonts.map(font => {
+          // Remove ALL quotes (single, double, escaped)
+          let cleaned = font.trim().replace(/['"\\]/g, '');
+          
+          // Generic font families that shouldn't be quoted
+          const genericFamilies = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui'];
+          
+          if (genericFamilies.includes(cleaned)) {
+            return cleaned;
+          } else if (cleaned.includes(' ')) {
+            // Quote fonts with spaces
+            return `"${cleaned}"`;
+          } else {
+            return cleaned;
+          }
+        });
+        sanitizedValue = quotedFonts.join(', ');
+      }
+      
+      // Sanitize duplicate units (e.g., "36pxpx" -> "36px")
+      if (typeof sanitizedValue === 'string') {
+        const duplicateUnitPattern = /^([-\d.]+)(px|rem|em|%|vh|vw|ch|ex)\2+$/;
+        const match = sanitizedValue.match(duplicateUnitPattern);
+        if (match) {
+          sanitizedValue = `${match[1]}${match[2]}`;
+        }
+      }
+      
+      return `  ${cssPropertyToKebab(prop)}: ${sanitizedValue};`;
+    })
     .join('\n');
 };
 
@@ -328,6 +363,39 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   const handleUpdateElement = (groupIndex, element, property, value) => {
     const updatedGroups = [...groups];
     const currentStyles = updatedGroups[groupIndex].elements[element] || {};
+
+    // Validate CSS values and warn about common issues
+    if (value && typeof value === 'string') {
+      // Check for duplicate units (e.g., "36pxpx", "2remrem")
+      const duplicateUnitPattern = /(px|rem|em|%|vh|vw|ch|ex){2,}/;
+      if (duplicateUnitPattern.test(value)) {
+        addNotification({ 
+          type: 'warning', 
+          message: `Invalid CSS value "${value}" for ${property} - contains duplicate units. Please correct this value.` 
+        });
+      }
+
+      // Check for triple quotes in font-family
+      if (property === 'fontFamily' && (value.includes('"""') || value.includes("'''"))) {
+        addNotification({ 
+          type: 'warning', 
+          message: `Invalid font-family value "${value}" - contains triple quotes. Please correct this value.` 
+        });
+      }
+
+      // Check for malformed numeric values
+      const numericProperties = ['fontSize', 'lineHeight', 'marginTop', 'marginBottom', 'letterSpacing', 'padding', 'margin'];
+      if (numericProperties.includes(property)) {
+        // Value should be: number + unit, or just a number (unitless)
+        const validNumericPattern = /^-?\d+(\.\d+)?(px|rem|em|%|vh|vw|ch|ex)?$/;
+        if (!validNumericPattern.test(value) && value !== '' && value !== 'auto' && value !== 'inherit' && value !== 'normal') {
+          addNotification({ 
+            type: 'warning', 
+            message: `Invalid numeric value "${value}" for ${property}. Expected format: number + unit (e.g., "16px", "1.5rem")` 
+          });
+        }
+      }
+    }
 
     updatedGroups[groupIndex] = {
       ...updatedGroups[groupIndex],

@@ -1251,6 +1251,8 @@ class PageTheme(models.Model):
             slot: Optional slot name for filtering
             frontend_scoped: If True, prepend .cms-content to all selectors
         """
+        import re
+        
         css_parts = []
 
         # When generating complete CSS, include ALL groups (don't filter)
@@ -1406,20 +1408,31 @@ class PageTheme(models.Model):
 
                         for font in fonts:
                             trimmed = font.strip()
-                            # If already quoted or is a generic family, leave as-is
-                            if (
-                                trimmed.startswith('"')
-                                or trimmed.startswith("'")
-                                or trimmed in generic_families
-                            ):
-                                quoted_fonts.append(trimmed)
-                            # If contains spaces, wrap in quotes
-                            elif " " in trimmed:
-                                quoted_fonts.append(f'"{trimmed}"')
+                            
+                            # Remove ALL quotes (both single and double) from the font name
+                            # This handles cases like 'Source Sans 3", "Source Sans 3', etc.
+                            unquoted = re.sub(r'["\']', '', trimmed)
+                            
+                            # If it's a generic family, use without quotes
+                            if unquoted in generic_families:
+                                quoted_fonts.append(unquoted)
+                            # If contains spaces, wrap in double quotes
+                            elif " " in unquoted:
+                                quoted_fonts.append(f'"{unquoted}"')
+                            # Single word font names don't need quotes
                             else:
-                                quoted_fonts.append(trimmed)
+                                quoted_fonts.append(unquoted)
 
                         property_value = ", ".join(quoted_fonts)
+                    
+                    # Sanitize duplicate units (e.g., "36pxpx" -> "36px", "2remrem" -> "2rem")
+                    # This fixes legacy data that may have accumulated duplicate units
+                    duplicate_unit_pattern = r'^([-\d.]+)(px|rem|em|%|vh|vw|ch|ex)\2+$'
+                    match = re.match(duplicate_unit_pattern, str(property_value))
+                    if match:
+                        # Extract number and first unit only
+                        property_value = f"{match.group(1)}{match.group(2)}"
+                    
                     # Handle list-specific properties
                     if element in ["ul", "ol"] and property_name == "bulletType":
                         css_property = "list-style-type"

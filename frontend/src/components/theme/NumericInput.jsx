@@ -44,7 +44,19 @@ const NumericInput = ({
         // Parse numeric value with unit
         const match = strValue.match(/^([-\d.]+)(.*)$/);
         if (match) {
-            const [, num, u] = match;
+            let [, num, u] = match;
+            
+            // Defensive: Check for duplicate units (e.g., "pxpx", "remrem")
+            // This can happen if values are saved multiple times
+            const duplicateUnitPattern = /^(px|rem|em|%|vh|vw|ch|ex)(px|rem|em|%|vh|vw|ch|ex)+$/;
+            if (u && duplicateUnitPattern.test(u)) {
+                // Extract just the first unit
+                const firstUnitMatch = u.match(/^(px|rem|em|%|vh|vw|ch|ex)/);
+                if (firstUnitMatch) {
+                    u = firstUnitMatch[1];
+                }
+            }
+            
             setMode('numeric');
             setNumericValue(num);
             setUnit(u || (allowUnitless ? '' : (units[0] || 'rem')));
