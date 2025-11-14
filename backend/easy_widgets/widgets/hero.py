@@ -111,7 +111,7 @@ class HeroWidget(BaseWidget):
     widget_css = """
     .widget-type-easy-widgets-herowidget {
         position: relative;
-        padding: var(--hero-padding, 4rem 2rem);
+        padding: 0;
         background-color: var(--hero-bg-color);
         color: var(--hero-text-color);
         overflow: hidden;
@@ -151,7 +151,7 @@ class HeroWidget(BaseWidget):
     
     @media (max-width: 768px) {
         .widget-type-easy-widgets-herowidget {
-            padding: var(--hero-padding-mobile, 2rem 1rem);
+            padding: 0;
         }
         
         .widget-type-easy-widgets-herowidget .before-text {

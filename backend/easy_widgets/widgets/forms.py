@@ -53,28 +53,6 @@ class FormsConfig(BaseModel):
         populate_by_name=True,
     )
 
-    anchor: str = Field(
-        "",
-        description="Anchor ID for linking to this section",
-        json_schema_extra={
-            "component": "TextInput",
-            "placeholder": "section-name",
-            "order": 0,
-            "group": "Content",
-        },
-    )
-    anchor_title: str = Field(
-        "",
-        description="Anchor Title (for navigation menus)",
-        json_schema_extra={
-            "component": "TextInput",
-            "placeholder": "Display name for navigation",
-            "helpText": "Displayed in navigation menus when linking to this form",
-            "order": 0,
-            "group": "Content",
-        },
-    )
-
     title: str = Field(
         ...,
         min_length=1,
@@ -192,6 +170,27 @@ class FormsConfig(BaseModel):
         description="Component style from theme",
         json_schema_extra={
             "component": "ComponentStyleSelector",
+        },
+    )
+    anchor: str = Field(
+        "",
+        description="Anchor ID for linking to this section",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "section-name",
+            "order": 9999,
+            "group": "Advanced",
+        },
+    )
+    anchor_title: str = Field(
+        "",
+        description="Anchor title (for navigation menus)",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "Display name for navigation",
+            "helpText": "Displayed in navigation menus when linking to this form",
+            "order": 10000,
+            "group": "Advanced",
         },
     )
 

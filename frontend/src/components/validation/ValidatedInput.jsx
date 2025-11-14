@@ -115,7 +115,14 @@ export default function ValidatedInput({
             'autoValidate', 'debounceMs', 'minItems', 'maxItems',
             'minWidth', 'minHeight', 'mediaTypes', 'allowedMimeTypes',
             'autoTags', 'defaultCollection', 'allowedExtensions',
-            'allowedFileTypes', 'fileTypeLabel'
+            'allowedFileTypes', 'fileTypeLabel', 'helpText',
+            // Schema metadata props
+            'componentType', 'propertyOrder', 'relationshipType',
+            'allowedObjectTypes', 'component', 'category', 'order',
+            'conditionalOn', 'itemSchema', 'itemLabelTemplate',
+            // Widget/form-specific props
+            'onFieldChange', 'onFieldValidation', 'validateOnChange',
+            'validateOnBlur', 'isDirty', 'isTouched'
         ]
 
         // Filter props to only include valid HTML attributes

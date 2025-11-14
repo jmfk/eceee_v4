@@ -10,14 +10,14 @@
  * Handles both camelCase and snake_case field names
  * 
  * @param {string} fieldName - Field name in camelCase or snake_case
- * @returns {string} Human-readable label in Title Case
+ * @returns {string} Human-readable label in Sentence case (first letter capitalized)
  * 
  * @example
- * formatFieldLabel('backgroundImage') // "Background Image"
- * formatFieldLabel('background_image') // "Background Image"
- * formatFieldLabel('maxWidth') // "Max Width"
- * formatFieldLabel('seoTitle') // "Seo Title"
- * formatFieldLabel('URLPath') // "URL Path"
+ * formatFieldLabel('backgroundImage') // "Background image"
+ * formatFieldLabel('background_image') // "Background image"
+ * formatFieldLabel('maxWidth') // "Max width"
+ * formatFieldLabel('anchorTitle') // "Anchor title"
+ * formatFieldLabel('URLPath') // "URL path"
  */
 export function formatFieldLabel(fieldName) {
     if (!fieldName || typeof fieldName !== 'string') {
@@ -37,8 +37,8 @@ export function formatFieldLabel(fieldName) {
     // Trim any extra whitespace
     label = label.trim()
 
-    // Capitalize the first letter of each word (Title Case)
-    label = label.replace(/\b\w/g, char => char.toUpperCase())
+    // Convert to sentence case (only capitalize first letter)
+    label = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()
 
     return label
 }

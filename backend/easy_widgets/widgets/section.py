@@ -29,30 +29,6 @@ class SectionConfig(BaseModel):
         },
     )
 
-    anchor: Optional[str] = Field(
-        None,
-        description="Anchor name for linking (auto-generated from title)",
-        json_schema_extra={
-            "component": "TextInput",
-            "order": 2,
-            "group": "Content",
-            "placeholder": "Auto-generated from title",
-            "helpText": "Used for page navigation and deep linking",
-        },
-    )
-
-    anchor_title: Optional[str] = Field(
-        None,
-        description="Anchor Title (for navigation menus)",
-        json_schema_extra={
-            "component": "TextInput",
-            "order": 3,
-            "group": "Content",
-            "placeholder": "Auto-generated from title",
-            "helpText": "Displayed in navigation menus when linking to this section",
-        },
-    )
-
     enable_collapse: bool = Field(
         False,
         description="Enable collapsible functionality",
@@ -93,6 +69,30 @@ class SectionConfig(BaseModel):
             "component": "ComponentStyleSelector",
             "order": 7,
             "group": "Display Options",
+        },
+    )
+
+    anchor: Optional[str] = Field(
+        None,
+        description="Anchor name for linking (auto-generated from title)",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 9999,
+            "group": "Advanced",
+            "placeholder": "Auto-generated from title",
+            "helpText": "Used for page navigation and deep linking",
+        },
+    )
+
+    anchor_title: Optional[str] = Field(
+        None,
+        description="Anchor title (for navigation menus)",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 10000,
+            "group": "Advanced",
+            "placeholder": "Auto-generated from title",
+            "helpText": "Displayed in navigation menus when linking to this section",
         },
     )
 
