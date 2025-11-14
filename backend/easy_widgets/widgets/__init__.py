@@ -7,6 +7,7 @@ This module contains individual widget implementations organized into separate f
 # Import all widget classes to make them available when the module is imported
 from .content import ContentWidget
 from .content_card import ContentCardWidget
+from .banner import BannerWidget
 from .image import ImageWidget
 from .table import TableWidget
 from .footer import FooterWidget
@@ -29,6 +30,7 @@ from .sidebar_top_news import SidebarTopNewsWidget
 __all__ = [
     "ContentWidget",
     "ContentCardWidget",
+    "BannerWidget",
     "ImageWidget",
     "TableWidget",
     "FooterWidget",
