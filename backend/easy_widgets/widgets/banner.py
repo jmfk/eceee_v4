@@ -21,13 +21,36 @@ class BannerConfig(BaseModel):
         populate_by_name=True,
     )
 
+    bannerMode: Literal["header", "text"] = Field(
+        "text",
+        description="Banner mode: header (H2 text-only) or text (rich text)",
+        json_schema_extra={
+            "component": "SelectInput",
+            "options": [
+                {"label": "Header Mode", "value": "header"},
+                {"label": "Text Mode", "value": "text"},
+            ],
+            "order": 1,
+            "group": "Content",
+        },
+    )
     content: str = Field(
         "",
         description="Rich text content for the text block",
         json_schema_extra={
             "component": "RichTextInput",
             "rows": 6,
-            "order": 1,
+            "order": 2,
+            "group": "Content",
+        },
+    )
+    backgroundImage: Optional[str] = Field(
+        None,
+        description="Background image (cover)",
+        json_schema_extra={
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "order": 3,
             "group": "Content",
         },
     )
@@ -40,7 +63,7 @@ class BannerConfig(BaseModel):
                 {"label": "Left", "value": "left"},
                 {"label": "Right", "value": "right"},
             ],
-            "order": 2,
+            "order": 4,
             "group": "Layout",
         },
     )
@@ -54,7 +77,7 @@ class BannerConfig(BaseModel):
                 {"label": "2 Images", "value": 2},
                 {"label": "4 Images (no text)", "value": 4},
             ],
-            "order": 3,
+            "order": 5,
             "group": "Layout",
         },
     )
@@ -64,7 +87,7 @@ class BannerConfig(BaseModel):
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
-            "order": 4,
+            "order": 6,
             "group": "Images",
         },
     )
@@ -74,7 +97,7 @@ class BannerConfig(BaseModel):
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
-            "order": 5,
+            "order": 7,
             "group": "Images",
             "conditionalOn": {"imageCount": [2, 4]},
         },
@@ -85,7 +108,7 @@ class BannerConfig(BaseModel):
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
-            "order": 6,
+            "order": 8,
             "group": "Images",
             "conditionalOn": {"imageCount": [4]},
         },
@@ -96,7 +119,7 @@ class BannerConfig(BaseModel):
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
-            "order": 7,
+            "order": 9,
             "group": "Images",
             "conditionalOn": {"imageCount": [4]},
         },
@@ -106,7 +129,7 @@ class BannerConfig(BaseModel):
         description="Component style from theme",
         json_schema_extra={
             "component": "ComponentStyleSelector",
-            "order": 8,
+            "order": 10,
             "group": "Styling",
         },
     )
@@ -145,6 +168,7 @@ class BannerWidget(BaseWidget):
 
     widget_css = """
     .banner-widget {
+        position: relative;
         display: flex;
         flex-direction: column;
         width: 100%;
@@ -154,7 +178,22 @@ class BannerWidget(BaseWidget):
         box-shadow: var(--card-shadow, none);
     }
     
+    .banner-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        z-index: 0;
+        opacity: 0.8;
+    }
+    
     .banner-body {
+        position: relative;
+        z-index: 1;
         display: flex;
         flex: 1;
         min-height: 0;
@@ -339,10 +378,16 @@ class BannerWidget(BaseWidget):
         )
 
         # Add banner specific context
+        context["bannerMode"] = config.get("banner_mode") or config.get(
+            "bannerMode", "text"
+        )
         context["textPosition"] = config.get("text_position") or config.get(
             "textPosition", "left"
         )
         context["imageCount"] = config.get("image_count") or config.get("imageCount", 1)
+        context["backgroundImage"] = config.get("background_image") or config.get(
+            "backgroundImage"
+        )
 
         # Add image URLs
         context["image1"] = config.get("image1") or config.get("image_1")
@@ -361,6 +406,9 @@ class BannerWidget(BaseWidget):
         template_config = config.copy() if config else {}
 
         # Ensure snake_case fields for template
+        template_config["banner_mode"] = config.get("bannerMode") or config.get(
+            "banner_mode", "text"
+        )
         template_config["text_position"] = config.get("textPosition") or config.get(
             "text_position", "left"
         )
@@ -369,6 +417,9 @@ class BannerWidget(BaseWidget):
         )
         template_config["component_style"] = config.get("componentStyle") or config.get(
             "component_style", "default"
+        )
+        template_config["background_image"] = config.get("backgroundImage") or config.get(
+            "background_image"
         )
 
         # Convert image fields from camelCase to snake_case for template

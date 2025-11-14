@@ -1,12 +1,23 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Sparkles } from 'lucide-react'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
+import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { useEditorContext } from '../../contexts/unified-data/hooks'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
 
 /**
  * EASY Hero Widget Component
  * Hero section with header text, optional before/after text, background image, and customizable colors
  */
-const HeroWidget = ({ config = {}, mode = 'preview' }) => {
+const HeroWidget = ({ 
+    config = {}, 
+    mode = 'preview',
+    widgetId = null,
+    slotName = null,
+    onConfigChange = null,
+    widgetPath = []
+}) => {
     // Extract configuration with defaults
     const {
         header = '',
@@ -22,6 +33,19 @@ const HeroWidget = ({ config = {}, mode = 'preview' }) => {
     // State for optimized image URL
     const [backgroundUrl, setBackgroundUrl] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
+
+    // UDC Integration
+    const { publishUpdate } = useUnifiedData()
+    const contextType = useEditorContext()
+    const componentId = useMemo(() => `herowidget-${widgetId || 'preview'}`, [widgetId])
+
+    // Refs for editor renderers
+    const headerEditorRef = useRef(null)
+    const beforeTextEditorRef = useRef(null)
+    const afterTextEditorRef = useRef(null)
+    const headerContainerRef = useRef(null)
+    const beforeTextContainerRef = useRef(null)
+    const afterTextContainerRef = useRef(null)
 
     // Load optimized background image URL from backend API
     useEffect(() => {
@@ -103,6 +127,130 @@ const HeroWidget = ({ config = {}, mode = 'preview' }) => {
         color: textColor,
     }
 
+    // Content change handlers
+    const handleHeaderChange = useCallback((newContent) => {
+        if (widgetId && slotName) {
+            const updatedConfig = { ...config, header: newContent }
+            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                config: updatedConfig,
+                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+                slotName: slotName,
+                contextType: contextType
+            })
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+        }
+    }, [componentId, widgetId, slotName, config, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    const handleBeforeTextChange = useCallback((newContent) => {
+        if (widgetId && slotName) {
+            const updatedConfig = { ...config, beforeText: newContent }
+            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                config: updatedConfig,
+                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+                slotName: slotName,
+                contextType: contextType
+            })
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+        }
+    }, [componentId, widgetId, slotName, config, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    const handleAfterTextChange = useCallback((newContent) => {
+        if (widgetId && slotName) {
+            const updatedConfig = { ...config, afterText: newContent }
+            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                config: updatedConfig,
+                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+                slotName: slotName,
+                contextType: contextType
+            })
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+        }
+    }, [componentId, widgetId, slotName, config, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    // Initialize editors in editor mode
+    useEffect(() => {
+        if (mode === 'editor') {
+            // Initialize header editor
+            if (headerContainerRef.current && !headerEditorRef.current) {
+                headerEditorRef.current = new SimpleTextEditorRenderer(headerContainerRef.current, {
+                    content: header,
+                    mode: 'text-only',
+                    onChange: handleHeaderChange,
+                    placeholder: 'Enter hero header...',
+                    element: 'h1'
+                })
+                headerEditorRef.current.render()
+            }
+
+            // Initialize beforeText editor if needed
+            if (beforeText || beforeTextContainerRef.current) {
+                if (beforeTextContainerRef.current && !beforeTextEditorRef.current) {
+                    beforeTextEditorRef.current = new SimpleTextEditorRenderer(beforeTextContainerRef.current, {
+                        content: beforeText,
+                        mode: 'text-only',
+                        onChange: handleBeforeTextChange,
+                        placeholder: 'Enter text before header...',
+                        element: 'h5'
+                    })
+                    beforeTextEditorRef.current.render()
+                }
+            }
+
+            // Initialize afterText editor if needed
+            if (afterText || afterTextContainerRef.current) {
+                if (afterTextContainerRef.current && !afterTextEditorRef.current) {
+                    afterTextEditorRef.current = new SimpleTextEditorRenderer(afterTextContainerRef.current, {
+                        content: afterText,
+                        mode: 'text-only',
+                        onChange: handleAfterTextChange,
+                        placeholder: 'Enter text after header...',
+                        element: 'h6'
+                    })
+                    afterTextEditorRef.current.render()
+                }
+            }
+        }
+
+        return () => {
+            if (headerEditorRef.current) {
+                headerEditorRef.current.destroy()
+                headerEditorRef.current = null
+            }
+            if (beforeTextEditorRef.current) {
+                beforeTextEditorRef.current.destroy()
+                beforeTextEditorRef.current = null
+            }
+            if (afterTextEditorRef.current) {
+                afterTextEditorRef.current.destroy()
+                afterTextEditorRef.current = null
+            }
+        }
+    }, [mode])
+
+    // Update editor content when config changes externally
+    useEffect(() => {
+        if (mode === 'editor') {
+            if (headerEditorRef.current) {
+                headerEditorRef.current.updateConfig({ content: header })
+            }
+            if (beforeTextEditorRef.current) {
+                beforeTextEditorRef.current.updateConfig({ content: beforeText })
+            }
+            if (afterTextEditorRef.current) {
+                afterTextEditorRef.current.updateConfig({ content: afterText })
+            }
+        }
+    }, [header, beforeText, afterText, mode])
+
     // Editor mode: show placeholder if no header
     if (mode === 'editor') {
         if (!header) {
@@ -124,17 +272,9 @@ const HeroWidget = ({ config = {}, mode = 'preview' }) => {
                 )}
                 {backgroundStyle && <div style={backgroundStyle} />}
                 <div style={contentStyle}>
-                    {beforeText && (
-                        <div className="before-text" style={beforeTextStyle}>
-                            {beforeText}
-                        </div>
-                    )}
-                    <h1 style={headerStyle}>{header}</h1>
-                    {afterText && (
-                        <div className="after-text" style={afterTextStyle}>
-                            {afterText}
-                        </div>
-                    )}
+                    <div className="before-text" style={beforeTextStyle} ref={beforeTextContainerRef} />
+                    <div style={headerStyle} ref={headerContainerRef} />
+                    <div className="after-text" style={afterTextStyle} ref={afterTextContainerRef} />
                 </div>
                 <style dangerouslySetInnerHTML={{
                     __html: `
@@ -145,10 +285,10 @@ const HeroWidget = ({ config = {}, mode = 'preview' }) => {
                         .hero-widget h1 {
                             font-size: 2rem !important;
                         }
-                        .hero-widget .before-text {
+                        .hero-widget .before-text h5 {
                             font-size: 1rem !important;
                         }
-                        .hero-widget .after-text {
+                        .hero-widget .after-text h6 {
                             font-size: 1.125rem !important;
                         }
                     }

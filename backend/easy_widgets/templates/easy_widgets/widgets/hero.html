@@ -7,13 +7,13 @@
     
     <div class="hero-content">
         {% if config.before_text %}
-            <div class="before-text">{{ config.before_text|linebreaks }}</div>
+            <h5 class="before-text">{{ config.before_text|linebreaksbr }}</h5>
         {% endif %}
         
         <h1>{{ config.header }}</h1>
         
         {% if config.after_text %}
-            <div class="after-text">{{ config.after_text|linebreaks }}</div>
+            <h6 class="after-text">{{ config.after_text|linebreaksbr }}</h6>
         {% endif %}
     </div>
 </div>

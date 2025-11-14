@@ -7,6 +7,11 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from webpages.utils.mustache_renderer import (
+    render_mustache,
+    prepare_component_context,
+)
+from django.template.loader import render_to_string
 
 
 class HeroConfig(BaseModel):
@@ -115,6 +120,7 @@ class HeroWidget(BaseWidget):
         background-color: var(--hero-bg-color);
         color: var(--hero-text-color);
         overflow: hidden;
+        height: var(--hero-height, 310px);
     }
     
     .widget-type-easy-widgets-herowidget .hero-background {
@@ -135,20 +141,34 @@ class HeroWidget(BaseWidget):
         max-width: var(--hero-max-width, 1200px);
         margin: 0 auto;
         text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
+        padding-bottom: 12px;
     }
-    
+
+    .widget-type-easy-widgets-herowidget h1 {
+        font-family: "Source Sans 3", sans-serif;
+        font-weight: var(--hero-header-font-weight, 500); ;
+        font-size: var(--hero-header-size, 41px);
+        line-height: var(--hero-header-line-height, 44px);
+        margin-top: var(--hero-header-margin-top, 16px);;
+        margin-bottom: var(--hero-header-margin-bottom, 16px);;
+    }
+
     .widget-type-easy-widgets-herowidget .before-text {
-        font-size: var(--hero-before-text-size, 1.125rem);
-        margin-bottom: var(--hero-before-text-margin, 1rem);
-        color: var(--hero-decor-color);
+        font-size: var(--hero-before-text-size, 24px);
+        line-height: var(--hero-before-text-line-height, 24px);
+        margin: 0;
     }
     
     .widget-type-easy-widgets-herowidget .after-text {
-        font-size: var(--hero-after-text-size, 1.25rem);
-        margin-top: var(--hero-after-text-margin, 1rem);
-        color: var(--hero-text-color);
+        font-size: var(--hero-after-text-size, 24px);
+        line-height: var(--hero-after-text-line-height, 24px);
+        margin: 0;
     }
-    
+    font-size: 41px;
     @media (max-width: 768px) {
         .widget-type-easy-widgets-herowidget {
             padding: 0;
@@ -165,20 +185,21 @@ class HeroWidget(BaseWidget):
     """
 
     css_variables = {
-        "hero-padding": "4rem 2rem",
-        "hero-padding-mobile": "2rem 1rem",
+        "hero-padding": "0",
+        "hero-padding-mobile": "0",
         "hero-max-width": "1200px",
-        "hero-header-size": "3rem",
-        "hero-header-size-mobile": "2rem",
+        "hero-height": "310px",
+        "hero-height-mobile": "310px",
         "hero-header-weight": "700",
-        "hero-header-margin": "1rem 0",
-        "hero-header-line-height": "1.2",
-        "hero-before-text-size": "1.125rem",
-        "hero-before-text-size-mobile": "1rem",
-        "hero-before-text-margin": "1rem",
-        "hero-after-text-size": "1.25rem",
-        "hero-after-text-size-mobile": "1.125rem",
-        "hero-after-text-margin": "1rem",
+        "hero-header-size": "41px",
+        "hero-header-margin-top": "16px",
+        "hero-header-margin-bottom": "16px",
+        "hero-before-text-size": "24px",
+        "hero-before-text-size-mobile": "24px",
+        "hero-before-text-line-height": "24px",
+        "hero-after-text-size": "24px",
+        "hero-after-text-size-mobile": "24px",
+        "hero-after-text-line-height": "24px",
     }
 
     css_scope = "widget"
@@ -198,11 +219,6 @@ class HeroWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
-        from django.template.loader import render_to_string
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
@@ -221,8 +237,8 @@ class HeroWidget(BaseWidget):
 
         # Prepare context with rendered hero as content
         context = prepare_component_context(
-            content=hero_html, 
-            anchor="", 
+            content=hero_html,
+            anchor="",
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
         )

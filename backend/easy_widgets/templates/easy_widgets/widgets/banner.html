@@ -9,6 +9,11 @@
 {% endif %}
 
 <div class="banner-widget widget-type-{{ widget_type.css_class_name }} cms-content"{% if config.anchor %} id="{{ config.anchor }}"{% endif %}>
+    {# Background image if provided #}
+    {% if config.background_image %}
+        <div class="banner-background" style="background-image: url('{% imgproxy config.background_image width=1920 height=600 resize_type='fill' %}');"></div>
+    {% endif %}
+
     <div class="banner-body text-{{ config.text_position|default:'left' }} image-count-{{ config.image_count|default:1 }}">
         {% if config.image_count == 4 %}
             {# 4 images layout - no text, just images in a row #}

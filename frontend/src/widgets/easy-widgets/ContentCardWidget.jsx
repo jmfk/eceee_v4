@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { FileText } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
@@ -7,6 +7,8 @@ import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
+import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
 
 /**
  * EASY Content Card Widget Component
@@ -27,11 +29,17 @@ const ContentCardWidget = ({
     const { currentTheme } = useTheme({ pageId })
 
     // UDC Integration
-    const { useExternalChanges, getState } = useUnifiedData()
+    const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `contentcardwidget-${widgetId || 'preview'}`, [widgetId])
     const contextType = useEditorContext()
 
     const [localConfig, setLocalConfig] = useState(config)
+
+    // Refs for editor renderers
+    const headerEditorRef = useRef(null)
+    const contentEditorRef = useRef(null)
+    const headerContainerRef = useRef(null)
+    const contentContainerRef = useRef(null)
 
     // State for optimized image URLs
     const [image1Url, setImage1Url] = useState('')
@@ -119,6 +127,93 @@ const ContentCardWidget = ({
     // Determine text position
     const textPosition = localConfig.textPosition || 'left'
 
+    // Content change handlers
+    const handleHeaderChange = useCallback((newContent) => {
+        if (widgetId && slotName) {
+            const updatedConfig = { ...localConfig, header: newContent }
+            setLocalConfig(updatedConfig)
+            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                config: updatedConfig,
+                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+                slotName: slotName,
+                contextType: contextType
+            })
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+        }
+    }, [componentId, widgetId, slotName, localConfig, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    const handleContentChange = useCallback((newContent) => {
+        if (widgetId && slotName) {
+            const updatedConfig = { ...localConfig, content: newContent }
+            setLocalConfig(updatedConfig)
+            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                config: updatedConfig,
+                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+                slotName: slotName,
+                contextType: contextType
+            })
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+        }
+    }, [componentId, widgetId, slotName, localConfig, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    // Initialize editors in editor mode
+    useEffect(() => {
+        if (mode === 'editor') {
+            // Initialize header editor
+            if (headerContainerRef.current && !headerEditorRef.current) {
+                headerEditorRef.current = new SimpleTextEditorRenderer(headerContainerRef.current, {
+                    content: localConfig.header || '',
+                    mode: 'text-only',
+                    onChange: handleHeaderChange,
+                    placeholder: 'Enter card header...',
+                    element: 'h2'
+                })
+                headerEditorRef.current.render()
+            }
+
+            // Initialize content editor
+            if (contentContainerRef.current && !contentEditorRef.current && imageCount !== 4) {
+                contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
+                    content: localConfig.content || '',
+                    mode: 'inline-rich',
+                    onChange: handleContentChange,
+                    placeholder: 'Enter card content...',
+                    element: 'div'
+                })
+                contentEditorRef.current.render()
+            }
+        }
+
+        return () => {
+            if (headerEditorRef.current) {
+                headerEditorRef.current.destroy()
+                headerEditorRef.current = null
+            }
+            if (contentEditorRef.current) {
+                contentEditorRef.current.destroy()
+                contentEditorRef.current = null
+            }
+        }
+    }, [mode, imageCount])
+
+    // Update editor content when config changes externally
+    useEffect(() => {
+        if (mode === 'editor') {
+            if (headerEditorRef.current) {
+                headerEditorRef.current.updateConfig({ content: localConfig.header || '' })
+            }
+            if (contentEditorRef.current && imageCount !== 4) {
+                contentEditorRef.current.updateConfig({ content: localConfig.content || '' })
+            }
+        }
+    }, [localConfig.header, localConfig.content, mode, imageCount])
+
     // Check if using component style with Mustache template
     const componentStyle = localConfig.componentStyle || 'default'
     const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles
@@ -193,6 +288,39 @@ const ContentCardWidget = ({
             `text-${textPosition}`,
             `image-count-${imageCount}`
         ].join(' ')
+
+        if (mode === 'editor') {
+            return (
+                <div
+                    className="content-card-widget"
+                    id={localConfig.anchor || undefined}
+                >
+                    <div className="content-card-header" ref={headerContainerRef} />
+
+                    <div className={bodyClasses}>
+                        {imageCount === 4 ? (
+                            // 4 images layout - no text
+                            <div className="content-card-images layout-4">
+                                {image1Url && <img src={image1Url} alt="" />}
+                                {image2Url && <img src={image2Url} alt="" />}
+                                {image3Url && <img src={image3Url} alt="" />}
+                                {image4Url && <img src={image4Url} alt="" />}
+                            </div>
+                        ) : (
+                            // 1 or 2 images layout - with text
+                            <>
+                                <div className="content-card-text" ref={contentContainerRef} />
+
+                                <div className={`content-card-images layout-${imageCount}`}>
+                                    {image1Url && <img src={image1Url} alt="" />}
+                                    {image2Url && imageCount >= 2 && <img src={image2Url} alt="" />}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )
+        }
 
         return (
             <div
