@@ -254,13 +254,6 @@ const IsolatedFormRenderer = React.memo(({
                 })}
         </div>
     )
-}, (prevProps, nextProps) => {
-    // Custom comparison: only re-render if widget data or schema changes
-    // Ignore callback prop changes to prevent unnecessary re-renders
-    return (
-        prevProps.initWidgetData === nextProps.initWidgetData &&
-        prevProps.initschema === nextProps.initschema
-    )
 })
 
 export default IsolatedFormRenderer
