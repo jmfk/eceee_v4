@@ -194,7 +194,7 @@ const CSS_PROPERTIES = {
 
 const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => {
   const groups = designGroups?.groups || [];
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [expandedContent, setExpandedContent] = useState({});
   const [expandedTags, setExpandedTags] = useState({});
   const [expandedTargeting, setExpandedTargeting] = useState({});
   const [expandedLayoutProps, setExpandedLayoutProps] = useState({});
@@ -228,7 +228,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
       groups: [...groups, newGroup],
     };
     onChange(updatedDesignGroups);
-    setExpandedGroups({ ...expandedGroups, [groups.length]: true });
+    setExpandedContent({ ...expandedContent, [groups.length]: true });
   };
 
   const handleRemoveGroup = (index) => {
@@ -236,10 +236,10 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
-  const toggleGroup = (index) => {
-    setExpandedGroups({
-      ...expandedGroups,
-      [index]: !expandedGroups[index],
+  const toggleContent = (index) => {
+    setExpandedContent({
+      ...expandedContent,
+      [index]: !expandedContent[index],
     });
   };
 
@@ -554,7 +554,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         };
 
         onChange({ ...(designGroups || {}), groups: [...groups, newGroup] });
-        setExpandedGroups({ ...expandedGroups, [groups.length]: true });
+        setExpandedContent({ ...expandedContent, [groups.length]: true });
 
         let message = `Created new group with ${Object.keys(elements).length} elements`;
         if (warnings.length > 0) {
@@ -910,7 +910,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     onChange(updatedTypography);
 
     // Auto-expand the new group
-    setExpandedGroups({ ...expandedGroups, [groups.length]: true });
+    setExpandedContent({ ...expandedContent, [groups.length]: true });
   };
 
   const getTagGroupsInGroup = (group) => {
@@ -1045,7 +1045,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         <div className="lg:col-span-2 space-y-4">
           {groups.length > 0 ? (
             groups.map((group, groupIndex) => {
-              const isExpanded = expandedGroups[groupIndex];
               const tagGroupsInGroup = getTagGroupsInGroup(group);
               const availableTagGroups = getAvailableTagGroups(group);
 
@@ -1057,18 +1056,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                   {/* Group Header */}
                   <div className="p-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
                     <div className="flex items-center gap-3 mb-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(groupIndex)}
-                        className="text-gray-600 hover:text-gray-900 transition-colors"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="w-5 h-5" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5" />
-                        )}
-                      </button>
-
                       {/* Default Group Radio Button */}
                       <div className="flex items-center gap-1" title="Mark as default/base group">
                         <input
@@ -1219,87 +1206,89 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                         {group.className ? `.${group.className}` : '(global scope)'}
                       </span>
                     </div>
+                  </div>
 
-                    {/* Targeting & Color Scheme */}
-                    <div className="ml-11 mt-3 bg-gray-50 rounded-md border border-gray-200">
-                      {/* Collapsible Header */}
-                      <button
-                        onClick={() => toggleTargeting(groupIndex)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 rounded-t-md transition-colors"
-                      >
-                        {expandedTargeting[groupIndex] ? (
-                          <ChevronDown size={16} className="text-gray-600" />
-                        ) : (
-                          <ChevronRight size={16} className="text-gray-600" />
-                        )}
-                        <span className="text-xs font-medium text-gray-700">
-                          Targeting
-                        </span>
-                      </button>
+                  {/* Targeting Section */}
+                  <div className="border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => toggleTargeting(groupIndex)}
+                      className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      {expandedTargeting[groupIndex] ? (
+                        <ChevronDown size={18} className="text-gray-600" />
+                      ) : (
+                        <ChevronRight size={18} className="text-gray-600" />
+                      )}
+                      <span className="text-sm font-semibold text-gray-900">
+                        Targeting
+                      </span>
+                    </button>
 
-                      {/* Collapsible Content */}
-                      {expandedTargeting[groupIndex] && (
-                        <div className="p-3 border-t border-gray-200">
-                          <div className="grid grid-cols-2 gap-4">
-                            {/* Widget Types (multi-select) */}
-                            <div>
-                              <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
-                              <select
-                                multiple
-                                value={group.widgetTypes || (group.widgetType ? [group.widgetType] : [])}
-                                onChange={(e) => {
-                                  const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
-                                  handleUpdateWidgetTypes(groupIndex, selectedOptions);
-                                }}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                                disabled={isLoadingTypes}
-                              >
-                                {isLoadingTypes ? (
-                                  <option disabled>Loading widget types...</option>
-                                ) : (
-                                  widgetTypes.map(wt => (
-                                    <option key={wt.type} value={wt.type}>{wt.name}</option>
-                                  ))
-                                )}
-                              </select>
-                              <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
-                            </div>
+                    {expandedTargeting[groupIndex] && (
+                      <div className="px-4 pb-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Widget Types (multi-select) */}
+                          <div>
+                            <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
+                            <select
+                              multiple
+                              value={group.widgetTypes || (group.widgetType ? [group.widgetType] : [])}
+                              onChange={(e) => {
+                                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
+                                handleUpdateWidgetTypes(groupIndex, selectedOptions);
+                              }}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                              disabled={isLoadingTypes}
+                            >
+                              {isLoadingTypes ? (
+                                <option disabled>Loading widget types...</option>
+                              ) : (
+                                widgetTypes.map(wt => (
+                                  <option key={wt.type} value={wt.type}>{wt.name}</option>
+                                ))
+                              )}
+                            </select>
+                            <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
+                          </div>
 
-                            {/* Slots (comma-separated) */}
-                            <div>
-                              <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
-                              <input
-                                type="text"
-                                value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
-                                onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="main, sidebar, footer (comma-separated)"
-                              />
-                              <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
-                            </div>
+                          {/* Slots (comma-separated) */}
+                          <div>
+                            <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
+                            <input
+                              type="text"
+                              value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
+                              onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="main, sidebar, footer (comma-separated)"
+                            />
+                            <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Layout Properties Section */}
+                  <div className="border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => toggleLayoutProps(groupIndex)}
+                      className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      {expandedLayoutProps[groupIndex] ? (
+                        <ChevronDown size={18} className="text-gray-600" />
+                      ) : (
+                        <ChevronRight size={18} className="text-gray-600" />
                       )}
-                    </div>
+                      <span className="text-sm font-semibold text-gray-900">
+                        Layout Properties
+                      </span>
+                    </button>
 
-                    {/* Layout Properties */}
-                    {(group.widgetTypes?.length > 0 || group.widgetType) && (
-                      <div className="ml-11 mt-3 bg-blue-50 rounded-md border border-blue-200">
-                        <button
-                          onClick={() => toggleLayoutProps(groupIndex)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-blue-100 rounded-t-md transition-colors"
-                        >
-                          {expandedLayoutProps[groupIndex] ? (
-                            <ChevronDown size={16} className="text-blue-600" />
-                          ) : (
-                            <ChevronRight size={16} className="text-blue-600" />
-                          )}
-                          <span className="text-xs font-medium text-blue-700">
-                            Layout Properties (Responsive)
-                          </span>
-                        </button>
-
-                        {expandedLayoutProps[groupIndex] && (() => {
+                    {expandedLayoutProps[groupIndex] && (
+                      <div className="px-4 pb-4">
+                        {(() => {
                           const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
                           const layoutParts = new Set();
 
@@ -1312,14 +1301,16 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
 
                           if (layoutParts.size === 0) {
                             return (
-                              <div className="p-3 border-t border-blue-200 text-xs text-gray-600">
-                                Selected widgets don't have customizable layout parts.
+                              <div className="text-sm text-gray-600">
+                                {(group.widgetTypes?.length > 0 || group.widgetType)
+                                  ? "Selected widgets don't have customizable layout parts."
+                                  : "Select widget types in the Targeting section to configure layout properties."}
                               </div>
                             );
                           }
 
                           return (
-                            <div className="p-3 border-t border-blue-200 space-y-3">
+                            <div className="space-y-3">
                               {Array.from(layoutParts).map(part => {
                                 const partProps = group.layoutProperties?.[part] || {};
                                 const partKey = `${groupIndex}-${part}`;
@@ -1620,241 +1611,261 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                     )}
                   </div>
 
-                  {/* Group Content */}
-                  {isExpanded && (
-                    <div className="p-4 space-y-4">
-                      {(groupEditMode[groupIndex] || 'tags') === 'css' ? (
-                        /* CSS Editor Mode - Edit all group CSS at once */
-                        <div className="space-y-3">
-                          <div className="text-sm text-gray-600 mb-2">
-                            Edit all CSS for this group. Changes are saved when you click away or switch back to Tags mode.
-                          </div>
-                          <textarea
-                            ref={(el) => {
-                              if (el) cssTextareaRefs.current[`group-${groupIndex}`] = el;
-                            }}
-                            defaultValue={groupElementsToCSS(group.elements || {})}
-                            onChange={() => {
-                              if (onDirty) onDirty();
-                            }}
-                            onBlur={() => handleGroupCSSBlur(groupIndex)}
-                            className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            rows={Math.max(10, Object.keys(group.elements || {}).length * 5)}
-                            placeholder="h1 {&#10;  font-size: 2.5rem;&#10;  font-weight: 700;&#10;}&#10;&#10;p {&#10;  font-size: 1rem;&#10;  line-height: 1.6;&#10;}"
-                          />
-                        </div>
+                  {/* Content Section */}
+                  <div className="border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => toggleContent(groupIndex)}
+                      className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      {expandedContent[groupIndex] ? (
+                        <ChevronDown size={18} className="text-gray-600" />
                       ) : (
-                        /* Tags Mode - Individual tag editors */
-                        <>
-                          {/* Add Tag Buttons */}
-                          {availableTagGroups.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {availableTagGroups.map(tagGroup => (
-                                <button
-                                  key={tagGroup.base}
-                                  type="button"
-                                  onClick={() => handleAddTagGroup(groupIndex, tagGroup)}
-                                  className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                                  title={`Add ${tagGroup.label}`}
-                                >
-                                  + {tagGroup.label}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Tag Groups */}
-                          {tagGroupsInGroup.map((tagGroup) => {
-                            const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? !tagGroup.hasGroup;
-                            const baseStyles = group.elements[tagGroup.base] || {};
-
-                            return (
-                              <div key={tagGroup.base} className="border border-gray-200 rounded-lg overflow-hidden">
-                                {/* Tag Header */}
-                                <div
-                                  className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200"
-                                  onPaste={(e) => handleElementPaste(e, groupIndex, tagGroup.base)}
-                                  tabIndex={-1}
-                                >
-                                  {/* Only show toggle for links */}
-                                  {tagGroup.hasGroup && (
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleTag(groupIndex, tagGroup.base)}
-                                      className="text-gray-600 hover:text-gray-900"
-                                    >
-                                      {isTagExpanded ? (
-                                        <ChevronDown className="w-4 h-4" />
-                                      ) : (
-                                        <ChevronRight className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                  )}
-
-                                  <div className="flex-1">
-                                    <div className="font-mono text-sm font-semibold text-gray-900">{tagGroup.label}</div>
-                                    {tagGroup.hasGroup && (
-                                      <div className="text-xs text-gray-500 font-mono">{tagGroup.variants.join(', ')}</div>
-                                    )}
-                                  </div>
-
-                                  <div className="flex gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => openImportModal('element', groupIndex, tagGroup.base)}
-                                      className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
-                                      title="Import CSS for this element"
-                                    >
-                                      <FileUp className="w-4 h-4" />
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleCopyTag(tagGroup.base, baseStyles)}
-                                      className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                                      title="Copy tag styles"
-                                    >
-                                      {copiedIndicator === `tag-${tagGroup.base}` ? (
-                                        <Check className="w-4 h-4 text-green-600" />
-                                      ) : (
-                                        <Copy className="w-4 h-4" />
-                                      )}
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handlePaste(groupIndex, tagGroup.base)}
-                                      disabled={!clipboard || clipboard.type !== 'tag'}
-                                      className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                      title="Paste tag styles"
-                                    >
-                                      <Clipboard className="w-4 h-4" />
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveTagGroup(groupIndex, tagGroup)}
-                                      className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Tag Content */}
-                                {isTagExpanded && (
-                                  <div className="p-4 space-y-4">
-                                    {/* Render each variant */}
-                                    {tagGroup.variants.map(variant => {
-                                      const styles = group.elements[variant] || {};
-                                      const styleEntries = Object.entries(styles);
-                                      const editModeKey = `${groupIndex}-${tagGroup.base}-${variant}`;
-                                      const currentEditMode = editMode[editModeKey] || 'form';
-
-                                      return (
-                                        <div key={variant} className="space-y-3 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
-                                          <div className="flex items-center justify-between">
-                                            {variant !== tagGroup.base && (
-                                              <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                                                {variant}
-                                              </div>
-                                            )}
-
-                                            {/* Form/CSS Toggle */}
-                                            <div className="flex gap-1 ml-auto">
-                                              <button
-                                                type="button"
-                                                onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
-                                                className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'form'
-                                                  ? 'bg-blue-100 text-blue-700'
-                                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                  }`}
-                                              >
-                                                <FileText className="w-3 h-3 mr-1" />
-                                                Form
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
-                                                className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'css'
-                                                  ? 'bg-blue-100 text-blue-700'
-                                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                  }`}
-                                              >
-                                                <Code className="w-3 h-3 mr-1" />
-                                                CSS
-                                              </button>
-                                            </div>
-                                          </div>
-
-                                          {currentEditMode === 'form' ? (
-                                            /* Form View */
-                                            <>
-                                              {/* Existing Properties */}
-                                              {styleEntries.map(([property, value]) => (
-                                                <div key={property} className="flex gap-2 items-start">
-                                                  <div className="flex-1">
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                      {CSS_PROPERTIES[property]?.label || property}
-                                                    </label>
-                                                    {renderPropertyField(groupIndex, variant, property, value)}
-                                                  </div>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveProperty(groupIndex, variant, property)}
-                                                    className="mt-6 p-1 text-red-600 hover:text-red-700"
-                                                    title="Remove property"
-                                                  >
-                                                    <Trash2 className="w-4 h-4" />
-                                                  </button>
-                                                </div>
-                                              ))}
-
-                                              {/* Add Property */}
-                                              <div className="flex flex-wrap gap-2">
-                                                {Object.entries(CSS_PROPERTIES)
-                                                  .filter(([prop]) => !styles[prop])
-                                                  .map(([prop, config]) => (
-                                                    <button
-                                                      key={prop}
-                                                      type="button"
-                                                      onClick={() => handleUpdateElement(groupIndex, variant, prop, '')}
-                                                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                                                      title={`Add ${config.label}`}
-                                                    >
-                                                      + {config.label}
-                                                    </button>
-                                                  ))}
-                                              </div>
-                                            </>
-                                          ) : (
-                                            /* CSS View - uncontrolled with ref to prevent re-rendering */
-                                            <textarea
-                                              ref={(el) => {
-                                                if (el) cssTextareaRefs.current[editModeKey] = el;
-                                              }}
-                                              defaultValue={stylesToCSS(styles)}
-                                              onChange={() => {
-                                                if (onDirty) onDirty();
-                                              }}
-                                              onBlur={() => handleCSSBlur(groupIndex, variant)}
-                                              className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                              rows={Math.max(5, Object.keys(styles).length + 2)}
-                                              placeholder="property: value;"
-                                            />
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </>
+                        <ChevronRight size={18} className="text-gray-600" />
                       )}
-                    </div>
-                  )}
+                      <span className="text-sm font-semibold text-gray-900">
+                        Content & Styles
+                      </span>
+                      <span className="text-xs text-gray-500 ml-auto">
+                        {tagGroupsInGroup.length} {tagGroupsInGroup.length === 1 ? 'tag' : 'tags'}
+                      </span>
+                    </button>
+
+                    {expandedContent[groupIndex] && (
+                      <div className="p-4 space-y-4">
+                        {(groupEditMode[groupIndex] || 'tags') === 'css' ? (
+                          /* CSS Editor Mode - Edit all group CSS at once */
+                          <div className="space-y-3">
+                            <div className="text-sm text-gray-600 mb-2">
+                              Edit all CSS for this group. Changes are saved when you click away or switch back to Tags mode.
+                            </div>
+                            <textarea
+                              ref={(el) => {
+                                if (el) cssTextareaRefs.current[`group-${groupIndex}`] = el;
+                              }}
+                              defaultValue={groupElementsToCSS(group.elements || {})}
+                              onChange={() => {
+                                if (onDirty) onDirty();
+                              }}
+                              onBlur={() => handleGroupCSSBlur(groupIndex)}
+                              className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              rows={Math.max(10, Object.keys(group.elements || {}).length * 5)}
+                              placeholder="h1 {&#10;  font-size: 2.5rem;&#10;  font-weight: 700;&#10;}&#10;&#10;p {&#10;  font-size: 1rem;&#10;  line-height: 1.6;&#10;}"
+                            />
+                          </div>
+                        ) : (
+                          /* Tags Mode - Individual tag editors */
+                          <>
+                            {/* Add Tag Buttons */}
+                            {availableTagGroups.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {availableTagGroups.map(tagGroup => (
+                                  <button
+                                    key={tagGroup.base}
+                                    type="button"
+                                    onClick={() => handleAddTagGroup(groupIndex, tagGroup)}
+                                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                    title={`Add ${tagGroup.label}`}
+                                  >
+                                    + {tagGroup.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Tag Groups */}
+                            {tagGroupsInGroup.map((tagGroup) => {
+                              const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? !tagGroup.hasGroup;
+                              const baseStyles = group.elements[tagGroup.base] || {};
+
+                              return (
+                                <div key={tagGroup.base} className="border border-gray-200 rounded-lg overflow-hidden">
+                                  {/* Tag Header */}
+                                  <div
+                                    className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200"
+                                    onPaste={(e) => handleElementPaste(e, groupIndex, tagGroup.base)}
+                                    tabIndex={-1}
+                                  >
+                                    {/* Only show toggle for links */}
+                                    {tagGroup.hasGroup && (
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleTag(groupIndex, tagGroup.base)}
+                                        className="text-gray-600 hover:text-gray-900"
+                                      >
+                                        {isTagExpanded ? (
+                                          <ChevronDown className="w-4 h-4" />
+                                        ) : (
+                                          <ChevronRight className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                    )}
+
+                                    <div className="flex-1">
+                                      <div className="font-mono text-sm font-semibold text-gray-900">{tagGroup.label}</div>
+                                      {tagGroup.hasGroup && (
+                                        <div className="text-xs text-gray-500 font-mono">{tagGroup.variants.join(', ')}</div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => openImportModal('element', groupIndex, tagGroup.base)}
+                                        className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                        title="Import CSS for this element"
+                                      >
+                                        <FileUp className="w-4 h-4" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyTag(tagGroup.base, baseStyles)}
+                                        className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                                        title="Copy tag styles"
+                                      >
+                                        {copiedIndicator === `tag-${tagGroup.base}` ? (
+                                          <Check className="w-4 h-4 text-green-600" />
+                                        ) : (
+                                          <Copy className="w-4 h-4" />
+                                        )}
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePaste(groupIndex, tagGroup.base)}
+                                        disabled={!clipboard || clipboard.type !== 'tag'}
+                                        className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Paste tag styles"
+                                      >
+                                        <Clipboard className="w-4 h-4" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveTagGroup(groupIndex, tagGroup)}
+                                        className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Tag Content */}
+                                  {isTagExpanded && (
+                                    <div className="p-4 space-y-4">
+                                      {/* Render each variant */}
+                                      {tagGroup.variants.map(variant => {
+                                        const styles = group.elements[variant] || {};
+                                        const styleEntries = Object.entries(styles);
+                                        const editModeKey = `${groupIndex}-${tagGroup.base}-${variant}`;
+                                        const currentEditMode = editMode[editModeKey] || 'form';
+
+                                        return (
+                                          <div key={variant} className="space-y-3 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
+                                            <div className="flex items-center justify-between">
+                                              {variant !== tagGroup.base && (
+                                                <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                                  {variant}
+                                                </div>
+                                              )}
+
+                                              {/* Form/CSS Toggle */}
+                                              <div className="flex gap-1 ml-auto">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
+                                                  className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'form'
+                                                    ? 'bg-blue-100 text-blue-700'
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                  <FileText className="w-3 h-3 mr-1" />
+                                                  Form
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
+                                                  className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'css'
+                                                    ? 'bg-blue-100 text-blue-700'
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                  <Code className="w-3 h-3 mr-1" />
+                                                  CSS
+                                                </button>
+                                              </div>
+                                            </div>
+
+                                            {currentEditMode === 'form' ? (
+                                              /* Form View */
+                                              <>
+                                                {/* Existing Properties */}
+                                                {styleEntries.map(([property, value]) => (
+                                                  <div key={property} className="flex gap-2 items-start">
+                                                    <div className="flex-1">
+                                                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        {CSS_PROPERTIES[property]?.label || property}
+                                                      </label>
+                                                      {renderPropertyField(groupIndex, variant, property, value)}
+                                                    </div>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleRemoveProperty(groupIndex, variant, property)}
+                                                      className="mt-6 p-1 text-red-600 hover:text-red-700"
+                                                      title="Remove property"
+                                                    >
+                                                      <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                  </div>
+                                                ))}
+
+                                                {/* Add Property */}
+                                                <div className="flex flex-wrap gap-2">
+                                                  {Object.entries(CSS_PROPERTIES)
+                                                    .filter(([prop]) => !styles[prop])
+                                                    .map(([prop, config]) => (
+                                                      <button
+                                                        key={prop}
+                                                        type="button"
+                                                        onClick={() => handleUpdateElement(groupIndex, variant, prop, '')}
+                                                        className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                                        title={`Add ${config.label}`}
+                                                      >
+                                                        + {config.label}
+                                                      </button>
+                                                    ))}
+                                                </div>
+                                              </>
+                                            ) : (
+                                              /* CSS View - uncontrolled with ref to prevent re-rendering */
+                                              <textarea
+                                                ref={(el) => {
+                                                  if (el) cssTextareaRefs.current[editModeKey] = el;
+                                                }}
+                                                defaultValue={stylesToCSS(styles)}
+                                                onChange={() => {
+                                                  if (onDirty) onDirty();
+                                                }}
+                                                onBlur={() => handleCSSBlur(groupIndex, variant)}
+                                                className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                rows={Math.max(5, Object.keys(styles).length + 2)}
+                                                placeholder="property: value;"
+                                              />
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })
