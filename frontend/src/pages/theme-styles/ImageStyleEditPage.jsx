@@ -16,6 +16,7 @@ import { renderMustache, prepareGalleryContext, prepareCarouselContext } from '.
 import StyleAIHelper from '../../components/theme/StyleAIHelper';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { imageStyleScenarios, getScenarioById, getScenariosByType } from '../../utils/imageStyleScenarios';
+import { migrateLegacyCSS, generateCSSFromBreakpoints, getBreakpointLabel } from '../../utils/cssBreakpointUtils';
 
 const ImageStyleEditPage = () => {
     const { themeId, styleKey } = useParams();
@@ -25,7 +26,7 @@ const ImageStyleEditPage = () => {
     const { initTheme, switchTheme, updateThemeField, saveCurrentTheme, getState } = useUnifiedData();
 
     const [template, setTemplate] = useState('');
-    const [css, setCss] = useState('');
+    const [css, setCss] = useState({ default: '' }); // Changed to object for breakpoint support
     const [variables, setVariables] = useState({});
     const [imgproxyConfig, setImgproxyConfig] = useState({});
     const [lightboxConfig, setLightboxConfig] = useState({});
@@ -41,6 +42,7 @@ const ImageStyleEditPage = () => {
     const [copyStatus, setCopyStatus] = useState({ template: false, css: false });
     const [isSaving, setIsSaving] = useState(false);
     const [lightboxExpanded, setLightboxExpanded] = useState(false);
+    const [activeBreakpoint, setActiveBreakpoint] = useState('default');
     
     // New lightbox and default settings
     const [enableLightbox, setEnableLightbox] = useState(true);
@@ -95,9 +97,12 @@ const ImageStyleEditPage = () => {
             const styles = themeData.image_styles || themeData.imageStyles || {};
             const style = styles[styleKey];
             if (style) {
+                // Migrate legacy string CSS to object format
+                const cssData = migrateLegacyCSS(style.css || '');
+                
                 const initialStyle = {
                     template: style.template || '',
-                    css: style.css || '',
+                    css: cssData,
                     variables: style.variables || {},
                     imgproxyConfig: style.imgproxyConfig || {},
                     lightboxConfig: style.lightboxConfig || {},
@@ -114,7 +119,7 @@ const ImageStyleEditPage = () => {
                     defaultAutoPlayInterval: style.defaultAutoPlayInterval || 3,
                 };
                 setTemplate(initialStyle.template);
-                setCss(initialStyle.css);
+                setCss(cssData);
                 setVariables(initialStyle.variables);
                 setImgproxyConfig(initialStyle.imgproxyConfig);
                 setLightboxConfig(initialStyle.lightboxConfig);
@@ -139,7 +144,7 @@ const ImageStyleEditPage = () => {
     const keyChanged = newKey !== styleKey;
     const isDirty = initialData && (
         template !== initialData.template ||
-        css !== initialData.css ||
+        JSON.stringify(css) !== JSON.stringify(initialData.css) ||
         name !== initialData.name ||
         description !== initialData.description ||
         styleType !== initialData.styleType ||
@@ -698,16 +703,39 @@ const ImageStyleEditPage = () => {
                             />
                         </div>
 
-                        {/* CSS Editor */}
+                        {/* CSS Editor with Breakpoints */}
                         <div className="bg-white rounded-lg border p-6">
                             <h3 className="font-semibold text-gray-900 mb-4">CSS Styles</h3>
+                            
+                            {/* Breakpoint Tabs */}
+                            <div className="flex gap-1 mb-2 border-b border-gray-200">
+                                {['default', 'sm', 'md', 'lg', 'xl'].map(bp => (
+                                    <button
+                                        key={bp}
+                                        type="button"
+                                        onClick={() => setActiveBreakpoint(bp)}
+                                        className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
+                                            activeBreakpoint === bp
+                                                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {getBreakpointLabel(bp, themeData)}
+                                    </button>
+                                ))}
+                            </div>
+                            
                             <textarea
-                                value={css}
-                                onChange={(e) => setCss(e.target.value)}
+                                value={css[activeBreakpoint] || ''}
+                                onChange={(e) => setCss({ ...css, [activeBreakpoint]: e.target.value })}
                                 rows={12}
                                 placeholder=".my-style { }"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                             />
+                            
+                            <p className="text-xs text-gray-500 mt-2">
+                                💡 Styles cascade: Default applies to all sizes, then each breakpoint overrides at min-width.
+                            </p>
                         </div>
                     </div>
 

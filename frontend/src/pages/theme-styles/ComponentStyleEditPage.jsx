@@ -14,6 +14,7 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import CodeEditorPanel from '../../components/theme/CodeEditorPanel';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import { scenarios, getScenarioById } from '../../utils/componentStyleScenarios';
+import { migrateLegacyCSS, generateCSSFromBreakpoints, getBreakpointLabel } from '../../utils/cssBreakpointUtils';
 
 const ComponentStyleEditPage = () => {
     const { themeId, styleKey } = useParams();
@@ -22,7 +23,7 @@ const ComponentStyleEditPage = () => {
     const { addNotification } = useGlobalNotifications();
 
     const [template, setTemplate] = useState('');
-    const [css, setCss] = useState('');
+    const [css, setCss] = useState({ default: '' }); // Changed to object for breakpoint support
     const [variables, setVariables] = useState({});
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -32,6 +33,7 @@ const ComponentStyleEditPage = () => {
     const [copyStatus, setCopyStatus] = useState({ template: false, css: false });
     const [newKey, setNewKey] = useState(styleKey);
     const [manualKeyEdit, setManualKeyEdit] = useState(false);
+    const [activeBreakpoint, setActiveBreakpoint] = useState('default');
 
     // Fetch theme data
     const { data: themeData, isLoading } = useQuery({
@@ -46,15 +48,18 @@ const ComponentStyleEditPage = () => {
             const styles = themeData.componentStyles || {};
             const style = styles[styleKey];
             if (style) {
+                // Migrate legacy string CSS to object format
+                const cssData = migrateLegacyCSS(style.css || '');
+                
                 const initialStyle = {
                     template: style.template || '',
-                    css: style.css || '',
+                    css: cssData,
                     variables: style.variables || {},
                     name: style.name || styleKey,
                     description: style.description || '',
                 };
                 setTemplate(initialStyle.template);
-                setCss(initialStyle.css);
+                setCss(cssData);
                 setVariables(initialStyle.variables);
                 setName(initialStyle.name);
                 setDescription(initialStyle.description);
@@ -68,7 +73,7 @@ const ComponentStyleEditPage = () => {
     const keyChanged = newKey !== styleKey;
     const isDirty = initialData && (
         template !== initialData.template ||
-        css !== initialData.css ||
+        JSON.stringify(css) !== JSON.stringify(initialData.css) ||
         name !== initialData.name ||
         description !== initialData.description ||
         keyChanged
@@ -154,9 +159,11 @@ const ComponentStyleEditPage = () => {
                 variables
             );
             const html = renderMustache(template, context);
+            // Generate CSS with media queries from breakpoint object
+            const generatedCSS = generateCSSFromBreakpoints(css, themeData);
             return (
                 <div>
-                    {css && <style>{css}</style>}
+                    {generatedCSS && <style>{generatedCSS}</style>}
                     <div dangerouslySetInnerHTML={{ __html: html }} />
                 </div>
             );
@@ -188,11 +195,12 @@ const ComponentStyleEditPage = () => {
         const scenario = getScenarioById(selectedScenario);
         try {
             await navigator.clipboard.writeText(scenario.css);
-            setCss(scenario.css);
+            // Copy to active breakpoint
+            setCss({ ...css, [activeBreakpoint]: scenario.css });
             setCopyStatus({ ...copyStatus, css: true });
             addNotification({
                 type: 'success',
-                message: 'CSS copied to editor',
+                message: `CSS copied to ${activeBreakpoint} breakpoint`,
             });
             setTimeout(() => setCopyStatus({ ...copyStatus, css: false }), 2000);
         } catch (error) {
@@ -344,16 +352,39 @@ const ComponentStyleEditPage = () => {
                                 />
                             </div>
 
-                            {/* CSS Editor */}
+                            {/* CSS Editor with Breakpoints */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     CSS Styles (Optional)
                                 </label>
+                                
+                                {/* Breakpoint Tabs */}
+                                <div className="flex gap-1 mb-2 border-b border-gray-200">
+                                    {['default', 'sm', 'md', 'lg', 'xl'].map(bp => (
+                                        <button
+                                            key={bp}
+                                            type="button"
+                                            onClick={() => setActiveBreakpoint(bp)}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
+                                                activeBreakpoint === bp
+                                                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            {getBreakpointLabel(bp, themeData)}
+                                        </button>
+                                    ))}
+                                </div>
+                                
                                 <CodeEditorPanel
-                                    data={css}
-                                    onChange={setCss}
+                                    data={css[activeBreakpoint] || ''}
+                                    onChange={(value) => setCss({ ...css, [activeBreakpoint]: value })}
                                     mode="css"
                                 />
+                                
+                                <p className="text-xs text-gray-500 mt-2">
+                                    💡 Styles cascade: Default applies to all sizes, then each breakpoint overrides at min-width.
+                                </p>
                             </div>
                         </div>
                     </div>

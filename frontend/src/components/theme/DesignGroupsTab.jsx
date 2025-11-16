@@ -99,7 +99,12 @@ const LAYOUT_PROPERTIES = {
   transition: { type: 'text', label: 'Transition', placeholder: 'all 0.3s ease' },
 };
 
-const BREAKPOINTS = ['desktop', 'tablet', 'mobile'];
+// Breakpoint keys - now dynamic based on theme breakpoints
+// Legacy keys for migration: desktop -> default, tablet -> md, mobile -> sm
+const getBreakpointKeys = (includeDefault = true) => {
+  const keys = ['sm', 'md', 'lg', 'xl'];
+  return includeDefault ? ['default', ...keys] : keys;
+};
 
 // Convert element styles object to CSS string
 const stylesToCSS = (styles) => {
@@ -211,6 +216,16 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
+  
+  // Get theme breakpoints with defaults
+  const themeBreakpoints = breakpoints || { sm: 640, md: 768, lg: 1024, xl: 1280 };
+  const BREAKPOINTS = getBreakpointKeys(true); // ['default', 'sm', 'md', 'lg', 'xl']
+  
+  // Get breakpoint label for display
+  const getBreakpointLabel = (bp) => {
+    if (bp === 'default') return 'Default';
+    return `${bp.toUpperCase()} (${themeBreakpoints[bp]}px)`;
+  };
 
   // Refs for CSS textarea to prevent re-rendering
   const cssTextareaRefs = useRef({});
@@ -355,12 +370,24 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     if (!layoutProperties || Object.keys(layoutProperties).length === 0) return '';
 
     const cssParts = [];
+    const themeBreakpoints = breakpoints || { sm: 640, md: 768, lg: 1024, xl: 1280 };
 
-    for (const [part, breakpoints] of Object.entries(layoutProperties)) {
-      // Desktop (no media query)
-      if (breakpoints.desktop && Object.keys(breakpoints.desktop).length > 0) {
+    for (const [part, bpStyles] of Object.entries(layoutProperties)) {
+      // Default (no media query)
+      if (bpStyles.default && Object.keys(bpStyles.default).length > 0) {
         let cssRule = `.${part} {\n`;
-        for (const [prop, value] of Object.entries(breakpoints.desktop)) {
+        for (const [prop, value] of Object.entries(bpStyles.default)) {
+          const cssProp = cssPropertyToKebab(prop);
+          cssRule += `  ${cssProp}: ${value};\n`;
+        }
+        cssRule += '}';
+        cssParts.push(cssRule);
+      }
+      
+      // Legacy desktop support (migrate to default)
+      else if (bpStyles.desktop && Object.keys(bpStyles.desktop).length > 0) {
+        let cssRule = `.${part} {\n`;
+        for (const [prop, value] of Object.entries(bpStyles.desktop)) {
           const cssProp = cssPropertyToKebab(prop);
           cssRule += `  ${cssProp}: ${value};\n`;
         }
@@ -368,21 +395,34 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         cssParts.push(cssRule);
       }
 
-      // Tablet
-      if (breakpoints.tablet && Object.keys(breakpoints.tablet).length > 0) {
-        let cssRule = `@media (max-width: 1024px) {\n  .${part} {\n`;
-        for (const [prop, value] of Object.entries(breakpoints.tablet)) {
+      // Generate media queries for each breakpoint (mobile-first)
+      ['sm', 'md', 'lg', 'xl'].forEach(bp => {
+        if (bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0 && themeBreakpoints[bp]) {
+          let cssRule = `@media (min-width: ${themeBreakpoints[bp]}px) {\n  .${part} {\n`;
+          for (const [prop, value] of Object.entries(bpStyles[bp])) {
+            const cssProp = cssPropertyToKebab(prop);
+            cssRule += `    ${cssProp}: ${value};\n`;
+          }
+          cssRule += '  }\n}';
+          cssParts.push(cssRule);
+        }
+      });
+      
+      // Legacy tablet support (migrate to md)
+      if (bpStyles.tablet && Object.keys(bpStyles.tablet).length > 0 && !bpStyles.md) {
+        let cssRule = `@media (min-width: ${themeBreakpoints.md}px) {\n  .${part} {\n`;
+        for (const [prop, value] of Object.entries(bpStyles.tablet)) {
           const cssProp = cssPropertyToKebab(prop);
           cssRule += `    ${cssProp}: ${value};\n`;
         }
         cssRule += '  }\n}';
         cssParts.push(cssRule);
       }
-
-      // Mobile
-      if (breakpoints.mobile && Object.keys(breakpoints.mobile).length > 0) {
-        let cssRule = `@media (max-width: 768px) {\n  .${part} {\n`;
-        for (const [prop, value] of Object.entries(breakpoints.mobile)) {
+      
+      // Legacy mobile support (migrate to sm)
+      if (bpStyles.mobile && Object.keys(bpStyles.mobile).length > 0 && !bpStyles.sm) {
+        let cssRule = `@media (min-width: ${themeBreakpoints.sm}px) {\n  .${part} {\n`;
+        for (const [prop, value] of Object.entries(bpStyles.mobile)) {
           const cssProp = cssPropertyToKebab(prop);
           cssRule += `    ${cssProp}: ${value};\n`;
         }
@@ -399,75 +439,58 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     const layoutProperties = {};
 
     try {
-      // Parse desktop (non-media query) rules
-      const desktopRules = cssText.match(/\.(\w+)\s*\{([^}]+)\}/g);
-      if (desktopRules) {
-        desktopRules.forEach(rule => {
+      // Parse default (non-media query) rules
+      const defaultRules = cssText.match(/\.(\w+)\s*\{([^}]+)\}/g);
+      if (defaultRules) {
+        defaultRules.forEach(rule => {
           const match = rule.match(/\.(\w+)\s*\{([^}]+)\}/);
           if (match) {
             const part = match[1];
             const properties = match[2];
 
             if (!layoutProperties[part]) layoutProperties[part] = {};
-            if (!layoutProperties[part].desktop) layoutProperties[part].desktop = {};
+            if (!layoutProperties[part].default) layoutProperties[part].default = {};
 
             const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
             for (const propMatch of propMatches) {
               const cssProp = propMatch[1];
               const value = propMatch[2].trim();
-              // Convert kebab-case to camelCase
               const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-              layoutProperties[part].desktop[camelProp] = value;
+              layoutProperties[part].default[camelProp] = value;
             }
           }
         });
       }
 
-      // Parse tablet media query
-      const tabletMatch = cssText.match(/@media\s*\(max-width:\s*1024px\)\s*\{([\s\S]*?)\n\}/);
-      if (tabletMatch) {
-        const tabletContent = tabletMatch[1];
-        const tabletRules = tabletContent.matchAll(/\.(\w+)\s*\{([^}]+)\}/g);
+      // Parse breakpoint media queries (mobile-first)
+      ['sm', 'md', 'lg', 'xl'].forEach(bp => {
+        const bpValue = themeBreakpoints[bp];
+        if (!bpValue) return;
+        
+        const regex = new RegExp(`@media\\s*\\(min-width:\\s*${bpValue}px\\)\\s*\\{([\\s\\S]*?)\\n\\}`, 'g');
+        const matches = cssText.matchAll(regex);
+        
+        for (const match of matches) {
+          const content = match[1];
+          const rules = content.matchAll(/\.(\w+)\s*\{([^}]+)\}/g);
+          
+          for (const rule of rules) {
+            const part = rule[1];
+            const properties = rule[2];
 
-        for (const rule of tabletRules) {
-          const part = rule[1];
-          const properties = rule[2];
+            if (!layoutProperties[part]) layoutProperties[part] = {};
+            if (!layoutProperties[part][bp]) layoutProperties[part][bp] = {};
 
-          if (!layoutProperties[part]) layoutProperties[part] = {};
-          if (!layoutProperties[part].tablet) layoutProperties[part].tablet = {};
-
-          const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
-          for (const propMatch of propMatches) {
-            const cssProp = propMatch[1];
-            const value = propMatch[2].trim();
-            const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-            layoutProperties[part].tablet[camelProp] = value;
+            const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+            for (const propMatch of propMatches) {
+              const cssProp = propMatch[1];
+              const value = propMatch[2].trim();
+              const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+              layoutProperties[part][bp][camelProp] = value;
+            }
           }
         }
-      }
-
-      // Parse mobile media query
-      const mobileMatch = cssText.match(/@media\s*\(max-width:\s*768px\)\s*\{([\s\S]*?)\n\}/);
-      if (mobileMatch) {
-        const mobileContent = mobileMatch[1];
-        const mobileRules = mobileContent.matchAll(/\.(\w+)\s*\{([^}]+)\}/g);
-
-        for (const rule of mobileRules) {
-          const part = rule[1];
-          const properties = rule[2];
-
-          if (!layoutProperties[part]) layoutProperties[part] = {};
-          if (!layoutProperties[part].mobile) layoutProperties[part].mobile = {};
-
-          const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
-          for (const propMatch of propMatches) {
-            const cssProp = propMatch[1];
-            const value = propMatch[2].trim();
-            const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-            layoutProperties[part].mobile[camelProp] = value;
-          }
-        }
-      }
+      });
 
     } catch (error) {
       console.error('Error parsing layout CSS:', error);
@@ -1411,7 +1434,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                   ) : (
                                                     <ChevronRight size={12} className="text-gray-500" />
                                                   )}
-                                                  {breakpoint}
+                                                  {getBreakpointLabel(breakpoint)}
                                                 </button>
                                                 <div className="flex gap-1">
                                                   {/* Copy/Paste Buttons */}

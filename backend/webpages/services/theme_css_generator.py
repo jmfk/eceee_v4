@@ -104,19 +104,19 @@ class ThemeCSSGenerator:
 
         # 5. Component Styles CSS
         if theme.component_styles:
-            component_css = self._generate_component_css(theme.component_styles)
+            component_css = self._generate_component_css(theme.component_styles, theme)
             if component_css:
                 css_parts.append(component_css)
 
         # 6. Gallery Styles CSS
         if theme.gallery_styles:
-            gallery_css = self._generate_gallery_css(theme.gallery_styles)
+            gallery_css = self._generate_gallery_css(theme.gallery_styles, theme)
             if gallery_css:
                 css_parts.append(gallery_css)
 
         # 7. Carousel Styles CSS
         if theme.carousel_styles:
-            carousel_css = self._generate_carousel_css(theme.carousel_styles)
+            carousel_css = self._generate_carousel_css(theme.carousel_styles, theme)
             if carousel_css:
                 css_parts.append(carousel_css)
 
@@ -146,48 +146,96 @@ class ThemeCSSGenerator:
 
         return "\n".join(imports) if imports else ""
 
-    def _generate_component_css(self, component_styles):
-        """Generate CSS from component styles"""
+    def _generate_component_css(self, component_styles, theme):
+        """Generate CSS from component styles with breakpoint support"""
         if not component_styles:
             return ""
 
         css_parts = ["/* Component Styles */"]
+        breakpoints = theme.get_breakpoints()
 
         for key, style in component_styles.items():
             css_content = style.get("css", "")
-            if css_content:
-                css_parts.append(f"/* {style.get('name', key)} */")
+            if not css_content:
+                continue
+                
+            css_parts.append(f"/* {style.get('name', key)} */")
+            
+            # Support both string (legacy) and object (new) formats
+            if isinstance(css_content, str):
                 css_parts.append(css_content)
+            elif isinstance(css_content, dict):
+                # Generate default + media queries
+                if css_content.get('default'):
+                    css_parts.append(css_content['default'])
+                
+                # Generate media queries for each breakpoint (mobile-first)
+                for bp_key in ['sm', 'md', 'lg', 'xl']:
+                    if css_content.get(bp_key) and breakpoints.get(bp_key):
+                        media_query = f"@media (min-width: {breakpoints[bp_key]}px) {{\n{css_content[bp_key]}\n}}"
+                        css_parts.append(media_query)
 
         return "\n\n".join(css_parts) if len(css_parts) > 1 else ""
 
-    def _generate_gallery_css(self, gallery_styles):
-        """Generate CSS from gallery styles"""
+    def _generate_gallery_css(self, gallery_styles, theme):
+        """Generate CSS from gallery styles with breakpoint support"""
         if not gallery_styles:
             return ""
 
         css_parts = ["/* Gallery Styles */"]
+        breakpoints = theme.get_breakpoints()
 
         for key, style in gallery_styles.items():
             css_content = style.get("css", "")
-            if css_content:
-                css_parts.append(f"/* Gallery: {style.get('name', key)} */")
+            if not css_content:
+                continue
+                
+            css_parts.append(f"/* Gallery: {style.get('name', key)} */")
+            
+            # Support both string (legacy) and object (new) formats
+            if isinstance(css_content, str):
                 css_parts.append(css_content)
+            elif isinstance(css_content, dict):
+                # Generate default + media queries
+                if css_content.get('default'):
+                    css_parts.append(css_content['default'])
+                
+                # Generate media queries for each breakpoint (mobile-first)
+                for bp_key in ['sm', 'md', 'lg', 'xl']:
+                    if css_content.get(bp_key) and breakpoints.get(bp_key):
+                        media_query = f"@media (min-width: {breakpoints[bp_key]}px) {{\n{css_content[bp_key]}\n}}"
+                        css_parts.append(media_query)
 
         return "\n\n".join(css_parts) if len(css_parts) > 1 else ""
 
-    def _generate_carousel_css(self, carousel_styles):
-        """Generate CSS from carousel styles"""
+    def _generate_carousel_css(self, carousel_styles, theme):
+        """Generate CSS from carousel styles with breakpoint support"""
         if not carousel_styles:
             return ""
 
         css_parts = ["/* Carousel Styles */"]
+        breakpoints = theme.get_breakpoints()
 
         for key, style in carousel_styles.items():
             css_content = style.get("css", "")
-            if css_content:
-                css_parts.append(f"/* Carousel: {style.get('name', key)} */")
+            if not css_content:
+                continue
+                
+            css_parts.append(f"/* Carousel: {style.get('name', key)} */")
+            
+            # Support both string (legacy) and object (new) formats
+            if isinstance(css_content, str):
                 css_parts.append(css_content)
+            elif isinstance(css_content, dict):
+                # Generate default + media queries
+                if css_content.get('default'):
+                    css_parts.append(css_content['default'])
+                
+                # Generate media queries for each breakpoint (mobile-first)
+                for bp_key in ['sm', 'md', 'lg', 'xl']:
+                    if css_content.get(bp_key) and breakpoints.get(bp_key):
+                        media_query = f"@media (min-width: {breakpoints[bp_key]}px) {{\n{css_content[bp_key]}\n}}"
+                        css_parts.append(media_query)
 
         return "\n\n".join(css_parts) if len(css_parts) > 1 else ""
 
