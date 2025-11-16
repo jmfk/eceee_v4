@@ -113,6 +113,56 @@ class HeroWidget(BaseWidget):
     description = "Hero section with header text, optional before/after text, image, and customizable colors"
     template_name = "easy_widgets/widgets/hero.html"
 
+    layout_parts = {
+        "container": {
+            "label": "Main hero container",
+            "properties": [
+                "width",
+                "height",
+                "minHeight",
+                "maxHeight",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+                "position",
+                "display",
+                "flexDirection",
+                "justifyContent",
+                "alignItems",
+            ],
+        },
+        "background": {
+            "label": "Background image",
+            "properties": [
+                "width",
+                "height",
+                "position",
+                "top",
+                "left",
+                "objectFit",
+                "objectPosition",
+                "opacity",
+                "zIndex",
+            ],
+        },
+        "content": {
+            "label": "Text content overlay",
+            "properties": [
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+                "textAlign",
+                "maxWidth",
+                "borderRadius",
+                "boxShadow",
+                "position",
+                "zIndex",
+            ],
+        },
+    }
+
     widget_css = """
     .widget-type-easy-widgets-herowidget {
         position: relative;

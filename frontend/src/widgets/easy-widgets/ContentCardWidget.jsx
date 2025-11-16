@@ -325,15 +325,15 @@ const ContentCardWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="content-card-widget"
+                    className="content-card-widget container"
                     id={configRef.current.anchor || undefined}
                 >
-                    <div className="content-card-header" ref={headerContainerRef} />
+                    <div className="content-card-header header" ref={headerContainerRef} />
 
                     <div className={bodyClasses}>
                         {imageCount === 4 ? (
                             // 4 images layout - no text
-                            <div className="content-card-images layout-4">
+                            <div className="content-card-images image layout-4">
                                 {image1Url && <img src={image1Url} alt="" />}
                                 {image2Url && <img src={image2Url} alt="" />}
                                 {image3Url && <img src={image3Url} alt="" />}
@@ -342,9 +342,9 @@ const ContentCardWidget = ({
                         ) : (
                             // 1 or 2 images layout - with text
                             <>
-                                <div className="content-card-text" ref={contentContainerRef} />
+                                <div className="content-card-text content" ref={contentContainerRef} />
 
-                                <div className={`content-card-images layout-${imageCount}`}>
+                                <div className={`content-card-images image layout-${imageCount}`}>
                                     {image1Url && <img src={image1Url} alt="" />}
                                     {image2Url && imageCount >= 2 && <img src={image2Url} alt="" />}
                                 </div>
@@ -357,11 +357,11 @@ const ContentCardWidget = ({
 
         return (
             <div
-                className="content-card-widget"
+                className="content-card-widget container"
                 id={configRef.current.anchor || undefined}
             >
                 {configRef.current.header && (
-                    <div className="content-card-header">
+                    <div className="content-card-header header">
                         {configRef.current.header.split('\n').map((line, idx) => (
                             <React.Fragment key={idx}>
                                 {line}
@@ -374,7 +374,7 @@ const ContentCardWidget = ({
                 <div className={bodyClasses}>
                     {imageCount === 4 ? (
                         // 4 images layout - no text
-                        <div className="content-card-images layout-4">
+                        <div className="content-card-images image layout-4">
                             {image1Url && <img src={image1Url} alt="" />}
                             {image2Url && <img src={image2Url} alt="" />}
                             {image3Url && <img src={image3Url} alt="" />}
@@ -383,11 +383,11 @@ const ContentCardWidget = ({
                     ) : (
                         // 1 or 2 images layout - with text
                         <>
-                            <div className="content-card-text">
+                            <div className="content-card-text content">
                                 <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
                             </div>
 
-                            <div className={`content-card-images layout-${imageCount}`}>
+                            <div className={`content-card-images image layout-${imageCount}`}>
                                 {image1Url && <img src={image1Url} alt="" />}
                                 {image2Url && imageCount >= 2 && <img src={image2Url} alt="" />}
                             </div>

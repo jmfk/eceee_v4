@@ -154,6 +154,31 @@ class ContentCardWidget(BaseWidget):
     )
     template_name = "easy_widgets/widgets/content_card.html"
 
+    layout_parts = {
+        "container": {
+            "label": "Main widget container",
+            "properties": ["width", "maxWidth", "padding", "margin", "gap", 
+                          "backgroundColor", "borderColor", "borderWidth", 
+                          "borderStyle", "borderRadius", "boxShadow",
+                          "display", "flexDirection", "alignItems"]
+        },
+        "header": {
+            "label": "Header section",
+            "properties": ["padding", "margin", "backgroundColor", "color",
+                          "textAlign", "borderBottomWidth", "borderBottomColor"]
+        },
+        "image": {
+            "label": "Image area",
+            "properties": ["width", "height", "maxWidth", "maxHeight",
+                          "objectFit", "objectPosition", "borderRadius"]
+        },
+        "content": {
+            "label": "Text content area",
+            "properties": ["padding", "margin", "backgroundColor", "color",
+                          "textAlign", "lineHeight"]
+        },
+    }
+
     widget_css = """
     .content-card-widget {
         display: flex;

@@ -73,7 +73,7 @@ export class SimpleTextEditorRenderer {
 
         this.editorElement = null
         this.isActive = false
-        
+
         // Track last externally-provided content to prevent unnecessary updates
         this.lastExternalContent = options.content || ''
         // Track whether we're currently processing an internal change
@@ -117,7 +117,7 @@ export class SimpleTextEditorRenderer {
         this.editorElement = document.createElement(this.options.element)
         this.editorElement.contentEditable = true
         this.editorElement.className = 'simple-text-editor outline-none'
-        
+
         // Add placeholder attribute if provided
         if (this.options.placeholder) {
             this.editorElement.setAttribute('data-placeholder', this.options.placeholder)
@@ -164,7 +164,7 @@ export class SimpleTextEditorRenderer {
 
         // Update last external content
         this.lastExternalContent = content || ''
-        
+
         // Reset internal change flag after a tick
         setTimeout(() => {
             this.isInternalChange = false
@@ -218,7 +218,7 @@ export class SimpleTextEditorRenderer {
         } else {
             // Get HTML if available
             const html = e.clipboardData.getData('text/html')
-            
+
             if (html) {
                 // Clean and insert HTML
                 const cleaned = cleanInlineHTML(html)
@@ -342,7 +342,7 @@ export class SimpleTextEditorRenderer {
 
         const selection = window.getSelection()
         let isLink = false
-        
+
         if (selection.rangeCount > 0) {
             let node = selection.anchorNode
             while (node && node !== this.editorElement) {
@@ -373,7 +373,7 @@ export class SimpleTextEditorRenderer {
      */
     activate() {
         this.isActive = true
-        
+
         // Only register with toolbar manager for inline-rich mode
         if (this.options.mode === 'inline-rich') {
             // Dynamically import to avoid circular dependencies
@@ -390,7 +390,7 @@ export class SimpleTextEditorRenderer {
         // Small delay to allow button clicks to register
         setTimeout(() => {
             this.isActive = false
-            
+
             // Unregister from toolbar manager for inline-rich mode
             if (this.options.mode === 'inline-rich') {
                 import('../../utils/wysiwygToolbarManager.js').then(({ toolbarManager }) => {
@@ -408,7 +408,7 @@ export class SimpleTextEditorRenderer {
         if (newOptions.onChange !== undefined) {
             this.options.onChange = newOptions.onChange
         }
-        
+
         // Update other options
         if (newOptions.mode !== undefined) {
             this.options.mode = newOptions.mode
@@ -422,7 +422,7 @@ export class SimpleTextEditorRenderer {
                 this.editorElement.setAttribute('data-placeholder', newOptions.placeholder)
             }
         }
-        
+
         // Update content if it changed and is different from current editor content
         if (newOptions.content !== undefined) {
             const currentContent = this.getContent()

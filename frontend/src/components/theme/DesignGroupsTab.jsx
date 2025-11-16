@@ -1,15 +1,15 @@
 /**
- * Design Groups Tab Component - Polished Editor
- * 
- * Features:
- * - Expandable design groups (all can be open simultaneously)
- * - Form with theme-based selectors (colors, fonts)
- * - Numeric inputs with steppers and unit selectors
- * - Smart copy/paste (full set → all tags, single tag → selected tag)
- * - Tags grouped with pseudo-classes
- * - Group-level CSS editor (edit all CSS at once)
- * - Clipboard paste support for CSS snippets (Ctrl+V/Cmd+V)
- */
+* Design Groups Tab Component - Polished Editor
+* 
+* Features:
+* - Expandable design groups (all can be open simultaneously)
+* - Form with theme-based selectors (colors, fonts)
+* - Numeric inputs with steppers and unit selectors
+* - Smart copy/paste (full set → all tags, single tag → selected tag)
+* - Tags grouped with pseudo-classes
+* - Group-level CSS editor (edit all CSS at once)
+* - Clipboard paste support for CSS snippets (Ctrl+V/Cmd+V)
+*/
 
 import React, { useState, useRef } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp, Globe, Package } from 'lucide-react';
@@ -28,23 +28,96 @@ const cssPropertyToKebab = (prop) => {
   return prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
 };
 
+// Layout property configuration
+// Comprehensive CSS properties for widget layout parts
+const LAYOUT_PROPERTIES = {
+  // Layout & Sizing
+  width: { type: 'text', label: 'Width', placeholder: 'auto, 100%, 400px' },
+  height: { type: 'text', label: 'Height', placeholder: 'auto, 100%, 300px' },
+  minWidth: { type: 'text', label: 'Min Width', placeholder: '0, 200px' },
+  maxWidth: { type: 'text', label: 'Max Width', placeholder: 'none, 1200px' },
+  minHeight: { type: 'text', label: 'Min Height', placeholder: '0, 100px' },
+  maxHeight: { type: 'text', label: 'Max Height', placeholder: 'none, 500px' },
+  padding: { type: 'text', label: 'Padding', placeholder: '1rem, 16px' },
+  margin: { type: 'text', label: 'Margin', placeholder: '1rem, 0 auto' },
+  gap: { type: 'text', label: 'Gap', placeholder: '1rem, 16px' },
+
+  // Flexbox & Grid
+  display: { type: 'select', label: 'Display', options: ['block', 'inline-block', 'flex', 'inline-flex', 'grid', 'inline-grid', 'none'] },
+  flexDirection: { type: 'select', label: 'Flex Direction', options: ['row', 'row-reverse', 'column', 'column-reverse'] },
+  justifyContent: { type: 'select', label: 'Justify Content', options: ['flex-start', 'flex-end', 'center', 'space-between', 'space-around', 'space-evenly'] },
+  alignItems: { type: 'select', label: 'Align Items', options: ['flex-start', 'flex-end', 'center', 'baseline', 'stretch'] },
+  alignSelf: { type: 'select', label: 'Align Self', options: ['auto', 'flex-start', 'flex-end', 'center', 'baseline', 'stretch'] },
+  flexWrap: { type: 'select', label: 'Flex Wrap', options: ['nowrap', 'wrap', 'wrap-reverse'] },
+  flexGrow: { type: 'text', label: 'Flex Grow', placeholder: '0, 1' },
+  flexShrink: { type: 'text', label: 'Flex Shrink', placeholder: '0, 1' },
+  gridTemplateColumns: { type: 'text', label: 'Grid Columns', placeholder: 'repeat(3, 1fr)' },
+  gridTemplateRows: { type: 'text', label: 'Grid Rows', placeholder: 'auto, 1fr 2fr' },
+  gridGap: { type: 'text', label: 'Grid Gap', placeholder: '1rem, 16px' },
+
+  // Colors & Backgrounds
+  backgroundColor: { type: 'color', label: 'Background Color', placeholder: '#ffffff' },
+  color: { type: 'color', label: 'Text Color', placeholder: '#000000' },
+  opacity: { type: 'text', label: 'Opacity', placeholder: '0.0 to 1.0' },
+
+  // Borders
+  borderColor: { type: 'color', label: 'Border Color', placeholder: '#cccccc' },
+  borderWidth: { type: 'numeric', label: 'Border Width', placeholder: '1px' },
+  borderStyle: { type: 'select', label: 'Border Style', options: ['none', 'solid', 'dashed', 'dotted', 'double'] },
+  borderRadius: { type: 'numeric', label: 'Border Radius', placeholder: '4px' },
+  borderTopWidth: { type: 'numeric', label: 'Border Top Width', placeholder: '1px' },
+  borderRightWidth: { type: 'numeric', label: 'Border Right Width', placeholder: '1px' },
+  borderBottomWidth: { type: 'numeric', label: 'Border Bottom Width', placeholder: '1px' },
+  borderLeftWidth: { type: 'numeric', label: 'Border Left Width', placeholder: '1px' },
+  borderTopLeftRadius: { type: 'numeric', label: 'Border Top Left Radius', placeholder: '4px' },
+  borderTopRightRadius: { type: 'numeric', label: 'Border Top Right Radius', placeholder: '4px' },
+  borderBottomLeftRadius: { type: 'numeric', label: 'Border Bottom Left Radius', placeholder: '4px' },
+  borderBottomRightRadius: { type: 'numeric', label: 'Border Bottom Right Radius', placeholder: '4px' },
+
+  // Typography
+  textAlign: { type: 'select', label: 'Text Align', options: ['left', 'center', 'right', 'justify'] },
+  textDecoration: { type: 'select', label: 'Text Decoration', options: ['none', 'underline', 'overline', 'line-through'] },
+  textTransform: { type: 'select', label: 'Text Transform', options: ['none', 'uppercase', 'lowercase', 'capitalize'] },
+  lineHeight: { type: 'text', label: 'Line Height', placeholder: '1.5, 24px' },
+  letterSpacing: { type: 'text', label: 'Letter Spacing', placeholder: 'normal, 0.05em' },
+
+  // Images
+  objectFit: { type: 'select', label: 'Object Fit', options: ['fill', 'contain', 'cover', 'none', 'scale-down'] },
+  objectPosition: { type: 'text', label: 'Object Position', placeholder: 'center, 50% 50%' },
+
+  // Positioning
+  position: { type: 'select', label: 'Position', options: ['static', 'relative', 'absolute', 'fixed', 'sticky'] },
+  top: { type: 'text', label: 'Top', placeholder: 'auto, 0, 10px' },
+  right: { type: 'text', label: 'Right', placeholder: 'auto, 0, 10px' },
+  bottom: { type: 'text', label: 'Bottom', placeholder: 'auto, 0, 10px' },
+  left: { type: 'text', label: 'Left', placeholder: 'auto, 0, 10px' },
+  zIndex: { type: 'text', label: 'Z-Index', placeholder: 'auto, 1, 10' },
+
+  // Effects
+  boxShadow: { type: 'text', label: 'Box Shadow', placeholder: '0 2px 4px rgba(0,0,0,0.1)' },
+  transform: { type: 'text', label: 'Transform', placeholder: 'rotate(45deg), scale(1.2)' },
+  transition: { type: 'text', label: 'Transition', placeholder: 'all 0.3s ease' },
+};
+
+const BREAKPOINTS = ['desktop', 'tablet', 'mobile'];
+
 // Convert element styles object to CSS string
 const stylesToCSS = (styles) => {
   if (!styles || Object.keys(styles).length === 0) return '';
   return Object.entries(styles)
     .map(([prop, value]) => {
       let sanitizedValue = value;
-      
+
       // Sanitize font-family: remove all quotes, then re-quote fonts with spaces
       if (prop === 'fontFamily' && sanitizedValue) {
         const fonts = sanitizedValue.split(',');
         const quotedFonts = fonts.map(font => {
           // Remove ALL quotes (single, double, escaped)
           let cleaned = font.trim().replace(/['"\\]/g, '');
-          
+
           // Generic font families that shouldn't be quoted
           const genericFamilies = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui'];
-          
+
           if (genericFamilies.includes(cleaned)) {
             return cleaned;
           } else if (cleaned.includes(' ')) {
@@ -56,7 +129,7 @@ const stylesToCSS = (styles) => {
         });
         sanitizedValue = quotedFonts.join(', ');
       }
-      
+
       // Sanitize duplicate units (e.g., "36pxpx" -> "36px")
       if (typeof sanitizedValue === 'string') {
         const duplicateUnitPattern = /^([-\d.]+)(px|rem|em|%|vh|vw|ch|ex)\2+$/;
@@ -65,7 +138,7 @@ const stylesToCSS = (styles) => {
           sanitizedValue = `${match[1]}${match[2]}`;
         }
       }
-      
+
       return `  ${cssPropertyToKebab(prop)}: ${sanitizedValue};`;
     })
     .join('\n');
@@ -124,14 +197,18 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   const [expandedGroups, setExpandedGroups] = useState({});
   const [expandedTags, setExpandedTags] = useState({});
   const [expandedTargeting, setExpandedTargeting] = useState({});
+  const [expandedLayoutProps, setExpandedLayoutProps] = useState({});
+  const [expandedLayoutParts, setExpandedLayoutParts] = useState({}); // { groupIndex-part: boolean }
+  const [expandedLayoutBreakpoints, setExpandedLayoutBreakpoints] = useState({}); // { groupIndex-part-breakpoint: boolean }
   const [clipboard, setClipboard] = useState(null); // { type: 'tag' | 'group', data: {...} }
   const [copiedIndicator, setCopiedIndicator] = useState(null);
   const [editMode, setEditMode] = useState({}); // { groupIndex-tagBase-variant: 'form' | 'css' }
   const [groupEditMode, setGroupEditMode] = useState({}); // { groupIndex: 'tags' | 'css' }
+  const [layoutEditMode, setLayoutEditMode] = useState({}); // { groupIndex: 'form' | 'css' }
   const [importModal, setImportModal] = useState(null); // { type: 'global' | 'group' | 'element', groupIndex?: number, elementKey?: string }
   const [importCSSText, setImportCSSText] = useState('');
   const { addNotification } = useGlobalNotifications();
-  
+
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
 
@@ -231,16 +308,197 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
-  const handleUpdateColorScheme = (index, field, value) => {
+  const toggleLayoutProps = (groupIndex) => {
+    setExpandedLayoutProps({
+      ...expandedLayoutProps,
+      [groupIndex]: !expandedLayoutProps[groupIndex],
+    });
+  };
+
+  const handleUpdateLayoutProperty = (groupIndex, part, breakpoint, property, value) => {
     const updatedGroups = [...groups];
-    updatedGroups[index] = {
-      ...updatedGroups[index],
-      colorScheme: {
-        ...(updatedGroups[index].colorScheme || {}),
-        [field]: value === '' ? null : value,
-      },
+    const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
+    const partProps = layoutProperties[part] || {};
+    const breakpointProps = partProps[breakpoint] || {};
+
+    // Update or remove property
+    if (value === '' || value === null) {
+      delete breakpointProps[property];
+    } else {
+      breakpointProps[property] = value;
+    }
+
+    // Clean up empty objects
+    if (Object.keys(breakpointProps).length === 0) {
+      delete partProps[breakpoint];
+    } else {
+      partProps[breakpoint] = breakpointProps;
+    }
+
+    if (Object.keys(partProps).length === 0) {
+      delete layoutProperties[part];
+    } else {
+      layoutProperties[part] = partProps;
+    }
+
+    updatedGroups[groupIndex] = {
+      ...updatedGroups[groupIndex],
+      layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
     };
+
     onChange({ ...(designGroups || {}), groups: updatedGroups });
+    if (onDirty) onDirty();
+  };
+
+  // Convert layout properties to CSS
+  const layoutPropertiesToCSS = (layoutProperties) => {
+    if (!layoutProperties || Object.keys(layoutProperties).length === 0) return '';
+
+    const cssParts = [];
+
+    for (const [part, breakpoints] of Object.entries(layoutProperties)) {
+      // Desktop (no media query)
+      if (breakpoints.desktop && Object.keys(breakpoints.desktop).length > 0) {
+        let cssRule = `.${part} {\n`;
+        for (const [prop, value] of Object.entries(breakpoints.desktop)) {
+          const cssProp = cssPropertyToKebab(prop);
+          cssRule += `  ${cssProp}: ${value};\n`;
+        }
+        cssRule += '}';
+        cssParts.push(cssRule);
+      }
+
+      // Tablet
+      if (breakpoints.tablet && Object.keys(breakpoints.tablet).length > 0) {
+        let cssRule = `@media (max-width: 1024px) {\n  .${part} {\n`;
+        for (const [prop, value] of Object.entries(breakpoints.tablet)) {
+          const cssProp = cssPropertyToKebab(prop);
+          cssRule += `    ${cssProp}: ${value};\n`;
+        }
+        cssRule += '  }\n}';
+        cssParts.push(cssRule);
+      }
+
+      // Mobile
+      if (breakpoints.mobile && Object.keys(breakpoints.mobile).length > 0) {
+        let cssRule = `@media (max-width: 768px) {\n  .${part} {\n`;
+        for (const [prop, value] of Object.entries(breakpoints.mobile)) {
+          const cssProp = cssPropertyToKebab(prop);
+          cssRule += `    ${cssProp}: ${value};\n`;
+        }
+        cssRule += '  }\n}';
+        cssParts.push(cssRule);
+      }
+    }
+
+    return cssParts.join('\n\n');
+  };
+
+  // Convert CSS to layout properties
+  const cssToLayoutProperties = (cssText) => {
+    const layoutProperties = {};
+
+    try {
+      // Parse desktop (non-media query) rules
+      const desktopRules = cssText.match(/\.(\w+)\s*\{([^}]+)\}/g);
+      if (desktopRules) {
+        desktopRules.forEach(rule => {
+          const match = rule.match(/\.(\w+)\s*\{([^}]+)\}/);
+          if (match) {
+            const part = match[1];
+            const properties = match[2];
+
+            if (!layoutProperties[part]) layoutProperties[part] = {};
+            if (!layoutProperties[part].desktop) layoutProperties[part].desktop = {};
+
+            const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+            for (const propMatch of propMatches) {
+              const cssProp = propMatch[1];
+              const value = propMatch[2].trim();
+              // Convert kebab-case to camelCase
+              const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+              layoutProperties[part].desktop[camelProp] = value;
+            }
+          }
+        });
+      }
+
+      // Parse tablet media query
+      const tabletMatch = cssText.match(/@media\s*\(max-width:\s*1024px\)\s*\{([\s\S]*?)\n\}/);
+      if (tabletMatch) {
+        const tabletContent = tabletMatch[1];
+        const tabletRules = tabletContent.matchAll(/\.(\w+)\s*\{([^}]+)\}/g);
+
+        for (const rule of tabletRules) {
+          const part = rule[1];
+          const properties = rule[2];
+
+          if (!layoutProperties[part]) layoutProperties[part] = {};
+          if (!layoutProperties[part].tablet) layoutProperties[part].tablet = {};
+
+          const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+          for (const propMatch of propMatches) {
+            const cssProp = propMatch[1];
+            const value = propMatch[2].trim();
+            const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+            layoutProperties[part].tablet[camelProp] = value;
+          }
+        }
+      }
+
+      // Parse mobile media query
+      const mobileMatch = cssText.match(/@media\s*\(max-width:\s*768px\)\s*\{([\s\S]*?)\n\}/);
+      if (mobileMatch) {
+        const mobileContent = mobileMatch[1];
+        const mobileRules = mobileContent.matchAll(/\.(\w+)\s*\{([^}]+)\}/g);
+
+        for (const rule of mobileRules) {
+          const part = rule[1];
+          const properties = rule[2];
+
+          if (!layoutProperties[part]) layoutProperties[part] = {};
+          if (!layoutProperties[part].mobile) layoutProperties[part].mobile = {};
+
+          const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+          for (const propMatch of propMatches) {
+            const cssProp = propMatch[1];
+            const value = propMatch[2].trim();
+            const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+            layoutProperties[part].mobile[camelProp] = value;
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Error parsing layout CSS:', error);
+      throw new Error('Invalid CSS format');
+    }
+
+    return layoutProperties;
+  };
+
+  const handleLayoutCSSBlur = (groupIndex) => {
+    const textarea = cssTextareaRefs.current[`layout-${groupIndex}`];
+    if (!textarea) return;
+
+    try {
+      const cssText = textarea.value;
+      const layoutProperties = cssToLayoutProperties(cssText);
+
+      const updatedGroups = [...groups];
+      updatedGroups[groupIndex] = {
+        ...updatedGroups[groupIndex],
+        layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
+      };
+
+      onChange({ ...(designGroups || {}), groups: updatedGroups });
+      if (onDirty) onDirty();
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        message: `Failed to parse layout CSS: ${error.message}`
+      });
+    }
   };
 
   // CSS Import Handlers
@@ -369,17 +627,17 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
       // Check for duplicate units (e.g., "36pxpx", "2remrem")
       const duplicateUnitPattern = /(px|rem|em|%|vh|vw|ch|ex){2,}/;
       if (duplicateUnitPattern.test(value)) {
-        addNotification({ 
-          type: 'warning', 
-          message: `Invalid CSS value "${value}" for ${property} - contains duplicate units. Please correct this value.` 
+        addNotification({
+          type: 'warning',
+          message: `Invalid CSS value "${value}" for ${property} - contains duplicate units. Please correct this value.`
         });
       }
 
       // Check for triple quotes in font-family
       if (property === 'fontFamily' && (value.includes('"""') || value.includes("'''"))) {
-        addNotification({ 
-          type: 'warning', 
-          message: `Invalid font-family value "${value}" - contains triple quotes. Please correct this value.` 
+        addNotification({
+          type: 'warning',
+          message: `Invalid font-family value "${value}" - contains triple quotes. Please correct this value.`
         });
       }
 
@@ -389,9 +647,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         // Value should be: number + unit, or just a number (unitless)
         const validNumericPattern = /^-?\d+(\.\d+)?(px|rem|em|%|vh|vw|ch|ex)?$/;
         if (!validNumericPattern.test(value) && value !== '' && value !== 'auto' && value !== 'inherit' && value !== 'normal') {
-          addNotification({ 
-            type: 'warning', 
-            message: `Invalid numeric value "${value}" for ${property}. Expected format: number + unit (e.g., "16px", "1.5rem")` 
+          addNotification({
+            type: 'warning',
+            message: `Invalid numeric value "${value}" for ${property}. Expected format: number + unit (e.g., "16px", "1.5rem")`
           });
         }
       }
@@ -480,7 +738,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   // Toggle group edit mode between 'tags' and 'css'
   const toggleGroupEditMode = (groupIndex) => {
     const currentMode = groupEditMode[groupIndex] || 'tags';
-    
+
     // If switching from CSS to tags, save the CSS first
     if (currentMode === 'css') {
       const ref = cssTextareaRefs.current[`group-${groupIndex}`];
@@ -488,7 +746,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         handleGroupCSSBlur(groupIndex);
       }
     }
-    
+
     setGroupEditMode({
       ...groupEditMode,
       [groupIndex]: currentMode === 'css' ? 'tags' : 'css',
@@ -499,12 +757,12 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   const handleGroupCSSBlur = (groupIndex) => {
     const ref = cssTextareaRefs.current[`group-${groupIndex}`];
     if (!ref) return;
-    
+
     const cssText = ref.value;
     try {
       const rules = parseCSSRules(cssText);
       const { elements, warnings } = cssToGroupElements(rules);
-      
+
       // Replace entire elements object
       const updatedGroups = [...groups];
       updatedGroups[groupIndex] = {
@@ -512,7 +770,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         elements: elements,
       };
       onChange({ ...(designGroups || {}), groups: updatedGroups });
-      
+
       if (warnings.length > 0) {
         addNotification({
           type: 'warning',
@@ -531,17 +789,17 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
   const handleElementPaste = async (e, groupIndex, elementKey) => {
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain').trim();
-    
+
     if (!text) return;
-    
+
     try {
       // Parse as CSS properties (no selector)
       const properties = cssToElementProperties(text);
-      
+
       if (Object.keys(properties).length > 0) {
         const updatedGroups = [...groups];
         const currentStyles = updatedGroups[groupIndex].elements[elementKey] || {};
-        
+
         updatedGroups[groupIndex] = {
           ...updatedGroups[groupIndex],
           elements: {
@@ -550,9 +808,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
           }
         };
         onChange({ ...(designGroups || {}), groups: updatedGroups });
-        
+
         addNotification({
-          type: 'success', 
+          type: 'success',
           message: `Pasted ${Object.keys(properties).length} properties to ${elementKey}`
         });
       } else {
@@ -845,15 +1103,15 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                             {(() => {
                               const types = group.widgetTypes?.length > 0 ? group.widgetTypes : (group.widgetType ? [group.widgetType] : []);
                               const slots = group.slots?.length > 0 ? group.slots : (group.slot ? [group.slot] : []);
-                              
-                              let text = types.length > 0 
+
+                              let text = types.length > 0
                                 ? types.map(t => widgetTypes.find(w => w.type === t)?.name || t).join(', ')
                                 : 'Any';
-                              
+
                               if (slots.length > 0) {
                                 text += ` > ${slots.join(', ')}`;
                               }
-                              
+
                               return text;
                             })()}
                           </span>
@@ -874,11 +1132,10 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                         <button
                           type="button"
                           onClick={() => toggleGroupEditMode(groupIndex)}
-                          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                            (groupEditMode[groupIndex] || 'tags') === 'css'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
+                          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded transition-colors ${(groupEditMode[groupIndex] || 'tags') === 'css'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
                           title={(groupEditMode[groupIndex] || 'tags') === 'css' ? 'Switch to tag editor' : 'Edit all CSS'}
                         >
                           {(groupEditMode[groupIndex] || 'tags') === 'css' ? (
@@ -953,8 +1210,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                         value={group.className || ''}
                         onChange={(e) => handleUpdateGroupClassName(groupIndex, e.target.value)}
                         className={`px-2 py-1 border rounded text-xs font-mono focus:outline-none focus:ring-2 ${group.className && !isValidClassName(group.className)
-                            ? 'border-red-300 focus:ring-red-500 text-red-600'
-                            : 'border-gray-300 focus:ring-blue-500'
+                          ? 'border-red-300 focus:ring-red-500 text-red-600'
+                          : 'border-gray-300 focus:ring-blue-500'
                           }`}
                         placeholder="auto-generated"
                       />
@@ -976,7 +1233,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                           <ChevronRight size={16} className="text-gray-600" />
                         )}
                         <span className="text-xs font-medium text-gray-700">
-                          Targeting & Color Scheme
+                          Targeting
                         </span>
                       </button>
 
@@ -1021,28 +1278,346 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
                               <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
                             </div>
                           </div>
-
-                          {/* Color Scheme */}
-                          <div className="mt-3 pt-3 border-t border-gray-300">
-                            <div className="text-xs text-gray-700 font-semibold mb-2">Color Scheme (for this widget/slot):</div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <ColorSelector
-                                label="Background Color"
-                                value={group.colorScheme?.background || ''}
-                                onChange={(value) => handleUpdateColorScheme(groupIndex, 'background', value)}
-                                colors={colors}
-                              />
-                              <ColorSelector
-                                label="Text Color"
-                                value={group.colorScheme?.text || ''}
-                                onChange={(value) => handleUpdateColorScheme(groupIndex, 'text', value)}
-                                colors={colors}
-                              />
-                            </div>
-                          </div>
                         </div>
                       )}
                     </div>
+
+                    {/* Layout Properties */}
+                    {(group.widgetTypes?.length > 0 || group.widgetType) && (
+                      <div className="ml-11 mt-3 bg-blue-50 rounded-md border border-blue-200">
+                        <button
+                          onClick={() => toggleLayoutProps(groupIndex)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-blue-100 rounded-t-md transition-colors"
+                        >
+                          {expandedLayoutProps[groupIndex] ? (
+                            <ChevronDown size={16} className="text-blue-600" />
+                          ) : (
+                            <ChevronRight size={16} className="text-blue-600" />
+                          )}
+                          <span className="text-xs font-medium text-blue-700">
+                            Layout Properties (Responsive)
+                          </span>
+                        </button>
+
+                        {expandedLayoutProps[groupIndex] && (() => {
+                          const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
+                          const layoutParts = new Set();
+
+                          selectedWidgetTypes.forEach(wtType => {
+                            const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                            if (widgetMeta?.layoutParts) {
+                              Object.keys(widgetMeta.layoutParts).forEach(part => layoutParts.add(part));
+                            }
+                          });
+
+                          if (layoutParts.size === 0) {
+                            return (
+                              <div className="p-3 border-t border-blue-200 text-xs text-gray-600">
+                                Selected widgets don't have customizable layout parts.
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="p-3 border-t border-blue-200 space-y-3">
+                              {Array.from(layoutParts).map(part => {
+                                const partProps = group.layoutProperties?.[part] || {};
+                                const partKey = `${groupIndex}-${part}`;
+                                const isPartExpanded = expandedLayoutParts[partKey] !== false; // Default to true
+
+                                // Get allowed properties for this part from widget metadata
+                                let allowedProperties = null; // null = all properties allowed
+                                selectedWidgetTypes.forEach(wtType => {
+                                  const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                                  if (widgetMeta?.layoutParts?.[part]?.properties) {
+                                    // If any widget defines properties for this part, use them
+                                    const partConfig = widgetMeta.layoutParts[part];
+                                    if (partConfig.properties) {
+                                      allowedProperties = partConfig.properties;
+                                    }
+                                  }
+                                });
+
+                                // Filter LAYOUT_PROPERTIES based on allowed properties
+                                const availableProperties = allowedProperties
+                                  ? Object.fromEntries(
+                                    Object.entries(LAYOUT_PROPERTIES).filter(([prop]) =>
+                                      allowedProperties.includes(prop)
+                                    )
+                                  )
+                                  : LAYOUT_PROPERTIES;
+
+                                // Get the label for this part from widget metadata
+                                let partLabel = part;
+                                selectedWidgetTypes.forEach(wtType => {
+                                  const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                                  if (widgetMeta?.layoutParts?.[part]?.label) {
+                                    partLabel = widgetMeta.layoutParts[part].label;
+                                  }
+                                });
+
+                                return (
+                                  <div key={part} className="bg-white rounded border border-gray-200">
+                                    {/* Part Header - Collapsible */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedLayoutParts({
+                                        ...expandedLayoutParts,
+                                        [partKey]: !isPartExpanded
+                                      })}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 rounded-t transition-colors"
+                                    >
+                                      {isPartExpanded ? (
+                                        <ChevronDown size={14} className="text-gray-600" />
+                                      ) : (
+                                        <ChevronRight size={14} className="text-gray-600" />
+                                      )}
+                                      <span className="text-xs font-semibold text-gray-700">
+                                        {partLabel}
+                                      </span>
+                                      {allowedProperties && (
+                                        <span className="text-xs text-gray-500 ml-auto">
+                                          {allowedProperties.length} {allowedProperties.length === 1 ? 'property' : 'properties'}
+                                        </span>
+                                      )}
+                                    </button>
+
+                                    {isPartExpanded && (
+                                      <div className="p-3 pt-0">
+                                        {BREAKPOINTS.map(breakpoint => {
+                                          const modeKey = `${groupIndex}-${part}-${breakpoint}`;
+                                          const currentMode = layoutEditMode[modeKey] || 'form';
+                                          const breakpointProps = partProps[breakpoint] || {};
+
+                                          // Convert breakpoint properties to CSS
+                                          const breakpointToCSS = () => {
+                                            if (!breakpointProps || Object.keys(breakpointProps).length === 0) return '';
+                                            let css = '';
+                                            for (const [prop, value] of Object.entries(breakpointProps)) {
+                                              const cssProp = cssPropertyToKebab(prop);
+                                              css += `${cssProp}: ${value};\n`;
+                                            }
+                                            return css;
+                                          };
+
+                                          const breakpointKey = `${groupIndex}-${part}-${breakpoint}`;
+                                          const isBreakpointExpanded = expandedLayoutBreakpoints[breakpointKey] !== false; // Default to true
+
+                                          return (
+                                            <div key={breakpoint} className="mb-3 last:mb-0 border border-gray-200 rounded">
+                                              {/* Breakpoint Header - Collapsible */}
+                                              <div className="flex items-center justify-between px-2 py-1.5 bg-gray-50 rounded-t">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setExpandedLayoutBreakpoints({
+                                                    ...expandedLayoutBreakpoints,
+                                                    [breakpointKey]: !isBreakpointExpanded
+                                                  })}
+                                                  className="flex items-center gap-1 text-xs font-medium text-gray-600 capitalize hover:text-gray-900 transition-colors"
+                                                >
+                                                  {isBreakpointExpanded ? (
+                                                    <ChevronDown size={12} className="text-gray-500" />
+                                                  ) : (
+                                                    <ChevronRight size={12} className="text-gray-500" />
+                                                  )}
+                                                  {breakpoint}
+                                                </button>
+                                                <div className="flex gap-1">
+                                                  {/* Copy/Paste Buttons */}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      setClipboard({
+                                                        type: 'layoutBreakpoint',
+                                                        part,
+                                                        breakpoint,
+                                                        data: breakpointProps
+                                                      });
+                                                      setCopiedIndicator(`layout-${modeKey}`);
+                                                      setTimeout(() => setCopiedIndicator(null), 2000);
+                                                    }}
+                                                    className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                                                    title={`Copy ${part} ${breakpoint} properties`}
+                                                  >
+                                                    {copiedIndicator === `layout-${modeKey}` ? (
+                                                      <Check className="w-3 h-3 text-green-600" />
+                                                    ) : (
+                                                      <Copy className="w-3 h-3" />
+                                                    )}
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      if (!clipboard || clipboard.type !== 'layoutBreakpoint') return;
+
+                                                      const updatedGroups = [...groups];
+                                                      const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
+                                                      const partProps = layoutProperties[part] || {};
+
+                                                      // Merge clipboard data with existing properties
+                                                      partProps[breakpoint] = { ...partProps[breakpoint], ...clipboard.data };
+
+                                                      if (Object.keys(partProps).length > 0) {
+                                                        layoutProperties[part] = partProps;
+                                                      }
+
+                                                      updatedGroups[groupIndex] = {
+                                                        ...updatedGroups[groupIndex],
+                                                        layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
+                                                      };
+
+                                                      onChange({ ...(designGroups || {}), groups: updatedGroups });
+                                                      if (onDirty) onDirty();
+                                                    }}
+                                                    disabled={!clipboard || clipboard.type !== 'layoutBreakpoint'}
+                                                    className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    title={`Paste ${clipboard?.part || ''} ${clipboard?.breakpoint || ''} properties`}
+                                                  >
+                                                    <Clipboard className="w-3 h-3" />
+                                                  </button>
+
+                                                  {/* Form/CSS Toggle */}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setLayoutEditMode({ ...layoutEditMode, [modeKey]: 'form' })}
+                                                    className={`px-2 py-0.5 text-xs rounded transition-colors ${currentMode === 'form'
+                                                      ? 'bg-blue-600 text-white'
+                                                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                      }`}
+                                                  >
+                                                    Form
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setLayoutEditMode({ ...layoutEditMode, [modeKey]: 'css' })}
+                                                    className={`px-2 py-0.5 text-xs rounded transition-colors ${currentMode === 'css'
+                                                      ? 'bg-blue-600 text-white'
+                                                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                      }`}
+                                                  >
+                                                    CSS
+                                                  </button>
+                                                </div>
+                                              </div>
+
+                                              {isBreakpointExpanded && (currentMode === 'css' ? (
+                                                <div className="p-2">
+                                                  <textarea
+                                                    ref={(el) => {
+                                                      if (el) cssTextareaRefs.current[`layout-${modeKey}`] = el;
+                                                    }}
+                                                    defaultValue={breakpointToCSS()}
+                                                    onChange={() => {
+                                                      if (onDirty) onDirty();
+                                                    }}
+                                                    onBlur={(e) => {
+                                                      try {
+                                                        const cssText = e.target.value;
+                                                        const properties = {};
+                                                        const propMatches = cssText.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+                                                        for (const match of propMatches) {
+                                                          const cssProp = match[1];
+                                                          const value = match[2].trim();
+                                                          const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+                                                          properties[camelProp] = value;
+                                                        }
+
+                                                        const updatedGroups = [...groups];
+                                                        const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
+                                                        const partProps = layoutProperties[part] || {};
+
+                                                        if (Object.keys(properties).length > 0) {
+                                                          partProps[breakpoint] = properties;
+                                                        } else {
+                                                          delete partProps[breakpoint];
+                                                        }
+
+                                                        if (Object.keys(partProps).length > 0) {
+                                                          layoutProperties[part] = partProps;
+                                                        } else {
+                                                          delete layoutProperties[part];
+                                                        }
+
+                                                        updatedGroups[groupIndex] = {
+                                                          ...updatedGroups[groupIndex],
+                                                          layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
+                                                        };
+
+                                                        onChange({ ...(designGroups || {}), groups: updatedGroups });
+                                                      } catch (error) {
+                                                        addNotification({
+                                                          type: 'error',
+                                                          message: `Failed to parse CSS: ${error.message}`
+                                                        });
+                                                      }
+                                                    }}
+                                                    className="w-full px-2 py-1.5 text-xs font-mono border border-gray-300 rounded bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                    rows={5}
+                                                    placeholder="width: 100%;&#10;padding: 1rem;&#10;gap: 0.5rem;"
+                                                  />
+                                                </div>
+                                              ) : (
+                                                <div className="grid grid-cols-2 gap-2 p-2">
+                                                  {Object.entries(availableProperties).map(([prop, config]) => {
+                                                    const value = breakpointProps[prop] || '';
+
+                                                    return (
+                                                      <div key={prop}>
+                                                        <label className="block text-xs text-gray-500 mb-0.5">
+                                                          {config.label}:
+                                                        </label>
+                                                        {config.type === 'color' ? (
+                                                          <ColorSelector
+                                                            value={value}
+                                                            onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null)}
+                                                            colors={colors}
+                                                            className="w-full"
+                                                          />
+                                                        ) : config.type === 'numeric' ? (
+                                                          <NumericInput
+                                                            value={value}
+                                                            onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null)}
+                                                            property={prop}
+                                                            className="w-full"
+                                                          />
+                                                        ) : config.type === 'select' ? (
+                                                          <select
+                                                            value={value}
+                                                            onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null)}
+                                                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                          >
+                                                            <option value="">None</option>
+                                                            {config.options?.map(opt => (
+                                                              <option key={opt} value={opt}>{opt}</option>
+                                                            ))}
+                                                          </select>
+                                                        ) : (
+                                                          <input
+                                                            type="text"
+                                                            value={value}
+                                                            onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null)}
+                                                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                            placeholder={config.placeholder}
+                                                          />
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Group Content */}
@@ -1090,192 +1665,192 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
 
                           {/* Tag Groups */}
                           {tagGroupsInGroup.map((tagGroup) => {
-                        const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? !tagGroup.hasGroup;
-                        const baseStyles = group.elements[tagGroup.base] || {};
+                            const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? !tagGroup.hasGroup;
+                            const baseStyles = group.elements[tagGroup.base] || {};
 
-                        return (
-                          <div key={tagGroup.base} className="border border-gray-200 rounded-lg overflow-hidden">
-                            {/* Tag Header */}
-                            <div 
-                              className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200"
-                              onPaste={(e) => handleElementPaste(e, groupIndex, tagGroup.base)}
-                              tabIndex={-1}
-                            >
-                              {/* Only show toggle for links */}
-                              {tagGroup.hasGroup && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleTag(groupIndex, tagGroup.base)}
-                                  className="text-gray-600 hover:text-gray-900"
+                            return (
+                              <div key={tagGroup.base} className="border border-gray-200 rounded-lg overflow-hidden">
+                                {/* Tag Header */}
+                                <div
+                                  className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200"
+                                  onPaste={(e) => handleElementPaste(e, groupIndex, tagGroup.base)}
+                                  tabIndex={-1}
                                 >
-                                  {isTagExpanded ? (
-                                    <ChevronDown className="w-4 h-4" />
-                                  ) : (
-                                    <ChevronRight className="w-4 h-4" />
+                                  {/* Only show toggle for links */}
+                                  {tagGroup.hasGroup && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleTag(groupIndex, tagGroup.base)}
+                                      className="text-gray-600 hover:text-gray-900"
+                                    >
+                                      {isTagExpanded ? (
+                                        <ChevronDown className="w-4 h-4" />
+                                      ) : (
+                                        <ChevronRight className="w-4 h-4" />
+                                      )}
+                                    </button>
                                   )}
-                                </button>
-                              )}
 
-                              <div className="flex-1">
-                                <div className="font-mono text-sm font-semibold text-gray-900">{tagGroup.label}</div>
-                                {tagGroup.hasGroup && (
-                                  <div className="text-xs text-gray-500 font-mono">{tagGroup.variants.join(', ')}</div>
-                                )}
-                              </div>
+                                  <div className="flex-1">
+                                    <div className="font-mono text-sm font-semibold text-gray-900">{tagGroup.label}</div>
+                                    {tagGroup.hasGroup && (
+                                      <div className="text-xs text-gray-500 font-mono">{tagGroup.variants.join(', ')}</div>
+                                    )}
+                                  </div>
 
-                              <div className="flex gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => openImportModal('element', groupIndex, tagGroup.base)}
-                                  className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
-                                  title="Import CSS for this element"
-                                >
-                                  <FileUp className="w-4 h-4" />
-                                </button>
+                                  <div className="flex gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => openImportModal('element', groupIndex, tagGroup.base)}
+                                      className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                      title="Import CSS for this element"
+                                    >
+                                      <FileUp className="w-4 h-4" />
+                                    </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyTag(tagGroup.base, baseStyles)}
-                                  className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                                  title="Copy tag styles"
-                                >
-                                  {copiedIndicator === `tag-${tagGroup.base}` ? (
-                                    <Check className="w-4 h-4 text-green-600" />
-                                  ) : (
-                                    <Copy className="w-4 h-4" />
-                                  )}
-                                </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyTag(tagGroup.base, baseStyles)}
+                                      className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                                      title="Copy tag styles"
+                                    >
+                                      {copiedIndicator === `tag-${tagGroup.base}` ? (
+                                        <Check className="w-4 h-4 text-green-600" />
+                                      ) : (
+                                        <Copy className="w-4 h-4" />
+                                      )}
+                                    </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handlePaste(groupIndex, tagGroup.base)}
-                                  disabled={!clipboard || clipboard.type !== 'tag'}
-                                  className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                  title="Paste tag styles"
-                                >
-                                  <Clipboard className="w-4 h-4" />
-                                </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePaste(groupIndex, tagGroup.base)}
+                                      disabled={!clipboard || clipboard.type !== 'tag'}
+                                      className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                      title="Paste tag styles"
+                                    >
+                                      <Clipboard className="w-4 h-4" />
+                                    </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveTagGroup(groupIndex, tagGroup)}
-                                  className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveTagGroup(groupIndex, tagGroup)}
+                                      className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
 
-                            {/* Tag Content */}
-                            {isTagExpanded && (
-                              <div className="p-4 space-y-4">
-                                {/* Render each variant */}
-                                {tagGroup.variants.map(variant => {
-                                  const styles = group.elements[variant] || {};
-                                  const styleEntries = Object.entries(styles);
-                                  const editModeKey = `${groupIndex}-${tagGroup.base}-${variant}`;
-                                  const currentEditMode = editMode[editModeKey] || 'form';
+                                {/* Tag Content */}
+                                {isTagExpanded && (
+                                  <div className="p-4 space-y-4">
+                                    {/* Render each variant */}
+                                    {tagGroup.variants.map(variant => {
+                                      const styles = group.elements[variant] || {};
+                                      const styleEntries = Object.entries(styles);
+                                      const editModeKey = `${groupIndex}-${tagGroup.base}-${variant}`;
+                                      const currentEditMode = editMode[editModeKey] || 'form';
 
-                                  return (
-                                    <div key={variant} className="space-y-3 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
-                                      <div className="flex items-center justify-between">
-                                        {variant !== tagGroup.base && (
-                                          <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                                            {variant}
-                                          </div>
-                                        )}
-
-                                        {/* Form/CSS Toggle */}
-                                        <div className="flex gap-1 ml-auto">
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
-                                            className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'form'
-                                              ? 'bg-blue-100 text-blue-700'
-                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                              }`}
-                                          >
-                                            <FileText className="w-3 h-3 mr-1" />
-                                            Form
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
-                                            className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'css'
-                                              ? 'bg-blue-100 text-blue-700'
-                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                              }`}
-                                          >
-                                            <Code className="w-3 h-3 mr-1" />
-                                            CSS
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                      {currentEditMode === 'form' ? (
-                                        /* Form View */
-                                        <>
-                                          {/* Existing Properties */}
-                                          {styleEntries.map(([property, value]) => (
-                                            <div key={property} className="flex gap-2 items-start">
-                                              <div className="flex-1">
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                  {CSS_PROPERTIES[property]?.label || property}
-                                                </label>
-                                                {renderPropertyField(groupIndex, variant, property, value)}
+                                      return (
+                                        <div key={variant} className="space-y-3 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
+                                          <div className="flex items-center justify-between">
+                                            {variant !== tagGroup.base && (
+                                              <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                                {variant}
                                               </div>
+                                            )}
+
+                                            {/* Form/CSS Toggle */}
+                                            <div className="flex gap-1 ml-auto">
                                               <button
                                                 type="button"
-                                                onClick={() => handleRemoveProperty(groupIndex, variant, property)}
-                                                className="mt-6 p-1 text-red-600 hover:text-red-700"
-                                                title="Remove property"
+                                                onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
+                                                className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'form'
+                                                  ? 'bg-blue-100 text-blue-700'
+                                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                  }`}
                                               >
-                                                <Trash2 className="w-4 h-4" />
+                                                <FileText className="w-3 h-3 mr-1" />
+                                                Form
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
+                                                className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'css'
+                                                  ? 'bg-blue-100 text-blue-700'
+                                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                  }`}
+                                              >
+                                                <Code className="w-3 h-3 mr-1" />
+                                                CSS
                                               </button>
                                             </div>
-                                          ))}
-
-                                          {/* Add Property */}
-                                          <div className="flex flex-wrap gap-2">
-                                            {Object.entries(CSS_PROPERTIES)
-                                              .filter(([prop]) => !styles[prop])
-                                              .map(([prop, config]) => (
-                                                <button
-                                                  key={prop}
-                                                  type="button"
-                                                  onClick={() => handleUpdateElement(groupIndex, variant, prop, '')}
-                                                  className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                                                  title={`Add ${config.label}`}
-                                                >
-                                                  + {config.label}
-                                                </button>
-                                              ))}
                                           </div>
-                                        </>
-                                      ) : (
-                                        /* CSS View - uncontrolled with ref to prevent re-rendering */
-                                        <textarea
-                                          ref={(el) => {
-                                            if (el) cssTextareaRefs.current[editModeKey] = el;
-                                          }}
-                                          defaultValue={stylesToCSS(styles)}
-                                          onChange={() => {
-                                            if (onDirty) onDirty();
-                                          }}
-                                          onBlur={() => handleCSSBlur(groupIndex, variant)}
-                                          className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                          rows={Math.max(5, Object.keys(styles).length + 2)}
-                                          placeholder="property: value;"
-                                        />
-                                      )}
-                                    </div>
-                                  );
-                                })}
+
+                                          {currentEditMode === 'form' ? (
+                                            /* Form View */
+                                            <>
+                                              {/* Existing Properties */}
+                                              {styleEntries.map(([property, value]) => (
+                                                <div key={property} className="flex gap-2 items-start">
+                                                  <div className="flex-1">
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                      {CSS_PROPERTIES[property]?.label || property}
+                                                    </label>
+                                                    {renderPropertyField(groupIndex, variant, property, value)}
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveProperty(groupIndex, variant, property)}
+                                                    className="mt-6 p-1 text-red-600 hover:text-red-700"
+                                                    title="Remove property"
+                                                  >
+                                                    <Trash2 className="w-4 h-4" />
+                                                  </button>
+                                                </div>
+                                              ))}
+
+                                              {/* Add Property */}
+                                              <div className="flex flex-wrap gap-2">
+                                                {Object.entries(CSS_PROPERTIES)
+                                                  .filter(([prop]) => !styles[prop])
+                                                  .map(([prop, config]) => (
+                                                    <button
+                                                      key={prop}
+                                                      type="button"
+                                                      onClick={() => handleUpdateElement(groupIndex, variant, prop, '')}
+                                                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                                      title={`Add ${config.label}`}
+                                                    >
+                                                      + {config.label}
+                                                    </button>
+                                                  ))}
+                                              </div>
+                                            </>
+                                          ) : (
+                                            /* CSS View - uncontrolled with ref to prevent re-rendering */
+                                            <textarea
+                                              ref={(el) => {
+                                                if (el) cssTextareaRefs.current[editModeKey] = el;
+                                              }}
+                                              defaultValue={stylesToCSS(styles)}
+                                              onChange={() => {
+                                                if (onDirty) onDirty();
+                                              }}
+                                              onBlur={() => handleCSSBlur(groupIndex, variant)}
+                                              className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                              rows={Math.max(5, Object.keys(styles).length + 2)}
+                                              placeholder="property: value;"
+                                            />
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
                         </>
                       )}
                     </div>

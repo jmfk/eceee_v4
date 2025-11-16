@@ -102,9 +102,7 @@ class ImageConfig(BaseModel):
             "order": 5,
             "group": "Override Settings",
             "variant": "toggle",
-            "conditionalOn": {
-                "imageStyle": "carousel"
-            },
+            "conditionalOn": {"imageStyle": "carousel"},
             "isOverride": True,
         },
     )
@@ -122,9 +120,7 @@ class ImageConfig(BaseModel):
             "step": 1,
             "unit": "seconds",
             "showValue": True,
-            "conditionalOn": {
-                "imageStyle": "carousel"
-            },
+            "conditionalOn": {"imageStyle": "carousel"},
             "isOverride": True,
         },
     )
@@ -365,12 +361,12 @@ class ImageWidget(BaseWidget):
         # Start with the base configuration
         template_config = config.copy() if config else {}
         context = context if context else {}
-        
+
         # Get theme and style for applying defaults (context may contain theme)
         theme = context.get("theme")
         style = None
         style_name = config.get("image_style") or config.get("imageStyle")
-        
+
         if theme and style_name:
             image_styles = theme.image_styles or {}
             style = image_styles.get(style_name)
@@ -378,7 +374,9 @@ class ImageWidget(BaseWidget):
                 # Fallback to legacy
                 gallery_styles = theme.gallery_styles or {}
                 carousel_styles = theme.carousel_styles or {}
-                style = gallery_styles.get(style_name) or carousel_styles.get(style_name)
+                style = gallery_styles.get(style_name) or carousel_styles.get(
+                    style_name
+                )
 
         # Check if we have a collection to resolve
         collection_id = config.get("collection_id") or config.get("collectionId")
@@ -439,30 +437,36 @@ class ImageWidget(BaseWidget):
         template_config["gallery_columns"] = template_config.get(
             "galleryColumns", template_config.get("gallery_columns", 3)
         )
-        
+
         # Apply style defaults with widget overrides
         # enableLightbox now comes from style only
-        template_config["enable_lightbox"] = style.get("enableLightbox", True) if style else True
-        
+        template_config["enable_lightbox"] = (
+            style.get("enableLightbox", True) if style else True
+        )
+
         # Apply widget overrides or style defaults for other settings
         # showCaptions
-        show_captions_override = template_config.get("showCaptions") or template_config.get("show_captions")
+        show_captions_override = template_config.get(
+            "showCaptions"
+        ) or template_config.get("show_captions")
         if show_captions_override is not None:
             template_config["show_captions"] = show_captions_override
         elif style and "defaultShowCaptions" in style:
             template_config["show_captions"] = style["defaultShowCaptions"]
         else:
             template_config["show_captions"] = True
-        
+
         # lightboxGroup
-        lightbox_group_override = template_config.get("lightboxGroup") or template_config.get("lightbox_group")
+        lightbox_group_override = template_config.get(
+            "lightboxGroup"
+        ) or template_config.get("lightbox_group")
         if lightbox_group_override is not None:
             template_config["lightbox_group"] = lightbox_group_override
         elif style and "defaultLightboxGroup" in style:
             template_config["lightbox_group"] = style["defaultLightboxGroup"]
         else:
             template_config["lightbox_group"] = None
-        
+
         # autoPlay (carousel only)
         auto_play_override = template_config.get("autoPlay")
         if auto_play_override is not None:
@@ -471,8 +475,8 @@ class ImageWidget(BaseWidget):
             template_config["auto_play"] = style["defaultAutoPlay"]
         else:
             template_config["auto_play"] = False
-        
-        # autoPlayInterval (carousel only)  
+
+        # autoPlayInterval (carousel only)
         auto_play_interval_override = template_config.get("autoPlayInterval")
         if auto_play_interval_override is not None:
             template_config["auto_play_interval"] = auto_play_interval_override
@@ -480,7 +484,7 @@ class ImageWidget(BaseWidget):
             template_config["auto_play_interval"] = style["defaultAutoPlayInterval"]
         else:
             template_config["auto_play_interval"] = 3
-        
+
         template_config["lightbox_style"] = template_config.get(
             "lightboxStyle", template_config.get("lightbox_style", None)
         )
@@ -499,7 +503,11 @@ class ImageWidget(BaseWidget):
             collection_config = config.get("collection_config") or config.get(
                 "collectionConfig", {}
             )
-            should_randomize = collection_config.get("randomize", False) if collection_config else False
+            should_randomize = (
+                collection_config.get("randomize", False)
+                if collection_config
+                else False
+            )
         if should_randomize and template_config.get("media_items"):
             import random
 
@@ -564,7 +572,7 @@ class ImageWidget(BaseWidget):
         # Get imgproxy config from style (can be overridden by widget config)
         imgproxy_config = style.get("imgproxy_config")
         lightbox_config = style.get("lightbox_config")
-        
+
         # Extract style defaults for overrides
         style_defaults = {
             "enableLightbox": style.get("enableLightbox", True),
@@ -573,11 +581,13 @@ class ImageWidget(BaseWidget):
             "defaultLightboxGroup": style.get("defaultLightboxGroup", ""),
             "defaultRandomize": style.get("defaultRandomize", False),
         }
-        
+
         # Add carousel-specific defaults if carousel type
         if style_type == "carousel":
             style_defaults["defaultAutoPlay"] = style.get("defaultAutoPlay", False)
-            style_defaults["defaultAutoPlayInterval"] = style.get("defaultAutoPlayInterval", 3)
+            style_defaults["defaultAutoPlayInterval"] = style.get(
+                "defaultAutoPlayInterval", 3
+            )
 
         # Use styleType to determine which context to prepare
         if style_type == "carousel":
@@ -586,7 +596,12 @@ class ImageWidget(BaseWidget):
             )
         else:
             context = prepare_gallery_context(
-                images, config, style.get("variables"), imgproxy_config, lightbox_config, style_defaults
+                images,
+                config,
+                style.get("variables"),
+                imgproxy_config,
+                lightbox_config,
+                style_defaults,
             )
 
         # Render template

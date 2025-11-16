@@ -104,26 +104,6 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             );
         }
 
-        // Apply group-level color scheme for each base selector
-        if (group.colorScheme && (group.colorScheme.background || group.colorScheme.text)) {
-            const colorSchemeSelectors = baseSelectors.join(',\n');
-            let colorSchemeRule = `${colorSchemeSelectors} {\n`;
-            if (group.colorScheme.background) {
-                const bgValue = colors[group.colorScheme.background] 
-                    ? `var(--${group.colorScheme.background})` 
-                    : group.colorScheme.background;
-                colorSchemeRule += `  background-color: ${bgValue};\n`;
-            }
-            if (group.colorScheme.text) {
-                const textValue = colors[group.colorScheme.text] 
-                    ? `var(--${group.colorScheme.text})` 
-                    : group.colorScheme.text;
-                colorSchemeRule += `  color: ${textValue};\n`;
-            }
-            colorSchemeRule += '}';
-            cssParts.push(colorSchemeRule);
-        }
-
         const elements = group.elements || {};
 
         for (const [element, styles] of Object.entries(elements)) {
@@ -177,6 +157,49 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
             cssRule += '}';
             cssParts.push(cssRule);
+        }
+
+        // Generate layout properties CSS (NEW for widget layout parts)
+        if (group.layoutProperties) {
+            for (const [part, breakpoints] of Object.entries(group.layoutProperties)) {
+                // Desktop (default, no media query)
+                if (breakpoints.desktop && Object.keys(breakpoints.desktop).length > 0) {
+                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
+                    let partRule = `${partSelectors} {\n`;
+                    for (const [prop, value] of Object.entries(breakpoints.desktop)) {
+                        const cssProp = camelToKebab(prop);
+                        partRule += `  ${cssProp}: ${value};\n`;
+                    }
+                    partRule += '}';
+                    cssParts.push(partRule);
+                }
+
+                // Tablet (@media max-width: 1024px)
+                if (breakpoints.tablet && Object.keys(breakpoints.tablet).length > 0) {
+                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
+                    let tabletRule = `@media (max-width: 1024px) {\n`;
+                    tabletRule += `  ${partSelectors} {\n`;
+                    for (const [prop, value] of Object.entries(breakpoints.tablet)) {
+                        const cssProp = camelToKebab(prop);
+                        tabletRule += `    ${cssProp}: ${value};\n`;
+                    }
+                    tabletRule += '  }\n}';
+                    cssParts.push(tabletRule);
+                }
+
+                // Mobile (@media max-width: 768px)
+                if (breakpoints.mobile && Object.keys(breakpoints.mobile).length > 0) {
+                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
+                    let mobileRule = `@media (max-width: 768px) {\n`;
+                    mobileRule += `  ${partSelectors} {\n`;
+                    for (const [prop, value] of Object.entries(breakpoints.mobile)) {
+                        const cssProp = camelToKebab(prop);
+                        mobileRule += `    ${cssProp}: ${value};\n`;
+                    }
+                    mobileRule += '  }\n}';
+                    cssParts.push(mobileRule);
+                }
+            }
         }
     }
 

@@ -165,6 +165,31 @@ class BannerWidget(BaseWidget):
         "Flexible banner with text content and configurable image layouts"
     )
     template_name = "easy_widgets/widgets/banner.html"
+    
+    layout_parts = {
+        "container": {
+            "label": "Main widget container",
+            "properties": ["width", "height", "minHeight", "maxHeight",
+                          "padding", "margin", "position", "display",
+                          "flexDirection", "justifyContent", "alignItems"]
+        },
+        "background": {
+            "label": "Background image area",
+            "properties": ["width", "height", "position", "top", "left",
+                          "objectFit", "objectPosition", "opacity", "zIndex"]
+        },
+        "image": {
+            "label": "Foreground images area",
+            "properties": ["width", "maxWidth", "height", "margin",
+                          "objectFit", "borderRadius", "boxShadow"]
+        },
+        "content": {
+            "label": "Text content area",
+            "properties": ["padding", "margin", "backgroundColor", "color",
+                          "textAlign", "maxWidth", "borderRadius", "boxShadow",
+                          "position", "zIndex"]
+        }
+    }
 
     widget_css = """
     .banner-widget {

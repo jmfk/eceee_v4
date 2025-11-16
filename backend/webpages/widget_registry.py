@@ -265,6 +265,33 @@ class BaseWidget(ABC):
             "configuration_schema": self.configuration_model.model_json_schema(),
         }
 
+        # Include layout_parts if defined
+        if hasattr(self, 'layout_parts') and self.layout_parts:
+            # Normalize layout_parts format for frontend consumption
+            # Supports both string format (legacy) and dict format (new)
+            normalized_parts = {}
+            for part_name, part_config in self.layout_parts.items():
+                if isinstance(part_config, str):
+                    # Legacy format: "container": "Main widget container"
+                    normalized_parts[part_name] = {
+                        "label": part_config,
+                        "properties": None  # None = all properties available
+                    }
+                elif isinstance(part_config, dict):
+                    # New format: already has "label" and optional "properties"
+                    normalized_parts[part_name] = {
+                        "label": part_config.get("label", part_name.capitalize()),
+                        "properties": part_config.get("properties")  # None or list of property names
+                    }
+                else:
+                    # Fallback: treat as label string
+                    normalized_parts[part_name] = {
+                        "label": str(part_config),
+                        "properties": None
+                    }
+            
+            result["layout_parts"] = normalized_parts
+
         # Include template JSON only when requested
         if include_template_json:
             template_json = self.get_template_json()

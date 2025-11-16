@@ -30,8 +30,11 @@ class PageTheme(models.Model):
     design_groups = models.JSONField(
         default=dict,
         help_text=(
-            "Grouped HTML element styles with color schemes and optional widget_type/slot targeting. "
-            "Each group can have an 'isDefault' boolean field to mark it as the base/default group for style inheritance."
+            "Grouped HTML element styles with optional widget_type/slot targeting. "
+            "Each group can have an 'isDefault' boolean field to mark it as the base/default group for style inheritance. "
+            "Groups can also include 'layoutProperties' to define responsive layout and styling settings "
+            "(width, height, padding, margin, gap, background-color, color, border properties, etc.) "
+            "for widget layout parts (e.g., container, header, image, content) across breakpoints (desktop, tablet, mobile)."
         ),
     )
     component_styles = models.JSONField(
@@ -1252,7 +1255,7 @@ class PageTheme(models.Model):
             frontend_scoped: If True, prepend .cms-content to all selectors
         """
         import re
-        
+
         css_parts = []
 
         # When generating complete CSS, include ALL groups (don't filter)
@@ -1330,26 +1333,6 @@ class PageTheme(models.Model):
                     for sel in base_selectors
                 ]
 
-            # Apply group-level color scheme if defined
-            color_scheme = group.get("colorScheme", {})
-            if color_scheme and (
-                color_scheme.get("background") or color_scheme.get("text")
-            ):
-                selectors_str = ",\n".join(base_selectors)
-                color_scheme_rule = f"{selectors_str} {{\n"
-                if color_scheme.get("background"):
-                    bg_value = color_scheme["background"]
-                    if bg_value in self.colors:
-                        bg_value = f"var(--{bg_value})"
-                    color_scheme_rule += f"  background-color: {bg_value};\n"
-                if color_scheme.get("text"):
-                    text_value = color_scheme["text"]
-                    if text_value in self.colors:
-                        text_value = f"var(--{text_value})"
-                    color_scheme_rule += f"  color: {text_value};\n"
-                color_scheme_rule += "}"
-                css_parts.append(color_scheme_rule)
-
             elements = group.get("elements", {})
             for element, styles in elements.items():
                 if not styles:
@@ -1408,11 +1391,11 @@ class PageTheme(models.Model):
 
                         for font in fonts:
                             trimmed = font.strip()
-                            
+
                             # Remove ALL quotes (both single and double) from the font name
                             # This handles cases like 'Source Sans 3", "Source Sans 3', etc.
-                            unquoted = re.sub(r'["\']', '', trimmed)
-                            
+                            unquoted = re.sub(r'["\']', "", trimmed)
+
                             # If it's a generic family, use without quotes
                             if unquoted in generic_families:
                                 quoted_fonts.append(unquoted)
@@ -1424,15 +1407,15 @@ class PageTheme(models.Model):
                                 quoted_fonts.append(unquoted)
 
                         property_value = ", ".join(quoted_fonts)
-                    
+
                     # Sanitize duplicate units (e.g., "36pxpx" -> "36px", "2remrem" -> "2rem")
                     # This fixes legacy data that may have accumulated duplicate units
-                    duplicate_unit_pattern = r'^([-\d.]+)(px|rem|em|%|vh|vw|ch|ex)\2+$'
+                    duplicate_unit_pattern = r"^([-\d.]+)(px|rem|em|%|vh|vw|ch|ex)\2+$"
                     match = re.match(duplicate_unit_pattern, str(property_value))
                     if match:
                         # Extract number and first unit only
                         property_value = f"{match.group(1)}{match.group(2)}"
-                    
+
                     # Handle list-specific properties
                     if element in ["ul", "ol"] and property_name == "bulletType":
                         css_property = "list-style-type"
