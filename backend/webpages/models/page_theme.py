@@ -63,6 +63,14 @@ class PageTheme(models.Model):
     table_templates = models.JSONField(
         default=dict, help_text="Predefined table templates for the Table widget"
     )
+    breakpoints = models.JSONField(
+        default=dict,
+        help_text=(
+            "Responsive breakpoint configuration with pixel values for media queries. "
+            "Format: {'sm': 640, 'md': 768, 'lg': 1024, 'xl': 1280}. "
+            "If not specified, defaults to standard breakpoints."
+        ),
+    )
 
     # Deprecated fields (kept for migration compatibility)
     css_variables = models.JSONField(
@@ -102,6 +110,27 @@ class PageTheme(models.Model):
     def __str__(self):
         return self.name
 
+    def get_breakpoints(self):
+        """
+        Get responsive breakpoints for this theme.
+        Returns theme-specific breakpoints or hard defaults.
+        
+        Returns:
+            dict: Breakpoint configuration with keys 'sm', 'md', 'lg', 'xl'
+        """
+        DEFAULT_BREAKPOINTS = {
+            'sm': 640,   # Tailwind sm
+            'md': 768,   # Tailwind md (Bootstrap md)
+            'lg': 1024,  # Tailwind lg (Bootstrap lg)
+            'xl': 1280,  # Tailwind xl (Bootstrap xl)
+        }
+        
+        if self.breakpoints and isinstance(self.breakpoints, dict):
+            # Merge with defaults to ensure all keys exist
+            return {**DEFAULT_BREAKPOINTS, **self.breakpoints}
+        
+        return DEFAULT_BREAKPOINTS
+
     def to_dict(self):
         """Convert theme to dictionary representation"""
         return {
@@ -117,6 +146,7 @@ class PageTheme(models.Model):
             "gallery_styles": self.gallery_styles,  # Deprecated
             "carousel_styles": self.carousel_styles,  # Deprecated
             "table_templates": self.table_templates,
+            "breakpoints": self.get_breakpoints(),  # Always include computed breakpoints
             # Deprecated fields (for backwards compatibility)
             "css_variables": self.css_variables,
             "html_elements": self.html_elements,
@@ -1551,6 +1581,7 @@ class PageTheme(models.Model):
             gallery_styles=self.gallery_styles.copy() if self.gallery_styles else {},
             carousel_styles=self.carousel_styles.copy() if self.carousel_styles else {},
             table_templates=self.table_templates.copy() if self.table_templates else {},
+            breakpoints=self.breakpoints.copy() if self.breakpoints else {},
             css_variables=self.css_variables.copy() if self.css_variables else {},
             html_elements=self.html_elements.copy() if self.html_elements else {},
             custom_css=self.custom_css,

@@ -29,6 +29,7 @@ import DesignGroupsTab from './theme/DesignGroupsTab';
 import ComponentStylesTab from './theme/ComponentStylesTab';
 import ImageStylesTab from './theme/ImageStylesTab';
 import TableTemplatesTab from './theme/TableTemplatesTab';
+import BreakpointsTab from './theme/BreakpointsTab';
 import ImageUpload from './theme/ImageUpload';
 import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
 import CopyButton from './theme/CopyButton';
@@ -472,6 +473,7 @@ const ThemeEditor = ({ onSave }) => {
         { id: 'basic', label: 'Basic Info' },
         { id: 'fonts', label: 'Fonts' },
         { id: 'colors', label: 'Colors' },
+        { id: 'breakpoints', label: 'Breakpoints' },
         { id: 'typography', label: 'Design Groups' },
         { id: 'component-styles', label: 'Component Styles' },
         { id: 'image-styles', label: 'Image Styles' },
@@ -789,11 +791,19 @@ const ThemeEditor = ({ onSave }) => {
                         />
                     )}
 
+                    {activeTab === 'breakpoints' && (
+                        <BreakpointsTab
+                            breakpoints={themeData?.breakpoints || {}}
+                            onChange={(breakpoints) => updateThemeField('breakpoints', breakpoints)}
+                        />
+                    )}
+
                     {activeTab === 'typography' && (
                         <DesignGroupsTab
                             designGroups={themeData?.designGroups || themeData?.typography || { groups: [] }}
                             colors={themeData?.colors || {}}
                             fonts={themeData?.fonts || {}}
+                            breakpoints={themeData?.breakpoints || {}}
                             onChange={(designGroups) => updateThemeField('designGroups', designGroups)}
                             onDirty={() => setThemeDirty(true)}
                         />

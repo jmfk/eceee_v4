@@ -1,0 +1,255 @@
+/**
+ * Breakpoints Tab Component
+ * 
+ * UI for editing theme breakpoint configuration.
+ * Provides visual editor with validation for responsive breakpoints.
+ */
+
+import React, { useState } from 'react';
+import { Monitor, Tablet, Smartphone, Tv, RotateCcw, AlertCircle } from 'lucide-react';
+import { getBreakpoints } from '../../utils/themeUtils';
+
+const BreakpointsTab = ({ breakpoints, onChange }) => {
+    const currentBreakpoints = breakpoints || {};
+    const effectiveBreakpoints = getBreakpoints({ breakpoints: currentBreakpoints });
+    
+    const [errors, setErrors] = useState({});
+
+    const breakpointConfig = [
+        {
+            key: 'sm',
+            label: 'Small (Mobile)',
+            description: 'Small devices and mobile phones',
+            icon: Smartphone,
+            default: 640,
+        },
+        {
+            key: 'md',
+            label: 'Medium (Tablet)',
+            description: 'Tablets and small laptops',
+            icon: Tablet,
+            default: 768,
+        },
+        {
+            key: 'lg',
+            label: 'Large (Desktop)',
+            description: 'Desktops and large screens',
+            icon: Monitor,
+            default: 1024,
+        },
+        {
+            key: 'xl',
+            label: 'Extra Large',
+            description: 'Large desktops and displays',
+            icon: Tv,
+            default: 1280,
+        },
+    ];
+
+    const validateBreakpoints = (newBreakpoints) => {
+        const validationErrors = {};
+        const order = ['sm', 'md', 'lg', 'xl'];
+        
+        // Check each value is positive
+        for (const key of order) {
+            if (newBreakpoints[key] !== undefined) {
+                if (!Number.isInteger(newBreakpoints[key]) || newBreakpoints[key] <= 0) {
+                    validationErrors[key] = 'Must be a positive integer';
+                }
+            }
+        }
+
+        // Check ascending order
+        for (let i = 0; i < order.length - 1; i++) {
+            const curr = order[i];
+            const next = order[i + 1];
+            
+            if (newBreakpoints[curr] !== undefined && newBreakpoints[next] !== undefined) {
+                if (newBreakpoints[curr] >= newBreakpoints[next]) {
+                    validationErrors[next] = `Must be greater than ${curr} (${newBreakpoints[curr]}px)`;
+                }
+            }
+        }
+
+        return validationErrors;
+    };
+
+    const handleChange = (key, value) => {
+        const numValue = value === '' ? undefined : parseInt(value, 10);
+        const newBreakpoints = { ...currentBreakpoints };
+        
+        if (numValue === undefined || isNaN(numValue)) {
+            delete newBreakpoints[key];
+        } else {
+            newBreakpoints[key] = numValue;
+        }
+
+        const validationErrors = validateBreakpoints({ ...effectiveBreakpoints, ...newBreakpoints });
+        setErrors(validationErrors);
+
+        if (Object.keys(validationErrors).length === 0) {
+            onChange(newBreakpoints);
+        }
+    };
+
+    const handleReset = () => {
+        setErrors({});
+        onChange({});
+    };
+
+    const isDefault = Object.keys(currentBreakpoints).length === 0;
+
+    return (
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Responsive Breakpoints</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                        Configure responsive breakpoint values for this theme. Leave empty to use defaults.
+                    </p>
+                </div>
+                <button
+                    onClick={handleReset}
+                    disabled={isDefault}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                        isDefault
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    title="Reset to defaults"
+                >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset to Defaults
+                </button>
+            </div>
+
+            {/* Breakpoint Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {breakpointConfig.map(({ key, label, description, icon: Icon, default: defaultValue }) => {
+                    const value = effectiveBreakpoints[key];
+                    const isCustom = currentBreakpoints[key] !== undefined;
+                    const hasError = errors[key];
+
+                    return (
+                        <div
+                            key={key}
+                            className={`border rounded-lg p-4 transition-all ${
+                                hasError
+                                    ? 'border-red-300 bg-red-50'
+                                    : isCustom
+                                    ? 'border-blue-300 bg-blue-50'
+                                    : 'border-gray-200 bg-white'
+                            }`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className={`p-2 rounded-md ${
+                                    hasError ? 'bg-red-100' : isCustom ? 'bg-blue-100' : 'bg-gray-100'
+                                }`}>
+                                    <Icon className={`w-5 h-5 ${
+                                        hasError ? 'text-red-600' : isCustom ? 'text-blue-600' : 'text-gray-600'
+                                    }`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <h4 className="font-medium text-gray-900">{label}</h4>
+                                        {isCustom && !hasError && (
+                                            <span className="text-xs text-blue-600 font-medium">Custom</span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-gray-600 mb-3">{description}</p>
+                                    
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative flex-1">
+                                            <input
+                                                type="number"
+                                                value={currentBreakpoints[key] || ''}
+                                                onChange={(e) => handleChange(key, e.target.value)}
+                                                placeholder={`${defaultValue}`}
+                                                min="1"
+                                                step="1"
+                                                className={`w-full px-3 py-2 pr-10 border rounded-md text-sm transition-colors ${
+                                                    hasError
+                                                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                                                        : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                                                }`}
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                                                px
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {hasError && (
+                                        <div className="flex items-center gap-1 mt-2 text-xs text-red-600">
+                                            <AlertCircle className="w-3 h-3" />
+                                            {errors[key]}
+                                        </div>
+                                    )}
+
+                                    {!hasError && !isCustom && (
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Using default: {defaultValue}px
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Visual Breakpoint Scale */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Breakpoint Scale</h4>
+                <div className="relative">
+                    <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                        <span>0px</span>
+                        <span>{effectiveBreakpoints.xl}px+</span>
+                    </div>
+                    <div className="relative h-8 bg-gradient-to-r from-blue-200 via-blue-300 to-blue-400 rounded-md overflow-hidden">
+                        {/* Breakpoint markers */}
+                        {Object.keys(effectiveBreakpoints)
+                            .sort((a, b) => effectiveBreakpoints[a] - effectiveBreakpoints[b])
+                            .map((key) => {
+                                const value = effectiveBreakpoints[key];
+                                const maxValue = effectiveBreakpoints.xl;
+                                const position = (value / maxValue) * 100;
+
+                                return (
+                                    <div
+                                        key={key}
+                                        className="absolute top-0 bottom-0 w-px bg-gray-700"
+                                        style={{ left: `${position}%` }}
+                                    >
+                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-medium text-gray-700 whitespace-nowrap">
+                                            {key}: {value}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                    </div>
+                </div>
+            </div>
+
+            {/* Help Text */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-900">
+                        <p className="font-medium mb-1">How Breakpoints Work</p>
+                        <ul className="list-disc list-inside space-y-1 text-blue-800">
+                            <li>Breakpoints define max-width values for responsive media queries</li>
+                            <li>Larger screens inherit styles from smaller breakpoints</li>
+                            <li>Values must be in ascending order (sm &lt; md &lt; lg &lt; xl)</li>
+                            <li>Leave fields empty to use theme defaults ({breakpointConfig.map(b => `${b.key}: ${b.default}px`).join(', ')})</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default BreakpointsTab;
+

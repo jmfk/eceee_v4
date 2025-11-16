@@ -74,7 +74,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
 
     def to_representation(self, instance):
-        """Custom representation to return full image URL"""
+        """Custom representation to return full image URL and computed breakpoints"""
         data = super().to_representation(instance)
 
         # Convert image field to full URL
@@ -114,6 +114,9 @@ class PageThemeSerializer(serializers.ModelSerializer):
         else:
             data["image"] = None
 
+        # Always include computed breakpoints (with defaults if not set)
+        data["breakpoints"] = instance.get_breakpoints()
+
         return data
 
     class Meta:
@@ -131,6 +134,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "gallery_styles",  # Deprecated
             "carousel_styles",  # Deprecated
             "table_templates",
+            "breakpoints",
             # Legacy fields (deprecated)
             "css_variables",
             "html_elements",
@@ -143,6 +147,42 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "created_by",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "created_by"]
+
+    def validate_breakpoints(self, value):
+        """Validate breakpoints configuration"""
+        if not value:
+            return value
+            
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Breakpoints must be a JSON object")
+
+        # Validate that values are positive integers
+        valid_keys = {'sm', 'md', 'lg', 'xl'}
+        for key, val in value.items():
+            if key not in valid_keys:
+                raise serializers.ValidationError(
+                    f"Invalid breakpoint key '{key}'. Must be one of: {', '.join(valid_keys)}"
+                )
+            if not isinstance(val, int) or val <= 0:
+                raise serializers.ValidationError(
+                    f"Breakpoint '{key}' must be a positive integer (pixels)"
+                )
+
+        # Validate ascending order if multiple breakpoints provided
+        if len(value) > 1:
+            breakpoint_order = ['sm', 'md', 'lg', 'xl']
+            provided_values = [(k, value[k]) for k in breakpoint_order if k in value]
+            
+            for i in range(len(provided_values) - 1):
+                curr_name, curr_val = provided_values[i]
+                next_name, next_val = provided_values[i + 1]
+                if curr_val >= next_val:
+                    raise serializers.ValidationError(
+                        f"Breakpoints must be in ascending order: {curr_name} ({curr_val}px) "
+                        f"must be less than {next_name} ({next_val}px)"
+                    )
+
+        return value
 
     def validate_fonts(self, value):
         """Validate fonts configuration"""

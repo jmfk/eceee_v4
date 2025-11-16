@@ -192,7 +192,7 @@ const CSS_PROPERTIES = {
   textTransform: { type: 'select', label: 'Text Transform', options: ['none', 'uppercase', 'lowercase', 'capitalize'] },
 };
 
-const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => {
+const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, onDirty }) => {
   const groups = designGroups?.groups || [];
   const [expandedContent, setExpandedContent] = useState({});
   const [expandedTags, setExpandedTags] = useState({});
@@ -1880,7 +1880,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, onChange, onDirty }) => 
         <div className="lg:sticky lg:top-6 lg:self-start">
           <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
             <h4 className="text-sm font-semibold text-gray-900 mb-3">Live Preview</h4>
-            <DesignGroupsPreview designGroups={designGroups} colors={colors} />
+            <DesignGroupsPreview designGroups={designGroups} colors={colors} breakpoints={breakpoints} />
           </div>
         </div>
       </div>

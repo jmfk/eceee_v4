@@ -5,9 +5,9 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { generateDesignGroupsCSS, generateColorsCSS, mergeGroupElements } from '../../utils/themeUtils';
+import { generateDesignGroupsCSS, generateColorsCSS, mergeGroupElements, getBreakpoints } from '../../utils/themeUtils';
 
-const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = null }) => {
+const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = null, breakpoints = null }) => {
     const groups = designGroups?.groups || [];
     const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
 
@@ -41,16 +41,21 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
             slots: []
         };
 
+        // Get breakpoints (with defaults if not provided)
+        const bps = breakpoints || getBreakpoints(null);
+
         const designGroupsCSS = generateDesignGroupsCSS(
             { groups: [mergedGroup] },
             colors || {},
             '',  // No scope - use data attributes
             widgetType,
-            slot
+            slot,
+            false, // frontendScoped
+            bps    // Pass breakpoints
         );
 
         return `${colorCSS}\n\n${designGroupsCSS}`;
-    }, [designGroups, groups, selectedGroupIndex, colors, widgetType, slot]);
+    }, [designGroups, groups, selectedGroupIndex, colors, widgetType, slot, breakpoints]);
 
     return (
         <div className="design-groups-preview-container">

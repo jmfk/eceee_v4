@@ -5,6 +5,44 @@
  */
 
 /**
+ * Default breakpoint configuration
+ * Hard-coded defaults matching Tailwind/Bootstrap conventions
+ */
+const DEFAULT_BREAKPOINTS = {
+    sm: 640,   // Tailwind sm
+    md: 768,   // Tailwind md (Bootstrap md)
+    lg: 1024,  // Tailwind lg (Bootstrap lg)
+    xl: 1280,  // Tailwind xl (Bootstrap xl)
+};
+
+/**
+ * Get breakpoints from theme or return defaults
+ * @param {Object} theme - Theme object with optional breakpoints
+ * @returns {Object} Breakpoint configuration
+ */
+export function getBreakpoints(theme) {
+    if (theme && theme.breakpoints && typeof theme.breakpoints === 'object') {
+        // Merge with defaults to ensure all keys exist
+        return { ...DEFAULT_BREAKPOINTS, ...theme.breakpoints };
+    }
+    return DEFAULT_BREAKPOINTS;
+}
+
+/**
+ * Map old breakpoint names to new semantic names (backward compatibility)
+ * @param {string} oldName - Old breakpoint name (mobile, tablet, desktop)
+ * @returns {string} New semantic name (sm, md, lg, xl)
+ */
+export function mapBreakpointName(oldName) {
+    const mapping = {
+        'mobile': 'sm',
+        'tablet': 'md',
+        'desktop': 'lg',
+    };
+    return mapping[oldName] || oldName;
+}
+
+/**
  * Normalize a value for use as a CSS class name
  * Converts to lowercase and replaces non-alphanumeric characters with hyphens
  * @param {string} value - Value to normalize
@@ -23,9 +61,12 @@ function normalizeForCSS(value) {
  * @param {string} widgetType - Optional widget type for filtering
  * @param {string} slot - Optional slot name for filtering
  * @param {boolean} frontendScoped - If true, prepend .cms-content to all selectors
+ * @param {Object} breakpoints - Breakpoint configuration (defaults to DEFAULT_BREAKPOINTS)
  * @returns {string} Generated CSS
  */
-export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = null, slot = null, frontendScoped = false) {
+export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = null, slot = null, frontendScoped = false, breakpoints = null) {
+    // Use provided breakpoints or defaults
+    const bps = breakpoints || DEFAULT_BREAKPOINTS;
     if (!designGroups || !designGroups.groups) {
         return '';
     }
@@ -161,12 +202,13 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
         // Generate layout properties CSS (NEW for widget layout parts)
         if (group.layoutProperties) {
-            for (const [part, breakpoints] of Object.entries(group.layoutProperties)) {
-                // Desktop (default, no media query)
-                if (breakpoints.desktop && Object.keys(breakpoints.desktop).length > 0) {
+            for (const [part, partBreakpoints] of Object.entries(group.layoutProperties)) {
+                // Desktop/lg (default, no media query)
+                const desktopProps = partBreakpoints.desktop || partBreakpoints.lg;
+                if (desktopProps && Object.keys(desktopProps).length > 0) {
                     const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
                     let partRule = `${partSelectors} {\n`;
-                    for (const [prop, value] of Object.entries(breakpoints.desktop)) {
+                    for (const [prop, value] of Object.entries(desktopProps)) {
                         const cssProp = camelToKebab(prop);
                         partRule += `  ${cssProp}: ${value};\n`;
                     }
@@ -174,12 +216,14 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     cssParts.push(partRule);
                 }
 
-                // Tablet (@media max-width: 1024px)
-                if (breakpoints.tablet && Object.keys(breakpoints.tablet).length > 0) {
+                // Tablet/md (@media max-width based on theme breakpoints)
+                const tabletProps = partBreakpoints.tablet || partBreakpoints.md;
+                if (tabletProps && Object.keys(tabletProps).length > 0) {
                     const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
-                    let tabletRule = `@media (max-width: 1024px) {\n`;
+                    const maxWidth = bps.lg || 1024; // lg breakpoint for tablet max-width
+                    let tabletRule = `@media (max-width: ${maxWidth}px) {\n`;
                     tabletRule += `  ${partSelectors} {\n`;
-                    for (const [prop, value] of Object.entries(breakpoints.tablet)) {
+                    for (const [prop, value] of Object.entries(tabletProps)) {
                         const cssProp = camelToKebab(prop);
                         tabletRule += `    ${cssProp}: ${value};\n`;
                     }
@@ -187,17 +231,34 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     cssParts.push(tabletRule);
                 }
 
-                // Mobile (@media max-width: 768px)
-                if (breakpoints.mobile && Object.keys(breakpoints.mobile).length > 0) {
+                // Mobile/sm (@media max-width based on theme breakpoints)
+                const mobileProps = partBreakpoints.mobile || partBreakpoints.sm;
+                if (mobileProps && Object.keys(mobileProps).length > 0) {
                     const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
-                    let mobileRule = `@media (max-width: 768px) {\n`;
+                    const maxWidth = bps.md || 768; // md breakpoint for mobile max-width
+                    let mobileRule = `@media (max-width: ${maxWidth}px) {\n`;
                     mobileRule += `  ${partSelectors} {\n`;
-                    for (const [prop, value] of Object.entries(breakpoints.mobile)) {
+                    for (const [prop, value] of Object.entries(mobileProps)) {
                         const cssProp = camelToKebab(prop);
                         mobileRule += `    ${cssProp}: ${value};\n`;
                     }
                     mobileRule += '  }\n}';
                     cssParts.push(mobileRule);
+                }
+                
+                // XL (extra large, @media min-width)
+                const xlProps = partBreakpoints.xl;
+                if (xlProps && Object.keys(xlProps).length > 0) {
+                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
+                    const minWidth = bps.xl || 1280;
+                    let xlRule = `@media (min-width: ${minWidth}px) {\n`;
+                    xlRule += `  ${partSelectors} {\n`;
+                    for (const [prop, value] of Object.entries(xlProps)) {
+                        const cssProp = camelToKebab(prop);
+                        xlRule += `    ${cssProp}: ${value};\n`;
+                    }
+                    xlRule += '  }\n}';
+                    cssParts.push(xlRule);
                 }
             }
         }
