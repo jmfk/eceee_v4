@@ -181,17 +181,6 @@ class ContentCardWidget(BaseWidget):
                 "borderBottom",
             ],
         },
-        "content-card-body": {
-            "label": "Card Body",
-            "properties": [
-                "width",
-                "height",
-                "display",
-                "flex",
-                "minHeight",
-                "flexDirection",
-            ],
-        },
         "content-card-text": {
             "label": "Text Content",
             "properties": [
@@ -404,7 +393,7 @@ class ContentCardWidget(BaseWidget):
 
     def prepare_template_context(self, config, context=None):
         """
-        Prepare template context with snake_case field conversions.
+        Prepare template context with snake_case field conversions and layout properties.
         """
         template_config = config.copy() if config else {}
 
@@ -412,8 +401,8 @@ class ContentCardWidget(BaseWidget):
         template_config["text_position"] = config.get("textPosition") or config.get(
             "text_position", "left"
         )
-        template_config["image_count"] = config.get("imageCount") or config.get(
-            "image_count", 1
+        template_config["image_count"] = int(
+            config.get("imageCount") or config.get("image_count", 1)
         )
         template_config["component_style"] = config.get("componentStyle") or config.get(
             "component_style", "default"
@@ -424,5 +413,42 @@ class ContentCardWidget(BaseWidget):
         template_config["image_2"] = config.get("image2") or config.get("image_2")
         template_config["image_3"] = config.get("image3") or config.get("image_3")
         template_config["image_4"] = config.get("image4") or config.get("image_4")
+
+        # Extract layout properties from theme for dynamic image sizing
+        theme = context.get("theme") if context else None
+        if theme and hasattr(theme, "design_groups"):
+            design_groups = theme.design_groups or {}
+            groups = design_groups.get("groups", [])
+
+            # Find layout properties for content-card-image part
+            for group in groups:
+                layout_props = group.get("layoutProperties") or group.get(
+                    "layout_properties", {}
+                )
+                if "content-card-image" in layout_props:
+                    # Extract height from breakpoints (use 'sm' as default)
+                    part_props = layout_props["content-card-image"]
+                    height_val = part_props.get("sm", {}).get("height")
+
+                    # Parse height and calculate width (1:1 ratio)
+                    if height_val:
+                        try:
+                            # Remove 'px' suffix if present
+                            height_str = str(height_val).replace("px", "").strip()
+                            height_px = int(height_str)
+
+                            # Set image dimensions for different layouts (1:1 aspect ratio)
+                            template_config["image_width"] = height_px
+                            template_config["image_height"] = height_px
+
+                            # Retina (2x) dimensions
+                            template_config["image_width_2x"] = height_px * 2
+                            template_config["image_height_2x"] = height_px * 2
+                        except (ValueError, AttributeError):
+                            # If parsing fails, defaults will be used from template
+                            logger.warning(
+                                f"Could not parse height value: {height_val}"
+                            )
+                    break  # Use first matching group
 
         return template_config

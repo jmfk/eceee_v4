@@ -14,7 +14,6 @@
         {{ config.header|linebreaksbr }}
     </div>
     {% endif %}
-   
     <div class="content-card-body text-{{ config.text_position|default:'left' }} image-count-{{ config.image_count|default:1 }}">
         {% if config.image_count == 4 %}
             {# 4 images layout - no text, just images in a row #}
@@ -23,29 +22,29 @@
                 {% if config.image_1 %}
                     <img 
                         class="content-card-image"
-                        src="{% imgproxy config.image_1 width=400 height=400 resize_type='fill' %}"
-                        srcset="{% imgproxy config.image_1 width=400 height=400 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=800 height=800 resize_type='fill' %} 2x"
+                        src="{% imgproxy config.image_1 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %}"
+                        srcset="{% imgproxy config.image_1 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=config.image_width_2x|default:800 height=config.image_height_2x|default:800 resize_type='fill' %} 2x"
                         alt="" />
                 {% endif %}
                 {% if config.image_2 %}
                     <img 
                         class="content-card-image"
-                        src="{% imgproxy config.image_2 width=400 height=400 resize_type='fill' %}"
-                        srcset="{% imgproxy config.image_2 width=400 height=400 resize_type='fill' %} 1x, {% imgproxy config.image_2 width=800 height=800 resize_type='fill' %} 2x"
+                        src="{% imgproxy config.image_2 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %}"
+                        srcset="{% imgproxy config.image_2 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %} 1x, {% imgproxy config.image_2 width=config.image_width_2x|default:800 height=config.image_height_2x|default:800 resize_type='fill' %} 2x"
                         alt="" />
                 {% endif %}
                 {% if config.image_3 %}
                     <img 
                         class="content-card-image"
-                        src="{% imgproxy config.image_3 width=400 height=400 resize_type='fill' %}"
-                        srcset="{% imgproxy config.image_3 width=400 height=400 resize_type='fill' %} 1x, {% imgproxy config.image_3 width=800 height=800 resize_type='fill' %} 2x"
+                        src="{% imgproxy config.image_3 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %}"
+                        srcset="{% imgproxy config.image_3 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %} 1x, {% imgproxy config.image_3 width=config.image_width_2x|default:800 height=config.image_height_2x|default:800 resize_type='fill' %} 2x"
                         alt="" />
                 {% endif %}
                 {% if config.image_4 %}
                     <img 
                         class="content-card-image"
-                        src="{% imgproxy config.image_4 width=400 height=400 resize_type='fill' %}"
-                        srcset="{% imgproxy config.image_4 width=400 height=400 resize_type='fill' %} 1x, {% imgproxy config.image_4 width=800 height=800 resize_type='fill' %} 2x"
+                        src="{% imgproxy config.image_4 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %}"
+                        srcset="{% imgproxy config.image_4 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %} 1x, {% imgproxy config.image_4 width=config.image_width_2x|default:800 height=config.image_height_2x|default:800 resize_type='fill' %} 2x"
                         alt="" />
                 {% endif %}
             </div>
@@ -58,27 +57,34 @@
             <div class="content-card-images layout-{{ config.image_count|default:1 }}">
                 {% if config.image_1 %}
                     {% if config.image_count == 1 %}
-                        {# Single image - square 600x600, 2x: 1200x1200 #}
+                        {# Single image - square 600x600, 2x: 1200x1200 (or from layout properties) #}
                         <img 
                             class="content-card-image"
-                            src="{% imgproxy config.image_1 width=600 height=600 resize_type='fill' %}"
-                            srcset="{% imgproxy config.image_1 width=600 height=600 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=1200 height=1200 resize_type='fill' %} 2x"
+                            src="{% imgproxy config.image_1 width=config.image_width|default:600 height=config.image_height|default:600 resize_type='fill' %}"
+                            srcset="{% imgproxy config.image_1 width=config.image_width|default:600 height=config.image_height|default:600 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=config.image_width_2x|default:1200 height=config.image_height_2x|default:1200 resize_type='fill' %} 2x"
                             alt="" />
                     {% else %}
-                        {# Two images - portrait 400x600, 2x: 800x1200 #}
+                        {# Two images - square (or from layout properties), default 400x400 for 1:1 ratio #}
                         <img 
                             class="content-card-image"
-                            src="{% imgproxy config.image_1 width=400 height=600 resize_type='fill' %}"
-                            srcset="{% imgproxy config.image_1 width=400 height=600 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=800 height=1200 resize_type='fill' %} 2x"
+                            src="{% imgproxy config.image_1 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %}"
+                            srcset="{% imgproxy config.image_1 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=config.image_width_2x|default:800 height=config.image_height_2x|default:800 resize_type='fill' %} 2x"
                             alt="" />
-                    {% endif %}
+                        {% endif %}
                 {% endif %}
                 {% if config.image_2 and config.image_count >= 2 %}
-                    {# Second image - portrait 400x600, 2x: 800x1200 #}
+                    {# Second image - square (or from layout properties), default 400x400 for 1:1 ratio #}
                     <img 
                         class="content-card-image"
-                        src="{% imgproxy config.image_2 width=400 height=600 resize_type='fill' %}"
-                        srcset="{% imgproxy config.image_2 width=400 height=600 resize_type='fill' %} 1x, {% imgproxy config.image_2 width=800 height=1200 resize_type='fill' %} 2x"
+                        src="{% imgproxy config.image_2 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %}"
+                        srcset="{% imgproxy config.image_2 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %} 1x, {% imgproxy config.image_2 width=config.image_width_2x|default:800 height=config.image_height_2x|default:800 resize_type='fill' %} 2x"
+                        alt="" />
+                {% endif %}
+                {% if config.image_3 %}
+                    <img 
+                        class="content-card-image"
+                        src="{% imgproxy config.image_3 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %}"
+                        srcset="{% imgproxy config.image_3 width=config.image_width|default:400 height=config.image_height|default:400 resize_type='fill' %} 1x, {% imgproxy config.image_3 width=config.image_width_2x|default:800 height=config.image_height_2x|default:800 resize_type='fill' %} 2x"
                         alt="" />
                 {% endif %}
             </div>
