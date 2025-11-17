@@ -5,7 +5,7 @@
  * Provides visual editor with validation for responsive breakpoints.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Monitor, Tablet, Smartphone, Tv, RotateCcw, AlertCircle } from 'lucide-react';
 import { getBreakpoints } from '../../utils/themeUtils';
 
@@ -14,6 +14,8 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
     const effectiveBreakpoints = getBreakpoints({ breakpoints: currentBreakpoints });
     
     const [errors, setErrors] = useState({});
+    const [inputValues, setInputValues] = useState({});
+    const debounceTimerRef = useRef(null);
 
     const breakpointConfig = [
         {
@@ -46,7 +48,7 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
         },
     ];
 
-    const validateBreakpoints = (newBreakpoints) => {
+    const validateBreakpoints = useCallback((newBreakpoints) => {
         const validationErrors = {};
         const order = ['sm', 'md', 'lg', 'xl'];
         
@@ -72,28 +74,78 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
         }
 
         return validationErrors;
-    };
+    }, []);
 
-    const handleChange = (key, value) => {
-        const numValue = value === '' ? undefined : parseInt(value, 10);
-        const newBreakpoints = { ...currentBreakpoints };
-        
-        if (numValue === undefined || isNaN(numValue)) {
-            delete newBreakpoints[key];
-        } else {
-            newBreakpoints[key] = numValue;
+    // Cleanup debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
+
+    const performValidation = useCallback((newInputValues) => {
+        // Convert input values to numeric breakpoints
+        const newBreakpoints = {};
+        for (const key in newInputValues) {
+            const numValue = newInputValues[key] === '' ? undefined : parseInt(newInputValues[key], 10);
+            if (numValue !== undefined && !isNaN(numValue)) {
+                newBreakpoints[key] = numValue;
+            }
         }
 
+        // Validate combined breakpoints
         const validationErrors = validateBreakpoints({ ...effectiveBreakpoints, ...newBreakpoints });
         setErrors(validationErrors);
 
+        // If valid, update parent
         if (Object.keys(validationErrors).length === 0) {
             onChange(newBreakpoints);
         }
-    };
+    }, [effectiveBreakpoints, validateBreakpoints, onChange]);
+
+    const handleChange = useCallback((key, value) => {
+        // Update input values immediately for responsive typing
+        const newInputValues = { ...inputValues, [key]: value };
+        
+        // Handle empty value
+        if (value === '') {
+            const updated = { ...newInputValues };
+            delete updated[key];
+            setInputValues(updated);
+        } else {
+            setInputValues(newInputValues);
+        }
+
+        // Clear previous debounce timer
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        // Set new debounce timer for validation
+        debounceTimerRef.current = setTimeout(() => {
+            performValidation(value === '' ? (() => {
+                const updated = { ...newInputValues };
+                delete updated[key];
+                return updated;
+            })() : newInputValues);
+        }, 500);
+    }, [inputValues, performValidation]);
+
+    const handleBlur = useCallback((key) => {
+        // Clear any pending debounce timer
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        // Immediately validate on blur
+        performValidation(inputValues);
+    }, [inputValues, performValidation]);
 
     const handleReset = () => {
         setErrors({});
+        setInputValues({});
         onChange({});
     };
 
@@ -163,8 +215,9 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                                         <div className="relative flex-1">
                                             <input
                                                 type="number"
-                                                value={currentBreakpoints[key] || ''}
+                                                value={inputValues[key] !== undefined ? inputValues[key] : (currentBreakpoints[key] || '')}
                                                 onChange={(e) => handleChange(key, e.target.value)}
+                                                onBlur={() => handleBlur(key)}
                                                 placeholder={`${defaultValue}`}
                                                 min="1"
                                                 step="1"

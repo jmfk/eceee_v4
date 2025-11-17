@@ -11,9 +11,9 @@
 * - Clipboard paste support for CSS snippets (Ctrl+V/Cmd+V)
 */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp, Globe, Package } from 'lucide-react';
-import { createDesignGroup, generateClassName } from '../../utils/themeUtils';
+import { createDesignGroup, generateClassName, getBreakpoints } from '../../utils/themeUtils';
 import { parseCSSRules, cssToGroupElements, cssToElementProperties, groupElementsToCSS, isValidClassName } from '../../utils/cssParser';
 import DesignGroupsPreview from './DesignGroupsPreview';
 import ColorSelector from './form-fields/ColorSelector';
@@ -211,13 +211,24 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const [layoutEditMode, setLayoutEditMode] = useState({}); // { groupIndex: 'form' | 'css' }
   const [importModal, setImportModal] = useState(null); // { type: 'global' | 'group' | 'element', groupIndex?: number, elementKey?: string }
   const [importCSSText, setImportCSSText] = useState('');
+  const [layoutInputValues, setLayoutInputValues] = useState({}); // Local state for layout property inputs
+  const layoutDebounceTimerRef = useRef({});
   const { addNotification } = useGlobalNotifications();
 
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
   
+  // Cleanup layout debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(layoutDebounceTimerRef.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, []);
+
   // Get theme breakpoints with defaults
-  const themeBreakpoints = breakpoints || { sm: 640, md: 768, lg: 1024, xl: 1280 };
+  const themeBreakpoints = getBreakpoints({ breakpoints });
   const BREAKPOINTS = getBreakpointKeys(); // ['sm', 'md', 'lg', 'xl']
   
   // Get breakpoint label for display
@@ -334,39 +345,84 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     });
   };
 
-  const handleUpdateLayoutProperty = (groupIndex, part, breakpoint, property, value) => {
-    const updatedGroups = [...groups];
-    const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
-    const partProps = layoutProperties[part] || {};
-    const breakpointProps = partProps[breakpoint] || {};
+  const handleUpdateLayoutProperty = (groupIndex, part, breakpoint, property, value, immediate = false) => {
+    const key = `${groupIndex}-${part}-${breakpoint}-${property}`;
+    
+    // Update local input state immediately
+    setLayoutInputValues(prev => ({
+      ...prev,
+      [key]: value
+    }));
 
-    // Update or remove property
-    if (value === '' || value === null) {
-      delete breakpointProps[property];
-    } else {
-      breakpointProps[property] = value;
+    // Clear previous debounce timer for this specific property
+    if (layoutDebounceTimerRef.current[key]) {
+      clearTimeout(layoutDebounceTimerRef.current[key]);
     }
 
-    // Clean up empty objects
-    if (Object.keys(breakpointProps).length === 0) {
-      delete partProps[breakpoint];
-    } else {
-      partProps[breakpoint] = breakpointProps;
-    }
+    // Function to perform the actual update
+    const performUpdate = () => {
+      const updatedGroups = [...groups];
+      const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
+      const partProps = layoutProperties[part] || {};
+      const breakpointProps = partProps[breakpoint] || {};
 
-    if (Object.keys(partProps).length === 0) {
-      delete layoutProperties[part];
-    } else {
-      layoutProperties[part] = partProps;
-    }
+      // Update or remove property
+      if (value === '' || value === null) {
+        delete breakpointProps[property];
+      } else {
+        breakpointProps[property] = value;
+      }
 
-    updatedGroups[groupIndex] = {
-      ...updatedGroups[groupIndex],
-      layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
+      // Clean up empty objects
+      if (Object.keys(breakpointProps).length === 0) {
+        delete partProps[breakpoint];
+      } else {
+        partProps[breakpoint] = breakpointProps;
+      }
+
+      if (Object.keys(partProps).length === 0) {
+        delete layoutProperties[part];
+      } else {
+        layoutProperties[part] = partProps;
+      }
+
+      updatedGroups[groupIndex] = {
+        ...updatedGroups[groupIndex],
+        layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
+      };
+
+      onChange({ ...(designGroups || {}), groups: updatedGroups });
+      if (onDirty) onDirty();
+      
+      // Clear the local input value after successful update
+      setLayoutInputValues(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
     };
 
-    onChange({ ...(designGroups || {}), groups: updatedGroups });
-    if (onDirty) onDirty();
+    // Either update immediately or debounce
+    if (immediate) {
+      performUpdate();
+    } else {
+      layoutDebounceTimerRef.current[key] = setTimeout(performUpdate, 500);
+    }
+  };
+
+  const handleLayoutPropertyBlur = (groupIndex, part, breakpoint, property) => {
+    const key = `${groupIndex}-${part}-${breakpoint}-${property}`;
+    
+    // Clear any pending debounce timer
+    if (layoutDebounceTimerRef.current[key]) {
+      clearTimeout(layoutDebounceTimerRef.current[key]);
+    }
+    
+    // Trigger immediate update with current local value
+    const value = layoutInputValues[key];
+    if (value !== undefined) {
+      handleUpdateLayoutProperty(groupIndex, part, breakpoint, property, value, true);
+    }
   };
 
   // Convert layout properties to CSS
@@ -374,7 +430,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     if (!layoutProperties || Object.keys(layoutProperties).length === 0) return '';
 
     const cssParts = [];
-    const themeBreakpoints = breakpoints || { sm: 640, md: 768, lg: 1024, xl: 1280 };
+    const effectiveBreakpoints = getBreakpoints({ breakpoints });
 
     for (const [part, bpStyles] of Object.entries(layoutProperties)) {
       // Default (no media query)
@@ -401,8 +457,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
       // Generate media queries for each breakpoint (mobile-first)
       ['sm', 'md', 'lg', 'xl'].forEach(bp => {
-        if (bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0 && themeBreakpoints[bp]) {
-          let cssRule = `@media (min-width: ${themeBreakpoints[bp]}px) {\n  .${part} {\n`;
+        if (bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0 && effectiveBreakpoints[bp]) {
+          let cssRule = `@media (min-width: ${effectiveBreakpoints[bp]}px) {\n  .${part} {\n`;
           for (const [prop, value] of Object.entries(bpStyles[bp])) {
             const cssProp = cssPropertyToKebab(prop);
             cssRule += `    ${cssProp}: ${value};\n`;
@@ -414,7 +470,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       
       // Legacy tablet support (migrate to md)
       if (bpStyles.tablet && Object.keys(bpStyles.tablet).length > 0 && !bpStyles.md) {
-        let cssRule = `@media (min-width: ${themeBreakpoints.md}px) {\n  .${part} {\n`;
+        let cssRule = `@media (min-width: ${effectiveBreakpoints.md}px) {\n  .${part} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.tablet)) {
           const cssProp = cssPropertyToKebab(prop);
           cssRule += `    ${cssProp}: ${value};\n`;
@@ -425,7 +481,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       
       // Legacy mobile support (migrate to sm)
       if (bpStyles.mobile && Object.keys(bpStyles.mobile).length > 0 && !bpStyles.sm) {
-        let cssRule = `@media (min-width: ${themeBreakpoints.sm}px) {\n  .${part} {\n`;
+        let cssRule = `@media (min-width: ${effectiveBreakpoints.sm}px) {\n  .${part} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.mobile)) {
           const cssProp = cssPropertyToKebab(prop);
           cssRule += `    ${cssProp}: ${value};\n`;
@@ -467,8 +523,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       }
 
       // Parse breakpoint media queries (mobile-first)
+      const effectiveBreakpoints = getBreakpoints({ breakpoints });
       ['sm', 'md', 'lg', 'xl'].forEach(bp => {
-        const bpValue = themeBreakpoints[bp];
+        const bpValue = effectiveBreakpoints[bp];
         if (!bpValue) return;
         
         const regex = new RegExp(`@media\\s*\\(min-width:\\s*${bpValue}px\\)\\s*\\{([\\s\\S]*?)\\n\\}`, 'g');
@@ -1577,7 +1634,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                               ) : (
                                                 <div className="grid grid-cols-2 gap-2 p-2">
                                                   {Object.entries(availableProperties).map(([prop, config]) => {
-                                                    const value = breakpointProps[prop] || '';
+                                                    const key = `${groupIndex}-${part}-${breakpoint}-${prop}`;
+                                                    const storedValue = breakpointProps[prop] || '';
+                                                    const value = layoutInputValues[key] !== undefined ? layoutInputValues[key] : storedValue;
 
                                                     return (
                                                       <div key={prop}>
@@ -1587,7 +1646,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                         {config.type === 'color' ? (
                                                           <ColorSelector
                                                             value={value}
-                                                            onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null)}
+                                                            onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
                                                             colors={colors}
                                                             className="w-full"
                                                           />
@@ -1595,13 +1654,14 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                           <NumericInput
                                                             value={value}
                                                             onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null)}
+                                                            onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
                                                             property={prop}
                                                             className="w-full"
                                                           />
                                                         ) : config.type === 'select' ? (
                                                           <select
                                                             value={value}
-                                                            onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null)}
+                                                            onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null, true)}
                                                             className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                           >
                                                             <option value="">None</option>
@@ -1614,6 +1674,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                             type="text"
                                                             value={value}
                                                             onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null)}
+                                                            onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
                                                             className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                             placeholder={config.placeholder}
                                                           />
