@@ -317,8 +317,8 @@ const HeroWidget = ({
                         Optimizing image...
                     </div>
                 )}
-                {backgroundStyle && <div style={backgroundStyle} />}
-                <div style={contentStyle}>
+                {backgroundStyle && <div className="hero-background" style={backgroundStyle} />}
+                <div className="hero-content" style={contentStyle}>
                     <div className="before-text" style={beforeTextStyle} ref={beforeTextContainerRef} />
                     <div style={headerStyle} ref={headerContainerRef} />
                     <div className="after-text" style={afterTextStyle} ref={afterTextContainerRef} />
@@ -351,8 +351,8 @@ const HeroWidget = ({
 
     return (
         <div className="hero-widget cms-content" style={containerStyle}>
-            {backgroundStyle && <div style={backgroundStyle} />}
-            <div style={contentStyle}>
+            {backgroundStyle && <div className="hero-background" style={backgroundStyle} />}
+            <div className="hero-content" style={contentStyle}>
                 {beforeText && (
                     <div className="before-text" style={beforeTextStyle}>
                         {beforeText}

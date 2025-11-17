@@ -334,10 +334,10 @@ const ContentCardWidget = ({
                         {imageCount === 4 ? (
                             // 4 images layout - no text
                             <div className="content-card-images image layout-4">
-                                {image1Url && <img src={image1Url} alt="" />}
-                                {image2Url && <img src={image2Url} alt="" />}
-                                {image3Url && <img src={image3Url} alt="" />}
-                                {image4Url && <img src={image4Url} alt="" />}
+                                {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
+                                {image2Url && <img className="content-card-image" src={image2Url} alt="" />}
+                                {image3Url && <img className="content-card-image" src={image3Url} alt="" />}
+                                {image4Url && <img className="content-card-image" src={image4Url} alt="" />}
                             </div>
                         ) : (
                             // 1 or 2 images layout - with text
@@ -345,8 +345,8 @@ const ContentCardWidget = ({
                                 <div className="content-card-text content" ref={contentContainerRef} />
 
                                 <div className={`content-card-images image layout-${imageCount}`}>
-                                    {image1Url && <img src={image1Url} alt="" />}
-                                    {image2Url && imageCount >= 2 && <img src={image2Url} alt="" />}
+                                    {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
+                                    {image2Url && imageCount >= 2 && <img className="content-card-image" src={image2Url} alt="" />}
                                 </div>
                             </>
                         )}
@@ -375,10 +375,10 @@ const ContentCardWidget = ({
                     {imageCount === 4 ? (
                         // 4 images layout - no text
                         <div className="content-card-images image layout-4">
-                            {image1Url && <img src={image1Url} alt="" />}
-                            {image2Url && <img src={image2Url} alt="" />}
-                            {image3Url && <img src={image3Url} alt="" />}
-                            {image4Url && <img src={image4Url} alt="" />}
+                            {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
+                            {image2Url && <img className="content-card-image" src={image2Url} alt="" />}
+                            {image3Url && <img className="content-card-image" src={image3Url} alt="" />}
+                            {image4Url && <img className="content-card-image" src={image4Url} alt="" />}
                         </div>
                     ) : (
                         // 1 or 2 images layout - with text
@@ -388,8 +388,8 @@ const ContentCardWidget = ({
                             </div>
 
                             <div className={`content-card-images image layout-${imageCount}`}>
-                                {image1Url && <img src={image1Url} alt="" />}
-                                {image2Url && imageCount >= 2 && <img src={image2Url} alt="" />}
+                                {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
+                                {image2Url && imageCount >= 2 && <img className="content-card-image" src={image2Url} alt="" />}
                             </div>
                         </>
                     )}
