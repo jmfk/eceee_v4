@@ -37,16 +37,17 @@ class Command(BaseCommand):
         if clear_all:
             self.stdout.write(self.style.WARNING("Clearing all theme CSS caches..."))
             
-            # Clear all theme CSS cache entries
-            cache.delete_pattern("theme_css_*")
+            # Clear cache for each theme (delete_pattern not available in all cache backends)
+            themes = PageTheme.objects.all()
+            for theme in themes:
+                generator.invalidate_cache(theme.id)
             
             self.stdout.write(
                 self.style.SUCCESS("✓ Successfully cleared all theme CSS caches")
             )
             
             # Show count of themes
-            theme_count = PageTheme.objects.count()
-            self.stdout.write(f"  • {theme_count} theme(s) affected")
+            self.stdout.write(f"  • {themes.count()} theme(s) affected")
 
         elif theme_id:
             try:
