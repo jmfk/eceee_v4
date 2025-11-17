@@ -243,7 +243,6 @@ class BannerWidget(BaseWidget):
         flex-direction: column;
         width: 100%;
         overflow: hidden;
-        background: #ffffff;
         border-radius: 0;
         box-shadow: none;
     }
@@ -258,7 +257,6 @@ class BannerWidget(BaseWidget):
         background-position: center;
         background-repeat: no-repeat;
         z-index: 0;
-        opacity: 0.8;
     }
     
     .banner-body {
@@ -270,10 +268,9 @@ class BannerWidget(BaseWidget):
     }
     
     .banner-text {
-        padding: 1.5rem;
-        font-size: 1rem;
+        padding: 0;
+        font-size: 12px;
         line-height: 1.6;
-        color: #374151;
         overflow-y: auto;
     }
     
@@ -290,35 +287,14 @@ class BannerWidget(BaseWidget):
     
     .banner-images.layout-2 {
         flex: 1;
-        gap: 0.5rem;
     }
     
-    .banner-images.layout-4 {
-        width: 100%;
-        gap: 0.5rem;
-    }
-    
+  
     /* Individual image styling - height can be controlled via layout properties */
     .banner-image {
-        width: 100%;
-        height: 600px;  /* Default height, can be overridden via layout properties */
+        width: 400px;
+        height: 400px;  /* Default height, can be overridden via layout properties */
         object-fit: cover;
-    }
-    
-    .banner-images.layout-1 .banner-image {
-        max-width: 100%;
-        max-height: 100%;
-    }
-    
-    .banner-images.layout-2 .banner-image {
-        flex: 1;
-        max-width: 50%;
-    }
-    
-    .banner-images.layout-4 .banner-image {
-        flex: 1;
-        max-width: 25%;
-        height: 400px;  /* Smaller default for 4-image layout */
     }
     
     /* Text positioning */
@@ -374,14 +350,6 @@ class BannerWidget(BaseWidget):
         .banner-images.layout-2,
         .banner-images.layout-4 {
             flex-wrap: wrap;
-        }
-        
-        .banner-images.layout-2 .banner-image {
-            max-width: 100%;
-        }
-        
-        .banner-images.layout-4 .banner-image {
-            max-width: 50%;
         }
     }
     """
@@ -489,36 +457,40 @@ class BannerWidget(BaseWidget):
         template_config["image_4"] = config.get("image4") or config.get("image_4")
 
         # Extract layout properties from theme for dynamic image sizing
-        theme = context.get('theme') if context else None
-        if theme and hasattr(theme, 'design_groups'):
+        theme = context.get("theme") if context else None
+        if theme and hasattr(theme, "design_groups"):
             design_groups = theme.design_groups or {}
-            groups = design_groups.get('groups', [])
-            
+            groups = design_groups.get("groups", [])
+
             # Find layout properties for banner-image part
             for group in groups:
-                layout_props = group.get('layoutProperties') or group.get('layout_properties', {})
-                if 'banner-image' in layout_props:
+                layout_props = group.get("layoutProperties") or group.get(
+                    "layout_properties", {}
+                )
+                if "banner-image" in layout_props:
                     # Extract height from breakpoints (use 'sm' as default)
-                    part_props = layout_props['banner-image']
-                    height_val = part_props.get('sm', {}).get('height')
-                    
+                    part_props = layout_props["banner-image"]
+                    height_val = part_props.get("sm", {}).get("height")
+
                     # Parse height and calculate width (1:1 ratio)
                     if height_val:
                         try:
                             # Remove 'px' suffix if present
-                            height_str = str(height_val).replace('px', '').strip()
+                            height_str = str(height_val).replace("px", "").strip()
                             height_px = int(height_str)
-                            
+
                             # Set image dimensions for different layouts (1:1 aspect ratio)
-                            template_config['image_width'] = height_px
-                            template_config['image_height'] = height_px
-                            
+                            template_config["image_width"] = height_px
+                            template_config["image_height"] = height_px
+
                             # Retina (2x) dimensions
-                            template_config['image_width_2x'] = height_px * 2
-                            template_config['image_height_2x'] = height_px * 2
+                            template_config["image_width_2x"] = height_px * 2
+                            template_config["image_height_2x"] = height_px * 2
                         except (ValueError, AttributeError):
                             # If parsing fails, defaults will be used from template
-                            logger.warning(f"Could not parse height value: {height_val}")
+                            logger.warning(
+                                f"Could not parse height value: {height_val}"
+                            )
                     break  # Use first matching group
 
         return template_config
