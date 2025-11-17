@@ -24,6 +24,10 @@ const ComponentStyleRenderer = ({
     useEffect(() => {
         if (!css || !styleId) return
 
+        // Ensure css is a string
+        const cssString = typeof css === 'string' ? css : ''
+        if (!cssString) return
+
         // Create or update style element
         let styleElement = document.getElementById(`component-style-${styleId}`)
 
@@ -35,7 +39,7 @@ const ComponentStyleRenderer = ({
         }
 
         // Scope CSS to this component
-        const scopedCss = css.replace(
+        const scopedCss = cssString.replace(
             /([^{}]+)\{/g,
             (match, selector) => {
                 // Add data attribute to scope the CSS
