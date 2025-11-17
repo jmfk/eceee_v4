@@ -307,7 +307,7 @@ const BannerWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="banner-widget container"
+                    className="banner-widget widget-type-easy-widgets-bannerwidget container"
                     id={configRef.current.anchor || undefined}
                     style={{ position: 'relative' }}
                 >
@@ -333,10 +333,10 @@ const BannerWidget = ({
                         {imageCount === 4 ? (
                             // 4 images layout - no text
                             <div className="banner-images image layout-4">
-                                {image1Url && <img src={image1Url} alt="" />}
-                                {image2Url && <img src={image2Url} alt="" />}
-                                {image3Url && <img src={image3Url} alt="" />}
-                                {image4Url && <img src={image4Url} alt="" />}
+                                {image1Url && <img className="banner-image" src={image1Url} alt="" />}
+                                {image2Url && <img className="banner-image" src={image2Url} alt="" />}
+                                {image3Url && <img className="banner-image" src={image3Url} alt="" />}
+                                {image4Url && <img className="banner-image" src={image4Url} alt="" />}
                             </div>
                         ) : (
                             // 1 or 2 images layout - with text
@@ -344,8 +344,8 @@ const BannerWidget = ({
                                 <div className="banner-text content" ref={contentContainerRef} />
 
                                 <div className={`banner-images image layout-${imageCount}`}>
-                                    {image1Url && <img src={image1Url} alt="" />}
-                                    {image2Url && imageCount >= 2 && <img src={image2Url} alt="" />}
+                                    {image1Url && <img className="banner-image" src={image1Url} alt="" />}
+                                    {image2Url && imageCount >= 2 && <img className="banner-image" src={image2Url} alt="" />}
                                 </div>
                             </>
                         )}
@@ -356,7 +356,7 @@ const BannerWidget = ({
 
         return (
             <div
-                className="banner-widget container"
+                className="banner-widget widget-type-easy-widgets-bannerwidget container"
                 id={configRef.current.anchor || undefined}
                 style={{ position: 'relative' }}
             >
@@ -382,10 +382,10 @@ const BannerWidget = ({
                     {imageCount === 4 ? (
                         // 4 images layout - no text
                         <div className="banner-images image layout-4">
-                            {image1Url && <img src={image1Url} alt="" />}
-                            {image2Url && <img src={image2Url} alt="" />}
-                            {image3Url && <img src={image3Url} alt="" />}
-                            {image4Url && <img src={image4Url} alt="" />}
+                            {image1Url && <img className="banner-image" src={image1Url} alt="" />}
+                            {image2Url && <img className="banner-image" src={image2Url} alt="" />}
+                            {image3Url && <img className="banner-image" src={image3Url} alt="" />}
+                            {image4Url && <img className="banner-image" src={image4Url} alt="" />}
                         </div>
                     ) : (
                         // 1 or 2 images layout - with text
@@ -395,8 +395,8 @@ const BannerWidget = ({
                             </div>
 
                             <div className={`banner-images image layout-${imageCount}`}>
-                                {image1Url && <img src={image1Url} alt="" />}
-                                {image2Url && imageCount >= 2 && <img src={image2Url} alt="" />}
+                                {image1Url && <img className="banner-image" src={image1Url} alt="" />}
+                                {image2Url && imageCount >= 2 && <img className="banner-image" src={image2Url} alt="" />}
                             </div>
                         </>
                     )}

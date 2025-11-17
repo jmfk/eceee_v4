@@ -683,7 +683,7 @@ const ContentEditor = forwardRef(({
 
       <div
         ref={containerRef}
-        className={`layout-container content-editor-container flex-1 ${editable ? 'editable' : ''}`}
+        className={`cms-content layout-container content-editor-container flex-1 ${editable ? 'editable' : ''}`}
         style={{
           minHeight: '400px',
           height: '100%', // Use full available height from parent
