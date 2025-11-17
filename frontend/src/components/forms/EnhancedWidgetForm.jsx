@@ -125,13 +125,13 @@ const EnhancedWidgetForm = ({
                                 <div className="flex items-center gap-3">
                                     <input
                                         type="color"
-                                        value={fieldValue || '#000000'}
+                                        value={fieldValue ?? '#000000'}
                                         onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                                         className="w-12 h-8 border border-gray-300 rounded cursor-pointer"
                                     />
                                     <input
                                         type="text"
-                                        value={fieldValue || ''}
+                                        value={fieldValue ?? ''}
                                         onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                                         placeholder="#000000"
                                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -143,7 +143,7 @@ const EnhancedWidgetForm = ({
                                 <div className="relative">
                                     <input
                                         type="number"
-                                        value={fieldValue || ''}
+                                        value={fieldValue ?? ''}
                                         onChange={(e) => handleFieldChange(fieldName, Number(e.target.value))}
                                         min={specialHandling.min}
                                         max={specialHandling.max}

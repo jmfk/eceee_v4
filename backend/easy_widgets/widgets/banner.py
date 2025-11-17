@@ -207,15 +207,16 @@ class BannerWidget(BaseWidget):
             ],
         },
         "banner-images": {
-            "label": "Foreground images area",
+            "label": "Foreground images container",
             "properties": [
+                "gap",
                 "width",
-                "maxWidth",
+            ],
+        },
+        "banner-image": {
+            "label": "Individual Image",
+            "properties": [
                 "height",
-                "margin",
-                "objectFit",
-                "borderRadius",
-                "boxShadow",
             ],
         },
         "banner-text": {
@@ -297,25 +298,27 @@ class BannerWidget(BaseWidget):
         gap: 0.5rem;
     }
     
-    .banner-images img {
+    /* Individual image styling - height can be controlled via layout properties */
+    .banner-image {
         width: 100%;
-        height: 100%;
+        height: 600px;  /* Default height, can be overridden via layout properties */
         object-fit: cover;
     }
     
-    .banner-images.layout-1 img {
+    .banner-images.layout-1 .banner-image {
         max-width: 100%;
         max-height: 100%;
     }
     
-    .banner-images.layout-2 img {
+    .banner-images.layout-2 .banner-image {
         flex: 1;
         max-width: 50%;
     }
     
-    .banner-images.layout-4 img {
+    .banner-images.layout-4 .banner-image {
         flex: 1;
         max-width: 25%;
+        height: 400px;  /* Smaller default for 4-image layout */
     }
     
     /* Text positioning */
@@ -373,11 +376,11 @@ class BannerWidget(BaseWidget):
             flex-wrap: wrap;
         }
         
-        .banner-images.layout-2 img {
+        .banner-images.layout-2 .banner-image {
             max-width: 100%;
         }
         
-        .banner-images.layout-4 img {
+        .banner-images.layout-4 .banner-image {
             max-width: 50%;
         }
     }

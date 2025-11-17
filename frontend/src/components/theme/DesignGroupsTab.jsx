@@ -61,6 +61,11 @@ const LAYOUT_PROPERTIES = {
   opacity: { type: 'text', label: 'Opacity', placeholder: '0.0 to 1.0' },
 
   // Borders
+  border: { type: 'text', label: 'Border', placeholder: '1px solid #ccc' },
+  borderTop: { type: 'text', label: 'Border Top', placeholder: '1px solid #ccc' },
+  borderRight: { type: 'text', label: 'Border Right', placeholder: '1px solid #ccc' },
+  borderBottom: { type: 'text', label: 'Border Bottom', placeholder: '1px solid #ccc' },
+  borderLeft: { type: 'text', label: 'Border Left', placeholder: '1px solid #ccc' },
   borderColor: { type: 'color', label: 'Border Color', placeholder: '#cccccc' },
   borderWidth: { type: 'numeric', label: 'Border Width', placeholder: '1px' },
   borderStyle: { type: 'select', label: 'Border Style', options: ['none', 'solid', 'dashed', 'dotted', 'double'] },
@@ -75,6 +80,9 @@ const LAYOUT_PROPERTIES = {
   borderBottomRightRadius: { type: 'numeric', label: 'Border Bottom Right Radius', placeholder: '4px' },
 
   // Typography
+  fontFamily: { type: 'font', label: 'Font Family', placeholder: 'Arial, sans-serif' },
+  fontSize: { type: 'numeric', label: 'Font Size', placeholder: '16px, 1rem' },
+  fontWeight: { type: 'select', label: 'Font Weight', options: ['100', '200', '300', '400', '500', '600', '700', '800', '900', 'normal', 'bold', 'lighter', 'bolder'] },
   textAlign: { type: 'select', label: 'Text Align', options: ['left', 'center', 'right', 'justify'] },
   textDecoration: { type: 'select', label: 'Text Decoration', options: ['none', 'underline', 'overline', 'line-through'] },
   textTransform: { type: 'select', label: 'Text Transform', options: ['none', 'uppercase', 'lowercase', 'capitalize'] },
@@ -217,7 +225,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
-  
+
   // Cleanup layout debounce timers on unmount
   useEffect(() => {
     return () => {
@@ -230,7 +238,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   // Get theme breakpoints with defaults
   const themeBreakpoints = getBreakpoints({ breakpoints });
   const BREAKPOINTS = getBreakpointKeys(); // ['sm', 'md', 'lg', 'xl']
-  
+
   // Get breakpoint label for display
   const getBreakpointLabel = (bp) => {
     const labels = {
@@ -347,7 +355,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   const handleUpdateLayoutProperty = (groupIndex, part, breakpoint, property, value, immediate = false) => {
     const key = `${groupIndex}-${part}-${breakpoint}-${property}`;
-    
+
     // Update local input state immediately
     setLayoutInputValues(prev => ({
       ...prev,
@@ -393,7 +401,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
       onChange({ ...(designGroups || {}), groups: updatedGroups });
       if (onDirty) onDirty();
-      
+
       // Clear the local input value after successful update
       setLayoutInputValues(prev => {
         const newState = { ...prev };
@@ -412,12 +420,12 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   const handleLayoutPropertyBlur = (groupIndex, part, breakpoint, property) => {
     const key = `${groupIndex}-${part}-${breakpoint}-${property}`;
-    
+
     // Clear any pending debounce timer
     if (layoutDebounceTimerRef.current[key]) {
       clearTimeout(layoutDebounceTimerRef.current[key]);
     }
-    
+
     // Trigger immediate update with current local value
     const value = layoutInputValues[key];
     if (value !== undefined) {
@@ -443,7 +451,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         cssRule += '}';
         cssParts.push(cssRule);
       }
-      
+
       // Legacy desktop support (migrate to default)
       else if (bpStyles.desktop && Object.keys(bpStyles.desktop).length > 0) {
         let cssRule = `.${part} {\n`;
@@ -467,7 +475,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
           cssParts.push(cssRule);
         }
       });
-      
+
       // Legacy tablet support (migrate to md)
       if (bpStyles.tablet && Object.keys(bpStyles.tablet).length > 0 && !bpStyles.md) {
         let cssRule = `@media (min-width: ${effectiveBreakpoints.md}px) {\n  .${part} {\n`;
@@ -478,7 +486,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         cssRule += '  }\n}';
         cssParts.push(cssRule);
       }
-      
+
       // Legacy mobile support (migrate to sm)
       if (bpStyles.mobile && Object.keys(bpStyles.mobile).length > 0 && !bpStyles.sm) {
         let cssRule = `@media (min-width: ${effectiveBreakpoints.sm}px) {\n  .${part} {\n`;
@@ -527,14 +535,14 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       ['sm', 'md', 'lg', 'xl'].forEach(bp => {
         const bpValue = effectiveBreakpoints[bp];
         if (!bpValue) return;
-        
+
         const regex = new RegExp(`@media\\s*\\(min-width:\\s*${bpValue}px\\)\\s*\\{([\\s\\S]*?)\\n\\}`, 'g');
         const matches = cssText.matchAll(regex);
-        
+
         for (const match of matches) {
           const content = match[1];
           const rules = content.matchAll(/\.(\w+)\s*\{([^}]+)\}/g);
-          
+
           for (const rule of rules) {
             const part = rule[1];
             const properties = rule[2];
@@ -1648,6 +1656,15 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                             value={value}
                                                             onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
                                                             colors={colors}
+                                                            className="w-full"
+                                                          />
+                                                        ) : config.type === 'font' ? (
+                                                          <FontSelector
+                                                            fontFamily={value}
+                                                            fontWeight={breakpointProps.fontWeight}
+                                                            onFontFamilyChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
+                                                            onFontWeightChange={(newWeight) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, 'fontWeight', newWeight || null, true)}
+                                                            fonts={fonts}
                                                             className="w-full"
                                                           />
                                                         ) : config.type === 'numeric' ? (

@@ -161,18 +161,19 @@ class ContentCardWidget(BaseWidget):
                 "width",
                 "height",
                 "padding",
-                "margin",
                 "backgroundColor",
-                "borderRadius",
+                "borderColor",
+                "borderWidth",
                 "boxShadow",
-                "display",
-                "flexDirection",
             ],
         },
         "content-card-header": {
             "label": "Card Header",
             "properties": [
+                "width",
+                "height",
                 "padding",
+                "fontFamily",
                 "fontSize",
                 "fontWeight",
                 "color",
@@ -182,29 +183,41 @@ class ContentCardWidget(BaseWidget):
         },
         "content-card-body": {
             "label": "Card Body",
-            "properties": ["display", "flex", "minHeight", "flexDirection"],
+            "properties": [
+                "width",
+                "height",
+                "display",
+                "flex",
+                "minHeight",
+                "flexDirection",
+            ],
         },
         "content-card-text": {
             "label": "Text Content",
             "properties": [
+                "width",
+                "height",
                 "padding",
+                "fontFamily",
                 "fontSize",
-                "lineHeight",
+                "fontWeight",
                 "color",
-                "flex",
-                "overflowY",
+                "lineHeight",
             ],
         },
         "content-card-images": {
             "label": "Images Container",
             "properties": [
-                "display",
-                "flex",
-                "alignItems",
-                "justifyContent",
-                "backgroundColor",
                 "gap",
                 "width",
+                "height",
+            ],
+        },
+        "content-card-image": {
+            "label": "Individual Image",
+            "properties": [
+                "width",
+                "height",
             ],
         },
     }
@@ -216,32 +229,20 @@ class ContentCardWidget(BaseWidget):
         width: 100%;
         height: auto;
         overflow: hidden;
-        background: #ffffff;
         border-radius: 0;
         box-shadow: none;
     }
     
     .content-card-header {
-        padding: 1.5rem 1.5rem 1rem;
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #111827;
-        line-height: 1.3;
-        border-bottom: none;
     }
     
     .content-card-body {
-        display: flex;
+        display: flex;  
         flex: 1;
         min-height: 0;
     }
     
     .content-card-text {
-        padding: 1.5rem;
-        font-size: 1rem;
-        line-height: 1.6;
-        color: #374151;
-        overflow-y: auto;
     }
     
     .content-card-images {
@@ -250,40 +251,22 @@ class ContentCardWidget(BaseWidget):
         justify-content: center;
         background: #f9fafb;
     }
-    
-    .content-card-images.layout-1 {
-        flex: 1;
-    }
-    
-    .content-card-images.layout-2 {
-        flex: 1;
-        gap: 0.5rem;
-    }
-    
-    .content-card-images.layout-4 {
-        width: 100%;
-        gap: 0.5rem;
-    }
-    
-    .content-card-images img {
-        width: 100%;
-        height: 100%;
+    /* Individual image styling - height can be controlled via layout properties */
+    .content-card-image {
+        width: auto;
+        height: auto;  /* Default height, can be overridden via layout properties */
         object-fit: cover;
     }
     
-    .content-card-images.layout-1 img {
-        max-width: 100%;
-        max-height: 100%;
+    .content-card-images.layout-1 .content-card-image {
+        max-width: auto;
+        max-height:auto;
     }
     
-    .content-card-images.layout-2 img {
-        flex: 1;
-        max-width: 50%;
+    .content-card-images.layout-2 .content-card-image {
     }
     
-    .content-card-images.layout-4 img {
-        flex: 1;
-        max-width: 25%;
+    .content-card-images.layout-4 .content-card-image {
     }
     
     /* Text positioning */
@@ -341,11 +324,11 @@ class ContentCardWidget(BaseWidget):
             flex-wrap: wrap;
         }
         
-        .content-card-images.layout-2 img {
+        .content-card-images.layout-2 .content-card-image {
             max-width: 100%;
         }
         
-        .content-card-images.layout-4 img {
+        .content-card-images.layout-4 .content-card-image {
             max-width: 50%;
         }
     }

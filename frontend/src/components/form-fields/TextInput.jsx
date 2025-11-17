@@ -50,9 +50,9 @@ const TextInput = React.memo(({
 
     // Add either value or defaultValue, but never both
     if (value !== undefined) {
-        inputProps.value = value || ''
+        inputProps.value = value ?? ''
     } else if (defaultValue !== undefined) {
-        inputProps.defaultValue = defaultValue
+        inputProps.defaultValue = defaultValue ?? ''
     }
 
     return <ValidatedInput {...inputProps} />

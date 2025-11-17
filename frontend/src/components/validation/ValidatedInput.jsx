@@ -147,9 +147,9 @@ export default function ValidatedInput({
 
         // Add either value or defaultValue, but never both
         if (isControlled) {
-            commonProps.value = value
+            commonProps.value = value ?? ''
         } else if (isUncontrolled) {
-            commonProps.defaultValue = defaultValue
+            commonProps.defaultValue = defaultValue ?? ''
         } else {
             // Neither provided, default to empty controlled
             commonProps.value = ''
