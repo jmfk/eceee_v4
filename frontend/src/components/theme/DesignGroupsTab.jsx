@@ -99,11 +99,10 @@ const LAYOUT_PROPERTIES = {
   transition: { type: 'text', label: 'Transition', placeholder: 'all 0.3s ease' },
 };
 
-// Breakpoint keys - now dynamic based on theme breakpoints
-// Legacy keys for migration: desktop -> default, tablet -> md, mobile -> sm
-const getBreakpointKeys = (includeDefault = true) => {
-  const keys = ['sm', 'md', 'lg', 'xl'];
-  return includeDefault ? ['default', ...keys] : keys;
+// Breakpoint keys - mobile-first approach
+// sm is the base (no media query), md/lg/xl use @media (min-width)
+const getBreakpointKeys = () => {
+  return ['sm', 'md', 'lg', 'xl'];
 };
 
 // Convert element styles object to CSS string
@@ -219,12 +218,17 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   
   // Get theme breakpoints with defaults
   const themeBreakpoints = breakpoints || { sm: 640, md: 768, lg: 1024, xl: 1280 };
-  const BREAKPOINTS = getBreakpointKeys(true); // ['default', 'sm', 'md', 'lg', 'xl']
+  const BREAKPOINTS = getBreakpointKeys(); // ['sm', 'md', 'lg', 'xl']
   
   // Get breakpoint label for display
   const getBreakpointLabel = (bp) => {
-    if (bp === 'default') return 'Default';
-    return `${bp.toUpperCase()} (${themeBreakpoints[bp]}px)`;
+    const labels = {
+      sm: 'Base / SM & Up',
+      md: `MD & Up (≥${themeBreakpoints.md}px)`,
+      lg: `LG & Up (≥${themeBreakpoints.lg}px)`,
+      xl: `XL & Up (≥${themeBreakpoints.xl}px)`,
+    };
+    return labels[bp] || bp;
   };
 
   // Refs for CSS textarea to prevent re-rendering

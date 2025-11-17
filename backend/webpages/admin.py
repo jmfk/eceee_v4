@@ -74,10 +74,43 @@ class HasHostnamesFilter(admin.SimpleListFilter):
 
 @admin.register(PageTheme)
 class PageThemeAdmin(admin.ModelAdmin):
-    list_display = ["name", "description", "is_active", "created_at", "created_by"]
-    list_filter = ["is_active", "created_at"]
+    list_display = [
+        "name",
+        "description",
+        "is_active",
+        "is_default",
+        "created_at",
+        "created_by",
+    ]
+    list_filter = ["is_active", "is_default", "created_at"]
     search_fields = ["name", "description"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        json_widget = PrettyJSONWidget(
+            attrs={
+                "rows": 20,
+                "cols": 80,
+                "style": "font-family: monospace; white-space: pre;",
+            }
+        )
+        for field_name in [
+            "fonts",
+            "colors",
+            "design_groups",
+            "component_styles",
+            "image_styles",
+            "gallery_styles",
+            "carousel_styles",
+            "table_templates",
+            "breakpoints",
+            "css_variables",
+            "html_elements",
+        ]:
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = json_widget
+        return form
 
     fieldsets = (
         (
@@ -85,14 +118,40 @@ class PageThemeAdmin(admin.ModelAdmin):
             {"fields": ("name", "description", "image", "is_active", "is_default")},
         ),
         (
-            "Theme Configuration",
+            "New Theme Structure (5 Parts)",
+            {
+                "fields": (
+                    "fonts",
+                    "colors",
+                    "design_groups",
+                    "component_styles",
+                    "image_styles",
+                ),
+                "description": "New unified theme structure with fonts, colors, design groups, component styles, and image styles",
+            },
+        ),
+        (
+            "Additional Configuration",
+            {
+                "fields": (
+                    "table_templates",
+                    "breakpoints",
+                    "custom_css",
+                ),
+                "description": "Table templates, responsive breakpoints, and custom CSS",
+            },
+        ),
+        (
+            "Deprecated Fields",
             {
                 "fields": (
                     "css_variables",
                     "html_elements",
-                    "image_styles",
-                    "custom_css",
-                )
+                    "gallery_styles",
+                    "carousel_styles",
+                ),
+                "classes": ("collapse",),
+                "description": "Legacy fields kept for backwards compatibility",
             },
         ),
         (
@@ -105,7 +164,7 @@ class PageThemeAdmin(admin.ModelAdmin):
     )
 
     def save_model(self, request, obj, form, change):
-        if not change:  # Creating new object
+        if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
 

@@ -155,27 +155,57 @@ class ContentCardWidget(BaseWidget):
     template_name = "easy_widgets/widgets/content_card.html"
 
     layout_parts = {
-        "container": {
-            "label": "Main widget container",
-            "properties": ["width", "maxWidth", "padding", "margin", "gap", 
-                          "backgroundColor", "borderColor", "borderWidth", 
-                          "borderStyle", "borderRadius", "boxShadow",
-                          "display", "flexDirection", "alignItems"]
+        "content-card-widget": {
+            "label": "Content Card Widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "borderRadius",
+                "boxShadow",
+                "display",
+                "flexDirection",
+            ],
         },
-        "header": {
-            "label": "Header section",
-            "properties": ["padding", "margin", "backgroundColor", "color",
-                          "textAlign", "borderBottomWidth", "borderBottomColor"]
+        "content-card-header": {
+            "label": "Card Header",
+            "properties": [
+                "padding",
+                "fontSize",
+                "fontWeight",
+                "color",
+                "lineHeight",
+                "borderBottom",
+            ],
         },
-        "image": {
-            "label": "Image area",
-            "properties": ["width", "height", "maxWidth", "maxHeight",
-                          "objectFit", "objectPosition", "borderRadius"]
+        "content-card-body": {
+            "label": "Card Body",
+            "properties": ["display", "flex", "minHeight", "flexDirection"],
         },
-        "content": {
-            "label": "Text content area",
-            "properties": ["padding", "margin", "backgroundColor", "color",
-                          "textAlign", "lineHeight"]
+        "content-card-text": {
+            "label": "Text Content",
+            "properties": [
+                "padding",
+                "fontSize",
+                "lineHeight",
+                "color",
+                "flex",
+                "overflowY",
+            ],
+        },
+        "content-card-images": {
+            "label": "Images Container",
+            "properties": [
+                "display",
+                "flex",
+                "alignItems",
+                "justifyContent",
+                "backgroundColor",
+                "gap",
+                "width",
+            ],
         },
     }
 
@@ -184,19 +214,20 @@ class ContentCardWidget(BaseWidget):
         display: flex;
         flex-direction: column;
         width: 100%;
+        height: auto;
         overflow: hidden;
-        background: var(--card-bg, #ffffff);
-        border-radius: var(--card-radius, 0);
-        box-shadow: var(--card-shadow, none);
+        background: #ffffff;
+        border-radius: 0;
+        box-shadow: none;
     }
     
     .content-card-header {
-        padding: var(--header-padding, 1.5rem 1.5rem 1rem);
-        font-size: var(--header-font-size, 1.5rem);
-        font-weight: var(--header-font-weight, 600);
-        color: var(--header-color, #111827);
-        line-height: var(--header-line-height, 1.3);
-        border-bottom: var(--header-border, none);
+        padding: 1.5rem 1.5rem 1rem;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #111827;
+        line-height: 1.3;
+        border-bottom: none;
     }
     
     .content-card-body {
@@ -206,10 +237,10 @@ class ContentCardWidget(BaseWidget):
     }
     
     .content-card-text {
-        padding: var(--text-padding, 1.5rem);
-        font-size: var(--text-font-size, 1rem);
-        line-height: var(--text-line-height, 1.6);
-        color: var(--text-color, #374151);
+        padding: 1.5rem;
+        font-size: 1rem;
+        line-height: 1.6;
+        color: #374151;
         overflow-y: auto;
     }
     
@@ -217,7 +248,7 @@ class ContentCardWidget(BaseWidget):
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--images-bg, #f9fafb);
+        background: #f9fafb;
     }
     
     .content-card-images.layout-1 {
@@ -226,12 +257,12 @@ class ContentCardWidget(BaseWidget):
     
     .content-card-images.layout-2 {
         flex: 1;
-        gap: var(--images-gap, 0.5rem);
+        gap: 0.5rem;
     }
     
     .content-card-images.layout-4 {
         width: 100%;
-        gap: var(--images-gap, 0.5rem);
+        gap: 0.5rem;
     }
     
     .content-card-images img {
@@ -319,24 +350,6 @@ class ContentCardWidget(BaseWidget):
         }
     }
     """
-
-    css_variables = {
-        "card-bg": "#ffffff",
-        "card-radius": "0",
-        "card-shadow": "none",
-        "header-padding": "1.5rem 1.5rem 1rem",
-        "header-font-size": "1.5rem",
-        "header-font-weight": "600",
-        "header-color": "#111827",
-        "header-line-height": "1.3",
-        "header-border": "none",
-        "text-padding": "1.5rem",
-        "text-font-size": "1rem",
-        "text-line-height": "1.6",
-        "text-color": "#374151",
-        "images-bg": "#f9fafb",
-        "images-gap": "0.5rem",
-    }
 
     css_scope = "widget"
 

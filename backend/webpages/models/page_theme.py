@@ -34,7 +34,7 @@ class PageTheme(models.Model):
             "Each group can have an 'isDefault' boolean field to mark it as the base/default group for style inheritance. "
             "Groups can also include 'layoutProperties' to define responsive layout and styling settings "
             "(width, height, padding, margin, gap, background-color, color, border properties, etc.) "
-            "for widget layout parts (e.g., container, header, image, content) across breakpoints (desktop, tablet, mobile)."
+            "for widget layout parts (e.g., container, header, image, content) across mobile-first breakpoints (sm, md, lg, xl)."
         ),
     )
     component_styles = models.JSONField(
@@ -114,21 +114,21 @@ class PageTheme(models.Model):
         """
         Get responsive breakpoints for this theme.
         Returns theme-specific breakpoints or hard defaults.
-        
+
         Returns:
             dict: Breakpoint configuration with keys 'sm', 'md', 'lg', 'xl'
         """
         DEFAULT_BREAKPOINTS = {
-            'sm': 640,   # Tailwind sm
-            'md': 768,   # Tailwind md (Bootstrap md)
-            'lg': 1024,  # Tailwind lg (Bootstrap lg)
-            'xl': 1280,  # Tailwind xl (Bootstrap xl)
+            "sm": 640,  # Tailwind sm
+            "md": 768,  # Tailwind md (Bootstrap md)
+            "lg": 1024,  # Tailwind lg (Bootstrap lg)
+            "xl": 1280,  # Tailwind xl (Bootstrap xl)
         }
-        
+
         if self.breakpoints and isinstance(self.breakpoints, dict):
             # Merge with defaults to ensure all keys exist
             return {**DEFAULT_BREAKPOINTS, **self.breakpoints}
-        
+
         return DEFAULT_BREAKPOINTS
 
     def to_dict(self):
@@ -1454,6 +1454,91 @@ class PageTheme(models.Model):
 
                 css_rule += "}"
                 css_parts.append(css_rule)
+
+            # Generate layout properties CSS for widget layout parts
+            layout_properties = group.get("layoutProperties") or group.get(
+                "layout_properties"
+            )
+            if layout_properties:
+                # Get theme breakpoints for media queries
+                breakpoints = self.get_breakpoints()
+
+                for part, part_breakpoints in layout_properties.items():
+                    # Handle each breakpoint in mobile-first order
+                    for bp_key in ["sm", "md", "lg", "xl"]:
+                        # Get properties for this breakpoint with legacy support
+                        if bp_key == "sm":
+                            # Merge legacy formats into sm (base)
+                            bp_props = {}
+                            if part_breakpoints.get("default"):  # Legacy: default -> sm
+                                bp_props.update(part_breakpoints["default"])
+                            if part_breakpoints.get(
+                                "desktop"
+                            ):  # Very old: desktop -> sm
+                                bp_props.update(part_breakpoints["desktop"])
+                            if part_breakpoints.get(
+                                "mobile"
+                            ):  # Legacy: mobile -> sm (lower priority)
+                                temp = (
+                                    part_breakpoints["mobile"].copy()
+                                    if isinstance(part_breakpoints.get("mobile"), dict)
+                                    else {}
+                                )
+                                temp.update(bp_props)
+                                bp_props = temp
+                            if part_breakpoints.get(
+                                "sm"
+                            ):  # New format (takes precedence)
+                                bp_props.update(part_breakpoints["sm"])
+                        elif bp_key == "md":
+                            bp_props = (
+                                part_breakpoints.get("md")
+                                or part_breakpoints.get("tablet")
+                                or {}
+                            )
+                        else:
+                            bp_props = part_breakpoints.get(bp_key) or {}
+
+                        if not bp_props or len(bp_props) == 0:
+                            continue
+
+                        # Build selectors using layout part classes
+                        # base_selectors contain widget-type classes like:
+                        # .widget-type-easy-widgets-contentcardwidget
+                        # So we append the layout part class as a descendant selector
+                        part_selectors = [
+                            (
+                                f"{base} .{part}".strip()
+                                if base
+                                else f".{part}"  # Fallback for global layout parts
+                            )
+                            for base in base_selectors
+                        ]
+                        selector = ",\n".join(part_selectors)
+
+                        # Convert properties to CSS
+                        css_rules = []
+                        for prop_name, prop_value in bp_props.items():
+                            css_prop = (
+                                self._camel_to_kebab(prop_name)
+                                if "_" not in prop_name
+                                else prop_name.replace("_", "-")
+                            )
+                            css_rules.append(f"  {css_prop}: {prop_value};")
+
+                        # Generate CSS rule
+                        if bp_key == "sm":
+                            # Base styles - NO media query
+                            rule = f"{selector} {{\n" + "\n".join(css_rules) + "\n}"
+                        else:
+                            # Media query for larger breakpoints (mobile-first)
+                            bp_px = breakpoints.get(bp_key)
+                            rule = f"@media (min-width: {bp_px}px) {{\n"
+                            rule += f"  {selector} {{\n"
+                            rule += "\n".join(f"  {r}" for r in css_rules)
+                            rule += "\n  }\n}"
+
+                        css_parts.append(rule)
 
         return "\n\n".join(css_parts)
 

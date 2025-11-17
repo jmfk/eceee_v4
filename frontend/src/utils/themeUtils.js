@@ -89,16 +89,16 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
     // Generate CSS for each applicable group
     for (const group of applicableGroups) {
         // Get widget types and slots (handle both new array format and old single value)
-        const widgetTypes = group.widget_types?.length > 0 
-            ? group.widget_types 
+        const widgetTypes = group.widget_types?.length > 0
+            ? group.widget_types
             : (group.widget_type ? [group.widget_type] : []);
-        const slots = group.slots?.length > 0 
-            ? group.slots 
+        const slots = group.slots?.length > 0
+            ? group.slots
             : (group.slot ? [group.slot] : []);
 
         // Build all selector combinations using CSS classes
         let baseSelectors = [];
-        
+
         if (widgetTypes.length === 0 && slots.length === 0) {
             // Global - no targeting
             baseSelectors.push(scope || '');
@@ -137,10 +137,10 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                 });
             });
         }
-        
+
         // Apply frontend scoping if requested
         if (frontendScoped) {
-            baseSelectors = baseSelectors.map(sel => 
+            baseSelectors = baseSelectors.map(sel =>
                 sel ? `.cms-content ${sel}`.trim() : '.cms-content'
             );
         }
@@ -163,8 +163,8 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
                 // Handle color references (named colors from palette)
                 // Check for any color-related property
-                const colorProperties = ['color', 'backgroundColor', 'borderColor', 'borderLeftColor', 
-                                       'borderRightColor', 'borderTopColor', 'borderBottomColor'];
+                const colorProperties = ['color', 'backgroundColor', 'borderColor', 'borderLeftColor',
+                    'borderRightColor', 'borderTopColor', 'borderBottomColor'];
                 if (colorProperties.includes(propertyName) && colors[propertyValue]) {
                     value = `var(--${propertyValue})`;
                 }
@@ -175,7 +175,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     value = value.split(',').map(font => {
                         const trimmed = font.trim();
                         // If already quoted or is a generic family, leave as-is
-                        if (trimmed.startsWith('"') || trimmed.startsWith("'") || 
+                        if (trimmed.startsWith('"') || trimmed.startsWith("'") ||
                             ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui'].includes(trimmed)) {
                             return trimmed;
                         }
@@ -200,65 +200,51 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             cssParts.push(cssRule);
         }
 
-        // Generate layout properties CSS (NEW for widget layout parts)
+        // Generate layout properties CSS (using layout part classes)
         if (group.layoutProperties) {
             for (const [part, partBreakpoints] of Object.entries(group.layoutProperties)) {
-                // Desktop/lg (default, no media query)
-                const desktopProps = partBreakpoints.desktop || partBreakpoints.lg;
-                if (desktopProps && Object.keys(desktopProps).length > 0) {
-                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
-                    let partRule = `${partSelectors} {\n`;
-                    for (const [prop, value] of Object.entries(desktopProps)) {
-                        const cssProp = camelToKebab(prop);
-                        partRule += `  ${cssProp}: ${value};\n`;
-                    }
-                    partRule += '}';
-                    cssParts.push(partRule);
-                }
+                // Mobile-first approach: Handle each breakpoint in order
+                for (const bpKey of ['sm', 'md', 'lg', 'xl']) {
+                    // Get properties for this breakpoint with legacy support
+                    let bpProps = {};
 
-                // Tablet/md (@media max-width based on theme breakpoints)
-                const tabletProps = partBreakpoints.tablet || partBreakpoints.md;
-                if (tabletProps && Object.keys(tabletProps).length > 0) {
-                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
-                    const maxWidth = bps.lg || 1024; // lg breakpoint for tablet max-width
-                    let tabletRule = `@media (max-width: ${maxWidth}px) {\n`;
-                    tabletRule += `  ${partSelectors} {\n`;
-                    for (const [prop, value] of Object.entries(tabletProps)) {
-                        const cssProp = camelToKebab(prop);
-                        tabletRule += `    ${cssProp}: ${value};\n`;
+                    if (bpKey === 'sm') {
+                        // Merge legacy formats into sm (base)
+                        if (partBreakpoints.default) bpProps = { ...bpProps, ...partBreakpoints.default };
+                        if (partBreakpoints.desktop) bpProps = { ...bpProps, ...partBreakpoints.desktop };
+                        if (partBreakpoints.mobile) bpProps = { ...partBreakpoints.mobile, ...bpProps }; // mobile lower priority
+                        if (partBreakpoints.sm) bpProps = { ...bpProps, ...partBreakpoints.sm };
+                    } else if (bpKey === 'md') {
+                        bpProps = partBreakpoints.md || partBreakpoints.tablet || {};
+                    } else {
+                        bpProps = partBreakpoints[bpKey] || {};
                     }
-                    tabletRule += '  }\n}';
-                    cssParts.push(tabletRule);
-                }
 
-                // Mobile/sm (@media max-width based on theme breakpoints)
-                const mobileProps = partBreakpoints.mobile || partBreakpoints.sm;
-                if (mobileProps && Object.keys(mobileProps).length > 0) {
-                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
-                    const maxWidth = bps.md || 768; // md breakpoint for mobile max-width
-                    let mobileRule = `@media (max-width: ${maxWidth}px) {\n`;
-                    mobileRule += `  ${partSelectors} {\n`;
-                    for (const [prop, value] of Object.entries(mobileProps)) {
-                        const cssProp = camelToKebab(prop);
-                        mobileRule += `    ${cssProp}: ${value};\n`;
+                    if (!bpProps || Object.keys(bpProps).length === 0) {
+                        continue;
                     }
-                    mobileRule += '  }\n}';
-                    cssParts.push(mobileRule);
-                }
-                
-                // XL (extra large, @media min-width)
-                const xlProps = partBreakpoints.xl;
-                if (xlProps && Object.keys(xlProps).length > 0) {
+
+                    // Build selectors using layout part classes
                     const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
-                    const minWidth = bps.xl || 1280;
-                    let xlRule = `@media (min-width: ${minWidth}px) {\n`;
-                    xlRule += `  ${partSelectors} {\n`;
-                    for (const [prop, value] of Object.entries(xlProps)) {
+
+                    // Convert properties to CSS
+                    const cssRules = [];
+                    for (const [prop, value] of Object.entries(bpProps)) {
                         const cssProp = camelToKebab(prop);
-                        xlRule += `    ${cssProp}: ${value};\n`;
+                        cssRules.push(`  ${cssProp}: ${value};`);
                     }
-                    xlRule += '  }\n}';
-                    cssParts.push(xlRule);
+
+                    // Generate CSS rule
+                    if (bpKey === 'sm') {
+                        // Base styles - NO media query
+                        const rule = `${partSelectors} {\n${cssRules.join('\n')}\n}`;
+                        cssParts.push(rule);
+                    } else {
+                        // Media query for larger breakpoints (mobile-first)
+                        const bpPx = bps[bpKey];
+                        const rule = `@media (min-width: ${bpPx}px) {\n  ${partSelectors} {\n${cssRules.map(r => `  ${r}`).join('\n')}\n  }\n}`;
+                        cssParts.push(rule);
+                    }
                 }
             }
         }
@@ -414,25 +400,25 @@ export function mergeDesignGroups(baseGroups = [], overrideGroups = []) {
  */
 export function mergeGroupElements(defaultElements = {}, specificElements = {}) {
     const merged = {};
-    
+
     // Get all unique element tags from both groups
     const allTags = new Set([
         ...Object.keys(defaultElements),
         ...Object.keys(specificElements)
     ]);
-    
+
     // Merge styles for each tag
     for (const tag of allTags) {
         const defaultStyles = defaultElements[tag] || {};
         const specificStyles = specificElements[tag] || {};
-        
+
         // Merge properties, with specific overriding default
         merged[tag] = {
             ...defaultStyles,
             ...specificStyles
         };
     }
-    
+
     return merged;
 }
 

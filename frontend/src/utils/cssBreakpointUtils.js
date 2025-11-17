@@ -26,13 +26,13 @@ export function generateCSSFromBreakpoints(cssObj, theme) {
     
     const parts = [];
     
-    // Default styles (no media query)
-    if (cssObj.default) {
-        parts.push(cssObj.default);
+    // Base styles (sm - no media query)
+    if (cssObj.sm) {
+        parts.push(cssObj.sm);
     }
     
-    // Generate media queries for each breakpoint (mobile-first)
-    ['sm', 'md', 'lg', 'xl'].forEach(bp => {
+    // Generate media queries for larger breakpoints (mobile-first)
+    ['md', 'lg', 'xl'].forEach(bp => {
         if (cssObj[bp] && cssObj[bp].trim() && breakpoints[bp]) {
             const mediaQuery = `@media (min-width: ${breakpoints[bp]}px) {\n${cssObj[bp]}\n}`;
             parts.push(mediaQuery);
@@ -46,7 +46,7 @@ export function generateCSSFromBreakpoints(cssObj, theme) {
  * Convert legacy string CSS to object format
  * 
  * @param {string} css - CSS string
- * @returns {Object} - CSS object with default key
+ * @returns {Object} - CSS object with sm (base) key
  */
 export function migrateLegacyCSS(css) {
     if (typeof css === 'object' && css !== null) {
@@ -54,7 +54,7 @@ export function migrateLegacyCSS(css) {
     }
     
     return {
-        default: css || ''
+        sm: css || ''
     };
 }
 
@@ -62,14 +62,14 @@ export function migrateLegacyCSS(css) {
  * Convert CSS object to string (for backwards compatibility)
  * 
  * @param {Object} cssObj - CSS object with breakpoints
- * @returns {string} - CSS as string (only default breakpoint)
+ * @returns {string} - CSS as string (only sm/base breakpoint)
  */
 export function cssObjectToString(cssObj) {
     if (typeof cssObj === 'string') {
         return cssObj;
     }
     
-    return cssObj.default || '';
+    return cssObj.sm || '';
 }
 
 /**
@@ -118,14 +118,12 @@ export function clearBreakpointCSS(cssObj, breakpoint) {
 }
 
 /**
- * Get breakpoint keys in order
+ * Get breakpoint keys in order (mobile-first)
  * 
- * @param {boolean} includeDefault - Whether to include 'default'
  * @returns {Array} - Array of breakpoint keys
  */
-export function getBreakpointKeys(includeDefault = true) {
-    const keys = ['sm', 'md', 'lg', 'xl'];
-    return includeDefault ? ['default', ...keys] : keys;
+export function getBreakpointKeys() {
+    return ['sm', 'md', 'lg', 'xl'];
 }
 
 /**
@@ -136,54 +134,15 @@ export function getBreakpointKeys(includeDefault = true) {
  * @returns {string} - Display label
  */
 export function getBreakpointLabel(breakpoint, theme) {
-    if (breakpoint === 'default') {
-        return 'Default';
-    }
-    
     const breakpoints = getBreakpoints(theme);
-    const pixels = breakpoints[breakpoint];
     
-    return `${breakpoint.toUpperCase()} (${pixels}px)`;
-}
-
-/**
- * Migrate old layout properties format to new format
- * Converts desktop/tablet/mobile to default/sm/md/lg/xl
- * 
- * @param {Object} layoutProperties - Layout properties object
- * @returns {Object} - Migrated layout properties
- */
-export function migrateLayoutProperties(layoutProperties) {
-    if (!layoutProperties) return layoutProperties;
+    const labels = {
+        sm: 'Base / SM & Up',
+        md: `MD & Up (≥${breakpoints.md}px)`,
+        lg: `LG & Up (≥${breakpoints.lg}px)`,
+        xl: `XL & Up (≥${breakpoints.xl}px)`,
+    };
     
-    const migrated = {};
-    
-    for (const [part, breakpoints] of Object.entries(layoutProperties)) {
-        // Check if already using new format
-        if (breakpoints.default !== undefined || breakpoints.sm !== undefined ||
-            breakpoints.md !== undefined || breakpoints.lg !== undefined ||
-            breakpoints.xl !== undefined) {
-            // Already in new format
-            migrated[part] = breakpoints;
-            continue;
-        }
-        
-        // Migrate from old format
-        migrated[part] = {};
-        
-        if (breakpoints.desktop) {
-            migrated[part].default = breakpoints.desktop;
-        }
-        
-        if (breakpoints.mobile) {
-            migrated[part].sm = breakpoints.mobile;
-        }
-        
-        if (breakpoints.tablet) {
-            migrated[part].md = breakpoints.tablet;
-        }
-    }
-    
-    return migrated;
+    return labels[breakpoint] || breakpoint;
 }
 
