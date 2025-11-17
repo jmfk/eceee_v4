@@ -1505,15 +1505,28 @@ class PageTheme(models.Model):
                         # Build selectors using layout part classes
                         # base_selectors contain widget-type classes like:
                         # .widget-type-easy-widgets-contentcardwidget
-                        # So we append the layout part class as a descendant selector
-                        part_selectors = [
-                            (
-                                f"{base} .{part}".strip()
-                                if base
-                                else f".{part}"  # Fallback for global layout parts
-                            )
-                            for base in base_selectors
-                        ]
+                        # 
+                        # For widget root elements (parts ending in '-widget' or named 'container'),
+                        # the widget-type class and part class are on the SAME element,
+                        # so we use a same-element selector (no space).
+                        # For child elements, we use descendant selectors (with space).
+                        is_root_element = part.endswith('-widget') or part == 'container'
+                        
+                        part_selectors = []
+                        for base in base_selectors:
+                            if base:
+                                if is_root_element:
+                                    # Root element: both classes on same div
+                                    # .slot-main .widget-type-{type}.{part}
+                                    part_selectors.append(f"{base}.{part}".strip())
+                                else:
+                                    # Child element: descendant selector
+                                    # .slot-main .widget-type-{type} .{part}
+                                    part_selectors.append(f"{base} .{part}".strip())
+                            else:
+                                # Fallback for global layout parts
+                                part_selectors.append(f".{part}")
+                        
                         selector = ",\n".join(part_selectors)
 
                         # Convert properties to CSS

@@ -225,7 +225,28 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     }
 
                     // Build selectors using layout part classes
-                    const partSelectors = baseSelectors.map(base => `${base} .${part}`).join(',\n');
+                    // For widget root elements (parts ending in '-widget' or named 'container'),
+                    // the widget-type class and part class are on the SAME element,
+                    // so we use a same-element selector (no space).
+                    // For child elements, we use descendant selectors (with space).
+                    const isRootElement = part.endsWith('-widget') || part === 'container';
+                    
+                    const partSelectors = baseSelectors.map(base => {
+                        if (base) {
+                            if (isRootElement) {
+                                // Root element: both classes on same div
+                                // .slot-main .widget-type-{type}.{part}
+                                return `${base}.${part}`;
+                            } else {
+                                // Child element: descendant selector
+                                // .slot-main .widget-type-{type} .{part}
+                                return `${base} .${part}`;
+                            }
+                        } else {
+                            // Fallback for global layout parts
+                            return `.${part}`;
+                        }
+                    }).join(',\n');
 
                     // Convert properties to CSS
                     const cssRules = [];

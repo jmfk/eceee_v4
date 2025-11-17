@@ -165,7 +165,7 @@ class BannerWidget(BaseWidget):
     template_name = "easy_widgets/widgets/banner.html"
 
     layout_parts = {
-        "container": {
+        "banner-widget": {
             "label": "Main widget container",
             "properties": [
                 "width",
@@ -181,7 +181,7 @@ class BannerWidget(BaseWidget):
                 "alignItems",
             ],
         },
-        "background": {
+        "banner-background": {
             "label": "Background image area",
             "properties": [
                 "width",
@@ -195,7 +195,7 @@ class BannerWidget(BaseWidget):
                 "zIndex",
             ],
         },
-        "body": {
+        "banner-body": {
             "label": "Banner body (text + images container)",
             "properties": [
                 "display",
@@ -206,7 +206,7 @@ class BannerWidget(BaseWidget):
                 "zIndex",
             ],
         },
-        "image": {
+        "banner-images": {
             "label": "Foreground images area",
             "properties": [
                 "width",
@@ -218,7 +218,7 @@ class BannerWidget(BaseWidget):
                 "boxShadow",
             ],
         },
-        "content": {
+        "banner-text": {
             "label": "Text content area",
             "properties": [
                 "padding",

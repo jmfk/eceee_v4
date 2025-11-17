@@ -114,8 +114,8 @@ class HeroWidget(BaseWidget):
     template_name = "easy_widgets/widgets/hero.html"
 
     layout_parts = {
-        "container": {
-            "label": "Main hero container",
+        "hero-widget": {
+            "label": "Main hero container (root element)",
             "properties": [
                 "width",
                 "height",
@@ -132,7 +132,7 @@ class HeroWidget(BaseWidget):
                 "alignItems",
             ],
         },
-        "background": {
+        "hero-background": {
             "label": "Background image",
             "properties": [
                 "width",
@@ -146,7 +146,7 @@ class HeroWidget(BaseWidget):
                 "zIndex",
             ],
         },
-        "content": {
+        "hero-content": {
             "label": "Text content overlay",
             "properties": [
                 "padding",
@@ -164,7 +164,7 @@ class HeroWidget(BaseWidget):
     }
 
     widget_css = """
-    .widget-type-easy-widgets-herowidget {
+    .hero-widget {
         position: relative;
         padding: 0;
         background-color: var(--hero-bg-color);
@@ -173,7 +173,7 @@ class HeroWidget(BaseWidget):
         height: var(--hero-height, 310px);
     }
     
-    .widget-type-easy-widgets-herowidget .hero-background {
+    .hero-widget .hero-background {
         position: absolute;
         top: 0;
         left: 0;
@@ -185,7 +185,7 @@ class HeroWidget(BaseWidget):
         z-index: 0;
     }
     
-    .widget-type-easy-widgets-herowidget .hero-content {
+    .hero-widget .hero-content {
         position: relative;
         z-index: 1;
         max-width: var(--hero-max-width, 1200px);
@@ -198,7 +198,7 @@ class HeroWidget(BaseWidget):
         padding-bottom: 12px;
     }
 
-    .widget-type-easy-widgets-herowidget h1 {
+    .hero-widget h1 {
         font-family: "Source Sans 3", sans-serif;
         font-weight: var(--hero-header-font-weight, 500); ;
         font-size: var(--hero-header-size, 41px);
@@ -207,28 +207,28 @@ class HeroWidget(BaseWidget):
         margin-bottom: var(--hero-header-margin-bottom, 16px);;
     }
 
-    .widget-type-easy-widgets-herowidget .before-text {
+    .hero-widget .before-text {
         font-size: var(--hero-before-text-size, 24px);
         line-height: var(--hero-before-text-line-height, 24px);
         margin: 0;
     }
     
-    .widget-type-easy-widgets-herowidget .after-text {
+    .hero-widget .after-text {
         font-size: var(--hero-after-text-size, 24px);
         line-height: var(--hero-after-text-line-height, 24px);
         margin: 0;
     }
     font-size: 41px;
     @media (max-width: 768px) {
-        .widget-type-easy-widgets-herowidget {
+        .hero-widget {
             padding: 0;
         }
         
-        .widget-type-easy-widgets-herowidget .before-text {
+        .hero-widget .before-text {
             font-size: var(--hero-before-text-size-mobile, 1rem);
         }
         
-        .widget-type-easy-widgets-herowidget .after-text {
+        .hero-widget .after-text {
             font-size: var(--hero-after-text-size-mobile, 1.125rem);
         }
     }
