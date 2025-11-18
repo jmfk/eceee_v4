@@ -199,7 +199,7 @@ const SimplifiedApprovalForm = ({
 
     // Render preview thumbnail for a file
     const renderThumbnail = (file) => {
-        const previewUrl = file.fileUrl || `/api/v1/media/pending/${file.id}/preview/`;
+        const previewUrl = file.fileUrl || `/api/v1/media/pending-files/${file.id}/preview/`;
 
         if (file.fileType === 'image') {
             return (

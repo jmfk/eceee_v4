@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { parseClipboardData } from '../../utils/themeCopyPaste';
 
-const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme }) => {
+const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting = false }) => {
     const [clipboardData, setClipboardData] = useState(null);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [manualInput, setManualInput] = useState('');
+    const [showManualInput, setShowManualInput] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
+            setShowManualInput(false);
+            setManualInput('');
             readClipboard();
         }
     }, [isOpen]);
@@ -16,12 +20,12 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme }) => {
     const readClipboard = async () => {
         setIsLoading(true);
         setError('');
-        
+
         try {
             const text = await navigator.clipboard.readText();
             console.log('[PasteThemeDialog] Raw clipboard text length:', text.length);
             console.log('[PasteThemeDialog] Raw clipboard text (first 200 chars):', text.substring(0, 200));
-            
+
             const result = parseClipboardData(text);
             console.log('[PasteThemeDialog] Parse result:', result);
 
@@ -43,15 +47,50 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme }) => {
             }
         } catch (err) {
             console.error('[PasteThemeDialog] Error reading clipboard:', err);
-            setError('Failed to read clipboard. Please ensure you have copied theme data.');
+            // Show manual paste option instead of error
+            setShowManualInput(true);
+            setError('');
             setClipboardData(null);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleManualPaste = () => {
+        console.log('[PasteThemeDialog] Manual paste triggered');
+        if (!manualInput.trim()) {
+            setError('Please paste the theme data into the text area');
+            return;
+        }
+
+        const result = parseClipboardData(manualInput);
+        console.log('[PasteThemeDialog] Manual parse result:', result);
+
+        if (!result.valid) {
+            console.error('[PasteThemeDialog] Invalid manual input:', result.error);
+            setError(result.error);
+            setClipboardData(null);
+        } else if (result.data.level !== 'full') {
+            console.error('[PasteThemeDialog] Wrong level from manual input:', result.data.level);
+            setError('Only full theme data can be pasted. Please copy a complete theme.');
+            setClipboardData(null);
+        } else {
+            console.log('[PasteThemeDialog] Valid manual input:', {
+                level: result.data.level,
+                dataKeys: Object.keys(result.data.data || {}),
+            });
+            setClipboardData(result.data);
+            setError('');
+            setShowManualInput(false);
+        }
+    };
+
     const handleConfirm = () => {
-        console.log('[PasteThemeDialog] Confirming paste with data:', clipboardData?.data);
+        console.log('[PasteThemeDialog] Confirming paste with data:', {
+            fullClipboardData: clipboardData,
+            dataOnly: clipboardData?.data,
+            dataKeys: clipboardData?.data ? Object.keys(clipboardData.data) : [],
+        });
         if (clipboardData) {
             onConfirm(clipboardData.data);
         }
@@ -83,6 +122,45 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme }) => {
                     {isLoading ? (
                         <div className="text-center py-8">
                             <p className="text-gray-600">Reading clipboard...</p>
+                        </div>
+                    ) : showManualInput ? (
+                        <div>
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+                                <p className="text-sm text-blue-800">
+                                    Clipboard access requires permission. Please paste the theme data manually below.
+                                </p>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Paste Theme Data (Ctrl/Cmd+V)
+                                </label>
+                                <textarea
+                                    value={manualInput}
+                                    onChange={(e) => setManualInput(e.target.value)}
+                                    placeholder="Paste the copied theme JSON here..."
+                                    className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                                    autoFocus
+                                />
+                            </div>
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+                                    <div className="flex items-start">
+                                        <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                                        <div>
+                                            <h3 className="text-sm font-medium text-red-800 mb-1">
+                                                Invalid Data
+                                            </h3>
+                                            <p className="text-sm text-red-700">{error}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            <button
+                                onClick={handleManualPaste}
+                                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                                Parse &amp; Continue
+                            </button>
                         </div>
                     ) : error ? (
                         <div className="bg-red-50 border border-red-200 rounded-md p-4">
@@ -205,7 +283,8 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme }) => {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        disabled={isPasting}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Cancel
                     </button>
@@ -213,9 +292,20 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme }) => {
                         <button
                             type="button"
                             onClick={handleConfirm}
-                            className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 border border-transparent rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                            disabled={isPasting}
+                            className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 border border-transparent rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
                         >
-                            Overwrite Theme
+                            {isPasting ? (
+                                <>
+                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Pasting...
+                                </>
+                            ) : (
+                                'Overwrite Theme'
+                            )}
                         </button>
                     )}
                 </div>

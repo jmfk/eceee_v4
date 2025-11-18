@@ -19,7 +19,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
 import { useAutoSave } from '../hooks/useAutoSave';
 import {
-    Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw, Clipboard, Download, FileUp
+    Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw, Clipboard, Download, FileUp, Files
 } from 'lucide-react';
 
 // Import tab components
@@ -48,6 +48,7 @@ const ThemeEditor = ({ onSave }) => {
     const [themeToClone, setThemeToClone] = useState(null);
     const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
     const [themeToPaste, setThemeToPaste] = useState(null);
+    const [isPasting, setIsPasting] = useState(false);
 
     // Derive view mode from URL
     const isCreating = themeId === 'new';
@@ -289,10 +290,8 @@ const ThemeEditor = ({ onSave }) => {
         // This ensures all uncontrolled textarea refs are saved to state
         if (activeTab === 'component-styles' && componentStylesTabRef.current) {
             componentStylesTabRef.current.flushPendingChanges();
-        } else if (activeTab === 'gallery-styles' && galleryStylesTabRef.current) {
-            galleryStylesTabRef.current.flushPendingChanges();
-        } else if (activeTab === 'carousel-styles' && carouselStylesTabRef.current) {
-            carouselStylesTabRef.current.flushPendingChanges();
+        } else if (activeTab === 'image-styles' && imageStylesTabRef.current) {
+            imageStylesTabRef.current.flushPendingChanges();
         }
 
         try {
@@ -386,6 +385,7 @@ const ThemeEditor = ({ onSave }) => {
     };
 
     const handlePaste = (theme) => {
+        console.log('[ThemeEditor] handlePaste called for theme:', theme?.name);
         setThemeToPaste(theme);
         setPasteDialogOpen(true);
     };
@@ -402,9 +402,15 @@ const ThemeEditor = ({ onSave }) => {
             return;
         }
 
+        setIsPasting(true);
+
         try {
             // Map the pasted data structure to match API expectations
+            // Use the source theme name (from pasted data) + " (Copy)"
+            const sourceName = pastedData.name || themeToPaste.name;
             const updateData = {
+                name: `${sourceName} (Copy)`, // Use source theme name + " (Copy)"
+                description: pastedData.description || themeToPaste.description, // Use source description or keep existing
                 fonts: pastedData.fonts || {},
                 colors: pastedData.colors || {},
                 designGroups: pastedData.designGroups || {},
@@ -435,15 +441,19 @@ const ThemeEditor = ({ onSave }) => {
                 type: 'success',
                 message: `Theme "${themeToPaste.name}" updated with pasted data`,
             });
+            
+            // Close dialog immediately after successful paste
+            setPasteDialogOpen(false);
+            setThemeToPaste(null);
         } catch (error) {
             console.error('[ThemeEditor] Paste error:', error);
             addNotification({
                 type: 'error',
                 message: extractErrorMessage(error, 'Failed to paste theme data'),
             });
+            // Keep dialog open on error so user can see what went wrong
         } finally {
-            setPasteDialogOpen(false);
-            setThemeToPaste(null);
+            setIsPasting(false);
         }
     };
 
@@ -607,6 +617,7 @@ const ThemeEditor = ({ onSave }) => {
 
     if (currentView === 'list') {
         return (
+            <>
             <div className="p-6">
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
@@ -726,29 +737,33 @@ const ThemeEditor = ({ onSave }) => {
                                                 <Edit3 className="w-4 h-4 mr-1" />
                                                 Edit
                                             </button>
-                                            <CopyButton
-                                                data={{
-                                                    fonts: theme.fonts || {},
-                                                    colors: theme.colors || {},
-                                                    designGroups: theme.designGroups || {},
-                                                    componentStyles: theme.componentStyles || {},
-                                                    imageStyles: theme.imageStyles || {},
-                                                    tableTemplates: theme.tableTemplates || {},
-                                                    image: theme.image || null,
-                                                }}
-                                                level="full"
-                                                iconOnly
-                                                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                                onSuccess={() => addNotification({ type: 'success', message: `Theme "${theme.name}" copied to clipboard` })}
-                                                onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
-                                            />
-                                            <button
-                                                onClick={() => handlePaste(theme)}
-                                                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                                title="Paste theme data from clipboard"
-                                            >
-                                                <Clipboard className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex items-center gap-0">
+                                                <CopyButton
+                                                    data={{
+                                                        name: theme.name, // Include source theme name
+                                                        description: theme.description, // Include source description
+                                                        fonts: theme.fonts || {},
+                                                        colors: theme.colors || {},
+                                                        designGroups: theme.designGroups || {},
+                                                        componentStyles: theme.componentStyles || {},
+                                                        imageStyles: theme.imageStyles || {},
+                                                        tableTemplates: theme.tableTemplates || {},
+                                                        image: theme.image || null,
+                                                    }}
+                                                    level="full"
+                                                    iconOnly
+                                                    className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md border-r-0 text-gray-700 bg-white hover:bg-gray-50"
+                                                    onSuccess={() => addNotification({ type: 'success', message: `Theme "${theme.name}" copied to clipboard` })}
+                                                    onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                                                />
+                                                <button
+                                                    onClick={() => handlePaste(theme)}
+                                                    className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50"
+                                                    title="Paste theme data from clipboard"
+                                                >
+                                                    <Clipboard className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                             <button
                                                 onClick={() => handleClone(theme)}
                                                 className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -787,6 +802,31 @@ const ThemeEditor = ({ onSave }) => {
                     </div>
                 )}
             </div>
+
+            {/* Clone Theme Dialog */}
+            <CloneThemeDialog
+                isOpen={cloneDialogOpen}
+                onClose={() => {
+                    setCloneDialogOpen(false);
+                    setThemeToClone(null);
+                }}
+                onConfirm={handleCloneConfirm}
+                themeName={themeToClone?.name}
+                existingNames={themes.map(t => t.name)}
+            />
+
+            {/* Paste Theme Dialog */}
+            <PasteThemeDialog
+                isOpen={pasteDialogOpen}
+                onClose={() => {
+                    setPasteDialogOpen(false);
+                    setThemeToPaste(null);
+                }}
+                onConfirm={handlePasteConfirm}
+                targetTheme={themeToPaste}
+                isPasting={isPasting}
+            />
+            </>
         );
     }
 
@@ -1017,6 +1057,7 @@ const ThemeEditor = ({ onSave }) => {
                 }}
                 onConfirm={handlePasteConfirm}
                 targetTheme={themeToPaste}
+                isPasting={isPasting}
             />
         </div>
     );

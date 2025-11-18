@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Copy, Check, AlertCircle } from 'lucide-react';
+import { Files, Check, AlertCircle } from 'lucide-react';
 import { copyToClipboard } from '../../utils/themeCopyPaste';
 
 const CopyButton = ({
@@ -61,7 +61,7 @@ const CopyButton = ({
     const getIcon = () => {
         if (status === 'success') return <Check className={iconSize} />;
         if (status === 'error') return <AlertCircle className={iconSize} />;
-        return <Copy className={iconSize} />;
+        return <Files className={iconSize} />;
     };
 
     const getColor = () => {
