@@ -324,6 +324,7 @@ const ConditionalGroupField = ({
                         order: _order,
                         group: _group,
                         conditionalOn: _conditionalOn,
+                        fieldName: _fieldName,
                         ...schemaProps
                     } = propSchema
 

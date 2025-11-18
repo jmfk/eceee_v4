@@ -157,6 +157,7 @@ const LocalStateFieldWrapper = React.memo(({
             isDirty: removedIsDirty,
             isTouched: removedIsTouched,
             isValidating: removedIsValidating,
+            fieldName: removedFieldName, // Remove fieldName from being spread to DOM
             // Preserve context
             context,
             // Keep the rest

@@ -215,7 +215,6 @@ const SchemaFieldRenderer = ({
             placeholder: fieldSchema.placeholder,
             namespace: namespace,
             context: context,
-            fieldName: fieldName, // Pass fieldName for UDC integration
             ...componentProps
         }
 
