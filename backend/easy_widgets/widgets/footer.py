@@ -97,116 +97,130 @@ class FooterWidget(BaseWidget):
     description = "Footer widget with multi-column grid layout for links and content"
     template_name = "easy_widgets/widgets/footer.html"
 
+    layout_parts = {
+        "footer-widget": {
+            "label": "Footer widget container",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+        "footer-content": {
+            "label": "Footer content wrapper",
+            "properties": [
+                "maxWidth",
+                "padding",
+                "margin",
+            ],
+        },
+        "footer-column": {
+            "label": "Individual footer column",
+            "properties": [
+                "padding",
+                "textAlign",
+            ],
+        },
+        "footer-column-title": {
+            "label": "Column title/heading",
+            "properties": [
+                "fontFamily",
+                "fontSize",
+                "fontWeight",
+                "color",
+                "margin",
+            ],
+        },
+    }
+
     widget_css = """
-    .widget-type-easy-widgets-footerwidget {
-        background-color: var(--footer-bg-color, #1f2937);
-        background-image: var(--footer-bg-image, none);
-        background-size: var(--footer-bg-size, cover);
-        background-position: var(--footer-bg-position, center);
-        background-repeat: var(--footer-bg-repeat, no-repeat);
-        color: var(--footer-text-color, #f9fafb);
-        padding: var(--footer-padding, 2rem 1rem);
+    .footer-widget {
+        box-sizing: border-box;
+        background-color: #1f2937;
+        color: #f9fafb;
+        padding: 2rem 1rem;
         margin-top: auto;
+        width: 100%;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-content {
-        max-width: var(--footer-max-width, 1200px);
+    .footer-content {
+        max-width: 1200px;
         margin: 0 auto;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-columns {
+    .footer-columns {
         display: grid;
-        grid-template-columns: repeat(var(--footer-column-count, 3), 1fr);
-        gap: var(--footer-column-gap, 2rem);
-        margin-bottom: var(--footer-section-margin, 2rem);
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+        margin-bottom: 2rem;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-column {
-        text-align: var(--footer-text-align, left);
+    .footer-column {
+        text-align: left;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-column-title {
-        color: var(--footer-heading-color, inherit);
-        font-size: var(--footer-heading-size, 1.125rem);
-        font-weight: var(--footer-heading-weight, 600);
-        margin-bottom: var(--footer-heading-margin, 1rem);
+    .footer-column-title {
+        color: inherit;
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-column-items {
+    .footer-column-items {
         list-style: none;
         padding: 0;
         margin: 0;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-column-item {
-        margin-bottom: var(--footer-list-item-margin, 0.5rem);
-        line-height: var(--footer-line-height, 1.6);
+    .footer-column-item {
+        margin-bottom: 0.5rem;
+        line-height: 1.6;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-column-item a {
-        color: var(--footer-link-color, #60a5fa);
+    .footer-column-item a {
+        color: #60a5fa;
         text-decoration: none;
         transition: color 0.2s ease-in-out;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-column-item a:hover {
-        color: var(--footer-link-hover-color, #93c5fd);
+    .footer-column-item a:hover {
+        color: #93c5fd;
         text-decoration: underline;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-social-links,
-    .widget-type-easy-widgets-footerwidget .footer-copyright {
+    .footer-social-links,
+    .footer-copyright {
         text-align: center;
-        margin-top: var(--footer-section-margin, 2rem);
+        margin-top: 2rem;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-social-link {
+    .footer-social-link {
         display: inline-block;
         margin: 0 0.5rem;
-        color: var(--footer-link-color, #60a5fa);
+        color: #60a5fa;
         transition: color 0.2s ease-in-out;
     }
     
-    .widget-type-easy-widgets-footerwidget .footer-social-link:hover {
-        color: var(--footer-link-hover-color, #93c5fd);
+    .footer-social-link:hover {
+        color: #93c5fd;
     }
     
     /* Responsive design */
     @media (max-width: 1024px) {
-        .widget-type-easy-widgets-footerwidget .footer-columns {
+        .footer-columns {
             grid-template-columns: repeat(2, 1fr);
         }
     }
     
     @media (max-width: 640px) {
-        .widget-type-easy-widgets-footerwidget .footer-columns {
+        .footer-columns {
             grid-template-columns: 1fr;
         }
     }
     """
-
-    css_variables = {
-        "footer-bg-color": "#1f2937",
-        "footer-bg-image": "none",
-        "footer-bg-size": "cover",
-        "footer-bg-position": "center",
-        "footer-bg-repeat": "no-repeat",
-        "footer-text-color": "#f9fafb",
-        "footer-padding": "2rem 1rem",
-        "footer-max-width": "1200px",
-        "footer-column-count": "3",
-        "footer-column-gap": "2rem",
-        "footer-text-align": "left",
-        "footer-heading-color": "inherit",
-        "footer-heading-size": "1.125rem",
-        "footer-heading-weight": "600",
-        "footer-heading-margin": "1rem",
-        "footer-section-margin": "2rem",
-        "footer-line-height": "1.6",
-        "footer-link-color": "#60a5fa",
-        "footer-link-hover-color": "#93c5fd",
-        "footer-list-item-margin": "0.5rem",
-    }
 
     css_scope = "widget"
 
@@ -232,26 +246,85 @@ class FooterWidget(BaseWidget):
         from django.template.loader import render_to_string
 
         style_name = config.get("component_style", "default")
+        
+        # For default style, return None to use standard Django template rendering
         if not style_name or style_name == "default":
             return None
 
         styles = theme.component_styles or {}
         style = styles.get(style_name)
+        
+        # If style not found in theme, fall back to default rendering
         if not style:
             return None
 
+        template_str = style.get("template", "")
+        css = style.get("css", "")
+
+        # Check for passthru marker (must be only content in template after trimming)
+        if template_str.strip() == "{{passthru}}":
+            # Passthru mode: use default rendering but inject CSS
+            return None, css
+
+        # Prepare template context first
+        prepared_config = self.prepare_template_context(config, {"theme": theme})
+
         # Render the footer HTML using the default template first
-        footer_html = render_to_string(self.template_name, {"config": config})
+        footer_html = render_to_string(self.template_name, {"config": prepared_config, "widget_type": self})
 
         # Prepare context with rendered footer as content
         context = prepare_component_context(
             content=footer_html, 
             anchor="", 
             style_vars=style.get("variables", {}),
-            config=config,  # Pass raw config for granular control
+            config=prepared_config,  # Pass processed config for granular control
         )
 
         # Render with style template
-        html = render_mustache(style.get("template", ""), context)
-        css = style.get("css", "")
+        html = render_mustache(template_str, context)
         return html, css
+
+    def prepare_template_context(self, config, context=None):
+        """
+        Prepare template context with snake_case field conversions and layout properties.
+        """
+        template_config = config.copy() if config else {}
+
+        # Ensure snake_case fields for template
+        template_config["column_count"] = config.get("columnCount") or config.get(
+            "column_count", 3
+        )
+        template_config["show_copyright"] = config.get("showCopyright") or config.get(
+            "show_copyright", True
+        )
+        template_config["copyright_text"] = config.get("copyrightText") or config.get(
+            "copyright_text", ""
+        )
+        template_config["social_links"] = config.get("socialLinks") or config.get(
+            "social_links", []
+        )
+        template_config["component_style"] = config.get("componentStyle") or config.get(
+            "component_style", "default"
+        )
+
+        # Extract layout properties from theme for dynamic sizing (similar to Banner/ContentCard)
+        theme = context.get("theme") if context else None
+        if theme and hasattr(theme, "design_groups"):
+            design_groups = theme.design_groups or {}
+            groups = design_groups.get("groups", [])
+
+            # Find layout properties for footer parts
+            for group in groups:
+                layout_props = group.get("layoutProperties") or group.get(
+                    "layout_properties", {}
+                )
+                
+                # Extract properties for footer-widget (main container)
+                if "footer-widget" in layout_props:
+                    part_props = layout_props["footer-widget"]
+                    # Note: Layout properties can be applied via CSS from design groups
+                    # This is just for awareness - actual application happens in rendering
+                
+                # Could extract other footer parts if needed in the future
+
+        return template_config

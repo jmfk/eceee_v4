@@ -193,9 +193,10 @@ class BannerWidget(BaseWidget):
         overflow: hidden;
         border-radius: 0;
         box-shadow: none;
-        margin-bottom: 30px;
     }
-    
+    .banner-widget:not(:last-child) {
+        margin-bottom: 30px;
+    }    
     .banner-background {
         position: absolute;
         top: 0;

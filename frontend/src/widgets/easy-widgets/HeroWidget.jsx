@@ -108,57 +108,16 @@ const HeroWidget = ({
         loadImage()
     }, [image])
 
-    // Build inline styles
-    const containerStyle = {
-        position: 'relative',
-        padding: '4rem 2rem',
-        backgroundColor,
-        color: textColor,
-        overflow: 'hidden',
-        minHeight: '400px',
+    // Build inline styles with CSS variables
+    const heroStyle = {
+        '--hero-text-color': textColor,
+        '--hero-decor-color': decorColor,
+        '--hero-bg-color': backgroundColor,
     }
 
     const backgroundStyle = image && backgroundUrl ? {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
         backgroundImage: `url('${backgroundUrl}')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        zIndex: 0,
-        opacity: 0.8,
     } : null
-
-    const contentStyle = {
-        position: 'relative',
-        zIndex: 1,
-        maxWidth: '1200px',
-        margin: '0 auto',
-        textAlign: 'center',
-    }
-
-    const beforeTextStyle = {
-        fontSize: '1.125rem',
-        marginBottom: '1rem',
-        color: decorColor,
-    }
-
-    const headerStyle = {
-        fontSize: '3rem',
-        fontWeight: '700',
-        margin: '1rem 0',
-        lineHeight: '1.2',
-        color: textColor,
-    }
-
-    const afterTextStyle = {
-        fontSize: '1.25rem',
-        marginTop: '1rem',
-        color: textColor,
-    }
 
     // Content change handlers - use configRef for stable references
     const handleHeaderChange = useCallback((newContent) => {
@@ -311,35 +270,18 @@ const HeroWidget = ({
         }
 
         return (
-            <div className="hero-widget widget-type-easy-widgets-herowidget" style={containerStyle}>
+            <div className="hero-widget widget-type-easy-widgets-herowidget" style={heroStyle}>
                 {imageLoading && (
                     <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
                         Optimizing image...
                     </div>
                 )}
                 {backgroundStyle && <div className="hero-background" style={backgroundStyle} />}
-                <div className="hero-content" style={contentStyle}>
-                    <div className="before-text" style={beforeTextStyle} ref={beforeTextContainerRef} />
-                    <div style={headerStyle} ref={headerContainerRef} />
-                    <div className="after-text" style={afterTextStyle} ref={afterTextContainerRef} />
+                <div className="hero-content">
+                    <div className="before-text" ref={beforeTextContainerRef} />
+                    <div ref={headerContainerRef} />
+                    <div className="after-text" ref={afterTextContainerRef} />
                 </div>
-                <style dangerouslySetInnerHTML={{
-                    __html: `
-                    @media (max-width: 768px) {
-                        .hero-widget {
-                            padding: 2rem 1rem !important;
-                        }
-                        .hero-widget h1 {
-                            font-size: 2rem !important;
-                        }
-                        .hero-widget .before-text h5 {
-                            font-size: 1rem !important;
-                        }
-                        .hero-widget .after-text h6 {
-                            font-size: 1.125rem !important;
-                        }
-                    }
-                `}} />
             </div>
         )
     }
@@ -350,38 +292,21 @@ const HeroWidget = ({
     }
 
     return (
-        <div className="hero-widget widget-type-easy-widgets-herowidget" style={containerStyle}>
+        <div className="hero-widget widget-type-easy-widgets-herowidget" style={heroStyle}>
             {backgroundStyle && <div className="hero-background" style={backgroundStyle} />}
-            <div className="hero-content" style={contentStyle}>
+            <div className="hero-content">
                 {beforeText && (
-                    <div className="before-text" style={beforeTextStyle}>
+                    <h5 className="before-text">
                         {beforeText}
-                    </div>
+                    </h5>
                 )}
-                <h1 style={headerStyle}>{header}</h1>
+                <h1>{header}</h1>
                 {afterText && (
-                    <div className="after-text" style={afterTextStyle}>
+                    <h6 className="after-text">
                         {afterText}
-                    </div>
+                    </h6>
                 )}
             </div>
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                @media (max-width: 768px) {
-                    .hero-widget {
-                        padding: 2rem 1rem !important;
-                    }
-                    .hero-widget h1 {
-                        font-size: 2rem !important;
-                    }
-                    .hero-widget .before-text {
-                        font-size: 1rem !important;
-                    }
-                    .hero-widget .after-text {
-                        font-size: 1.125rem !important;
-                    }
-                }
-            `}} />
         </div>
     )
 }

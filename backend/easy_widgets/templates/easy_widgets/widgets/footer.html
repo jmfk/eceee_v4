@@ -1,7 +1,7 @@
 {% load static %}
 {% load security_filters %}
 
-<div class="widget-type-{{ widget_type.css_class_name }}">
+<div class="footer-widget widget-type-{{ widget_type.css_class_name }}">
 <div class="footer-content">
     {% if config.columns %}
     <div class="footer-columns" style="--footer-column-count: {{ config.column_count|default:3 }};">

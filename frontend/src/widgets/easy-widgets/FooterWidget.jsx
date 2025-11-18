@@ -28,17 +28,23 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
     const currentYear = new Date().getFullYear()
     const displayCopyright = copyrightText || `© ${currentYear} All rights reserved.`
 
-    // Build footer styles
-    const footerStyle = {
-        backgroundColor: backgroundColor,
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
-        backgroundSize: backgroundSize,
-        backgroundPosition: backgroundPosition,
-        backgroundRepeat: 'no-repeat',
-        color: textColor,
-        padding: padding
-    }
+    // Build footer styles (keep only custom overrides, let CSS handle defaults)
+    const footerStyle = {}
 
+    if (backgroundColor && backgroundColor !== '#1f2937') {
+        footerStyle.backgroundColor = backgroundColor
+    }
+    if (backgroundImage) {
+        footerStyle.backgroundImage = `url(${backgroundImage})`
+        footerStyle.backgroundSize = backgroundSize
+        footerStyle.backgroundPosition = backgroundPosition
+    }
+    if (textColor && textColor !== '#f9fafb') {
+        footerStyle.color = textColor
+    }
+    if (padding && padding !== '2rem 1rem') {
+        footerStyle.padding = padding
+    }
     if (margin) {
         footerStyle.margin = margin
     }
@@ -78,30 +84,25 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
         return (
             <div className="footer-widget-editor p-4">
                 <footer
-                    className={`footer-widget rounded ${cssClass}`}
+                    className={`footer-widget widget-type-easy-widgets-footerwidget rounded ${cssClass}`}
                     style={footerStyle}
                 >
-                    <div className="footer-content max-w-6xl mx-auto">
+                    <div className="footer-content">
                         {columns && columns.length > 0 && (
-                            <div
-                                className="footer-columns grid gap-8 mb-8"
-                                style={{
-                                    gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
-                                }}
-                            >
+                            <div className="footer-columns">
                                 {columns.map((column, index) => renderColumn(column, index))}
                             </div>
                         )}
 
                         {socialLinks.length > 0 && (
-                            <div className="footer-social-links mt-4 flex justify-center space-x-4">
+                            <div className="footer-social-links">
                                 {socialLinks.map((link, index) => (
                                     <a
                                         key={index}
                                         href={link.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                                        className="footer-social-link"
                                         title={link.name}
                                     >
                                         {link.icon && <i className={link.icon}></i>}
@@ -112,7 +113,7 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
                         )}
 
                         {showCopyright && (
-                            <div className="footer-copyright mt-4 text-sm opacity-80 text-center">
+                            <div className="footer-copyright">
                                 {displayCopyright}
                             </div>
                         )}
@@ -129,30 +130,25 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
     // Preview/production mode: full rendering with all config applied
     return (
         <footer
-            className={`footer-widget ${cssClass}`}
+            className={`footer-widget widget-type-easy-widgets-footerwidget ${cssClass}`}
             style={footerStyle}
         >
-            <div className="footer-content max-w-6xl mx-auto">
+            <div className="footer-content">
                 {columns && columns.length > 0 && (
-                    <div
-                        className="footer-columns grid gap-8 mb-8"
-                        style={{
-                            gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
-                        }}
-                    >
+                    <div className="footer-columns">
                         {columns.map((column, index) => renderColumn(column, index))}
                     </div>
                 )}
 
                 {socialLinks.length > 0 && (
-                    <div className="footer-social-links mt-4 flex justify-center space-x-4">
+                    <div className="footer-social-links">
                         {socialLinks.map((link, index) => (
                             <a
                                 key={index}
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="hover:opacity-80 transition-opacity"
+                                className="footer-social-link"
                                 title={link.name}
                             >
                                 {link.icon && <i className={link.icon}></i>}
@@ -163,7 +159,7 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
                 )}
 
                 {showCopyright && (
-                    <div className="footer-copyright mt-4 text-sm opacity-80 text-center">
+                    <div className="footer-copyright">
                         {displayCopyright}
                     </div>
                 )}

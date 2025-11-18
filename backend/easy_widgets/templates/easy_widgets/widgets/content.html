@@ -4,7 +4,7 @@
 {% if custom_style_css %}
 <style>{{ custom_style_css|safe }}</style>
 {% endif %}
-<div class="widget-type-{{ widget_type.css_class_name }} cms-content">
+<div class="content-widget widget-type-{{ widget_type.css_class_name }} cms-content">
     {% if config.processed_content %}
         {{ config.processed_content|safe %}
     {% else %}

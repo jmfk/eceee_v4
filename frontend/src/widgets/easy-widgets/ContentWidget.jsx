@@ -237,7 +237,7 @@ const ContentWidget = memo(({
     }
 
     return (
-        <div className="content-widget min-h-32 default cms-content">
+        <div className="content-widget widget-type-easy-widgets-contentwidget min-h-32 cms-content">
             {configRef.current.content && <div dangerouslySetInnerHTML={{ __html: configRef.current.content }} />}
         </div>
     )
