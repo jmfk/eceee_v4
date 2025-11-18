@@ -11,6 +11,9 @@ import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
+import { useTheme } from '../../hooks/useTheme';
+import ComponentStyleRenderer from '../../components/ComponentStyleRenderer';
+import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import PropTypes from 'prop-types';
 
 // Simple slugify function for anchor generation
@@ -49,6 +52,9 @@ const SectionWidget = ({
 
     // Get all available widget types from the system
     const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
+
+    // Get current theme for component styles
+    const { currentTheme } = useTheme({ pageId: context.pageId });
 
     // Local state management for slots data and collapse state
     const [slotsData, setSlotsData] = useState(() => {
@@ -344,34 +350,99 @@ const SectionWidget = ({
         );
     }
 
-    // In display mode, render the widgets in the content slot
-    return (
-        <div className="section-widget mb-6"
-            data-section-id={config.anchor || ''}
-            data-accordion-mode={config.accordionMode ? 'true' : 'false'}>
-            {config.title && (
-                <div className={`section-header ${config.enableCollapse ? 'cursor-pointer' : ''}`}
-                    onClick={toggleSection}
-                    id={config.anchor}>
-                    <div className="flex justify-between items-center">
-                        <span className="font-semibold text-xl">{config.title}</span>
-                        {config.enableCollapse && (
-                            <span className={`section-toggle transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>
-                                ▶
-                            </span>
-                        )}
+    // Check if using component style with Mustache template
+    const componentStyle = config.componentStyle || 'default';
+    const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles;
+
+    if (useCustomStyle) {
+        const style = currentTheme.componentStyles[componentStyle];
+
+        if (style) {
+            try {
+                // Check for passthru mode
+                const isPassthru = style.template?.trim() === '{{passthru}}';
+
+                if (!isPassthru) {
+                    // Prepare context for Mustache rendering
+                    const mustacheContext = prepareComponentContext(
+                        '', // No content for section
+                        config.anchor || '',
+                        style.variables || {},
+                        config
+                    );
+
+                    // Add section specific context
+                    mustacheContext.title = config.title || '';
+                    mustacheContext.enableCollapse = config.enableCollapse || false;
+                    mustacheContext.isExpanded = isExpanded;
+
+                    // Use ComponentStyleRenderer for consistent scoped rendering
+                    const styleId = `section-${widgetId || 'preview'}-${componentStyle}`;
+
+                    return (
+                        <ComponentStyleRenderer
+                            template={style.template}
+                            context={mustacheContext}
+                            css={style.css}
+                            styleId={styleId}
+                            className=""
+                        />
+                    );
+                }
+
+                // Passthru mode: render default with custom CSS
+                const styleId = `section-${widgetId || 'preview'}-${componentStyle}`;
+
+                return (
+                    <div data-style-id={styleId}>
+                        {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
+                        {renderDefaultSection()}
                     </div>
-                </div>
-            )}
-            <div className={`section-content ${config.enableCollapse && !isExpanded ? 'hidden' : ''}`}>
-                {slotsData.content && slotsData.content.length > 0 ? (
-                    slotsData.content.map((widget, index) => renderWidget(widget, 'content', index))
-                ) : (
-                    <div className="p-4 text-center text-gray-400">Section content</div>
+                );
+            } catch (error) {
+                console.error('Error rendering custom component style:', error);
+                return (
+                    <div>
+                        <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
+                    </div>
+                );
+            }
+        }
+    }
+
+    // Default rendering helper function
+    function renderDefaultSection() {
+        return (
+            <div className="section-widget mb-6"
+                data-section-id={config.anchor || ''}
+                data-accordion-mode={config.accordionMode ? 'true' : 'false'}>
+                {config.title && (
+                    <div className={`section-header ${config.enableCollapse ? 'cursor-pointer' : ''}`}
+                        onClick={toggleSection}
+                        id={config.anchor}>
+                        <div className="flex justify-between items-center">
+                            <span className="font-semibold text-xl">{config.title}</span>
+                            {config.enableCollapse && (
+                                <span className={`section-toggle transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>
+                                    ▶
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 )}
+                <div className={`section-content ${config.enableCollapse && !isExpanded ? 'hidden' : ''}`}>
+                    {slotsData.content && slotsData.content.length > 0 ? (
+                        slotsData.content.map((widget, index) => renderWidget(widget, 'content', index))
+                    ) : (
+                        <div className="p-4 text-center text-gray-400">Section content</div>
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    }
+
+    // In display mode, render the default section
+    return renderDefaultSection();
 };
 
 SectionWidget.propTypes = {

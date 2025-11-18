@@ -11,6 +11,9 @@ import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
+import { useTheme } from '../../hooks/useTheme';
+import ComponentStyleRenderer from '../../components/ComponentStyleRenderer';
+import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import PropTypes from 'prop-types';
 
 const TwoColumnsWidget = ({
@@ -36,6 +39,9 @@ const TwoColumnsWidget = ({
 
     // Get all available widget types from the system
     const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
+
+    // Get current theme for component styles
+    const { currentTheme } = useTheme({ pageId: context.pageId });
 
     // Local state management for slots data
     // Initialize from config.slots, but maintain locally to avoid prop resets
@@ -288,25 +294,85 @@ const TwoColumnsWidget = ({
         );
     }
 
-    // In display mode, render the widgets in each slot
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
-            <div className="column-slot left min-h-[50px]">
-                {slotsData.left && slotsData.left.length > 0 ? (
-                    slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
-                ) : (
-                    <div className="p-4 text-center text-gray-400">Left column</div>
-                )}
+    // Check if using component style with Mustache template
+    const componentStyle = config.componentStyle || 'default';
+    const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles;
+
+    if (useCustomStyle) {
+        const style = currentTheme.componentStyles[componentStyle];
+
+        if (style) {
+            try {
+                // Check for passthru mode
+                const isPassthru = style.template?.trim() === '{{passthru}}';
+
+                if (!isPassthru) {
+                    // Prepare context for Mustache rendering
+                    const mustacheContext = prepareComponentContext(
+                        '', // No content for two columns
+                        '',
+                        style.variables || {},
+                        config
+                    );
+
+                    // Use ComponentStyleRenderer for consistent scoped rendering
+                    const styleId = `two-columns-${widgetId || 'preview'}-${componentStyle}`;
+
+                    return (
+                        <ComponentStyleRenderer
+                            template={style.template}
+                            context={mustacheContext}
+                            css={style.css}
+                            styleId={styleId}
+                            className=""
+                        />
+                    );
+                }
+
+                // Passthru mode: render default with custom CSS
+                const styleId = `two-columns-${widgetId || 'preview'}-${componentStyle}`;
+
+                return (
+                    <div data-style-id={styleId}>
+                        {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
+                        {renderDefaultTwoColumns()}
+                    </div>
+                );
+            } catch (error) {
+                console.error('Error rendering custom component style:', error);
+                return (
+                    <div>
+                        <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
+                    </div>
+                );
+            }
+        }
+    }
+
+    // Default rendering helper function
+    function renderDefaultTwoColumns() {
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
+                <div className="column-slot left min-h-[50px]">
+                    {slotsData.left && slotsData.left.length > 0 ? (
+                        slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
+                    ) : (
+                        <div className="p-4 text-center text-gray-400">Left column</div>
+                    )}
+                </div>
+                <div className="column-slot right min-h-[50px]">
+                    {slotsData.right && slotsData.right.length > 0 ? (
+                        slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
+                    ) : (
+                        <div className="p-4 text-center text-gray-400">Right column</div>
+                    )}
+                </div>
             </div>
-            <div className="column-slot right min-h-[50px]">
-                {slotsData.right && slotsData.right.length > 0 ? (
-                    slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
-                ) : (
-                    <div className="p-4 text-center text-gray-400">Right column</div>
-                )}
-            </div>
-        </div>
-    );
+        );
+    }
+
+    // In display mode, render the default two columns
+    return renderDefaultTwoColumns();
 };
 
 TwoColumnsWidget.propTypes = {

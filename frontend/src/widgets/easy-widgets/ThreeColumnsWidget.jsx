@@ -11,6 +11,9 @@ import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
+import { useTheme } from '../../hooks/useTheme';
+import ComponentStyleRenderer from '../../components/ComponentStyleRenderer';
+import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import PropTypes from 'prop-types';
 
 const ThreeColumnsWidget = ({
@@ -36,6 +39,9 @@ const ThreeColumnsWidget = ({
 
     // Get all available widget types from the system
     const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
+
+    // Get current theme for component styles
+    const { currentTheme } = useTheme({ pageId: context.pageId });
 
     // Local state management for slots data
     const [slotsData, setSlotsData] = useState(() => {
@@ -279,34 +285,94 @@ const ThreeColumnsWidget = ({
         );
     }
 
-    // In display mode, render the widgets in each slot
-    return (
-        <div className="three-columns-widget">
-            <div className="column-slot left" data-slot="left">
-                {slotsData.left && slotsData.left.length > 0 ? (
-                    slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
-                ) : (
-                    <div className="empty-slot">Left column</div>
-                )}
-            </div>
+    // Check if using component style with Mustache template
+    const componentStyle = config.componentStyle || 'default';
+    const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles;
 
-            <div className="column-slot center" data-slot="center">
-                {slotsData.center && slotsData.center.length > 0 ? (
-                    slotsData.center.map((widget, index) => renderWidget(widget, 'center', index))
-                ) : (
-                    <div className="empty-slot">Center column</div>
-                )}
-            </div>
+    if (useCustomStyle) {
+        const style = currentTheme.componentStyles[componentStyle];
 
-            <div className="column-slot right" data-slot="right">
-                {slotsData.right && slotsData.right.length > 0 ? (
-                    slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
-                ) : (
-                    <div className="empty-slot">Right column</div>
-                )}
+        if (style) {
+            try {
+                // Check for passthru mode
+                const isPassthru = style.template?.trim() === '{{passthru}}';
+
+                if (!isPassthru) {
+                    // Prepare context for Mustache rendering
+                    const mustacheContext = prepareComponentContext(
+                        '', // No content for three columns
+                        '',
+                        style.variables || {},
+                        config
+                    );
+
+                    // Use ComponentStyleRenderer for consistent scoped rendering
+                    const styleId = `three-columns-${widgetId || 'preview'}-${componentStyle}`;
+
+                    return (
+                        <ComponentStyleRenderer
+                            template={style.template}
+                            context={mustacheContext}
+                            css={style.css}
+                            styleId={styleId}
+                            className=""
+                        />
+                    );
+                }
+
+                // Passthru mode: render default with custom CSS
+                const styleId = `three-columns-${widgetId || 'preview'}-${componentStyle}`;
+
+                return (
+                    <div data-style-id={styleId}>
+                        {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
+                        {renderDefaultThreeColumns()}
+                    </div>
+                );
+            } catch (error) {
+                console.error('Error rendering custom component style:', error);
+                return (
+                    <div>
+                        <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
+                    </div>
+                );
+            }
+        }
+    }
+
+    // Default rendering helper function
+    function renderDefaultThreeColumns() {
+        return (
+            <div className="three-columns-widget">
+                <div className="column-slot left" data-slot="left">
+                    {slotsData.left && slotsData.left.length > 0 ? (
+                        slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
+                    ) : (
+                        <div className="empty-slot">Left column</div>
+                    )}
+                </div>
+
+                <div className="column-slot center" data-slot="center">
+                    {slotsData.center && slotsData.center.length > 0 ? (
+                        slotsData.center.map((widget, index) => renderWidget(widget, 'center', index))
+                    ) : (
+                        <div className="empty-slot">Center column</div>
+                    )}
+                </div>
+
+                <div className="column-slot right" data-slot="right">
+                    {slotsData.right && slotsData.right.length > 0 ? (
+                        slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
+                    ) : (
+                        <div className="empty-slot">Right column</div>
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    }
+
+    // In display mode, render the default three columns
+    return renderDefaultThreeColumns();
 };
 
 ThreeColumnsWidget.propTypes = {

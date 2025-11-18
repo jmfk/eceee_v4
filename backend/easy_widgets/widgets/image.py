@@ -149,6 +149,15 @@ class ImageConfig(BaseModel):
             "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
         },
     )
+    component_style: str = Field(
+        "default",
+        description="Component style from theme",
+        json_schema_extra={
+            "component": "ComponentStyleSelector",
+            "order": 0,
+            "group": "Display Options",
+        },
+    )
     anchor: str = Field(
         "",
         description="Anchor ID for linking to this section",
@@ -518,6 +527,58 @@ class ImageWidget(BaseWidget):
 
         return template_config
 
+    def render_with_component_style(self, config, theme):
+        """
+        Render image widget with custom component style from theme.
+
+        Args:
+            config: Widget configuration
+            theme: PageTheme instance
+
+        Returns:
+            Tuple of (html, css) or None for default rendering
+        """
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
+        from django.template.loader import render_to_string
+
+        style_name = config.get("component_style", "default")
+        if not style_name or style_name == "default":
+            return None
+
+        styles = theme.component_styles or {}
+        style = styles.get(style_name)
+        if not style:
+            return None
+
+        template_str = style.get("template", "")
+        css = style.get("css", "")
+
+        # Check for passthru marker (must be only content in template after trimming)
+        if template_str.strip() == "{{passthru}}":
+            # Passthru mode: use default rendering but inject CSS
+            return None, css
+
+        # Prepare template context first
+        prepared_config = self.prepare_template_context(config, {"theme": theme})
+
+        # Render the widget HTML using the default template first
+        widget_html = render_to_string(self.template_name, {"config": prepared_config})
+
+        # Prepare context with rendered widget as content
+        context = prepare_component_context(
+            content=widget_html,
+            anchor=prepared_config.get("anchor", ""),
+            style_vars=style.get("variables", {}),
+            config=prepared_config,  # Pass processed config for granular control
+        )
+
+        # Render with style template
+        html = render_mustache(template_str, context)
+        return html, css
+
     def render_with_style(self, config, theme=None):
         """
         Render images using theme's image style with Mustache templates.
@@ -534,6 +595,15 @@ class ImageWidget(BaseWidget):
             prepare_gallery_context,
             prepare_carousel_context,
         )
+
+        # Check for component_style first (takes precedence over image_style)
+        component_style_name = config.get("component_style") or config.get(
+            "componentStyle"
+        )
+        if component_style_name and component_style_name != "default" and theme:
+            result = self.render_with_component_style(config, theme)
+            if result is not None:
+                return result
 
         # Get style name (support both snake_case and camelCase)
         style_name = config.get("image_style") or config.get("imageStyle")

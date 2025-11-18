@@ -5,6 +5,9 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
+import { useTheme } from '../../hooks/useTheme'
+import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
+import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer'
 
 /**
  * EASY Table Widget Component
@@ -31,6 +34,9 @@ const TableWidget = memo(({
     }
     const componentId = `widget-${widgetId}`;
     const contextType = useEditorContext();
+
+    // Get current theme for component styles (TableWidget doesn't have context.pageId, so we don't pass it)
+    const { currentTheme } = useTheme();
 
     useEffect(() => {
         if (!widgetId || !slotName) {
@@ -106,53 +112,118 @@ const TableWidget = memo(({
         )
     }
 
-    return (
-        <div className={`table-widget cms-content ${responsive ? 'overflow-x-auto' : ''}`}>
-            <table className={`border-collapse ${table_width === 'full' ? 'w-full' : 'w-auto'} ${show_borders ? 'border border-gray-300' : ''} ${css_class}`}>
-                {caption && (
-                    <caption className="text-sm font-medium text-gray-700 mb-2">{caption}</caption>
-                )}
-                <tbody>
-                    {rows.map((row, rowIndex) => (
-                        <tr key={rowIndex}
-                            className={`
-                                ${row.is_header ? 'bg-gray-100 font-semibold' : ''} 
-                                ${striped_rows && !row.is_header && rowIndex % 2 === 1 ? 'bg-gray-50' : ''} 
-                                ${hover_effect ? 'hover:bg-gray-100' : ''}
-                                ${row.css_class || ''}
-                            `}
-                            style={row.background_color ? { backgroundColor: row.background_color } : {}}>
-                            {row.cells?.map((cell, cellIndex) => {
-                                const CellTag = row.is_header ? 'th' : 'td'
-                                return (
-                                    <CellTag
-                                        key={cellIndex}
-                                        colSpan={cell.colspan > 1 ? cell.colspan : undefined}
-                                        rowSpan={cell.rowspan > 1 ? cell.rowspan : undefined}
-                                        className={`
-                                            ${show_borders ? 'border border-gray-300' : ''}
-                                            px-3 py-2 text-${cell.alignment || 'left'}
-                                            ${cell.font_weight === 'bold' ? 'font-bold' : ''}
-                                            ${cell.font_style === 'italic' ? 'italic' : ''}
-                                            ${cell.css_class || ''}
-                                        `}
-                                        style={{
-                                            backgroundColor: cell.background_color,
-                                            color: cell.text_color,
-                                            padding: cell.padding,
-                                            border: cell.border
-                                        }}
-                                    >
-                                        <div dangerouslySetInnerHTML={{ __html: cell.content || '' }} />
-                                    </CellTag>
-                                )
-                            })}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    )
+    // Check if using component style with Mustache template
+    const componentStyle = configRef.current.componentStyle || configRef.current.component_style || 'default';
+    const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles;
+
+    if (useCustomStyle) {
+        const style = currentTheme.componentStyles[componentStyle];
+
+        if (style) {
+            try {
+                // Check for passthru mode
+                const isPassthru = style.template?.trim() === '{{passthru}}';
+
+                if (!isPassthru) {
+                    // Prepare context for Mustache rendering
+                    const mustacheContext = prepareComponentContext(
+                        '', // No content for table
+                        caption || '',
+                        style.variables || {},
+                        configRef.current
+                    );
+
+                    // Add table specific context
+                    mustacheContext.rows = rows;
+                    mustacheContext.caption = caption;
+
+                    // Use ComponentStyleRenderer for consistent scoped rendering
+                    const styleId = `table-${widgetId || 'preview'}-${componentStyle}`;
+
+                    return (
+                        <ComponentStyleRenderer
+                            template={style.template}
+                            context={mustacheContext}
+                            css={style.css}
+                            styleId={styleId}
+                            className=""
+                        />
+                    );
+                }
+
+                // Passthru mode: render default with custom CSS
+                const styleId = `table-${widgetId || 'preview'}-${componentStyle}`;
+
+                return (
+                    <div data-style-id={styleId}>
+                        {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
+                        {renderDefaultTable()}
+                    </div>
+                );
+            } catch (error) {
+                console.error('Error rendering custom component style:', error);
+                return (
+                    <div>
+                        <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
+                    </div>
+                );
+            }
+        }
+    }
+
+    // Default rendering helper function
+    function renderDefaultTable() {
+        return (
+            <div className={`table-widget cms-content ${responsive ? 'overflow-x-auto' : ''}`}>
+                <table className={`border-collapse ${table_width === 'full' ? 'w-full' : 'w-auto'} ${show_borders ? 'border border-gray-300' : ''} ${css_class}`}>
+                    {caption && (
+                        <caption className="text-sm font-medium text-gray-700 mb-2">{caption}</caption>
+                    )}
+                    <tbody>
+                        {rows.map((row, rowIndex) => (
+                            <tr key={rowIndex}
+                                className={`
+                                    ${row.is_header ? 'bg-gray-100 font-semibold' : ''} 
+                                    ${striped_rows && !row.is_header && rowIndex % 2 === 1 ? 'bg-gray-50' : ''} 
+                                    ${hover_effect ? 'hover:bg-gray-100' : ''}
+                                    ${row.css_class || ''}
+                                `}
+                                style={row.background_color ? { backgroundColor: row.background_color } : {}}>
+                                {row.cells?.map((cell, cellIndex) => {
+                                    const CellTag = row.is_header ? 'th' : 'td'
+                                    return (
+                                        <CellTag
+                                            key={cellIndex}
+                                            colSpan={cell.colspan > 1 ? cell.colspan : undefined}
+                                            rowSpan={cell.rowspan > 1 ? cell.rowspan : undefined}
+                                            className={`
+                                                ${show_borders ? 'border border-gray-300' : ''}
+                                                px-3 py-2 text-${cell.alignment || 'left'}
+                                                ${cell.font_weight === 'bold' ? 'font-bold' : ''}
+                                                ${cell.font_style === 'italic' ? 'italic' : ''}
+                                                ${cell.css_class || ''}
+                                            `}
+                                            style={{
+                                                backgroundColor: cell.background_color,
+                                                color: cell.text_color,
+                                                padding: cell.padding,
+                                                border: cell.border
+                                            }}
+                                        >
+                                            <div dangerouslySetInnerHTML={{ __html: cell.content || '' }} />
+                                        </CellTag>
+                                    )
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    }
+
+    // Render the default table
+    return renderDefaultTable()
 }, (prevProps, nextProps) => {
     // Custom comparison to prevent re-renders when only object references change
     return (

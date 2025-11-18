@@ -6,7 +6,8 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
-import { renderMustache, prepareGalleryContext, prepareCarouselContext } from '../../utils/mustacheRenderer'
+import { renderMustache, prepareGalleryContext, prepareCarouselContext, prepareComponentContext } from '../../utils/mustacheRenderer'
+import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 
 /**
  * EASY Image Widget Component
@@ -403,7 +404,66 @@ const ImageWidget = ({
         )
     }
 
-    // Check if custom style should be used (Mustache rendering)
+    // Check if using component style with Mustache template (takes precedence over imageStyle)
+    const componentStyle = localConfig.componentStyle || 'default';
+    const useComponentStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles;
+
+    if (useComponentStyle) {
+        const style = currentTheme.componentStyles[componentStyle];
+
+        if (style) {
+            try {
+                // Check for passthru mode
+                const isPassthru = style.template?.trim() === '{{passthru}}';
+
+                if (!isPassthru) {
+                    // Prepare context for Mustache rendering
+                    const mustacheContext = prepareComponentContext(
+                        '', // No content for image
+                        localConfig.anchor || '',
+                        style.variables || {},
+                        localConfig
+                    );
+
+                    // Add image specific context
+                    mustacheContext.mediaItems = items;
+                    mustacheContext.imageCount = items.length;
+
+                    // Use ComponentStyleRenderer for consistent scoped rendering
+                    const styleId = `image-${widgetId || 'preview'}-${componentStyle}`;
+
+                    return (
+                        <ComponentStyleRenderer
+                            template={style.template}
+                            context={mustacheContext}
+                            css={style.css}
+                            styleId={styleId}
+                            className=""
+                        />
+                    );
+                }
+
+                // Passthru mode: render default with custom CSS
+                const styleId = `image-${widgetId || 'preview'}-${componentStyle}`;
+
+                return (
+                    <div data-style-id={styleId}>
+                        {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
+                        {renderDefaultImage()}
+                    </div>
+                );
+            } catch (error) {
+                console.error('Error rendering custom component style:', error);
+                return (
+                    <div>
+                        <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
+                    </div>
+                );
+            }
+        }
+    }
+
+    // Check if custom imageStyle should be used (Mustache rendering)
     // This applies to BOTH editor and preview modes for WYSIWYG consistency
     const useCustomStyle = localConfig.imageStyle && localConfig.imageStyle !== 'default' && items.length > 0
 
@@ -451,62 +511,67 @@ const ImageWidget = ({
         }
     }
 
-    // Default rendering (no custom style selected)
-    if (mode === 'editor') {
-        return (
-            <div className="image-widget-editor p-4">
-                <div className={`${alignmentClasses[resolvedImageStyle.alignment]}`}>
-                    {items.length > 0 ? (
-                        items.length === 1 ? (
-                            // Single image display regardless of displayType setting
-                            <div>
-                                {renderMediaItem(items[0])}
-                                {(localConfig.showCaptions !== false) && items[0].caption && (
-                                    <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
-                                )}
-                            </div>
+    // Helper function for default rendering
+    function renderDefaultImage() {
+        if (mode === 'editor') {
+            return (
+                <div className="image-widget-editor p-4">
+                    <div className={`${alignmentClasses[resolvedImageStyle.alignment]}`}>
+                        {items.length > 0 ? (
+                            items.length === 1 ? (
+                                // Single image display regardless of displayType setting
+                                <div>
+                                    {renderMediaItem(items[0])}
+                                    {(localConfig.showCaptions !== false) && items[0].caption && (
+                                        <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
+                                    )}
+                                </div>
+                            ) : (
+                                // Multiple images: use displayType setting
+                                (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
+                            )
                         ) : (
-                            // Multiple images: use displayType setting
-                            (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
-                        )
-                    ) : (
-                        <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
-                            <Image className="h-8 w-8 mr-2" />
-                            Image placeholder
-                        </div>
-                    )}
+                            <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
+                                <Image className="h-8 w-8 mr-2" />
+                                Image placeholder
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-        )
-    }
+            );
+        }
 
-    if (items.length === 0) {
+        if (items.length === 0) {
+            return (
+                <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]}`}>
+                    <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
+                        <Image className="h-8 w-8 mr-2" />
+                        No media
+                    </div>
+                </div>
+            );
+        }
+
         return (
-            <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]}`}>
-                <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
-                    <Image className="h-8 w-8 mr-2" />
-                    No media
-                </div>
+            <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]} mx-auto`}>
+                {items.length === 1 ? (
+                    // Single image display regardless of displayType setting
+                    <div>
+                        {renderMediaItem(items[0])}
+                        {(localConfig.showCaptions !== false) && items[0].caption && (
+                            <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
+                        )}
+                    </div>
+                ) : (
+                    // Multiple images: use displayType setting
+                    (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
+                )}
             </div>
-        )
+        );
     }
 
-    return (
-        <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]} mx-auto`}>
-            {items.length === 1 ? (
-                // Single image display regardless of displayType setting
-                <div>
-                    {renderMediaItem(items[0])}
-                    {(localConfig.showCaptions !== false) && items[0].caption && (
-                        <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
-                    )}
-                </div>
-            ) : (
-                // Multiple images: use displayType setting
-                (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
-            )}
-        </div>
-    )
+    // Default rendering (no custom style selected)
+    return renderDefaultImage()
 }
 
 // === COLOCATED METADATA ===

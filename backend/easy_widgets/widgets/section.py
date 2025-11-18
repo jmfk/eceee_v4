@@ -206,6 +206,14 @@ class SectionWidget(BaseWidget):
         if not style:
             return None
 
+        template_str = style.get("template", "")
+        css = style.get("css", "")
+
+        # Check for passthru marker (must be only content in template after trimming)
+        if template_str.strip() == "{{passthru}}":
+            # Passthru mode: use default rendering but inject CSS
+            return None, css
+
         # Prepare template context first
         prepared_config = self.prepare_template_context(config, {"theme": theme})
 
@@ -224,8 +232,7 @@ class SectionWidget(BaseWidget):
         )
 
         # Render with style template
-        html = render_mustache(style.get("template", ""), context)
-        css = style.get("css", "")
+        html = render_mustache(template_str, context)
         return html, css
 
     def render(self, config, context=None):

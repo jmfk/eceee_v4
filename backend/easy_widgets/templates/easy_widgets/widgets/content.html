@@ -4,9 +4,9 @@
 {% if custom_style_css %}
 <style>{{ custom_style_css|safe }}</style>
 {% endif %}
-<div class="content-widget widget-type-{{ widget_type.css_class_name }} cms-content">
+<div class="content-widget widget-type-{{ widget_type.css_class_name }}  xl:pl-[80px] xl:pr-[60px] cms-content">
     {% if config.processed_content %}
-        {{ config.processed_content|safe %}
+        {{ config.processed_content|safe }}
     {% else %}
         {{ config.content|sanitize_html:config.allow_scripts }}
     {% endif %}
