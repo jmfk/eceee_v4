@@ -138,9 +138,6 @@ class ContentWidget(BaseWidget):
         line-height: 1.6;
         color: inherit;
     }
-    .content-widget:not(:last-child) {
-        margin-bottom: 30px;
-    }    
 
     .content-widget h1,
     .content-widget h2,

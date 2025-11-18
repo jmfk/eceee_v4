@@ -47,6 +47,8 @@ export { default as ReorderableInput } from './ReorderableInput'
 export { default as RatingInput } from './RatingInput'
 export { default as SegmentedControlInput } from './SegmentedControlInput'
 export { default as NumericStepperInput } from './NumericStepperInput'
+export { default as TwoColumnRatioSelector } from './TwoColumnRatioSelector'
+export { default as ThreeColumnRatioSelector } from './ThreeColumnRatioSelector'
 
 // Media Components
 export { default as ImageInput } from './ImageInput'
@@ -111,6 +113,8 @@ export const FIELD_COMPONENTS = {
     RatingInput: () => import('./RatingInput'),
     SegmentedControlInput: () => import('./SegmentedControlInput'),
     NumericStepperInput: () => import('./NumericStepperInput'),
+    TwoColumnRatioSelector: () => import('./TwoColumnRatioSelector'),
+    ThreeColumnRatioSelector: () => import('./ThreeColumnRatioSelector'),
     // Media Components
     ImageInput: () => import('./ImageInput'),
     FileInput: () => import('./FileInput'),

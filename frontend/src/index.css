@@ -247,6 +247,13 @@ div[style*="z-index"] {
   transition: all 0.2s ease-in-out;
 }
 
+/* Layout Slot Containers - Default flex column with gap */
+.layout-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 30px; /* Default gap - can be overridden by theme design groups */
+}
+
 /* Ensure all rendered content stays below editor UI */
 .rendered-widget {
   position: relative;

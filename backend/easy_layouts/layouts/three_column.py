@@ -14,6 +14,29 @@ class ThreeColumnLayout(BaseLayout):
     template_name = "easy_layouts/layouts/three_column.html"
     css_classes = "layout-three-column"
 
+    layout_parts = {
+        "slot-header": {
+            "label": "Header slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-left-sidebar": {
+            "label": "Left sidebar slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-main": {
+            "label": "Main slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-right-sidebar": {
+            "label": "Right sidebar slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-footer": {
+            "label": "Footer slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+    }
+
     layout_css = """
     /* Three Column Layout CSS Variables */
     :root {

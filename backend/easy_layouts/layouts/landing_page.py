@@ -17,6 +17,25 @@ class LandingPageLayout(BaseLayout):
     template_name = "easy_layouts/layouts/landing_page.html"
     css_classes = "layout-landing-page"
 
+    layout_parts = {
+        "slot-landing-page": {
+            "label": "Landing page slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-header": {
+            "label": "Header slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-navbar": {
+            "label": "Navbar slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-footer": {
+            "label": "Footer slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+    }
+
     layout_css = """
     /* Landing Page Layout CSS Variables */
     :root {

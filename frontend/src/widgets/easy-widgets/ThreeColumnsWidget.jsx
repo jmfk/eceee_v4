@@ -165,6 +165,25 @@ const ThreeColumnsWidget = ({
     // Get filtered widget types for slots
     const filteredWidgetTypes = getFilteredWidgetTypes();
 
+    // Get grid classes based on layout style
+    const getGridClasses = useCallback((layoutStyle) => {
+        if (!layoutStyle) return 'lg:grid-cols-3'
+        
+        // Generate CSS class name matching backend convention
+        const ratioClass = `three-col-ratio-${layoutStyle.replace(/:/g, '-')}`
+        
+        // Also add Tailwind classes for immediate styling
+        const ratioMap = {
+            '3:2:1': 'lg:grid-cols-[3fr_2fr_1fr]',
+            '2:2:2': 'lg:grid-cols-3',
+            '1:2:3': 'lg:grid-cols-[1fr_2fr_3fr]',
+            '1:4:1': 'lg:grid-cols-[1fr_4fr_1fr]',
+        }
+        const tailwindClass = ratioMap[layoutStyle] || 'lg:grid-cols-3'
+        
+        return `${ratioClass} ${tailwindClass}`
+    }, [])
+
     // Render individual widget in a slot (for display mode)
     const renderWidget = useCallback((widget, slotName, index) => {
         const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
@@ -192,9 +211,11 @@ const ThreeColumnsWidget = ({
 
     // Show loading state
     if (mode === 'editor' && isLoadingTypes) {
+        const layoutStyle = config.layoutStyle || config.layout_style || '2:2:2'
+        const gridClasses = getGridClasses(layoutStyle)
         return (
             <div className="three-columns-widget-editor">
-                <div className="columns-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className={`columns-grid grid grid-cols-1 ${gridClasses} gap-4`}>
                     <div className="p-4 text-center text-gray-500">Loading...</div>
                     <div className="p-4 text-center text-gray-500">Loading...</div>
                     <div className="p-4 text-center text-gray-500">Loading...</div>
@@ -205,9 +226,11 @@ const ThreeColumnsWidget = ({
 
     // Show error state
     if (mode === 'editor' && typesError) {
+        const layoutStyle = config.layoutStyle || config.layout_style || '2:2:2'
+        const gridClasses = getGridClasses(layoutStyle)
         return (
             <div className="three-columns-widget-editor">
-                <div className="columns-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className={`columns-grid grid grid-cols-1 ${gridClasses} gap-4`}>
                     <div className="p-4 text-center text-red-500">Error: {typesError.message}</div>
                     <div className="p-4 text-center text-red-500">Error: {typesError.message}</div>
                     <div className="p-4 text-center text-red-500">Error: {typesError.message}</div>
@@ -218,9 +241,11 @@ const ThreeColumnsWidget = ({
 
     // In editor mode, show SlotEditor components
     if (mode === 'editor') {
+        const layoutStyle = config.layoutStyle || config.layout_style || '2:2:2'
+        const gridClasses = getGridClasses(layoutStyle)
         return (
             <div className="three-columns-widget-editor">
-                <div className="columns-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className={`columns-grid grid grid-cols-1 ${gridClasses} gap-4`}>
                     <SlotEditor
                         slotName="left"
                         slotLabel="Left Column"
@@ -342,29 +367,32 @@ const ThreeColumnsWidget = ({
 
     // Default rendering helper function
     function renderDefaultThreeColumns() {
+        const layoutStyle = config.layoutStyle || config.layout_style || '2:2:2'
+        const gridClasses = getGridClasses(layoutStyle)
+
         return (
-            <div className="three-columns-widget">
-                <div className="column-slot left" data-slot="left">
+            <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
+                <div className="three-col-slot left" data-slot="left">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
                     ) : (
-                        <div className="empty-slot">Left column</div>
+                        <div className="three-col-empty-slot">Left column</div>
                     )}
                 </div>
 
-                <div className="column-slot center" data-slot="center">
+                <div className="three-col-slot center" data-slot="center">
                     {slotsData.center && slotsData.center.length > 0 ? (
                         slotsData.center.map((widget, index) => renderWidget(widget, 'center', index))
                     ) : (
-                        <div className="empty-slot">Center column</div>
+                        <div className="three-col-empty-slot">Center column</div>
                     )}
                 </div>
 
-                <div className="column-slot right" data-slot="right">
+                <div className="three-col-slot right" data-slot="right">
                     {slotsData.right && slotsData.right.length > 0 ? (
                         slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
                     ) : (
-                        <div className="empty-slot">Right column</div>
+                        <div className="three-col-empty-slot">Right column</div>
                     )}
                 </div>
             </div>
@@ -423,7 +451,7 @@ ThreeColumnsWidget.slotConfiguration = {
 };
 
 ThreeColumnsWidget.defaultConfig = {
-    layout_style: null,
+    layoutStyle: '2:2:2',
     slots: { left: [], center: [], right: [] }
 };
 

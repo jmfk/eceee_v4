@@ -2,7 +2,7 @@
 Simple two-column widget implementation.
 """
 
-from typing import Type, Optional
+from typing import Type, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -17,15 +17,13 @@ class TwoColumnsConfig(BaseModel):
         populate_by_name=True,
     )
 
-    layout_style: Optional[str] = Field(
-        None,
-        description="Select widget layout",
+    layout_style: Optional[Literal["5:1", "4:2", "3:3", "2:4", "1:5"]] = Field(
+        "3:3",
+        description="Column width ratio",
         json_schema_extra={
-            "component": "SelectInput",
+            "component": "TwoColumnRatioSelector",
             "order": 1,
             "group": "Display Options",
-            "valueListName": "two-column-layout",  # References a value list
-            "placeholder": "Select layout...",
         },
     )
     component_style: str = Field(
@@ -49,34 +47,53 @@ class TwoColumnsWidget(BaseWidget):
     widget_css = """
     .two-columns-widget {
         display: grid;
-        grid-template-columns: 1fr 1fr;
         gap: 1rem;
         width: 100%;
         margin-bottom: 1rem;
     }
     
-    .column-slot {
+    .two-columns-widget.two-col-ratio-5-1 {
+        grid-template-columns: 5fr 1fr;
+    }
+    
+    .two-columns-widget.two-col-ratio-4-2 {
+        grid-template-columns: 2fr 1fr;
+    }
+    
+    .two-columns-widget.two-col-ratio-3-3 {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .two-columns-widget.two-col-ratio-2-4 {
+        grid-template-columns: 1fr 2fr;
+    }
+    
+    .two-columns-widget.two-col-ratio-1-5 {
+        grid-template-columns: 1fr 5fr;
+    }
+    
+    .two-col-slot {
         position: relative;
         min-height: 50px;
     }
     
-    .column-slot.left {
+    .two-col-slot.left {
         grid-area: 1 / 1;
     }
     
-    .column-slot.right {
+    .two-col-slot.right {
         grid-area: 1 / 2;
     }
     
-    .widget-wrapper {
+    .two-col-widget-wrapper {
         margin-bottom: 0.75rem;
     }
     
-    .widget-wrapper:last-child {
+    .two-col-widget-wrapper:last-child {
         margin-bottom: 0;
     }
     
-    .empty-slot {
+    .two-col-empty-slot {
         color: #9ca3af;
         font-style: italic;
         text-align: center;
@@ -93,11 +110,11 @@ class TwoColumnsWidget(BaseWidget):
             grid-template-rows: auto auto;
         }
         
-        .column-slot.left {
+        .two-col-slot.left {
             grid-area: 1 / 1;
         }
         
-        .column-slot.right {
+        .two-col-slot.right {
             grid-area: 2 / 1;
         }
     }
@@ -112,52 +129,54 @@ class TwoColumnsWidget(BaseWidget):
     def render_with_style(self, config, theme):
         """
         Render two-column widget with custom component style from theme.
-        
+
         Args:
             config: Widget configuration
             theme: PageTheme instance
-            
+
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
         from django.template.loader import render_to_string
-        
+
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
             return None
-        
+
         styles = theme.component_styles or {}
         style = styles.get(style_name)
         if not style:
             return None
-        
+
         template_str = style.get("template", "")
         css = style.get("css", "")
-        
+
         # Check for passthru marker (must be only content in template after trimming)
         if template_str.strip() == "{{passthru}}":
             # Passthru mode: use default rendering but inject CSS
             return None, css
-        
+
         # Prepare template context first
         prepared_config = self.prepare_template_context(config, {"theme": theme})
-        
+
         # Render the widget HTML using the default template first
-        widget_html = render_to_string(
-            self.template_name,
-            {"config": prepared_config}
-        )
-        
+        widget_html = render_to_string(self.template_name, {"config": prepared_config})
+
         # Prepare context with rendered widget as content
         context = prepare_component_context(
             content=widget_html,
             anchor="",
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
-            slots=prepared_config.get("rendered_slots"),  # Pass slot data for custom rendering
+            slots=prepared_config.get(
+                "rendered_slots"
+            ),  # Pass slot data for custom rendering
         )
-        
+
         # Render with style template
         html = render_mustache(template_str, context)
         return html, css
@@ -165,6 +184,11 @@ class TwoColumnsWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering like PageVersion"""
         template_config = super().prepare_template_context(config, context)
+
+        # Add ratio CSS class based on layout_style
+        layout_style = config.get("layout_style", "3:3")
+        ratio_class = f"two-col-ratio-{layout_style.replace(':', '-')}"
+        template_config["ratio_class"] = ratio_class
 
         # Get slots data (like PageVersion.widgets)
         slots_data = config.get("slots", {"left": [], "right": []})
@@ -177,9 +201,12 @@ class TwoColumnsWidget(BaseWidget):
                 for index, widget_data in enumerate(widgets):
                     try:
                         # Add sort_order if missing (use array index to preserve order)
-                        if "sort_order" not in widget_data and "order" not in widget_data:
+                        if (
+                            "sort_order" not in widget_data
+                            and "order" not in widget_data
+                        ):
                             widget_data = {**widget_data, "sort_order": index}
-                        
+
                         widget_html = context["renderer"].render_widget_json(
                             widget_data, context
                         )

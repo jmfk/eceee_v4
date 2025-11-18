@@ -2,7 +2,7 @@
 Simple three-column widget implementation.
 """
 
-from typing import Type, Optional
+from typing import Type, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -17,15 +17,13 @@ class ThreeColumnsConfig(BaseModel):
         populate_by_name=True,
     )
 
-    layout_style: Optional[str] = Field(
-        None,
-        description="Select widget layout",
+    layout_style: Optional[Literal["3:2:1", "2:2:2", "1:2:3", "1:4:1"]] = Field(
+        "2:2:2",
+        description="Column width ratio",
         json_schema_extra={
-            "component": "SelectInput",
+            "component": "ThreeColumnRatioSelector",
             "order": 1,
             "group": "Display Options",
-            "valueListName": "three-column-layout",  # References a value list
-            "placeholder": "Select layout...",
         },
     )
     component_style: str = Field(
@@ -51,38 +49,53 @@ class ThreeColumnsWidget(BaseWidget):
     widget_css = """
     .three-columns-widget {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
         gap: 1rem;
         width: 100%;
         margin-bottom: 1rem;
     }
     
-    .column-slot {
+    .three-columns-widget.three-col-ratio-3-2-1 {
+        grid-template-columns: 3fr 2fr 1fr;
+    }
+    
+    .three-columns-widget.three-col-ratio-2-2-2 {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+    
+    .three-columns-widget.three-col-ratio-1-2-3 {
+        grid-template-columns: 1fr 2fr 3fr;
+    }
+    
+    .three-columns-widget.three-col-ratio-1-4-1 {
+        grid-template-columns: 1fr 4fr 1fr;
+    }
+    
+    .three-col-slot {
         position: relative;
         min-height: 50px;
     }
     
-    .column-slot.left {
+    .three-col-slot.left {
         grid-area: 1 / 1;
     }
     
-    .column-slot.center {
+    .three-col-slot.center {
         grid-area: 1 / 2;
     }
     
-    .column-slot.right {
+    .three-col-slot.right {
         grid-area: 1 / 3;
     }
     
-    .widget-wrapper {
+    .three-col-widget-wrapper {
         margin-bottom: 0.75rem;
     }
     
-    .widget-wrapper:last-child {
+    .three-col-widget-wrapper:last-child {
         margin-bottom: 0;
     }
     
-    .empty-slot {
+    .three-col-empty-slot {
         color: #9ca3af;
         font-style: italic;
         text-align: center;
@@ -99,15 +112,15 @@ class ThreeColumnsWidget(BaseWidget):
             grid-template-rows: auto auto;
         }
         
-        .column-slot.left {
+        .three-col-slot.left {
             grid-area: 1 / 1;
         }
         
-        .column-slot.center {
+        .three-col-slot.center {
             grid-area: 1 / 2;
         }
         
-        .column-slot.right {
+        .three-col-slot.right {
             grid-area: 2 / 1 / 2 / 3;
         }
     }
@@ -118,15 +131,15 @@ class ThreeColumnsWidget(BaseWidget):
             grid-template-rows: auto auto auto;
         }
         
-        .column-slot.left {
+        .three-col-slot.left {
             grid-area: 1 / 1;
         }
         
-        .column-slot.center {
+        .three-col-slot.center {
             grid-area: 2 / 1;
         }
         
-        .column-slot.right {
+        .three-col-slot.right {
             grid-area: 3 / 1;
         }
     }
@@ -196,6 +209,11 @@ class ThreeColumnsWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering like PageVersion"""
         template_config = super().prepare_template_context(config, context)
+
+        # Add ratio CSS class based on layout_style
+        layout_style = config.get("layout_style", "2:2:2")
+        ratio_class = f"three-col-ratio-{layout_style.replace(':', '-')}"
+        template_config["ratio_class"] = ratio_class
 
         # Get slots data (like PageVersion.widgets)
         slots_data = config.get("slots", {"left": [], "center": [], "right": []})

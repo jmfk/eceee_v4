@@ -69,7 +69,7 @@ export const LandingPage = ({
 
                 <main className="bg-white min-h-[310px]">
                     <WidgetSlot
-                        name="landing_page"
+                        name="landingPage"
                         label="Landing Page"
                         description="Primary content area for articles and posts"
                         widgets={widgets}

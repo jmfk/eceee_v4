@@ -186,6 +186,26 @@ const TwoColumnsWidget = ({
     // Get filtered widget types for slots
     const filteredWidgetTypes = getFilteredWidgetTypes();
 
+    // Get grid classes based on layout style
+    const getGridClasses = useCallback((layoutStyle) => {
+        if (!layoutStyle) return 'md:grid-cols-2'
+
+        // Generate CSS class name matching backend convention
+        const ratioClass = `two-col-ratio-${layoutStyle.replace(/:/g, '-')}`
+
+        // Also add Tailwind classes for immediate styling
+        const ratioMap = {
+            '5:1': 'md:grid-cols-[5fr_1fr]',
+            '4:2': 'md:grid-cols-[2fr_1fr]',
+            '3:3': 'md:grid-cols-2',
+            '2:4': 'md:grid-cols-[1fr_2fr]',
+            '1:5': 'md:grid-cols-[1fr_5fr]',
+        }
+        const tailwindClass = ratioMap[layoutStyle] || 'md:grid-cols-2'
+
+        return `${ratioClass} ${tailwindClass}`
+    }, [])
+
     // Render individual widget in a slot (for display mode)
     const renderWidget = useCallback((widget, slotName, index) => {
         // Create unique key for widget
@@ -246,9 +266,12 @@ const TwoColumnsWidget = ({
 
     // In editor mode, show SlotEditor components with editable widgets
     if (mode === 'editor') {
+        const layoutStyle = config.layoutStyle || config.layout_style || '3:3'
+        const gridClasses = getGridClasses(layoutStyle)
+
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
-                <div className="column-slot left min-h-[50px]">
+            <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
+                <div className="two-col-slot left min-h-[50px]">
                     <SlotEditor
                         slotName="left"
                         slotLabel="Left Column"
@@ -269,7 +292,7 @@ const TwoColumnsWidget = ({
                         compactAddButton={true} // Show just + icon
                     />
                 </div>
-                <div className="column-slot right min-h-[50px]">
+                <div className="two-col-slot right min-h-[50px]">
                     <SlotEditor
                         slotName="right"
                         slotLabel="Right Column"
@@ -351,16 +374,19 @@ const TwoColumnsWidget = ({
 
     // Default rendering helper function
     function renderDefaultTwoColumns() {
+        const layoutStyle = config.layoutStyle || config.layout_style || '3:3'
+        const gridClasses = getGridClasses(layoutStyle)
+
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
-                <div className="column-slot left min-h-[50px]">
+            <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
+                <div className="two-col-slot left min-h-[50px]">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
                     ) : (
                         <div className="p-4 text-center text-gray-400">Left column</div>
                     )}
                 </div>
-                <div className="column-slot right min-h-[50px]">
+                <div className="two-col-slot right min-h-[50px]">
                     {slotsData.right && slotsData.right.length > 0 ? (
                         slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
                     ) : (
@@ -415,7 +441,7 @@ TwoColumnsWidget.slotConfiguration = {
 };
 
 TwoColumnsWidget.defaultConfig = {
-    layout_style: null,
+    layoutStyle: '3:3',
     slots: { left: [], right: [] }
 };
 

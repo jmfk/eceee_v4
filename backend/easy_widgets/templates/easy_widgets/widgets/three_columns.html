@@ -1,40 +1,39 @@
 {% load security_filters %}
 
-<div class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="three-columns">
-    <div class="column-slot left" data-slot="left">
-        {% if rendered_slots.left %}
-            {% for widget in rendered_slots.left %}
-                <div class="widget-wrapper">
+<div class="three-columns-widget widget-type-{{ widget_type.css_class_name }} {{ config.ratio_class }}" data-widget-type="three-columns">
+    <div class="three-col-slot left" data-slot="left">
+        {% if config.rendered_slots.left %}
+            {% for widget in config.rendered_slots.left %}
+                <div class="three-col-widget-wrapper">
                     {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}
-            <div class="empty-slot">Left column</div>
+            <div class="three-col-empty-slot">Left column</div>
         {% endif %}
     </div>
 
-    <div class="column-slot center" data-slot="center">
-        {% if rendered_slots.center %}
-            {% for widget in rendered_slots.center %}
-                <div class="widget-wrapper">
+    <div class="three-col-slot center" data-slot="center">
+        {% if config.rendered_slots.center %}
+            {% for widget in config.rendered_slots.center %}
+                <div class="three-col-widget-wrapper">
                     {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}
-            <div class="empty-slot">Center column</div>
+            <div class="three-col-empty-slot">Center column</div>
         {% endif %}
     </div>
 
-    <div class="column-slot right" data-slot="right">
-        {% if rendered_slots.right %}
-            {% for widget in rendered_slots.right %}
-                <div class="widget-wrapper">
+    <div class="three-col-slot right" data-slot="right">
+        {% if config.rendered_slots.right %}
+            {% for widget in config.rendered_slots.right %}
+                <div class="three-col-widget-wrapper">
                     {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}
-            <div class="empty-slot">Right column</div>
+            <div class="three-col-empty-slot">Right column</div>
         {% endif %}
     </div>
 </div>
-

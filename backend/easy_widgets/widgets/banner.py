@@ -194,9 +194,6 @@ class BannerWidget(BaseWidget):
         border-radius: 0;
         box-shadow: none;
     }
-    .banner-widget:not(:last-child) {
-        margin-bottom: 30px;
-    }    
     .banner-background {
         position: absolute;
         top: 0;

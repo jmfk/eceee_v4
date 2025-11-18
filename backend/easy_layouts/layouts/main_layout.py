@@ -17,6 +17,33 @@ class MainLayoutLayout(BaseLayout):
     template_name = "easy_layouts/layouts/main_layout.html"
     css_classes = "layout-single-column"
 
+    layout_parts = {
+        "slot-main": {
+            "label": "Main slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-sidebar": {
+            "label": "Sidebar slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-header": {
+            "label": "Header slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-navbar": {
+            "label": "Navbar slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-hero": {
+            "label": "Hero slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-footer": {
+            "label": "Footer slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+    }
+
     layout_css = """
     /* Main Layout CSS Variables */
     :root {

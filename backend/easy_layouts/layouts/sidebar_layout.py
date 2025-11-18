@@ -14,6 +14,33 @@ class SidebarLayout(BaseLayout):
     template_name = "easy_layouts/layouts/sidebar_layout.html"
     css_classes = "layout-sidebar"
 
+    layout_parts = {
+        "slot-header": {
+            "label": "Header slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-main": {
+            "label": "Main slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-sidebar-top": {
+            "label": "Sidebar top slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-sidebar-middle": {
+            "label": "Sidebar middle slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-sidebar-bottom": {
+            "label": "Sidebar bottom slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-footer": {
+            "label": "Footer slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+    }
+
     layout_css = """
     /* Sidebar Layout CSS Variables */
     :root {

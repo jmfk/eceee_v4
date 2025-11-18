@@ -14,6 +14,17 @@ class MinimalLayout(BaseLayout):
     template_name = "easy_layouts/layouts/minimal.html"
     css_classes = "layout-minimal"
 
+    layout_parts = {
+        "slot-header": {
+            "label": "Header slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-content": {
+            "label": "Content slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+    }
+
     layout_css = """
     /* Minimal Layout CSS Variables */
     :root {
