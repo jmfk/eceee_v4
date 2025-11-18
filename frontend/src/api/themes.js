@@ -189,7 +189,33 @@ export const themesApi = {
      */
     clearCache: wrapApiCall(async (themeId) => {
         return api.post(`${endpoints.themes.detail(themeId)}/clear_cache/`)
-    }, 'themes.clearCache')
+    }, 'themes.clearCache'),
+
+    /**
+     * Export a theme as a zip file
+     * @param {number} themeId - Theme ID to export
+     * @returns {Promise<Blob>} Zip file blob
+     */
+    exportTheme: wrapApiCall(async (themeId) => {
+        return api.get(`${endpoints.themes.detail(themeId)}export_theme/`, {
+            responseType: 'blob'
+        })
+    }, 'themes.exportTheme'),
+
+    /**
+     * Import a theme from a zip file
+     * @param {File} zipFile - Zip file containing theme data
+     * @returns {Promise<Object>} Imported theme data
+     */
+    importTheme: wrapApiCall(async (zipFile) => {
+        const formData = new FormData()
+        formData.append('theme_zip', zipFile)
+        return api.post(`${endpoints.themes.list}import_theme/`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.importTheme')
 }
 
 export default themesApi

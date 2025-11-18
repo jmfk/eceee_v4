@@ -19,7 +19,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
 import { useAutoSave } from '../hooks/useAutoSave';
 import {
-    Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw
+    Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw, Clipboard, Download, FileUp
 } from 'lucide-react';
 
 // Import tab components
@@ -33,6 +33,8 @@ import BreakpointsTab from './theme/BreakpointsTab';
 import ImageUpload from './theme/ImageUpload';
 import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
 import CopyButton from './theme/CopyButton';
+import CloneThemeDialog from './theme/CloneThemeDialog';
+import PasteThemeDialog from './theme/PasteThemeDialog';
 
 const ThemeEditor = ({ onSave }) => {
     const { themeId, tab } = useParams();
@@ -42,6 +44,10 @@ const ThemeEditor = ({ onSave }) => {
     const { showConfirm } = useNotificationContext();
     const { addNotification } = useGlobalNotifications();
     const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+    const [themeToClone, setThemeToClone] = useState(null);
+    const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
+    const [themeToPaste, setThemeToPaste] = useState(null);
 
     // Derive view mode from URL
     const isCreating = themeId === 'new';
@@ -367,9 +373,128 @@ const ThemeEditor = ({ onSave }) => {
     };
 
     const handleClone = async (theme) => {
-        const newName = prompt('Enter a name for the cloned theme:', `${theme.name} (Copy)`);
-        if (newName) {
-            cloneMutation.mutate({ id: theme.id, name: newName });
+        setThemeToClone(theme);
+        setCloneDialogOpen(true);
+    };
+
+    const handleCloneConfirm = (newName) => {
+        if (themeToClone && newName) {
+            cloneMutation.mutate({ id: themeToClone.id, name: newName });
+        }
+        setCloneDialogOpen(false);
+        setThemeToClone(null);
+    };
+
+    const handlePaste = (theme) => {
+        setThemeToPaste(theme);
+        setPasteDialogOpen(true);
+    };
+
+    const handlePasteConfirm = async (pastedData) => {
+        console.log('[ThemeEditor] handlePasteConfirm called with:', {
+            themeToPaste,
+            pastedData,
+            pastedDataKeys: Object.keys(pastedData || {}),
+        });
+
+        if (!themeToPaste) {
+            console.error('[ThemeEditor] No theme to paste to!');
+            return;
+        }
+
+        try {
+            // Map the pasted data structure to match API expectations
+            const updateData = {
+                fonts: pastedData.fonts || {},
+                colors: pastedData.colors || {},
+                designGroups: pastedData.designGroups || {},
+                componentStyles: pastedData.componentStyles || {},
+                imageStyles: pastedData.imageStyles || {},
+                galleryStyles: pastedData.galleryStyles || {},
+                carouselStyles: pastedData.carouselStyles || {},
+                tableTemplates: pastedData.tableTemplates || {},
+            };
+
+            console.log('[ThemeEditor] Sending update to API:', {
+                themeId: themeToPaste.id,
+                updateData,
+                updateDataKeys: Object.keys(updateData),
+            });
+
+            // Update the theme
+            const response = await themesApi.update(themeToPaste.id, updateData);
+            console.log('[ThemeEditor] API update response:', response);
+
+            // If there's an image URL in the pasted data, we can't paste it directly
+            // The user would need to manually upload it or use export/import
+            
+            await queryClient.invalidateQueries(['themes']);
+            await queryClient.refetchQueries(['themes']);
+            
+            addNotification({
+                type: 'success',
+                message: `Theme "${themeToPaste.name}" updated with pasted data`,
+            });
+        } catch (error) {
+            console.error('[ThemeEditor] Paste error:', error);
+            addNotification({
+                type: 'error',
+                message: extractErrorMessage(error, 'Failed to paste theme data'),
+            });
+        } finally {
+            setPasteDialogOpen(false);
+            setThemeToPaste(null);
+        }
+    };
+
+    const handleExport = async (theme) => {
+        try {
+            const blob = await themesApi.exportTheme(theme.id);
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `theme_${theme.name.replace(/\s+/g, '_')}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            addNotification({
+                type: 'success',
+                message: `Theme "${theme.name}" exported successfully`,
+            });
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: extractErrorMessage(error, 'Failed to export theme'),
+            });
+        }
+    };
+
+    const handleImport = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const result = await themesApi.importTheme(file);
+            
+            await queryClient.invalidateQueries(['themes']);
+            await queryClient.refetchQueries(['themes']);
+            
+            addNotification({
+                type: 'success',
+                message: result.message || 'Theme imported successfully',
+            });
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: extractErrorMessage(error, 'Failed to import theme'),
+            });
+        } finally {
+            // Reset the file input
+            event.target.value = '';
         }
     };
 
@@ -491,13 +616,25 @@ const ThemeEditor = ({ onSave }) => {
                                 Create and manage themes with fonts, colors, typography, component styles, and table templates
                             </p>
                         </div>
-                        <button
-                            onClick={handleCreateNew}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Create Theme
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                                <FileUp className="w-4 h-4 mr-2" />
+                                Import Theme
+                                <input
+                                    type="file"
+                                    accept=".zip"
+                                    onChange={handleImport}
+                                    className="hidden"
+                                />
+                            </label>
+                            <button
+                                onClick={handleCreateNew}
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create Theme
+                            </button>
+                        </div>
                     </div>
 
                     {/* Search */}
@@ -580,43 +717,63 @@ const ThemeEditor = ({ onSave }) => {
                                     <div className="flex-1"></div>
 
                                     {/* Buttons aligned to bottom */}
-                                    <div className="flex items-center gap-2 mt-auto">
-                                        <button
-                                            onClick={() => handleEditTheme(theme)}
-                                            className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                        >
-                                            <Edit3 className="w-4 h-4 mr-1" />
-                                            Edit
-                                        </button>
-                                        <CopyButton
-                                            data={{
-                                                fonts: theme.fonts || {},
-                                                colors: theme.colors || {},
-                                                typography: theme.typography || { groups: [] },
-                                                componentStyles: theme.componentStyles || {},
-                                                imageStyles: theme.imageStyles || {},
-                                                tableTemplates: theme.tableTemplates || {},
-                                            }}
-                                            level="full"
-                                            iconOnly
-                                            className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                            onSuccess={() => addNotification({ type: 'success', message: `Theme "${theme.name}" copied to clipboard` })}
-                                            onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
-                                        />
-                                        <button
-                                            onClick={() => handleClone(theme)}
-                                            className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                            title="Clone theme"
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(theme)}
-                                            className="inline-flex items-center justify-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
-                                            title="Delete theme"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                    <div className="space-y-2 mt-auto">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => handleEditTheme(theme)}
+                                                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                            >
+                                                <Edit3 className="w-4 h-4 mr-1" />
+                                                Edit
+                                            </button>
+                                            <CopyButton
+                                                data={{
+                                                    fonts: theme.fonts || {},
+                                                    colors: theme.colors || {},
+                                                    designGroups: theme.designGroups || {},
+                                                    componentStyles: theme.componentStyles || {},
+                                                    imageStyles: theme.imageStyles || {},
+                                                    tableTemplates: theme.tableTemplates || {},
+                                                    image: theme.image || null,
+                                                }}
+                                                level="full"
+                                                iconOnly
+                                                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                onSuccess={() => addNotification({ type: 'success', message: `Theme "${theme.name}" copied to clipboard` })}
+                                                onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                                            />
+                                            <button
+                                                onClick={() => handlePaste(theme)}
+                                                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                title="Paste theme data from clipboard"
+                                            >
+                                                <Clipboard className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleClone(theme)}
+                                                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                title="Clone theme"
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(theme)}
+                                                className="inline-flex items-center justify-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
+                                                title="Delete theme"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => handleExport(theme)}
+                                                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                title="Export theme as zip"
+                                            >
+                                                <Download className="w-4 h-4 mr-1" />
+                                                Export
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -838,6 +995,29 @@ const ThemeEditor = ({ onSave }) => {
                     )}
                 </div>
             </div>
+
+            {/* Clone Theme Dialog */}
+            <CloneThemeDialog
+                isOpen={cloneDialogOpen}
+                onClose={() => {
+                    setCloneDialogOpen(false);
+                    setThemeToClone(null);
+                }}
+                onConfirm={handleCloneConfirm}
+                themeName={themeToClone?.name}
+                existingNames={themes.map(t => t.name)}
+            />
+
+            {/* Paste Theme Dialog */}
+            <PasteThemeDialog
+                isOpen={pasteDialogOpen}
+                onClose={() => {
+                    setPasteDialogOpen(false);
+                    setThemeToPaste(null);
+                }}
+                onConfirm={handlePasteConfirm}
+                targetTheme={themeToPaste}
+            />
         </div>
     );
 };

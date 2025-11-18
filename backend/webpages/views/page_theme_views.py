@@ -8,7 +8,11 @@ from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
+from django.core.files.base import ContentFile
 import json
+import zipfile
+import io
+from datetime import datetime
 
 from ..models import PageTheme
 from ..serializers import PageThemeSerializer
@@ -451,5 +455,173 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {"error": f"AI generation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["get"])
+    def export_theme(self, request, pk=None):
+        """
+        Export a theme as a zip file containing:
+        - theme.json (theme data)
+        - metadata.json (name, description, creation date, author, version)
+        - image file (if exists)
+        """
+        theme = self.get_object()
+
+        # Create in-memory zip file
+        zip_buffer = io.BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            # Prepare theme data (exclude image field, we'll handle it separately)
+            theme_data = {
+                "fonts": theme.fonts,
+                "colors": theme.colors,
+                "design_groups": theme.design_groups,
+                "component_styles": theme.component_styles,
+                "image_styles": theme.image_styles,
+                "gallery_styles": theme.gallery_styles,
+                "carousel_styles": theme.carousel_styles,
+                "table_templates": theme.table_templates,
+                "breakpoints": theme.breakpoints,
+                "css_variables": theme.css_variables,
+                "html_elements": theme.html_elements,
+                "custom_css": theme.custom_css,
+                "is_active": theme.is_active,
+            }
+
+            # Write theme data
+            zip_file.writestr(
+                "theme.json", json.dumps(theme_data, indent=2, ensure_ascii=False)
+            )
+
+            # Prepare metadata
+            metadata = {
+                "name": theme.name,
+                "description": theme.description,
+                "created_at": theme.created_at.isoformat(),
+                "updated_at": theme.updated_at.isoformat(),
+                "created_by": (
+                    theme.created_by.username if theme.created_by else None
+                ),
+                "version": "1.0",
+                "export_date": datetime.now().isoformat(),
+            }
+
+            # Write metadata
+            zip_file.writestr(
+                "metadata.json", json.dumps(metadata, indent=2, ensure_ascii=False)
+            )
+
+            # Add image if exists
+            if theme.image:
+                try:
+                    image_name = theme.image.name.split("/")[-1]
+                    zip_file.writestr(f"image/{image_name}", theme.image.read())
+                except Exception as e:
+                    # Log error but continue
+                    print(f"Failed to add image to export: {str(e)}")
+
+        # Prepare response
+        zip_buffer.seek(0)
+        response = HttpResponse(zip_buffer.read(), content_type="application/zip")
+        response["Content-Disposition"] = (
+            f'attachment; filename="theme_{theme.name.replace(" ", "_")}.zip"'
+        )
+
+        return response
+
+    @action(detail=False, methods=["post"])
+    def import_theme(self, request):
+        """
+        Import a theme from a zip file.
+        Expects multipart/form-data with 'theme_zip' file.
+        """
+        if "theme_zip" not in request.FILES:
+            return Response(
+                {"error": "No theme_zip file provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        zip_file = request.FILES["theme_zip"]
+
+        try:
+            # Read zip file
+            with zipfile.ZipFile(zip_file, "r") as zf:
+                # Read theme data
+                if "theme.json" not in zf.namelist():
+                    return Response(
+                        {"error": "Invalid theme zip: missing theme.json"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                theme_data = json.loads(zf.read("theme.json").decode("utf-8"))
+
+                # Read metadata
+                metadata = {}
+                if "metadata.json" in zf.namelist():
+                    metadata = json.loads(zf.read("metadata.json").decode("utf-8"))
+
+                # Generate unique name if name already exists
+                base_name = metadata.get("name", "Imported Theme")
+                name = base_name
+                counter = 1
+                while PageTheme.objects.filter(name=name).exists():
+                    counter += 1
+                    name = f"{base_name} ({counter})"
+
+                # Create theme
+                new_theme = PageTheme.objects.create(
+                    name=name,
+                    description=metadata.get(
+                        "description", "Imported from theme package"
+                    ),
+                    fonts=theme_data.get("fonts", {}),
+                    colors=theme_data.get("colors", {}),
+                    design_groups=theme_data.get("design_groups", {}),
+                    component_styles=theme_data.get("component_styles", {}),
+                    image_styles=theme_data.get("image_styles", {}),
+                    gallery_styles=theme_data.get("gallery_styles", {}),
+                    carousel_styles=theme_data.get("carousel_styles", {}),
+                    table_templates=theme_data.get("table_templates", {}),
+                    breakpoints=theme_data.get("breakpoints", {}),
+                    css_variables=theme_data.get("css_variables", {}),
+                    html_elements=theme_data.get("html_elements", {}),
+                    custom_css=theme_data.get("custom_css", ""),
+                    is_active=theme_data.get("is_active", True),
+                    is_default=False,  # Imported themes are never default
+                    created_by=request.user,
+                )
+
+                # Handle image if exists
+                image_files = [f for f in zf.namelist() if f.startswith("image/")]
+                if image_files:
+                    image_file = image_files[0]
+                    image_name = image_file.split("/")[-1]
+                    image_content = zf.read(image_file)
+                    new_theme.image.save(
+                        image_name, ContentFile(image_content), save=True
+                    )
+
+            serializer = PageThemeSerializer(new_theme, context={"request": request})
+            return Response(
+                {
+                    "message": f"Theme imported successfully as '{name}'",
+                    "theme": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except zipfile.BadZipFile:
+            return Response(
+                {"error": "Invalid zip file"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except json.JSONDecodeError as e:
+            return Response(
+                {"error": f"Invalid JSON in theme package: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to import theme: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

@@ -69,8 +69,8 @@ export const LandingPage = ({
 
                 <main className="bg-white min-h-[310px]">
                     <WidgetSlot
-                        name="main"
-                        label="Main Content"
+                        name="landing_page"
+                        label="Landing Page"
                         description="Primary content area for articles and posts"
                         widgets={widgets}
                         onWidgetAction={onWidgetAction}
@@ -80,7 +80,13 @@ export const LandingPage = ({
                         onClearSlot={onClearSlot}
                         behavior={{
                             slotType: "content",
-                            required: true
+                            required: true,
+                            allowedWidgetTypes: [
+                                'easy_widgets.BannerWidget',
+                                'easy_widgets.HeroWidget',
+                                'easy_widgets.TwoColumnsWidget',
+                                'easy_widgets.ThreeColumnsWidget'
+                            ]
                         }}
                         // Forward inheritance props
                         inheritedWidgets={inheritedWidgets}

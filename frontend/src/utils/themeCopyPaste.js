@@ -31,11 +31,20 @@ export function createCopyPayload(data, level, section = null, itemKey = null) {
 export async function copyToClipboard(data, level, section = null, itemKey = null) {
     try {
         const payload = createCopyPayload(data, level, section, itemKey);
+        console.log('[themeCopyPaste] copyToClipboard payload:', {
+            level,
+            section,
+            itemKey,
+            payloadKeys: Object.keys(payload),
+            dataKeys: Object.keys(payload.data || {}),
+            payload,
+        });
         const jsonString = JSON.stringify(payload, null, 2);
+        console.log('[themeCopyPaste] JSON string length:', jsonString.length);
         await navigator.clipboard.writeText(jsonString);
         return { success: true };
     } catch (error) {
-        console.error('Failed to copy to clipboard:', error);
+        console.error('[themeCopyPaste] Failed to copy to clipboard:', error);
         return { success: false, error: error.message };
     }
 }
@@ -45,30 +54,46 @@ export async function copyToClipboard(data, level, section = null, itemKey = nul
  */
 export function validateCopyData(jsonString) {
     try {
+        console.log('[themeCopyPaste] validateCopyData - parsing JSON...');
         const data = JSON.parse(jsonString);
+        console.log('[themeCopyPaste] validateCopyData - parsed data:', {
+            type: data.type,
+            version: data.version,
+            level: data.level,
+            section: data.section,
+            hasData: !!data.data,
+            dataKeys: data.data ? Object.keys(data.data) : [],
+        });
 
         if (data.type !== COPY_TYPE) {
+            console.error('[themeCopyPaste] validateCopyData - wrong type:', data.type);
             return { valid: false, error: 'Invalid data type. Expected theme-settings data.' };
         }
 
         if (!data.version) {
+            console.error('[themeCopyPaste] validateCopyData - missing version');
             return { valid: false, error: 'Missing version information.' };
         }
 
         if (!['full', 'section', 'item'].includes(data.level)) {
+            console.error('[themeCopyPaste] validateCopyData - invalid level:', data.level);
             return { valid: false, error: 'Invalid level. Must be "full", "section", or "item".' };
         }
 
         if (data.level !== 'full' && !data.section) {
+            console.error('[themeCopyPaste] validateCopyData - missing section for non-full level');
             return { valid: false, error: 'Section is required for section or item level data.' };
         }
 
         if (!data.data) {
+            console.error('[themeCopyPaste] validateCopyData - missing data');
             return { valid: false, error: 'Missing data payload.' };
         }
 
+        console.log('[themeCopyPaste] validateCopyData - validation passed');
         return { valid: true, data };
     } catch (error) {
+        console.error('[themeCopyPaste] validateCopyData - JSON parse error:', error);
         return { valid: false, error: `Invalid JSON: ${error.message}` };
     }
 }
@@ -77,7 +102,10 @@ export function validateCopyData(jsonString) {
  * Parses clipboard data
  */
 export function parseClipboardData(jsonString) {
-    return validateCopyData(jsonString);
+    console.log('[themeCopyPaste] parseClipboardData called');
+    const result = validateCopyData(jsonString);
+    console.log('[themeCopyPaste] parseClipboardData result:', result);
+    return result;
 }
 
 /**
@@ -89,7 +117,7 @@ export function detectConflicts(existingData, newData, section, level) {
 
     if (level === 'full') {
         // Check each section for conflicts
-        const sections = ['fonts', 'colors', 'typography', 'componentStyles', 'galleryStyles', 'carouselStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'galleryStyles', 'carouselStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             const sectionConflicts = detectSectionConflicts(
@@ -138,18 +166,18 @@ function detectSectionConflicts(existing, incoming, sectionName) {
                 });
             }
         });
-    } else if (sectionName === 'typography') {
-        // Typography has groups array
-        // For now, we'll treat the whole typography as a single unit
+    } else if (sectionName === 'designGroups') {
+        // Design Groups has groups array
+        // For now, we'll treat the whole designGroups as a single unit
         // Could be enhanced to detect group-level conflicts
         if (existing.groups && existing.groups.length > 0) {
             conflicts.push({
                 section: sectionName,
-                key: 'typography',
-                type: 'typography',
+                key: 'designGroups',
+                type: 'designGroups',
                 existing,
                 incoming,
-                path: 'typography',
+                path: 'designGroups',
             });
         }
     } else {
@@ -192,8 +220,8 @@ function detectItemConflicts(existing, incoming, sectionName) {
                 path: `googleFonts[${existingIndex}]`,
             });
         }
-    } else if (sectionName === 'typography') {
-        // Typography doesn't support item-level copy
+    } else if (sectionName === 'designGroups') {
+        // Design Groups doesn't support item-level copy
         // Would need group-level support
     } else {
         // For object-based sections
@@ -228,7 +256,7 @@ export function mergeThemeData(existing, incoming, level, section, resolutions =
 
     if (level === 'full') {
         // Merge all sections
-        const sections = ['fonts', 'colors', 'typography', 'componentStyles', 'galleryStyles', 'carouselStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'galleryStyles', 'carouselStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             if (incoming[sectionName]) {
@@ -240,6 +268,11 @@ export function mergeThemeData(existing, incoming, level, section, resolutions =
                 );
             }
         });
+
+        // Also include image if present (metadata, not a section)
+        if (incoming.image) {
+            result.image = incoming.image;
+        }
     } else if (level === 'section') {
         // Merge specific section
         result[section] = mergeSectionData(
@@ -290,8 +323,8 @@ function mergeSectionData(existing, incoming, sectionName, resolutions) {
         });
 
         return { ...existing, googleFonts: mergedFonts };
-    } else if (sectionName === 'typography') {
-        const conflictKey = 'typography';
+    } else if (sectionName === 'designGroups') {
+        const conflictKey = 'designGroups';
         const resolution = resolutions[`${sectionName}.${conflictKey}`];
 
         if (resolution === 'overwrite') {

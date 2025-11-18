@@ -72,16 +72,17 @@ class LandingPageLayout(BaseLayout):
                 header,
                 navbar,
                 {
-                    "name": "main",
-                    "title": "Main Content",
+                    "name": "landing_page",
+                    "title": "Landing Page Main Content",
                     "description": "Primary content area for articles and posts",
                     "max_widgets": None,
-                    "css_classes": "slot-main",
+                    "css_classes": "slot-landing-page",
                     "required": True,
-                    "disallowed_types": [
-                        "easy_widgets.FooterWidget",
-                        "easy_widgets.NavbarWidget",
-                        "easy_widgets.HeaderWidget",
+                    "allowed_types": [
+                        "easy_widgets.BannerWidget",
+                        "easy_widgets.HeroWidget",
+                        "easy_widgets.TwoColumnsWidget",
+                        "easy_widgets.ThreeColumnsWidget",
                     ],
                     "dimensions": {
                         "mobile": {"width": 640, "height": None},

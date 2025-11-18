@@ -30,7 +30,7 @@ export const EASY_LAYOUT_REGISTRY = {
         name: 'landing_page',
         label: 'Landing Page',
         description: 'Full-width landing page layout with hero section and conversion focus',
-        slots: ['header', 'navbar', 'main', 'footer'],
+        slots: ['header', 'navbar', 'landing_page', 'footer'],
         responsive: true
     }
 };
