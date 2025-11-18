@@ -153,3 +153,4 @@ def _extract_dimensions(image_obj: Any) -> Tuple[Optional[int], Optional[int]]:
 
     return None, None
 
+

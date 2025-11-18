@@ -204,36 +204,54 @@ class ContentCardWidget(BaseWidget):
 
     widget_css = """
     .content-card-widget {
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         width: 100%;
-        height: auto;
+        height: 310px;
+        outline: 1px solid #999999;
+        border-width: 0;
         overflow: hidden;
         border-radius: 0;
         box-shadow: none;
+        margin-bottom: 30px;
     }
-    
+    .content-card-header {
+        box-sizing: border-box;
+        height: 140px;
+        padding: 30px;
+        font-size: 36px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 400;
+    }
     .content-card-body {
         display: flex;  
         flex: 1;
         min-height: 0;
+        height: 170px;
+        padding-bottom: 30px;
+        gap: 30px;
     }
-    
+    .content-card-text {
+        flex: 1; 
+        padding: 0px 0px 0px 30px;
+        font-size: 16px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 300;
+        line-height: 22px;
+        overflow: hidden;
+    }
     .content-card-images {
         display: flex;
-        align-items: center;
-        justify-content: center;
+        align-items: top;
+        justify-content: right;
+        padding: 0px 30px 30px 0px;        
     }
     /* Individual image styling - height can be controlled via layout properties */
     .content-card-image {
-        width: auto;
-        height: auto;  /* Default height, can be overridden via layout properties */
+        width: 140px;
+        height: 140px;  /* Default height, can be overridden via layout properties */
         object-fit: cover;
-    }
-    
-    .content-card-images.layout-1 .content-card-image {
-        max-width: auto;
-        max-height:auto;
     }
     
     /* Text positioning */
@@ -252,24 +270,7 @@ class ContentCardWidget(BaseWidget):
     .content-card-body.text-right .content-card-images {
         order: 1;
     }
-    
-    /* Width ratios for text/image splits */
-    .content-card-body.image-count-1 .content-card-text {
-        flex: 2;
-    }
-    
-    .content-card-body.image-count-1 .content-card-images {
-        flex: 1;
-    }
-    
-    .content-card-body.image-count-2 .content-card-text {
-        flex: 1;
-    }
-    
-    .content-card-body.image-count-2 .content-card-images {
-        flex: 1;
-    }
-    
+     
     /* Responsive behavior */
     @media (max-width: 768px) {
         .content-card-body {

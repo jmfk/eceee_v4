@@ -170,81 +170,30 @@ class BannerWidget(BaseWidget):
             "properties": [
                 "width",
                 "height",
-                "minHeight",
-                "maxHeight",
-                "padding",
-                "margin",
-                "position",
-                "display",
-                "flexDirection",
-                "justifyContent",
-                "alignItems",
-            ],
-        },
-        "banner-background": {
-            "label": "Background image area",
-            "properties": [
-                "width",
-                "height",
-                "position",
-                "top",
-                "left",
-                "objectFit",
-                "objectPosition",
-                "opacity",
-                "zIndex",
-            ],
-        },
-        "banner-body": {
-            "label": "Banner body (text + images container)",
-            "properties": [
-                "display",
-                "flex",
-                "minHeight",
-                "flexDirection",
-                "position",
-                "zIndex",
-            ],
-        },
-        "banner-images": {
-            "label": "Foreground images container",
-            "properties": [
-                "gap",
-                "width",
             ],
         },
         "banner-image": {
             "label": "Individual Image",
             "properties": [
+                "width",
                 "height",
-            ],
-        },
-        "banner-text": {
-            "label": "Text content area",
-            "properties": [
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-                "textAlign",
-                "maxWidth",
-                "borderRadius",
-                "boxShadow",
-                "position",
-                "zIndex",
             ],
         },
     }
 
     widget_css = """
     .banner-widget {
-        position: relative;
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         width: 100%;
+        height: 140px;
+        outline: 1px solid #999999;
+        border-width: 0;
         overflow: hidden;
         border-radius: 0;
         box-shadow: none;
+        margin-bottom: 30px;
     }
     
     .banner-background {
@@ -260,40 +209,33 @@ class BannerWidget(BaseWidget):
     }
     
     .banner-body {
-        position: relative;
-        z-index: 1;
-        display: flex;
+        display: flex;  
         flex: 1;
         min-height: 0;
+        height: 140px;
     }
     
     .banner-text {
-        padding: 0;
-        font-size: 12px;
-        line-height: 1.6;
-        overflow-y: auto;
+        flex: 1; 
+        padding: 30px;
+        font-size: 16px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 300;
+        line-height: 22px;
+        overflow: hidden;
     }
     
     .banner-images {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #f9fafb;
+        align-items: top;
+        justify-content: right;
+        padding: 0px; 
     }
-    
-    .banner-images.layout-1 {
-        flex: 1;
-    }
-    
-    .banner-images.layout-2 {
-        flex: 1;
-    }
-    
   
     /* Individual image styling - height can be controlled via layout properties */
     .banner-image {
-        width: 400px;
-        height: 400px;  /* Default height, can be overridden via layout properties */
+        width: 140px;
+        height: 140px;  /* Default height, can be overridden via layout properties */
         object-fit: cover;
     }
     
@@ -312,23 +254,6 @@ class BannerWidget(BaseWidget):
     
     .banner-body.text-right .banner-images {
         order: 1;
-    }
-    
-    /* Width ratios for text/image splits */
-    .banner-body.image-count-1 .banner-text {
-        flex: 2;
-    }
-    
-    .banner-body.image-count-1 .banner-images {
-        flex: 1;
-    }
-    
-    .banner-body.image-count-2 .banner-text {
-        flex: 1;
-    }
-    
-    .banner-body.image-count-2 .banner-images {
-        flex: 1;
     }
     
     /* Responsive behavior */
