@@ -112,33 +112,85 @@ class ContentWidget(BaseWidget):
     description = "Content widget that contains HTML"
     template_name = "easy_widgets/widgets/content.html"
 
-    widget_css = ""
-
-    css_variables = {
-        "content-font": "inherit",
-        "content-line-height": "1.6",
-        "content-color": "inherit",
-        "heading-margin-top": "0",
-        "heading-margin-bottom": "0.5rem",
-        "heading-font-weight": "600",
-        "paragraph-margin": "1rem",
-        "list-margin": "1rem",
-        "list-padding": "1.5rem",
-        "blockquote-border": "4px solid #e5e7eb",
-        "blockquote-padding": "1rem",
-        "blockquote-margin": "1.5rem 0",
-        "blockquote-color": "#6b7280",
-        "code-bg": "#f3f4f6",
-        "code-padding": "0.125rem 0.25rem",
-        "code-radius": "0.25rem",
-        "code-font": "monospace",
-        "code-font-size": "0.875rem",
-        "pre-bg": "#1f2937",
-        "pre-color": "#f9fafb",
-        "pre-padding": "1rem",
-        "pre-radius": "0.5rem",
-        "pre-margin": "1.5rem 0",
+    layout_parts = {
+        "content-widget": {
+            "label": "Content widget container",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+                "fontFamily",
+                "fontSize",
+                "lineHeight",
+            ],
+        },
     }
+
+    widget_css = """
+    .content-widget {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 32px;
+        font-family: inherit;
+        line-height: 1.6;
+        color: inherit;
+    }
+    
+    .content-widget h1,
+    .content-widget h2,
+    .content-widget h3,
+    .content-widget h4,
+    .content-widget h5,
+    .content-widget h6 {
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+    
+    .content-widget p {
+        margin: 1rem 0;
+    }
+    
+    .content-widget ul,
+    .content-widget ol {
+        margin: 1rem 0;
+        padding-left: 1.5rem;
+    }
+    
+    .content-widget blockquote {
+        border-left: 4px solid #e5e7eb;
+        padding: 1rem;
+        margin: 1.5rem 0;
+        color: #6b7280;
+    }
+    
+    .content-widget code {
+        background-color: #f3f4f6;
+        padding: 0.125rem 0.25rem;
+        border-radius: 0.25rem;
+        font-family: monospace;
+        font-size: 0.875rem;
+    }
+    
+    .content-widget pre {
+        background-color: #1f2937;
+        color: #f9fafb;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 1.5rem 0;
+        overflow-x: auto;
+    }
+    
+    .content-widget pre code {
+        background-color: transparent;
+        padding: 0;
+        border-radius: 0;
+        color: inherit;
+    }
+    """
 
     css_scope = "widget"
 
@@ -163,19 +215,23 @@ class ContentWidget(BaseWidget):
         )
 
         style_name = config.get("component_style", "default")
+        
+        # For default style, return None to use standard Django template rendering
         if not style_name or style_name == "default":
             return None
 
         styles = theme.component_styles or {}
         style = styles.get(style_name)
+        
+        # If style not found in theme, fall back to default rendering
         if not style:
             return None
 
-        template = style.get("template", "")
+        template_str = style.get("template", "")
         css = style.get("css", "")
 
         # Check for passthru marker (must be only content in template after trimming)
-        if template.strip() == "{{passthru}}":
+        if template_str.strip() == "{{passthru}}":
             # Passthru mode: use default rendering but inject CSS
             return None, css
 
@@ -188,7 +244,7 @@ class ContentWidget(BaseWidget):
         )
 
         # Render template
-        html = render_mustache(template, context)
+        html = render_mustache(template_str, context)
         return html, css
 
     def prepare_template_context(self, config, context=None):

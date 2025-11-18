@@ -7,11 +7,6 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-from webpages.utils.mustache_renderer import (
-    render_mustache,
-    prepare_component_context,
-)
-from django.template.loader import render_to_string
 
 
 class HeroConfig(BaseModel):
@@ -115,21 +110,15 @@ class HeroWidget(BaseWidget):
 
     layout_parts = {
         "hero-widget": {
-            "label": "Main hero container (root element)",
+            "label": "Main hero container",
             "properties": [
                 "width",
                 "height",
                 "minHeight",
-                "maxHeight",
                 "padding",
                 "margin",
                 "backgroundColor",
                 "color",
-                "position",
-                "display",
-                "flexDirection",
-                "justifyContent",
-                "alignItems",
             ],
         },
         "hero-background": {
@@ -137,13 +126,7 @@ class HeroWidget(BaseWidget):
             "properties": [
                 "width",
                 "height",
-                "position",
-                "top",
-                "left",
-                "objectFit",
-                "objectPosition",
                 "opacity",
-                "zIndex",
             ],
         },
         "hero-content": {
@@ -155,25 +138,56 @@ class HeroWidget(BaseWidget):
                 "color",
                 "textAlign",
                 "maxWidth",
-                "borderRadius",
-                "boxShadow",
-                "position",
-                "zIndex",
+            ],
+        },
+        "hero-header": {
+            "label": "Hero header (h1)",
+            "properties": [
+                "fontFamily",
+                "fontSize",
+                "fontWeight",
+                "lineHeight",
+                "color",
+                "margin",
+            ],
+        },
+        "hero-before-text": {
+            "label": "Before text (h5)",
+            "properties": [
+                "fontFamily",
+                "fontSize",
+                "fontWeight",
+                "lineHeight",
+                "color",
+                "margin",
+            ],
+        },
+        "hero-after-text": {
+            "label": "After text (h6)",
+            "properties": [
+                "fontFamily",
+                "fontSize",
+                "fontWeight",
+                "lineHeight",
+                "color",
+                "margin",
             ],
         },
     }
 
     widget_css = """
     .hero-widget {
+        box-sizing: border-box;
         position: relative;
         padding: 0;
-        background-color: var(--hero-bg-color);
-        color: var(--hero-text-color);
         overflow: hidden;
-        height: var(--hero-height, 310px);
+        height: 310px;
+        width: 100%;
+        background-color: var(--hero-bg-color, #000000);
+        color: var(--hero-text-color, #ffffff);
     }
     
-    .hero-widget .hero-background {
+    .hero-background {
         position: absolute;
         top: 0;
         left: 0;
@@ -185,72 +199,62 @@ class HeroWidget(BaseWidget):
         z-index: 0;
     }
     
-    .hero-widget .hero-content {
+    .hero-content {
         position: relative;
         z-index: 1;
-        max-width: var(--hero-max-width, 1200px);
+        max-width: 1200px;
         margin: 0 auto;
         text-align: center;
         display: flex;
         flex-direction: column;
         justify-content: center;
         height: 100%;
-        padding-bottom: 12px;
+        padding: 30px;
     }
 
     .hero-widget h1 {
         font-family: "Source Sans 3", sans-serif;
-        font-weight: var(--hero-header-font-weight, 500); ;
-        font-size: var(--hero-header-size, 41px);
-        line-height: var(--hero-header-line-height, 44px);
-        margin-top: var(--hero-header-margin-top, 16px);;
-        margin-bottom: var(--hero-header-margin-bottom, 16px);;
+        font-weight: 500;
+        font-size: 41px;
+        line-height: 44px;
+        margin-top: 16px;
+        margin-bottom: 16px;
+        color: var(--hero-text-color, #ffffff);
     }
 
     .hero-widget .before-text {
-        font-size: var(--hero-before-text-size, 24px);
-        line-height: var(--hero-before-text-line-height, 24px);
+        font-size: 24px;
+        line-height: 24px;
         margin: 0;
+        color: var(--hero-decor-color, #cccccc);
     }
     
     .hero-widget .after-text {
-        font-size: var(--hero-after-text-size, 24px);
-        line-height: var(--hero-after-text-line-height, 24px);
+        font-size: 24px;
+        line-height: 24px;
         margin: 0;
+        color: var(--hero-text-color, #ffffff);
     }
-    font-size: 41px;
+    
     @media (max-width: 768px) {
         .hero-widget {
             padding: 0;
         }
         
+        .hero-widget h1 {
+            font-size: 32px;
+            line-height: 36px;
+        }
+        
         .hero-widget .before-text {
-            font-size: var(--hero-before-text-size-mobile, 1rem);
+            font-size: 18px;
         }
         
         .hero-widget .after-text {
-            font-size: var(--hero-after-text-size-mobile, 1.125rem);
+            font-size: 18px;
         }
     }
     """
-
-    css_variables = {
-        "hero-padding": "0",
-        "hero-padding-mobile": "0",
-        "hero-max-width": "1200px",
-        "hero-height": "310px",
-        "hero-height-mobile": "310px",
-        "hero-header-weight": "700",
-        "hero-header-size": "41px",
-        "hero-header-margin-top": "16px",
-        "hero-header-margin-bottom": "16px",
-        "hero-before-text-size": "24px",
-        "hero-before-text-size-mobile": "24px",
-        "hero-before-text-line-height": "24px",
-        "hero-after-text-size": "24px",
-        "hero-after-text-size-mobile": "24px",
-        "hero-after-text-line-height": "24px",
-    }
 
     css_scope = "widget"
 
@@ -269,21 +273,38 @@ class HeroWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
 
         style_name = config.get("component_style", "default")
+
+        # For default style, return None to use standard Django template rendering
         if not style_name or style_name == "default":
             return None
 
         styles = theme.component_styles or {}
         style = styles.get(style_name)
+
+        # If style not found in theme, fall back to default rendering
         if not style:
             return None
+
+        template_str = style.get("template", "")
+        css = style.get("css", "")
+
+        # Check for passthru marker (must be only content in template after trimming)
+        if template_str.strip() == "{{passthru}}":
+            # Passthru mode: use default rendering but inject CSS
+            return None, css
 
         # Prepare template context first
         prepared_config = self.prepare_template_context(config, {"theme": theme})
 
         # Render the hero HTML using the default template first
-        hero_html = render_to_string(self.template_name, {"config": prepared_config})
+        from django.template.loader import render_to_string
+        hero_html = render_to_string(self.template_name, {"config": prepared_config, "widget_type": self})
 
         # Prepare context with rendered hero as content
         context = prepare_component_context(
@@ -294,15 +315,16 @@ class HeroWidget(BaseWidget):
         )
 
         # Render with style template
-        html = render_mustache(style.get("template", ""), context)
-        css = style.get("css", "")
+        html = render_mustache(template_str, context)
         return html, css
 
     def prepare_template_context(self, config, context=None):
-        """Prepare hero template context with image processing and color variables"""
+        """
+        Prepare template context with snake_case field conversions and layout properties.
+        """
         from file_manager.imgproxy import imgproxy_service
-
-        template_config = super().prepare_template_context(config, context)
+        
+        template_config = config.copy() if config else {}
 
         # Build CSS variables for colors
         style_parts = []
@@ -332,5 +354,26 @@ class HeroWidget(BaseWidget):
 
         # Join all style parts
         template_config["hero_style"] = " ".join(style_parts)
+
+        # Extract layout properties from theme for dynamic sizing (similar to Banner/ContentCard)
+        theme = context.get("theme") if context else None
+        if theme and hasattr(theme, "design_groups"):
+            design_groups = theme.design_groups or {}
+            groups = design_groups.get("groups", [])
+
+            # Find layout properties for hero parts
+            for group in groups:
+                layout_props = group.get("layoutProperties") or group.get(
+                    "layout_properties", {}
+                )
+                
+                # Extract properties for hero-widget (main container)
+                if "hero-widget" in layout_props:
+                    part_props = layout_props["hero-widget"]
+                    # Note: Layout properties can be applied via CSS from design groups
+                    # This is just for awareness - actual application happens in rendering
+                
+                # Could extract other hero parts if needed in the future
+                # e.g., hero-content, hero-header, etc.
 
         return template_config
