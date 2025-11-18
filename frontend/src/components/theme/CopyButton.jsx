@@ -26,17 +26,7 @@ const CopyButton = ({
     const handleCopy = async (e) => {
         e.stopPropagation();
 
-        console.log('[CopyButton] Copying data:', {
-            data,
-            level,
-            section,
-            itemKey,
-            dataKeys: Object.keys(data || {}),
-        });
-
         const result = await copyToClipboard(data, level, section, itemKey);
-
-        console.log('[CopyButton] Copy result:', result);
 
         if (result.success) {
             setStatus('success');
@@ -44,7 +34,6 @@ const CopyButton = ({
             setTimeout(() => setStatus('idle'), 2000);
         } else {
             setStatus('error');
-            console.error('[CopyButton] Copy failed:', result.error);
             if (onError) onError(result.error);
             setTimeout(() => setStatus('idle'), 3000);
         }

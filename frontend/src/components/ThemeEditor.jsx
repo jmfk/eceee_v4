@@ -385,22 +385,12 @@ const ThemeEditor = ({ onSave }) => {
     };
 
     const handlePaste = (theme) => {
-        console.log('[ThemeEditor] handlePaste called for theme:', theme?.name);
         setThemeToPaste(theme);
         setPasteDialogOpen(true);
     };
 
     const handlePasteConfirm = async (pastedData) => {
-        console.log('[ThemeEditor] handlePasteConfirm called with:', {
-            themeToPaste,
-            pastedData,
-            pastedDataKeys: Object.keys(pastedData || {}),
-        });
-
-        if (!themeToPaste) {
-            console.error('[ThemeEditor] No theme to paste to!');
-            return;
-        }
+        if (!themeToPaste) return;
 
         setIsPasting(true);
 
@@ -421,18 +411,8 @@ const ThemeEditor = ({ onSave }) => {
                 tableTemplates: pastedData.tableTemplates || {},
             };
 
-            console.log('[ThemeEditor] Sending update to API:', {
-                themeId: themeToPaste.id,
-                updateData,
-                updateDataKeys: Object.keys(updateData),
-            });
-
             // Update the theme
-            const response = await themesApi.update(themeToPaste.id, updateData);
-            console.log('[ThemeEditor] API update response:', response);
-
-            // If there's an image URL in the pasted data, we can't paste it directly
-            // The user would need to manually upload it or use export/import
+            await themesApi.update(themeToPaste.id, updateData);
             
             await queryClient.invalidateQueries(['themes']);
             await queryClient.refetchQueries(['themes']);
@@ -446,7 +426,6 @@ const ThemeEditor = ({ onSave }) => {
             setPasteDialogOpen(false);
             setThemeToPaste(null);
         } catch (error) {
-            console.error('[ThemeEditor] Paste error:', error);
             addNotification({
                 type: 'error',
                 message: extractErrorMessage(error, 'Failed to paste theme data'),

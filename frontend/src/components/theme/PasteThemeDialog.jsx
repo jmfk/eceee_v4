@@ -20,33 +20,21 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
     const readClipboard = async () => {
         setIsLoading(true);
         setError('');
-
+        
         try {
             const text = await navigator.clipboard.readText();
-            console.log('[PasteThemeDialog] Raw clipboard text length:', text.length);
-            console.log('[PasteThemeDialog] Raw clipboard text (first 200 chars):', text.substring(0, 200));
-
             const result = parseClipboardData(text);
-            console.log('[PasteThemeDialog] Parse result:', result);
 
             if (!result.valid) {
-                console.error('[PasteThemeDialog] Invalid clipboard data:', result.error);
                 setError(result.error);
                 setClipboardData(null);
             } else if (result.data.level !== 'full') {
-                console.error('[PasteThemeDialog] Wrong level:', result.data.level);
                 setError('Only full theme data can be pasted. Please copy a complete theme.');
                 setClipboardData(null);
             } else {
-                console.log('[PasteThemeDialog] Valid clipboard data:', {
-                    level: result.data.level,
-                    dataKeys: Object.keys(result.data.data || {}),
-                    data: result.data.data,
-                });
                 setClipboardData(result.data);
             }
         } catch (err) {
-            console.error('[PasteThemeDialog] Error reading clipboard:', err);
             // Show manual paste option instead of error
             setShowManualInput(true);
             setError('');
@@ -57,28 +45,20 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
     };
 
     const handleManualPaste = () => {
-        console.log('[PasteThemeDialog] Manual paste triggered');
         if (!manualInput.trim()) {
             setError('Please paste the theme data into the text area');
             return;
         }
 
         const result = parseClipboardData(manualInput);
-        console.log('[PasteThemeDialog] Manual parse result:', result);
 
         if (!result.valid) {
-            console.error('[PasteThemeDialog] Invalid manual input:', result.error);
             setError(result.error);
             setClipboardData(null);
         } else if (result.data.level !== 'full') {
-            console.error('[PasteThemeDialog] Wrong level from manual input:', result.data.level);
             setError('Only full theme data can be pasted. Please copy a complete theme.');
             setClipboardData(null);
         } else {
-            console.log('[PasteThemeDialog] Valid manual input:', {
-                level: result.data.level,
-                dataKeys: Object.keys(result.data.data || {}),
-            });
             setClipboardData(result.data);
             setError('');
             setShowManualInput(false);
@@ -86,11 +66,6 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
     };
 
     const handleConfirm = () => {
-        console.log('[PasteThemeDialog] Confirming paste with data:', {
-            fullClipboardData: clipboardData,
-            dataOnly: clipboardData?.data,
-            dataKeys: clipboardData?.data ? Object.keys(clipboardData.data) : [],
-        });
         if (clipboardData) {
             onConfirm(clipboardData.data);
         }

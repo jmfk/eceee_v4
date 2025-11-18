@@ -31,20 +31,10 @@ export function createCopyPayload(data, level, section = null, itemKey = null) {
 export async function copyToClipboard(data, level, section = null, itemKey = null) {
     try {
         const payload = createCopyPayload(data, level, section, itemKey);
-        console.log('[themeCopyPaste] copyToClipboard payload:', {
-            level,
-            section,
-            itemKey,
-            payloadKeys: Object.keys(payload),
-            dataKeys: Object.keys(payload.data || {}),
-            payload,
-        });
         const jsonString = JSON.stringify(payload, null, 2);
-        console.log('[themeCopyPaste] JSON string length:', jsonString.length);
         await navigator.clipboard.writeText(jsonString);
         return { success: true };
     } catch (error) {
-        console.error('[themeCopyPaste] Failed to copy to clipboard:', error);
         return { success: false, error: error.message };
     }
 }
@@ -54,46 +44,30 @@ export async function copyToClipboard(data, level, section = null, itemKey = nul
  */
 export function validateCopyData(jsonString) {
     try {
-        console.log('[themeCopyPaste] validateCopyData - parsing JSON...');
         const data = JSON.parse(jsonString);
-        console.log('[themeCopyPaste] validateCopyData - parsed data:', {
-            type: data.type,
-            version: data.version,
-            level: data.level,
-            section: data.section,
-            hasData: !!data.data,
-            dataKeys: data.data ? Object.keys(data.data) : [],
-        });
 
         if (data.type !== COPY_TYPE) {
-            console.error('[themeCopyPaste] validateCopyData - wrong type:', data.type);
             return { valid: false, error: 'Invalid data type. Expected theme-settings data.' };
         }
 
         if (!data.version) {
-            console.error('[themeCopyPaste] validateCopyData - missing version');
             return { valid: false, error: 'Missing version information.' };
         }
 
         if (!['full', 'section', 'item'].includes(data.level)) {
-            console.error('[themeCopyPaste] validateCopyData - invalid level:', data.level);
             return { valid: false, error: 'Invalid level. Must be "full", "section", or "item".' };
         }
 
         if (data.level !== 'full' && !data.section) {
-            console.error('[themeCopyPaste] validateCopyData - missing section for non-full level');
             return { valid: false, error: 'Section is required for section or item level data.' };
         }
 
         if (!data.data) {
-            console.error('[themeCopyPaste] validateCopyData - missing data');
             return { valid: false, error: 'Missing data payload.' };
         }
 
-        console.log('[themeCopyPaste] validateCopyData - validation passed');
         return { valid: true, data };
     } catch (error) {
-        console.error('[themeCopyPaste] validateCopyData - JSON parse error:', error);
         return { valid: false, error: `Invalid JSON: ${error.message}` };
     }
 }
@@ -102,10 +76,7 @@ export function validateCopyData(jsonString) {
  * Parses clipboard data
  */
 export function parseClipboardData(jsonString) {
-    console.log('[themeCopyPaste] parseClipboardData called');
-    const result = validateCopyData(jsonString);
-    console.log('[themeCopyPaste] parseClipboardData result:', result);
-    return result;
+    return validateCopyData(jsonString);
 }
 
 /**
