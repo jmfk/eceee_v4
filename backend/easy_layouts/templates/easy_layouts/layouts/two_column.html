@@ -13,44 +13,23 @@
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-white">
-  <div class="max-w-6xl mx-auto px-4 py-8">
-    <!-- Grid container with 2 columns -->
-    <div class="grid grid-cols-2 gap-8">
+<div class="two-column-container">
+  <div class="two-column-wrapper">
+    <div class="two-column-grid">
       
-      <!-- Header spanning both columns -->
-      <header class="col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4"
-              data-widget-slot="header"
-              data-slot-title="Header"
-              data-slot-description="Page header spanning both columns"
-              data-slot-max-widgets="2">
+      <header class="two-column-header">
         {% render_slot "header" %}
       </header>
       
-      <!-- Main content column -->
-      <main class="col-span-1 bg-white rounded-lg shadow-sm border border-gray-200 p-8"
-            data-widget-slot="main"
-            data-slot-title="Main Content"
-            data-slot-description="Primary content column"
-            data-slot-max-widgets="">
+      <main class="two-column-main">
         {% render_slot "main" %}
       </main>
       
-      <!-- Sidebar column -->
-      <aside class="col-span-1 bg-gray-50 rounded-lg border border-gray-200 p-6"
-             data-widget-slot="sidebar"
-             data-slot-title="Sidebar"
-             data-slot-description="Secondary content sidebar"
-             data-slot-max-widgets="5">
+      <aside class="two-column-sidebar">
         {% render_slot "sidebar" %}
       </aside>
       
-      <!-- Footer spanning both columns -->
-      <footer class="col-span-2 bg-gray-100 rounded-lg border border-gray-200 p-6 mt-4"
-              data-widget-slot="footer"
-              data-slot-title="Footer"
-              data-slot-description="Page footer spanning both columns"
-              data-slot-max-widgets="2">
+      <footer class="two-column-footer">
         {% render_slot "footer" %}
       </footer>
       

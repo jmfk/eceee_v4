@@ -9,4 +9,11 @@ Layouts are automatically registered when this app is imported.
 from . import layout_registry
 
 # Import all layout classes to trigger their registration
-from .layouts import MainLayoutLayout, LandingPageLayout
+from .layouts import (
+    MainLayoutLayout,
+    LandingPageLayout,
+    MinimalLayout,
+    SidebarLayout,
+    ThreeColumnLayout,
+    TwoColumnLayout,
+)

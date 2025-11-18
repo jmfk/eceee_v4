@@ -34,8 +34,8 @@
         {% endif %}
     {% endif %}
     
-    {% if effective_layout.css_classes %}
-        <style>{{ effective_layout.css_classes|safe }}</style>
+    {% if effective_layout and effective_layout.css_content %}
+        <style>{{ effective_layout.css_content|safe }}</style>
     {% endif %}
 {% endblock %}
 

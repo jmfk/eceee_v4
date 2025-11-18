@@ -17,6 +17,54 @@ class LandingPageLayout(BaseLayout):
     template_name = "easy_layouts/layouts/landing_page.html"
     css_classes = "layout-landing-page"
 
+    layout_css = """
+    /* Landing Page Layout CSS Variables */
+    :root {
+        --landing-bg-outer: #9ca3af;
+        --landing-bg-white: #ffffff;
+        --landing-max-width: 1280px;
+        --landing-spacing: 32px;
+        --landing-footer-bg: #1f2937;
+        --landing-footer-min-height: 300px;
+        --landing-main-min-height: 310px;
+    }
+
+    /* Landing Page Container */
+    .landing-page-container {
+        min-height: 100vh;
+        background-color: var(--landing-bg-outer);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Landing Page Inner Wrapper */
+    .landing-page-wrapper {
+        width: 100%;
+        max-width: var(--landing-max-width);
+        margin-left: auto;
+        margin-right: auto;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--landing-bg-white);
+    }
+
+    /* Landing Page Main Content */
+    .landing-page-main {
+        background-color: var(--landing-bg-white);
+        padding: var(--landing-spacing);
+        min-height: var(--landing-main-min-height);
+    }
+
+    /* Landing Page Footer */
+    .landing-page-footer {
+        background-color: var(--landing-footer-bg);
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        padding: var(--landing-spacing);
+        min-height: var(--landing-footer-min-height);
+    }
+    """
+
     @property
     def slot_configuration(self):
         return {

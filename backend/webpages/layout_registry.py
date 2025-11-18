@@ -27,6 +27,11 @@ class BaseLayout(ABC):
     template_name: str = "webpages/page_detail.html"
     css_classes: str = ""
 
+    # CSS injection system (similar to BaseWidget)
+    layout_css: str = ""  # Layout-specific CSS
+    css_variables: Dict[str, str] = {}  # Layout CSS variables
+    css_dependencies: List[str] = []  # External CSS dependencies (URLs)
+
     def __init__(self):
         if self.name is None:
             raise ImproperlyConfigured(
@@ -108,6 +113,11 @@ class BaseLayout(ABC):
     def get_template(self):
         """Get the Django template for this layout."""
         return get_template(self.template_name)
+
+    @property
+    def css_content(self) -> str:
+        """Return the layout CSS content for injection."""
+        return self.layout_css
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert layout to dictionary representation for API serialization."""

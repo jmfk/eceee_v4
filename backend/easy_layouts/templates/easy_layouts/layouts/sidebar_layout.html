@@ -13,54 +13,31 @@
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen p-6 md:p-5 sm:p-4 bg-gray-50 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[2fr_1fr] gap-6 md:gap-5 sm:gap-4 grid-rows-[auto_1fr_auto] md:grid-rows-[auto_1fr_auto]">
+<div class="sidebar-layout-container">
   
-  <header class="col-span-1 md:col-span-3 lg:col-span-2 bg-white p-8 md:p-6 sm:p-5 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between"
-          data-widget-slot="header"
-          data-slot-title="Page Header"
-          data-slot-description="Site navigation, branding, and header content"
-          data-slot-max-widgets="3">
-          {% render_slot "header" %}
+  <header class="sidebar-layout-header">
+    {% render_slot "header" %}
   </header>
 
-  <main class="col-span-1 md:col-span-2 lg:col-span-1 bg-white p-8 md:p-6 sm:p-5 rounded-xl shadow-sm border border-gray-200 overflow-y-auto leading-relaxed text-base"
-        data-widget-slot="main"
-        data-slot-title="Main Content"
-        data-slot-description="Primary content area for articles, posts, and main page content">
-        {% render_slot "main" %}
+  <main class="sidebar-layout-main">
+    {% render_slot "main" %}
   </main>
 
-  <aside class="col-span-1 bg-white p-8 md:p-6 sm:p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-5 text-sm">
-    <div class="pb-5 border-b border-gray-200 last:border-b-0 last:pb-0"
-         data-widget-slot="sidebar-top"
-         data-slot-title="Sidebar Top"
-         data-slot-description="Top sidebar widgets like recent posts, categories, or featured content"
-         data-slot-max-widgets="3">
+  <aside class="sidebar-layout-aside">
+    <div class="sidebar-layout-section">
       {% render_slot "sidebar-top" %}
     </div>
 
-    <div class="pb-5 border-b border-gray-200 last:border-b-0 last:pb-0"
-         data-widget-slot="sidebar-middle"
-         data-slot-title="Sidebar Middle" 
-         data-slot-description="Middle sidebar area for ads, social media, or related content"
-         data-slot-max-widgets="4">
+    <div class="sidebar-layout-section">
       {% render_slot "sidebar-middle" %}
     </div>
 
-    <div class="pb-5 border-b border-gray-200 last:border-b-0 last:pb-0"
-         data-widget-slot="sidebar-bottom"
-         data-slot-title="Sidebar Bottom"
-         data-slot-description="Bottom sidebar widgets for archives, tags, or supplementary content"
-         data-slot-max-widgets="3">
+    <div class="sidebar-layout-section">
       {% render_slot "sidebar-bottom" %}
     </div>
   </aside>
 
-  <footer class="col-span-1 md:col-span-3 lg:col-span-2 bg-gray-700 text-white p-6 md:p-5 rounded-xl text-center"
-          data-widget-slot="footer"
-          data-slot-title="Footer"
-          data-slot-description="Site footer with links, copyright, and contact information"
-          data-slot-max-widgets="2">
+  <footer class="sidebar-layout-footer">
     {% render_slot "footer" %}
   </footer>
 </div>

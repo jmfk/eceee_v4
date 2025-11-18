@@ -17,6 +17,111 @@ class MainLayoutLayout(BaseLayout):
     template_name = "easy_layouts/layouts/main_layout.html"
     css_classes = "layout-single-column"
 
+    layout_css = """
+    /* Main Layout CSS Variables */
+    :root {
+        --main-layout-bg-outer: #9ca3af;
+        --main-layout-bg-white: #ffffff;
+        --main-layout-max-width: 1280px;
+        --main-layout-gap: 30px;
+        --main-layout-padding-x: 40px;
+        --main-layout-padding-y: 30px;
+        --main-layout-footer-bg: #1f2937;
+        --main-layout-footer-min-height: 300px;
+        --main-content-max-width-default: 650px;
+        --main-content-max-width-xl: 790px;
+        --main-sidebar-min-height: 310px;
+    }
+
+    /* Main Layout Container */
+    .main-layout-container {
+        min-height: 100vh;
+        background-color: var(--main-layout-bg-outer);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Main Layout Inner Wrapper */
+    .main-layout-wrapper {
+        width: 100%;
+        max-width: var(--main-layout-max-width);
+        margin-left: auto;
+        margin-right: auto;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--main-layout-bg-white);
+    }
+
+    /* Main Layout Grid */
+    .main-layout-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--main-layout-gap);
+        padding: var(--main-layout-padding-y) var(--main-layout-padding-x);
+        flex: 1;
+        min-height: 300px;
+    }
+
+    /* Main Content Area */
+    .main-layout-main {
+        margin-left: auto;
+        margin-right: auto;
+        padding: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+        max-width: var(--main-content-max-width-default);
+    }
+
+    /* Sidebar Area */
+    .main-layout-aside {
+        display: grid;
+        grid-template-columns: 1fr;
+        min-height: var(--main-sidebar-min-height);
+        gap: var(--main-layout-gap);
+    }
+
+    /* Footer */
+    .main-layout-footer {
+        background-color: var(--main-layout-footer-bg);
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        padding: 32px;
+        min-height: var(--main-layout-footer-min-height);
+    }
+
+    /* Tablet breakpoint (768px and up) */
+    @media (min-width: 768px) {
+        .main-layout-aside {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* Large breakpoint (1024px and up) */
+    @media (min-width: 1024px) {
+        .main-layout-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .main-layout-main {
+            grid-column: span 2;
+        }
+
+        .main-layout-aside {
+            grid-column: span 1;
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* XL breakpoint (1280px and up) */
+    @media (min-width: 1280px) {
+        .main-layout-main {
+            margin-left: 0;
+            margin-right: 0;
+            max-width: var(--main-content-max-width-xl);
+        }
+    }
+    """
+
     @property
     def slot_configuration(self):
         return {

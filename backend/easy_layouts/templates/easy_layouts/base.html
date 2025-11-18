@@ -29,6 +29,11 @@
     <link rel="stylesheet" href="{{ theme_css_url }}" />
     {% endif %}
     
+    <!-- Layout CSS (from code-based layout) -->
+    {% if effective_layout and effective_layout.css_content %}
+    <style>{{ effective_layout.css_content|safe }}</style>
+    {% endif %}
+    
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.1" 
             integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/" 

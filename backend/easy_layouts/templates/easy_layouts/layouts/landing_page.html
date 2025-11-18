@@ -13,17 +13,17 @@
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-400 flex flex-col">
-  <div class="w-full max-w-[1280px] mx-auto flex-1 flex flex-col bg-white">
+<div class="landing-page-container">
+  <div class="landing-page-wrapper">
     
     {% render_slot "header" %}
     {% render_slot "navbar" %}
 
-    <main class="bg-white p-8 min-h-[310px]">
+    <main class="landing-page-main">
       {% render_slot "main" %}
     </main>
 
-    <footer class="bg-gray-800 shadow-sm p-8 min-h-[300px]">
+    <footer class="landing-page-footer">
       {% render_slot "footer" %}
     </footer>
         
