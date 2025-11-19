@@ -38,6 +38,7 @@ const BannerWidget = ({
     // UDC Integration
     const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `bannerwidget-${widgetId || 'preview'}`, [widgetId])
+    const fieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-content`, [widgetId])
     const contextType = useEditorContext()
 
     // State for optimized image URLs
@@ -66,7 +67,7 @@ const BannerWidget = ({
         }
     }, [])
 
-    // Subscribe to external changes via UDC
+    // Subscribe to external changes via UDC (widget-level)
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
@@ -74,6 +75,47 @@ const BannerWidget = ({
         if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
             setConfig(newConfig)
             forceRerender({})
+        }
+    })
+
+    // Subscribe to field-level updates for content field (from form field)
+    // Form publishes with isolated-form-* componentId, so sourceId = isolated-form-*
+    // Widget publishes with bannerwidget-* or field-* componentId, so sourceId = bannerwidget-* or field-*
+    useExternalChanges(fieldComponentId, (state, metadata) => {
+        if (!widgetId || !slotName) {
+            console.log('[BannerWidget] Subscription skipped - missing widgetId or slotName', { widgetId, slotName })
+            return
+        }
+
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+        const newContent = widget?.config?.content
+
+        // Check if update came from this widget's WYSIWYG (self-update)
+        const sourceId = metadata?.sourceId || ''
+        // Self-update if: widget-level (bannerwidget-123) OR field-level (field-123-content) from this widget
+        const isSelfUpdate = sourceId === componentId || sourceId === fieldComponentId
+        // Form publishes with isolated-form-* so it will update WYSIWYG (not self)
+
+        console.log('[BannerWidget] Field-level subscription received', {
+            sourceId,
+            componentId,
+            fieldComponentId,
+            isSelfUpdate,
+            newContent,
+            currentContent: configRef.current.content,
+            contentChanged: newContent !== configRef.current.content
+        })
+
+        if (newContent !== undefined && newContent !== configRef.current.content && !isSelfUpdate) {
+            console.log('[BannerWidget] Updating WYSIWYG from external source (form field)')
+            // External update (from form field with isolated-form-* sourceId) - update WYSIWYG editor
+            if (contentEditorRef.current) {
+                contentEditorRef.current.updateConfig({ content: newContent })
+            }
+            // Also update our config ref
+            setConfig({ ...configRef.current, content: newContent })
+        } else {
+            console.log('[BannerWidget] Skipping update', { reason: isSelfUpdate ? 'self-update' : 'no change' })
         }
     })
 
@@ -164,8 +206,24 @@ const BannerWidget = ({
     // Content change handler - use configRef for stable reference
     const handleContentChange = useCallback((newContent) => {
         if (widgetId && slotName) {
+            console.log('[BannerWidget] handleContentChange called', { widgetId, newContent, fieldComponentId, componentId })
             const updatedConfig = { ...configRef.current, content: newContent }
             setConfig(updatedConfig)
+            
+            // Publish to field-level path for form field sync
+            // Use fieldComponentId so form fields subscribed to field-* path receive the update
+            // sourceId will be field-123-content, which form fields will treat as external (not isolated-form-*)
+            console.log('[BannerWidget] Publishing to field-level path', { fieldComponentId, config: { content: newContent } })
+            publishUpdate(fieldComponentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                config: { content: newContent }, // Only publish the changed field
+                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+                slotName: slotName,
+                contextType: contextType
+            })
+            
+            // Also publish to widget-level for other subscribers
+            console.log('[BannerWidget] Publishing to widget-level path', { componentId, config: updatedConfig })
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: updatedConfig,
@@ -173,11 +231,12 @@ const BannerWidget = ({
                 slotName: slotName,
                 contextType: contextType
             })
+            
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [fieldComponentId, componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
     // Initialize editor in editor mode (only once)
     useEffect(() => {

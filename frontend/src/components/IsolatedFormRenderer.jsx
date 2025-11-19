@@ -22,8 +22,128 @@ const IsolatedFieldWrapper = React.memo(({
     context = {},
     fullSchema = null, // Full schema with $defs for resolving $ref
 }) => {
-    // Get initial value from widget data
-    const initialValue = widgetData?.config?.[fieldName] ?? ''
+    // Extract UDC context
+    const widgetId = context?.widgetId || widgetData?.id
+    const slotName = context?.slotName || widgetData?.slotName || widgetData?.slot
+    const contextType = context?.contextType
+    const widgetPath = context?.widgetPath
+
+    // UDC Integration for field-level updates
+    const { useExternalChanges, getState } = useUnifiedData()
+    const fieldComponentId = useMemo(() =>
+        `field-${widgetId || 'preview'}-${fieldName}`,
+        [widgetId, fieldName]
+    )
+
+    // For content field, subscribe to widget-level componentId to receive WYSIWYG updates
+    // This avoids the self-update filter issue when BannerWidget publishes with fieldComponentId
+    // We'll check sourceId to distinguish form vs widget updates
+    const subscriptionComponentId = useMemo(() => {
+        // Content field needs special handling - subscribe to widget-level to receive WYSIWYG updates
+        // Subscribe to bannerwidget-* pattern to receive updates from BannerWidget
+        if (fieldName === 'content') {
+            // Subscribe to widget-level componentId (bannerwidget-*, etc.)
+            // We'll filter by sourceId to only process field-level updates
+            return `bannerwidget-${widgetId || 'preview'}`
+        }
+        return fieldComponentId
+    }, [fieldName, widgetId, fieldComponentId])
+
+    // Local state for this field to receive external updates
+    const [fieldValue, setFieldValue] = useState(widgetData?.config?.[fieldName] ?? '')
+    const fieldValueRef = useRef(fieldValue)
+
+    // Subscribe to UDC updates for this specific field
+    useExternalChanges(subscriptionComponentId, (state, metadata) => {
+        if (!widgetId || !slotName || !contextType) {
+            console.log('[IsolatedFieldWrapper] Subscription skipped - missing context', { widgetId, slotName, contextType, fieldName })
+            return
+        }
+
+        // For content field, only process if sourceId matches field-level pattern
+        if (fieldName === 'content') {
+            const sourceId = metadata?.sourceId || ''
+            // Only process if sourceId is field-level (from BannerWidget publishing with fieldComponentId)
+            if (!sourceId.startsWith('field-')) {
+                // Not a field-level update, skip
+                return
+            }
+            // Verify it's for this specific field
+            if (sourceId !== fieldComponentId) {
+                // Not for content field, skip
+                return
+            }
+        }
+
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+        const newFieldValue = widget?.config?.[fieldName]
+
+        // Debug log for content field specifically - log EVERYTHING
+        if (fieldName === 'content') {
+            console.log('[IsolatedFieldWrapper] CONTENT FIELD subscription received', {
+                subscriptionComponentId,
+                fieldComponentId,
+                widgetId,
+                slotName,
+                sourceId: metadata?.sourceId,
+                newFieldValue,
+                currentValue: fieldValueRef.current,
+                widgetConfig: widget?.config,
+                fullWidget: widget
+            })
+        }
+
+        console.log('[IsolatedFieldWrapper] Field-level subscription received', {
+            fieldName,
+            fieldComponentId,
+            sourceId: metadata?.sourceId,
+            newFieldValue,
+            currentValue: fieldValueRef.current,
+            valueChanged: newFieldValue !== fieldValueRef.current
+        })
+
+        if (newFieldValue !== undefined && newFieldValue !== fieldValueRef.current) {
+            const sourceId = metadata?.sourceId || ''
+
+            // Extract fieldName from subscription path: field-${widgetId}-${fieldName}
+            // We already have fieldName as prop, but this confirms we're listening to the right field
+
+            // Check if update came from this form field itself (self-update)
+            // Form publishes with isolated-form-* componentId, so sourceId = isolated-form-*
+            const isSelfUpdate = sourceId.startsWith('isolated-form-')
+
+            console.log('[IsolatedFieldWrapper] Processing update', {
+                sourceId,
+                isSelfUpdate,
+                willUpdate: !isSelfUpdate
+            })
+
+            if (!isSelfUpdate) {
+                console.log('[IsolatedFieldWrapper] Updating field from external source (WYSIWYG)')
+                // External update (from WYSIWYG editor with bannerwidget-* or field-* sourceId) - update field value
+                fieldValueRef.current = newFieldValue
+                setFieldValue(newFieldValue)
+            } else {
+                console.log('[IsolatedFieldWrapper] Skipping self-update (silent sync)')
+                // Self update from form field - just sync ref, no rerender
+                fieldValueRef.current = newFieldValue
+            }
+        } else {
+            console.log('[IsolatedFieldWrapper] Skipping update', { reason: newFieldValue === undefined ? 'no value' : 'no change' })
+        }
+    })
+
+    // Sync fieldValue when widgetData prop changes (initial load)
+    useEffect(() => {
+        const propValue = widgetData?.config?.[fieldName] ?? ''
+        if (propValue !== fieldValueRef.current) {
+            fieldValueRef.current = propValue
+            setFieldValue(propValue)
+        }
+    }, [widgetData?.config?.[fieldName], fieldName])
+
+    // Use fieldValue state instead of widgetData for initial value
+    const initialValue = fieldValue
 
     // Hide fields that are managed by special editors
     const hiddenFields = {
@@ -135,12 +255,16 @@ const IsolatedFormRenderer = React.memo(({
 
     // Ref to track current config for ODC synchronization
     const configRef = useRef(initWidgetData?.config || {})
-
-    // State for widget data - triggers re-renders when data changes
-    const [widgetData, setWidgetData] = useState(initWidgetData)
+    // Ref to track last UDC update timestamp to prevent prop sync from overwriting UDC updates
+    const lastUdcUpdateRef = useRef(0)
 
     // Use form data buffer to store changes without re-renders
     const formBuffer = useFormDataBuffer(initWidgetData)
+
+    // Get current widget data from formBuffer (no state, no rerenders)
+    const getCurrentWidgetData = useCallback(() => {
+        return formBuffer.getCurrentData() || initWidgetData
+    }, [formBuffer, initWidgetData])
 
     // Keep original state for schema and type info (these don't change frequently)
     const [schema] = useState(initschema)
@@ -164,28 +288,78 @@ const IsolatedFormRenderer = React.memo(({
     }, [schema, formBuffer])
 
     // Sync initWidgetData prop changes to state and formBuffer
+    // BUT: Don't overwrite if we just received a UDC update (to prevent prop updates from overriding UDC)
     useEffect(() => {
         if (initWidgetData) {
-            setWidgetData(initWidgetData)
+            // Check if this prop update is newer than our last UDC update
+            // If UDC updated recently (within last 100ms), skip prop sync to prevent overwriting
+            const timeSinceLastUdcUpdate = Date.now() - lastUdcUpdateRef.current
+            if (timeSinceLastUdcUpdate < 100) {
+                // UDC update just happened, don't overwrite with stale prop data
+                return
+            }
+
+            // Check if the prop config is actually different from current UDC state
+            const currentUdcConfig = configRef.current
+            const propConfig = initWidgetData?.config || {}
+
+            // If prop config matches UDC config, it's safe to sync (no conflict)
+            // If prop config is different, it might be stale, so check if UDC is newer
+            if (JSON.stringify(propConfig) !== JSON.stringify(currentUdcConfig)) {
+                // Configs differ - UDC is source of truth, don't overwrite
+                return
+            }
+
+            // Safe to sync - configs match or UDC hasn't updated recently
             formBuffer.resetTo(initWidgetData)
             configRef.current = initWidgetData?.config || {}
         }
     }, [initWidgetData, formBuffer])
 
     // ODC External Changes Subscription - Listen for updates from other components
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, (state, metadata) => {
         if (!widgetId || !slotName || !contextType) return
+
+        // Skip updates from field-level sources - those are handled by individual fields
+        // This prevents form rerenders when fields update via field-level subscriptions
+        const sourceId = metadata?.sourceId || ''
+        if (sourceId.startsWith('field-')) {
+            // Field-level updates are handled by IsolatedFieldWrapper subscriptions
+            // Don't update widgetData here to prevent form rerenders
+            // Only sync the config ref silently
+            const widgetPath = context?.widgetPath
+            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+            if (widget && widget.config) {
+                configRef.current = widget.config
+            }
+            return
+        }
+
+        // Also skip save operations - they don't need to trigger form rerenders
+        // Fields will sync from UDC state when needed
+        if (sourceId === 'udc-save-current-version') {
+            console.log('[IsolatedFormRenderer] Skipping save operation update to prevent form rerender')
+            // Save operation completed - just sync config ref, no rerender
+            const widgetPath = context?.widgetPath
+            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+            if (widget && widget.config) {
+                configRef.current = widget.config
+            }
+            return
+        }
 
         const widgetPath = context?.widgetPath
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
+            console.log('[IsolatedFormRenderer] Widget-level subscription updating form', { sourceId })
+            // Mark this as a UDC update to prevent prop sync from overwriting it
+            lastUdcUpdateRef.current = Date.now()
 
             configRef.current = widget.config
             const updatedData = { ...initWidgetData, config: widget.config }
-            // Update form buffer with new config from ODC
+            // Update form buffer with new config from UDC
             formBuffer.resetTo(updatedData)
-            // Update state to trigger smooth re-render with new props
-            setWidgetData(updatedData)
+            // NO setWidgetData() - fields sync via their own subscriptions, no form rerender needed
         }
     })
 
@@ -206,12 +380,13 @@ const IsolatedFormRenderer = React.memo(({
         // Extract widgetPath from context for nested widget support
         const widgetPath = context?.widgetPath
 
+        // Publish with isolated-form componentId so widgets can distinguish form updates
+        // Widgets subscribe to field-* paths but form publishes with isolated-form-* sourceId
         await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetId,
             slotName: slotName,
             contextType: contextType,
-            config: currentData.config,
-            // NEW: Path-based approach (supports infinite nesting)
+            config: { [fieldName]: value }, // Only publish the changed field
             widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
         })
     }, [formBuffer, context, componentId, widgetId, slotName, contextType, publishUpdate])
@@ -238,31 +413,52 @@ const IsolatedFormRenderer = React.memo(({
     // Get the required fields array from the correct location
     const requiredFields = activeSchema?.schema?.required || activeSchema?.required || []
 
+    // Debug: Log which fields are being rendered
+    const renderedFields = Object.entries(schemaProperties)
+        .filter(([fieldName, fieldSchema]) => {
+            // Filter out hidden fields
+            return !fieldSchema.hidden
+        })
+    console.log('[IsolatedFormRenderer] Rendering fields', {
+        fieldNames: renderedFields.map(([name]) => name),
+        hasContentField: renderedFields.some(([name]) => name === 'content'),
+        allSchemaFields: Object.keys(schemaProperties),
+        widgetId,
+        slotName
+    })
+
+    // Debug: Check if content field exists in schema
+    if (schemaProperties.content) {
+        console.log('[IsolatedFormRenderer] Content field schema found', {
+            contentFieldSchema: schemaProperties.content,
+            isHidden: schemaProperties.content.hidden
+        })
+    } else {
+        console.warn('[IsolatedFormRenderer] Content field NOT in schema!', {
+            availableFields: Object.keys(schemaProperties)
+        })
+    }
+
     return (
         <div className="space-y-4 p-4 min-w-0">
-            {Object.entries(schemaProperties)
-                .filter(([fieldName, fieldSchema]) => {
-                    // Filter out hidden fields
-                    return !fieldSchema.hidden
-                })
-                .map(([fieldName, fieldSchema]) => {
-                    const isRequired = requiredFields.includes(fieldName) || false
+            {renderedFields.map(([fieldName, fieldSchema]) => {
+                const isRequired = requiredFields.includes(fieldName) || false
 
-                    return (
-                        <IsolatedFieldWrapper
-                            key={fieldName}
-                            fieldName={fieldName}
-                            fieldSchema={fieldSchema}
-                            widgetData={widgetData}
-                            widgetType={widgetData?.type || ''}
-                            isRequired={isRequired}
-                            onFieldChange={handleFieldChange}
-                            namespace={namespace}
-                            context={context}
-                            fullSchema={activeSchema?.schema || activeSchema}
-                        />
-                    )
-                })}
+                return (
+                    <IsolatedFieldWrapper
+                        key={fieldName}
+                        fieldName={fieldName}
+                        fieldSchema={fieldSchema}
+                        widgetData={getCurrentWidgetData()}
+                        widgetType={getCurrentWidgetData()?.type || ''}
+                        isRequired={isRequired}
+                        onFieldChange={handleFieldChange}
+                        namespace={namespace}
+                        context={context}
+                        fullSchema={activeSchema?.schema || activeSchema}
+                    />
+                )
+            })}
         </div>
     )
 }, (prevProps, nextProps) => {

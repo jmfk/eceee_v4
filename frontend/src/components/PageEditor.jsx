@@ -247,7 +247,14 @@ const PageEditor = () => {
             const isFromIsolatedComponent =
                 sourceId.startsWith('isolated-form-') ||
                 sourceId.startsWith('special-editor-') ||
-                sourceId.startsWith('field-');
+                sourceId.startsWith('field-') ||
+                sourceId.startsWith('bannerwidget-') ||
+                sourceId.startsWith('two-columns-widget-') ||
+                sourceId.startsWith('three-columns-widget-') ||
+                sourceId.startsWith('section-widget-') ||
+                sourceId.startsWith('contentcardwidget-') ||
+                sourceId.startsWith('widget-') || // Generic widget pattern
+                /^[a-z-]+widget-\d+$/.test(sourceId); // Pattern: *widget-{id}
 
             if (isFromIsolatedComponent) {
                 // Isolated components handle their own state and UDC subscriptions
@@ -359,7 +366,7 @@ const PageEditor = () => {
         onSave: saveCurrentVersion,
         delay: 3000,
         isDirty: isDirty && !isNewPage, // Don't auto-save new pages
-        enabled: true
+        enabled: false // TEMPORARILY DISABLED FOR DEBUGGING
     })
 
     // Widget editor panel state
