@@ -457,24 +457,18 @@ const ContentCardWidget = ({
     }
 
     // Default rendering (no custom style)
-    const hasImages = image1 || image2 || image3 || image4
+    const hasContent = configRef.current.header || configRef.current.content || image1 || image2 || image3 || image4
 
     if (mode === 'editor') {
         return (
             <div className="content-card-widget-editor">
-                {!hasImages && (
-                    <div className="bg-gray-200 h-48 flex items-center justify-center text-gray-500 mb-4">
-                        <FileText className="h-8 w-8 mr-2" />
-                        Content Card placeholder - Add images to get started
-                    </div>
-                )}
                 {renderDefaultCard()}
             </div>
         )
     }
 
     // Preview mode
-    if (!hasImages) {
+    if (!hasContent) {
         return (
             <div className="content-card-widget">
                 <div className="bg-gray-200 h-48 flex items-center justify-center text-gray-500">
