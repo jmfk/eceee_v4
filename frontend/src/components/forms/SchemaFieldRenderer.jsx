@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react'
+import React, { Suspense, useMemo, useCallback } from 'react'
 import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
 import { getFieldComponent, FIELD_COMPONENTS } from '../form-fields'
 import { Loader2 } from 'lucide-react'
@@ -198,45 +198,66 @@ const SchemaFieldRenderer = ({
             ...componentProps
         } = fieldSchema
 
-        // Load component asynchronously
-        const FieldComponent = React.lazy(() => {
+        // Memoize FieldComponent
+        const FieldComponent = useMemo(() => React.lazy(() => {
             if (FIELD_COMPONENTS[componentName]) {
                 return FIELD_COMPONENTS[componentName]()
             }
             console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
             return FIELD_COMPONENTS.TextInput()
-        })
+        }), [componentName]) // Only recreate if componentName changes
 
-        const fieldProps = {
-            label: fieldSchema.title || formatFieldLabel(fieldName),
-            description: fieldSchema.description,
+        // Memoize fieldProps
+        const fieldProps = useMemo(() => {
+            const baseProps = {
+                label: fieldSchema.title || formatFieldLabel(fieldName),
+                description: fieldSchema.description,
+                required,
+                disabled,
+                placeholder: fieldSchema.placeholder,
+                namespace: namespace,
+                context: context,
+                ...componentProps
+            }
+
+            // Special handling for ItemsListField - pass itemSchema
+            if (componentName === 'ItemsListField' && fieldSchema.items) {
+                let itemSchema = fieldSchema.items
+
+                // Resolve $ref if present
+                if (itemSchema.$ref && schema && schema.$defs) {
+                    const refPath = itemSchema.$ref.replace('#/$defs/', '')
+                    itemSchema = schema.$defs[refPath] || itemSchema
+                }
+
+                baseProps.itemSchema = itemSchema
+
+                // Handle itemLabelTemplate function - memoize this function
+                if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
+                    const propertyName = componentProps.itemLabelTemplate
+                    baseProps.itemLabelTemplate = useCallback(
+                        (item) => item[propertyName] || '',
+                        [propertyName]
+                    )
+                }
+            }
+
+            return baseProps
+        }, [
+            fieldSchema.title,
+            fieldSchema.description,
+            fieldSchema.placeholder,
+            fieldSchema.items,
+            fieldName,
             required,
             disabled,
-            placeholder: fieldSchema.placeholder,
-            namespace: namespace,
-            context: context,
-            ...componentProps
-        }
+            namespace,
+            context,
+            componentName,
+            componentProps,
+            schema
+        ])
 
-        // Special handling for ItemsListField - pass itemSchema
-        if (componentName === 'ItemsListField' && fieldSchema.items) {
-            let itemSchema = fieldSchema.items
-
-            // Resolve $ref if present
-            if (itemSchema.$ref && schema && schema.$defs) {
-                const refPath = itemSchema.$ref.replace('#/$defs/', '')
-                itemSchema = schema.$defs[refPath] || itemSchema
-            }
-
-            fieldProps.itemSchema = itemSchema
-
-            // Handle itemLabelTemplate function
-            if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
-                // If it's a string, convert to a function that accesses that property
-                const propertyName = componentProps.itemLabelTemplate
-                fieldProps.itemLabelTemplate = (item) => item[propertyName] || ''
-            }
-        }
         return (
             <Suspense fallback={
                 <FieldPlaceholder

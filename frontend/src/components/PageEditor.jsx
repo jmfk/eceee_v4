@@ -233,35 +233,35 @@ const PageEditor = () => {
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
     useExternalChanges(componentId, (state, metadata) => {
+        const sourceId = metadata?.sourceId || '';
+
+        // Check if update came from isolated components FIRST, before any state updates
+        const isFromIsolatedComponent =
+            sourceId.startsWith('isolated-form-') ||
+            sourceId.startsWith('special-editor-') ||
+            sourceId.startsWith('field-') ||
+            sourceId.includes('-field-') || // Field-level updates (bannerwidget-*-field-*)
+            sourceId.startsWith('bannerwidget-') ||
+            sourceId.startsWith('two-columns-widget-') ||
+            sourceId.startsWith('three-columns-widget-') ||
+            sourceId.startsWith('section-widget-') ||
+            sourceId.startsWith('contentcardwidget-') ||
+            sourceId.startsWith('widget-') ||
+            /^[a-z-]+widget-\d+/.test(sourceId);
+
+        if (isFromIsolatedComponent) {
+            // Isolated components handle their own state and UDC subscriptions
+            // Don't update any state to prevent unnecessary rerenders
+            return;
+        }
+
+        // Only update state for non-isolated sources
         setIsDirtyState(state.metadata.isDirty);
 
         // Update local widgets from external UDC changes (other components/users)
         if (versionId && state.versions[versionId]?.widgets) {
             const externalWidgets = state.versions[versionId].widgets;
             setLocalWidgets(externalWidgets);
-
-            // Skip updating pageVersionData if update came from isolated components
-            // These components manage their own state and subscribe to UDC directly
-            // Updating pageVersionData here would cause unnecessary rerenders
-            const sourceId = metadata?.sourceId || '';
-            const isFromIsolatedComponent =
-                sourceId.startsWith('isolated-form-') ||
-                sourceId.startsWith('special-editor-') ||
-                sourceId.startsWith('field-') ||
-                sourceId.startsWith('bannerwidget-') ||
-                sourceId.startsWith('two-columns-widget-') ||
-                sourceId.startsWith('three-columns-widget-') ||
-                sourceId.startsWith('section-widget-') ||
-                sourceId.startsWith('contentcardwidget-') ||
-                sourceId.startsWith('widget-') || // Generic widget pattern
-                /^[a-z-]+widget-\d+$/.test(sourceId); // Pattern: *widget-{id}
-
-            if (isFromIsolatedComponent) {
-                // Isolated components handle their own state and UDC subscriptions
-                // Don't update pageVersionData to prevent unnecessary rerenders
-                // Other components that need these updates subscribe to UDC directly
-                return;
-            }
 
             // Normal update for non-isolated sources (other users, other components, etc.)
             setPageVersionData(prev => ({

@@ -84,6 +84,36 @@ export class SubscriptionManager {
             // Defer callback execution to avoid render-phase conflicts
             queueMicrotask(() => {
                 try {
+                    // Filter: For field-level subscriptions, only notify if sourceId matches componentId pattern
+                    const subscriptionComponentId = subscription.options.componentId;
+                    const operationSourceId = operation?.sourceId || '';
+
+                    console.log("subscriptionComponentId", subscriptionComponentId)
+                    console.log("operationSourceId", operationSourceId)
+
+                    if (subscriptionComponentId && operationSourceId) {
+                        // Check if this is a field-level subscription (starts with "field-")
+                        if (subscriptionComponentId.startsWith('field-')) {
+                            // Extract field name from componentId: field-${widgetId}-${fieldName}
+                            // The fieldName is the last segment after splitting on '-'
+                            const parts = subscriptionComponentId.split('-');
+                            const fieldNameFromComponentId = parts[parts.length - 1]; // e.g., "content" from "field-widget-1763502841353-1-y249k9l5t-content"
+                            
+                            // Check if sourceId contains this field name
+                            // sourceId format: bannerwidget-${widgetId}-field-${fieldName} or isolated-form-${widgetId}-field-${fieldName}
+                            if (operationSourceId.includes('-field-')) {
+                                const fieldNameFromSourceId = operationSourceId.split('-field-')[1];
+                                // Only notify if field names match
+                                if (fieldNameFromSourceId !== fieldNameFromComponentId) {
+                                    return; // Skip this subscription - different field
+                                }
+                            } else {
+                                // sourceId doesn't specify a field, skip field-level subscriptions
+                                return;
+                            }
+                        }
+                    }
+                    
                     let newValue = state;
                     if (subscription.selector) {
                         newValue = subscription.selector(state);

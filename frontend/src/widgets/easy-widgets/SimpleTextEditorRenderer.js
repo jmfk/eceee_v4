@@ -190,7 +190,6 @@ export class SimpleTextEditorRenderer {
     handleContentChange() {
         // Don't trigger onChange if this is an internal change (from setContent)
         if (this.isInternalChange) {
-            console.log('[SimpleTextEditorRenderer] Skipping onChange - internal change')
             return
         }
 
@@ -198,14 +197,9 @@ export class SimpleTextEditorRenderer {
             const content = this.getContent()
             // Only call onChange if content actually changed from last external content
             if (content !== this.lastExternalContent) {
-                console.log('[SimpleTextEditorRenderer] Calling onChange', { content, lastExternalContent: this.lastExternalContent })
                 this.lastExternalContent = content
                 this.options.onChange(content)
-            } else {
-                console.log('[SimpleTextEditorRenderer] Skipping onChange - content unchanged', { content, lastExternalContent: this.lastExternalContent })
             }
-        } else {
-            console.log('[SimpleTextEditorRenderer] No onChange callback provided')
         }
     }
 

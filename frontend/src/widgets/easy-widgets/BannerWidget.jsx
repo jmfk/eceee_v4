@@ -83,7 +83,6 @@ const BannerWidget = ({
     // Widget publishes with bannerwidget-* or field-* componentId, so sourceId = bannerwidget-* or field-*
     useExternalChanges(fieldComponentId, (state, metadata) => {
         if (!widgetId || !slotName) {
-            console.log('[BannerWidget] Subscription skipped - missing widgetId or slotName', { widgetId, slotName })
             return
         }
 
@@ -96,26 +95,13 @@ const BannerWidget = ({
         const isSelfUpdate = sourceId === componentId || sourceId === fieldComponentId
         // Form publishes with isolated-form-* so it will update WYSIWYG (not self)
 
-        console.log('[BannerWidget] Field-level subscription received', {
-            sourceId,
-            componentId,
-            fieldComponentId,
-            isSelfUpdate,
-            newContent,
-            currentContent: configRef.current.content,
-            contentChanged: newContent !== configRef.current.content
-        })
-
         if (newContent !== undefined && newContent !== configRef.current.content && !isSelfUpdate) {
-            console.log('[BannerWidget] Updating WYSIWYG from external source (form field)')
             // External update (from form field with isolated-form-* sourceId) - update WYSIWYG editor
             if (contentEditorRef.current) {
                 contentEditorRef.current.updateConfig({ content: newContent })
             }
             // Also update our config ref
             setConfig({ ...configRef.current, content: newContent })
-        } else {
-            console.log('[BannerWidget] Skipping update', { reason: isSelfUpdate ? 'self-update' : 'no change' })
         }
     })
 
@@ -206,15 +192,14 @@ const BannerWidget = ({
     // Content change handler - use configRef for stable reference
     const handleContentChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            console.log('[BannerWidget] handleContentChange called', { widgetId, newContent, fieldComponentId, componentId })
             const updatedConfig = { ...configRef.current, content: newContent }
             setConfig(updatedConfig)
             
             // Publish to field-level path for form field sync
-            // Use fieldComponentId so form fields subscribed to field-* path receive the update
-            // sourceId will be field-123-content, which form fields will treat as external (not isolated-form-*)
-            console.log('[BannerWidget] Publishing to field-level path', { fieldComponentId, config: { content: newContent } })
-            publishUpdate(fieldComponentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            // Use sourceId with widget type prefix: bannerwidget-${widgetId}-field-content
+            // Content field subscribes to field-${widgetId}-content, so sourceId !== componentId
+            const fieldSourceId = `${componentId}-field-content` // bannerwidget-${widgetId}-field-content
+            publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 config: { content: newContent }, // Only publish the changed field
                 widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
@@ -222,21 +207,15 @@ const BannerWidget = ({
                 contextType: contextType
             })
             
-            // Also publish to widget-level for other subscribers
-            console.log('[BannerWidget] Publishing to widget-level path', { componentId, config: updatedConfig })
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: updatedConfig,
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
+            // REMOVED: Widget-level publish - not needed for form sync
+            // Form only needs field-level updates, and widget-level publish causes form rerenders
+            // If other components need widget-level updates, they can subscribe to field-level paths
             
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [fieldComponentId, componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [fieldComponentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
     // Initialize editor in editor mode (only once)
     useEffect(() => {

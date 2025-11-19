@@ -39,16 +39,38 @@ const LocalStateFieldWrapper = React.memo(({
     const validationTimeoutRef = useRef(null)
     const initializedRef = useRef(false)
     const lastSentValueRef = useRef(initialValue)
+    const fieldRef = useRef(null) // Add this line - ref for direct DOM updates
+
+    // Add a ref to track current value without state updates
+    const currentValueRef = useRef(initialValue)
 
     // Initialize local value when initialValue changes (e.g., form reset)
     useEffect(() => {
-        if (!initializedRef.current || initialValue !== lastSentValueRef.current) {
+        // Only update if value actually changed
+        if (initialValue !== currentValueRef.current) {
+            // Check if this is a textarea/input field by checking the fieldName or component type
+            // For content fields (which are typically textarea), update DOM directly
+            const isTextareaField = fieldName === 'content' ||
+                fieldProps.component === 'Textarea' ||
+                (fieldRef.current && (fieldRef.current.tagName === 'TEXTAREA' || fieldRef.current.tagName === 'INPUT'))
+
+            if (isTextareaField && fieldRef.current) {
+                // Direct DOM update - no rerender needed
+                fieldRef.current.value = initialValue
+                // Sync refs silently - DON'T call setLocalValue
+                currentValueRef.current = initialValue
+                lastSentValueRef.current = initialValue
+                return // Exit early - no state update, no rerender
+            }
+
+            // For other field types, update state normally (will cause rerender)
             setLocalValue(initialValue)
             setIsDirty(false)
+            currentValueRef.current = initialValue
             lastSentValueRef.current = initialValue
             initializedRef.current = true
         }
-    }, [initialValue])
+    }, [initialValue, fieldName, fieldProps.component]) // Remove localValue from dependencies
 
     // Debounced function to notify parent of changes
     const notifyParentChange = useCallback((value) => {
@@ -115,6 +137,13 @@ const LocalStateFieldWrapper = React.memo(({
     const handleChange = useCallback((newValue) => {
         setLocalValue(newValue)
         setIsDirty(true)
+        
+        // Sync ref for textarea fields
+        const isTextareaField = fieldName === 'content' || fieldProps.component === 'Textarea'
+        if (isTextareaField) {
+            currentValueRef.current = newValue
+        }
+        
         // Immediately notify parent for real-time updates
         notifyParentChange(newValue)
 
@@ -122,7 +151,7 @@ const LocalStateFieldWrapper = React.memo(({
         if (validateOnChange) {
             validateField(newValue)
         }
-    }, [notifyParentChange, validateOnChange, validateField])
+    }, [notifyParentChange, validateOnChange, validateField, fieldName, fieldProps.component])
 
     // Handle field blur events
     const handleBlur = useCallback((e) => {
@@ -148,6 +177,9 @@ const LocalStateFieldWrapper = React.memo(({
 
     // Memoize the enhanced field props to prevent unnecessary re-renders
     const enhancedFieldProps = useMemo(() => {
+        // Always use localValue for the value prop - this ensures user input works
+        // For external updates, we update DOM directly in useEffect, but still need state for controlled component
+        
         // Filter out non-DOM props that shouldn't be passed to HTML elements
         const {
             // Remove metadata props
@@ -164,7 +196,7 @@ const LocalStateFieldWrapper = React.memo(({
             ...componentProps
         } = {
             ...fieldProps,
-            value: localValue,
+            value: localValue, // Always use localValue - don't use ref
             onChange: handleChange,
             onBlur: handleBlur,
             onFocus: handleFocus,
@@ -176,11 +208,11 @@ const LocalStateFieldWrapper = React.memo(({
             'data-field-name': fieldName,
             'data-local-state': true
         }
-
+        
         return { ...componentProps, context }
     }, [
         fieldProps,
-        localValue,
+        localValue, // Use localValue in dependencies
         handleChange,
         handleBlur,
         handleFocus,
@@ -203,6 +235,7 @@ const LocalStateFieldWrapper = React.memo(({
             }
         }
     }, [])
+
     // Render the field component with enhanced props
     if (!FieldComponent) {
         return (
