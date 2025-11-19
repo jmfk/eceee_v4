@@ -88,9 +88,6 @@ export class SubscriptionManager {
                     const subscriptionComponentId = subscription.options.componentId;
                     const operationSourceId = operation?.sourceId || '';
 
-                    console.log("subscriptionComponentId", subscriptionComponentId)
-                    console.log("operationSourceId", operationSourceId)
-
                     if (subscriptionComponentId && operationSourceId) {
                         // Check if this is a field-level subscription (starts with "field-")
                         if (subscriptionComponentId.startsWith('field-')) {

@@ -57,6 +57,27 @@ const stripHTML = (html) => {
 }
 
 /**
+ * Check if content is truly empty (handles whitespace, <br> tags, etc.)
+ */
+const isEmptyContent = (content) => {
+    if (!content) return true
+    
+    // Strip HTML and check if only whitespace remains
+    const text = stripHTML(content).trim()
+    if (text.length === 0) return true
+    
+    // Check if content is just a single <br> tag
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = content.trim()
+    const children = Array.from(tempDiv.childNodes)
+    if (children.length === 1 && children[0].tagName === 'BR') {
+        return true
+    }
+    
+    return false
+}
+
+/**
  * SimpleTextEditorRenderer class
  */
 export class SimpleTextEditorRenderer {
@@ -86,6 +107,7 @@ export class SimpleTextEditorRenderer {
         this.handleCommand = this.handleCommand.bind(this)
         this.activate = this.activate.bind(this)
         this.deactivate = this.deactivate.bind(this)
+        this.updateEmptyState = this.updateEmptyState.bind(this)
     }
 
     /**
@@ -108,6 +130,11 @@ export class SimpleTextEditorRenderer {
 
         // Set initial content
         this.setContent(this.options.content)
+        
+        // Update empty state after initial render
+        setTimeout(() => {
+            this.updateEmptyState()
+        }, 0)
     }
 
     /**
@@ -168,6 +195,8 @@ export class SimpleTextEditorRenderer {
         // Reset internal change flag after a tick
         setTimeout(() => {
             this.isInternalChange = false
+            // Update empty state after content is set
+            this.updateEmptyState()
         }, 0)
     }
 
@@ -185,9 +214,52 @@ export class SimpleTextEditorRenderer {
     }
 
     /**
+     * Update empty state class on editor element
+     */
+    updateEmptyState() {
+        if (!this.editorElement) return
+        
+        // Check both the content string and the actual DOM element
+        const content = this.getContent()
+        let isEmpty = isEmptyContent(content)
+        
+        // Also check if the DOM element is visually empty (only has <br> or whitespace)
+        if (!isEmpty) {
+            const children = Array.from(this.editorElement.childNodes)
+            const hasOnlyBr = children.length === 1 && 
+                             children[0].nodeType === Node.ELEMENT_NODE && 
+                             children[0].tagName === 'BR'
+            const hasOnlyText = children.length === 1 && 
+                               children[0].nodeType === Node.TEXT_NODE && 
+                               (!children[0].textContent || children[0].textContent.trim() === '')
+            const hasOnlyWhitespace = children.length > 0 && 
+                                     children.every(node => {
+                                         if (node.nodeType === Node.TEXT_NODE) {
+                                             return !node.textContent || node.textContent.trim() === ''
+                                         }
+                                         if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
+                                             return true
+                                         }
+                                         return false
+                                     })
+            
+            isEmpty = hasOnlyBr || hasOnlyText || hasOnlyWhitespace
+        }
+        
+        if (isEmpty) {
+            this.editorElement.classList.add('is-empty')
+        } else {
+            this.editorElement.classList.remove('is-empty')
+        }
+    }
+
+    /**
      * Handle content change
      */
     handleContentChange() {
+        // Update empty state
+        this.updateEmptyState()
+        
         // Don't trigger onChange if this is an internal change (from setContent)
         if (this.isInternalChange) {
             return
@@ -430,6 +502,10 @@ export class SimpleTextEditorRenderer {
             // AND it's different from what we last set externally
             if (newOptions.content !== currentContent && newOptions.content !== this.lastExternalContent) {
                 this.setContent(newOptions.content)
+                // Update empty state after content is set
+                setTimeout(() => {
+                    this.updateEmptyState()
+                }, 0)
             }
         }
     }

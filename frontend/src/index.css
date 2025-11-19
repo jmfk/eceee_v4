@@ -457,6 +457,27 @@ div[style*="z-index"] {
   border-color: var(--editor-border, #d1d5db);
 }
 
+/* Empty state indicators for WYSIWYG fields (ContentCard, Banner) */
+.simple-text-editor.is-empty,
+.simple-text-editor:empty {
+  background-color: #f9fafb;
+  min-height: 1.5rem;
+}
+
+.simple-text-editor.is-empty::before,
+.simple-text-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Banner widget specific: show background when container has empty editor */
+.banner-text:has(.simple-text-editor.is-empty),
+.banner-text:has(.simple-text-editor:empty) {
+  background-color: #f9fafb;
+}
+
 /* Slot overlay for empty slots in edit mode */
 .widget-slot-container.widget-slot-empty::before {
   content: attr(data-slot-title) " Slot";
