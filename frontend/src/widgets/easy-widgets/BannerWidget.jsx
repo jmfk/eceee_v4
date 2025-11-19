@@ -194,7 +194,7 @@ const BannerWidget = ({
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, content: newContent }
             setConfig(updatedConfig)
-            
+
             // Publish to field-level path for form field sync
             // Use sourceId with widget type prefix: bannerwidget-${widgetId}-field-content
             // Content field subscribes to field-${widgetId}-content, so sourceId !== componentId
@@ -206,11 +206,7 @@ const BannerWidget = ({
                 slotName: slotName,
                 contextType: contextType
             })
-            
-            // REMOVED: Widget-level publish - not needed for form sync
-            // Form only needs field-level updates, and widget-level publish causes form rerenders
-            // If other components need widget-level updates, they can subscribe to field-level paths
-            
+
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }

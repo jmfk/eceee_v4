@@ -201,7 +201,7 @@ const ContentCardWidget = ({
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, header: newContent }
             setConfig(updatedConfig)
-            
+
             // Publish to field-level path for form field sync
             // Use sourceId with widget type prefix: contentcardwidget-${widgetId}-field-header
             const fieldSourceId = `${componentId}-field-header` // contentcardwidget-${widgetId}-field-header
@@ -212,7 +212,7 @@ const ContentCardWidget = ({
                 slotName: slotName,
                 contextType: contextType
             })
-            
+
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
@@ -223,7 +223,7 @@ const ContentCardWidget = ({
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, content: newContent }
             setConfig(updatedConfig)
-            
+
             // Publish to field-level path for form field sync
             // Use sourceId with widget type prefix: contentcardwidget-${widgetId}-field-content
             const fieldSourceId = `${componentId}-field-content` // contentcardwidget-${widgetId}-field-content
@@ -234,7 +234,7 @@ const ContentCardWidget = ({
                 slotName: slotName,
                 contextType: contextType
             })
-            
+
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }

@@ -214,6 +214,15 @@ export function UnifiedDataProvider({
         };
 
         await manager.dispatch(operation);
+
+        // Automatically set dirty flag when widget config is updated
+        if (type === OperationTypes.UPDATE_WIDGET_CONFIG) {
+            manager.dispatch({
+                type: OperationTypes.SET_DIRTY,
+                sourceId: undefined,
+                payload: { isDirty: true }
+            });
+        }
     }, [manager]);
 
     // Save to current version using granular smart save API
