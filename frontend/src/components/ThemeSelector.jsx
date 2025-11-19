@@ -22,14 +22,6 @@ const ThemeSelector = ({
     const [showPreview, setShowPreview] = useState(false)
     const { addNotification } = useGlobalNotifications()
 
-    // Normalize inheritance info to handle both old and new structure
-    // NEW structure (from backend): { inheritedFrom: {id, title, slug}, effectiveTheme, ... }
-    // OLD structure (client-built): { source: 'inherited', inheritedFrom: {pageTitle, ...} }
-    const isInherited = themeInheritanceInfo?.inheritedFrom || themeInheritanceInfo?.source === 'inherited'
-    const inheritedFromPage = themeInheritanceInfo?.inheritedFrom?.title || 
-                              themeInheritanceInfo?.inheritedFrom?.pageTitle ||
-                              null
-
     // Fetch available themes
     const { data: themes = [], isLoading, error } = useQuery({
         queryKey: ['themes'],
@@ -151,13 +143,13 @@ const ThemeSelector = ({
             </div>
 
             {/* Theme Inheritance Status Banner */}
-            {isInherited && inheritedFromPage && (
+            {themeInheritanceInfo && themeInheritanceInfo.source === 'inherited' && themeInheritanceInfo.inheritedFrom && (
                 <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                             <Palette className="w-4 h-4 text-blue-600" />
                             <span className="text-sm text-blue-900">
-                                Theme inherited from <span className="font-medium">{inheritedFromPage}</span>
+                                Theme inherited from <span className="font-medium">{themeInheritanceInfo.inheritedFrom.pageTitle}</span>
                             </span>
                         </div>
 
@@ -228,7 +220,7 @@ const ThemeSelector = ({
                                                                     )}
                                                                     {isEffective && (
                                                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                                            {isInherited ? 'Inherited' : 'Active (Default)'}
+                                                                            {themeInheritanceInfo?.source === 'inherited' ? 'Inherited' : 'Active (Default)'}
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -353,7 +345,7 @@ const ThemeSelector = ({
                                                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                             }`}
                                                     >
-                                                        {isSelected ? 'Currently Selected' : isEffective ? (isInherited ? 'Inherited (Click to Override)' : 'Using Default (Click to Override)') : 'Select Theme'}
+                                                        {isSelected ? 'Currently Selected' : isEffective ? (themeInheritanceInfo?.source === 'inherited' ? 'Inherited (Click to Override)' : 'Using Default (Click to Override)') : 'Select Theme'}
                                                     </button>
                                                 </div>
                                             </div>

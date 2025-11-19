@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react'
 import { X, RefreshCw, Save, HelpCircle } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
@@ -368,8 +368,37 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData, schema])
 
-    if (!isOpen) return null
+    // Memoize context object to prevent unnecessary rerenders of IsolatedFormRenderer
+    const memoizedContext = useMemo(() => {
+        if (!widgetData) return {}
+        return {
+            ...(widgetData?.context || {}),
+            widgetId: widgetData?.id,
+            slotName: widgetData?.slotName || widgetData?.slot,
+            mode: 'edit',
+            contextType,
+            pageId: context?.pageId || webpageData?.id,
+            versionId: context?.versionId || pageVersionData?.versionId,
+            webpageData: context?.webpageData || webpageData,
+            pageVersionData: context?.pageVersionData || pageVersionData,
+            theme: pageVersionData?.effectiveTheme
+        }
+    }, [
+        widgetData?.id,
+        widgetData?.slotName,
+        widgetData?.slot,
+        widgetData?.context,
+        contextType,
+        context?.pageId,
+        context?.versionId,
+        context?.webpageData,
+        context?.pageVersionData,
+        webpageData?.id,
+        pageVersionData?.versionId,
+        pageVersionData?.effectiveTheme
+    ])
 
+    if (!isOpen) return null
     return (
         <>
             {/* Backdrop overlay for mobile */}
@@ -509,18 +538,7 @@ const WidgetEditorPanel = forwardRef(({
                                     contextType={contextType}
                                     widgetId={widgetData?.id}
                                     slotName={widgetData?.slotName || widgetData?.slot}
-                                    context={{
-                                        ...(widgetData?.context || {}),
-                                        widgetId: widgetData?.id,
-                                        slotName: widgetData?.slotName || widgetData?.slot,
-                                        mode: 'edit',
-                                        contextType,
-                                        pageId: context?.pageId || webpageData?.id,
-                                        versionId: context?.versionId || pageVersionData?.versionId,
-                                        webpageData: context?.webpageData || webpageData,
-                                        pageVersionData: context?.pageVersionData || pageVersionData,
-                                        theme: pageVersionData?.effectiveTheme
-                                    }}
+                                    context={memoizedContext}
                                 />
                                 <WidgetPublishingInheritanceFields
                                     widgetData={widgetData}

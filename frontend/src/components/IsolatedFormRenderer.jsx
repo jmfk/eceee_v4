@@ -163,6 +163,15 @@ const IsolatedFormRenderer = React.memo(({
         }
     }, [schema, formBuffer])
 
+    // Sync initWidgetData prop changes to state and formBuffer
+    useEffect(() => {
+        if (initWidgetData) {
+            setWidgetData(initWidgetData)
+            formBuffer.resetTo(initWidgetData)
+            configRef.current = initWidgetData?.config || {}
+        }
+    }, [initWidgetData, formBuffer])
+
     // ODC External Changes Subscription - Listen for updates from other components
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName || !contextType) return
@@ -188,9 +197,11 @@ const IsolatedFormRenderer = React.memo(({
 
         // Get updated config for real-time updates
         const currentData = formBuffer.getCurrentData()
-        
-        // Update state to keep it in sync with buffer
-        setWidgetData(currentData)
+
+        // Don't update widgetData state here - fields manage their own state
+        // and only need widgetData for initial values. Updating state here causes
+        // unnecessary rerenders of all fields. State is only updated when external
+        // changes come in (see useExternalChanges above).
 
         // Extract widgetPath from context for nested widget support
         const widgetPath = context?.widgetPath
@@ -254,6 +265,72 @@ const IsolatedFormRenderer = React.memo(({
                 })}
         </div>
     )
+}, (prevProps, nextProps) => {
+    // Custom comparison: only rerender if props actually changed
+    // Return true if props are equal (prevent rerender), false if different (allow rerender)
+
+    // Compare primitive props
+    if (prevProps.widgetId !== nextProps.widgetId) return false
+    if (prevProps.slotName !== nextProps.slotName) return false
+    if (prevProps.contextType !== nextProps.contextType) return false
+    if (prevProps.namespace !== nextProps.namespace) return false
+
+    // Compare schema reference (should be stable)
+    if (prevProps.initschema !== nextProps.initschema) return false
+
+    // Compare widget data by ID
+    const prevId = prevProps.initWidgetData?.id
+    const nextId = nextProps.initWidgetData?.id
+    if (prevId !== nextId) return false
+
+    // Compare widget type
+    const prevType = prevProps.initWidgetData?.type
+    const nextType = nextProps.initWidgetData?.type
+    if (prevType !== nextType) return false
+
+    // Deep compare config objects - only rerender if config actually changed
+    const prevConfig = prevProps.initWidgetData?.config
+    const nextConfig = nextProps.initWidgetData?.config
+
+    // If both are undefined/null, they're equal
+    if (!prevConfig && !nextConfig) {
+        // Continue to context comparison
+    } else if (!prevConfig || !nextConfig) {
+        return false // One is null, other isn't
+    } else {
+        // Both exist, do deep comparison
+        try {
+            if (JSON.stringify(prevConfig) !== JSON.stringify(nextConfig)) {
+                return false
+            }
+        } catch (e) {
+            // If JSON.stringify fails, assume they're different to be safe
+            return false
+        }
+    }
+
+    // Deep compare context object
+    const prevContext = prevProps.context
+    const nextContext = nextProps.context
+
+    // If both are empty objects or undefined, they're equal
+    if ((!prevContext || Object.keys(prevContext).length === 0) &&
+        (!nextContext || Object.keys(nextContext).length === 0)) {
+        return true
+    }
+
+    // Compare context deeply
+    try {
+        if (JSON.stringify(prevContext) !== JSON.stringify(nextContext)) {
+            return false
+        }
+    } catch (e) {
+        // If JSON.stringify fails, assume they're different to be safe
+        return false
+    }
+
+    // All props are equal, prevent rerender
+    return true
 })
 
 export default IsolatedFormRenderer

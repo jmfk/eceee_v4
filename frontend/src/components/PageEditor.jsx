@@ -213,8 +213,8 @@ const PageEditor = () => {
         'preview': 'Preview',
         'publishing': 'Publishing'
     }
-    const pageTitle = isNewPage 
-        ? 'New Page' 
+    const pageTitle = isNewPage
+        ? 'New Page'
         : (webpageData?.title || 'Loading...')
     const tabName = tabNames[activeTab] || activeTab
     useDocumentTitle(`${pageTitle} - ${tabName}`)
@@ -232,7 +232,7 @@ const PageEditor = () => {
 
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
-    useExternalChanges(componentId, state => {
+    useExternalChanges(componentId, (state, metadata) => {
         setIsDirtyState(state.metadata.isDirty);
 
         // Update local widgets from external UDC changes (other components/users)
@@ -240,7 +240,23 @@ const PageEditor = () => {
             const externalWidgets = state.versions[versionId].widgets;
             setLocalWidgets(externalWidgets);
 
-            // Also update pageVersionData to keep persistence layer in sync
+            // Skip updating pageVersionData if update came from isolated components
+            // These components manage their own state and subscribe to UDC directly
+            // Updating pageVersionData here would cause unnecessary rerenders
+            const sourceId = metadata?.sourceId || '';
+            const isFromIsolatedComponent =
+                sourceId.startsWith('isolated-form-') ||
+                sourceId.startsWith('special-editor-') ||
+                sourceId.startsWith('field-');
+
+            if (isFromIsolatedComponent) {
+                // Isolated components handle their own state and UDC subscriptions
+                // Don't update pageVersionData to prevent unnecessary rerenders
+                // Other components that need these updates subscribe to UDC directly
+                return;
+            }
+
+            // Normal update for non-isolated sources (other users, other components, etc.)
             setPageVersionData(prev => ({
                 ...prev,
                 widgets: externalWidgets
@@ -484,7 +500,7 @@ const PageEditor = () => {
         enabled: !isNewPage && Boolean(pageId),
         includeWidgets: true
     })
-    
+
     // Extract widget inheritance (for backward compatibility)
     const {
         inherited: inheritedWidgets,
@@ -492,7 +508,7 @@ const PageEditor = () => {
         hasContent: hasInheritedContent,
         parentId
     } = pageInheritance.widgets
-    
+
     const isLoadingInheritance = pageInheritance.isLoading
     const refetchInheritance = pageInheritance.refetch
 
@@ -563,7 +579,7 @@ const PageEditor = () => {
                         id: webpage.id,
                         data: webpage
                     });
-                    
+
                     // Then initialize version
                     const versionComponentId = `page-editor-${pageId}-${pageVersion.versionId || pageVersion.id || 'current'}`;
                     const versionDataForUDC = {
@@ -571,7 +587,7 @@ const PageEditor = () => {
                         pageId: String(pageId), // Ensure pageId is string for consistency
                         versionNumber: processedVersionData.versionNumber || 1 // Ensure versionNumber is set
                     };
-                    
+
                     await publishUpdate(versionComponentId, OperationTypes.INIT_VERSION, {
                         id: processedVersionData.id,
                         data: versionDataForUDC
@@ -580,7 +596,7 @@ const PageEditor = () => {
                     console.error('[PageEditor] Error initializing version in UDC:', error);
                 }
             };
-            
+
             initVersionAsync();
         }
     }, [pageVersion, isNewPage, webpage, publishUpdate, pageId])
