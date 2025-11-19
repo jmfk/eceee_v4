@@ -38,6 +38,8 @@ const ContentCardWidget = ({
     // UDC Integration
     const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `contentcardwidget-${widgetId || 'preview'}`, [widgetId])
+    const headerFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-header`, [widgetId])
+    const contentFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-content`, [widgetId])
     const contextType = useEditorContext()
 
     // Refs for editor renderers
@@ -67,7 +69,7 @@ const ContentCardWidget = ({
         }
     }, [])
 
-    // Subscribe to external changes via UDC
+    // Subscribe to external changes via UDC (widget-level)
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
@@ -75,6 +77,52 @@ const ContentCardWidget = ({
         if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
             setConfig(newConfig)
             forceRerender({})
+        }
+    })
+
+    // Subscribe to field-level updates for header field (from form field)
+    useExternalChanges(headerFieldComponentId, (state, metadata) => {
+        if (!widgetId || !slotName) {
+            return
+        }
+
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+        const newHeader = widget?.config?.header
+
+        // Check if update came from this widget's WYSIWYG (self-update)
+        const sourceId = metadata?.sourceId || ''
+        const isSelfUpdate = sourceId === componentId || sourceId === headerFieldComponentId
+
+        if (newHeader !== undefined && newHeader !== configRef.current.header && !isSelfUpdate) {
+            // External update (from form field with isolated-form-* sourceId) - update WYSIWYG editor
+            if (headerEditorRef.current) {
+                headerEditorRef.current.updateConfig({ content: newHeader })
+            }
+            // Also update our config ref
+            setConfig({ ...configRef.current, header: newHeader })
+        }
+    })
+
+    // Subscribe to field-level updates for content field (from form field)
+    useExternalChanges(contentFieldComponentId, (state, metadata) => {
+        if (!widgetId || !slotName) {
+            return
+        }
+
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+        const newContent = widget?.config?.content
+
+        // Check if update came from this widget's WYSIWYG (self-update)
+        const sourceId = metadata?.sourceId || ''
+        const isSelfUpdate = sourceId === componentId || sourceId === contentFieldComponentId
+
+        if (newContent !== undefined && newContent !== configRef.current.content && !isSelfUpdate) {
+            // External update (from form field with isolated-form-* sourceId) - update WYSIWYG editor
+            if (contentEditorRef.current) {
+                contentEditorRef.current.updateConfig({ content: newContent })
+            }
+            // Also update our config ref
+            setConfig({ ...configRef.current, content: newContent })
         }
     })
 
@@ -153,13 +201,18 @@ const ContentCardWidget = ({
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, header: newContent }
             setConfig(updatedConfig)
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            
+            // Publish to field-level path for form field sync
+            // Use sourceId with widget type prefix: contentcardwidget-${widgetId}-field-header
+            const fieldSourceId = `${componentId}-field-header` // contentcardwidget-${widgetId}-field-header
+            publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
-                config: updatedConfig,
+                config: { header: newContent }, // Only publish the changed field
                 widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
                 slotName: slotName,
                 contextType: contextType
             })
+            
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
@@ -170,13 +223,18 @@ const ContentCardWidget = ({
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, content: newContent }
             setConfig(updatedConfig)
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            
+            // Publish to field-level path for form field sync
+            // Use sourceId with widget type prefix: contentcardwidget-${widgetId}-field-content
+            const fieldSourceId = `${componentId}-field-content` // contentcardwidget-${widgetId}-field-content
+            publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
-                config: updatedConfig,
+                config: { content: newContent }, // Only publish the changed field
                 widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
                 slotName: slotName,
                 contextType: contextType
             })
+            
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
