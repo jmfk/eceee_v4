@@ -27,6 +27,14 @@ const ThreeColumnsWidget = ({
     slotName,
     widgetPath = [],
     context = {}, // Full context including page data
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    buildWidgetPath,
+    parseWidgetPath,
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -264,6 +272,14 @@ const ThreeColumnsWidget = ({
                         mode="editor"
                         showClearButton={false}
                         compactAddButton={true}
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
 
                     <SlotEditor
@@ -284,6 +300,14 @@ const ThreeColumnsWidget = ({
                         mode="editor"
                         showClearButton={false}
                         compactAddButton={true}
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
 
                     <SlotEditor
@@ -304,6 +328,14 @@ const ThreeColumnsWidget = ({
                         mode="editor"
                         showClearButton={false}
                         compactAddButton={true}
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </div>
             </div>

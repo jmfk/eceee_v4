@@ -13,6 +13,8 @@ import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import ImportDialog from '../../components/ImportDialog';
+import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../../utils/clipboardService';
+import { Clipboard, Scissors, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'main_layout',  // Default to main_layout (available layout)
@@ -73,6 +75,43 @@ const ReactLayoutRenderer = forwardRef(({
     // Import dialog state
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [importSlotName, setImportSlotName] = useState(null);
+
+    // Widget selection state: Set<widgetPath> where widgetPath = "slotName/widgetId" or "slotName/containerId/nestedSlot/nestedWidgetId"
+    const [selectedWidgets, setSelectedWidgets] = useState(() => new Set());
+    
+    // Cut widgets state: tracks widgets that have been cut (waiting for paste)
+    // Set<widgetPath>
+    const [cutWidgets, setCutWidgets] = useState(() => new Set());
+    
+    // Toolbar collapse state
+    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+    
+    // Helper: Build widget path string from slotName and widgetId (and optional nested path)
+    const buildWidgetPath = useCallback((slotName, widgetId, nestedPath = null) => {
+        if (nestedPath) {
+            return `${slotName}/${widgetId}/${nestedPath}`;
+        }
+        return `${slotName}/${widgetId}`;
+    }, []);
+    
+    // Helper: Parse widget path to extract components
+    const parseWidgetPath = useCallback((widgetPath) => {
+        const parts = widgetPath.split('/');
+        if (parts.length === 2) {
+            // Top-level: "slotName/widgetId"
+            return { slotName: parts[0], widgetId: parts[1], isNested: false };
+        } else if (parts.length === 4) {
+            // Nested: "slotName/containerId/nestedSlot/nestedWidgetId"
+            return {
+                slotName: parts[0],
+                containerId: parts[1],
+                nestedSlot: parts[2],
+                nestedWidgetId: parts[3],
+                isNested: true
+            };
+        }
+        return null;
+    }, []);
 
     // Page context for widgets - includes all necessary context data
     const pageContext = useMemo(() => ({
@@ -267,6 +306,7 @@ const ReactLayoutRenderer = forwardRef(({
                 const pastedWidget = widget;
                 const insertAfterIndex = args[0];
                 const insertPosition = insertAfterIndex + 1;
+                const clipboardMetadata = args[1]; // Optional: { operation, metadata } from clipboard
 
                 // Update local state for immediate UI feedback
                 const slotWidgetsPaste = [...(widgets[slotName] || [])];
@@ -299,6 +339,11 @@ const ReactLayoutRenderer = forwardRef(({
                         contextType: contextType,
                         order: insertPosition
                     });
+                }
+
+                // If this was a cut operation, delete the original widgets
+                if (clipboardMetadata && clipboardMetadata.operation === 'cut' && clipboardMetadata.metadata) {
+                    await handleDeleteCutWidgets(clipboardMetadata.metadata);
                 }
 
                 break;
@@ -359,6 +404,91 @@ const ReactLayoutRenderer = forwardRef(({
         }
         handleCloseWidgetModal();
     }, [selectedSlotForModal, replacementContext, handleWidgetAction, handleCloseWidgetModal]);
+
+    // Widget selection handlers - now support widget paths for nested widgets
+    const toggleWidgetSelection = useCallback((slotName, widgetId, nestedPath = null) => {
+        const widgetPath = buildWidgetPath(slotName, widgetId, nestedPath);
+        setSelectedWidgets(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(widgetPath)) {
+                newSet.delete(widgetPath);
+            } else {
+                newSet.add(widgetPath);
+            }
+            return newSet;
+        });
+    }, [buildWidgetPath]);
+
+    const selectAllInSlot = useCallback((slotName) => {
+        const slotWidgets = widgets[slotName] || [];
+        if (slotWidgets.length === 0) return;
+        
+        setSelectedWidgets(prev => {
+            const newSet = new Set(prev);
+            slotWidgets.forEach(widget => {
+                const widgetPath = buildWidgetPath(slotName, widget.id);
+                newSet.add(widgetPath);
+            });
+            return newSet;
+        });
+    }, [widgets, buildWidgetPath]);
+
+    const clearSelection = useCallback(() => {
+        setSelectedWidgets(new Set());
+        setCutWidgets(new Set());
+    }, []);
+
+    const isWidgetSelected = useCallback((slotName, widgetId, nestedPath = null) => {
+        const widgetPath = buildWidgetPath(slotName, widgetId, nestedPath);
+        return selectedWidgets.has(widgetPath);
+    }, [selectedWidgets, buildWidgetPath]);
+
+    const isWidgetCut = useCallback((slotName, widgetId, nestedPath = null) => {
+        const widgetPath = buildWidgetPath(slotName, widgetId, nestedPath);
+        return cutWidgets.has(widgetPath);
+    }, [cutWidgets, buildWidgetPath]);
+
+    const getSelectedCount = useCallback(() => {
+        return selectedWidgets.size;
+    }, [selectedWidgets]);
+
+    // Get selected widgets - now handles both top-level and nested widgets
+    const getSelectedWidgets = useCallback(() => {
+        const selected = [];
+        
+        selectedWidgets.forEach(widgetPath => {
+            const parsed = parseWidgetPath(widgetPath);
+            if (!parsed) return;
+            
+            if (!parsed.isNested) {
+                // Top-level widget
+                const slotWidgets = widgets[parsed.slotName] || [];
+                const widget = slotWidgets.find(w => w.id === parsed.widgetId);
+                if (widget) {
+                    selected.push({ widget, slotName: parsed.slotName, widgetPath });
+                }
+            } else {
+                // Nested widget - need to find it in the container widget's config
+                const slotWidgets = widgets[parsed.slotName] || [];
+                const containerWidget = slotWidgets.find(w => w.id === parsed.containerId);
+                if (containerWidget && containerWidget.config && containerWidget.config.slots) {
+                    const nestedSlotWidgets = containerWidget.config.slots[parsed.nestedSlot] || [];
+                    const nestedWidget = nestedSlotWidgets.find(w => w.id === parsed.nestedWidgetId);
+                    if (nestedWidget) {
+                        selected.push({
+                            widget: nestedWidget,
+                            slotName: parsed.slotName,
+                            containerWidget,
+                            nestedSlot: parsed.nestedSlot,
+                            widgetPath
+                        });
+                    }
+                }
+            }
+        });
+        
+        return selected;
+    }, [selectedWidgets, widgets, parseWidgetPath]);
 
     // Clear slot handler
     const handleClearSlot = useCallback(async (slotName) => {
@@ -424,6 +554,224 @@ const ReactLayoutRenderer = forwardRef(({
         }
     }, [importSlotName, widgets, onWidgetChange, publishUpdate, componentId, contextType]);
 
+    // Bulk action handlers
+    const handleCopySelected = useCallback(async () => {
+        const selected = getSelectedWidgets();
+        if (selected.length === 0) return;
+        
+        const widgetsToCopy = selected.map(item => item.widget);
+        await copyWidgetsToClipboard(widgetsToCopy);
+    }, [getSelectedWidgets]);
+
+    const handleCutSelected = useCallback(async () => {
+        const selected = getSelectedWidgets();
+        if (selected.length === 0) return;
+        
+        const widgetsToCut = selected.map(item => item.widget);
+        
+        // Build metadata for cut operation (track which widgets to delete using widget paths)
+        const cutMetadata = {
+            pageId: context?.pageId || webpageData?.id, // Store source pageId for cross-page cut/paste
+            widgetPaths: selected.map(item => item.widgetPath),
+            widgets: {} // Keep backward compatibility: { slotName: [widgetIds] }
+        };
+        
+        // Build backward-compatible format for top-level widgets
+        selected.forEach(({ widget, slotName, nestedSlot, containerWidget }) => {
+            if (!nestedSlot) {
+                // Top-level widget
+                if (!cutMetadata.widgets[slotName]) {
+                    cutMetadata.widgets[slotName] = [];
+                }
+                cutMetadata.widgets[slotName].push(widget.id);
+            } else {
+                // Nested widget - store in nested format
+                const nestedKey = `${slotName}/${containerWidget.id}/${nestedSlot}`;
+                if (!cutMetadata.widgets[nestedKey]) {
+                    cutMetadata.widgets[nestedKey] = [];
+                }
+                cutMetadata.widgets[nestedKey].push(widget.id);
+            }
+        });
+        
+        // Mark widgets as cut (visual indicator) - use widget paths
+        setCutWidgets(prev => {
+            const newSet = new Set(prev);
+            selected.forEach(item => {
+                newSet.add(item.widgetPath);
+            });
+            return newSet;
+        });
+        
+        await cutWidgetsToClipboard(widgetsToCut, cutMetadata);
+    }, [getSelectedWidgets, context, webpageData]);
+
+    const handleDeleteCutWidgets = useCallback(async (cutMetadata) => {
+        // Delete widgets that were cut and pasted
+        // Supports both new format (widgetPaths) and old format (widgets object)
+        
+        // Check if this is a cross-page cut/paste operation
+        const sourcePageId = cutMetadata.pageId;
+        const currentPageId = context?.pageId || webpageData?.id;
+        const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
+        
+        // For cross-page operations, we need to publish REMOVE_WIDGET operations to UDC
+        // for the source page, not the current page
+        if (isCrossPage) {
+            // Publish REMOVE_WIDGET operations to UDC for the source page
+            if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+                for (const widgetPath of cutMetadata.widgetPaths) {
+                    const parsed = parseWidgetPath(widgetPath);
+                    if (!parsed) continue;
+                    
+                    // Publish to UDC for the source page
+                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                        id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
+                        contextType: contextType,
+                        pageId: sourcePageId, // Specify source page
+                    });
+                }
+            } else if (cutMetadata.widgets) {
+                // Handle old format
+                for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
+                    for (const widgetId of widgetIds) {
+                        await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                            id: widgetId,
+                            contextType: contextType,
+                            pageId: sourcePageId, // Specify source page
+                        });
+                    }
+                }
+            }
+            return; // Don't update local widgets for cross-page operations
+        }
+        
+        // For same-page operations, update local widgets
+        const updatedWidgets = { ...widgets };
+        let hasChanges = false;
+        
+        // Handle new format with widget paths
+        if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+            for (const widgetPath of cutMetadata.widgetPaths) {
+                const parsed = parseWidgetPath(widgetPath);
+                if (!parsed) continue;
+                
+                if (!parsed.isNested) {
+                    // Top-level widget
+                    if (updatedWidgets[parsed.slotName]) {
+                        const originalLength = updatedWidgets[parsed.slotName].length;
+                        updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(
+                            widget => widget.id !== parsed.widgetId
+                        );
+                        
+                        if (updatedWidgets[parsed.slotName].length !== originalLength) {
+                            hasChanges = true;
+                            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                                id: parsed.widgetId,
+                                contextType: contextType
+                            });
+                        }
+                    }
+                } else {
+                    // Nested widget - update container widget's config
+                    if (updatedWidgets[parsed.slotName]) {
+                        const containerWidget = updatedWidgets[parsed.slotName].find(
+                            w => w.id === parsed.containerId
+                        );
+                        if (containerWidget && containerWidget.config && containerWidget.config.slots) {
+                            const nestedSlotWidgets = containerWidget.config.slots[parsed.nestedSlot] || [];
+                            const originalLength = nestedSlotWidgets.length;
+                            
+                            containerWidget.config.slots[parsed.nestedSlot] = nestedSlotWidgets.filter(
+                                w => w.id !== parsed.nestedWidgetId
+                            );
+                            
+                            if (containerWidget.config.slots[parsed.nestedSlot].length !== originalLength) {
+                                hasChanges = true;
+                                // Update the container widget
+                                updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].map(w =>
+                                    w.id === parsed.containerId ? containerWidget : w
+                                );
+                                
+                                await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                                    id: parsed.containerId,
+                                    slotName: parsed.slotName,
+                                    contextType: contextType,
+                                    config: containerWidget.config
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Handle backward-compatible format (old format)
+        if (cutMetadata.widgets && typeof cutMetadata.widgets === 'object') {
+            for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
+                // Check if this is a nested key (format: "slotName/containerId/nestedSlot")
+                const keyParts = key.split('/');
+                
+                if (keyParts.length === 3) {
+                    // Nested widget
+                    const [slotName, containerId, nestedSlot] = keyParts;
+                    if (updatedWidgets[slotName]) {
+                        const containerWidget = updatedWidgets[slotName].find(w => w.id === containerId);
+                        if (containerWidget && containerWidget.config && containerWidget.config.slots) {
+                            const nestedSlotWidgets = containerWidget.config.slots[nestedSlot] || [];
+                            const originalLength = nestedSlotWidgets.length;
+                            
+                            containerWidget.config.slots[nestedSlot] = nestedSlotWidgets.filter(
+                                w => !widgetIds.includes(w.id)
+                            );
+                            
+                            if (containerWidget.config.slots[nestedSlot].length !== originalLength) {
+                                hasChanges = true;
+                                updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                                    w.id === containerId ? containerWidget : w
+                                );
+                                
+                                await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                                    id: containerId,
+                                    slotName: slotName,
+                                    contextType: contextType,
+                                    config: containerWidget.config
+                                });
+                            }
+                        }
+                    }
+                } else {
+                    // Top-level widget
+                    const slotName = key;
+                    if (updatedWidgets[slotName]) {
+                        const originalLength = updatedWidgets[slotName].length;
+                        updatedWidgets[slotName] = updatedWidgets[slotName].filter(
+                            widget => !widgetIds.includes(widget.id)
+                        );
+                        
+                        if (updatedWidgets[slotName].length !== originalLength) {
+                            hasChanges = true;
+                            for (const widgetId of widgetIds) {
+                                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                                    id: widgetId,
+                                    contextType: contextType
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (hasChanges && onWidgetChange) {
+            onWidgetChange(updatedWidgets, { sourceId: 'cut-operation' });
+        }
+        
+        // Clear cut state and selection
+        setCutWidgets(new Set());
+        setSelectedWidgets(new Set());
+    }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData]);
+
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
 
@@ -477,10 +825,79 @@ const ReactLayoutRenderer = forwardRef(({
         getCurrentWidgets: () => widgets,
     }), [widgets, layoutName, versionId, isPublished]);
 
+    // Calculate selected count for toolbar
+    const selectedCount = getSelectedCount();
+    
+    // Reset toolbar collapse when selection changes
+    useEffect(() => {
+        if (selectedCount === 0) {
+            setIsToolbarCollapsed(false);
+        }
+    }, [selectedCount]);
+
     // Render the layout component
     // Make this div act like an iframe - break out of parent constraints and use full viewport width
     return (
-        <div className="react-layout-renderer w-full h-full">
+        <div className="react-layout-renderer w-full h-full relative">
+            {/* Bulk Action Toolbar - Floating */}
+            {selectedCount > 0 && (
+                <>
+                    {isToolbarCollapsed ? (
+                        // Collapsed: Small floating button in top right
+                        <button
+                            onClick={() => setIsToolbarCollapsed(false)}
+                            className="fixed top-4 right-4 z-[10005] bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all hover:scale-110 flex items-center justify-center"
+                            title={`${selectedCount} widget${selectedCount !== 1 ? 's' : ''} selected - Click to expand`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold">{selectedCount}</span>
+                                <ChevronUp className="h-4 w-4" />
+                            </div>
+                        </button>
+                    ) : (
+                        // Expanded: Full toolbar
+                        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10005] bg-white border border-gray-300 rounded-lg shadow-xl px-4 py-2 flex items-center gap-3">
+                            <span className="text-sm font-medium text-gray-700">
+                                {selectedCount} widget{selectedCount !== 1 ? 's' : ''} selected
+                            </span>
+                            <div className="h-4 w-px bg-gray-300"></div>
+                            <button
+                                onClick={handleCopySelected}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded transition-colors"
+                                title="Copy selected widgets"
+                            >
+                                <Clipboard className="h-4 w-4" />
+                                Copy
+                            </button>
+                            <button
+                                onClick={handleCutSelected}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded transition-colors"
+                                title="Cut selected widgets"
+                            >
+                                <Scissors className="h-4 w-4" />
+                                Cut
+                            </button>
+                            <button
+                                onClick={clearSelection}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded transition-colors"
+                                title="Clear selection"
+                            >
+                                <X className="h-4 w-4" />
+                                Clear
+                            </button>
+                            <div className="h-4 w-px bg-gray-300"></div>
+                            <button
+                                onClick={() => setIsToolbarCollapsed(true)}
+                                className="flex items-center gap-1.5 px-2 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                                title="Collapse toolbar"
+                            >
+                                <ChevronDown className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+
             <LayoutComponent
                 widgets={widgets}
                 onWidgetAction={handleWidgetAction}
@@ -493,6 +910,15 @@ const ReactLayoutRenderer = forwardRef(({
                 // Widget inheritance
                 inheritedWidgets={inheritedWidgets}
                 slotInheritanceRules={slotInheritanceRules}
+                // Selection props - pass to all WidgetSlots and container widgets
+                selectedWidgets={selectedWidgets}
+                cutWidgets={cutWidgets}
+                onToggleWidgetSelection={toggleWidgetSelection}
+                isWidgetSelected={isWidgetSelected}
+                isWidgetCut={isWidgetCut}
+                onDeleteCutWidgets={handleDeleteCutWidgets}
+                buildWidgetPath={buildWidgetPath}
+                parseWidgetPath={parseWidgetPath}
             />
 
             {/* Widget Selection Modal */}

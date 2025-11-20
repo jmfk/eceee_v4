@@ -14,11 +14,13 @@ import {
     ExternalLink,
     Plus,
     Clipboard,
-    ClipboardPaste
+    ClipboardPaste,
+    Scissors
 } from 'lucide-react'
 import ConfirmationModal from '../../components/ConfirmationModal'
 import PasteConfirmationModal from '../../components/PasteConfirmationModal'
-import { copyWidgetToClipboard, copyWidgetsToClipboard, readWidgetsFromClipboard, generateNewWidgetIds } from '../../utils/widgetClipboard'
+import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
+import { generateNewWidgetIds } from '../../utils/widgetClipboard'
 
 const PageWidgetHeaderWithSlots = ({
     widgetType,
@@ -45,9 +47,18 @@ const PageWidgetHeaderWithSlots = ({
     // Copy/Paste props for widget-level
     widget = null,
     onPaste = null,
+    // Cut props
+    onCut = null,
+    pageId = null,
+    widgetPath = null,
     // Copy/Paste props for slot-level
     widgets = null,
-    onPasteToSlot = null
+    onPasteToSlot = null,
+    // Selection props
+    slotName = null,
+    isSelected = false,
+    isCut = false,
+    onToggleSelection = null
 }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [showPasteConfirm, setShowPasteConfirm] = useState(false)
@@ -76,17 +87,44 @@ const PageWidgetHeaderWithSlots = ({
     // Widget-level copy/paste handlers
     const handleCopyWidget = async () => {
         if (widget) {
-            await copyWidgetToClipboard(widget)
+            await copyWidgetsToClipboard([widget])
+        }
+    }
+
+    const handleCutWidget = async () => {
+        if (!widget || !slotName) return
+        
+        // Build metadata for cut operation
+        const cutMetadata = {
+            pageId: pageId,
+            widgetPaths: widgetPath ? [widgetPath] : [`${slotName}/${widget.id}`],
+            widgets: {
+                [slotName]: [widget.id]
+            }
+        }
+        
+        await cutWidgetsToClipboard([widget], cutMetadata)
+        
+        // If onCut callback is provided, call it (for visual feedback)
+        if (onCut) {
+            onCut()
         }
     }
 
     const handlePasteWidget = async () => {
         if (!onPaste) return
         
-        const pastedWidget = await readWidgetsFromClipboard()
-        if (pastedWidget && pastedWidget.length > 0) {
-            const widgetWithNewId = generateNewWidgetIds(pastedWidget[0])
-            onPaste(widgetWithNewId)
+        const clipboardResult = await readClipboardWithMetadata()
+        if (clipboardResult && clipboardResult.data && clipboardResult.data.length > 0) {
+            const widgetWithNewId = generateNewWidgetIds(clipboardResult.data[0])
+            
+            // Pass clipboard metadata if it's a cut operation
+            const metadata = clipboardResult.operation === 'cut' ? {
+                operation: clipboardResult.operation,
+                metadata: clipboardResult.metadata
+            } : undefined;
+            
+            onPaste(widgetWithNewId, metadata)
         }
     }
 
@@ -100,17 +138,30 @@ const PageWidgetHeaderWithSlots = ({
     const handlePasteToSlot = async () => {
         if (!onPasteToSlot) return
         
-        const pastedWidgets = await readWidgetsFromClipboard()
-        if (pastedWidgets && pastedWidgets.length > 0) {
-            setPendingPasteWidgets(pastedWidgets)
+        const clipboardResult = await readClipboardWithMetadata()
+        if (clipboardResult && clipboardResult.data && clipboardResult.data.length > 0) {
+            setPendingPasteWidgets({
+                widgets: clipboardResult.data,
+                operation: clipboardResult.operation,
+                metadata: clipboardResult.metadata
+            })
             setShowPasteConfirm(true)
         }
     }
 
     const handleConfirmPaste = (mode) => {
         if (pendingPasteWidgets && onPasteToSlot) {
-            const widgetsWithNewIds = pendingPasteWidgets.map(w => generateNewWidgetIds(w))
-            onPasteToSlot(widgetsWithNewIds, mode)
+            const widgetsData = pendingPasteWidgets.widgets || pendingPasteWidgets
+            const widgetsArray = Array.isArray(widgetsData) ? widgetsData : [widgetsData]
+            const widgetsWithNewIds = widgetsArray.map(w => generateNewWidgetIds(w))
+            
+            // Pass metadata if it's a cut operation
+            const metadata = pendingPasteWidgets.operation === 'cut' ? {
+                operation: pendingPasteWidgets.operation,
+                metadata: pendingPasteWidgets.metadata
+            } : undefined;
+            
+            onPasteToSlot(widgetsWithNewIds, mode, metadata)
             setPendingPasteWidgets(null)
         }
     }
@@ -118,15 +169,27 @@ const PageWidgetHeaderWithSlots = ({
     const canAdd = canAddWidget && (!maxWidgets || widgetCount < maxWidgets)
 
     return (
-        <div className={`widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${className}`}>
+        <div className={`widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
             {/* Left side - Widget info and slot label */}
             <div className="flex items-center space-x-2">
+                {/* Selection checkbox */}
+                {onToggleSelection && !isInherited && (
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={onToggleSelection}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                        title={isSelected ? 'Deselect widget' : 'Select widget'}
+                    />
+                )}
+
                 {isInherited && (
                     <Lock className="h-3.5 w-3.5 text-amber-600" />
                 )}
 
                 <div className="flex items-center space-x-2">
-                    <span className={`text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'}`}>
+                    <span className={`text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'} ${isCut ? 'line-through' : ''}`}>
                         {widgetType}
                     </span>
 
@@ -257,17 +320,28 @@ const PageWidgetHeaderWithSlots = ({
                         </div>
                     )}
 
-                    {/* Copy/Paste controls for widget */}
-                    {(widget || onPaste) && (
+                    {/* Copy/Cut/Paste controls for widget */}
+                    {(widget || onPaste || onCut) && (
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2">
                             {widget && (
-                                <button
-                                    onClick={handleCopyWidget}
-                                    className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
-                                    title="Copy widget"
-                                >
-                                    <Clipboard className="h-3 w-3" />
-                                </button>
+                                <>
+                                    <button
+                                        onClick={handleCopyWidget}
+                                        className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
+                                        title="Copy widget"
+                                    >
+                                        <Clipboard className="h-3 w-3" />
+                                    </button>
+                                    {(onCut || (widget && slotName)) && (
+                                        <button
+                                            onClick={handleCutWidget}
+                                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
+                                            title="Cut widget"
+                                        >
+                                            <Scissors className="h-3 w-3" />
+                                        </button>
+                                    )}
+                                </>
                             )}
                             {onPaste && (
                                 <button

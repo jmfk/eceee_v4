@@ -11,6 +11,7 @@ from .models import (
     AIAgentTask,
     AIAgentTaskUpdate,
     AIAgentTaskTemplate,
+    ClipboardEntry,
 )
 
 
@@ -394,3 +395,38 @@ class AIAgentTaskUpdateAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         """Prevent manual addition of updates."""
         return False
+
+
+@admin.register(ClipboardEntry)
+class ClipboardEntryAdmin(admin.ModelAdmin):
+    """Admin interface for Clipboard Entries."""
+
+    list_display = [
+        "id",
+        "user",
+        "clipboard_type",
+        "operation",
+        "created_at",
+        "expires_at",
+    ]
+    list_filter = ["clipboard_type", "operation", "created_at", "user"]
+    search_fields = ["user__username", "clipboard_type"]
+    readonly_fields = ["id", "created_at"]
+    
+    fieldsets = (
+        ("Clipboard Information", {
+            "fields": ("id", "user", "clipboard_type", "operation")
+        }),
+        ("Data", {
+            "fields": ("data", "metadata"),
+            "classes": ("collapse",)
+        }),
+        ("Metadata", {
+            "fields": ("created_at", "expires_at"),
+            "classes": ("collapse",)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Optimize queryset."""
+        return super().get_queryset(request).select_related("user")

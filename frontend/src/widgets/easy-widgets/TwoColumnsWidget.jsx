@@ -27,6 +27,14 @@ const TwoColumnsWidget = ({
     slotName, // Which slot this TwoColumnsWidget is in (e.g., 'main')  
     widgetPath = [], // Full path to this widget (for infinite nesting)
     context = {}, // Full context including page data
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    buildWidgetPath,
+    parseWidgetPath,
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -290,6 +298,14 @@ const TwoColumnsWidget = ({
                         mode="editor" // Explicitly pass editor mode
                         showClearButton={false} // Hide Clear Slot button
                         compactAddButton={true} // Show just + icon
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </div>
                 <div className="two-col-slot right min-h-[50px]">
@@ -311,6 +327,14 @@ const TwoColumnsWidget = ({
                         mode="editor" // Explicitly pass editor mode
                         showClearButton={false} // Hide Clear Slot button
                         compactAddButton={true} // Show just + icon
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </div>
             </div>

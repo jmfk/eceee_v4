@@ -207,6 +207,18 @@ export const endpoints = {
         process: `${BASE_PATH}/content-import/process/`,
         generateMetadata: `${BASE_PATH}/content-import/generate-metadata/`,
         uploadMedia: `${BASE_PATH}/content-import/upload-media/`
+    },
+
+    // Clipboard endpoints
+    clipboard: {
+        base: `${BASE_PATH}/utils/clipboard`,
+        create: `${BASE_PATH}/utils/clipboard/`,
+        get: (uuid) => `${BASE_PATH}/utils/clipboard/${uuid}/`,
+        delete: (uuid) => `${BASE_PATH}/utils/clipboard/${uuid}/`,
+        list: `${BASE_PATH}/utils/clipboard/`,
+        getByType: (type) => `${BASE_PATH}/utils/clipboard/by-type/${type}/`,
+        clearByType: (type) => `${BASE_PATH}/utils/clipboard/by-type/${type}/`,
+        clearAll: `${BASE_PATH}/utils/clipboard/clear-all/`
     }
 }
 

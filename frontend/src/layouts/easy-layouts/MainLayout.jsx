@@ -15,7 +15,16 @@ export const MainLayout = ({
     onImportContent,
     // Inheritance props
     inheritedWidgets = {},
-    slotInheritanceRules = {}
+    slotInheritanceRules = {},
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    onDeleteCutWidgets,
+    buildWidgetPath,
+    parseWidgetPath
 }) => {
     return (
         <div className="grid grid-cols-3 w-full" style={{ gridTemplateColumns: '1fr minmax(0,1280px) 1fr' }}>
@@ -40,6 +49,14 @@ export const MainLayout = ({
                         // Forward inheritance props
                         inheritedWidgets={inheritedWidgets}
                         slotInheritanceRules={slotInheritanceRules}
+                        // Forward selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </header>
 
@@ -61,6 +78,12 @@ export const MainLayout = ({
                     // Forward inheritance props
                     inheritedWidgets={inheritedWidgets}
                     slotInheritanceRules={slotInheritanceRules}
+                    // Forward selection props
+                    selectedWidgets={selectedWidgets}
+                    cutWidgets={cutWidgets}
+                    onToggleWidgetSelection={onToggleWidgetSelection}
+                    isWidgetSelected={isWidgetSelected}
+                    isWidgetCut={isWidgetCut}
                 />
                 <div>
                     <WidgetSlot
@@ -81,6 +104,14 @@ export const MainLayout = ({
                         // Forward inheritance props
                         inheritedWidgets={inheritedWidgets}
                         slotInheritanceRules={slotInheritanceRules}
+                        // Forward selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </div>
 
@@ -104,6 +135,12 @@ export const MainLayout = ({
                             // Forward inheritance props
                             inheritedWidgets={inheritedWidgets}
                             slotInheritanceRules={slotInheritanceRules}
+                            // Forward selection props
+                            selectedWidgets={selectedWidgets}
+                            cutWidgets={cutWidgets}
+                            onToggleWidgetSelection={onToggleWidgetSelection}
+                            isWidgetSelected={isWidgetSelected}
+                            isWidgetCut={isWidgetCut}
                         />
                     </main>
 
@@ -127,6 +164,12 @@ export const MainLayout = ({
                             // Forward inheritance props
                             inheritedWidgets={inheritedWidgets}
                             slotInheritanceRules={slotInheritanceRules}
+                            // Forward selection props
+                            selectedWidgets={selectedWidgets}
+                            cutWidgets={cutWidgets}
+                            onToggleWidgetSelection={onToggleWidgetSelection}
+                            isWidgetSelected={isWidgetSelected}
+                            isWidgetCut={isWidgetCut}
                         />
                     </aside>
                 </div>
@@ -151,6 +194,14 @@ export const MainLayout = ({
                         // Forward inheritance props
                         inheritedWidgets={inheritedWidgets}
                         slotInheritanceRules={slotInheritanceRules}
+                        // Forward selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </footer>
             </div>

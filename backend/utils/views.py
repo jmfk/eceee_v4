@@ -7,6 +7,7 @@ from django.http import HttpResponse
 from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.sites.shortcuts import get_current_site
+from django.db import models
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
@@ -21,6 +22,7 @@ from .models import (
     AIAgentTask,
     AIAgentTaskTemplate,
     AIAgentTaskUpdate,
+    ClipboardEntry,
 )
 from .serializers import (
     ValueListSerializer,
@@ -40,6 +42,9 @@ from .serializers import (
     PasswordResetLinkSerializer,
     CreateUserSerializer,
     UpdateUserSerializer,
+    ClipboardEntrySerializer,
+    ClipboardEntryCreateSerializer,
+    ClipboardEntryUpdateSerializer,
 )
 
 
@@ -713,3 +718,96 @@ class GeneratePasswordResetView(APIView):
         serializer.is_valid(raise_exception=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ClipboardEntryViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing clipboard entries.
+    
+    Provides CRUD operations for server-side clipboard storage.
+    All operations are user-scoped - users can only access their own clipboard entries.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return clipboard entries for the current user."""
+        queryset = ClipboardEntry.objects.filter(user=self.request.user)
+        
+        # Filter out expired entries
+        from django.utils import timezone
+        queryset = queryset.filter(
+            models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())
+        )
+        
+        return queryset.order_by("-created_at")
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if self.action == "create":
+            return ClipboardEntryCreateSerializer
+        elif self.action in ["update", "partial_update"]:
+            return ClipboardEntryUpdateSerializer
+        return ClipboardEntrySerializer
+
+    def perform_create(self, serializer):
+        """Create a new clipboard entry for the current user."""
+        serializer.save(user=self.request.user)
+
+    def get_by_type(self, request, **kwargs):
+        """Get the most recent clipboard entry of a specific type for the current user."""
+        clipboard_type = kwargs.get('clipboard_type')
+        if not clipboard_type:
+            return Response(
+                {"error": "clipboard_type parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        entry = (
+            self.get_queryset()
+            .filter(clipboard_type=clipboard_type)
+            .first()
+        )
+        
+        if not entry:
+            return Response(
+                {"error": f"No clipboard entry found for type: {clipboard_type}"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        serializer = self.get_serializer(entry)
+        return Response(serializer.data)
+
+    def clear_by_type(self, request, **kwargs):
+        """Clear all clipboard entries of a specific type for the current user."""
+        clipboard_type = kwargs.get('clipboard_type')
+        if not clipboard_type:
+            return Response(
+                {"error": "clipboard_type parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        count = (
+            self.get_queryset()
+            .filter(clipboard_type=clipboard_type)
+            .delete()[0]
+        )
+        
+        return Response(
+            {
+                "message": f"Cleared {count} clipboard entr{'y' if count == 1 else 'ies'} of type '{clipboard_type}'"
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["delete"], url_path="clear-all")
+    def clear_all(self, request):
+        """Clear all clipboard entries for the current user."""
+        count = self.get_queryset().delete()[0]
+        
+        return Response(
+            {
+                "message": f"Cleared {count} clipboard entr{'y' if count == 1 else 'ies'}"
+            },
+            status=status.HTTP_200_OK,
+        )

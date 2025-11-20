@@ -21,7 +21,16 @@ export const LandingPage = ({
     onClearSlot,
     // Inheritance props
     inheritedWidgets = {},
-    slotInheritanceRules = {}
+    slotInheritanceRules = {},
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    onDeleteCutWidgets,
+    buildWidgetPath,
+    parseWidgetPath
 }) => {
     return (
         <div className="grid grid-cols-3 w-full" style={{ gridTemplateColumns: '1fr minmax(0,1280px) 1fr' }}>
@@ -45,6 +54,14 @@ export const LandingPage = ({
                         // Forward inheritance props
                         inheritedWidgets={inheritedWidgets}
                         slotInheritanceRules={slotInheritanceRules}
+                        // Forward selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </header>
 
@@ -65,6 +82,12 @@ export const LandingPage = ({
                     // Forward inheritance props
                     inheritedWidgets={inheritedWidgets}
                     slotInheritanceRules={slotInheritanceRules}
+                    // Forward selection props
+                    selectedWidgets={selectedWidgets}
+                    cutWidgets={cutWidgets}
+                    onToggleWidgetSelection={onToggleWidgetSelection}
+                    isWidgetSelected={isWidgetSelected}
+                    isWidgetCut={isWidgetCut}
                 />
 
                 <main className="bg-white min-h-[310px]">
@@ -91,6 +114,14 @@ export const LandingPage = ({
                         // Forward inheritance props
                         inheritedWidgets={inheritedWidgets}
                         slotInheritanceRules={slotInheritanceRules}
+                        // Forward selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </main>
 
@@ -113,6 +144,14 @@ export const LandingPage = ({
                         // Forward inheritance props
                         inheritedWidgets={inheritedWidgets}
                         slotInheritanceRules={slotInheritanceRules}
+                        // Forward selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </footer>
             </div>

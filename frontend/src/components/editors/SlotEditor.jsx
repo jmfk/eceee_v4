@@ -31,7 +31,15 @@ const SlotEditor = forwardRef(({
     showClearButton = true,
     compactAddButton = false,
     emptyMessage = null,
-    mode = 'editor' // Mode for nested widgets: 'editor' or 'display'
+    mode = 'editor', // Mode for nested widgets: 'editor' or 'display'
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    buildWidgetPath,
+    parseWidgetPath
 }, ref) => {
     // Ref to the SelfContainedSlotEditor component
     const slotEditorRef = useRef(null);
@@ -77,6 +85,14 @@ const SlotEditor = forwardRef(({
                 compactAddButton={compactAddButton}
                 emptyMessage={emptyMessage}
                 mode={mode}
+                // Selection props
+                selectedWidgets={selectedWidgets}
+                cutWidgets={cutWidgets}
+                onToggleWidgetSelection={onToggleWidgetSelection}
+                isWidgetSelected={isWidgetSelected}
+                isWidgetCut={isWidgetCut}
+                buildWidgetPath={buildWidgetPath}
+                parseWidgetPath={parseWidgetPath}
             />
         </div>
     );

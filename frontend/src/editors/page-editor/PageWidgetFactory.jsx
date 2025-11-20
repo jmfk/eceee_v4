@@ -66,7 +66,15 @@ const PageWidgetFactory = ({
     // Path variables for dynamic content
     pathVariables = {},
     simulatedPath,
-    onSimulatedPathChange
+    onSimulatedPathChange,
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    buildWidgetPath,
+    parseWidgetPath
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -121,9 +129,9 @@ const PageWidgetFactory = ({
     }
 
     // Handle pasting a widget after this one
-    const handlePaste = (pastedWidget) => {
+    const handlePaste = (pastedWidget, metadata) => {
         if (onPaste) {
-            onPaste(slotName, index, pastedWidget);
+            onPaste(slotName, index, pastedWidget, metadata);
         }
     }
 
@@ -281,6 +289,14 @@ const PageWidgetFactory = ({
                                 simulatedPath: simulatedPath,
                                 onSimulatedPathChange: onSimulatedPathChange
                             }}
+                            // Selection props for container widgets
+                            selectedWidgets={selectedWidgets}
+                            cutWidgets={cutWidgets}
+                            onToggleWidgetSelection={onToggleWidgetSelection}
+                            isWidgetSelected={isWidgetSelected}
+                            isWidgetCut={isWidgetCut}
+                            buildWidgetPath={buildWidgetPath}
+                            parseWidgetPath={parseWidgetPath}
                         />
                     </div>
                 </div>
@@ -310,6 +326,22 @@ const PageWidgetFactory = ({
                     inheritedFrom={null}
                     widget={widget}
                     onPaste={onPaste ? handlePaste : undefined}
+                    onCut={undefined}
+                    pageId={pageId || webpageData?.id}
+                    widgetPath={buildWidgetPath ? buildWidgetPath(actualSlotName, actualWidgetId) : `${actualSlotName}/${actualWidgetId}`}
+                    // Selection props
+                    slotName={actualSlotName}
+                    isSelected={isWidgetSelected ? isWidgetSelected(actualSlotName, actualWidgetId) : false}
+                    isCut={isWidgetCut ? isWidgetCut(actualSlotName, actualWidgetId) : false}
+                    onToggleSelection={onToggleWidgetSelection ? () => onToggleWidgetSelection(actualSlotName, actualWidgetId) : undefined}
+                    // Pass selection helpers to nested widgets
+                    selectedWidgets={selectedWidgets}
+                    cutWidgets={cutWidgets}
+                    onToggleWidgetSelection={onToggleWidgetSelection}
+                    isWidgetSelected={isWidgetSelected}
+                    isWidgetCut={isWidgetCut}
+                    buildWidgetPath={buildWidgetPath}
+                    parseWidgetPath={parseWidgetPath}
                 />
 
                 {/* Core Widget Content */}
@@ -350,6 +382,14 @@ const PageWidgetFactory = ({
                                 simulatedPath: simulatedPath,
                                 onSimulatedPathChange: onSimulatedPathChange
                             }}
+                            // Selection props for container widgets (TwoColumnsWidget, ThreeColumnsWidget, etc.)
+                            selectedWidgets={selectedWidgets}
+                            cutWidgets={cutWidgets}
+                            onToggleWidgetSelection={onToggleWidgetSelection}
+                            isWidgetSelected={isWidgetSelected}
+                            isWidgetCut={isWidgetCut}
+                            buildWidgetPath={buildWidgetPath}
+                            parseWidgetPath={parseWidgetPath}
                         />
                     </div>
                 </div>

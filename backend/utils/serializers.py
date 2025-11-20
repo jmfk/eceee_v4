@@ -5,7 +5,7 @@ Common serializers used across the project.
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from typing import Any, Dict, List
-from .models import ValueList, ValueListItem
+from .models import ValueList, ValueListItem, ClipboardEntry
 
 
 class ValueListItemSerializer(serializers.ModelSerializer):
@@ -283,3 +283,67 @@ class UpdateUserSerializer(serializers.ModelSerializer):
         if value and value != user.email and User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists.")
         return value
+
+
+class ClipboardEntrySerializer(serializers.ModelSerializer):
+    """Serializer for ClipboardEntry model."""
+
+    created_at = serializers.DateTimeField(
+        format="%Y-%m-%dT%H:%M:%SZ", read_only=True
+    )
+    expires_at = serializers.DateTimeField(
+        format="%Y-%m-%dT%H:%M:%SZ", required=False, allow_null=True
+    )
+
+    class Meta:
+        model = ClipboardEntry
+        fields = [
+            "id",
+            "clipboard_type",
+            "operation",
+            "data",
+            "metadata",
+            "created_at",
+            "expires_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class ClipboardEntryCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating a ClipboardEntry."""
+
+    class Meta:
+        model = ClipboardEntry
+        fields = [
+            "clipboard_type",
+            "operation",
+            "data",
+            "metadata",
+            "expires_at",
+        ]
+
+    def validate_clipboard_type(self, value):
+        """Validate clipboard type is in allowed choices."""
+        valid_types = [choice[0] for choice in ClipboardEntry.CLIPBOARD_TYPE_CHOICES]
+        if value not in valid_types:
+            raise serializers.ValidationError(
+                f"Invalid clipboard type. Must be one of: {', '.join(valid_types)}"
+            )
+        return value
+
+    def validate_operation(self, value):
+        """Validate operation is in allowed choices."""
+        valid_operations = [choice[0] for choice in ClipboardEntry.OPERATION_CHOICES]
+        if value not in valid_operations:
+            raise serializers.ValidationError(
+                f"Invalid operation. Must be one of: {', '.join(valid_operations)}"
+            )
+        return value
+
+
+class ClipboardEntryUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating a ClipboardEntry."""
+
+    class Meta:
+        model = ClipboardEntry
+        fields = ["data", "metadata", "expires_at"]

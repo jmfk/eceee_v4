@@ -458,3 +458,76 @@ class AIAgentTaskTemplate(models.Model):
         """Increment usage counter when template is used."""
         self.usage_count += 1
         self.save(update_fields=["usage_count"])
+
+
+class ClipboardEntry(models.Model):
+    """
+    Server-side clipboard storage for user cut/copy operations.
+    
+    Stores clipboard data on the server with UUIDs, enabling cross-window/instance
+    clipboard operations without browser permission issues.
+    """
+
+    CLIPBOARD_TYPE_CHOICES = [
+        ("widgets", "Widgets"),
+        ("pages", "Pages"),
+        ("content", "Content"),
+        ("media", "Media"),
+    ]
+
+    OPERATION_CHOICES = [
+        ("cut", "Cut"),
+        ("copy", "Copy"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="clipboard_entries",
+        help_text="User who owns this clipboard entry",
+    )
+    clipboard_type = models.CharField(
+        max_length=20,
+        choices=CLIPBOARD_TYPE_CHOICES,
+        help_text="Type of clipboard content (widgets, pages, content, etc.)",
+    )
+    operation = models.CharField(
+        max_length=10,
+        choices=OPERATION_CHOICES,
+        help_text="Operation type: cut or copy",
+    )
+    data = models.JSONField(
+        default=dict,
+        help_text="Clipboard content data (widgets, pages, etc.)",
+    )
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Operation-specific metadata (pageId, widgetPaths, etc.)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Optional expiration time for automatic cleanup",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "clipboard_type"]),
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["clipboard_type", "created_at"]),
+        ]
+        verbose_name = "Clipboard Entry"
+        verbose_name_plural = "Clipboard Entries"
+
+    def __str__(self):
+        return f"{self.user.username} - {self.clipboard_type} ({self.operation})"
+
+    def is_expired(self):
+        """Check if the clipboard entry has expired."""
+        if self.expires_at:
+            return timezone.now() > self.expires_at
+        return False

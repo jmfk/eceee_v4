@@ -42,6 +42,14 @@ const WidgetSlot = ({
     slotMode, // External mode control (optional)
     onSlotModeChange, // Callback when mode changes
     className = '', // Additional classes to apply to the slot container
+    // Selection props
+    selectedWidgets, // Set<widgetPath>
+    cutWidgets, // Set<widgetPath>
+    onToggleWidgetSelection, // (slotName, widgetId, nestedPath?) => void
+    isWidgetSelected, // (slotName, widgetId, nestedPath?) => boolean
+    isWidgetCut, // (slotName, widgetId, nestedPath?) => boolean
+    buildWidgetPath, // (slotName, widgetId, nestedPath?) => string
+    parseWidgetPath, // (widgetPath) => object
 }) => {
     // Build path for this slot: append slot name to parent path
     const slotPath = [...widgetPath, name];
@@ -287,7 +295,7 @@ const WidgetSlot = ({
                         onDelete={(slotName, idx, w) => handleWidgetAction('delete', w, idx)}
                         onMoveUp={(slotName, idx, w) => handleWidgetAction('moveUp', w, idx)}
                         onMoveDown={(slotName, idx, w) => handleWidgetAction('moveDown', w, idx)}
-                        onPaste={(slotName, idx, pastedWidget) => handleWidgetAction('paste', pastedWidget, idx)}
+                        onPaste={(slotName, idx, pastedWidget, metadata) => handleWidgetAction('paste', pastedWidget, idx, metadata)}
                         onConfigChange={(widgetId, slotName, newConfig) => handleWidgetAction('configChange', { id: widgetId }, newConfig)}
                         canMoveUp={index > 0}
                         canMoveDown={index < effectiveWidgets.length - 1}
@@ -322,6 +330,14 @@ const WidgetSlot = ({
                         pathVariables={pageContext?.pathVariables}
                         simulatedPath={pageContext?.simulatedPath}
                         onSimulatedPathChange={pageContext?.onSimulatedPathChange}
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                     />
                 </div>
             );
