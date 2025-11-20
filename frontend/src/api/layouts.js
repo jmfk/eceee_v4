@@ -68,7 +68,18 @@ export const layoutsApi = {
          */
         getJson: wrapApiCall(async (name) => {
             return api.get(endpoints.layouts.json(name))
-        }, 'layouts.codeLayouts.getJson')
+        }, 'layouts.codeLayouts.getJson'),
+
+        /**
+         * Get all unique slot names from all registered layouts
+         * @param {boolean} activeOnly - Filter to active layouts only
+         * @returns {Promise<Object>} All slots with metadata
+         */
+        allSlots: wrapApiCall(async (activeOnly = true) => {
+            const params = { active_only: activeOnly }
+            const queryString = buildQueryParams(params)
+            return api.get(`${endpoints.layouts.allSlots}${queryString}`)
+        }, 'layouts.codeLayouts.allSlots')
     },
 
     /**
@@ -108,7 +119,18 @@ export const layoutsApi = {
      */
     getJson: wrapApiCall(async (name) => {
         return api.get(endpoints.layouts.json(name))
-    }, 'layouts.getJson')
+    }, 'layouts.getJson'),
+
+    /**
+     * Get all unique slot names from all registered layouts
+     * @param {boolean} activeOnly - Filter to active layouts only
+     * @returns {Promise<Object>} All slots with metadata
+     */
+    allSlots: wrapApiCall(async (activeOnly = true) => {
+        const params = { active_only: activeOnly }
+        const queryString = buildQueryParams(params)
+        return api.get(`${endpoints.layouts.allSlots}${queryString}`)
+    }, 'layouts.allSlots')
 }
 
 export default layoutsApi

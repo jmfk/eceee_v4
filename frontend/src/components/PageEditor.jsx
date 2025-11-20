@@ -26,7 +26,8 @@ import {
     Trash2,
     Calendar,
     Save,
-    Globe
+    Globe,
+    Layers
 } from 'lucide-react'
 import { pagesApi, layoutsApi, versionsApi, themesApi, namespacesApi } from '../api'
 import { api } from '../api/client'
@@ -47,6 +48,7 @@ import ThemeSelector from './ThemeSelector'
 import PagePreview from './PagePreview'
 import SettingsEditor from './SettingsEditor'
 import PublishingEditor from './PublishingEditor'
+import AllSlotsEditor from './AllSlotsEditor'
 import { getWidgetDisplayName } from '../hooks/useWidgets'
 import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
 import { usePageInheritance } from '../hooks/usePageInheritance'
@@ -1461,6 +1463,7 @@ const PageEditor = () => {
     // Tab navigation (main tabs)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
+        { id: 'slots', label: 'All Slots', icon: Layers },
         { id: 'settings', label: 'Settings & SEO', icon: Settings },
         { id: 'theme', label: 'Theme', icon: Palette },
         { id: 'publishing', label: 'Publish', icon: Calendar },
@@ -1767,6 +1770,33 @@ const PageEditor = () => {
                                     </div>
                                 )}
                             </>
+                        )}
+                        {activeTab === 'slots' && (
+                            <AllSlotsEditor
+                                key={`slots-${pageVersionData?.versionId || 'new'}`}
+                                widgets={localWidgets || pageVersionData?.widgets || {}}
+                                onWidgetChange={updateLocalWidgets}
+                                editable={!isNewPage}
+                                currentVersion={currentVersion}
+                                webpageData={webpageData}
+                                pageVersionData={pageVersionData}
+                                onVersionChange={switchToVersion}
+                                onOpenWidgetEditor={handleOpenWidgetEditor}
+                                context={{
+                                    pageId: webpageData?.id || pageId,
+                                    versionId: pageVersionData?.id || versionId,
+                                    contextType: 'page'
+                                }}
+                                sharedComponentId={componentId}
+                                publishWidgetOperation={publishWidgetOperation}
+                                inheritedWidgets={inheritedWidgets}
+                                slotInheritanceRules={slotInheritanceRules}
+                                hasInheritedContent={hasInheritedContent}
+                                refetchInheritance={refetchInheritance}
+                                pathVariables={pathVariables}
+                                simulatedPath={simulatedPath}
+                                onSimulatedPathChange={setSimulatedPath}
+                            />
                         )}
                         {activeTab === 'settings' && (
                             <SettingsEditor

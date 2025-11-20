@@ -160,6 +160,7 @@ class MainLayoutLayout(BaseLayout):
                     "name": "main",
                     "title": "Main Content",
                     "description": "Primary page content area",
+                    "order": 50,  # Middle of page
                     "max_widgets": None,  # Unlimited widgets
                     "css_classes": "main",
                     "default_widgets": [
@@ -189,6 +190,7 @@ class MainLayoutLayout(BaseLayout):
                     "name": "sidebar",
                     "title": "Sidebar",
                     "description": "Complementary content and widgets",
+                    "order": 60,  # After main content
                     "css_classes": "sidebar",
                     "default_widgets": [],
                     "allows_inheritance": True,

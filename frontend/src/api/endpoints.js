@@ -88,7 +88,8 @@ export const endpoints = {
         reload: `${BASE_PATH}/webpages/layouts/reload/`,
         validate: `${BASE_PATH}/webpages/layouts/validate/`,
         json: (name) => `${BASE_PATH}/webpages/layouts/${name}/json/`,
-        combined: `${BASE_PATH}/webpages/layouts/combined/`
+        combined: `${BASE_PATH}/webpages/layouts/combined/`,
+        allSlots: `${BASE_PATH}/webpages/layouts/all_slots/`
     },
 
     // Page Data Schemas endpoints

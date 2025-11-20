@@ -297,3 +297,73 @@ class CodeLayoutViewSet(viewsets.ViewSet):
             return self._create_formatted_response(
                 error_data, request, status.HTTP_400_BAD_REQUEST
             )
+
+    @action(detail=False, methods=["get"])
+    def all_slots(self, request):
+        """
+        Get all unique slot names from all registered layouts.
+        
+        Returns a list of all slots with metadata about which layouts define them.
+        """
+        from ..layout_registry import layout_registry
+
+        # Log metrics
+        self._log_metrics(request, "all_slots")
+
+        active_only = request.query_params.get("active_only", "true").lower() == "true"
+        layouts = layout_registry.list_layouts(active_only=active_only)
+
+        # Collect all slots with metadata
+        slot_map = {}  # {slot_name: {layouts: [layout_names], metadata: {...}}}
+
+        for layout in layouts:
+            layout_name = layout.name
+            slot_config = layout.slot_configuration
+            slots = slot_config.get("slots", [])
+
+            for slot in slots:
+                slot_name = slot.get("name")
+                if not slot_name:
+                    continue
+
+                if slot_name not in slot_map:
+                    slot_map[slot_name] = {
+                        "name": slot_name,
+                        "layouts": [],
+                        "metadata": {
+                            "title": slot.get("title", slot_name),
+                            "description": slot.get("description", ""),
+                            "max_widgets": slot.get("max_widgets"),
+                            "css_classes": slot.get("css_classes", ""),
+                            "dimensions": slot.get("dimensions"),  # Include width/height info
+                            "order": slot.get("order", 999),  # Default to 999 if not specified (sorts last)
+                        },
+                    }
+                else:
+                    # If slot already exists, merge dimensions and order if not present
+                    if not slot_map[slot_name]["metadata"].get("dimensions") and slot.get("dimensions"):
+                        slot_map[slot_name]["metadata"]["dimensions"] = slot.get("dimensions")
+                    # Use the lowest order value if multiple layouts define the same slot
+                    existing_order = slot_map[slot_name]["metadata"].get("order", 999)
+                    new_order = slot.get("order", 999)
+                    if new_order < existing_order:
+                        slot_map[slot_name]["metadata"]["order"] = new_order
+
+                slot_map[slot_name]["layouts"].append(layout_name)
+
+        # Convert to list and sort by order (then by name if order is the same)
+        slots_list = sorted(
+            slot_map.values(), 
+            key=lambda x: (x["metadata"].get("order", 999), x["name"])
+        )
+
+        response_data = {
+            "slots": slots_list,
+            "total": len(slots_list),
+            "api_version": self._get_api_version(request),
+        }
+
+        response = self._create_formatted_response(response_data, request)
+        response = self._add_caching_headers(response)
+        response = self._add_rate_limiting_headers(response, request, "list")
+        return response

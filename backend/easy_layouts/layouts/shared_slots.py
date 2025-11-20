@@ -3,6 +3,7 @@ header = {
     "name": "header",
     "title": "Header",
     "description": "Page header content",
+    "order": 10,  # First in order
     "max_widgets": 1,
     "css_classes": "header",
     "allows_inheritance": True,
@@ -30,6 +31,7 @@ navbar = {
     "name": "navbar",
     "title": "Navigation Bar",
     "description": "Main navigation menu",
+    "order": 20,  # After header
     "max_widgets": 1,
     "css_classes": "navbar",
     "allows_inheritance": True,
@@ -60,6 +62,7 @@ hero = {
     "name": "hero",
     "title": "Hero",
     "description": "The Hero space",
+    "order": 30,  # After navbar
     "max_widgets": 1,
     "css_classes": "hero",
     "allows_inheritance": True,
@@ -84,6 +87,7 @@ footer = {
     "name": "footer",
     "title": "Footer",
     "description": "Page footer content",
+    "order": 1000,  # Always last in order
     "max_widgets": 1,
     "css_classes": "footer",
     "allows_inheritance": True,
