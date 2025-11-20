@@ -37,14 +37,6 @@ const AllSlotsEditor = ({
     simulatedPath,
     onSimulatedPathChange,
 }) => {
-    // Debug: Log props on mount
-    console.log('[AllSlotsEditor] Component mounted with props:', {
-        hasOnOpenWidgetEditor: !!onOpenWidgetEditor,
-        onOpenWidgetEditorType: typeof onOpenWidgetEditor,
-        editable,
-        widgetsCount: Object.keys(widgets).length
-    });
-    
     // Fetch all slots from API
     const { data: slotsData, isLoading: isLoadingSlots } = useQuery({
         queryKey: ['allSlots'],
@@ -176,15 +168,6 @@ const AllSlotsEditor = ({
 
             case 'edit': {
                 const widgetIndex = args[0];
-                console.log('[AllSlotsEditor] Edit action triggered:', {
-                    action: 'edit',
-                    slotName,
-                    widgetIndex,
-                    widget,
-                    args,
-                    hasOnOpenWidgetEditor: !!onOpenWidgetEditor
-                });
-                
                 if (onOpenWidgetEditor) {
                     // Ensure widget has required fields for WidgetEditorPanel
                     const widgetData = {
@@ -202,19 +185,13 @@ const AllSlotsEditor = ({
                         }
                     };
                     
-                    console.log('[AllSlotsEditor] Prepared widgetData:', widgetData);
-                    
                     // Verify widget has type before opening editor
                     if (!widgetData.type) {
                         console.error('[AllSlotsEditor] Widget missing type field:', widget);
                         return;
                     }
                     
-                    console.log('[AllSlotsEditor] Calling onOpenWidgetEditor with:', widgetData);
                     onOpenWidgetEditor(widgetData);
-                    console.log('[AllSlotsEditor] onOpenWidgetEditor called successfully');
-                } else {
-                    console.warn('[AllSlotsEditor] onOpenWidgetEditor not provided');
                 }
                 break;
             }

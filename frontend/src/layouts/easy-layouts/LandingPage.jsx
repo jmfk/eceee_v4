@@ -90,6 +90,32 @@ export const LandingPage = ({
                     isWidgetCut={isWidgetCut}
                 />
 
+                <WidgetSlot
+                    name="hero"
+                    label="Hero"
+                    description="The Hero space"
+                    widgets={widgets}
+                    onWidgetAction={onWidgetAction}
+                    editable={editable}
+                    pageContext={pageContext}
+                    onShowWidgetModal={onShowWidgetModal}
+                    onClearSlot={onClearSlot}
+                    behavior={{
+                        maxWidgets: 1,
+                        required: false,
+                        allowedWidgetTypes: ['easy_widgets.HeroWidget']
+                    }}
+                    // Forward inheritance props
+                    inheritedWidgets={inheritedWidgets}
+                    slotInheritanceRules={slotInheritanceRules}
+                    // Forward selection props
+                    selectedWidgets={selectedWidgets}
+                    cutWidgets={cutWidgets}
+                    onToggleWidgetSelection={onToggleWidgetSelection}
+                    isWidgetSelected={isWidgetSelected}
+                    isWidgetCut={isWidgetCut}
+                />
+
                 <main className="bg-white min-h-[310px]">
                     <WidgetSlot
                         name="landingPage"

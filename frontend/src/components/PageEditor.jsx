@@ -1342,19 +1342,14 @@ const PageEditor = () => {
 
     // Widget editor handlers
     const handleOpenWidgetEditor = useCallback((widgetData) => {
-        console.log('[PageEditor] handleOpenWidgetEditor called with:', widgetData);
         const currentEditingWidget = editingWidgetRef.current
-        console.log('[PageEditor] Current editing widget:', currentEditingWidget);
         
         if (currentEditingWidget && widgetData && currentEditingWidget.id === widgetData.id) {
-            console.log('[PageEditor] Closing widget editor (same widget)');
             setWidgetEditorOpen(false)
             setEditingWidget(null)
         } else {
-            console.log('[PageEditor] Opening widget editor');
             setEditingWidget(widgetData)
             setWidgetEditorOpen(true)
-            console.log('[PageEditor] Widget editor state updated');
         }
     }, [])
 

@@ -182,19 +182,8 @@ const WidgetSlot = ({
 
     // Handle widget actions
     const handleWidgetAction = (action, widget, ...args) => {
-        if (action === 'edit') {
-            console.log('[WidgetSlot] Edit action received:', {
-                action,
-                slotName: name,
-                widget,
-                args,
-                hasOnWidgetAction: !!onWidgetAction
-            });
-        }
         if (onWidgetAction) {
             onWidgetAction(action, name, widget, ...args);
-        } else {
-            console.warn('[WidgetSlot] onWidgetAction not provided for action:', action);
         }
     };
 

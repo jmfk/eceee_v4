@@ -33,20 +33,6 @@ const WidgetEditorPanel = forwardRef(({
     webpageData = null,
     pageVersionData = null
 }, ref) => {
-    // Debug: Log when panel opens/closes or widgetData changes
-    useEffect(() => {
-        console.log('[WidgetEditorPanel] State changed:', {
-            isOpen,
-            hasWidgetData: !!widgetData,
-            widgetData: widgetData ? {
-                id: widgetData.id,
-                type: widgetData.type,
-                slotName: widgetData.slotName || widgetData.slot,
-                hasConfig: !!widgetData.config
-            } : null
-        });
-    }, [isOpen, widgetData]);
-    
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
     const [widgetTypeSlug, setWidgetTypeSlug] = useState(null)

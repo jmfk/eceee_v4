@@ -2,7 +2,7 @@
 Landing Page Layout implementation.
 """
 
-from easy_layouts.layouts.shared_slots import header, navbar, footer
+from easy_layouts.layouts.shared_slots import header, navbar, footer, hero
 from webpages.layout_registry import BaseLayout, register_layout
 
 
@@ -28,6 +28,10 @@ class LandingPageLayout(BaseLayout):
         },
         "slot-navbar": {
             "label": "Navbar slot container",
+            "properties": ["gap", "display", "flexDirection"],
+        },
+        "slot-hero": {
+            "label": "Hero slot container",
             "properties": ["gap", "display", "flexDirection"],
         },
         "slot-footer": {
@@ -90,6 +94,7 @@ class LandingPageLayout(BaseLayout):
             "slots": [
                 header,
                 navbar,
+                hero,
                 {
                     "name": "landing_page",
                     "title": "Landing Page Main Content",
@@ -108,6 +113,7 @@ class LandingPageLayout(BaseLayout):
                         "tablet": {"width": 1024, "height": None},
                         "desktop": {"width": 1280, "height": None},
                     },
+                    "order": 40,  # After hero
                 },
                 footer,
             ]
