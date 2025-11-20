@@ -73,6 +73,7 @@ const PageWidgetFactory = ({
     onToggleWidgetSelection,
     isWidgetSelected,
     isWidgetCut,
+    onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath
 }) => {
@@ -388,6 +389,7 @@ const PageWidgetFactory = ({
                             onToggleWidgetSelection={onToggleWidgetSelection}
                             isWidgetSelected={isWidgetSelected}
                             isWidgetCut={isWidgetCut}
+                            onDeleteCutWidgets={onDeleteCutWidgets}
                             buildWidgetPath={buildWidgetPath}
                             parseWidgetPath={parseWidgetPath}
                         />

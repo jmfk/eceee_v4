@@ -44,12 +44,13 @@ const SelfContainedSlotEditor = ({
     onToggleWidgetSelection,
     isWidgetSelected,
     isWidgetCut,
+    onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath
 }) => {
     // Build path for widgets in this slot: append slot name to parent path
     const slotPath = [...widgetPath, slotName];
-    
+
     // Determine if this is a nested slot (inside a container widget)
     // widgetPath format: [topSlot, containerId] for nested widgets
     // For selection paths, we need: "topSlot/containerId/nestedSlot/nestedWidgetId"
@@ -198,9 +199,14 @@ const SelfContainedSlotEditor = ({
 
     /**
      * Handle pasting widgets to slot
+     * @param {Array} pastedWidgets - Widgets to paste
+     * @param {string} mode - 'replace' or 'append'
+     * @param {Object} metadata - Optional metadata for cut operations { operation: 'cut', metadata: {...} }
      */
-    const handlePasteToSlot = useCallback((pastedWidgets, mode) => {
-        if (!pastedWidgets || !Array.isArray(pastedWidgets)) return;
+    const handlePasteToSlot = useCallback((pastedWidgets, mode, metadata) => {
+        if (!pastedWidgets || !Array.isArray(pastedWidgets)) {
+            return;
+        }
 
         let newWidgets;
         if (mode === 'replace') {
@@ -211,7 +217,14 @@ const SelfContainedSlotEditor = ({
 
         setWidgets(newWidgets);
         notifySlotChange(newWidgets);
-    }, [widgets, notifySlotChange]);
+
+        // If this was a cut operation, delete the original widgets
+        if (metadata && metadata.operation === 'cut' && metadata.metadata && onDeleteCutWidgets) {
+            onDeleteCutWidgets(metadata.metadata).catch(() => {
+                // Silently handle errors - deletion failure shouldn't break paste
+            });
+        }
+    }, [widgets, notifySlotChange, onDeleteCutWidgets]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback(() => {
@@ -292,6 +305,7 @@ const SelfContainedSlotEditor = ({
                                     onToggleWidgetSelection={onToggleWidgetSelection ? () => {
                                         // Build full nested path: "topSlot/containerId/nestedSlot/widgetId"
                                         if (isNestedSlot && topSlot && containerId) {
+                                            // For nested widgets, nestedPath should be "nestedSlot/widgetId"
                                             const nestedPath = `${slotName}/${widget.id}`;
                                             onToggleWidgetSelection(topSlot, containerId, nestedPath);
                                         } else {

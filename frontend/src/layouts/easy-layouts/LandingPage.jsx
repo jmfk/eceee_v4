@@ -120,6 +120,7 @@ export const LandingPage = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />

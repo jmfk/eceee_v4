@@ -40,6 +40,15 @@ const SectionWidget = ({
     slotName,
     widgetPath = [],
     context = {},
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    onDeleteCutWidgets, // Callback to delete cut widgets after paste
+    buildWidgetPath,
+    parseWidgetPath,
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -338,6 +347,15 @@ const SectionWidget = ({
                     onOpenWidgetEditor={onOpenWidgetEditor}
                     onSlotChange={handleSlotChange}
                     parentComponentId={parentComponentId}
+                    // Selection props
+                    selectedWidgets={selectedWidgets}
+                    cutWidgets={cutWidgets}
+                    onToggleWidgetSelection={onToggleWidgetSelection}
+                    isWidgetSelected={isWidgetSelected}
+                    isWidgetCut={isWidgetCut}
+                    onDeleteCutWidgets={onDeleteCutWidgets}
+                    buildWidgetPath={buildWidgetPath}
+                    parseWidgetPath={parseWidgetPath}
                     parentSlotName={slotName}
                     widgetPath={widgetPath}
                     emptyMessage="No content in section"
@@ -345,6 +363,14 @@ const SectionWidget = ({
                     mode="editor"
                     showClearButton={false}
                     compactAddButton={true}
+                    // Selection props
+                    selectedWidgets={selectedWidgets}
+                    cutWidgets={cutWidgets}
+                    onToggleWidgetSelection={onToggleWidgetSelection}
+                    isWidgetSelected={isWidgetSelected}
+                    isWidgetCut={isWidgetCut}
+                    buildWidgetPath={buildWidgetPath}
+                    parseWidgetPath={parseWidgetPath}
                 />
             </div>
         );

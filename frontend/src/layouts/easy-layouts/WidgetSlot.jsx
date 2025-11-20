@@ -48,6 +48,7 @@ const WidgetSlot = ({
     onToggleWidgetSelection, // (slotName, widgetId, nestedPath?) => void
     isWidgetSelected, // (slotName, widgetId, nestedPath?) => boolean
     isWidgetCut, // (slotName, widgetId, nestedPath?) => boolean
+    onDeleteCutWidgets, // (cutMetadata) => void - Callback to delete cut widgets
     buildWidgetPath, // (slotName, widgetId, nestedPath?) => string
     parseWidgetPath, // (widgetPath) => object
 }) => {
@@ -336,6 +337,7 @@ const WidgetSlot = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />

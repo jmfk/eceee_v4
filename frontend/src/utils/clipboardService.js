@@ -34,9 +34,13 @@ export const copyToClipboard = async (type, data, metadata = {}) => {
         }
 
         // Clear any existing clipboard entry of this type
-        await clearClipboardByType(type).catch(() => {
-            // Ignore errors - might not exist
-        })
+        // Silently ignore errors (401, 404, etc.) - might not exist or user might not be authenticated
+        try {
+            await clearClipboardByType(type)
+        } catch (error) {
+            // Ignore all errors - clipboard clearing is optional
+            console.debug('Could not clear existing clipboard entry:', error)
+        }
 
         // Create new clipboard entry
         const uuid = await createClipboardEntry(type, data, 'copy', metadata)
@@ -65,9 +69,13 @@ export const cutToClipboard = async (type, data, metadata = {}) => {
         }
 
         // Clear any existing clipboard entry of this type
-        await clearClipboardByType(type).catch(() => {
-            // Ignore errors - might not exist
-        })
+        // Silently ignore errors (401, 404, etc.) - might not exist or user might not be authenticated
+        try {
+            await clearClipboardByType(type)
+        } catch (error) {
+            // Ignore all errors - clipboard clearing is optional
+            console.debug('Could not clear existing clipboard entry:', error)
+        }
 
         // Create new clipboard entry with cut operation
         const uuid = await createClipboardEntry(type, data, 'cut', metadata)

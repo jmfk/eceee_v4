@@ -38,6 +38,7 @@ const SlotEditor = forwardRef(({
     onToggleWidgetSelection,
     isWidgetSelected,
     isWidgetCut,
+    onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath
 }, ref) => {
@@ -91,6 +92,7 @@ const SlotEditor = forwardRef(({
                 onToggleWidgetSelection={onToggleWidgetSelection}
                 isWidgetSelected={isWidgetSelected}
                 isWidgetCut={isWidgetCut}
+                onDeleteCutWidgets={onDeleteCutWidgets}
                 buildWidgetPath={buildWidgetPath}
                 parseWidgetPath={parseWidgetPath}
             />

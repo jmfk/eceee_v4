@@ -55,6 +55,7 @@ export const MainLayout = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />
@@ -110,6 +111,7 @@ export const MainLayout = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />
@@ -200,6 +202,7 @@ export const MainLayout = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />

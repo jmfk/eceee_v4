@@ -33,6 +33,7 @@ const ThreeColumnsWidget = ({
     onToggleWidgetSelection,
     isWidgetSelected,
     isWidgetCut,
+    onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath,
     ...props
@@ -278,6 +279,7 @@ const ThreeColumnsWidget = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />
@@ -306,6 +308,7 @@ const ThreeColumnsWidget = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />
@@ -334,6 +337,7 @@ const ThreeColumnsWidget = ({
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
                         isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />

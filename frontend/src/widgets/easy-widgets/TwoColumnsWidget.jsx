@@ -33,6 +33,7 @@ const TwoColumnsWidget = ({
     onToggleWidgetSelection,
     isWidgetSelected,
     isWidgetCut,
+    onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath,
     ...props
@@ -296,6 +297,15 @@ const TwoColumnsWidget = ({
                         emptyMessage="No widgets in left column"
                         className=""
                         mode="editor" // Explicitly pass editor mode
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                         showClearButton={false} // Hide Clear Slot button
                         compactAddButton={true} // Show just + icon
                         // Selection props
@@ -325,6 +335,15 @@ const TwoColumnsWidget = ({
                         emptyMessage="No widgets in right column"
                         className=""
                         mode="editor" // Explicitly pass editor mode
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
                         showClearButton={false} // Hide Clear Slot button
                         compactAddButton={true} // Show just + icon
                         // Selection props

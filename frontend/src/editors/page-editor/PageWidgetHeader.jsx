@@ -96,9 +96,12 @@ const PageWidgetHeader = ({
     };
 
     const handlePaste = async () => {
-        if (!onPaste) return;
+        if (!onPaste) {
+            return;
+        }
         
         const clipboardResult = await readClipboardWithMetadata();
+        
         if (clipboardResult && clipboardResult.data && clipboardResult.data.length > 0) {
             const pastedWidget = clipboardResult.data[0];
             const widgetWithNewId = generateNewWidgetIds(pastedWidget);

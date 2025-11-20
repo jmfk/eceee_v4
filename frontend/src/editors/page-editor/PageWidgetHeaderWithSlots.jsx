@@ -93,7 +93,7 @@ const PageWidgetHeaderWithSlots = ({
 
     const handleCutWidget = async () => {
         if (!widget || !slotName) return
-        
+
         // Build metadata for cut operation
         const cutMetadata = {
             pageId: pageId,
@@ -102,9 +102,9 @@ const PageWidgetHeaderWithSlots = ({
                 [slotName]: [widget.id]
             }
         }
-        
+
         await cutWidgetsToClipboard([widget], cutMetadata)
-        
+
         // If onCut callback is provided, call it (for visual feedback)
         if (onCut) {
             onCut()
@@ -113,17 +113,17 @@ const PageWidgetHeaderWithSlots = ({
 
     const handlePasteWidget = async () => {
         if (!onPaste) return
-        
+
         const clipboardResult = await readClipboardWithMetadata()
         if (clipboardResult && clipboardResult.data && clipboardResult.data.length > 0) {
             const widgetWithNewId = generateNewWidgetIds(clipboardResult.data[0])
-            
+
             // Pass clipboard metadata if it's a cut operation
             const metadata = clipboardResult.operation === 'cut' ? {
                 operation: clipboardResult.operation,
                 metadata: clipboardResult.metadata
             } : undefined;
-            
+
             onPaste(widgetWithNewId, metadata)
         }
     }
@@ -136,9 +136,12 @@ const PageWidgetHeaderWithSlots = ({
     }
 
     const handlePasteToSlot = async () => {
-        if (!onPasteToSlot) return
-        
-        const clipboardResult = await readClipboardWithMetadata()
+        if (!onPasteToSlot) {
+            return;
+        }
+
+        const clipboardResult = await readClipboardWithMetadata();
+
         if (clipboardResult && clipboardResult.data && clipboardResult.data.length > 0) {
             setPendingPasteWidgets({
                 widgets: clipboardResult.data,
@@ -154,13 +157,13 @@ const PageWidgetHeaderWithSlots = ({
             const widgetsData = pendingPasteWidgets.widgets || pendingPasteWidgets
             const widgetsArray = Array.isArray(widgetsData) ? widgetsData : [widgetsData]
             const widgetsWithNewIds = widgetsArray.map(w => generateNewWidgetIds(w))
-            
+
             // Pass metadata if it's a cut operation
             const metadata = pendingPasteWidgets.operation === 'cut' ? {
                 operation: pendingPasteWidgets.operation,
                 metadata: pendingPasteWidgets.metadata
             } : undefined;
-            
+
             onPasteToSlot(widgetsWithNewIds, mode, metadata)
             setPendingPasteWidgets(null)
         }

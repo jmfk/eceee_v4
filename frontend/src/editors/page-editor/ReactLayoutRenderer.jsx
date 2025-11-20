@@ -308,17 +308,223 @@ const ReactLayoutRenderer = forwardRef(({
                 const insertPosition = insertAfterIndex + 1;
                 const clipboardMetadata = args[1]; // Optional: { operation, metadata } from clipboard
 
-                // Update local state for immediate UI feedback
-                const slotWidgetsPaste = [...(widgets[slotName] || [])];
+                console.log('[Cut/Paste] ========== PASTE OPERATION START ==========');
+                console.log('[Cut/Paste] Pasted widget:', pastedWidget);
+                console.log('[Cut/Paste] Slot:', slotName, 'Insert position:', insertPosition);
+                console.log('[Cut/Paste] Clipboard metadata:', clipboardMetadata);
+                console.log('[Cut/Paste] Current widgets state:', widgets);
+
+                // Start with current widgets state
+                let updatedWidgets = { ...widgets };
+                
+                // Store pasted widget ID to ensure we don't accidentally delete it
+                const pastedWidgetId = pastedWidget.id;
+                console.log('[Cut/Paste] Pasted widget ID:', pastedWidgetId, 'Type:', typeof pastedWidgetId);
+                
+                // Add the pasted widget FIRST to ensure correct insert position
+                const slotWidgetsPaste = [...(updatedWidgets[slotName] || [])];
+                console.log('[Cut/Paste] Slot widgets before paste:', slotWidgetsPaste.map(w => ({ id: w.id, type: typeof w.id })));
                 slotWidgetsPaste.splice(insertPosition, 0, pastedWidget);
+                updatedWidgets[slotName] = slotWidgetsPaste;
+                console.log('[Cut/Paste] Slot widgets after paste:', updatedWidgets[slotName].map(w => ({ id: w.id, type: typeof w.id })));
 
-                const updatedWidgetsPaste = {
-                    ...widgets,
-                    [slotName]: slotWidgetsPaste
-                };
+                // If this was a cut operation, delete the original widgets AFTER adding pasted widget
+                // The pasted widget has a new ID, so it won't be deleted
+                if (clipboardMetadata && clipboardMetadata.operation === 'cut' && clipboardMetadata.metadata) {
+                    const cutMetadata = clipboardMetadata.metadata;
+                    
+                    // Check if this is a cross-page cut/paste operation
+                    const sourcePageId = cutMetadata.pageId;
+                    const currentPageId = context?.pageId || webpageData?.id;
+                    const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
+                    
+                    if (!isCrossPage) {
+                        // For same-page operations, remove widgets from updatedWidgets
+                        let widgetsDeleted = false;
+                        
+                        // Handle new format with widget paths
+                        if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+                            for (const widgetPath of cutMetadata.widgetPaths) {
+                                const parsed = parseWidgetPath(widgetPath);
+                                if (!parsed) continue;
+                                
+                                if (!parsed.isNested) {
+                                    // Top-level widget - remove from the slot
+                                    if (updatedWidgets[parsed.slotName]) {
+                                        const originalLength = updatedWidgets[parsed.slotName].length;
+                                        
+                                        // Filter out the widget to delete, but keep the pasted widget if it's in the same slot
+                                        // Use String() to ensure type matching and also check both string and number formats
+                                        updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(
+                                            w => {
+                                                if (!w) return false;
+                                                const widgetIdStr = String(w.id);
+                                                const parsedIdStr = String(parsed.widgetId);
+                                                const pastedIdStr = String(pastedWidgetId);
+                                                return widgetIdStr !== parsedIdStr && widgetIdStr !== pastedIdStr;
+                                            }
+                                        );
+                                        
+                                        const removed = originalLength - updatedWidgets[parsed.slotName].length;
+                                        
+                                        if (removed > 0) {
+                                            widgetsDeleted = true;
+                                            // Publish UDC operation
+                                            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                                                id: parsed.widgetId,
+                                                contextType: contextType
+                                            });
+                                        }
+                                    }
+                                } else {
+                                    // Nested widget - update container widget's config
+                                    if (updatedWidgets[parsed.slotName]) {
+                                        const containerWidget = updatedWidgets[parsed.slotName].find(
+                                            w => String(w.id) === String(parsed.containerId)
+                                        );
+                                        if (containerWidget && containerWidget.config && containerWidget.config.slots) {
+                                            const nestedSlotWidgets = containerWidget.config.slots[parsed.nestedSlot] || [];
+                                            const originalLength = nestedSlotWidgets.length;
+                                            
+                                            containerWidget.config.slots[parsed.nestedSlot] = nestedSlotWidgets.filter(
+                                                w => w && String(w.id) !== String(parsed.nestedWidgetId)
+                                            );
+                                            
+                                            const removed = originalLength - containerWidget.config.slots[parsed.nestedSlot].length;
+                                            if (removed > 0) {
+                                                widgetsDeleted = true;
+                                                // Update the container widget in the state
+                                                updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].map(w =>
+                                                    String(w.id) === String(parsed.containerId) ? containerWidget : w
+                                                );
+                                                
+                                                // Publish UDC operation
+                                                await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                                                    id: parsed.containerId,
+                                                    slotName: parsed.slotName,
+                                                    contextType: contextType,
+                                                    config: containerWidget.config
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (cutMetadata.widgets && typeof cutMetadata.widgets === 'object') {
+                            // Handle backward-compatible format (old format)
+                            for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
+                                const keyParts = key.split('/');
+                                
+                                if (keyParts.length === 3) {
+                                    // Nested widget
+                                    const [slotName, containerId, nestedSlot] = keyParts;
+                                    if (updatedWidgets[slotName]) {
+                                        const containerWidget = updatedWidgets[slotName].find(w => String(w.id) === String(containerId));
+                                        if (containerWidget && containerWidget.config && containerWidget.config.slots) {
+                                            const nestedSlotWidgets = containerWidget.config.slots[nestedSlot] || [];
+                                            const originalLength = nestedSlotWidgets.length;
+                                            
+                                            containerWidget.config.slots[nestedSlot] = nestedSlotWidgets.filter(
+                                                w => {
+                                                    if (!w) return false;
+                                                    const widgetIdStr = String(w.id);
+                                                    const pastedIdStr = String(pastedWidgetId);
+                                                    return !widgetIds.map(String).includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
+                                                }
+                                            );
+                                            
+                                            const removed = originalLength - containerWidget.config.slots[nestedSlot].length;
+                                            
+                                            if (removed > 0) {
+                                                widgetsDeleted = true;
+                                                updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                                                    String(w.id) === String(containerId) ? containerWidget : w
+                                                );
+                                                
+                                                await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                                                    id: containerId,
+                                                    slotName: slotName,
+                                                    contextType: contextType,
+                                                    config: containerWidget.config
+                                                });
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Top-level widget
+                                    const slotName = key;
+                                    
+                                    if (updatedWidgets[slotName]) {
+                                        const originalLength = updatedWidgets[slotName].length;
+                                        
+                                        // Filter out widgets to delete, but keep the pasted widget
+                                        // Use String() to ensure type matching
+                                        updatedWidgets[slotName] = updatedWidgets[slotName].filter(
+                                            widget => {
+                                                if (!widget) {
+                                                    return false;
+                                                }
+                                                const widgetIdStr = String(widget.id);
+                                                const pastedIdStr = String(pastedWidgetId);
+                                                const widgetIdsStr = widgetIds.map(String);
+                                                return !widgetIdsStr.includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
+                                            }
+                                        );
+                                        
+                                        const removed = originalLength - updatedWidgets[slotName].length;
+                                        
+                                        if (removed > 0) {
+                                            for (const widgetId of widgetIds) {
+                                                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                                                    id: widgetId,
+                                                    contextType: contextType
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // ALWAYS clear cut state and selection after paste (even if deletion didn't work)
+                        // This ensures the UI updates correctly
+                        setCutWidgets(new Set());
+                        setSelectedWidgets(new Set());
+                    } else {
+                        // For cross-page operations, publish REMOVE_WIDGET operations to UDC for the source page
+                        if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+                            for (const widgetPath of cutMetadata.widgetPaths) {
+                                const parsed = parseWidgetPath(widgetPath);
+                                if (!parsed) continue;
+                                
+                                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                                    id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
+                                    contextType: contextType,
+                                    pageId: sourcePageId,
+                                });
+                            }
+                        } else if (cutMetadata.widgets) {
+                            for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
+                                for (const widgetId of widgetIds) {
+                                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                                        id: widgetId,
+                                        contextType: contextType,
+                                        pageId: sourcePageId,
+                                    });
+                                }
+                            }
+                        }
+                        
+                        // Clear selection for cross-page operations too
+                        setCutWidgets(new Set());
+                        setSelectedWidgets(new Set());
+                    }
+                }
 
+                // Update state with both paste and deletion (if any)
+                // This MUST be called to update the parent component's state
                 if (onWidgetChange) {
-                    onWidgetChange(updatedWidgetsPaste, { sourceId: pastedWidget.id });
+                    onWidgetChange(updatedWidgets, { sourceId: pastedWidget.id });
                 }
 
                 // Publish to UDC for external sync
@@ -339,11 +545,6 @@ const ReactLayoutRenderer = forwardRef(({
                         contextType: contextType,
                         order: insertPosition
                     });
-                }
-
-                // If this was a cut operation, delete the original widgets
-                if (clipboardMetadata && clipboardMetadata.operation === 'cut' && clipboardMetadata.metadata) {
-                    await handleDeleteCutWidgets(clipboardMetadata.metadata);
                 }
 
                 break;
@@ -458,7 +659,9 @@ const ReactLayoutRenderer = forwardRef(({
         
         selectedWidgets.forEach(widgetPath => {
             const parsed = parseWidgetPath(widgetPath);
-            if (!parsed) return;
+            if (!parsed) {
+                return;
+            }
             
             if (!parsed.isNested) {
                 // Top-level widget
@@ -565,7 +768,9 @@ const ReactLayoutRenderer = forwardRef(({
 
     const handleCutSelected = useCallback(async () => {
         const selected = getSelectedWidgets();
-        if (selected.length === 0) return;
+        if (selected.length === 0) {
+            return;
+        }
         
         const widgetsToCut = selected.map(item => item.widget);
         
@@ -676,21 +881,23 @@ const ReactLayoutRenderer = forwardRef(({
                     // Nested widget - update container widget's config
                     if (updatedWidgets[parsed.slotName]) {
                         const containerWidget = updatedWidgets[parsed.slotName].find(
-                            w => w.id === parsed.containerId
+                            w => String(w.id) === String(parsed.containerId)
                         );
                         if (containerWidget && containerWidget.config && containerWidget.config.slots) {
                             const nestedSlotWidgets = containerWidget.config.slots[parsed.nestedSlot] || [];
                             const originalLength = nestedSlotWidgets.length;
                             
                             containerWidget.config.slots[parsed.nestedSlot] = nestedSlotWidgets.filter(
-                                w => w.id !== parsed.nestedWidgetId
+                                w => w && String(w.id) !== String(parsed.nestedWidgetId)
                             );
                             
-                            if (containerWidget.config.slots[parsed.nestedSlot].length !== originalLength) {
+                            const removed = originalLength - containerWidget.config.slots[parsed.nestedSlot].length;
+                            
+                            if (removed > 0) {
                                 hasChanges = true;
                                 // Update the container widget
                                 updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].map(w =>
-                                    w.id === parsed.containerId ? containerWidget : w
+                                    String(w.id) === String(parsed.containerId) ? containerWidget : w
                                 );
                                 
                                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
@@ -716,19 +923,21 @@ const ReactLayoutRenderer = forwardRef(({
                     // Nested widget
                     const [slotName, containerId, nestedSlot] = keyParts;
                     if (updatedWidgets[slotName]) {
-                        const containerWidget = updatedWidgets[slotName].find(w => w.id === containerId);
+                        const containerWidget = updatedWidgets[slotName].find(w => String(w.id) === String(containerId));
                         if (containerWidget && containerWidget.config && containerWidget.config.slots) {
                             const nestedSlotWidgets = containerWidget.config.slots[nestedSlot] || [];
                             const originalLength = nestedSlotWidgets.length;
                             
                             containerWidget.config.slots[nestedSlot] = nestedSlotWidgets.filter(
-                                w => !widgetIds.includes(w.id)
+                                w => w && !widgetIds.map(String).includes(String(w.id))
                             );
                             
-                            if (containerWidget.config.slots[nestedSlot].length !== originalLength) {
+                            const removed = originalLength - containerWidget.config.slots[nestedSlot].length;
+                            
+                            if (removed > 0) {
                                 hasChanges = true;
                                 updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
-                                    w.id === containerId ? containerWidget : w
+                                    String(w.id) === String(containerId) ? containerWidget : w
                                 );
                                 
                                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
