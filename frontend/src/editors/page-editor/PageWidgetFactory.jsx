@@ -100,8 +100,19 @@ const PageWidgetFactory = ({
 
     // PageEditor-specific edit handler with version awareness
     const handleEdit = () => {
+        console.log('[PageWidgetFactory] handleEdit called:', {
+            slotName,
+            index,
+            widget,
+            hasOnEdit: !!onEdit,
+            onEditType: typeof onEdit
+        });
         if (onEdit) {
-            onEdit(slotName, index, widget)
+            console.log('[PageWidgetFactory] Calling onEdit with:', { slotName, index, widget });
+            onEdit(slotName, index, widget);
+            console.log('[PageWidgetFactory] onEdit called successfully');
+        } else {
+            console.warn('[PageWidgetFactory] onEdit not provided');
         }
     }
 

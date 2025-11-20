@@ -399,7 +399,7 @@ The TreePageManager implements optimistic updates for all operations to provide 
 - **Top-level Pages**: Home (with hostnames), Blog (with hostnames), Staging Site (no hostnames), Development (no hostnames)
 - **2 Hostname Warnings**: "Staging Site" and "Development" pages show warning icons
 - **Complex Hierarchy**: Services → Consulting → Strategy/Technical Consulting (3 levels)
-- **Varied Layouts**: Uses single_column, two_column, three_column, landing_page, and minimal layouts
+- **Varied Layouts**: Uses single_column, main_layout, landing_page layouts
 - **Easy Recreation**: Run `docker-compose exec backend python manage.py create_sample_pages --clear`
 
 ## Summary

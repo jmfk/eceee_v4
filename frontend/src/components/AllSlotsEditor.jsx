@@ -37,6 +37,14 @@ const AllSlotsEditor = ({
     simulatedPath,
     onSimulatedPathChange,
 }) => {
+    // Debug: Log props on mount
+    console.log('[AllSlotsEditor] Component mounted with props:', {
+        hasOnOpenWidgetEditor: !!onOpenWidgetEditor,
+        onOpenWidgetEditorType: typeof onOpenWidgetEditor,
+        editable,
+        widgetsCount: Object.keys(widgets).length
+    });
+    
     // Fetch all slots from API
     const { data: slotsData, isLoading: isLoadingSlots } = useQuery({
         queryKey: ['allSlots'],
@@ -168,18 +176,45 @@ const AllSlotsEditor = ({
 
             case 'edit': {
                 const widgetIndex = args[0];
+                console.log('[AllSlotsEditor] Edit action triggered:', {
+                    action: 'edit',
+                    slotName,
+                    widgetIndex,
+                    widget,
+                    args,
+                    hasOnOpenWidgetEditor: !!onOpenWidgetEditor
+                });
+                
                 if (onOpenWidgetEditor) {
-                    onOpenWidgetEditor({
+                    // Ensure widget has required fields for WidgetEditorPanel
+                    const widgetData = {
                         ...widget,
-                        slotName,
+                        id: widget.id || `widget-${widgetIndex}`,
+                        type: widget.type,
+                        config: widget.config || {},
+                        slotName: slotName,
                         context: {
                             ...(context || {}),
                             slotName,
-                            widgetId: widget.id,
+                            widgetId: widget.id || `widget-${widgetIndex}`,
                             mode: 'edit',
                             contextType: 'page'
                         }
-                    });
+                    };
+                    
+                    console.log('[AllSlotsEditor] Prepared widgetData:', widgetData);
+                    
+                    // Verify widget has type before opening editor
+                    if (!widgetData.type) {
+                        console.error('[AllSlotsEditor] Widget missing type field:', widget);
+                        return;
+                    }
+                    
+                    console.log('[AllSlotsEditor] Calling onOpenWidgetEditor with:', widgetData);
+                    onOpenWidgetEditor(widgetData);
+                    console.log('[AllSlotsEditor] onOpenWidgetEditor called successfully');
+                } else {
+                    console.warn('[AllSlotsEditor] onOpenWidgetEditor not provided');
                 }
                 break;
             }

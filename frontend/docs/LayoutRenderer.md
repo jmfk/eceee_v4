@@ -59,8 +59,8 @@ None - all props are optional with sensible defaults.
 
 ```javascript
 const layout = {
-    name: 'two_column',
-    description: 'Two column layout',
+    name: 'main_layout',
+    description: 'Main layout with header, navbar, hero, main content, sidebar, and footer',
     slot_configuration: {
         slots: [
             {
@@ -79,7 +79,7 @@ const layout = {
             }
         ]
     },
-    css_classes: '.layout-two-column { display: grid; }'
+    css_classes: '.layout-main-layout { display: grid; }'
 }
 ```
 
@@ -244,7 +244,7 @@ Theme custom CSS is injected as `<style>` tags:
 Layout-specific CSS classes are applied:
 
 ```html
-<div class="page-layout layout-two_column">
+<div class="page-layout layout-main_layout">
     <!-- slots -->
 </div>
 ```

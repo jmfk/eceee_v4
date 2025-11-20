@@ -12,8 +12,4 @@ from . import layout_registry
 from .layouts import (
     MainLayoutLayout,
     LandingPageLayout,
-    MinimalLayout,
-    SidebarLayout,
-    ThreeColumnLayout,
-    TwoColumnLayout,
 )

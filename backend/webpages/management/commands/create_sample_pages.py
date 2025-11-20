@@ -134,7 +134,7 @@ class Command(BaseCommand):
                     {
                         "title": "About",
                         "slug": "about",
-                        "code_layout": "two_column",
+                        "code_layout": "main_layout",
                         "children": [
                             {
                                 "title": "Our Team",
@@ -156,7 +156,7 @@ class Command(BaseCommand):
                     {
                         "title": "Services",
                         "slug": "services",
-                        "code_layout": "two_column",
+                        "code_layout": "main_layout",
                         "children": [
                             {
                                 "title": "Consulting",
@@ -202,7 +202,7 @@ class Command(BaseCommand):
                     {
                         "title": "Resources",
                         "slug": "resources",
-                        "code_layout": "three_column",
+                        "code_layout": "main_layout",
                         "children": [
                             {
                                 "title": "Documentation",
@@ -245,7 +245,7 @@ class Command(BaseCommand):
                 "title": "Staging Site",
                 "slug": "staging",
                 "hostnames": [],  # No hostnames - should show warning
-                "code_layout": "minimal",
+                "code_layout": "main_layout",
                 "children": [
                     {
                         "title": "Test Page",
@@ -258,7 +258,7 @@ class Command(BaseCommand):
                 "title": "Development",
                 "slug": "development",
                 "hostnames": [],
-                "code_layout": "minimal",
+                "code_layout": "main_layout",
             },
         ]
 
