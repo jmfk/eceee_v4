@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { FileText } from 'lucide-react'
+import { FileText, Type, AlignLeft } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -213,11 +213,34 @@ const BannerWidget = ({
         }
     }, [fieldComponentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
-    // Initialize editor in editor mode (only once)
+    // Mode conversion handler
+    const handleModeToggle = useCallback(() => {
+        if (!widgetId || !slotName) return
+
+        const newMode = bannerMode === 'header' ? 'text' : 'header'
+        const updatedConfig = { ...configRef.current, bannerMode: newMode }
+        setConfig(updatedConfig)
+
+        // Publish mode change to UDC
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            config: { bannerMode: newMode },
+            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+            slotName: slotName,
+            contextType: contextType
+        })
+
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
+        }
+    }, [bannerMode, widgetId, slotName, componentId, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    // Initialize editor in editor mode
     useEffect(() => {
         if (mode === 'editor' && imageCount !== 4) {
             if (contentContainerRef.current && !contentEditorRef.current) {
-                const editorMode = bannerMode === 'header' ? 'text-only' : 'inline-rich'
+                // Both modes use inline-rich now (WYSIWYG with toolbar)
+                const editorMode = 'inline-rich'
                 const element = bannerMode === 'header' ? 'h2' : 'div'
 
                 contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
@@ -248,21 +271,39 @@ const BannerWidget = ({
         }
     }, [handleContentChange, mode, imageCount])
 
+    // Handle bannerMode changes from widget form - reinitialize editor with new element
+    useEffect(() => {
+        if (mode === 'editor' && imageCount !== 4 && contentEditorRef.current) {
+            const currentElement = contentEditorRef.current.options?.element || 'div'
+            const newElement = bannerMode === 'header' ? 'h2' : 'div'
+            
+            // If element type changed, destroy and let initialization effect recreate
+            if (currentElement !== newElement) {
+                contentEditorRef.current.destroy()
+                contentEditorRef.current = null
+                // Editor will be recreated by the initialization effect
+            }
+        }
+    }, [bannerMode, mode, imageCount])
+
     // Update editor content when config changes externally (from UDC/widget form)
     useEffect(() => {
         if (mode === 'editor' && imageCount !== 4) {
             if (contentEditorRef.current) {
-                const editorMode = bannerMode === 'header' ? 'text-only' : 'inline-rich'
+                // Both modes use inline-rich now
+                const editorMode = 'inline-rich'
                 const element = bannerMode === 'header' ? 'h2' : 'div'
 
-                contentEditorRef.current.updateConfig({
-                    content: configRef.current.content || '',
-                    mode: editorMode,
-                    element: element
-                })
+                // Only update if element matches current editor element
+                const currentElement = contentEditorRef.current.options?.element || 'div'
+                if (currentElement === element) {
+                    contentEditorRef.current.updateConfig({
+                        content: configRef.current.content || ''
+                    })
+                }
             }
         }
-    }, [configRef.current.content, mode, imageCount, bannerMode])
+    }, [configRef.current.content, mode, imageCount])
 
     // Check if using component style with Mustache template
     const componentStyle = configRef.current.componentStyle || 'default'
@@ -375,7 +416,27 @@ const BannerWidget = ({
                         ) : (
                             // 1 or 2 images layout - with text
                             <>
-                                <div className="banner-text content" ref={contentContainerRef} />
+                                <div className="banner-text content" style={{ position: 'relative' }} ref={contentContainerRef}>
+                                    {/* Mode toggle button */}
+                                    <button
+                                        onClick={handleModeToggle}
+                                        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs bg-white/90 hover:bg-white border border-gray-300 rounded shadow-sm flex items-center gap-1 transition-colors"
+                                        title={`Switch to ${bannerMode === 'header' ? 'Text' : 'Header'} mode`}
+                                        type="button"
+                                    >
+                                        {bannerMode === 'header' ? (
+                                            <>
+                                                <Type className="h-3 w-3" />
+                                                <span>Header</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <AlignLeft className="h-3 w-3" />
+                                                <span>Text</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
 
                                 <div className={`banner-images image layout-${imageCount}`}>
                                     {image1Url && <img className="banner-image" src={image1Url} alt="" />}
