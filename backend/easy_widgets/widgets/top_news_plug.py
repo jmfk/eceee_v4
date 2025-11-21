@@ -118,9 +118,12 @@ class TopNewsPlugWidget(BaseWidget):
     widget_css = """
     .top-news-plug-widget {
         font-family: var(--body-font, inherit);
-        margin: 2rem 0;
+        margin-bottom: 30px;
     }
-    
+    .top-news-plug-widget:last-child {
+        margin-bottom: 0;
+    }
+     
     /* Layout: 1x3 - Three columns */
     .top-news-plug-widget.layout-1x3 .news-grid {
         display: grid;

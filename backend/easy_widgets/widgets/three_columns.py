@@ -49,10 +49,15 @@ class ThreeColumnsWidget(BaseWidget):
     widget_css = """
     .three-columns-widget {
         display: grid;
-        gap: 1rem;
+        gap: 30px;
         width: 100%;
-        margin-bottom: 1rem;
+        min-height: 140px;
+        margin-bottom: 30px;
     }
+    .three-columns-widget:last-child {
+        margin-bottom: 0;
+    }
+    
     
     .three-columns-widget.three-col-ratio-3-2-1 {
         grid-template-columns: 3fr 2fr 1fr;
@@ -72,7 +77,8 @@ class ThreeColumnsWidget(BaseWidget):
     
     .three-col-slot {
         position: relative;
-        min-height: 50px;
+        min-height: 140px;
+        height: 100%;
     }
     
     .three-col-slot.left {
@@ -88,7 +94,7 @@ class ThreeColumnsWidget(BaseWidget):
     }
     
     .three-col-widget-wrapper {
-        margin-bottom: 0.75rem;
+        margin-bottom: 30px;
     }
     
     .three-col-widget-wrapper:last-child {
@@ -100,9 +106,9 @@ class ThreeColumnsWidget(BaseWidget):
         font-style: italic;
         text-align: center;
         padding: 2rem 1rem;
-        border: 2px dashed #e5e7eb;
-        border-radius: 0.5rem;
+        border: 1px dashed #e5e7eb;
         background-color: #f9fafb;
+        height: 100%;
     }
     
     /* Responsive design */

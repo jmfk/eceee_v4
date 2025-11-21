@@ -148,8 +148,11 @@ class TableWidget(BaseWidget):
     widget_css = """
     .table-widget {
         overflow-x: auto;
-        margin: var(--table-margin, 1rem 0);
+        margin-bottom: 30px;
     }
+    .table-widget:last-child {
+        margin-bottom: 0;
+    }    
     
     .table-widget table {
         width: 100%;
@@ -270,40 +273,40 @@ class TableWidget(BaseWidget):
     def render_with_style(self, config, theme):
         """
         Render table with custom component style from theme.
-        
+
         Args:
             config: Widget configuration
             theme: PageTheme instance
-            
+
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
         from django.template.loader import render_to_string
-        
+
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
             return None
-        
+
         styles = theme.component_styles or {}
         style = styles.get(style_name)
         if not style:
             return None
-        
+
         template = style.get("template", "")
         css = style.get("css", "")
-        
+
         # Check for passthru marker (must be only content in template after trimming)
         if template.strip() == "{{passthru}}":
             # Passthru mode: use default rendering but inject CSS
             return None, css
-        
+
         # Render the table HTML using the default template first
-        table_html = render_to_string(
-            self.template_name,
-            {"config": config}
-        )
-        
+        table_html = render_to_string(self.template_name, {"config": config})
+
         # Prepare context with rendered table as content
         context = prepare_component_context(
             content=table_html,
@@ -311,7 +314,7 @@ class TableWidget(BaseWidget):
             style_vars=style.get("variables", {}),
             config=config,  # Pass raw config for granular control
         )
-        
+
         # Render with style template
         html = render_mustache(template, context)
         return html, css

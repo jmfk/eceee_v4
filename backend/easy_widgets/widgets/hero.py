@@ -185,8 +185,12 @@ class HeroWidget(BaseWidget):
         width: 100%;
         background-color: var(--hero-bg-color, #000000);
         color: var(--hero-text-color, #ffffff);
+        margin-bottom: 30px;
     }
-    
+    .hero-widget:last-child {
+        margin-bottom: 0;
+    }   
+
     .hero-background {
         position: absolute;
         top: 0;

@@ -108,10 +108,11 @@ class SectionWidget(BaseWidget):
 
     widget_css = """
     .section-widget {
-        margin-bottom: 1.5rem;
-        border-radius: 0.5rem;
+        margin-bottom: 30px;
     }
-    
+    .section-widget:last-child {
+        margin-bottom: 0;
+    }    
     .section-header {
         cursor: pointer;
         padding: 1rem;

@@ -214,7 +214,12 @@ class ContentCardWidget(BaseWidget):
         overflow: hidden;
         border-radius: 0;
         box-shadow: none;
+        margin-bottom: 30px;
     }
+    .content-card-widget:last-child {
+        margin-bottom: 0;
+    }
+
     .content-card-header {
         box-sizing: border-box;
         height: 140px;

@@ -193,7 +193,11 @@ class ImageWidget(BaseWidget):
     .image-widget {
         display: block;
         text-align: var(--image-alignment, center);
+        margin-bottom: 30px;
     }
+    .table-widget:last-child {
+        image-widget: 0;
+    }    
     
     .image-widget img {
         max-width: 100%;

@@ -47,9 +47,12 @@ class TwoColumnsWidget(BaseWidget):
     widget_css = """
     .two-columns-widget {
         display: grid;
-        gap: 1rem;
+        gap: 30px;
         width: 100%;
-        margin-bottom: 1rem;
+        margin-bottom: 30px;
+    }
+    .two-columns-widget:last-child {
+        margin-bottom: 0;
     }
     
     .two-columns-widget.two-col-ratio-5-1 {
@@ -74,7 +77,7 @@ class TwoColumnsWidget(BaseWidget):
     
     .two-col-slot {
         position: relative;
-        min-height: 50px;
+        height: 100%;
     }
     
     .two-col-slot.left {
@@ -86,7 +89,7 @@ class TwoColumnsWidget(BaseWidget):
     }
     
     .two-col-widget-wrapper {
-        margin-bottom: 0.75rem;
+        margin-bottom: 30px;
     }
     
     .two-col-widget-wrapper:last-child {
@@ -98,9 +101,9 @@ class TwoColumnsWidget(BaseWidget):
         font-style: italic;
         text-align: center;
         padding: 2rem 1rem;
-        border: 2px dashed #e5e7eb;
-        border-radius: 0.5rem;
+        border: 1px dashed #e5e7eb;
         background-color: #f9fafb;
+        height: 100%;
     }
     
     /* Responsive design */
