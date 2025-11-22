@@ -76,3 +76,6 @@ mcp-server-logs/
 # Local storage for development
 storage/
 
+
+# Separate Repositories
+easy3e-serverless/
