@@ -292,6 +292,7 @@ const SelfContainedSlotEditor = ({
                                     showControls={mode === 'editor'}
                                     widgetId={widget.id}
                                     contextType={contextType}
+                                    onOpenWidgetEditor={onOpenWidgetEditor}
                                     // Pass parent context for nested widgets
                                     parentComponentId={parentComponentId}
                                     // Widget path for infinite nesting

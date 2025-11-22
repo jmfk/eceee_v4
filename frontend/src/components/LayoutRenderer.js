@@ -2316,6 +2316,37 @@ class LayoutRenderer {
       widget.setAttribute('data-slot-name', slotName);
     }
 
+    // Add click handler for widget body to detect focus change
+    if (this.editable) {
+      widget.addEventListener('click', (e) => {
+        // Check if clicking on an editable field (contenteditable, input, textarea, etc.)
+        const isEditableField = e.target.isContentEditable ||
+          e.target.tagName === 'INPUT' ||
+          e.target.tagName === 'TEXTAREA' ||
+          e.target.closest('[contenteditable="true"]');
+
+        if (isEditableField) {
+          // Open the widget editor panel but don't stop propagation
+          // This allows the field to still be focused for editing
+          if (this.openWidgetEditor) {
+            this.openWidgetEditor(widgetInstance);
+          }
+          // Don't stop propagation - allow the field to receive focus
+          return;
+        }
+
+        // Only trigger if clicking the widget body, not the header controls
+        if (!e.target.closest('.widget-header')) {
+          e.stopPropagation();
+
+          // Open the widget editor panel - same as clicking the cog icon
+          if (this.openWidgetEditor) {
+            this.openWidgetEditor(widgetInstance);
+          }
+        }
+      });
+    }
+
     // Add widget header with name and controls (only in editable mode)
     if (this.editable) {
       const header = this.createWidgetHeader(id, name, widgetInstance);

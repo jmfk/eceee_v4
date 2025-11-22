@@ -1341,16 +1341,15 @@ const PageEditor = () => {
 
 
     // Widget editor handlers
-    const handleOpenWidgetEditor = useCallback((widgetData) => {
-        const currentEditingWidget = editingWidgetRef.current
-        
-        if (currentEditingWidget && widgetData && currentEditingWidget.id === widgetData.id) {
-            setWidgetEditorOpen(false)
-            setEditingWidget(null)
-        } else {
-            setEditingWidget(widgetData)
+    const handleOpenWidgetEditor = useCallback((widgetData, forceOpen = true) => {
+        // Always update the editing widget
+        setEditingWidget(widgetData)
+        // forceOpen = true: open the panel (from edit button)
+        // forceOpen = false: only update if already open (from widget body click)
+        if (forceOpen) {
             setWidgetEditorOpen(true)
         }
+        // If forceOpen is false, panel state remains unchanged (open stays open, closed stays closed)
     }, [])
 
     const handleCloseWidgetEditor = useCallback(() => {

@@ -312,6 +312,41 @@ const PageWidgetFactory = ({
                 data-widget-id={widget.id}
                 data-version-id={versionId}
                 data-published={isPublished}
+                onClick={(e) => {
+                    // STOP PROPAGATION FIRST to prevent bubbling to parent container widgets
+                    e.stopPropagation();
+
+                    // Check if clicking on an editable field (contenteditable, input, textarea, etc.)
+                    const isEditableField = e.target.isContentEditable ||
+                        e.target.tagName === 'INPUT' ||
+                        e.target.tagName === 'TEXTAREA' ||
+                        e.target.closest('[contenteditable="true"]');
+
+                    if (isEditableField) {
+                        // Update panel content if already open, but don't auto-open
+                        if (onOpenWidgetEditor) {
+                            const widgetWithSlot = {
+                                ...widget,
+                                slotName: slotName
+                            };
+                            onOpenWidgetEditor(widgetWithSlot, false); // false = don't force open
+                        }
+                        // Don't prevent default - allow the field to receive focus
+                        return;
+                    }
+
+                    // Only trigger if clicking the widget body, not the header controls
+                    if (!e.target.closest('.widget-header') && !e.target.closest('button')) {
+                        // Update panel if already open, but don't auto-open
+                        if (onOpenWidgetEditor) {
+                            const widgetWithSlot = {
+                                ...widget,
+                                slotName: slotName
+                            };
+                            onOpenWidgetEditor(widgetWithSlot, false); // false = don't force open
+                        }
+                    }
+                }}
             >
                 {/* PageEditor-specific Widget Header */}
                 <PageWidgetHeader
