@@ -11,7 +11,7 @@ Section Widget Template
 
 {% if config.enable_collapse %}
     {# Collapsible section with header #}
-    <div class="section-widget" 
+    <div class="section-widget{% if config.show_border %} border-enabled{% endif %}" 
          {% if config.anchor %}id="{{ config.anchor }}"{% endif %}
          data-section-id="{{ config.anchor|default:'' }}"
          {% if config.accordion_mode %}data-accordion-mode="true"{% endif %}>
@@ -36,7 +36,7 @@ Section Widget Template
     </div>
 {% else %}
     {# Non-collapsible: just render content directly with anchor #}
-    <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only">
+    <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only{% if config.show_border %} border-enabled{% endif %}">
         {% for widget in config.rendered_slots.content %}
             <div class="widget-wrapper">
                 {{ widget.html|sanitize_html }}

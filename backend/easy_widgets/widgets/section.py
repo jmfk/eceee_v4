@@ -72,6 +72,17 @@ class SectionConfig(BaseModel):
         },
     )
 
+    showBorder: bool = Field(
+        False,
+        description="Show widget border",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "order": 8,
+            "group": "Display Options",
+        },
+    )
+
     anchor: Optional[str] = Field(
         None,
         description="Anchor name for linking (auto-generated from title)",
@@ -109,6 +120,12 @@ class SectionWidget(BaseWidget):
     widget_css = """
     .section-widget {
         margin-bottom: 30px;
+    }
+    .section-widget.border-enabled {
+        outline: 1px solid #999999;
+    }
+    .section-content-only.border-enabled {
+        outline: 1px solid #999999;
     }
     .section-widget:last-child {
         margin-bottom: 0;
@@ -252,6 +269,13 @@ class SectionWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering and anchor generation"""
         template_config = super().prepare_template_context(config, context)
+
+        # Ensure snake_case fields for template
+        template_config["show_border"] = (
+            config.get("showBorder")
+            if config.get("showBorder") is not None
+            else config.get("show_border", False)
+        )
 
         # Auto-generate anchor from title if not provided
         title = config.get("title", "")

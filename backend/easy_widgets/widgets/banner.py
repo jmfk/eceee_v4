@@ -133,6 +133,16 @@ class BannerConfig(BaseModel):
             "group": "Styling",
         },
     )
+    showBorder: bool = Field(
+        True,
+        description="Show widget border",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "order": 11,
+            "group": "Styling",
+        },
+    )
     anchor: str = Field(
         "",
         description="Anchor ID for linking to this section",
@@ -194,6 +204,9 @@ class BannerWidget(BaseWidget):
         border-radius: 0;
         box-shadow: none;
         margin-bottom: 30px;
+    }
+    .banner-widget.border-disabled {
+        outline: none;
     }
     .banner-widget:last-child {
         margin-bottom: 0;
@@ -373,6 +386,7 @@ class BannerWidget(BaseWidget):
         template_config["component_style"] = config.get("componentStyle") or config.get(
             "component_style", "default"
         )
+        template_config["show_border"] = config.get("showBorder") if config.get("showBorder") is not None else config.get("show_border", True)
         template_config["background_image"] = config.get(
             "backgroundImage"
         ) or config.get("background_image")

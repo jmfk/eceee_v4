@@ -539,6 +539,7 @@ const WidgetEditorPanel = forwardRef(({
                                     widgetId={widgetData?.id}
                                     slotName={widgetData?.slotName || widgetData?.slot}
                                     context={memoizedContext}
+                                    onDirtyChange={setHasChanges}
                                 />
                                 <WidgetPublishingInheritanceFields
                                     widgetData={widgetData}

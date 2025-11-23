@@ -54,6 +54,15 @@ class ContentConfig(BaseModel):
             "component": "ComponentStyleSelector",
         },
     )
+    showBorder: bool = Field(
+        False,
+        description="Show widget border",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "group": "Styling",
+        },
+    )
     enableLightbox: bool = Field(
         False,
         description="Enable lightbox on images inside content",
@@ -137,6 +146,9 @@ class ContentWidget(BaseWidget):
         font-family: inherit;
         line-height: 1.6;
         color: inherit;
+    }
+    .content-widget.border-enabled {
+        outline: 1px solid #999999;
     }
 
     .content-widget h1,
@@ -264,6 +276,7 @@ class ContentWidget(BaseWidget):
         template_config["sanitize_html"] = config.get("sanitize_html") or config.get(
             "sanitizeHtml", True
         )
+        template_config["show_border"] = config.get("showBorder") if config.get("showBorder") is not None else config.get("show_border", False)
 
         # Get content HTML
         content_html = config.get("content", "")

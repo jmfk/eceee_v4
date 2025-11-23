@@ -185,7 +185,8 @@ const IsolatedFormRenderer = React.memo(({
     contextType = null,
     widgetId = null,
     slotName = null,
-    context = {}
+    context = {},
+    onDirtyChange = null
 }) => {
     const schemaRef = useRef(null)
     // Use refs for form state to prevent rerenders
@@ -200,8 +201,18 @@ const IsolatedFormRenderer = React.memo(({
     // Ref to track last UDC update timestamp to prevent prop sync from overwriting UDC updates
     const lastUdcUpdateRef = useRef(0)
 
+    // Callback for dirty state changes
+    const handleDirtyChange = useCallback((isDirty) => {
+        // Notify parent component of dirty state changes
+        if (onDirtyChange) {
+            onDirtyChange(isDirty)
+        }
+    }, [onDirtyChange])
+
     // Use form data buffer to store changes without re-renders
-    const formBuffer = useFormDataBuffer(initWidgetData)
+    const formBuffer = useFormDataBuffer(initWidgetData, null, {
+        onDirtyChange: handleDirtyChange
+    })
 
     // Memoize current widget data to prevent rerenders from new object references
     // formBuffer.getCurrentData() returns a new object each time, so we need to memoize
