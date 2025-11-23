@@ -276,7 +276,7 @@ const BannerWidget = ({
         if (mode === 'editor' && imageCount !== 4 && contentEditorRef.current) {
             const currentElement = contentEditorRef.current.options?.element || 'div'
             const newElement = bannerMode === 'header' ? 'h2' : 'div'
-            
+
             // If element type changed, destroy and let initialization effect recreate
             if (currentElement !== newElement) {
                 contentEditorRef.current.destroy()

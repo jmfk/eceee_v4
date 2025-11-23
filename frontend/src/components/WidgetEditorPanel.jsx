@@ -390,13 +390,16 @@ const WidgetEditorPanel = forwardRef(({
             versionId: context?.versionId || pageVersionData?.versionId,
             webpageData: context?.webpageData || webpageData,
             pageVersionData: context?.pageVersionData || pageVersionData,
-            theme: pageVersionData?.effectiveTheme
+            theme: pageVersionData?.effectiveTheme,
+            // Preserve widgetPath from widgetData (top-level or context) for nested widgets
+            widgetPath: widgetData?.widgetPath || widgetData?.context?.widgetPath
         }
     }, [
         widgetData?.id,
         widgetData?.slotName,
         widgetData?.slot,
         widgetData?.context,
+        widgetData?.widgetPath,
         contextType,
         context?.pageId,
         context?.versionId,

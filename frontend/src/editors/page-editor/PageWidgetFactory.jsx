@@ -327,7 +327,16 @@ const PageWidgetFactory = ({
                         if (onOpenWidgetEditor) {
                             const widgetWithSlot = {
                                 ...widget,
-                                slotName: slotName
+                                slotName: slotName,
+                                widgetPath: widgetPath,
+                                context: {
+                                    ...widget.context,
+                                    slotName: slotName,
+                                    widgetId: widget.id,
+                                    mode: 'edit',
+                                    contextType,
+                                    widgetPath: widgetPath
+                                }
                             };
                             onOpenWidgetEditor(widgetWithSlot, false); // false = don't force open
                         }
@@ -341,7 +350,16 @@ const PageWidgetFactory = ({
                         if (onOpenWidgetEditor) {
                             const widgetWithSlot = {
                                 ...widget,
-                                slotName: slotName
+                                slotName: slotName,
+                                widgetPath: widgetPath,
+                                context: {
+                                    ...widget.context,
+                                    slotName: slotName,
+                                    widgetId: widget.id,
+                                    mode: 'edit',
+                                    contextType,
+                                    widgetPath: widgetPath
+                                }
                             };
                             onOpenWidgetEditor(widgetWithSlot, false); // false = don't force open
                         }
