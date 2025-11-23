@@ -115,6 +115,9 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
             )
         }
 
+        // Sort widgets alphabetically by name
+        widgets.sort((a, b) => a.name.localeCompare(b.name))
+
         return widgets
     }, [slot, availableWidgetTypes, searchTerm, showAllWidgets])
 

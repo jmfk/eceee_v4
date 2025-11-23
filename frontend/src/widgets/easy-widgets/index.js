@@ -16,6 +16,7 @@ import BannerWidget from './BannerWidget';
 import ImageWidget from './ImageWidget';
 import TableWidget from './TableWidget';
 import HeaderWidget from './HeaderWidget';
+import HeadlineWidget from './HeadlineWidget';
 import HeroWidget from './HeroWidget';
 import NavbarWidget from './NavbarWidget';
 import NavigationWidget from './NavigationWidget';
@@ -45,6 +46,7 @@ export const EASY_WIDGET_REGISTRY = {
     'easy_widgets.ImageWidget': registerWidget(ImageWidget, 'easy_widgets.ImageWidget'),
     'easy_widgets.TableWidget': registerWidget(TableWidget, 'easy_widgets.TableWidget'),
     'easy_widgets.HeaderWidget': registerWidget(HeaderWidget, 'easy_widgets.HeaderWidget'),
+    'easy_widgets.HeadlineWidget': registerWidget(HeadlineWidget, 'easy_widgets.HeadlineWidget'),
     'easy_widgets.HeroWidget': registerWidget(HeroWidget, 'easy_widgets.HeroWidget'),
     'easy_widgets.NavbarWidget': registerWidget(NavbarWidget, 'easy_widgets.NavbarWidget'),
     'easy_widgets.NavigationWidget': registerWidget(NavigationWidget, 'easy_widgets.NavigationWidget'),
@@ -111,6 +113,7 @@ export { default as BannerWidget } from './BannerWidget';
 export { default as ImageWidget } from './ImageWidget';
 export { default as TableWidget } from './TableWidget';
 export { default as HeaderWidget } from './HeaderWidget';
+export { default as HeadlineWidget } from './HeadlineWidget';
 export { default as HeroWidget } from './HeroWidget';
 export { default as NavbarWidget } from './NavbarWidget';
 export { default as NavigationWidget } from './NavigationWidget';

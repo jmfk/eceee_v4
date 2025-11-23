@@ -12,6 +12,7 @@ from .image import ImageWidget
 from .table import TableWidget
 from .footer import FooterWidget
 from .header import HeaderWidget
+from .headline import HeadlineWidget
 from .hero import HeroWidget
 from .navbar import NavbarWidget
 from .navigation import NavigationWidget
@@ -35,6 +36,7 @@ __all__ = [
     "TableWidget",
     "FooterWidget",
     "HeaderWidget",
+    "HeadlineWidget",
     "HeroWidget",
     "NavbarWidget",
     "NavigationWidget",
