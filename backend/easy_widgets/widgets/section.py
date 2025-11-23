@@ -124,10 +124,16 @@ class SectionWidget(BaseWidget):
     .section-widget.border-enabled {
         outline: 1px solid #999999;
     }
+    .section-widget:last-child {
+        margin-bottom: 0;
+    }
+    .section-content-only {
+        margin-bottom: 30px;
+    }
     .section-content-only.border-enabled {
         outline: 1px solid #999999;
     }
-    .section-widget:last-child {
+    .section-content-only:last-child {
         margin-bottom: 0;
     }    
     .section-header {
