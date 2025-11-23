@@ -31,7 +31,8 @@ const WidgetEditorPanel = forwardRef(({
     namespace = null,
     context = {},
     webpageData = null,
-    pageVersionData = null
+    pageVersionData = null,
+    onSpecialEditorStateChange = null
 }, ref) => {
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
@@ -99,6 +100,13 @@ const WidgetEditorPanel = forwardRef(({
             closeSpecialEditor()
         }
     }, [isOpen, showSpecialEditor, closeSpecialEditor])
+
+    // Notify parent when special editor state changes
+    useEffect(() => {
+        if (onSpecialEditorStateChange) {
+            onSpecialEditorStateChange(showSpecialEditor)
+        }
+    }, [showSpecialEditor, onSpecialEditorStateChange])
 
     // Validate widget type availability when widget data changes
     useEffect(() => {
@@ -312,8 +320,9 @@ const WidgetEditorPanel = forwardRef(({
         hasUnsavedChanges: () => hasChanges,
         resetToOriginal: () => {
             setHasChanges(false)
-        }
-    }), [hasChanges, widgetData])
+        },
+        isSpecialEditorOpen: () => showSpecialEditor
+    }), [hasChanges, widgetData, showSpecialEditor])
 
     // Handle close - revert changes if not saved
     const handleClose = async () => {

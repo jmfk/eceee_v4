@@ -374,6 +374,7 @@ const PageEditor = () => {
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
+    const [isSpecialEditorOpen, setIsSpecialEditorOpen] = useState(false)
     const widgetEditorRef = useRef(null)
 
     // Ref to track current editing widget for callbacks
@@ -1574,7 +1575,8 @@ const PageEditor = () => {
                         <div className="flex items-center space-x-4">
                             <button
                                 onClick={handleClose}
-                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                disabled={isSpecialEditorOpen}
+                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
                                 Back to {previousView === '/pages' ? 'Pages' :
@@ -1877,6 +1879,7 @@ const PageEditor = () => {
                         namespace={namespace}
                         webpageData={webpageData}
                         pageVersionData={pageVersionData}
+                        onSpecialEditorStateChange={setIsSpecialEditorOpen}
                         context={{
                             pageId: webpageData?.id,
                             versionId: pageVersionData?.versionId,
