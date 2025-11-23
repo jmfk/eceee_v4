@@ -49,6 +49,9 @@ const SectionWidget = ({
     onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition,
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -269,10 +272,12 @@ const SectionWidget = ({
                     pageVersionData={context.pageVersionData}
                     versionId={context.versionId}
                     widgetPath={fullWidgetPath}
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={onPasteAtPosition}
                 />
             </div>
         );
-    }, [widgetPath, widgetId, componentId, contextType, context]);
+    }, [widgetPath, widgetId, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
 
     // Show loading state while fetching widget types
     if (mode === 'editor' && isLoadingTypes) {
@@ -336,42 +341,46 @@ const SectionWidget = ({
 
         return (
             <div className={`section-widget border border-gray-200 mb-4 ${config.enableCollapse && !isExpanded ? 'collapsed' : ''}`}>
-                <SlotEditor
-                    slotName="content"
-                    slotLabel={slotLabel}
-                    widgets={widgets}
-                    availableWidgetTypes={filteredWidgetTypes}
-                    parentWidgetId={widgetId}
-                    contextType={contextType}
-                    onWidgetEdit={onWidgetEdit}
-                    onOpenWidgetEditor={onOpenWidgetEditor}
-                    onSlotChange={handleSlotChange}
-                    parentComponentId={parentComponentId}
-                    // Selection props
-                    selectedWidgets={selectedWidgets}
-                    cutWidgets={cutWidgets}
-                    onToggleWidgetSelection={onToggleWidgetSelection}
-                    isWidgetSelected={isWidgetSelected}
-                    isWidgetCut={isWidgetCut}
-                    onDeleteCutWidgets={onDeleteCutWidgets}
-                    buildWidgetPath={buildWidgetPath}
-                    parseWidgetPath={parseWidgetPath}
-                    parentSlotName={slotName}
-                    widgetPath={widgetPath}
-                    emptyMessage="No content in section"
-                    className={`[&_.slot-editor]:!p-0 ${config.enableCollapse && !isExpanded ? '[&_.widgets-list]:hidden' : ''}`}
-                    mode="editor"
-                    showClearButton={false}
-                    compactAddButton={true}
-                    // Selection props
-                    selectedWidgets={selectedWidgets}
-                    cutWidgets={cutWidgets}
-                    onToggleWidgetSelection={onToggleWidgetSelection}
-                    isWidgetSelected={isWidgetSelected}
-                    isWidgetCut={isWidgetCut}
-                    buildWidgetPath={buildWidgetPath}
-                    parseWidgetPath={parseWidgetPath}
-                />
+                <div className="p-4">
+                    <SlotEditor
+                        slotName="content"
+                        slotLabel={slotLabel}
+                        widgets={widgets}
+                        availableWidgetTypes={filteredWidgetTypes}
+                        parentWidgetId={widgetId}
+                        contextType={contextType}
+                        onWidgetEdit={onWidgetEdit}
+                        onOpenWidgetEditor={onOpenWidgetEditor}
+                        onSlotChange={handleSlotChange}
+                        parentComponentId={parentComponentId}
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
+                        parentSlotName={slotName}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
+                        widgetPath={widgetPath}
+                        emptyMessage="No content in section"
+                        className={`[&_.slot-editor]:!p-0 ${config.enableCollapse && !isExpanded ? '[&_.widgets-list]:hidden' : ''}`}
+                        mode="editor"
+                        showClearButton={false}
+                        compactAddButton={true}
+                        // Selection props
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
+                    />
+                </div>
             </div>
         );
     }
@@ -456,11 +465,11 @@ const SectionWidget = ({
                         </div>
                     </div>
                 )}
-                <div className={`section-content ${config.enableCollapse && !isExpanded ? 'hidden' : ''}`}>
+                <div className={`section-content p-4 ${config.enableCollapse && !isExpanded ? 'hidden' : ''}`}>
                     {slotsData.content && slotsData.content.length > 0 ? (
                         slotsData.content.map((widget, index) => renderWidget(widget, 'content', index))
                     ) : (
-                        <div className="p-4 text-center text-gray-400">Section content</div>
+                        <div className="text-center text-gray-400">Section content</div>
                     )}
                 </div>
             </div>
