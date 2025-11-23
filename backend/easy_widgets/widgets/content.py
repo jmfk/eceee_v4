@@ -63,6 +63,15 @@ class ContentConfig(BaseModel):
             "group": "Styling",
         },
     )
+    useContentMargins: bool = Field(
+        True,
+        description="Use content margins (extra left/right padding on larger screens)",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "group": "Styling",
+        },
+    )
     enableLightbox: bool = Field(
         False,
         description="Enable lightbox on images inside content",
@@ -276,7 +285,16 @@ class ContentWidget(BaseWidget):
         template_config["sanitize_html"] = config.get("sanitize_html") or config.get(
             "sanitizeHtml", True
         )
-        template_config["show_border"] = config.get("showBorder") if config.get("showBorder") is not None else config.get("show_border", False)
+        template_config["show_border"] = (
+            config.get("showBorder")
+            if config.get("showBorder") is not None
+            else config.get("show_border", False)
+        )
+        template_config["use_content_margins"] = (
+            config.get("useContentMargins")
+            if config.get("useContentMargins") is not None
+            else config.get("use_content_margins", True)
+        )
 
         # Get content HTML
         content_html = config.get("content", "")

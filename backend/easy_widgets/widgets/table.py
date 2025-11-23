@@ -133,6 +133,15 @@ class TableConfig(BaseModel):
             "component": "ComponentStyleSelector",
         },
     )
+    useContentMargins: bool = Field(
+        False,
+        description="Use content margins (extra left/right padding on larger screens)",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "group": "Display Options",
+        },
+    )
 
 
 @register_widget_type
@@ -318,6 +327,19 @@ class TableWidget(BaseWidget):
         # Render with style template
         html = render_mustache(template, context)
         return html, css
+
+    def prepare_template_context(self, config, context=None):
+        """Prepare template context with snake_case field conversions"""
+        template_config = super().prepare_template_context(config, context)
+
+        # Ensure snake_case fields for template
+        template_config["use_content_margins"] = (
+            config.get("useContentMargins")
+            if config.get("useContentMargins") is not None
+            else config.get("use_content_margins", False)
+        )
+
+        return template_config
 
     @staticmethod
     def get_default_config():

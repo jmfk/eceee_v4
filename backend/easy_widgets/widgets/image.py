@@ -158,6 +158,16 @@ class ImageConfig(BaseModel):
             "group": "Display Options",
         },
     )
+    useContentMargins: bool = Field(
+        False,
+        description="Use content margins (extra left/right padding on larger screens)",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "order": 1,
+            "group": "Display Options",
+        },
+    )
     anchor: str = Field(
         "",
         description="Anchor ID for linking to this section",
@@ -503,6 +513,11 @@ class ImageWidget(BaseWidget):
         )
         template_config["imgproxy_override"] = template_config.get(
             "imgproxyOverride", template_config.get("imgproxy_override", None)
+        )
+        template_config["use_content_margins"] = (
+            config.get("useContentMargins")
+            if config.get("useContentMargins") is not None
+            else config.get("use_content_margins", False)
         )
 
         # Apply randomization if enabled (widget override, then style default, then collection config)
