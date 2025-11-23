@@ -89,6 +89,7 @@ export class SimpleTextEditorRenderer {
             onChange: null,
             placeholder: '',
             element: 'div', // HTML element type: 'div', 'h1', 'h2', 'h5', 'h6'
+            allowedButtons: ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image'], // Which toolbar buttons to show
             ...options
         }
 
@@ -408,7 +409,8 @@ export class SimpleTextEditorRenderer {
                 mode: 'text-only',
                 bold: false,
                 italic: false,
-                link: false
+                link: false,
+                allowedButtons: this.options.allowedButtons || []
             }
         }
 
@@ -436,7 +438,8 @@ export class SimpleTextEditorRenderer {
             insertUnorderedList: false,
             insertOrderedList: false,
             code: false,
-            quote: false
+            quote: false,
+            allowedButtons: this.options.allowedButtons || ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image']
         }
     }
 

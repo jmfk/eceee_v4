@@ -124,7 +124,8 @@ const HeadlineWidget = ({
                     mode: 'inline-rich',
                     onChange: handleContentChange,
                     placeholder: 'Enter headline...',
-                    element: 'h2'
+                    element: 'h2',
+                    allowedButtons: ['bold', 'italic', 'link']
                 })
                 contentEditorRef.current.render()
             }

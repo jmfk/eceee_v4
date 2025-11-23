@@ -195,85 +195,108 @@ const ToolbarButtons = ({ state, onCommand }) => {
         return null;
     }
 
+    // Get allowed buttons (default to all if not specified)
+    const allowedButtons = state.allowedButtons || ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image'];
+    const isAllowed = (button) => allowedButtons.includes(button);
+
     return (
         <div className="flex items-center gap-1">
-            <ToolbarButton
-                command="bold"
-                title="Bold"
-                icon={ICONS.bold}
-                isActive={state.bold}
-                onClick={onCommand}
-            />
+            {isAllowed('bold') && (
+                <ToolbarButton
+                    command="bold"
+                    title="Bold"
+                    icon={ICONS.bold}
+                    isActive={state.bold}
+                    onClick={onCommand}
+                />
+            )}
 
-            <ToolbarButton
-                command="italic"
-                title="Italic"
-                icon={ICONS.italic}
-                isActive={state.italic}
-                onClick={onCommand}
-            />
+            {isAllowed('italic') && (
+                <ToolbarButton
+                    command="italic"
+                    title="Italic"
+                    icon={ICONS.italic}
+                    isActive={state.italic}
+                    onClick={onCommand}
+                />
+            )}
 
-            <ToolbarButton
-                command="createLink"
-                title="Insert/Edit Link"
-                icon={ICONS.link}
-                isActive={state.link}
-                onClick={onCommand}
-            />
+            {isAllowed('link') && (
+                <ToolbarButton
+                    command="createLink"
+                    title="Insert/Edit Link"
+                    icon={ICONS.link}
+                    isActive={state.link}
+                    onClick={onCommand}
+                />
+            )}
 
-            <ToolbarSeparator />
+            {isAllowed('format') && (
+                <>
+                    <ToolbarSeparator />
+                    <FormatDropdown
+                        currentFormat={state.format}
+                        maxHeaderLevel={state.maxHeaderLevel}
+                        onCommand={onCommand}
+                    />
+                </>
+            )}
 
-            <FormatDropdown
-                currentFormat={state.format}
-                maxHeaderLevel={state.maxHeaderLevel}
-                onCommand={onCommand}
-            />
+            {isAllowed('list') && (
+                <>
+                    <ToolbarSeparator />
+                    <ToolbarButton
+                        command="insertUnorderedList"
+                        title="Bullet List"
+                        icon={ICONS.list}
+                        isActive={state.insertUnorderedList}
+                        onClick={onCommand}
+                    />
+                    <ToolbarButton
+                        command="insertOrderedList"
+                        title="Numbered List"
+                        icon={ICONS.listOrdered}
+                        isActive={state.insertOrderedList}
+                        onClick={onCommand}
+                    />
+                </>
+            )}
 
-            <ToolbarSeparator />
+            {isAllowed('code') && (
+                <>
+                    <ToolbarSeparator />
+                    <ToolbarButton
+                        command="formatCode"
+                        title="Code (Cmd+K)"
+                        icon={ICONS.code}
+                        isActive={state.code}
+                        onClick={onCommand}
+                    />
+                </>
+            )}
 
-            <ToolbarButton
-                command="insertUnorderedList"
-                title="Bullet List"
-                icon={ICONS.list}
-                isActive={state.insertUnorderedList}
-                onClick={onCommand}
-            />
+            {isAllowed('quote') && (
+                <ToolbarButton
+                    command="formatBlockquote"
+                    title="Quote (Cmd+J)"
+                    icon={ICONS.quote}
+                    isActive={state.blockquote}
+                    onClick={onCommand}
+                />
+            )}
 
-            <ToolbarButton
-                command="insertOrderedList"
-                title="Numbered List"
-                icon={ICONS.listOrdered}
-                isActive={state.insertOrderedList}
-                onClick={onCommand}
-            />
-
-            <ToolbarSeparator />
-
-            <ToolbarButton
-                command="formatCode"
-                title="Code (Cmd+K)"
-                icon={ICONS.code}
-                isActive={state.code}
-                onClick={onCommand}
-            />
-
-            <ToolbarButton
-                command="formatBlockquote"
-                title="Quote (Cmd+J)"
-                icon={ICONS.quote}
-                isActive={state.blockquote}
-                onClick={onCommand}
-            />
-
-            <ToolbarSeparator />
-
-            <ToolbarButton
-                command="insertImage"
-                title="Insert Image or Collection"
-                icon={ICONS.image}
-                isActive={false}
-                onClick={onCommand}
-            />
+            {isAllowed('image') && (
+                <>
+                    <ToolbarSeparator />
+                    <ToolbarButton
+                        command="insertImage"
+                        title="Insert Image or Collection"
+                        icon={ICONS.image}
+                        isActive={false}
+                        onClick={onCommand}
+                    />
+                </>
+            )}
 
             <ToolbarSeparator />
 

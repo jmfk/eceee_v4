@@ -248,10 +248,11 @@ const ContentCardWidget = ({
             if (headerContainerRef.current && !headerEditorRef.current) {
                 headerEditorRef.current = new SimpleTextEditorRenderer(headerContainerRef.current, {
                     content: configRef.current.header || '',
-                    mode: 'text-only',
+                    mode: 'inline-rich',
                     onChange: handleHeaderChange,
                     placeholder: 'Enter card header...',
-                    element: 'h2'
+                    element: 'h2',
+                    allowedButtons: ['bold', 'italic', 'link']
                 })
                 headerEditorRef.current.render()
             }
@@ -263,7 +264,8 @@ const ContentCardWidget = ({
                     mode: 'inline-rich',
                     onChange: handleContentChange,
                     placeholder: 'Enter card content...',
-                    element: 'div'
+                    element: 'div',
+                    allowedButtons: ['bold', 'italic', 'link']
                 })
                 contentEditorRef.current.render()
             }

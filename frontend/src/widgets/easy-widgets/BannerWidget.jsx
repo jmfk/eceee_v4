@@ -248,7 +248,8 @@ const BannerWidget = ({
                     mode: editorMode,
                     onChange: handleContentChange,
                     placeholder: bannerMode === 'header' ? 'Enter banner header...' : 'Enter banner content...',
-                    element: element
+                    element: element,
+                    allowedButtons: ['bold', 'italic', 'link']
                 })
                 contentEditorRef.current.render()
             }
