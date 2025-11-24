@@ -46,6 +46,7 @@ class PageTheme(models.Model):
         help_text=(
             "Unified image styles (gallery and carousel) with Mustache templates and CSS. "
             "Each style supports: template (required), styleType (gallery|carousel, required), "
+            "usageType (standard|inline|both, defaults to 'both'), "
             "css, variables, imgproxy_config, lightbox_config, enableLightbox (boolean), "
             "lightboxTemplate (string), defaultShowCaptions (boolean), defaultLightboxGroup (string), "
             "defaultRandomize (boolean). Carousel styles also support: defaultAutoPlay (boolean), "
@@ -312,6 +313,7 @@ class PageTheme(models.Model):
             "grid-gallery": {
                 "name": "Grid Gallery",
                 "description": "Responsive grid gallery with hover effects and captions",
+                "usageType": "standard",
                 "template": """<div class="gallery-widget">
   <div class="gallery-grid" style="grid-template-columns: repeat({{columns}}, 1fr);">
     {{#images}}
@@ -409,6 +411,7 @@ class PageTheme(models.Model):
             "grid-with-overlay": {
                 "name": "Grid with Overlay",
                 "description": "Grid gallery with hover overlay and expand icon",
+                "usageType": "standard",
                 "template": """<div class="gallery-widget">
   <div class="gallery-grid" style="grid-template-columns: repeat({{columns}}, 1fr);">
     {{#images}}
@@ -523,6 +526,7 @@ class PageTheme(models.Model):
             "default-carousel": {
                 "name": "Default Carousel",
                 "description": "Clean carousel with prev/next buttons",
+                "usageType": "standard",
                 "template": """<div class="gallery-carousel">
   <div class="carousel-container">
     <div class="carousel-track" id="carousel-track">
@@ -623,6 +627,7 @@ class PageTheme(models.Model):
             "carousel-with-indicators": {
                 "name": "Carousel with Indicators",
                 "description": "Carousel with dot navigation indicators",
+                "usageType": "standard",
                 "template": """<div class="gallery-carousel">
   <div class="carousel-container">
     <div class="carousel-track" id="carousel-track">
@@ -749,6 +754,7 @@ class PageTheme(models.Model):
             "carousel-with-captions": {
                 "name": "Carousel with Captions",
                 "description": "Carousel with gradient caption overlay",
+                "usageType": "standard",
                 "template": """<div class="gallery-carousel">
   <div class="carousel-container">
     <div class="carousel-track" id="carousel-track">
@@ -1053,6 +1059,7 @@ class PageTheme(models.Model):
             "image-simple": {
                 "name": "Simple Image",
                 "description": "Basic image with size and alignment options",
+                "usageType": "both",
                 "template": """<div class="image-widget image-size-{{size}} image-align-{{alignment}}">
   <div class="image-container">
     {{content}}

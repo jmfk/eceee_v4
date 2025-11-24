@@ -224,6 +224,10 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
                                 }`}>
                                     {style.styleType === 'carousel' ? 'Carousel' : 'Gallery'}
                                 </span>
+                                <span className="px-2 py-1 rounded bg-gray-100 text-gray-700">
+                                    {style.usageType === 'standard' ? 'Standard' : 
+                                     style.usageType === 'inline' ? 'Inline' : 'Both'}
+                                </span>
                                 {style.alpine && (
                                     <span className="px-2 py-1 rounded bg-green-100 text-green-700">
                                         Alpine.js

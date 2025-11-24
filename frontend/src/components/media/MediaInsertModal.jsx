@@ -37,6 +37,7 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
     });
 
     // Get available image styles from theme (unified gallery and carousel styles)
+    // Filter to only show inline-compatible styles (usageType 'inline' or 'both')
     const availableImageStyles = useMemo(() => {
         if (!currentTheme || !currentTheme.imageStyles) {
             return [];
@@ -45,12 +46,18 @@ const MediaInsertModal = ({ isOpen, onClose, onInsert, namespace, pageId }) => {
         const imageStyles = currentTheme.imageStyles;
         const entries = Object.entries(imageStyles);
         
-        return entries.map(([key, style]) => ({
-            value: key,
-            label: style.name || key,
-            description: style.description,
-            styleType: style.styleType || 'gallery'
-        }));
+        return entries
+            .filter(([key, style]) => {
+                const usage = style.usageType || 'both'; // Default to 'both' for backward compatibility
+                return usage === 'both' || usage === 'inline';
+            })
+            .map(([key, style]) => ({
+                value: key,
+                label: style.name || key,
+                description: style.description,
+                styleType: style.styleType || 'gallery',
+                usageType: style.usageType || 'both'
+            }));
     }, [currentTheme]);
 
     // Get selected style info

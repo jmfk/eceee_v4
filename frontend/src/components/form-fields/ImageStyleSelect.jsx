@@ -70,12 +70,23 @@ const ImageStyleSelect = ({
             css: style.css,
             variables: style.variables,
             styleType: style.styleType || 'gallery',
+            usageType: style.usageType || 'both',
             previewImage: style.previewImage
         }));
     }, [currentTheme]);
 
-    const hasStyles = availableStyles.length > 0;
-    const selectedStyle = availableStyles.find(s => s.value === value);
+    // Filter styles based on context (standard vs inline)
+    const filteredStyles = useMemo(() => {
+        const contextMode = context?.imageMode || 'standard'; // 'standard' or 'inline'
+        
+        return availableStyles.filter(style => {
+            const usage = style.usageType || 'both'; // Default to 'both' for backward compatibility
+            return usage === 'both' || usage === contextMode;
+        });
+    }, [availableStyles, context?.imageMode]);
+
+    const hasStyles = filteredStyles.length > 0;
+    const selectedStyle = filteredStyles.find(s => s.value === value);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -221,7 +232,7 @@ const ImageStyleSelect = ({
                     </div>
 
                     {/* Custom styles with previews */}
-                    {availableStyles.map((style) => (
+                    {filteredStyles.map((style) => (
                         <div key={style.value}>
                             {renderStyleOption(style, false)}
                         </div>

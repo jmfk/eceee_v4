@@ -31,6 +31,7 @@ const ImageStyleEditPage = () => {
     const [imgproxyConfig, setImgproxyConfig] = useState({});
     const [lightboxConfig, setLightboxConfig] = useState({});
     const [styleType, setStyleType] = useState('gallery');
+    const [usageType, setUsageType] = useState('both');
     const [alpine, setAlpine] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -107,6 +108,7 @@ const ImageStyleEditPage = () => {
                     imgproxyConfig: style.imgproxyConfig || {},
                     lightboxConfig: style.lightboxConfig || {},
                     styleType: style.styleType || 'gallery',
+                    usageType: style.usageType || 'both',
                     alpine: style.alpine || false,
                     name: style.name || styleKey,
                     description: style.description || '',
@@ -124,6 +126,7 @@ const ImageStyleEditPage = () => {
                 setImgproxyConfig(initialStyle.imgproxyConfig);
                 setLightboxConfig(initialStyle.lightboxConfig);
                 setStyleType(initialStyle.styleType);
+                setUsageType(initialStyle.usageType);
                 setAlpine(initialStyle.alpine);
                 setName(initialStyle.name);
                 setDescription(initialStyle.description);
@@ -148,6 +151,7 @@ const ImageStyleEditPage = () => {
         name !== initialData.name ||
         description !== initialData.description ||
         styleType !== initialData.styleType ||
+        usageType !== initialData.usageType ||
         alpine !== initialData.alpine ||
         enableLightbox !== initialData.enableLightbox ||
         lightboxTemplate !== initialData.lightboxTemplate ||
@@ -194,6 +198,7 @@ const ImageStyleEditPage = () => {
             imgproxyConfig,
             lightboxConfig,
             styleType,
+            usageType,
             alpine,
             enableLightbox,
             lightboxTemplate,
@@ -229,6 +234,7 @@ const ImageStyleEditPage = () => {
                 imgproxyConfig,
                 lightboxConfig,
                 styleType,
+                usageType,
                 alpine,
                 enableLightbox,
                 lightboxTemplate,
@@ -471,6 +477,23 @@ const ImageStyleEditPage = () => {
                                             Carousel
                                         </button>
                                     </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Usage Type *
+                                    </label>
+                                    <select
+                                        value={usageType}
+                                        onChange={(e) => setUsageType(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="both">Both (Standard & Inline)</option>
+                                        <option value="standard">Standard Images Only</option>
+                                        <option value="inline">Inline Images Only</option>
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Controls where this style can be used
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <input

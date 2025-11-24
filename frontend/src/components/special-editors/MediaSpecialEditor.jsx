@@ -99,12 +99,18 @@ const MediaSpecialEditor = ({
     const isEmpty = !isCollectionMode && currentImages.length === 0
 
     // Get available image styles from current theme
+    // Filter to only show standard-compatible styles (usageType 'standard' or 'both')
     const availableImageStyles = useMemo(() => {
         if (!currentTheme?.imageStyles) return []
-        return Object.keys(currentTheme.imageStyles).map(styleName => ({
-            name: styleName,
-            config: currentTheme.imageStyles[styleName]
-        }))
+        return Object.entries(currentTheme.imageStyles)
+            .filter(([styleName, style]) => {
+                const usage = style.usageType || 'both' // Default to 'both' for backward compatibility
+                return usage === 'both' || usage === 'standard'
+            })
+            .map(([styleName, style]) => ({
+                name: styleName,
+                config: style
+            }))
     }, [currentTheme])
 
     // Enhanced config for preview - includes collection images when in collection mode
