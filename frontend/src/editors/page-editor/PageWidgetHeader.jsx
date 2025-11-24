@@ -19,6 +19,7 @@ import {
 import ConfirmationModal from '../../components/ConfirmationModal'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
 import { generateNewWidgetIds } from '../../utils/widgetClipboard'
+import { useClipboard } from '../../contexts/ClipboardContext'
 
 const PageWidgetHeader = ({
     widgetType,
@@ -47,6 +48,7 @@ const PageWidgetHeader = ({
     onToggleSelection = null
 }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const { refreshClipboard } = useClipboard();
 
     if (!showControls) {
         return null
@@ -72,6 +74,7 @@ const PageWidgetHeader = ({
     const handleCopy = async () => {
         if (widget) {
             await copyWidgetsToClipboard([widget]);
+            await refreshClipboard();
         }
     };
 
@@ -88,6 +91,7 @@ const PageWidgetHeader = ({
         };
         
         await cutWidgetsToClipboard([widget], cutMetadata);
+        await refreshClipboard();
         
         // If onCut callback is provided, call it (for visual feedback)
         if (onCut) {

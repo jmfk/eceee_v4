@@ -163,14 +163,21 @@ const PageWidgetFactory = ({
         setPasteHoverPosition(null);
     };
     
-    const handlePasteClick = () => {
-        if (!pasteModeActive || !pasteHoverPosition || !onPasteAtPosition) return;
+    const handlePasteClick = (shiftKey = false) => {
+        if (!pasteModeActive || !pasteHoverPosition || !onPasteAtPosition) {
+            return;
+        }
         
         // Calculate position based on hover state
         const position = pasteHoverPosition === 'before' ? index : index + 1;
         
-        // Call paste handler with slot name, position, and widget path
-        onPasteAtPosition(slotName, position, widgetPath);
+        // For top-level widgets, pass empty array (not the widget's own path)
+        // widgetPath from props is the current widget's path, not where we're pasting
+        // Only pass widgetPath if this widget IS a container (has nested slots)
+        const pasteWidgetPath = widgetPath.length > 2 ? widgetPath : [];
+        
+        // Call paste handler with slot name, position, path, and shift key state
+        onPasteAtPosition(slotName, position, pasteWidgetPath, shiftKey);
         
         // Reset hover state
         setPasteHoverPosition(null);
@@ -359,7 +366,7 @@ const PageWidgetFactory = ({
                     // Handle paste mode click
                     if (pasteModeActive && pasteHoverPosition) {
                         e.stopPropagation();
-                        handlePasteClick();
+                        handlePasteClick(e.shiftKey); // Pass shift key state
                         return;
                     }
                     

@@ -21,6 +21,7 @@ import ConfirmationModal from '../../components/ConfirmationModal'
 import PasteConfirmationModal from '../../components/PasteConfirmationModal'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
 import { generateNewWidgetIds } from '../../utils/widgetClipboard'
+import { useClipboard } from '../../contexts/ClipboardContext'
 
 const PageWidgetHeaderWithSlots = ({
     widgetType,
@@ -63,6 +64,7 @@ const PageWidgetHeaderWithSlots = ({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [showPasteConfirm, setShowPasteConfirm] = useState(false)
     const [pendingPasteWidgets, setPendingPasteWidgets] = useState(null)
+    const { refreshClipboard } = useClipboard();
 
     if (!showControls) {
         return null
@@ -87,7 +89,8 @@ const PageWidgetHeaderWithSlots = ({
     // Widget-level copy/paste handlers
     const handleCopyWidget = async () => {
         if (widget) {
-            await copyWidgetsToClipboard([widget])
+            await copyWidgetsToClipboard([widget]);
+            await refreshClipboard();
         }
     }
 
@@ -103,7 +106,8 @@ const PageWidgetHeaderWithSlots = ({
             }
         }
 
-        await cutWidgetsToClipboard([widget], cutMetadata)
+        await cutWidgetsToClipboard([widget], cutMetadata);
+        await refreshClipboard();
 
         // If onCut callback is provided, call it (for visual feedback)
         if (onCut) {
@@ -131,7 +135,8 @@ const PageWidgetHeaderWithSlots = ({
     // Slot-level copy/paste handlers
     const handleCopyAllWidgets = async () => {
         if (widgets && Array.isArray(widgets)) {
-            await copyWidgetsToClipboard(widgets)
+            await copyWidgetsToClipboard(widgets);
+            await refreshClipboard();
         }
     }
 

@@ -88,7 +88,7 @@ const ReactLayoutRenderer = forwardRef(({
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
     
     // Get global clipboard state
-    const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState } = useClipboard();
+    const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard();
     
     // Helper: Build widget path string from slotName and widgetId (and optional nested path)
     const buildWidgetPath = useCallback((slotName, widgetId, nestedPath = null) => {
@@ -759,7 +759,9 @@ const ReactLayoutRenderer = forwardRef(({
         
         const widgetsToCopy = selected.map(item => item.widget);
         await copyWidgetsToClipboard(widgetsToCopy);
-    }, [getSelectedWidgets]);
+        // Immediately refresh clipboard state in current window
+        await refreshClipboard();
+    }, [getSelectedWidgets, refreshClipboard]);
 
     const handleCutSelected = useCallback(async () => {
         const selected = getSelectedWidgets();
@@ -804,7 +806,9 @@ const ReactLayoutRenderer = forwardRef(({
         });
         
         await cutWidgetsToClipboard(widgetsToCut, cutMetadata);
-    }, [getSelectedWidgets, context, webpageData]);
+        // Immediately refresh clipboard state in current window
+        await refreshClipboard();
+    }, [getSelectedWidgets, context, webpageData, refreshClipboard]);
 
     const handleDeleteCutWidgets = useCallback(async (cutMetadata) => {
         // Delete widgets that were cut and pasted
@@ -977,7 +981,7 @@ const ReactLayoutRenderer = forwardRef(({
     }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData]);
 
     // Handle paste at specific position
-    const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = []) => {
+    const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = [], keepClipboard = false) => {
         if (!clipboardData || !clipboardData.data || clipboardData.data.length === 0) {
             return;
         }
@@ -1068,12 +1072,15 @@ const ReactLayoutRenderer = forwardRef(({
             }
             
             // Publish ADD_WIDGET operations for each pasted widget
-            for (const widget of pastedWidgets) {
+            for (let i = 0; i < pastedWidgets.length; i++) {
+                const widget = pastedWidgets[i];
                 await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
-                    slotName,
-                    widget,
-                    contextType,
-                    position
+                    id: widget.id,
+                    type: widget.type,
+                    config: widget.config,
+                    slot: slotName,
+                    contextType: contextType,
+                    order: position + i
                 });
             }
         }
@@ -1083,8 +1090,11 @@ const ReactLayoutRenderer = forwardRef(({
             await handleDeleteCutWidgets(clipboardData.metadata);
         }
         
-        // Don't clear clipboard after paste - allow repeated pasting
-    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, handleDeleteCutWidgets]);
+        // Clear clipboard after paste unless shift key was held (or it's a cut operation - always clear for cut)
+        if (!keepClipboard || isCut) {
+            await clearClipboardState();
+        }
+    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, handleDeleteCutWidgets, clearClipboardState]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);

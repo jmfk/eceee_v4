@@ -501,9 +501,9 @@ const WidgetSlot = ({
                                         {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && displayLocalWidgets.length === 0 && (
                                             <div 
                                                 className={`empty-slot text-center py-12 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
-                                                onClick={() => {
+                                                onClick={(e) => {
                                                     if (pasteModeActive && onPasteAtPosition) {
-                                                        onPasteAtPosition(name, 0, slotPath);
+                                                        onPasteAtPosition(name, 0, slotPath, e.shiftKey);
                                                     }
                                                 }}
                                             >
