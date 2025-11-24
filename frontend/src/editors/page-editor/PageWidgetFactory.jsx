@@ -148,6 +148,9 @@ const PageWidgetFactory = ({
     const handlePasteHover = (e) => {
         if (!pasteModeActive || !showPasteMarkers || !widgetRef.current) return;
         
+        // Stop propagation to prevent parent widgets from showing their paste markers
+        e.stopPropagation();
+        
         const rect = widgetRef.current.getBoundingClientRect();
         const mouseY = e.clientY;
         const widgetCenter = rect.top + rect.height / 2;
@@ -160,7 +163,11 @@ const PageWidgetFactory = ({
         }
     };
     
-    const handlePasteLeave = () => {
+    const handlePasteLeave = (e) => {
+        // Stop propagation to prevent parent from receiving the leave event
+        if (pasteModeActive && showPasteMarkers) {
+            e.stopPropagation();
+        }
         setPasteHoverPosition(null);
     };
     
