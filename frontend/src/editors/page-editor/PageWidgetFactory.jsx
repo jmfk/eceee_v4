@@ -84,6 +84,9 @@ const PageWidgetFactory = ({
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
     const actualSlotName = passedSlotName || slotName || widget?.slotName
+    
+    // Get global hover tracking for paste markers
+    const { hoveredWidgetId, setHoveredWidget, clearHoveredWidget } = useClipboard();
 
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
@@ -151,6 +154,9 @@ const PageWidgetFactory = ({
         // Stop propagation to prevent parent widgets from showing their paste markers
         e.stopPropagation();
         
+        // Mark this widget as the currently hovered one (for nested precedence)
+        setHoveredWidget(actualWidgetId);
+        
         const rect = widgetRef.current.getBoundingClientRect();
         const mouseY = e.clientY;
         const widgetCenter = rect.top + rect.height / 2;
@@ -168,6 +174,9 @@ const PageWidgetFactory = ({
         if (pasteModeActive && showPasteMarkers) {
             e.stopPropagation();
         }
+        
+        // Clear this widget's hover state
+        clearHoveredWidget(actualWidgetId);
         setPasteHoverPosition(null);
     };
     
@@ -466,15 +475,15 @@ const PageWidgetFactory = ({
                     parseWidgetPath={parseWidgetPath}
                 />
 
-                {/* Paste Mode Markers */}
-                {pasteModeActive && showPasteMarkers && pasteHoverPosition === 'before' && (
+                {/* Paste Mode Markers - only show if this widget is the currently hovered one */}
+                {pasteModeActive && showPasteMarkers && hoveredWidgetId === actualWidgetId && pasteHoverPosition === 'before' && (
                     <div className="absolute -top-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-t whitespace-nowrap">
                             Paste here
                         </div>
                     </div>
                 )}
-                {pasteModeActive && showPasteMarkers && pasteHoverPosition === 'after' && (
+                {pasteModeActive && showPasteMarkers && hoveredWidgetId === actualWidgetId && pasteHoverPosition === 'after' && (
                     <div className="absolute -bottom-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-b whitespace-nowrap">
                             Paste here

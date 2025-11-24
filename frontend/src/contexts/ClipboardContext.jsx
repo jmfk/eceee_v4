@@ -13,6 +13,7 @@ export const ClipboardProvider = ({ children }) => {
     const [clipboardData, setClipboardData] = useState(null);
     const [pasteModePaused, setPasteModePaused] = useState(false);
     const [pasteModeActive, setPasteModeActive] = useState(false);
+    const [hoveredWidgetId, setHoveredWidgetId] = useState(null);
     const lastClipboardIdRef = useRef(null);
     
     // Helper to update clipboard state
@@ -115,13 +116,26 @@ export const ClipboardProvider = ({ children }) => {
         await updateClipboardState(true);
     }, [updateClipboardState]);
     
+    // Hover tracking for nested widgets
+    const setHoveredWidget = useCallback((widgetId) => {
+        setHoveredWidgetId(widgetId);
+    }, []);
+    
+    const clearHoveredWidget = useCallback((widgetId) => {
+        // Only clear if this widget is the current hover target
+        setHoveredWidgetId(prev => prev === widgetId ? null : prev);
+    }, []);
+    
     const value = {
         clipboardData,
         pasteModePaused,
         pasteModeActive,
         togglePasteMode,
         clearClipboardState,
-        refreshClipboard
+        refreshClipboard,
+        hoveredWidgetId,
+        setHoveredWidget,
+        clearHoveredWidget
     };
     
     return <ClipboardContext.Provider value={value}>{children}</ClipboardContext.Provider>;
