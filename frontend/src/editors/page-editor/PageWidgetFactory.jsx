@@ -9,6 +9,7 @@ import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronR
 import { getWidgetComponent, getWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import PageWidgetHeader from './PageWidgetHeader'
+import { useClipboard } from '../../contexts/ClipboardContext'
 
 // Normalize widget type for CSS class (matches backend logic)
 const normalizeForCSS = (value) => {
