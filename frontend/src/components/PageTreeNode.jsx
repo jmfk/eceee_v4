@@ -170,8 +170,6 @@ const PageTreeNode = memo(({
     const [childrenLoaded, setChildrenLoaded] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [showHostnameModal, setShowHostnameModal] = useState(false)
-    const [isEditingTitle, setIsEditingTitle] = useState(false)
-    const [editingTitle, setEditingTitle] = useState('')
     const [isEditingSlug, setIsEditingSlug] = useState(false)
     const [editingSlug, setEditingSlug] = useState('')
     const [isTogglingPublication, setIsTogglingPublication] = useState(false)
@@ -497,37 +495,9 @@ const PageTreeNode = memo(({
         }
     }
 
-    // Title editing handlers
+    // Title click handler - opens page editor
     const handleTitleClick = () => {
-        setIsEditingTitle(true)
-        setEditingTitle(page.title)
-    }
-
-    const handleTitleSave = () => {
-        const trimmedTitle = editingTitle.trim()
-        if (!trimmedTitle) {
-            return
-        }
-        if (trimmedTitle === page.title) {
-            setIsEditingTitle(false)
-            return
-        }
-        updateTitleMutation.mutate({ title: trimmedTitle })
-    }
-
-    const handleTitleCancel = () => {
-        setIsEditingTitle(false)
-        setEditingTitle('')
-    }
-
-    const handleTitleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault()
-            handleTitleSave()
-        } else if (e.key === 'Escape') {
-            e.preventDefault()
-            handleTitleCancel()
-        }
+        handleEdit()
     }
 
     // Slug editing handlers
@@ -612,23 +582,6 @@ const PageTreeNode = memo(({
         onError: (error) => {
             console.error('Failed to update hostnames:', error.response?.data?.detail || error.message)
             showError(error, 'error')
-        }
-    })
-
-    // Update page title mutation
-    const updateTitleMutation = useMutation({
-        mutationFn: async (titleData) => {
-            return await pagesApi.update(page.id, titleData)
-        },
-        onSuccess: (updatedPage) => {
-            setIsEditingTitle(false)
-            // Update local state
-            setPage(prev => ({ ...prev, title: updatedPage.title }))
-        },
-        onError: (error) => {
-            console.error('Failed to update title:', error.response?.data?.detail || error.message)
-            showError(error, 'error')
-            setEditingTitle(page.title) // Reset to original title on error
         }
     })
 
@@ -756,43 +709,13 @@ const PageTreeNode = memo(({
                                 <Search className="w-3 h-3 text-blue-500" />
                             </div>
                         )}
-                        {isEditingTitle ? (
-                            <div className="flex items-center gap-1">
-                                <input
-                                    type="text"
-                                    value={editingTitle}
-                                    onChange={(e) => setEditingTitle(e.target.value)}
-                                    onKeyDown={handleTitleKeyDown}
-                                    className="truncate font-medium text-sm bg-white border border-blue-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 flex-1"
-                                    autoFocus
-                                    disabled={updateTitleMutation.isPending}
-                                />
-                                <button
-                                    onClick={handleTitleSave}
-                                    disabled={updateTitleMutation.isPending}
-                                    className="p-0.5 rounded hover:bg-green-100 text-green-600 transition-colors disabled:opacity-50"
-                                    title="Save (Enter)"
-                                >
-                                    <Save className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={handleTitleCancel}
-                                    disabled={updateTitleMutation.isPending}
-                                    className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
-                                    title="Cancel (Escape)"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                        ) : (
-                            <span
-                                className="truncate font-medium text-sm cursor-pointer hover:text-blue-600 hover:underline transition-colors"
-                                onClick={handleTitleClick}
-                                title="Click to edit title"
-                            >
-                                {highlightSearchTerm(page.title, searchTerm)}
-                            </span>
-                        )}
+                        <span
+                            className="truncate font-medium text-sm cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                            onClick={handleTitleClick}
+                            title="Click to edit page"
+                        >
+                            {highlightSearchTerm(page.title, searchTerm)}
+                        </span>
                         {isTopLevel ? (
                             <button
                                 onClick={handleHostnameClick}
