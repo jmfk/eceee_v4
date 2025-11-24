@@ -265,6 +265,7 @@ const SectionWidget = ({
                     index={index}
                     mode="display"
                     showControls={false}
+                    showPasteMarkers={true}
                     parentComponentId={componentId}
                     contextType={contextType}
                     pageId={context.pageId}

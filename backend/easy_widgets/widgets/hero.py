@@ -218,26 +218,31 @@ class HeroWidget(BaseWidget):
 
     .hero-widget h1 {
         font-family: "Source Sans 3", sans-serif;
-        font-weight: 500;
-        font-size: 41px;
+        font-weight: 300;
+        font-size: 54px;
         line-height: 44px;
         margin-top: 16px;
         margin-bottom: 16px;
         color: var(--hero-text-color, #ffffff);
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
     }
 
     .hero-widget .before-text {
         font-size: 24px;
         line-height: 24px;
+        font-weight: 500;
         margin: 0;
-        color: var(--hero-decor-color, #cccccc);
+        color: var(--hero-decor-color, #ffffff);
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
     }
     
     .hero-widget .after-text {
         font-size: 24px;
         line-height: 24px;
+        font-weight: 500;
         margin: 0;
         color: var(--hero-text-color, #ffffff);
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
     }
     
     @media (max-width: 768px) {

@@ -234,6 +234,7 @@ const TwoColumnsWidget = ({
                     index={index}
                     mode="display"
                     showControls={false}
+                    showPasteMarkers={true}
                     // Context props
                     parentComponentId={componentId}
                     contextType={contextType}

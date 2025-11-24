@@ -302,6 +302,7 @@ const WidgetSlot = ({
                         onPaste={(slotName, idx, pastedWidget, metadata) => handleWidgetAction('paste', pastedWidget, idx, metadata)}
                         pasteModeActive={pasteModeActive}
                         onPasteAtPosition={onPasteAtPosition}
+                        showPasteMarkers={true}
                         onConfigChange={(widgetId, slotName, newConfig) => handleWidgetAction('configChange', { id: widgetId }, newConfig)}
                         canMoveUp={index > 0}
                         canMoveDown={index < effectiveWidgets.length - 1}

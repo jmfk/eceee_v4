@@ -49,7 +49,8 @@ const SelfContainedSlotEditor = ({
     parseWidgetPath,
     // Paste mode props
     pasteModeActive = false,
-    onPasteAtPosition
+    onPasteAtPosition,
+    showPasteMarkers = true
 }) => {
     // Build path for widgets in this slot: append slot name to parent path
     const slotPath = [...widgetPath, slotName];
@@ -340,6 +341,7 @@ const SelfContainedSlotEditor = ({
                                     // Paste mode props
                                     pasteModeActive={pasteModeActive}
                                     onPasteAtPosition={onPasteAtPosition}
+                                    showPasteMarkers={showPasteMarkers}
                                 />
                             </div>
                         );

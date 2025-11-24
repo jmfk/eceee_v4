@@ -43,7 +43,8 @@ const SlotEditor = forwardRef(({
     parseWidgetPath,
     // Paste mode props
     pasteModeActive = false,
-    onPasteAtPosition
+    onPasteAtPosition,
+    showPasteMarkers = true
 }, ref) => {
     // Ref to the SelfContainedSlotEditor component
     const slotEditorRef = useRef(null);
@@ -101,6 +102,7 @@ const SlotEditor = forwardRef(({
                 // Paste mode props
                 pasteModeActive={pasteModeActive}
                 onPasteAtPosition={onPasteAtPosition}
+                showPasteMarkers={showPasteMarkers}
             />
         </div>
     );

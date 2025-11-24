@@ -78,7 +78,8 @@ const PageWidgetFactory = ({
     parseWidgetPath,
     // Paste mode props
     pasteModeActive = false,
-    onPasteAtPosition
+    onPasteAtPosition,
+    showPasteMarkers = true // Independent control for paste markers
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -145,7 +146,7 @@ const PageWidgetFactory = ({
     
     // Paste mode hover handlers
     const handlePasteHover = (e) => {
-        if (!pasteModeActive || !widgetRef.current) return;
+        if (!pasteModeActive || !showPasteMarkers || !widgetRef.current) return;
         
         const rect = widgetRef.current.getBoundingClientRect();
         const mouseY = e.clientY;
@@ -164,7 +165,7 @@ const PageWidgetFactory = ({
     };
     
     const handlePasteClick = (shiftKey = false) => {
-        if (!pasteModeActive || !pasteHoverPosition || !onPasteAtPosition) {
+        if (!pasteModeActive || !showPasteMarkers || !pasteHoverPosition || !onPasteAtPosition) {
             return;
         }
         
@@ -355,16 +356,16 @@ const PageWidgetFactory = ({
         return (
             <div
                 ref={widgetRef}
-                className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget relative group ${className} ${isPublished ? 'published-widget' : ''} ${pasteModeActive ? 'paste-mode-active' : ''}`}
+                className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget relative group ${className} ${isPublished ? 'published-widget' : ''} ${pasteModeActive && showPasteMarkers ? 'paste-mode-active' : ''}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-version-id={versionId}
                 data-published={isPublished}
-                onMouseMove={pasteModeActive ? handlePasteHover : undefined}
-                onMouseLeave={pasteModeActive ? handlePasteLeave : undefined}
+                onMouseMove={pasteModeActive && showPasteMarkers ? handlePasteHover : undefined}
+                onMouseLeave={pasteModeActive && showPasteMarkers ? handlePasteLeave : undefined}
                 onClick={(e) => {
                     // Handle paste mode click
-                    if (pasteModeActive && pasteHoverPosition) {
+                    if (pasteModeActive && showPasteMarkers && pasteHoverPosition) {
                         e.stopPropagation();
                         handlePasteClick(e.shiftKey); // Pass shift key state
                         return;
@@ -456,14 +457,14 @@ const PageWidgetFactory = ({
                 />
 
                 {/* Paste Mode Markers */}
-                {pasteModeActive && pasteHoverPosition === 'before' && (
+                {pasteModeActive && showPasteMarkers && pasteHoverPosition === 'before' && (
                     <div className="absolute -top-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-t whitespace-nowrap">
                             Paste here
                         </div>
                     </div>
                 )}
-                {pasteModeActive && pasteHoverPosition === 'after' && (
+                {pasteModeActive && showPasteMarkers && pasteHoverPosition === 'after' && (
                     <div className="absolute -bottom-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-b whitespace-nowrap">
                             Paste here
