@@ -95,6 +95,13 @@ export const cutToClipboard = async (type, data, metadata = {}) => {
  */
 export const readFromClipboard = async (type, silent = false) => {
     try {
+        // Check localStorage first - if no UUID exists, clipboard is empty
+        const uuid = getClipboardUuid(type);
+        if (!uuid) {
+            // No UUID in localStorage means clipboard is definitely empty
+            return null;
+        }
+        
         // First try to get by type (most recent)
         let entry = await getClipboardByType(type)
         

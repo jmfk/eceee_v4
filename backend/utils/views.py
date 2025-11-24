@@ -777,6 +777,23 @@ class ClipboardEntryViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(entry)
         return Response(serializer.data)
+    
+    def check_by_type(self, request, **kwargs):
+        """Check if clipboard entry exists for a specific type (HEAD request)."""
+        clipboard_type = kwargs.get('clipboard_type')
+        if not clipboard_type:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        
+        exists = (
+            self.get_queryset()
+            .filter(clipboard_type=clipboard_type)
+            .exists()
+        )
+        
+        if exists:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
     def clear_by_type(self, request, **kwargs):
         """Clear all clipboard entries of a specific type for the current user."""

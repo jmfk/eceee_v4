@@ -21,7 +21,11 @@ router.register(r"clipboard", views.ClipboardEntryViewSet, basename="clipboard")
 clipboard_patterns = [
     re_path(
         r"^clipboard/by-type/(?P<clipboard_type>[^/.]+)/$",
-        views.ClipboardEntryViewSet.as_view({"get": "get_by_type", "delete": "clear_by_type"}),
+        views.ClipboardEntryViewSet.as_view({
+            "get": "get_by_type",
+            "head": "check_by_type",
+            "delete": "clear_by_type"
+        }),
         name="clipboard-by-type",
     ),
 ]
