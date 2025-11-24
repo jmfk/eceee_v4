@@ -338,6 +338,9 @@ const PageWidgetFactory = ({
                                 simulatedPath: simulatedPath,
                                 onSimulatedPathChange: onSimulatedPathChange
                             }}
+                            // Paste mode props for container widgets
+                            pasteModeActive={pasteModeActive}
+                            onPasteAtPosition={onPasteAtPosition}
                             // Selection props for container widgets
                             selectedWidgets={selectedWidgets}
                             cutWidgets={cutWidgets}
@@ -510,6 +513,9 @@ const PageWidgetFactory = ({
                                 simulatedPath: simulatedPath,
                                 onSimulatedPathChange: onSimulatedPathChange
                             }}
+                            // Paste mode props for container widgets
+                            pasteModeActive={pasteModeActive}
+                            onPasteAtPosition={onPasteAtPosition}
                             // Selection props for container widgets (TwoColumnsWidget, ThreeColumnsWidget, etc.)
                             selectedWidgets={selectedWidgets}
                             cutWidgets={cutWidgets}
@@ -625,6 +631,18 @@ const PageWidgetFactory = ({
                         simulatedPath: simulatedPath,
                         onSimulatedPathChange: onSimulatedPathChange
                     }}
+                    // Paste mode props for container widgets
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={onPasteAtPosition}
+                    // Selection props for container widgets
+                    selectedWidgets={selectedWidgets}
+                    cutWidgets={cutWidgets}
+                    onToggleWidgetSelection={onToggleWidgetSelection}
+                    isWidgetSelected={isWidgetSelected}
+                    isWidgetCut={isWidgetCut}
+                    onDeleteCutWidgets={onDeleteCutWidgets}
+                    buildWidgetPath={buildWidgetPath}
+                    parseWidgetPath={parseWidgetPath}
                 />
             </div>
         </div>
