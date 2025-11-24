@@ -46,7 +46,10 @@ const SelfContainedSlotEditor = ({
     isWidgetCut,
     onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
-    parseWidgetPath
+    parseWidgetPath,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition
 }) => {
     // Build path for widgets in this slot: append slot name to parent path
     const slotPath = [...widgetPath, slotName];
@@ -334,6 +337,9 @@ const SelfContainedSlotEditor = ({
                                     } : undefined}
                                     buildWidgetPath={buildWidgetPath}
                                     parseWidgetPath={parseWidgetPath}
+                                    // Paste mode props
+                                    pasteModeActive={pasteModeActive}
+                                    onPasteAtPosition={onPasteAtPosition}
                                 />
                             </div>
                         );

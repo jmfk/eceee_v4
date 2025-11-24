@@ -51,6 +51,9 @@ const WidgetSlot = ({
     onDeleteCutWidgets, // (cutMetadata) => void - Callback to delete cut widgets
     buildWidgetPath, // (slotName, widgetId, nestedPath?) => string
     parseWidgetPath, // (widgetPath) => object
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition
 }) => {
     // Build path for this slot: append slot name to parent path
     const slotPath = [...widgetPath, name];
@@ -297,6 +300,8 @@ const WidgetSlot = ({
                         onMoveUp={(slotName, idx, w) => handleWidgetAction('moveUp', w, idx)}
                         onMoveDown={(slotName, idx, w) => handleWidgetAction('moveDown', w, idx)}
                         onPaste={(slotName, idx, pastedWidget, metadata) => handleWidgetAction('paste', pastedWidget, idx, metadata)}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                         onConfigChange={(widgetId, slotName, newConfig) => handleWidgetAction('configChange', { id: widgetId }, newConfig)}
                         canMoveUp={index > 0}
                         canMoveDown={index < effectiveWidgets.length - 1}
@@ -494,22 +499,42 @@ const WidgetSlot = ({
 
                                         {/* Empty slot handling - only when NO inherited AND NO local widgets */}
                                         {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && displayLocalWidgets.length === 0 && (
-                                            <div className="empty-slot text-center py-12 text-gray-500 border-2 border-dashed border-gray-300">
-                                                <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                                <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
-                                                <p className="text-sm">{description}</p>
+                                            <div 
+                                                className={`empty-slot text-center py-12 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
+                                                onClick={() => {
+                                                    if (pasteModeActive && onPasteAtPosition) {
+                                                        onPasteAtPosition(name, 0, slotPath);
+                                                    }
+                                                }}
+                                            >
+                                                {pasteModeActive ? (
+                                                    <>
+                                                        <div className="text-purple-600 font-semibold text-lg mb-2">
+                                                            Click to paste here
+                                                        </div>
+                                                        <p className="text-sm text-purple-700">
+                                                            Paste widget(s) into this empty slot
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                                        <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
+                                                        <p className="text-sm">{description}</p>
 
-                                                <div className="mt-4">
-                                                    <button
-                                                        onClick={handleAddWidget}
-                                                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                                    >
-                                                        <Plus className="h-4 w-4 mr-2" />
-                                                        Add Your First Widget
-                                                    </button>
-                                                </div>
-                                                {finalRequired && (
-                                                    <p className="text-xs text-orange-600 mt-2">This slot is required</p>
+                                                        <div className="mt-4">
+                                                            <button
+                                                                onClick={handleAddWidget}
+                                                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                                            >
+                                                                <Plus className="h-4 w-4 mr-2" />
+                                                                Add Your First Widget
+                                                            </button>
+                                                        </div>
+                                                        {finalRequired && (
+                                                            <p className="text-xs text-orange-600 mt-2">This slot is required</p>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         )}

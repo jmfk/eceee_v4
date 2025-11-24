@@ -39,6 +39,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
+import { useClipboard } from '../contexts/ClipboardContext'
 import { getDefaultLayout } from '../utils/defaultLayout'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
 import SchemaDrivenForm from './SchemaDrivenForm'
@@ -227,6 +228,9 @@ const PageEditor = () => {
     // Path pattern state for dynamic URL path simulation
     const [simulatedPath, setSimulatedPath] = useState('')
     const [pathVariables, setPathVariables] = useState({})
+    
+    // Get global clipboard state
+    const { clipboardData, pasteModePaused, togglePasteMode, clearClipboardState } = useClipboard()
 
     // Shared componentId for entire page editing group (includes versionId for proper isolation)
     const versionId = pageVersionData?.versionId || pageVersionData?.id || 'current'
@@ -1180,6 +1184,7 @@ const PageEditor = () => {
         }
     }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, currentVersion]); // Removed loadVersionsPreserveCurrent to break circular dependency
 
+    
     // Smart save - analyze changes first, then show modal only if needed
     const handleSaveFromStatusBar = useCallback(async () => {
         const unresolved = errorTodoItems.filter(i => !i.checked).length
@@ -1905,6 +1910,10 @@ const PageEditor = () => {
                 validationState={schemaValidationState}
                 autoSaveCountdown={autoSaveCountdown}
                 autoSaveStatus={autoSaveStatus}
+                onClearClipboard={async () => {
+                    await clearClipboardState();
+                    addNotification('Clipboard cleared', 'info');
+                }}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>

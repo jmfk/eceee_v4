@@ -36,6 +36,9 @@ const TwoColumnsWidget = ({
     onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition,
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -240,10 +243,13 @@ const TwoColumnsWidget = ({
                     versionId={context.versionId}
                     // Widget path for nested widget support
                     widgetPath={fullWidgetPath}
+                    // Paste mode props
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={onPasteAtPosition}
                 />
             </div>
         );
-    }, [widgetPath, widgetId, componentId, contextType, context]);
+    }, [widgetPath, widgetId, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
 
     // Show loading state while fetching widget types
     if (mode === 'editor' && isLoadingTypes) {
@@ -308,14 +314,9 @@ const TwoColumnsWidget = ({
                         parseWidgetPath={parseWidgetPath}
                         showClearButton={false} // Hide Clear Slot button
                         compactAddButton={true} // Show just + icon
-                        // Selection props
-                        selectedWidgets={selectedWidgets}
-                        cutWidgets={cutWidgets}
-                        onToggleWidgetSelection={onToggleWidgetSelection}
-                        isWidgetSelected={isWidgetSelected}
-                        isWidgetCut={isWidgetCut}
-                        buildWidgetPath={buildWidgetPath}
-                        parseWidgetPath={parseWidgetPath}
+                        // Paste mode props
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                     />
                 </div>
                 <div className="two-col-slot right min-h-[50px]">
@@ -340,6 +341,9 @@ const TwoColumnsWidget = ({
                         cutWidgets={cutWidgets}
                         onToggleWidgetSelection={onToggleWidgetSelection}
                         isWidgetSelected={isWidgetSelected}
+                        // Paste mode props
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                         isWidgetCut={isWidgetCut}
                         onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}

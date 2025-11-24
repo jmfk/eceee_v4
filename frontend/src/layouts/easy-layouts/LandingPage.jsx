@@ -30,7 +30,10 @@ export const LandingPage = ({
     isWidgetCut,
     onDeleteCutWidgets,
     buildWidgetPath,
-    parseWidgetPath
+    parseWidgetPath,
+    // Paste mode props
+    pasteModeActive,
+    onPasteAtPosition
 }) => {
     return (
         <div className="grid grid-cols-3 w-full" style={{ gridTemplateColumns: '1fr minmax(0,1280px) 1fr' }}>
@@ -62,6 +65,8 @@ export const LandingPage = ({
                         isWidgetCut={isWidgetCut}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                     />
                 </header>
 
@@ -88,6 +93,11 @@ export const LandingPage = ({
                     onToggleWidgetSelection={onToggleWidgetSelection}
                     isWidgetSelected={isWidgetSelected}
                     isWidgetCut={isWidgetCut}
+                    onDeleteCutWidgets={onDeleteCutWidgets}
+                    buildWidgetPath={buildWidgetPath}
+                    parseWidgetPath={parseWidgetPath}
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={onPasteAtPosition}
                 />
 
                 <WidgetSlot
@@ -114,6 +124,11 @@ export const LandingPage = ({
                     onToggleWidgetSelection={onToggleWidgetSelection}
                     isWidgetSelected={isWidgetSelected}
                     isWidgetCut={isWidgetCut}
+                    onDeleteCutWidgets={onDeleteCutWidgets}
+                    buildWidgetPath={buildWidgetPath}
+                    parseWidgetPath={parseWidgetPath}
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={onPasteAtPosition}
                 />
 
                 <main className="bg-white min-h-[310px]">
@@ -149,6 +164,8 @@ export const LandingPage = ({
                         onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                     />
                 </main>
 
@@ -179,6 +196,8 @@ export const LandingPage = ({
                         isWidgetCut={isWidgetCut}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                     />
                 </footer>
             </div>

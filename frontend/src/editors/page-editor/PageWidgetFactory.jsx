@@ -75,7 +75,10 @@ const PageWidgetFactory = ({
     isWidgetCut,
     onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
-    parseWidgetPath
+    parseWidgetPath,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -85,6 +88,10 @@ const PageWidgetFactory = ({
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
     const previewContainerRef = useRef(null)
+    
+    // Paste mode state
+    const [pasteHoverPosition, setPasteHoverPosition] = useState(null) // 'before' | 'after' | null
+    const widgetRef = useRef(null)
 
     // Create a stable config change handler that integrates with LayoutRenderer
     const stableConfigChangeHandler = useMemo(() => {
@@ -135,6 +142,39 @@ const PageWidgetFactory = ({
             onPaste(slotName, index, pastedWidget, metadata);
         }
     }
+    
+    // Paste mode hover handlers
+    const handlePasteHover = (e) => {
+        if (!pasteModeActive || !widgetRef.current) return;
+        
+        const rect = widgetRef.current.getBoundingClientRect();
+        const mouseY = e.clientY;
+        const widgetCenter = rect.top + rect.height / 2;
+        
+        // Determine if mouse is in top half (before) or bottom half (after)
+        if (mouseY < widgetCenter) {
+            setPasteHoverPosition('before');
+        } else {
+            setPasteHoverPosition('after');
+        }
+    };
+    
+    const handlePasteLeave = () => {
+        setPasteHoverPosition(null);
+    };
+    
+    const handlePasteClick = () => {
+        if (!pasteModeActive || !pasteHoverPosition || !onPasteAtPosition) return;
+        
+        // Calculate position based on hover state
+        const position = pasteHoverPosition === 'before' ? index : index + 1;
+        
+        // Call paste handler with slot name, position, and widget path
+        onPasteAtPosition(slotName, position, widgetPath);
+        
+        // Reset hover state
+        setPasteHoverPosition(null);
+    };
 
     // Enhanced preview with publishing context and slot type awareness
     const handleModalPreview = async () => {
@@ -307,12 +347,22 @@ const PageWidgetFactory = ({
         // Normal local widget rendering with full header
         return (
             <div
-                className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget relative group ${className} ${isPublished ? 'published-widget' : ''}`}
+                ref={widgetRef}
+                className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget relative group ${className} ${isPublished ? 'published-widget' : ''} ${pasteModeActive ? 'paste-mode-active' : ''}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-version-id={versionId}
                 data-published={isPublished}
+                onMouseMove={pasteModeActive ? handlePasteHover : undefined}
+                onMouseLeave={pasteModeActive ? handlePasteLeave : undefined}
                 onClick={(e) => {
+                    // Handle paste mode click
+                    if (pasteModeActive && pasteHoverPosition) {
+                        e.stopPropagation();
+                        handlePasteClick();
+                        return;
+                    }
+                    
                     // STOP PROPAGATION FIRST to prevent bubbling to parent container widgets
                     e.stopPropagation();
 
@@ -397,6 +447,22 @@ const PageWidgetFactory = ({
                     buildWidgetPath={buildWidgetPath}
                     parseWidgetPath={parseWidgetPath}
                 />
+
+                {/* Paste Mode Markers */}
+                {pasteModeActive && pasteHoverPosition === 'before' && (
+                    <div className="absolute -top-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
+                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-t whitespace-nowrap">
+                            Paste here
+                        </div>
+                    </div>
+                )}
+                {pasteModeActive && pasteHoverPosition === 'after' && (
+                    <div className="absolute -bottom-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
+                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-b whitespace-nowrap">
+                            Paste here
+                        </div>
+                    </div>
+                )}
 
                 {/* Core Widget Content */}
                 <div className="widget-content overflow-hidden border border-gray-200 border-t-0">

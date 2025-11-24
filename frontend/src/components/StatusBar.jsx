@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle, X, Clipboard, Scissors, Copy } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data'
+import { useClipboard } from '../contexts/ClipboardContext'
 import VersionSelector from './VersionSelector'
 
 const StatusBar = ({
@@ -23,8 +24,11 @@ const StatusBar = ({
     isDirty = false,
     // Auto-save props
     autoSaveCountdown = null,
-    autoSaveStatus = 'idle'
+    autoSaveStatus = 'idle',
+    onClearClipboard = null
 }) => {
+    // Get global clipboard state
+    const { clipboardData, pasteModePaused, togglePasteMode } = useClipboard();
     const {
         notifications,
         currentNotificationIndex,
@@ -266,6 +270,43 @@ const StatusBar = ({
                                 </div>
                             )}
                         </div>
+                    )}
+                </div>
+
+                {/* Clipboard Indicator - Always Visible Three States */}
+                <div className={`flex items-center space-x-2 px-3 py-1 border rounded text-xs flex-shrink-0 ml-4 transition-all ${
+                    !clipboardData || !clipboardData.data || clipboardData.data.length === 0
+                        ? 'bg-gray-50 border-gray-200 text-gray-400'
+                        : pasteModePaused 
+                            ? 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200 cursor-pointer' 
+                            : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 cursor-pointer'
+                }`}>
+                    <Clipboard className="w-3 h-3" />
+                    {clipboardData && clipboardData.data && clipboardData.data.length > 0 ? (
+                        <>
+                            <button
+                                onClick={togglePasteMode}
+                                disabled={!togglePasteMode}
+                                className="flex items-center space-x-2"
+                                title={pasteModePaused ? 'Click to activate paste mode' : 'Click to pause paste mode (or press ESC / Right-click)'}
+                            >
+                                {clipboardData.operation === 'cut' ? (
+                                    <Scissors className="w-3 h-3" />
+                                ) : (
+                                    <Copy className="w-3 h-3" />
+                                )}
+                                <span className="font-medium">
+                                    {clipboardData.data.length} widget{clipboardData.data.length !== 1 ? 's' : ''} {clipboardData.operation === 'cut' ? 'cut' : 'copied'}
+                                </span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                    pasteModePaused ? 'bg-gray-200 text-gray-600' : 'bg-purple-200 text-purple-800'
+                                }`}>
+                                    {pasteModePaused ? 'PAUSED' : 'ACTIVE'}
+                                </span>
+                            </button>
+                        </>
+                    ) : (
+                        <span className="font-medium">Empty</span>
                     )}
                 </div>
 

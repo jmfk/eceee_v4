@@ -15,6 +15,7 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import ImportDialog from '../../components/ImportDialog';
 import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../../utils/clipboardService';
 import { Clipboard, Scissors, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { useClipboard } from '../../contexts/ClipboardContext';
 
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'main_layout',  // Default to main_layout (available layout)
@@ -85,6 +86,9 @@ const ReactLayoutRenderer = forwardRef(({
     
     // Toolbar collapse state
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+    
+    // Get global clipboard state
+    const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState } = useClipboard();
     
     // Helper: Build widget path string from slotName and widgetId (and optional nested path)
     const buildWidgetPath = useCallback((slotName, widgetId, nestedPath = null) => {
@@ -308,25 +312,16 @@ const ReactLayoutRenderer = forwardRef(({
                 const insertPosition = insertAfterIndex + 1;
                 const clipboardMetadata = args[1]; // Optional: { operation, metadata } from clipboard
 
-                console.log('[Cut/Paste] ========== PASTE OPERATION START ==========');
-                console.log('[Cut/Paste] Pasted widget:', pastedWidget);
-                console.log('[Cut/Paste] Slot:', slotName, 'Insert position:', insertPosition);
-                console.log('[Cut/Paste] Clipboard metadata:', clipboardMetadata);
-                console.log('[Cut/Paste] Current widgets state:', widgets);
-
                 // Start with current widgets state
                 let updatedWidgets = { ...widgets };
                 
                 // Store pasted widget ID to ensure we don't accidentally delete it
                 const pastedWidgetId = pastedWidget.id;
-                console.log('[Cut/Paste] Pasted widget ID:', pastedWidgetId, 'Type:', typeof pastedWidgetId);
                 
                 // Add the pasted widget FIRST to ensure correct insert position
                 const slotWidgetsPaste = [...(updatedWidgets[slotName] || [])];
-                console.log('[Cut/Paste] Slot widgets before paste:', slotWidgetsPaste.map(w => ({ id: w.id, type: typeof w.id })));
                 slotWidgetsPaste.splice(insertPosition, 0, pastedWidget);
                 updatedWidgets[slotName] = slotWidgetsPaste;
-                console.log('[Cut/Paste] Slot widgets after paste:', updatedWidgets[slotName].map(w => ({ id: w.id, type: typeof w.id })));
 
                 // If this was a cut operation, delete the original widgets AFTER adding pasted widget
                 // The pasted widget has a new ID, so it won't be deleted
@@ -981,6 +976,116 @@ const ReactLayoutRenderer = forwardRef(({
         setSelectedWidgets(new Set());
     }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData]);
 
+    // Handle paste at specific position
+    const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = []) => {
+        if (!clipboardData || !clipboardData.data || clipboardData.data.length === 0) {
+            return;
+        }
+        
+        // Get widget(s) from clipboard
+        const widgetsToPaste = clipboardData.data;
+        const isCut = clipboardData.operation === 'cut';
+        
+        // Determine if this is a nested slot paste
+        const isNested = widgetPath.length > 0;
+        
+        if (isNested) {
+            // Nested slot paste - handle container widget slots
+            // widgetPath = [topSlotName, containerId, nestedSlotName]
+            const [topSlotName, containerId, nestedSlotName] = widgetPath;
+            
+            const slotWidgets = widgets[topSlotName] || [];
+            const containerWidget = slotWidgets.find(w => String(w.id) === String(containerId));
+            
+            if (!containerWidget) return;
+            
+            // Get nested slot widgets
+            const nestedSlotWidgets = containerWidget.config?.slots?.[nestedSlotName] || [];
+            
+            // Generate new IDs for pasted widgets
+            const pastedWidgets = widgetsToPaste.map(w => ({
+                ...w,
+                id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            }));
+            
+            // Insert at position
+            const updatedNestedWidgets = [...nestedSlotWidgets];
+            updatedNestedWidgets.splice(position, 0, ...pastedWidgets);
+            
+            // Update container widget config
+            const updatedContainer = {
+                ...containerWidget,
+                config: {
+                    ...containerWidget.config,
+                    slots: {
+                        ...containerWidget.config.slots,
+                        [nestedSlotName]: updatedNestedWidgets
+                    }
+                }
+            };
+            
+            // Update top-level slot
+            const updatedSlotWidgets = slotWidgets.map(w => 
+                String(w.id) === String(containerId) ? updatedContainer : w
+            );
+            
+            const updatedWidgets = {
+                ...widgets,
+                [topSlotName]: updatedSlotWidgets
+            };
+            
+            if (onWidgetChange) {
+                onWidgetChange(updatedWidgets);
+            }
+            
+            // Publish update
+            await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: containerId,
+                slotName: topSlotName,
+                contextType: contextType,
+                config: updatedContainer.config
+            });
+        } else {
+            // Top-level slot paste
+            const slotWidgets = [...(widgets[slotName] || [])];
+            
+            // Generate new IDs for pasted widgets
+            const pastedWidgets = widgetsToPaste.map(w => ({
+                ...w,
+                id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            }));
+            
+            // Insert at position
+            slotWidgets.splice(position, 0, ...pastedWidgets);
+            
+            const updatedWidgets = {
+                ...widgets,
+                [slotName]: slotWidgets
+            };
+            
+            if (onWidgetChange) {
+                onWidgetChange(updatedWidgets);
+            }
+            
+            // Publish ADD_WIDGET operations for each pasted widget
+            for (const widget of pastedWidgets) {
+                await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                    slotName,
+                    widget,
+                    contextType,
+                    position
+                });
+            }
+        }
+        
+        // Handle cut operation - delete from source
+        if (isCut && clipboardData.metadata) {
+            await handleDeleteCutWidgets(clipboardData.metadata);
+        }
+        
+        // Don't clear clipboard after paste - allow repeated pasting
+    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, handleDeleteCutWidgets]);
+
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
 
@@ -1036,6 +1141,32 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Calculate selected count for toolbar
     const selectedCount = getSelectedCount();
+    
+    // ESC and right-click handlers to pause paste mode
+    useEffect(() => {
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && pasteModeActive && !pasteModePaused) {
+                // Pause paste mode instead of clearing clipboard
+                togglePasteMode();
+            }
+        };
+        
+        const handleContextMenu = (e) => {
+            if (pasteModeActive && !pasteModePaused) {
+                e.preventDefault();
+                // Pause paste mode instead of clearing clipboard
+                togglePasteMode();
+            }
+        };
+        
+        document.addEventListener('keydown', handleEscape);
+        document.addEventListener('contextmenu', handleContextMenu);
+        
+        return () => {
+            document.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('contextmenu', handleContextMenu);
+        };
+    }, [pasteModeActive, pasteModePaused, togglePasteMode]);
     
     // Reset toolbar collapse when selection changes
     useEffect(() => {
@@ -1128,6 +1259,9 @@ const ReactLayoutRenderer = forwardRef(({
                 onDeleteCutWidgets={handleDeleteCutWidgets}
                 buildWidgetPath={buildWidgetPath}
                 parseWidgetPath={parseWidgetPath}
+                // Paste mode props
+                pasteModeActive={pasteModeActive}
+                onPasteAtPosition={handlePasteAtPosition}
             />
 
             {/* Widget Selection Modal */}

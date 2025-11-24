@@ -36,6 +36,9 @@ const ThreeColumnsWidget = ({
     onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
     parseWidgetPath,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition,
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -213,10 +216,12 @@ const ThreeColumnsWidget = ({
                     pageVersionData={context.pageVersionData}
                     versionId={context.versionId}
                     widgetPath={fullWidgetPath}
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={onPasteAtPosition}
                 />
             </div>
         );
-    }, [widgetPath, widgetId, componentId, contextType, context]);
+    }, [widgetPath, widgetId, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
 
     // Show loading state
     if (mode === 'editor' && isLoadingTypes) {
@@ -282,6 +287,8 @@ const ThreeColumnsWidget = ({
                         onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                     />
 
                     <SlotEditor
@@ -311,6 +318,8 @@ const ThreeColumnsWidget = ({
                         onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                     />
 
                     <SlotEditor
@@ -340,6 +349,8 @@ const ThreeColumnsWidget = ({
                         onDeleteCutWidgets={onDeleteCutWidgets}
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
                     />
                 </div>
             </div>

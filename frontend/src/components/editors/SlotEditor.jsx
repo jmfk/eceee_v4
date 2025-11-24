@@ -40,7 +40,10 @@ const SlotEditor = forwardRef(({
     isWidgetCut,
     onDeleteCutWidgets, // Callback to delete cut widgets after paste
     buildWidgetPath,
-    parseWidgetPath
+    parseWidgetPath,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition
 }, ref) => {
     // Ref to the SelfContainedSlotEditor component
     const slotEditorRef = useRef(null);
@@ -95,6 +98,9 @@ const SlotEditor = forwardRef(({
                 onDeleteCutWidgets={onDeleteCutWidgets}
                 buildWidgetPath={buildWidgetPath}
                 parseWidgetPath={parseWidgetPath}
+                // Paste mode props
+                pasteModeActive={pasteModeActive}
+                onPasteAtPosition={onPasteAtPosition}
             />
         </div>
     );

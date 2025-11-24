@@ -45,8 +45,7 @@ export const copyToClipboard = async (type, data, metadata = {}) => {
         // Create new clipboard entry
         const uuid = await createClipboardEntry(type, data, 'copy', metadata)
         
-        const message = `Copied to clipboard`
-        toast.success(message)
+        // Don't show toast - clipboard indicator shows the state
         return true
     } catch (error) {
         console.error('Failed to copy to clipboard:', error)
@@ -80,8 +79,7 @@ export const cutToClipboard = async (type, data, metadata = {}) => {
         // Create new clipboard entry with cut operation
         const uuid = await createClipboardEntry(type, data, 'cut', metadata)
         
-        const message = `Cut to clipboard`
-        toast.success(message)
+        // Don't show toast - clipboard indicator shows the state
         return true
     } catch (error) {
         console.error('Failed to cut to clipboard:', error)
@@ -92,9 +90,10 @@ export const cutToClipboard = async (type, data, metadata = {}) => {
 /**
  * Read clipboard data for a specific type
  * @param {string} type - Clipboard type
+ * @param {boolean} silent - If true, don't show error toasts (for polling)
  * @returns {Promise<Object|null>} Clipboard data with operation and metadata, or null if not found
  */
-export const readFromClipboard = async (type) => {
+export const readFromClipboard = async (type, silent = false) => {
     try {
         // First try to get by type (most recent)
         let entry = await getClipboardByType(type)
@@ -113,7 +112,7 @@ export const readFromClipboard = async (type) => {
         }
 
         if (!entry) {
-            toast.error('Clipboard is empty')
+            // Don't show toast for silent operations (polling)
             return null
         }
 
@@ -126,7 +125,9 @@ export const readFromClipboard = async (type) => {
                     await deleteClipboardEntry(entry.id).catch(() => {})
                 }
                 removeClipboardUuid(type)
-                toast.error('Clipboard entry has expired')
+                if (!silent) {
+                    toast.error('Clipboard entry has expired')
+                }
                 return null
             }
         }

@@ -41,6 +41,7 @@ import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { UnifiedDataProvider } from './contexts/unified-data'
+import { ClipboardProvider } from './contexts/ClipboardContext'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
 import StatusBar from './components/StatusBar'
@@ -620,12 +621,14 @@ function App() {
       <NotificationProvider>
         <GlobalNotificationProvider>
           <UnifiedDataProvider enableDevTools={true}>
-            <AuthProvider>
-              <SessionExpiredOverlay />
-              <Router>
-                <AppRoutes />
-              </Router>
-            </AuthProvider>
+            <ClipboardProvider>
+              <AuthProvider>
+                <SessionExpiredOverlay />
+                <Router>
+                  <AppRoutes />
+                </Router>
+              </AuthProvider>
+            </ClipboardProvider>
           </UnifiedDataProvider>
         </GlobalNotificationProvider>
       </NotificationProvider>
