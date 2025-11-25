@@ -50,9 +50,6 @@ const ContentCardWidget = ({
 
     // State for optimized image URLs
     const [image1Url, setImage1Url] = useState('')
-    const [image2Url, setImage2Url] = useState('')
-    const [image3Url, setImage3Url] = useState('')
-    const [image4Url, setImage4Url] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
 
     // Initialize from UDC state on mount
@@ -127,11 +124,8 @@ const ContentCardWidget = ({
     })
 
     // Get image objects from config
-    const imageCount = configRef.current.imageCount || 1
+    const imageSize = configRef.current.imageSize || 'square'
     const image1 = configRef.current.image1
-    const image2 = configRef.current.image2
-    const image3 = configRef.current.image3
-    const image4 = configRef.current.image4
 
     // Load optimized image URLs from backend API
     useEffect(() => {
@@ -139,49 +133,18 @@ const ContentCardWidget = ({
             setImageLoading(true)
 
             try {
-                // Load image URLs based on imageCount
+                // Load image URL based on imageSize
                 if (image1) {
+                    const dimensions = imageSize === 'rectangle'
+                        ? { width: 280, height: 140 }
+                        : { width: 140, height: 140 }
                     const url = await getImgproxyUrlFromImage(image1, {
-                        width: 800,
-                        height: 600,
+                        ...dimensions,
                         resizeType: 'fill'
                     })
                     setImage1Url(url)
                 } else {
                     setImage1Url('')
-                }
-
-                if (image2 && imageCount >= 2) {
-                    const url = await getImgproxyUrlFromImage(image2, {
-                        width: 800,
-                        height: 600,
-                        resizeType: 'fill'
-                    })
-                    setImage2Url(url)
-                } else {
-                    setImage2Url('')
-                }
-
-                if (image3 && imageCount >= 4) {
-                    const url = await getImgproxyUrlFromImage(image3, {
-                        width: 800,
-                        height: 600,
-                        resizeType: 'fill'
-                    })
-                    setImage3Url(url)
-                } else {
-                    setImage3Url('')
-                }
-
-                if (image4 && imageCount >= 4) {
-                    const url = await getImgproxyUrlFromImage(image4, {
-                        width: 800,
-                        height: 600,
-                        resizeType: 'fill'
-                    })
-                    setImage4Url(url)
-                } else {
-                    setImage4Url('')
                 }
             } catch (error) {
                 console.error('Failed to load optimized content card images:', error)
@@ -191,10 +154,7 @@ const ContentCardWidget = ({
         }
 
         loadImages()
-    }, [image1, image2, image3, image4, imageCount])
-
-    // Determine text position
-    const textPosition = configRef.current.textPosition || 'left'
+    }, [image1, imageSize])
 
     // Content change handlers - use configRef for stable references
     const handleHeaderChange = useCallback((newContent) => {
@@ -252,20 +212,20 @@ const ContentCardWidget = ({
                     onChange: handleHeaderChange,
                     placeholder: 'Enter card header...',
                     element: 'h2',
-                    allowedButtons: ['bold', 'italic', 'link']
+                    allowedButtons: undefined
                 })
                 headerEditorRef.current.render()
             }
 
             // Initialize content editor
-            if (contentContainerRef.current && !contentEditorRef.current && imageCount !== 4) {
+            if (contentContainerRef.current && !contentEditorRef.current) {
                 contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
                     content: configRef.current.content || '',
                     mode: 'inline-rich',
                     onChange: handleContentChange,
                     placeholder: 'Enter card content...',
                     element: 'div',
-                    allowedButtons: ['bold', 'italic', 'link']
+                    allowedButtons: ['format', 'bold', 'italic', 'link']
                 })
                 contentEditorRef.current.render()
             }
@@ -281,7 +241,7 @@ const ContentCardWidget = ({
                 contentEditorRef.current = null
             }
         }
-    }, [mode, imageCount])
+    }, [mode])
 
     // Update onChange callbacks when handlers change
     useEffect(() => {
@@ -289,11 +249,11 @@ const ContentCardWidget = ({
             if (headerEditorRef.current) {
                 headerEditorRef.current.updateConfig({ onChange: handleHeaderChange })
             }
-            if (contentEditorRef.current && imageCount !== 4) {
+            if (contentEditorRef.current) {
                 contentEditorRef.current.updateConfig({ onChange: handleContentChange })
             }
         }
-    }, [handleHeaderChange, handleContentChange, mode, imageCount])
+    }, [handleHeaderChange, handleContentChange, mode])
 
     // Update editor content when config changes externally
     useEffect(() => {
@@ -301,11 +261,11 @@ const ContentCardWidget = ({
             if (headerEditorRef.current) {
                 headerEditorRef.current.updateConfig({ content: configRef.current.header || '' })
             }
-            if (contentEditorRef.current && imageCount !== 4) {
+            if (contentEditorRef.current) {
                 contentEditorRef.current.updateConfig({ content: configRef.current.content || '' })
             }
         }
-    }, [configRef.current.header, configRef.current.content, mode, imageCount])
+    }, [configRef.current.header, configRef.current.content, mode])
 
     // Check if using component style with Mustache template
     const componentStyle = configRef.current.componentStyle || 'default'
@@ -330,12 +290,8 @@ const ContentCardWidget = ({
 
                     // Add content card specific context
                     mustacheContext.header = configRef.current.header || ''
-                    mustacheContext.textPosition = textPosition
-                    mustacheContext.imageCount = imageCount
+                    mustacheContext.imageSize = imageSize
                     mustacheContext.image1 = image1Url
-                    mustacheContext.image2 = image2Url
-                    mustacheContext.image3 = image3Url
-                    mustacheContext.image4 = image4Url
 
                     // Render template
                     const html = renderMustache(style.template, mustacheContext)
@@ -378,8 +334,7 @@ const ContentCardWidget = ({
     function renderDefaultCard() {
         const bodyClasses = [
             'content-card-body',
-            `text-${textPosition}`,
-            `image-count-${imageCount}`
+            `image-size-${imageSize}`
         ].join(' ')
 
         if (mode === 'editor') {
@@ -391,24 +346,12 @@ const ContentCardWidget = ({
                     <div className="content-card-header header" ref={headerContainerRef} />
 
                     <div className={bodyClasses}>
-                        {imageCount === 4 ? (
-                            // 4 images layout - no text
-                            <div className="content-card-images image layout-4">
-                                {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
-                                {image2Url && <img className="content-card-image" src={image2Url} alt="" />}
-                                {image3Url && <img className="content-card-image" src={image3Url} alt="" />}
-                                {image4Url && <img className="content-card-image" src={image4Url} alt="" />}
-                            </div>
-                        ) : (
-                            // 1 or 2 images layout - with text
-                            <>
-                                <div className="content-card-text content" ref={contentContainerRef} />
+                        <div className="content-card-text content" ref={contentContainerRef} />
 
-                                <div className={`content-card-images image layout-${imageCount}`}>
-                                    {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
-                                    {image2Url && imageCount >= 2 && <img className="content-card-image" src={image2Url} alt="" />}
-                                </div>
-                            </>
+                        {image1Url && (
+                            <div className="content-card-images image">
+                                <img className="content-card-image" src={image1Url} alt="" />
+                            </div>
                         )}
                     </div>
                 </div>
@@ -432,26 +375,14 @@ const ContentCardWidget = ({
                 )}
 
                 <div className={bodyClasses}>
-                    {imageCount === 4 ? (
-                        // 4 images layout - no text
-                        <div className="content-card-images image layout-4">
-                            {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
-                            {image2Url && <img className="content-card-image" src={image2Url} alt="" />}
-                            {image3Url && <img className="content-card-image" src={image3Url} alt="" />}
-                            {image4Url && <img className="content-card-image" src={image4Url} alt="" />}
-                        </div>
-                    ) : (
-                        // 1 or 2 images layout - with text
-                        <>
-                            <div className="content-card-text content">
-                                <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
-                            </div>
+                    <div className="content-card-text content">
+                        <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
+                    </div>
 
-                            <div className={`content-card-images image layout-${imageCount}`}>
-                                {image1Url && <img className="content-card-image" src={image1Url} alt="" />}
-                                {image2Url && imageCount >= 2 && <img className="content-card-image" src={image2Url} alt="" />}
-                            </div>
-                        </>
+                    {image1Url && (
+                        <div className="content-card-images image">
+                            <img className="content-card-image" src={image1Url} alt="" />
+                        </div>
                     )}
                 </div>
             </div>
@@ -459,7 +390,7 @@ const ContentCardWidget = ({
     }
 
     // Default rendering (no custom style)
-    const hasContent = configRef.current.header || configRef.current.content || image1 || image2 || image3 || image4
+    const hasContent = configRef.current.header || configRef.current.content || image1
 
     if (mode === 'editor') {
         return (
@@ -493,12 +424,8 @@ ContentCardWidget.defaultConfig = {
     anchor: '',
     header: '',
     content: '',
-    textPosition: 'left',
-    imageCount: 1,
+    imageSize: 'square',
     image1: null,
-    image2: null,
-    image3: null,
-    image4: null,
     componentStyle: 'default'
 }
 

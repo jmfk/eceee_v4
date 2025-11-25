@@ -43,9 +43,6 @@ const BannerWidget = ({
 
     // State for optimized image URLs
     const [image1Url, setImage1Url] = useState('')
-    const [image2Url, setImage2Url] = useState('')
-    const [image3Url, setImage3Url] = useState('')
-    const [image4Url, setImage4Url] = useState('')
     const [backgroundImageUrl, setBackgroundImageUrl] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
 
@@ -106,12 +103,9 @@ const BannerWidget = ({
     })
 
     // Get image objects from config
-    const imageCount = configRef.current.imageCount || 1
+    const imageSize = configRef.current.imageSize || 'square'
     const bannerMode = configRef.current.bannerMode || 'text'
     const image1 = configRef.current.image1
-    const image2 = configRef.current.image2
-    const image3 = configRef.current.image3
-    const image4 = configRef.current.image4
     const backgroundImage = configRef.current.backgroundImage
 
     // Load optimized image URLs from backend API
@@ -132,49 +126,18 @@ const BannerWidget = ({
                     setBackgroundImageUrl('')
                 }
 
-                // Load image URLs based on imageCount
-                if (image1) {
+                // Load image URL based on imageSize (only for text mode)
+                if (bannerMode === 'text' && image1) {
+                    const dimensions = imageSize === 'rectangle'
+                        ? { width: 280, height: 140 }
+                        : { width: 140, height: 140 }
                     const url = await getImgproxyUrlFromImage(image1, {
-                        width: 800,
-                        height: 600,
+                        ...dimensions,
                         resizeType: 'fill'
                     })
                     setImage1Url(url)
                 } else {
                     setImage1Url('')
-                }
-
-                if (image2 && imageCount >= 2) {
-                    const url = await getImgproxyUrlFromImage(image2, {
-                        width: 800,
-                        height: 600,
-                        resizeType: 'fill'
-                    })
-                    setImage2Url(url)
-                } else {
-                    setImage2Url('')
-                }
-
-                if (image3 && imageCount >= 4) {
-                    const url = await getImgproxyUrlFromImage(image3, {
-                        width: 800,
-                        height: 600,
-                        resizeType: 'fill'
-                    })
-                    setImage3Url(url)
-                } else {
-                    setImage3Url('')
-                }
-
-                if (image4 && imageCount >= 4) {
-                    const url = await getImgproxyUrlFromImage(image4, {
-                        width: 800,
-                        height: 600,
-                        resizeType: 'fill'
-                    })
-                    setImage4Url(url)
-                } else {
-                    setImage4Url('')
                 }
             } catch (error) {
                 console.error('Failed to load optimized banner images:', error)
@@ -184,10 +147,9 @@ const BannerWidget = ({
         }
 
         loadImages()
-    }, [image1, image2, image3, image4, imageCount, backgroundImage])
+    }, [image1, imageSize, backgroundImage, bannerMode])
 
-    // Determine text position
-    const textPosition = configRef.current.textPosition || 'left'
+    // Determine text position - removed, no longer used
 
     // Content change handler - use configRef for stable reference
     const handleContentChange = useCallback((newContent) => {
@@ -237,11 +199,15 @@ const BannerWidget = ({
 
     // Initialize editor in editor mode
     useEffect(() => {
-        if (mode === 'editor' && imageCount !== 4) {
+        if (mode === 'editor') {
             if (contentContainerRef.current && !contentEditorRef.current) {
-                // Both modes use inline-rich now (WYSIWYG with toolbar)
-                const editorMode = 'inline-rich'
+                // Text mode: inline-rich with toolbar (bold, italic, link)
+                // Header mode: inline-plain with no toolbar, max 1 line break
+                const editorMode = bannerMode === 'header' ? 'inline-plain' : 'inline-rich'
                 const element = bannerMode === 'header' ? 'h2' : 'div'
+                const allowedButtons = bannerMode === 'header'
+                    ? undefined
+                    : ['format', 'bold', 'italic', 'link']
 
                 contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
                     content: configRef.current.content || '',
@@ -249,7 +215,8 @@ const BannerWidget = ({
                     onChange: handleContentChange,
                     placeholder: bannerMode === 'header' ? 'Enter banner header...' : 'Enter banner content...',
                     element: element,
-                    allowedButtons: ['bold', 'italic', 'link']
+                    allowedButtons: allowedButtons,
+                    maxBreaks: bannerMode === 'header' ? 1 : undefined
                 })
                 contentEditorRef.current.render()
             }
@@ -261,20 +228,20 @@ const BannerWidget = ({
                 contentEditorRef.current = null
             }
         }
-    }, [mode, imageCount, bannerMode])
+    }, [mode, bannerMode])
 
     // Update onChange callback when handler changes
     useEffect(() => {
-        if (mode === 'editor' && imageCount !== 4) {
+        if (mode === 'editor') {
             if (contentEditorRef.current) {
                 contentEditorRef.current.updateConfig({ onChange: handleContentChange })
             }
         }
-    }, [handleContentChange, mode, imageCount])
+    }, [handleContentChange, mode])
 
     // Handle bannerMode changes from widget form - reinitialize editor with new element
     useEffect(() => {
-        if (mode === 'editor' && imageCount !== 4 && contentEditorRef.current) {
+        if (mode === 'editor' && contentEditorRef.current) {
             const currentElement = contentEditorRef.current.options?.element || 'div'
             const newElement = bannerMode === 'header' ? 'h2' : 'div'
 
@@ -285,14 +252,12 @@ const BannerWidget = ({
                 // Editor will be recreated by the initialization effect
             }
         }
-    }, [bannerMode, mode, imageCount])
+    }, [bannerMode, mode])
 
     // Update editor content when config changes externally (from UDC/widget form)
     useEffect(() => {
-        if (mode === 'editor' && imageCount !== 4) {
+        if (mode === 'editor') {
             if (contentEditorRef.current) {
-                // Both modes use inline-rich now
-                const editorMode = 'inline-rich'
                 const element = bannerMode === 'header' ? 'h2' : 'div'
 
                 // Only update if element matches current editor element
@@ -304,7 +269,7 @@ const BannerWidget = ({
                 }
             }
         }
-    }, [configRef.current.content, mode, imageCount])
+    }, [configRef.current.content, mode])
 
     // Check if using component style with Mustache template
     const componentStyle = configRef.current.componentStyle || 'default'
@@ -328,12 +293,9 @@ const BannerWidget = ({
                     )
 
                     // Add banner specific context
-                    mustacheContext.textPosition = textPosition
-                    mustacheContext.imageCount = imageCount
+                    mustacheContext.bannerMode = bannerMode
+                    mustacheContext.imageSize = imageSize
                     mustacheContext.image1 = image1Url
-                    mustacheContext.image2 = image2Url
-                    mustacheContext.image3 = image3Url
-                    mustacheContext.image4 = image4Url
 
                     // Render template
                     const html = renderMustache(style.template, mustacheContext)
@@ -376,8 +338,8 @@ const BannerWidget = ({
     function renderDefaultBanner() {
         const bodyClasses = [
             'banner-body',
-            `text-${textPosition}`,
-            `image-count-${imageCount}`
+            `mode-${bannerMode}`,
+            `image-size-${imageSize}`
         ].join(' ')
 
         if (mode === 'editor') {
@@ -406,44 +368,32 @@ const BannerWidget = ({
                         />
                     )}
                     <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
-                        {imageCount === 4 ? (
-                            // 4 images layout - no text
-                            <div className="banner-images image layout-4">
-                                {image1Url && <img className="banner-image" src={image1Url} alt="" />}
-                                {image2Url && <img className="banner-image" src={image2Url} alt="" />}
-                                {image3Url && <img className="banner-image" src={image3Url} alt="" />}
-                                {image4Url && <img className="banner-image" src={image4Url} alt="" />}
-                            </div>
-                        ) : (
-                            // 1 or 2 images layout - with text
-                            <>
-                                <div className="banner-text content" style={{ position: 'relative' }} ref={contentContainerRef}>
-                                    {/* Mode toggle button */}
-                                    <button
-                                        onClick={handleModeToggle}
-                                        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs bg-white/90 hover:bg-white border border-gray-300 rounded shadow-sm flex items-center gap-1 transition-colors"
-                                        title={`Switch to ${bannerMode === 'header' ? 'Text' : 'Header'} mode`}
-                                        type="button"
-                                    >
-                                        {bannerMode === 'header' ? (
-                                            <>
-                                                <Type className="h-3 w-3" />
-                                                <span>Header</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <AlignLeft className="h-3 w-3" />
-                                                <span>Text</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
+                        <div className="banner-text content" style={{ position: 'relative' }} ref={contentContainerRef}>
+                            {/* Mode toggle button */}
+                            <button
+                                onClick={handleModeToggle}
+                                className="absolute top-2 right-2 z-10 px-2 py-1 text-xs bg-white/90 hover:bg-white border border-gray-300 rounded shadow-sm flex items-center gap-1 transition-colors"
+                                title={`Switch to ${bannerMode === 'header' ? 'Text' : 'Header'} mode`}
+                                type="button"
+                            >
+                                {bannerMode === 'header' ? (
+                                    <>
+                                        <Type className="h-3 w-3" />
+                                        <span>Header</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <AlignLeft className="h-3 w-3" />
+                                        <span>Text</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
 
-                                <div className={`banner-images image layout-${imageCount}`}>
-                                    {image1Url && <img className="banner-image" src={image1Url} alt="" />}
-                                    {image2Url && imageCount >= 2 && <img className="banner-image" src={image2Url} alt="" />}
-                                </div>
-                            </>
+                        {bannerMode === 'text' && image1Url && (
+                            <div className="banner-images image">
+                                <img className="banner-image" src={image1Url} alt="" />
+                            </div>
                         )}
                     </div>
                 </div>
@@ -475,26 +425,14 @@ const BannerWidget = ({
                     />
                 )}
                 <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
-                    {imageCount === 4 ? (
-                        // 4 images layout - no text
-                        <div className="banner-images image layout-4">
-                            {image1Url && <img className="banner-image" src={image1Url} alt="" />}
-                            {image2Url && <img className="banner-image" src={image2Url} alt="" />}
-                            {image3Url && <img className="banner-image" src={image3Url} alt="" />}
-                            {image4Url && <img className="banner-image" src={image4Url} alt="" />}
-                        </div>
-                    ) : (
-                        // 1 or 2 images layout - with text
-                        <>
-                            <div className="banner-text content">
-                                <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
-                            </div>
+                    <div className="banner-text content">
+                        <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
+                    </div>
 
-                            <div className={`banner-images image layout-${imageCount}`}>
-                                {image1Url && <img className="banner-image" src={image1Url} alt="" />}
-                                {image2Url && imageCount >= 2 && <img className="banner-image" src={image2Url} alt="" />}
-                            </div>
-                        </>
+                    {bannerMode === 'text' && image1Url && (
+                        <div className="banner-images image">
+                            <img className="banner-image" src={image1Url} alt="" />
+                        </div>
                     )}
                 </div>
             </div>
@@ -502,7 +440,7 @@ const BannerWidget = ({
     }
 
     // Default rendering (no custom style)
-    const hasContent = configRef.current.content || image1 || image2 || image3 || image4 || backgroundImage
+    const hasContent = configRef.current.content || image1 || backgroundImage
 
     if (mode === 'editor') {
         return (
@@ -537,12 +475,8 @@ BannerWidget.defaultConfig = {
     bannerMode: 'text',
     content: '',
     backgroundImage: null,
-    textPosition: 'left',
-    imageCount: 1,
+    imageSize: 'square',
     image1: null,
-    image2: null,
-    image3: null,
-    image4: null,
     componentStyle: 'default'
 }
 

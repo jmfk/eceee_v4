@@ -23,15 +23,32 @@ class BannerConfig(BaseModel):
 
     bannerMode: Literal["header", "text"] = Field(
         "text",
-        description="Banner mode: header (H2 text-only) or text (rich text)",
+        description="Banner mode: header (H2 centered) or text (H3 + paragraph with optional image)",
         json_schema_extra={
-            "component": "SelectInput",
-            "options": [
-                {"label": "Header Mode", "value": "header"},
-                {"label": "Text Mode", "value": "text"},
-            ],
+            "component": "BannerModeSelector",
             "order": 1,
             "group": "Content",
+        },
+    )
+    imageSize: Literal["square", "rectangle"] = Field(
+        "square",
+        description="Size/shape of the image",
+        json_schema_extra={
+            "component": "ImageSizeSelector",
+            "order": 4,
+            "group": "Layout",
+            "conditionalOn": {"bannerMode": ["text"]},
+        },
+    )
+    image1: Optional[str] = Field(
+        None,
+        description="Image URL",
+        json_schema_extra={
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "order": 5,
+            "group": "Images",
+            "conditionalOn": {"bannerMode": ["text"]},
         },
     )
     content: str = Field(
@@ -54,82 +71,13 @@ class BannerConfig(BaseModel):
             "group": "Content",
         },
     )
-    textPosition: Literal["left", "right"] = Field(
-        "left",
-        description="Position of text block relative to images",
-        json_schema_extra={
-            "component": "SelectInput",
-            "options": [
-                {"label": "Left", "value": "left"},
-                {"label": "Right", "value": "right"},
-            ],
-            "order": 4,
-            "group": "Layout",
-        },
-    )
-    imageCount: Literal[1, 2, 4] = Field(
-        1,
-        description="Number of images to display",
-        json_schema_extra={
-            "component": "SelectInput",
-            "options": [
-                {"label": "1 Image", "value": 1},
-                {"label": "2 Images", "value": 2},
-                {"label": "4 Images (no text)", "value": 4},
-            ],
-            "order": 5,
-            "group": "Layout",
-        },
-    )
-    image1: Optional[str] = Field(
-        None,
-        description="First image URL",
-        json_schema_extra={
-            "component": "ImageInput",
-            "mediaTypes": ["image"],
-            "order": 6,
-            "group": "Images",
-        },
-    )
-    image2: Optional[str] = Field(
-        None,
-        description="Second image URL (for 2 or 4 image layouts)",
-        json_schema_extra={
-            "component": "ImageInput",
-            "mediaTypes": ["image"],
-            "order": 7,
-            "group": "Images",
-            "conditionalOn": {"imageCount": [2, 4]},
-        },
-    )
-    image3: Optional[str] = Field(
-        None,
-        description="Third image URL (for 4 image layout)",
-        json_schema_extra={
-            "component": "ImageInput",
-            "mediaTypes": ["image"],
-            "order": 8,
-            "group": "Images",
-            "conditionalOn": {"imageCount": [4]},
-        },
-    )
-    image4: Optional[str] = Field(
-        None,
-        description="Fourth image URL (for 4 image layout)",
-        json_schema_extra={
-            "component": "ImageInput",
-            "mediaTypes": ["image"],
-            "order": 9,
-            "group": "Images",
-            "conditionalOn": {"imageCount": [4]},
-        },
-    )
+
     componentStyle: str = Field(
         "default",
         description="Component style from theme",
         json_schema_extra={
             "component": "ComponentStyleSelector",
-            "order": 10,
+            "order": 6,
             "group": "Styling",
         },
     )
@@ -139,7 +87,7 @@ class BannerConfig(BaseModel):
         json_schema_extra={
             "component": "BooleanInput",
             "variant": "toggle",
-            "order": 11,
+            "order": 7,
             "group": "Styling",
         },
     )
@@ -230,7 +178,13 @@ class BannerWidget(BaseWidget):
         height: 140px;
     }
     
-    .banner-text {
+    /* Text mode styles */
+    .banner-body.mode-text {
+        justify-content: flex-start;
+        align-items: flex-start;
+    }
+    
+    .banner-body.mode-text .banner-text {
         flex: 1; 
         padding: 30px;
         font-size: 16px;
@@ -240,56 +194,47 @@ class BannerWidget(BaseWidget):
         overflow: hidden;
     }
     
-    .banner-images {
+    .banner-body.mode-text .banner-images {
         display: flex;
         align-items: top;
         justify-content: right;
         padding: 0px; 
     }
+    
+    /* Header mode styles */
+    .banner-body.mode-header {
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .banner-body.mode-header .banner-text {
+        width: 100%;
+        padding: 30px;
+        text-align: center;
+        font-size: 24px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 400;
+        line-height: 32px;
+        overflow: hidden;
+    }
   
-    /* Individual image styling - height can be controlled via layout properties */
+    /* Individual image styling - square (default) */
     .banner-image {
         width: 140px;
-        height: 140px;  /* Default height, can be overridden via layout properties */
+        height: 140px;
         object-fit: cover;
     }
     
-    /* Text positioning */
-    .banner-body.text-left .banner-text {
-        order: 1;
-    }
-    
-    .banner-body.text-left .banner-images {
-        order: 2;
-    }
-    
-    .banner-body.text-right .banner-text {
-        order: 2;
-    }
-    
-    .banner-body.text-right .banner-images {
-        order: 1;
+    /* Rectangle image styling */
+    .banner-body.image-size-rectangle .banner-image {
+        width: 280px;
+        height: 140px;
     }
     
     /* Responsive behavior */
     @media (max-width: 768px) {
-        .banner-body {
+        .banner-body.mode-text {
             flex-direction: column;
-        }
-        
-        .banner-body.text-left .banner-text,
-        .banner-body.text-right .banner-text {
-            order: 1;
-        }
-        
-        .banner-body.text-left .banner-images,
-        .banner-body.text-right .banner-images {
-            order: 2;
-        }
-        
-        .banner-images.layout-2,
-        .banner-images.layout-4 {
-            flex-wrap: wrap;
         }
     }
     """
@@ -349,19 +294,15 @@ class BannerWidget(BaseWidget):
         context["bannerMode"] = config.get("banner_mode") or config.get(
             "bannerMode", "text"
         )
-        context["textPosition"] = config.get("text_position") or config.get(
-            "textPosition", "left"
+        context["imageSize"] = config.get("image_size") or config.get(
+            "imageSize", "square"
         )
-        context["imageCount"] = config.get("image_count") or config.get("imageCount", 1)
         context["backgroundImage"] = config.get("background_image") or config.get(
             "backgroundImage"
         )
 
-        # Add image URLs
+        # Add image URL (only for text mode)
         context["image1"] = config.get("image1") or config.get("image_1")
-        context["image2"] = config.get("image2") or config.get("image_2")
-        context["image3"] = config.get("image3") or config.get("image_3")
-        context["image4"] = config.get("image4") or config.get("image_4")
 
         # Render template
         html = render_mustache(template_str, context)
@@ -377,61 +318,22 @@ class BannerWidget(BaseWidget):
         template_config["banner_mode"] = config.get("bannerMode") or config.get(
             "banner_mode", "text"
         )
-        template_config["text_position"] = config.get("textPosition") or config.get(
-            "text_position", "left"
-        )
-        template_config["image_count"] = config.get("imageCount") or config.get(
-            "image_count", 1
+        template_config["image_size"] = config.get("imageSize") or config.get(
+            "image_size", "square"
         )
         template_config["component_style"] = config.get("componentStyle") or config.get(
             "component_style", "default"
         )
-        template_config["show_border"] = config.get("showBorder") if config.get("showBorder") is not None else config.get("show_border", True)
+        template_config["show_border"] = (
+            config.get("showBorder")
+            if config.get("showBorder") is not None
+            else config.get("show_border", True)
+        )
         template_config["background_image"] = config.get(
             "backgroundImage"
         ) or config.get("background_image")
 
-        # Convert image fields from camelCase to snake_case for template
+        # Convert image field from camelCase to snake_case for template (only for text mode)
         template_config["image_1"] = config.get("image1") or config.get("image_1")
-        template_config["image_2"] = config.get("image2") or config.get("image_2")
-        template_config["image_3"] = config.get("image3") or config.get("image_3")
-        template_config["image_4"] = config.get("image4") or config.get("image_4")
-
-        # Extract layout properties from theme for dynamic image sizing
-        theme = context.get("theme") if context else None
-        if theme and hasattr(theme, "design_groups"):
-            design_groups = theme.design_groups or {}
-            groups = design_groups.get("groups", [])
-
-            # Find layout properties for banner-image part
-            for group in groups:
-                layout_props = group.get("layoutProperties") or group.get(
-                    "layout_properties", {}
-                )
-                if "banner-image" in layout_props:
-                    # Extract height from breakpoints (use 'sm' as default)
-                    part_props = layout_props["banner-image"]
-                    height_val = part_props.get("sm", {}).get("height")
-
-                    # Parse height and calculate width (1:1 ratio)
-                    if height_val:
-                        try:
-                            # Remove 'px' suffix if present
-                            height_str = str(height_val).replace("px", "").strip()
-                            height_px = int(height_str)
-
-                            # Set image dimensions for different layouts (1:1 aspect ratio)
-                            template_config["image_width"] = height_px
-                            template_config["image_height"] = height_px
-
-                            # Retina (2x) dimensions
-                            template_config["image_width_2x"] = height_px * 2
-                            template_config["image_height_2x"] = height_px * 2
-                        except (ValueError, AttributeError):
-                            # If parsing fails, defaults will be used from template
-                            logger.warning(
-                                f"Could not parse height value: {height_val}"
-                            )
-                    break  # Use first matching group
 
         return template_config

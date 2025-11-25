@@ -49,6 +49,8 @@ export { default as SegmentedControlInput } from './SegmentedControlInput'
 export { default as NumericStepperInput } from './NumericStepperInput'
 export { default as TwoColumnRatioSelector } from './TwoColumnRatioSelector'
 export { default as ThreeColumnRatioSelector } from './ThreeColumnRatioSelector'
+export { default as ImageSizeSelector } from './ImageSizeSelector'
+export { default as BannerModeSelector } from './BannerModeSelector'
 
 // Media Components
 export { default as ImageInput } from './ImageInput'
@@ -115,6 +117,8 @@ export const FIELD_COMPONENTS = {
     NumericStepperInput: () => import('./NumericStepperInput'),
     TwoColumnRatioSelector: () => import('./TwoColumnRatioSelector'),
     ThreeColumnRatioSelector: () => import('./ThreeColumnRatioSelector'),
+    ImageSizeSelector: () => import('./ImageSizeSelector'),
+    BannerModeSelector: () => import('./BannerModeSelector'),
     // Media Components
     ImageInput: () => import('./ImageInput'),
     FileInput: () => import('./FileInput'),
