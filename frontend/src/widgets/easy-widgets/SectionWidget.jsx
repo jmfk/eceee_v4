@@ -258,7 +258,7 @@ const SectionWidget = ({
         const fullWidgetPath = [...widgetPath, widgetId, slotName, widget.id];
 
         return (
-            <div key={uniqueKey} className="widget-wrapper">
+            <>
                 <PageWidgetFactory
                     widget={widget}
                     slotName={slotName}
@@ -276,7 +276,7 @@ const SectionWidget = ({
                     pasteModeActive={pasteModeActive}
                     onPasteAtPosition={onPasteAtPosition}
                 />
-            </div>
+            </>
         );
     }, [widgetPath, widgetId, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
 
@@ -448,27 +448,63 @@ const SectionWidget = ({
 
     // Default rendering helper function
     function renderDefaultSection() {
+        const hasContent = slotsData.content && slotsData.content.length > 0;
+        const isCollapsed = config.enableCollapse && !isExpanded;
+
         return (
-            <div className="section-widget mb-6"
+            <div className={`section-widget mb-6 ${isCollapsed ? 'section-collapsed' : ''}`}
                 data-section-id={config.anchor || ''}
                 data-accordion-mode={config.accordionMode ? 'true' : 'false'}>
                 {config.title && (
-                    <div className={`section-header ${config.enableCollapse ? 'cursor-pointer' : ''}`}
-                        onClick={toggleSection}
+                    <div className="section-header p-4 font-semibold text-xl"
                         id={config.anchor}>
-                        <div className="flex justify-between items-center">
-                            <span className="font-semibold text-xl">{config.title}</span>
-                            {config.enableCollapse && (
-                                <span className={`section-toggle transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>
-                                    ▶
-                                </span>
-                            )}
-                        </div>
+                        {config.title}
                     </div>
                 )}
-                <div className={`section-content p-4 ${config.enableCollapse && !isExpanded ? 'hidden' : ''}`}>
-                    {slotsData.content && slotsData.content.length > 0 ? (
-                        slotsData.content.map((widget, index) => renderWidget(widget, 'content', index))
+                <div className="section-content px-4 pb-4">
+                    {hasContent ? (
+                        <>
+                            {/* First widget - always visible */}
+                            {renderWidget(slotsData.content[0], 'content', 0)}
+
+                            {config.enableCollapse && (
+                                <>
+                                    {/* Remaining widgets - animated expand/collapse */}
+                                    <div className="section-remaining-content block section-collapsed:hidden">
+                                        {slotsData.content.slice(1).map((widget, index) => renderWidget(widget, 'content', index + 1))}
+                                    </div>
+
+                                    {/* Expand banner - shown when collapsed */}
+                                    <div
+                                        className="section-banner expand-banner hidden section-collapsed:flex items-center justify-center p-4 mt-4 border-t border-gray-300 cursor-pointer select-none transition-opacity hover:opacity-80 font-medium"
+                                        onClick={toggleSection}
+                                        style={{
+                                            backgroundColor: config.bannerBgColor || '#f3f4f6',
+                                            color: config.bannerTextColor || '#374151'
+                                        }}
+                                    >
+                                        <span>{config.expandText || 'Expand to read more'}</span>
+                                    </div>
+
+                                    {/* Contract banner - shown when expanded */}
+                                    <div
+                                        className="section-banner contract-banner flex section-collapsed:hidden items-center justify-center p-4 mt-4 border-t border-gray-300 cursor-pointer select-none transition-opacity hover:opacity-80 font-medium"
+                                        onClick={toggleSection}
+                                        style={{
+                                            backgroundColor: config.bannerBgColor || '#f3f4f6',
+                                            color: config.bannerTextColor || '#374151'
+                                        }}
+                                    >
+                                        <span>{config.contractText || 'Show less'}</span>
+                                    </div>
+                                </>
+                            )}
+
+                            {!config.enableCollapse && (
+                                /* No collapse enabled - show all widgets without banner */
+                                slotsData.content.slice(1).map((widget, index) => renderWidget(widget, 'content', index + 1))
+                            )}
+                        </>
                     ) : (
                         <div className="text-center text-gray-400">Section content</div>
                     )}
@@ -524,6 +560,10 @@ SectionWidget.defaultConfig = {
     enableCollapse: false,
     startExpanded: true,
     accordionMode: false,
+    expandText: 'Expand to read more',
+    contractText: 'Show less',
+    bannerBgColor: '#f3f4f6',
+    bannerTextColor: '#374151',
     componentStyle: 'default',
     slots: { content: [] }
 };

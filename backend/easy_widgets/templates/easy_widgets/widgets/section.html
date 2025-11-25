@@ -11,36 +11,50 @@ Section Widget Template
 
 {% if config.enable_collapse %}
     {# Collapsible section with header #}
-    <div class="section-widget{% if config.show_border %} border-enabled{% endif %}" 
+    <div class="section-widget{% if config.show_border %} border-enabled{% endif %} {% if not config.start_expanded %}section-collapsed{% endif %}" 
          {% if config.anchor %}id="{{ config.anchor }}"{% endif %}
          data-section-id="{{ config.anchor|default:'' }}"
          {% if config.accordion_mode %}data-accordion-mode="true"{% endif %}>
         
         {% if config.title %}
-        <div class="section-header" 
-             onclick="toggleSection(this)"
-             data-expanded="{{ config.start_expanded|default:true|yesno:'true,false' }}">
+        <div class="section-header">
             <span class="section-title">{{ config.title }}</span>
-            <span class="section-toggle {% if config.start_expanded %}expanded{% endif %}">▶</span>
         </div>
         {% endif %}
         
-        <div class="section-content {% if config.start_expanded %}expanded{% else %}collapsed{% endif %}"
-             style="max-height: {% if config.start_expanded %}5000px{% else %}0{% endif %};">
-            {% for widget in config.rendered_slots.content %}
-                <div class="widget-wrapper">
-                    {{ widget.html|sanitize_html }}
-                </div>
-            {% endfor %}
+        <div class="section-content">
+            {# First widget - always visible #}
+            {% if config.rendered_slots.content %}
+                {{ config.rendered_slots.content.0.html|sanitize_html }}
+            {% endif %}
+            
+            {# Remaining widgets - hidden when collapsed #}
+            <div class="section-remaining-content">
+                {% for widget in config.rendered_slots.content %}
+                    {% if not forloop.first %}
+                        {{ widget.html|sanitize_html }}
+                    {% endif %}
+                {% endfor %}
+            </div>
+            
+            {# Expand/Contract banners #}
+            <div class="section-banner expand-banner" 
+                 onclick="toggleSection(this)"
+                 style="background-color: {{ config.banner_bg_color|default:'#f3f4f6' }}; color: {{ config.banner_text_color|default:'#374151' }};">
+                <span>{{ config.expand_text|default:'Expand to read more' }}</span>
+            </div>
+            <div class="section-banner contract-banner" 
+                 onclick="toggleSection(this)"
+                 style="background-color: {{ config.banner_bg_color|default:'#f3f4f6' }}; color: {{ config.banner_text_color|default:'#374151' }};">
+                <span>{{ config.contract_text|default:'Show less' }}</span>
+            </div>
         </div>
     </div>
 {% else %}
     {# Non-collapsible: just render content directly with anchor #}
     <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only{% if config.show_border %} border-enabled{% endif %}">
         {% for widget in config.rendered_slots.content %}
-            <div class="widget-wrapper">
-                {{ widget.html|sanitize_html }}
-            </div>
+            {{ widget.html|sanitize_html }}
         {% endfor %}
     </div>
 {% endif %}
@@ -48,61 +62,27 @@ Section Widget Template
 {% if config.enable_collapse %}
 <script>
 (function() {
-    // Toggle section collapse/expand
-    window.toggleSection = function(headerElement) {
-        const sectionWidget = headerElement.closest('.section-widget');
-        const contentElement = sectionWidget.querySelector('.section-content');
-        const toggleIcon = headerElement.querySelector('.section-toggle');
-        const isExpanded = contentElement.classList.contains('expanded');
+    window.toggleSection = function(element) {
+        const sectionWidget = element.closest('.section-widget');
+        const isCollapsed = sectionWidget.classList.contains('section-collapsed');
         
         // Handle accordion mode
         if (sectionWidget.dataset.accordionMode === 'true') {
-            // Close all other sections with accordion mode
             const allSections = document.querySelectorAll('.section-widget[data-accordion-mode="true"]');
             allSections.forEach(section => {
-                if (section !== sectionWidget) {
-                    const otherContent = section.querySelector('.section-content');
-                    const otherToggle = section.querySelector('.section-toggle');
-                    if (otherContent && otherContent.classList.contains('expanded')) {
-                        otherContent.classList.remove('expanded');
-                        otherContent.classList.add('collapsed');
-                        otherContent.style.maxHeight = '0';
-                        if (otherToggle) {
-                            otherToggle.classList.remove('expanded');
-                        }
-                    }
+                if (section !== sectionWidget && !section.classList.contains('section-collapsed')) {
+                    section.classList.add('section-collapsed');
                 }
             });
         }
         
         // Toggle current section
-        if (isExpanded) {
-            // Collapse
-            contentElement.classList.remove('expanded');
-            contentElement.classList.add('collapsed');
-            contentElement.style.maxHeight = '0';
-            if (toggleIcon) {
-                toggleIcon.classList.remove('expanded');
-            }
+        if (isCollapsed) {
+            sectionWidget.classList.remove('section-collapsed');
         } else {
-            // Expand
-            contentElement.classList.remove('collapsed');
-            contentElement.classList.add('expanded');
-            contentElement.style.maxHeight = contentElement.scrollHeight + 'px';
-            if (toggleIcon) {
-                toggleIcon.classList.add('expanded');
-            }
+            sectionWidget.classList.add('section-collapsed');
         }
     };
-    
-    // Initialize sections on load
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.section-content.expanded').forEach(function(content) {
-            if (content.closest('.section-widget').querySelector('.section-header[data-expanded]')) {
-                content.style.maxHeight = content.scrollHeight + 'px';
-            }
-        });
-    });
 })();
 </script>
 {% endif %}

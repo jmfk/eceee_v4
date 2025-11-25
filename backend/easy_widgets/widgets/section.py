@@ -62,12 +62,56 @@ class SectionConfig(BaseModel):
         },
     )
 
+    expand_text: str = Field(
+        "Expand to read more",
+        description="Text for expand button",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 7,
+            "group": "Behavior",
+            "conditionalOn": {"field": "enable_collapse", "value": True},
+        },
+    )
+
+    contract_text: str = Field(
+        "Show less",
+        description="Text for contract button",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 8,
+            "group": "Behavior",
+            "conditionalOn": {"field": "enable_collapse", "value": True},
+        },
+    )
+
+    banner_bg_color: str = Field(
+        "#f3f4f6",
+        description="Banner background color",
+        json_schema_extra={
+            "component": "ColorInput",
+            "order": 9,
+            "group": "Display Options",
+            "conditionalOn": {"field": "enable_collapse", "value": True},
+        },
+    )
+
+    banner_text_color: str = Field(
+        "#374151",
+        description="Banner text color",
+        json_schema_extra={
+            "component": "ColorInput",
+            "order": 10,
+            "group": "Display Options",
+            "conditionalOn": {"field": "enable_collapse", "value": True},
+        },
+    )
+
     component_style: str = Field(
         "default",
         description="Component style from theme",
         json_schema_extra={
             "component": "ComponentStyleSelector",
-            "order": 7,
+            "order": 11,
             "group": "Display Options",
         },
     )
@@ -78,7 +122,7 @@ class SectionConfig(BaseModel):
         json_schema_extra={
             "component": "BooleanInput",
             "variant": "toggle",
-            "order": 8,
+            "order": 12,
             "group": "Display Options",
         },
     )
@@ -137,64 +181,64 @@ class SectionWidget(BaseWidget):
         margin-bottom: 0;
     }    
     .section-header {
-        cursor: pointer;
         padding: 1rem;
         font-weight: 600;
         font-size: 1.25rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
         user-select: none;
     }
     
-    .section-header.non-collapsible {
-        cursor: default;
-        padding-bottom: 0.5rem;
-    }
-    
-    .section-toggle {
-        transition: transform 0.2s ease;
-        display: inline-block;
-        margin-left: 0.5rem;
-    }
-    
-    .section-toggle.expanded {
-        transform: rotate(90deg);
-    }
-    
-    .section-content {
-        padding: 0 1rem 1rem 1rem;
-        overflow: hidden;
-        transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
-    }
-    
-    .section-content.collapsed {
-        max-height: 0 !important;
-        opacity: 0;
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-    
-    .section-content.expanded {
-        opacity: 1;
-    }
-    
     .widget-wrapper {
-        margin-bottom: 0.75rem;
     }
     
-    .widget-wrapper:last-child {
-        margin-bottom: 0;
+    .section-remaining-content {
+        display: block;
+        margin-bottom: 30px;
+    }
+    
+    .section-collapsed .section-remaining-content {
+        display: none;
+    }
+    
+    .section-banner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 70px;
+        padding: 0;
+        cursor: pointer;
+        user-select: none;
+        transition: opacity 0.2s ease;
+        font-size: 16px;
+        font-weight: 300;        
+    }
+    
+    .section-banner:hover {
+        opacity: 0.8;
+    }
+    
+    .contract-banner {
+        display: flex;
+    }
+    
+    .section-collapsed .contract-banner {
+        display: none;
+    }
+    
+    .expand-banner {
+        display: none;
+    }
+    
+    .section-collapsed .expand-banner {
+        display: flex;
     }
     
     .empty-slot {
         color: #9ca3af;
         font-style: italic;
         text-align: center;
-        padding: 2rem 1rem;
-        border: 2px dashed #e5e7eb;
-        border-radius: 0.5rem;
-        background-color: #f9fafb;
+        font-size: 16px;
+        font-weight: 300;        
+        padding: 30px;
     }
     """
 

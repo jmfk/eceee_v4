@@ -155,11 +155,11 @@ class ContentWidget(BaseWidget):
         font-family: inherit;
         line-height: 1.6;
         color: inherit;
-        padding-top: 50px;
-        padding-bottom: 50px;
         margin-bottom: 30px;        
     }
     .content-widget.border-enabled {
+        padding-top: 50px;
+        padding-bottom: 50px;
         outline: 1px solid #999999;
     }
     """
