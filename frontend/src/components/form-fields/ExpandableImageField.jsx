@@ -667,8 +667,22 @@ const ExpandableImageField = ({
         isExpanded,
         setIsExpanded,
         onRemoveImage: (imageId, event) => handleRemoveImage(imageId, event),
-        getThumbnailUrl
-    }), [displayImages, multiple, maxFiles, isExpanded, setIsExpanded, handleRemoveImage, getThumbnailUrl])
+        getThumbnailUrl,
+        namespace,
+        onImageTagsChanged: (updatedFile) => {
+            // Update the image in the value with new tags
+            if (multiple) {
+                const updatedImages = (Array.isArray(value) ? value : []).map(img =>
+                    img.id === updatedFile.id ? { ...img, tags: updatedFile.tags } : img
+                )
+                onChange(updatedImages)
+            } else {
+                if (value && value.id === updatedFile.id) {
+                    onChange({ ...value, tags: updatedFile.tags })
+                }
+            }
+        }
+    }), [displayImages, multiple, maxFiles, isExpanded, setIsExpanded, handleRemoveImage, getThumbnailUrl, namespace, value, onChange])
 
     // Memoize stable handlers to prevent recreation
     const toggleExpanded = useCallback(() => {
@@ -790,6 +804,8 @@ const ExpandableImageField = ({
                                 onChange={handleSearchChange}
                                 namespace={namespace}
                                 placeholder="Search images..."
+                                autoSearch={true}
+                                autoSearchDelay={500}
                             />
                         </div>
 

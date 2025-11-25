@@ -14,6 +14,7 @@ import { namespacesApi, mediaApi, mediaCollectionsApi, mediaTagsApi } from '../.
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import MediaTagWidget from '../media/MediaTagWidget'
 import MediaSearchWidget from '../media/MediaSearchWidget'
+import MediaItemTagEditor from '../media/MediaItemTagEditor'
 import { ImageWidget } from '../../widgets'
 import { useTheme } from '../../hooks/useTheme'
 import FloatingMessage from '../common/FloatingMessage'
@@ -67,6 +68,7 @@ const MediaSpecialEditor = ({
     const [createCollectionName, setCreateCollectionName] = useState('')
     const [tempSelectedImages, setTempSelectedImages] = useState([])
     const [localConfig, setLocalConfig] = useState({})
+    const [editingTagsForImage, setEditingTagsForImage] = useState(null) // Track which image is being edited for tags
 
     // Use local config that updates immediately, fallback to widgetData config
     const currentConfig = useMemo(() => {
@@ -397,6 +399,28 @@ const MediaSpecialEditor = ({
         setLocalConfig(updatedConfig)
         onConfigChange(updatedConfig)
     }
+
+    // Handle tag changes for an image
+    const handleImageTagsChanged = useCallback(async (updatedMediaFile) => {
+        // Refresh the currentImages to show updated tags
+        const updatedImages = currentImages.map(img =>
+            img.id === updatedMediaFile.id
+                ? {
+                    ...img,
+                    tags: updatedMediaFile.tags
+                }
+                : img
+        )
+
+        const updatedConfig = {
+            ...currentConfig,
+            mediaItems: updatedImages
+        }
+
+        setLocalConfig(updatedConfig)
+        onConfigChange(updatedConfig)
+        setEditingTagsForImage(null)
+    }, [currentImages, currentConfig, onConfigChange])
 
     // Remove image from collection
     const handleRemoveImageFromCollection = (image) => {
@@ -1302,37 +1326,69 @@ const MediaSpecialEditor = ({
                 ) : isFreeImagesMode ? (
                     <div className="space-y-4">
                         <div className="grid grid-cols-3 gap-2 mb-3">
-                            {currentImages.map((image, index) => (
-                                <div key={image.id || index} className="relative aspect-square bg-gray-100 rounded overflow-hidden border">
-                                    <img
-                                        src={image.thumbnailUrl || image.url}
-                                        alt={image.altText || 'Image'}
-                                        className="w-full h-full object-cover"
-                                    />
-                                    <div className="absolute top-1 right-1 flex gap-1">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                setEditingItem({ type: 'editImage', data: image, index })
-                                            }}
-                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                                            title="Edit image metadata"
-                                        >
-                                            <Edit3 className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleRemoveImage(image.id)
-                                            }}
-                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
-                                            title="Remove image"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
+                            {currentImages.map((image, index) => {
+                                const isEditingTags = editingTagsForImage === image.id
+                                return (
+                                    <div key={image.id || index} className="relative bg-gray-100 rounded overflow-hidden border">
+                                        <div className="aspect-square">
+                                            <img
+                                                src={image.thumbnailUrl || image.url}
+                                                alt={image.altText || 'Image'}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="absolute top-1 right-1 flex gap-1">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setEditingTagsForImage(isEditingTags ? null : image.id)
+                                                }}
+                                                className={`p-1 bg-white rounded shadow-sm border ${
+                                                    isEditingTags 
+                                                        ? 'border-blue-500 text-blue-600' 
+                                                        : (image.tags && image.tags.length > 0)
+                                                            ? 'border-blue-300 text-blue-600'
+                                                            : 'border-gray-200 text-gray-700'
+                                                } hover:text-blue-600 hover:border-blue-300 transition-colors`}
+                                                title={`${(image.tags || []).length} tag${(image.tags || []).length !== 1 ? 's' : ''}`}
+                                            >
+                                                <Tag className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setEditingItem({ type: 'editImage', data: image, index })
+                                                }}
+                                                className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                                title="Edit image metadata"
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleRemoveImage(image.id)
+                                                }}
+                                                className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
+                                                title="Remove image"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        {isEditingTags && (
+                                            <div className="absolute inset-0 bg-white p-2 overflow-y-auto z-10">
+                                                <MediaItemTagEditor
+                                                    mediaFile={{ id: image.id, tags: image.tags || [] }}
+                                                    namespace={namespace}
+                                                    onTagsChanged={handleImageTagsChanged}
+                                                    compact={false}
+                                                    className="h-full"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
 
                         {/* Free Images Actions */}
@@ -1708,6 +1764,8 @@ const MediaSpecialEditor = ({
                         namespace={namespace}
                         placeholder="Search images or select tags..."
                         className="w-full"
+                        autoSearch={true}
+                        autoSearchDelay={500}
                     />
                 </div>
             </div>

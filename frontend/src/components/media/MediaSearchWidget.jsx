@@ -7,7 +7,9 @@ const MediaSearchWidget = ({
     onChange,
     disabled = false,
     namespace,
-    placeholder = "Search by title or tags..."
+    placeholder = "Search by title or tags...",
+    autoSearch = false, // Auto-trigger search after typing 2+ characters
+    autoSearchDelay = 500 // Delay in ms for auto-search (debounce)
 }) => {
     const [inputValue, setInputValue] = useState('')
     const [showSuggestions, setShowSuggestions] = useState(false)
@@ -18,6 +20,7 @@ const MediaSearchWidget = ({
     const inputRef = useRef(null)
     const suggestionsRef = useRef(null)
     const searchTimeoutRef = useRef(null)
+    const autoSearchTimeoutRef = useRef(null)
 
     // Debounced search function for server-side tag lookup
     const searchTags = useCallback(async (searchQuery) => {
@@ -86,6 +89,9 @@ const MediaSearchWidget = ({
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
             }
+            if (autoSearchTimeoutRef.current) {
+                clearTimeout(autoSearchTimeoutRef.current);
+            }
         };
     }, []);
 
@@ -106,6 +112,25 @@ const MediaSearchWidget = ({
 
         // Trigger server-side search
         searchTags(value)
+
+        // Auto-search: automatically add text search term after delay
+        if (autoSearch && value.trim().length >= 2) {
+            // Clear existing auto-search timeout
+            if (autoSearchTimeoutRef.current) {
+                clearTimeout(autoSearchTimeoutRef.current);
+            }
+
+            // Set new auto-search timeout
+            autoSearchTimeoutRef.current = setTimeout(() => {
+                // Only auto-add if the value hasn't changed and is still >= 2 chars
+                if (inputRef.current && inputRef.current.value.trim().length >= 2) {
+                    addSearchTerm(inputRef.current.value.trim(), 'text')
+                }
+            }, autoSearchDelay);
+        } else if (autoSearchTimeoutRef.current) {
+            // Clear timeout if value is too short
+            clearTimeout(autoSearchTimeoutRef.current);
+        }
     }
 
     const handleKeyDown = (e) => {
