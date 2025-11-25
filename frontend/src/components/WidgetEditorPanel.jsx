@@ -3,7 +3,6 @@ import { X, RefreshCw, Save, HelpCircle } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
-import { useAutoSave } from '../hooks/useAutoSave'
 
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
@@ -484,7 +483,7 @@ const WidgetEditorPanel = forwardRef(({
                             {hasChanges && (
                                 <span className="flex items-center text-xs text-blue-600 flex-shrink-0">
                                     <Save className="w-3 h-3 mr-1" />
-                                    Changes will auto-save
+                                    Unsaved changes
                                 </span>
                             )}
                         </div>
