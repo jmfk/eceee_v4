@@ -45,9 +45,12 @@ const PageWidgetHeader = ({
     slotName = null,
     isSelected = false,
     isCut = false,
-    onToggleSelection = null
+    onToggleSelection = null,
+    // Active/Inactive toggle props
+    onConfigChange = null
 }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isActive, setIsActive] = useState(widget?.config?.isActive !== false);
     const { refreshClipboard } = useClipboard();
 
     if (!showControls) {
@@ -120,6 +123,21 @@ const PageWidgetHeader = ({
         }
     };
 
+    const handleToggleActive = () => {
+        if (!widget || !onConfigChange) return;
+        
+        const newActiveState = !isActive;
+        setIsActive(newActiveState);
+        
+        // Update widget config through parent
+        const updatedConfig = {
+            ...widget.config,
+            isActive: newActiveState
+        };
+        
+        onConfigChange(updatedConfig);
+    };
+
     return (
         <div className={`widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
             {/* Left side - Widget info and status */}
@@ -145,6 +163,21 @@ const PageWidgetHeader = ({
                     <span className={`text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'} ${isCut ? 'line-through' : ''}`}>
                         {widgetType}
                     </span>
+
+                    {/* Active/Inactive toggle button */}
+                    {!isInherited && widget && (
+                        <button
+                            onClick={handleToggleActive}
+                            className={`text-xs px-2 py-0.5 rounded transition-colors ${
+                                isActive
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            }`}
+                            title={isActive ? 'Click to deactivate widget' : 'Click to activate widget'}
+                        >
+                            {isActive ? 'Active' : 'Inactive'}
+                        </button>
+                    )}
 
                     {/* Inherited badge */}
                     {isInherited && inheritedFrom && (

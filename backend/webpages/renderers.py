@@ -337,9 +337,12 @@ class WebPageRenderer:
                 # Use tree to get merged widgets for display (much simpler!)
                 merged_widgets = helpers.get_merged_widgets(slot_name)
 
+                # Filter out inactive widgets before rendering
+                active_widgets = [w for w in merged_widgets if w.config.get('isActive', True)]
+
                 # Render each widget
                 rendered_widgets = []
-                for widget in merged_widgets:
+                for widget in active_widgets:
                     # Get layout name (handle both dict and Layout object)
                     layout = context.get("layout")
                     if hasattr(layout, "name"):

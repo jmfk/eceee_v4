@@ -345,6 +345,10 @@ export class SimpleTextEditorRenderer {
             document.execCommand(command, false, null)
             this.editorElement.focus()
             this.handleContentChange()
+        } else if (command === 'formatBlock') {
+            document.execCommand('formatBlock', false, value)
+            this.editorElement.focus()
+            this.handleContentChange()
         }
     }
 
@@ -415,32 +419,56 @@ export class SimpleTextEditorRenderer {
         }
 
         const selection = window.getSelection()
-        let isLink = false
-
-        if (selection.rangeCount > 0) {
-            let node = selection.anchorNode
-            while (node && node !== this.editorElement) {
-                if (node.tagName === 'A') {
-                    isLink = true
-                    break
-                }
-                node = node.parentElement
-            }
-        }
-
-        return {
+        const state = {
             mode: 'inline-rich',
             bold: document.queryCommandState('bold'),
             italic: document.queryCommandState('italic'),
-            link: isLink,
-            // Disable all other formatting options
-            format: 'p',
+            link: false,
+            format: 'Paragraph', // Default
             insertUnorderedList: false,
             insertOrderedList: false,
             code: false,
             quote: false,
             allowedButtons: this.options.allowedButtons || ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image']
         }
+
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0)
+            
+            // Check for block format
+            let currentElement = range.commonAncestorContainer
+            if (currentElement.nodeType === Node.TEXT_NODE) {
+                currentElement = currentElement.parentElement
+            }
+
+            // Walk up to find the formatting element
+            while (currentElement && currentElement !== this.editorElement) {
+                const tagName = currentElement.tagName?.toLowerCase()
+
+                if (tagName === 'p') {
+                    state.format = 'Paragraph'
+                    break
+                } else if (tagName && tagName.match(/^h[1-6]$/)) {
+                    const level = tagName.charAt(1)
+                    state.format = `Heading ${level}`
+                    break
+                }
+
+                currentElement = currentElement.parentElement
+            }
+
+            // Check for links
+            let node = selection.anchorNode
+            while (node && node !== this.editorElement) {
+                if (node.tagName === 'A') {
+                    state.link = true
+                    break
+                }
+                node = node.parentElement
+            }
+        }
+
+        return state
     }
 
     /**

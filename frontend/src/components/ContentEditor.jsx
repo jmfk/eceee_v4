@@ -479,6 +479,25 @@ const ContentEditor = forwardRef(({
         min-height: auto !important;
         overflow: visible !important;
       }
+
+      /* Inactive widget styles */
+      .widget-inactive {
+        opacity: 0.6;
+        border-left: 3px solid #9ca3af !important;
+      }
+
+      .widget-inactive .widget-header {
+        background-color: #f3f4f6;
+      }
+
+      .widget-collapsed .widget-content {
+        display: none;
+      }
+
+      .expand-toggle {
+        cursor: pointer;
+        user-select: none;
+      }
     `;
     document.head.appendChild(style);
 

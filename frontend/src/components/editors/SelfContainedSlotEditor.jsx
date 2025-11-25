@@ -146,6 +146,17 @@ const SelfContainedSlotEditor = ({
     }, [widgets, notifySlotChange]);
 
     /**
+     * Handle widget config changes (for active/inactive toggle, etc.)
+     */
+    const handleConfigChange = useCallback((widgetId, updatedConfig) => {
+        const newWidgets = widgets.map(w => 
+            w.id === widgetId ? { ...w, config: updatedConfig } : w
+        );
+        setWidgets(newWidgets);
+        notifySlotChange(newWidgets);
+    }, [widgets, notifySlotChange]);
+
+    /**
      * Handle editing a widget
      * Note: PageWidgetFactory calls this with (slotName, index, widget)
      * 
@@ -290,6 +301,7 @@ const SelfContainedSlotEditor = ({
                                     onDelete={() => handleRemoveWidget(index)}
                                     onMoveUp={() => handleMoveWidget(index, index - 1)}
                                     onMoveDown={() => handleMoveWidget(index, index + 1)}
+                                    onConfigChange={(newConfig) => handleConfigChange(widget.id, newConfig)}
                                     canMoveUp={index > 0}
                                     canMoveDown={index < widgets.length - 1}
                                     mode={mode}

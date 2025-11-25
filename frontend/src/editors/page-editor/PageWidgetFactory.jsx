@@ -106,7 +106,16 @@ const PageWidgetFactory = ({
                 const updatedWidget = { ...widget, config: newConfig }
                 layoutRenderer.updateWidget(actualSlotName, index, updatedWidget)
             }
-            onConfigChange(widget.id, slotName, newConfig)
+            // Handle different onConfigChange signatures:
+            // - Top-level: (widgetId, slotName, newConfig)
+            // - Nested: (newConfig)
+            if (onConfigChange.length === 1) {
+                // Nested widget handler - just pass config
+                onConfigChange(newConfig)
+            } else {
+                // Top-level widget handler - pass full args
+                onConfigChange(widget.id, slotName, newConfig)
+            }
         } : undefined
     }, [onConfigChange, widget.id, slotName, layoutRenderer, actualSlotName, index, widget])
 
@@ -474,6 +483,8 @@ const PageWidgetFactory = ({
                     isWidgetCut={isWidgetCut}
                     buildWidgetPath={buildWidgetPath}
                     parseWidgetPath={parseWidgetPath}
+                    // Active/Inactive toggle
+                    onConfigChange={stableConfigChangeHandler}
                 />
 
                 {/* Paste Mode Markers - only show if this widget is the currently hovered one */}

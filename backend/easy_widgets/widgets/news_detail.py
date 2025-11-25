@@ -220,6 +220,12 @@ class NewsDetailWidget(BaseWidget):
             rendered_widgets = []
             for widget_data in widgets:
                 try:
+                    # Filter out inactive widgets (check both config.isActive and config.is_active)
+                    widget_config = widget_data.get("config", {})
+                    is_active = widget_config.get("isActive", widget_config.get("is_active", True))
+                    if not is_active:
+                        continue  # Skip inactive widgets
+                    
                     widget_html = renderer.render_widget_json(widget_data, context)
                     rendered_widgets.append(widget_html)
                 except Exception:

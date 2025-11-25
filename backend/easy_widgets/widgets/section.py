@@ -344,6 +344,14 @@ class SectionWidget(BaseWidget):
             rendered_widgets = []
             for index, widget_data in enumerate(content_widgets):
                 try:
+                    # Filter out inactive widgets (check both config.isActive and config.is_active)
+                    widget_config = widget_data.get("config", {})
+                    is_active = widget_config.get(
+                        "isActive", widget_config.get("is_active", True)
+                    )
+                    if not is_active:
+                        continue  # Skip inactive widgets
+
                     # Add sort_order if missing (use array index to preserve order)
                     if "sort_order" not in widget_data and "order" not in widget_data:
                         widget_data = {**widget_data, "sort_order": index}

@@ -190,6 +190,7 @@ class PageWidgetData(BaseModel):
         description="How this widget behaves with parent widgets",
     )
     is_visible: bool = Field(True, description="Whether the widget is visible")
+    is_active: bool = Field(True, description="Whether the widget is active and should be rendered")
 
     # Backward compatibility - deprecated fields
     inherit_from_parent: Optional[bool] = Field(

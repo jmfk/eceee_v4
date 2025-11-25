@@ -2351,11 +2351,32 @@ class LayoutRenderer {
     if (this.editable) {
       const header = this.createWidgetHeader(id, name, widgetInstance);
       widget.appendChild(header);
+      
+      // Check if widget is inactive
+      const isActive = widgetInstance.config?.isActive !== false;
+      if (!isActive) {
+        widget.classList.add('widget-inactive', 'widget-collapsed');
+      }
     }
 
-    // Add widget content - pass full widgetInstance for templateJson access
+    // Add widget content
     const content = await this.renderWidgetContent(type, config, widgetInstance);
-    widget.appendChild(content);
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'widget-content';
+
+    // Hide content if widget is inactive
+    if (this.editable && widgetInstance.config?.isActive === false) {
+      contentWrapper.style.display = 'none';
+      // Add expand toggle to header
+      const header = widget.querySelector('.widget-header');
+      if (header && !header.querySelector('.expand-toggle')) {
+        const expandToggle = this.createExpandToggle(id);
+        header.appendChild(expandToggle);
+      }
+    }
+
+    contentWrapper.appendChild(content);
+    widget.appendChild(contentWrapper);
 
     return widget;
   }
@@ -2387,16 +2408,64 @@ class LayoutRenderer {
     const header = document.createElement('div');
     header.className = 'widget-header flex items-center justify-between mb-3 pb-2 border-b border-gray-100';
 
+    // Left side: title + active toggle
+    const leftSide = document.createElement('div');
+    leftSide.className = 'flex items-center gap-2';
+    
     const title = document.createElement('span');
     title.className = 'text-sm font-medium text-gray-700';
     title.textContent = name;
+    
+    // Add active/inactive toggle
+    const activeToggle = this.createActiveToggle(id, widgetInstance);
+    
+    leftSide.appendChild(title);
+    leftSide.appendChild(activeToggle);
 
     const controls = this.createWidgetControls(id, name, widgetInstance);
 
-    header.appendChild(title);
+    header.appendChild(leftSide);
     header.appendChild(controls);
 
     return header;
+  }
+
+  /**
+   * Create active/inactive toggle button
+   * @param {string} id - Widget ID
+   * @param {Object} widgetInstance - Complete widget instance
+   * @returns {HTMLElement} Toggle button element
+   */
+  createActiveToggle(id, widgetInstance) {
+    const isActive = widgetInstance.config?.isActive !== false;
+    
+    const toggle = document.createElement('button');
+    toggle.className = 'active-toggle text-xs px-2 py-0.5 rounded transition-colors';
+    toggle.style.zIndex = '10000';
+    
+    const updateToggleState = (active) => {
+      if (active) {
+        toggle.className = 'active-toggle text-xs px-2 py-0.5 rounded transition-colors bg-green-100 text-green-700 hover:bg-green-200';
+        toggle.textContent = 'Active';
+        toggle.title = 'Click to deactivate widget';
+      } else {
+        toggle.className = 'active-toggle text-xs px-2 py-0.5 rounded transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200';
+        toggle.textContent = 'Inactive';
+        toggle.title = 'Click to activate widget';
+      }
+    };
+    
+    updateToggleState(isActive);
+    
+    let currentState = isActive;
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentState = !currentState;
+      this.toggleWidgetActive(id, widgetInstance, currentState);
+      updateToggleState(currentState);
+    });
+    
+    return toggle;
   }
 
   /**
@@ -2501,6 +2570,90 @@ class LayoutRenderer {
     menuDropdown.appendChild(removeItem);
 
     return menuDropdown;
+  }
+
+  /**
+   * Toggle widget active/inactive state
+   * @param {string} widgetId - Widget ID
+   * @param {Object} widgetInstance - Complete widget instance
+   * @param {boolean} isActive - New active state
+   */
+  toggleWidgetActive(widgetId, widgetInstance, isActive) {
+    // Update widget config
+    const updatedWidget = {
+      ...widgetInstance,
+      config: {
+        ...widgetInstance.config,
+        isActive: isActive
+      }
+    };
+    
+    // Find widget element
+    const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
+    if (!widgetElement) return;
+    
+    // Toggle collapsed state
+    if (isActive) {
+      widgetElement.classList.remove('widget-inactive');
+      widgetElement.classList.remove('widget-collapsed');
+      // Show content
+      const content = widgetElement.querySelector('.widget-content');
+      if (content) content.style.display = '';
+      // Remove expand toggle if exists
+      const expandToggle = widgetElement.querySelector('.expand-toggle');
+      if (expandToggle) expandToggle.remove();
+    } else {
+      widgetElement.classList.add('widget-inactive');
+      widgetElement.classList.add('widget-collapsed');
+      // Hide content but show expand toggle
+      const content = widgetElement.querySelector('.widget-content');
+      if (content) content.style.display = 'none';
+      
+      // Add expand button if not exists
+      if (!widgetElement.querySelector('.expand-toggle')) {
+        const expandToggle = this.createExpandToggle(widgetId);
+        widgetElement.querySelector('.widget-header').appendChild(expandToggle);
+      }
+    }
+    
+    // Notify parent of config change
+    if (this.widgetDataCallbacks?.widgetDataChanged) {
+      this.widgetDataCallbacks.widgetDataChanged(
+        'UPDATE',
+        widgetInstance.slotName,
+        updatedWidget
+      );
+    }
+    
+    this.markAsDirty(`Widget ${isActive ? 'activated' : 'deactivated'}`);
+  }
+
+  /**
+   * Create expand/collapse toggle for inactive widgets
+   * @param {string} widgetId - Widget ID
+   * @returns {HTMLElement} Toggle button element
+   */
+  createExpandToggle(widgetId) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'expand-toggle text-xs text-gray-500 hover:text-gray-700 ml-2';
+    toggleBtn.innerHTML = '▼ Expand';
+    toggleBtn.title = 'Temporarily show widget content';
+    
+    let isExpanded = false;
+    
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
+      const content = widgetElement?.querySelector('.widget-content');
+      
+      if (content) {
+        isExpanded = !isExpanded;
+        content.style.display = isExpanded ? '' : 'none';
+        toggleBtn.innerHTML = isExpanded ? '▲ Collapse' : '▼ Expand';
+      }
+    });
+    
+    return toggleBtn;
   }
 
   /**
