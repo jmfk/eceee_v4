@@ -97,12 +97,10 @@ class HeadlineWidget(BaseWidget):
         display: flex;
         flex-direction: column;
         width: 100%;
-        min-height: 60px;
+        min-height: 140px;
         outline: 1px solid #999999;
         border-width: 0;
         overflow: hidden;
-        border-radius: 0;
-        box-shadow: none;
         margin-bottom: 30px;
     }
     .headline-widget.border-disabled {
@@ -193,7 +191,10 @@ class HeadlineWidget(BaseWidget):
         template_config["component_style"] = config.get("componentStyle") or config.get(
             "component_style", "default"
         )
-        template_config["show_border"] = config.get("showBorder") if config.get("showBorder") is not None else config.get("show_border", True)
+        template_config["show_border"] = (
+            config.get("showBorder")
+            if config.get("showBorder") is not None
+            else config.get("show_border", True)
+        )
 
         return template_config
-
