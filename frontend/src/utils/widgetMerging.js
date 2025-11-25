@@ -21,33 +21,37 @@ export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], sl
     const safeLocalWidgets = Array.isArray(localWidgets) ? localWidgets : [];
     const safeInheritedWidgets = Array.isArray(inheritedWidgets) ? inheritedWidgets : [];
 
+    // Filter out hidden widgets (isVisible !== false)
+    const visibleLocalWidgets = safeLocalWidgets.filter(w => w.isVisible !== false);
+    const visibleInheritedWidgets = safeInheritedWidgets.filter(w => w.isVisible !== false);
+
     // If inheritance not allowed, return only local widgets
     if (!slotRules.inheritanceAllowed) {
-        return safeLocalWidgets.map(w => ({ ...w, isInherited: false }))
+        return visibleLocalWidgets.map(w => ({ ...w, isInherited: false }))
     }
 
     // TYPE-BASED REPLACEMENT: If inheritableTypes defined and any local widget matches, skip all inherited
     if (slotRules.inheritableTypes?.length > 0) {
-        const localTypes = safeLocalWidgets.map(w => w?.type).filter(Boolean);
+        const localTypes = visibleLocalWidgets.map(w => w?.type).filter(Boolean);
         const hasMatchingType = slotRules.inheritableTypes.some(type =>
             localTypes.includes(type)
         );
 
         if (hasMatchingType) {
             // Local widget of inheritable type exists, skip all inherited widgets
-            return safeLocalWidgets.map(w => ({ ...w, isInherited: false }));
+            return visibleLocalWidgets.map(w => ({ ...w, isInherited: false }));
         }
     }
 
     // MERGE MODE: Check if slot supports merging (mergeMode = inheritanceAllowed AND allowMerge)
     // If mergeMode is true, combine inherited + local widgets respecting inheritance_behavior
-    if (slotRules.mergeMode && safeInheritedWidgets.length > 0) {
+    if (slotRules.mergeMode && visibleInheritedWidgets.length > 0) {
         // Categorize local widgets by inheritance behavior
         const beforeWidgets = [];
         const overrideWidgets = [];
         const afterWidgets = [];
 
-        safeLocalWidgets.forEach(widget => {
+        visibleLocalWidgets.forEach(widget => {
             // Check for inheritance_behavior (snake_case from API or camelCase from frontend)
             const behavior = widget.inheritanceBehavior || widget.inheritance_behavior || 'insert_after_parent';
 
@@ -69,19 +73,19 @@ export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], sl
         // Otherwise: before + inherited + after
         return [
             ...beforeWidgets.map(w => ({ ...w, isInherited: false })),
-            ...safeInheritedWidgets.map(w => ({ ...w, isInherited: true })),
+            ...visibleInheritedWidgets.map(w => ({ ...w, isInherited: true })),
             ...afterWidgets.map(w => ({ ...w, isInherited: false }))
         ];
     }
 
     // REPLACEMENT MODE (allowMerge=false): Local widgets REPLACE inherited widgets
     // If slot has any local widgets, they REPLACE inherited widgets
-    if (safeLocalWidgets.length > 0) {
-        return safeLocalWidgets.map(w => ({ ...w, isInherited: false }))
+    if (visibleLocalWidgets.length > 0) {
+        return visibleLocalWidgets.map(w => ({ ...w, isInherited: false }))
     }
 
     // No local widgets - show inherited widgets (until user adds local widgets to replace them)
-    return safeInheritedWidgets.map(w => ({ ...w, isInherited: true }))
+    return visibleInheritedWidgets.map(w => ({ ...w, isInherited: true }))
 }
 
 /**
@@ -98,13 +102,17 @@ export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets 
     const safeLocalWidgets = Array.isArray(localWidgets) ? localWidgets : [];
     const safeInheritedWidgets = Array.isArray(inheritedWidgets) ? inheritedWidgets : [];
 
+    // Filter out hidden widgets (isVisible !== false)
+    const visibleLocalWidgets = safeLocalWidgets.filter(w => w.isVisible !== false);
+    const visibleInheritedWidgets = safeInheritedWidgets.filter(w => w.isVisible !== false);
+
     if (mode === 'edit') {
         // Edit mode: show only local widgets (what can be edited)
-        return safeLocalWidgets.map(w => ({ ...w, isInherited: false }))
+        return visibleLocalWidgets.map(w => ({ ...w, isInherited: false }))
     }
 
     // Preview mode: show merged widgets
-    return mergeWidgetsForSlot(safeLocalWidgets, safeInheritedWidgets, slotRules)
+    return mergeWidgetsForSlot(visibleLocalWidgets, visibleInheritedWidgets, slotRules)
 }
 
 /**

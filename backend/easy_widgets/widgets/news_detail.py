@@ -220,8 +220,13 @@ class NewsDetailWidget(BaseWidget):
             rendered_widgets = []
             for widget_data in widgets:
                 try:
-                    # Filter out inactive widgets (check both config.isActive and config.is_active)
+                    # Filter out hidden widgets (check both config.isVisible and config.is_visible)
                     widget_config = widget_data.get("config", {})
+                    is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
+                    if not is_visible:
+                        continue  # Skip hidden widgets
+                    
+                    # Filter out inactive widgets (check both config.isActive and config.is_active)
                     is_active = widget_config.get("isActive", widget_config.get("is_active", True))
                     if not is_active:
                         continue  # Skip inactive widgets

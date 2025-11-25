@@ -2306,6 +2306,13 @@ class LayoutRenderer {
   async renderWidgetInstance(widgetInstance) {
     const { id, type, name, config, slotName } = widgetInstance;
 
+    // Check if widget is hidden (isVisible === false)
+    const isVisible = widgetInstance.isVisible !== false;
+    if (!isVisible && !this.editable) {
+      // In public/preview mode, skip rendering hidden widgets entirely
+      return null;
+    }
+
     // Create main widget container
     const widget = this.createWidgetContainer(id, type);
 
@@ -2352,6 +2359,13 @@ class LayoutRenderer {
       const header = this.createWidgetHeader(id, name, widgetInstance);
       widget.appendChild(header);
       
+      // Check if widget is hidden
+      const isVisible = widgetInstance.isVisible !== false;
+      if (!isVisible) {
+        widget.classList.add('widget-hidden', 'widget-collapsed');
+        widget.style.opacity = '0.4';
+      }
+      
       // Check if widget is inactive
       const isActive = widgetInstance.config?.isActive !== false;
       if (!isActive) {
@@ -2364,8 +2378,11 @@ class LayoutRenderer {
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'widget-content cms-content';
 
-    // Hide content if widget is inactive
-    if (this.editable && widgetInstance.config?.isActive === false) {
+    // Hide content if widget is hidden or inactive (only in editable mode)
+    const isVisible = widgetInstance.isVisible !== false;
+    const isActive = widgetInstance.config?.isActive !== false;
+    
+    if (this.editable && (!isVisible || !isActive)) {
       contentWrapper.style.display = 'none';
       // Add expand toggle to header
       const header = widget.querySelector('.widget-header');

@@ -343,6 +343,13 @@ class WebPageRenderer:
                 # Render each widget
                 rendered_widgets = []
                 for widget in merged_widgets:
+                    # Filter out hidden widgets (check both is_visible and isVisible)
+                    is_visible = widget.config.get("is_visible")
+                    if is_visible is None:
+                        is_visible = widget.config.get("isVisible", True)
+                    if not is_visible:
+                        continue  # Skip hidden widgets
+                    
                     # Get layout name (handle both dict and Layout object)
                     layout = context.get("layout")
                     if hasattr(layout, "name"):

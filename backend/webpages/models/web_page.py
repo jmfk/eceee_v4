@@ -1246,6 +1246,13 @@ class WebPage(models.Model):
         published = []
 
         for widget in widgets:
+            # Check is_visible flag (check both snake_case and camelCase, default to True)
+            is_visible = widget.get("is_visible")
+            if is_visible is None:
+                is_visible = widget.get("isVisible", True)
+            if not is_visible:
+                continue  # Skip hidden widgets
+            
             # Check is_published flag (check both snake_case and camelCase, default to True for backward compatibility)
             is_published = widget.get("is_published")
             if is_published is None:
