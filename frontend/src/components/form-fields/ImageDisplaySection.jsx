@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react'
-import { X, ChevronDown, ChevronUp, Eye } from 'lucide-react'
+import React, { useCallback, useState } from 'react'
+import { X, ChevronDown, ChevronUp, Eye, Tag } from 'lucide-react'
 import { getImageUrl, formatFileSize } from './ImageValidationUtils'
+import MediaItemTagEditor from '../media/MediaItemTagEditor'
 
 const ImageDisplaySection = ({
     images,
@@ -9,8 +10,11 @@ const ImageDisplaySection = ({
     isExpanded,
     setIsExpanded,
     onRemoveImage,
-    getThumbnailUrl
+    getThumbnailUrl,
+    namespace = null,
+    onImageTagsChanged = null
 }) => {
+    const [editingTagsForImage, setEditingTagsForImage] = useState(null)
     if (!images || images.length === 0) return null
 
     const displayImages = Array.isArray(images) ? images : [images]
@@ -80,6 +84,7 @@ const ImageDisplaySection = ({
                                 const thumbnailUrl = getThumbnailUrl
                                     ? getThumbnailUrl(image, 150)
                                     : (image.thumbnailUrl || getImageUrl(image))
+                                const isEditingTags = editingTagsForImage === image.id
                                 return (
                                     <div key={image.id || index} className="relative group">
                                         <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
@@ -92,14 +97,47 @@ const ImageDisplaySection = ({
                                             )}
                                         </div>
 
-                                        {/* Remove button */}
-                                        <button
-                                            onClick={(event) => onRemoveImage(image.id, event)}
-                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                            title="Remove image"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                        {/* Action buttons */}
+                                        <div className="absolute top-1 right-1 flex gap-1">
+                                            {namespace && (
+                                                <button
+                                                    onClick={() => setEditingTagsForImage(isEditingTags ? null : image.id)}
+                                                    className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-opacity ${
+                                                        isEditingTags
+                                                            ? 'bg-blue-500 text-white'
+                                                            : (image.tags && image.tags.length > 0)
+                                                                ? 'bg-blue-100 text-blue-600'
+                                                                : 'bg-white text-gray-600'
+                                                    } opacity-0 group-hover:opacity-100`}
+                                                    title={`${(image.tags || []).length} tag${(image.tags || []).length !== 1 ? 's' : ''}`}
+                                                >
+                                                    <Tag className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={(event) => onRemoveImage(image.id, event)}
+                                                className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                                title="Remove image"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Tag editor overlay */}
+                                        {isEditingTags && namespace && onImageTagsChanged && (
+                                            <div className="absolute inset-0 bg-white p-2 rounded-lg overflow-y-auto z-10 border-2 border-blue-500">
+                                                <MediaItemTagEditor
+                                                    mediaFile={{ id: image.id, tags: image.tags || [] }}
+                                                    namespace={namespace}
+                                                    onTagsChanged={(updatedFile) => {
+                                                        onImageTagsChanged(updatedFile)
+                                                        setEditingTagsForImage(null)
+                                                    }}
+                                                    compact={false}
+                                                    className="h-full"
+                                                />
+                                            </div>
+                                        )}
 
                                         {/* Image info */}
                                         <div className="mt-2 text-xs text-gray-500 min-w-0">
@@ -108,6 +146,12 @@ const ImageDisplaySection = ({
                                             </div>
                                             {image.file_size && (
                                                 <div className="truncate">{formatFileSize(image.file_size)}</div>
+                                            )}
+                                            {image.tags && image.tags.length > 0 && (
+                                                <div className="flex items-center gap-1 mt-1">
+                                                    <Tag className="w-3 h-3 text-blue-500" />
+                                                    <span className="text-blue-600">{image.tags.length}</span>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -166,7 +210,20 @@ const ImageDisplaySection = ({
 
             {/* Expanded actions section */}
             {isExpanded && (
-                <div className="p-4 bg-gray-50 border-t border-gray-200">
+                <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-4">
+                    {/* Tags section */}
+                    {namespace && (
+                        <div>
+                            <MediaItemTagEditor
+                                mediaFile={{ id: image.id, tags: image.tags || [] }}
+                                namespace={namespace}
+                                onTagsChanged={onImageTagsChanged}
+                                compact={false}
+                            />
+                        </div>
+                    )}
+
+                    {/* Action buttons */}
                     <div className="flex items-center justify-end gap-2">
                         {/* Preview button */}
                         {thumbnailUrl && (

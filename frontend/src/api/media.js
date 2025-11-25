@@ -128,6 +128,30 @@ export const mediaFilesApi = {
         });
     }),
 
+    /**
+     * Add tags to a media file (creates tags if they don't exist)
+     * @param {string} id - Media file ID
+     * @param {string[]} tagNames - Array of tag names to add
+     * @returns {Promise} API response with updated file
+     */
+    addTags: (id, tagNames) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.file(id)}add_tags/`, {
+            tag_names: tagNames
+        })
+    ),
+
+    /**
+     * Remove tags from a media file
+     * @param {string} id - Media file ID
+     * @param {string[]} tagIds - Array of tag IDs to remove
+     * @returns {Promise} API response with updated file
+     */
+    removeTags: (id, tagIds) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.file(id)}remove_tags/`, {
+            tag_ids: tagIds
+        })
+    ),
+
 };
 
 /**

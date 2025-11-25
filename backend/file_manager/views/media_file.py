@@ -402,3 +402,90 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 {"error": f"Failed to replace file: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @action(detail=True, methods=["post"])
+    def add_tags(self, request, pk=None):
+        """Add tags to a media file. Creates tags if they don't exist."""
+        from ..serializers import convert_tag_names_to_ids
+        from ..models import MediaTag
+
+        media_file = self.get_object()
+        tag_names = request.data.get("tag_names", [])
+
+        if not tag_names:
+            return Response(
+                {"error": "tag_names is required and must not be empty"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Convert tag names to IDs, creating new tags as needed
+            tag_ids = convert_tag_names_to_ids(
+                tag_names, media_file.namespace, request.user
+            )
+
+            # Get existing tag IDs
+            existing_tag_ids = set(str(tag.id) for tag in media_file.tags.all())
+
+            # Add only new tags
+            new_tag_ids = [tag_id for tag_id in tag_ids if tag_id not in existing_tag_ids]
+            if new_tag_ids:
+                new_tags = MediaTag.objects.filter(id__in=new_tag_ids)
+                media_file.tags.add(*new_tags)
+
+            # Return updated media file
+            serializer = self.get_serializer(media_file)
+            return Response(
+                {
+                    "message": f"Added {len(new_tag_ids)} new tag(s) to media file",
+                    "media_file": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to add tags: {e}")
+            return Response(
+                {"error": f"Failed to add tags: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def remove_tags(self, request, pk=None):
+        """Remove tags from a media file."""
+        from ..models import MediaTag
+
+        media_file = self.get_object()
+        tag_ids = request.data.get("tag_ids", [])
+
+        if not tag_ids:
+            return Response(
+                {"error": "tag_ids is required and must not be empty"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Get tags to remove (only those that belong to this file's namespace)
+            tags_to_remove = MediaTag.objects.filter(
+                id__in=tag_ids, namespace=media_file.namespace
+            )
+
+            # Remove tags from media file
+            media_file.tags.remove(*tags_to_remove)
+
+            # Return updated media file
+            serializer = self.get_serializer(media_file)
+            return Response(
+                {
+                    "message": f"Removed {tags_to_remove.count()} tag(s) from media file",
+                    "media_file": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to remove tags: {e}")
+            return Response(
+                {"error": f"Failed to remove tags: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

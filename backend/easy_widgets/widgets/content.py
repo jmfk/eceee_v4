@@ -155,11 +155,16 @@ class ContentWidget(BaseWidget):
         font-family: inherit;
         line-height: 1.6;
         color: inherit;
+        padding-top: 50px;
+        padding-bottom: 50px;
+        margin-bottom: 30px;        
     }
     .content-widget.border-enabled {
         outline: 1px solid #999999;
     }
+    """
 
+    not_used = """
     .content-widget h1,
     .content-widget h2,
     .content-widget h3,
