@@ -300,7 +300,7 @@ const HeroWidget = ({
                         {beforeText}
                     </h5>
                 )}
-                <h1>{header}</h1>
+                <div><h1>{header}</h1></div>
                 {afterText && (
                     <h6 className="after-text">
                         {afterText}
