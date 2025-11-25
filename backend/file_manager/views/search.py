@@ -53,10 +53,12 @@ class MediaSearchView(APIView):
             ).distinct()
 
         # Handle new structured search
-        # Text search - searches in title field only for exact matches
+        # Text search - searches in title and tag names for better discoverability
         if filters.get("text_search"):
             text_query = filters["text_search"]
-            queryset = queryset.filter(title__icontains=text_query)
+            queryset = queryset.filter(
+                Q(title__icontains=text_query) | Q(tags__name__icontains=text_query)
+            ).distinct()
 
         # Tag search - must match ALL provided tags (AND logic)
         if filters.get("tag_names"):

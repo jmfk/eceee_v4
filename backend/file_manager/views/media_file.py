@@ -194,7 +194,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         if mime_types:
             queryset = queryset.filter(content_type__in=mime_types)
 
-        # Text search across multiple fields
+        # Text search across multiple fields including tags
         text_search = self.request.query_params.get("text_search")
         if text_search:
             from django.db.models import Q
@@ -204,7 +204,8 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 | Q(description__icontains=text_search)
                 | Q(original_filename__icontains=text_search)
                 | Q(ai_extracted_text__icontains=text_search)
-            )
+                | Q(tags__name__icontains=text_search)
+            ).distinct()
 
         return queryset
 

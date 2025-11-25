@@ -7,7 +7,7 @@ const MediaSearchWidget = ({
     onChange,
     disabled = false,
     namespace,
-    placeholder = "Search media files..."
+    placeholder = "Search by title or tags..."
 }) => {
     const [inputValue, setInputValue] = useState('')
     const [showSuggestions, setShowSuggestions] = useState(false)
@@ -382,7 +382,7 @@ const MediaSearchWidget = ({
                         ? "Loading available tags..."
                         : isSearching
                             ? "Searching for tags..."
-                            : "Type to search existing tags (blue pills) or add one text search term (gray pill). Multiple tags work as AND filters."
+                            : "Type to search tags (blue pills) or add text search (gray pill) to search titles and tags. Multiple tags work as AND filters."
                 }
             </p>
         </div>
