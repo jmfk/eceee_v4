@@ -13,6 +13,7 @@ import FooterWidget from './FooterWidget';
 import ContentWidget from './ContentWidget';
 import ContentCardWidget from './ContentCardWidget';
 import BannerWidget from './BannerWidget';
+import BioWidget from './BioWidget';
 import ImageWidget from './ImageWidget';
 import TableWidget from './TableWidget';
 import HeaderWidget from './HeaderWidget';
@@ -43,6 +44,7 @@ export const EASY_WIDGET_REGISTRY = {
     'easy_widgets.ContentWidget': registerWidget(ContentWidget, 'easy_widgets.ContentWidget'),
     'easy_widgets.ContentCardWidget': registerWidget(ContentCardWidget, 'easy_widgets.ContentCardWidget'),
     'easy_widgets.BannerWidget': registerWidget(BannerWidget, 'easy_widgets.BannerWidget'),
+    'easy_widgets.BioWidget': registerWidget(BioWidget, 'easy_widgets.BioWidget'),
     'easy_widgets.ImageWidget': registerWidget(ImageWidget, 'easy_widgets.ImageWidget'),
     'easy_widgets.TableWidget': registerWidget(TableWidget, 'easy_widgets.TableWidget'),
     'easy_widgets.HeaderWidget': registerWidget(HeaderWidget, 'easy_widgets.HeaderWidget'),
@@ -110,6 +112,7 @@ export { default as FooterWidget } from './FooterWidget';
 export { default as ContentWidget } from './ContentWidget';
 export { default as ContentCardWidget } from './ContentCardWidget';
 export { default as BannerWidget } from './BannerWidget';
+export { default as BioWidget } from './BioWidget';
 export { default as ImageWidget } from './ImageWidget';
 export { default as TableWidget } from './TableWidget';
 export { default as HeaderWidget } from './HeaderWidget';

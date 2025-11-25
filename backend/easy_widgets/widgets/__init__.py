@@ -8,6 +8,7 @@ This module contains individual widget implementations organized into separate f
 from .content import ContentWidget
 from .content_card import ContentCardWidget
 from .banner import BannerWidget
+from .bio import BioWidget
 from .image import ImageWidget
 from .table import TableWidget
 from .footer import FooterWidget
@@ -32,6 +33,7 @@ __all__ = [
     "ContentWidget",
     "ContentCardWidget",
     "BannerWidget",
+    "BioWidget",
     "ImageWidget",
     "TableWidget",
     "FooterWidget",
