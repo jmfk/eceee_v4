@@ -224,7 +224,9 @@ class HeroWidget(BaseWidget):
         margin-top: 16px;
         margin-bottom: 16px;
         color: var(--hero-text-color, #ffffff);
-        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+        background-color: rgba(0,0,0,0.5);
+        display: inline-block;
+        padding: 17px 20px 12px;
     }
 
     .hero-widget .before-text {
@@ -233,7 +235,6 @@ class HeroWidget(BaseWidget):
         font-weight: 500;
         margin: 0;
         color: var(--hero-decor-color, #ffffff);
-        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
     }
     
     .hero-widget .after-text {
@@ -242,7 +243,6 @@ class HeroWidget(BaseWidget):
         font-weight: 500;
         margin: 0;
         color: var(--hero-text-color, #ffffff);
-        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
     }
     
     @media (max-width: 768px) {
