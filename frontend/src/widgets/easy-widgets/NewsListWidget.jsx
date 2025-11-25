@@ -141,7 +141,7 @@ const NewsListWidget = ({
     }
 
     return (
-        <div className="news-list-widget" data-widget-id={widgetId}>
+        <div className="news-list-widget cms-content" data-widget-id={widgetId}>
             <div className="news-items-container">
                 {newsItems.map((item) => {
                     const featuredImage = config.showFeaturedImage ? getFeaturedImage(item) : null;

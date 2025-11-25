@@ -342,7 +342,7 @@ const ContentCardWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="content-card-widget widget-type-easy-widgets-contentcardwidget container"
+                    className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content"
                     id={configRef.current.anchor || undefined}
                 >
                     <div className="content-card-header header" ref={headerContainerRef} />
@@ -362,7 +362,7 @@ const ContentCardWidget = ({
 
         return (
             <div
-                className="content-card-widget widget-type-easy-widgets-contentcardwidget container"
+                className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content"
                 id={configRef.current.anchor || undefined}
             >
                 {configRef.current.header && (

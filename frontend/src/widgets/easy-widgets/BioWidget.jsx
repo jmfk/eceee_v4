@@ -213,7 +213,7 @@ const BioWidget = memo(({
     }
 
     return (
-        <div className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget`}>
+        <div className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget cms-content`}>
             <div className="bio-widget__container">
                 {mediaItem && mediaItem.url && (
                     <div className="bio-widget__image">

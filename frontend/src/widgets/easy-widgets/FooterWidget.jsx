@@ -84,7 +84,7 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
         return (
             <div className="footer-widget-editor p-4">
                 <footer
-                    className={`footer-widget widget-type-easy-widgets-footerwidget rounded ${cssClass}`}
+                    className={`footer-widget widget-type-easy-widgets-footerwidget rounded cms-content ${cssClass}`}
                     style={footerStyle}
                 >
                     <div className="footer-content">
@@ -130,7 +130,7 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
     // Preview/production mode: full rendering with all config applied
     return (
         <footer
-            className={`footer-widget widget-type-easy-widgets-footerwidget ${cssClass}`}
+            className={`footer-widget widget-type-easy-widgets-footerwidget cms-content ${cssClass}`}
             style={footerStyle}
         >
             <div className="footer-content">

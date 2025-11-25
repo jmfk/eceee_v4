@@ -381,7 +381,7 @@ const BannerWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="banner-widget widget-type-easy-widgets-bannerwidget container"
+                    className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
                     id={configRef.current.anchor || undefined}
                     style={{ position: 'relative' }}
                 >
@@ -403,7 +403,7 @@ const BannerWidget = ({
                             }}
                         />
                     )}
-                    <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
+                    <div className={bodyClasses} style={{ position: 'relative' }}>
                         <div className="banner-text content" style={{ position: 'relative' }} ref={contentContainerRef}>
                             {/* Mode toggle button */}
                             <button
@@ -438,7 +438,7 @@ const BannerWidget = ({
 
         return (
             <div
-                className="banner-widget widget-type-easy-widgets-bannerwidget container"
+                className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
                 id={configRef.current.anchor || undefined}
                 style={{ position: 'relative' }}
             >
@@ -460,7 +460,7 @@ const BannerWidget = ({
                         }}
                     />
                 )}
-                <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
+                <div className={bodyClasses} style={{ position: 'relative' }}>
                     <div className="banner-text content">
                         <div dangerouslySetInnerHTML={{
                             __html: bannerMode === 'header'
