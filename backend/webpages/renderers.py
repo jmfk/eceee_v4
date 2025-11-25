@@ -109,12 +109,14 @@ class WebPageRenderer:
 
         # Enhanced context
         enhanced_context = dict(context or {})
-        
+
         # Add widget inheritance metadata if available (for Component Style templates)
-        if 'inherited_from' in widget_data:
-            enhanced_context['widget_inherited_from'] = widget_data['inherited_from']
-        if 'inheritance_depth' in widget_data:
-            enhanced_context['widget_inheritance_depth'] = widget_data['inheritance_depth']
+        if "inherited_from" in widget_data:
+            enhanced_context["widget_inherited_from"] = widget_data["inherited_from"]
+        if "inheritance_depth" in widget_data:
+            enhanced_context["widget_inheritance_depth"] = widget_data[
+                "inheritance_depth"
+            ]
 
         # Prepare template context with widget-specific logic (e.g., collection resolution)
         # All widgets now have prepare_template_context (default implementation in BaseWidget)
@@ -312,8 +314,9 @@ class WebPageRenderer:
     def _render_widgets_by_slot(self, page, page_version, context):
         """Render widgets organized by slot using inheritance tree for better performance."""
         import logging
+
         logger = logging.getLogger(__name__)
-        
+
         widgets_by_slot = {}
 
         # NEW: Build inheritance tree (replaces complex slot-by-slot inheritance logic)
@@ -337,12 +340,9 @@ class WebPageRenderer:
                 # Use tree to get merged widgets for display (much simpler!)
                 merged_widgets = helpers.get_merged_widgets(slot_name)
 
-                # Filter out inactive widgets before rendering
-                active_widgets = [w for w in merged_widgets if w.config.get('isActive', True)]
-
                 # Render each widget
                 rendered_widgets = []
-                for widget in active_widgets:
+                for widget in merged_widgets:
                     # Get layout name (handle both dict and Layout object)
                     layout = context.get("layout")
                     if hasattr(layout, "name"):
@@ -351,7 +351,7 @@ class WebPageRenderer:
                         context["layout_name"] = layout.get("name", "")
                     else:
                         context["layout_name"] = ""
-                    
+
                     context["slot_name"] = slot_name
                     # Pass entire slot configuration in context
                     context["slot"] = slot_config
@@ -363,7 +363,7 @@ class WebPageRenderer:
                         "config": widget.config,
                         "order": widget.order,
                     }
-                    
+
                     # Add inheritance metadata for Component Style templates
                     if not widget.is_local:
                         # Build inherited_from dict by finding the source page
@@ -372,7 +372,7 @@ class WebPageRenderer:
                         for _ in range(source_depth):
                             if source_node.parent:
                                 source_node = source_node.parent
-                        
+
                         widget_data["inherited_from"] = {
                             "id": source_node.page_id,
                             "title": source_node.page.title,

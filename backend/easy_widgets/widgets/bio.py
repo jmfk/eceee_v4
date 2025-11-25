@@ -179,47 +179,8 @@ class BioWidget(BaseWidget):
         height: auto;
         border-radius: 8px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Text content styling */
-    .bio-widget__text {
-        font-size: 1rem;
-        line-height: 1.6;
-        color: inherit;
-    }
-    
-    .bio-widget__text p {
-        margin: 0 0 1rem 0;
-    }
-    
-    .bio-widget__text p:last-child {
-        margin-bottom: 0;
-    }
-    
-    .bio-widget__text h1,
-    .bio-widget__text h2,
-    .bio-widget__text h3,
-    .bio-widget__text h4,
-    .bio-widget__text h5,
-    .bio-widget__text h6 {
-        margin-top: 0;
-        margin-bottom: 0.5rem;
-        font-weight: 600;
-    }
-    
-    .bio-widget__text ul,
-    .bio-widget__text ol {
-        margin: 1rem 0;
-        padding-left: 1.5rem;
-    }
-    
-    .bio-widget__text blockquote {
-        border-left: 4px solid #e5e7eb;
-        padding: 1rem;
-        margin: 1.5rem 0;
-        color: #6b7280;
-    }
-    
+    }   
+   
     /* Responsive - stack on mobile */
     @media (max-width: 768px) {
         .bio-widget--column .bio-widget__container {
@@ -282,4 +243,3 @@ class BioWidget(BaseWidget):
             template_config["media_item"] = None
 
         return template_config
-

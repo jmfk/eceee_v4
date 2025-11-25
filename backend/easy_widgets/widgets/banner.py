@@ -236,6 +236,10 @@ class BannerWidget(BaseWidget):
         height: 140px;
         object-fit: cover;
     }
+
+    .banner-widget.border-disabled {
+        border: none;
+    }
     
     /* Rectangle image styling */
     .banner-body.image-size-rectangle .banner-image {
@@ -296,7 +300,7 @@ class BannerWidget(BaseWidget):
 
         # Get banner mode
         banner_mode = config.get("banner_mode") or config.get("bannerMode", "text")
-        
+
         # Select content based on mode
         content = (
             config.get("header_content") or config.get("headerContent", "")
@@ -314,8 +318,12 @@ class BannerWidget(BaseWidget):
 
         # Add banner specific context
         context["bannerMode"] = banner_mode
-        context["headerContent"] = config.get("header_content") or config.get("headerContent", "")
-        context["textContent"] = config.get("text_content") or config.get("textContent", "")
+        context["headerContent"] = config.get("header_content") or config.get(
+            "headerContent", ""
+        )
+        context["textContent"] = config.get("text_content") or config.get(
+            "textContent", ""
+        )
         context["imageSize"] = config.get("image_size") or config.get(
             "imageSize", "square"
         )

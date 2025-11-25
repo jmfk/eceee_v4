@@ -2362,7 +2362,7 @@ class LayoutRenderer {
     // Add widget content
     const content = await this.renderWidgetContent(type, config, widgetInstance);
     const contentWrapper = document.createElement('div');
-    contentWrapper.className = 'widget-content';
+    contentWrapper.className = 'widget-content cms-content';
 
     // Hide content if widget is inactive
     if (this.editable && widgetInstance.config?.isActive === false) {
