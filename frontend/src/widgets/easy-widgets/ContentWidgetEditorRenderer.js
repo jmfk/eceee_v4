@@ -548,6 +548,7 @@ class ContentWidgetEditorRenderer {
 
         // Theme configuration
         this.maxHeaderLevel = options.maxHeaderLevel || this.getThemeHeaderLevel() || 3
+        this.allowedFormats = options.allowedFormats || null // Restrict allowed paragraph formats
 
         // Detached toolbar mode - if true, toolbar is managed externally
         this.detachedToolbar = options.detachedToolbar || false
@@ -768,14 +769,25 @@ class ContentWidgetEditorRenderer {
         dropdownMenu.className = 'absolute left-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 hidden'
         dropdownMenu.style.zIndex = '1000'
 
-        // Format options
-        const formatOptions = [
+        // Format options - build all possible options
+        const allFormatOptions = [
             { value: '<p>', label: 'Paragraph' },
-            ...Array.from({ length: this.maxHeaderLevel }, (_, i) => ({
+            ...Array.from({ length: 6 }, (_, i) => ({
                 value: `<h${i + 1}>`,
                 label: `Heading ${i + 1}`
             }))
-        ]
+        ];
+
+        // Filter based on allowedFormats or maxHeaderLevel
+        const formatOptions = this.allowedFormats
+            ? allFormatOptions.filter(opt => this.allowedFormats.includes(opt.value))
+            : [
+                { value: '<p>', label: 'Paragraph' },
+                ...Array.from({ length: this.maxHeaderLevel }, (_, i) => ({
+                    value: `<h${i + 1}>`,
+                    label: `Heading ${i + 1}`
+                }))
+            ];
 
         // Create menu items
         formatOptions.forEach(option => {
@@ -1156,17 +1168,22 @@ class ContentWidgetEditorRenderer {
         if (isMod) {
             // Cmd/Ctrl + 0: Paragraph
             if (e.key === '0') {
-                e.preventDefault()
-                this.execCommand('formatBlock', '<p>')
+                if (!this.allowedFormats || this.allowedFormats.includes('<p>')) {
+                    e.preventDefault()
+                    this.execCommand('formatBlock', '<p>')
+                }
                 return
             }
 
             // Cmd/Ctrl + 1-6: Headings
             if (e.key >= '1' && e.key <= '6') {
                 const level = parseInt(e.key)
+                const formatValue = `<h${level}>`;
                 if (level <= this.maxHeaderLevel) {
-                    e.preventDefault()
-                    this.execCommand('formatBlock', `<h${level}>`)
+                    if (!this.allowedFormats || this.allowedFormats.includes(formatValue)) {
+                        e.preventDefault()
+                        this.execCommand('formatBlock', formatValue)
+                    }
                 }
                 return
             }
@@ -1405,7 +1422,8 @@ class ContentWidgetEditorRenderer {
             insertUnorderedList: state.insertUnorderedList,
             insertOrderedList: state.insertOrderedList,
             format: state.format,
-            maxHeaderLevel: state.maxHeaderLevel
+            maxHeaderLevel: state.maxHeaderLevel,
+            allowedFormats: this.allowedFormats
         }
 
         // Show context menu
@@ -2492,6 +2510,9 @@ class ContentWidgetEditorRenderer {
         if (options.pageId !== undefined) {
             this.pageId = options.pageId
         }
+        if (options.allowedFormats !== undefined) {
+            this.allowedFormats = options.allowedFormats
+        }
     }
 
     /**
@@ -2619,7 +2640,8 @@ class ContentWidgetEditorRenderer {
             code: false,
             blockquote: false,
             format: 'Format',
-            maxHeaderLevel: this.maxHeaderLevel
+            maxHeaderLevel: this.maxHeaderLevel,
+            allowedFormats: this.allowedFormats
         };
 
         if (!selection.rangeCount) {

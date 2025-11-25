@@ -2,8 +2,9 @@
  * SimpleTextEditorRenderer.js
  * Vanilla JS text editor for Hero, Banner, and ContentCard widgets
  * 
- * Supports two modes:
+ * Supports three modes:
  * - text-only: Plain text editing, no formatting, no toolbar
+ * - inline-plain: Plain text editing with simple formatting, no toolbar
  * - inline-rich: Bold, italic, link formatting via global toolbar (no block elements)
  * 
  * Integrates with the global WYSIWYG toolbar system (wysiwygToolbarManager)
@@ -48,6 +49,59 @@ const cleanInlineHTML = (html) => {
 }
 
 /**
+ * Clean HTML allowing both inline and specified block-level tags
+ */
+const cleanRichHTML = (html, allowedFormats) => {
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = html
+
+    // Base inline tags that are always allowed
+    const allowedInlineTags = ['strong', 'b', 'em', 'i', 'a', 'br']
+
+    // Extract block tags from allowedFormats
+    const allowedBlockTags = []
+    if (allowedFormats && Array.isArray(allowedFormats)) {
+        allowedFormats.forEach(format => {
+            // Extract tag name from format like '<p>' or '<h3>'
+            const match = format.match(/^<(\w+)>$/)
+            if (match) {
+                allowedBlockTags.push(match[1].toLowerCase())
+            }
+        })
+    }
+
+    // Combine inline and block tags
+    const allowedTags = [...allowedInlineTags, ...allowedBlockTags]
+    const allowedAttributes = ['href', 'target']
+
+    // Remove all non-allowed tags
+    const allElements = tempDiv.querySelectorAll('*')
+    const elementsToProcess = Array.from(allElements).reverse()
+
+    elementsToProcess.forEach(el => {
+        const tagName = el.tagName.toLowerCase()
+
+        if (!allowedTags.includes(tagName)) {
+            // Unwrap disallowed tags, keep content
+            while (el.firstChild) {
+                el.parentNode.insertBefore(el.firstChild, el)
+            }
+            el.remove()
+        } else {
+            // Clean attributes
+            const attrs = Array.from(el.attributes)
+            attrs.forEach(attr => {
+                if (!allowedAttributes.includes(attr.name)) {
+                    el.removeAttribute(attr.name)
+                }
+            })
+        }
+    })
+
+    return tempDiv.innerHTML
+}
+
+/**
  * Strip all HTML tags, return plain text
  */
 const stripHTML = (html) => {
@@ -61,11 +115,11 @@ const stripHTML = (html) => {
  */
 const isEmptyContent = (content) => {
     if (!content) return true
-    
+
     // Strip HTML and check if only whitespace remains
     const text = stripHTML(content).trim()
     if (text.length === 0) return true
-    
+
     // Check if content is just a single <br> tag
     const tempDiv = document.createElement('div')
     tempDiv.innerHTML = content.trim()
@@ -73,7 +127,7 @@ const isEmptyContent = (content) => {
     if (children.length === 1 && children[0].tagName === 'BR') {
         return true
     }
-    
+
     return false
 }
 
@@ -85,11 +139,12 @@ export class SimpleTextEditorRenderer {
         this.container = container
         this.options = {
             content: '',
-            mode: 'text-only', // 'text-only' or 'inline-rich'
+            mode: 'text-only', // 'text-only', 'inline-plain', or 'inline-rich'
             onChange: null,
             placeholder: '',
             element: 'div', // HTML element type: 'div', 'h1', 'h2', 'h5', 'h6'
             allowedButtons: ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image'], // Which toolbar buttons to show
+            allowedFormats: null, // Restrict allowed paragraph formats (e.g., ['<p>', '<h2>', '<h3>'])
             ...options
         }
 
@@ -131,7 +186,7 @@ export class SimpleTextEditorRenderer {
 
         // Set initial content
         this.setContent(this.options.content)
-        
+
         // Update empty state after initial render
         setTimeout(() => {
             this.updateEmptyState()
@@ -156,7 +211,8 @@ export class SimpleTextEditorRenderer {
         this.editorElement.addEventListener('paste', this.handlePaste)
         this.editorElement.addEventListener('keydown', this.handleKeyDown)
 
-        // For inline-rich mode, listen for commands from global toolbar
+        // For inline-rich mode only, listen for commands from global toolbar
+        // inline-plain mode doesn't use the toolbar
         if (this.options.mode === 'inline-rich') {
             this.editorElement.addEventListener('wysiwyg-command', this.handleCommand)
         }
@@ -182,11 +238,14 @@ export class SimpleTextEditorRenderer {
         // Mark as internal change to prevent onChange from triggering
         this.isInternalChange = true
 
-        if (this.options.mode === 'text-only') {
+        if (this.options.mode === 'text-only' || this.options.mode === 'inline-plain') {
             // Plain text only
             this.editorElement.textContent = stripHTML(content || '')
+        } else if (this.options.allowedFormats) {
+            // Inline rich with block-level tags - preserve allowed blocks
+            this.editorElement.innerHTML = cleanRichHTML(content || '', this.options.allowedFormats)
         } else {
-            // Inline rich - clean and set HTML
+            // Inline rich without formats - only inline tags
             this.editorElement.innerHTML = cleanInlineHTML(content || '')
         }
 
@@ -207,9 +266,13 @@ export class SimpleTextEditorRenderer {
     getContent() {
         if (!this.editorElement) return ''
 
-        if (this.options.mode === 'text-only') {
+        if (this.options.mode === 'text-only' || this.options.mode === 'inline-plain') {
             return this.editorElement.textContent || ''
+        } else if (this.options.allowedFormats) {
+            // When allowedFormats is set, preserve block-level tags
+            return cleanRichHTML(this.editorElement.innerHTML, this.options.allowedFormats)
         } else {
+            // Legacy behavior: only inline tags
             return cleanInlineHTML(this.editorElement.innerHTML)
         }
     }
@@ -219,34 +282,34 @@ export class SimpleTextEditorRenderer {
      */
     updateEmptyState() {
         if (!this.editorElement) return
-        
+
         // Check both the content string and the actual DOM element
         const content = this.getContent()
         let isEmpty = isEmptyContent(content)
-        
+
         // Also check if the DOM element is visually empty (only has <br> or whitespace)
         if (!isEmpty) {
             const children = Array.from(this.editorElement.childNodes)
-            const hasOnlyBr = children.length === 1 && 
-                             children[0].nodeType === Node.ELEMENT_NODE && 
-                             children[0].tagName === 'BR'
-            const hasOnlyText = children.length === 1 && 
-                               children[0].nodeType === Node.TEXT_NODE && 
-                               (!children[0].textContent || children[0].textContent.trim() === '')
-            const hasOnlyWhitespace = children.length > 0 && 
-                                     children.every(node => {
-                                         if (node.nodeType === Node.TEXT_NODE) {
-                                             return !node.textContent || node.textContent.trim() === ''
-                                         }
-                                         if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
-                                             return true
-                                         }
-                                         return false
-                                     })
-            
+            const hasOnlyBr = children.length === 1 &&
+                children[0].nodeType === Node.ELEMENT_NODE &&
+                children[0].tagName === 'BR'
+            const hasOnlyText = children.length === 1 &&
+                children[0].nodeType === Node.TEXT_NODE &&
+                (!children[0].textContent || children[0].textContent.trim() === '')
+            const hasOnlyWhitespace = children.length > 0 &&
+                children.every(node => {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        return !node.textContent || node.textContent.trim() === ''
+                    }
+                    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
+                        return true
+                    }
+                    return false
+                })
+
             isEmpty = hasOnlyBr || hasOnlyText || hasOnlyWhitespace
         }
-        
+
         if (isEmpty) {
             this.editorElement.classList.add('is-empty')
         } else {
@@ -260,7 +323,7 @@ export class SimpleTextEditorRenderer {
     handleContentChange() {
         // Update empty state
         this.updateEmptyState()
-        
+
         // Don't trigger onChange if this is an internal change (from setContent)
         if (this.isInternalChange) {
             return
@@ -285,7 +348,7 @@ export class SimpleTextEditorRenderer {
         // Get plain text from clipboard
         const text = e.clipboardData.getData('text/plain')
 
-        if (this.options.mode === 'text-only') {
+        if (this.options.mode === 'text-only' || this.options.mode === 'inline-plain') {
             // Insert as plain text
             document.execCommand('insertText', false, text)
         } else {
@@ -293,8 +356,10 @@ export class SimpleTextEditorRenderer {
             const html = e.clipboardData.getData('text/html')
 
             if (html) {
-                // Clean and insert HTML
-                const cleaned = cleanInlineHTML(html)
+                // Clean and insert HTML - use cleanRichHTML if allowedFormats is set
+                const cleaned = this.options.allowedFormats
+                    ? cleanRichHTML(html, this.options.allowedFormats)
+                    : cleanInlineHTML(html)
                 document.execCommand('insertHTML', false, cleaned)
             } else {
                 // Insert plain text
@@ -307,14 +372,56 @@ export class SimpleTextEditorRenderer {
      * Handle keydown
      */
     handleKeyDown(e) {
-        // Prevent Enter key from creating new elements in both modes
+        // Handle Enter key
         if (e.key === 'Enter') {
+            // In HTML mode (inline-rich with allowedFormats), create new paragraph
+            if (this.options.mode === 'inline-rich' && this.options.allowedFormats) {
+                e.preventDefault()
+
+                // Get the current selection
+                const selection = window.getSelection()
+                const range = selection.getRangeAt(0)
+
+                // Create a new paragraph element
+                const newParagraph = document.createElement('p')
+                newParagraph.innerHTML = '<br>' // Placeholder for cursor
+
+                // Find the current block element
+                let currentBlock = range.commonAncestorContainer
+                if (currentBlock.nodeType === Node.TEXT_NODE) {
+                    currentBlock = currentBlock.parentElement
+                }
+
+                // Walk up to find the block-level element
+                while (currentBlock && currentBlock !== this.editorElement && !['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'DIV'].includes(currentBlock.tagName)) {
+                    currentBlock = currentBlock.parentElement
+                }
+
+                // If we're at the end of a block, insert after it
+                if (currentBlock && currentBlock !== this.editorElement) {
+                    currentBlock.parentNode.insertBefore(newParagraph, currentBlock.nextSibling)
+
+                    // Move cursor to the new paragraph
+                    const newRange = document.createRange()
+                    newRange.setStart(newParagraph, 0)
+                    newRange.collapse(true)
+                    selection.removeAllRanges()
+                    selection.addRange(newRange)
+                } else {
+                    // Fallback: insert paragraph at current position
+                    document.execCommand('insertHTML', false, '<p><br></p>')
+                }
+
+                this.handleContentChange()
+                return
+            }
+
+            // In inline-only modes, insert line break
             e.preventDefault()
-            // Insert a line break
             document.execCommand('insertHTML', false, '<br>')
         }
 
-        // Shortcuts for inline-rich mode
+        // Shortcuts for inline-rich mode only (not inline-plain)
         if (this.options.mode === 'inline-rich') {
             if (e.metaKey || e.ctrlKey) {
                 if (e.key === 'b') {
@@ -410,7 +517,7 @@ export class SimpleTextEditorRenderer {
     getToolbarState() {
         if (this.options.mode !== 'inline-rich') {
             return {
-                mode: 'text-only',
+                mode: this.options.mode,
                 bold: false,
                 italic: false,
                 link: false,
@@ -429,12 +536,13 @@ export class SimpleTextEditorRenderer {
             insertOrderedList: false,
             code: false,
             quote: false,
-            allowedButtons: this.options.allowedButtons || ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image']
+            allowedButtons: this.options.allowedButtons || ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image'],
+            allowedFormats: this.options.allowedFormats
         }
 
         if (selection.rangeCount > 0) {
             const range = selection.getRangeAt(0)
-            
+
             // Check for block format
             let currentElement = range.commonAncestorContainer
             if (currentElement.nodeType === Node.TEXT_NODE) {
@@ -524,6 +632,12 @@ export class SimpleTextEditorRenderer {
             if (this.editorElement) {
                 this.editorElement.setAttribute('data-placeholder', newOptions.placeholder)
             }
+        }
+        if (newOptions.allowedButtons !== undefined) {
+            this.options.allowedButtons = newOptions.allowedButtons
+        }
+        if (newOptions.allowedFormats !== undefined) {
+            this.options.allowedFormats = newOptions.allowedFormats
         }
 
         // Update content if it changed and is different from current editor content

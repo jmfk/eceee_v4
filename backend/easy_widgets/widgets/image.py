@@ -205,7 +205,7 @@ class ImageWidget(BaseWidget):
         text-align: var(--image-alignment, center);
         margin-bottom: 30px;
     }
-    .table-widget:last-child {
+    .image-widget:last-child {
         image-widget: 0;
     }    
     

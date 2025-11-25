@@ -30,6 +30,28 @@ class BannerConfig(BaseModel):
             "group": "Content",
         },
     )
+    headerContent: str = Field(
+        "",
+        description="Header text content (plain text, shown when in header mode)",
+        json_schema_extra={
+            "component": "RichTextInput",
+            "rows": 3,
+            "order": 2,
+            "group": "Content",
+            "conditionalOn": {"bannerMode": ["header"]},
+        },
+    )
+    textContent: str = Field(
+        "",
+        description="Rich text content (shown when in text mode)",
+        json_schema_extra={
+            "component": "RichTextInput",
+            "rows": 6,
+            "order": 3,
+            "group": "Content",
+            "conditionalOn": {"bannerMode": ["text"]},
+        },
+    )
     imageSize: Literal["square", "rectangle"] = Field(
         "square",
         description="Size/shape of the image",
@@ -49,16 +71,6 @@ class BannerConfig(BaseModel):
             "order": 5,
             "group": "Images",
             "conditionalOn": {"bannerMode": ["text"]},
-        },
-    )
-    content: str = Field(
-        "",
-        description="Rich text content for the text block",
-        json_schema_extra={
-            "component": "RichTextInput",
-            "rows": 6,
-            "order": 2,
-            "group": "Content",
         },
     )
     backgroundImage: Optional[str] = Field(
@@ -282,18 +294,28 @@ class BannerWidget(BaseWidget):
             # Passthru mode: use default rendering but inject CSS
             return None, css
 
+        # Get banner mode
+        banner_mode = config.get("banner_mode") or config.get("bannerMode", "text")
+        
+        # Select content based on mode
+        content = (
+            config.get("header_content") or config.get("headerContent", "")
+            if banner_mode == "header"
+            else config.get("text_content") or config.get("textContent", "")
+        )
+
         # Prepare context with all widget data
         context = prepare_component_context(
-            content=config.get("content", ""),
+            content=content,
             anchor=config.get("anchor", ""),
             style_vars=style.get("variables", {}),
             config=config,  # Pass raw config for granular control
         )
 
         # Add banner specific context
-        context["bannerMode"] = config.get("banner_mode") or config.get(
-            "bannerMode", "text"
-        )
+        context["bannerMode"] = banner_mode
+        context["headerContent"] = config.get("header_content") or config.get("headerContent", "")
+        context["textContent"] = config.get("text_content") or config.get("textContent", "")
         context["imageSize"] = config.get("image_size") or config.get(
             "imageSize", "square"
         )
@@ -317,6 +339,12 @@ class BannerWidget(BaseWidget):
         # Ensure snake_case fields for template
         template_config["banner_mode"] = config.get("bannerMode") or config.get(
             "banner_mode", "text"
+        )
+        template_config["header_content"] = config.get("headerContent") or config.get(
+            "header_content", ""
+        )
+        template_config["text_content"] = config.get("textContent") or config.get(
+            "text_content", ""
         )
         template_config["image_size"] = config.get("imageSize") or config.get(
             "image_size", "square"

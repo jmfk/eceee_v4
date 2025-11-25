@@ -38,7 +38,8 @@ const BannerWidget = ({
     // UDC Integration
     const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `bannerwidget-${widgetId || 'preview'}`, [widgetId])
-    const fieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-content`, [widgetId])
+    const headerFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-headerContent`, [widgetId])
+    const textFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-textContent`, [widgetId])
     const contextType = useEditorContext()
 
     // State for optimized image URLs
@@ -75,30 +76,49 @@ const BannerWidget = ({
         }
     })
 
-    // Subscribe to field-level updates for content field (from form field)
-    // Form publishes with isolated-form-* componentId, so sourceId = isolated-form-*
-    // Widget publishes with bannerwidget-* or field-* componentId, so sourceId = bannerwidget-* or field-*
-    useExternalChanges(fieldComponentId, (state, metadata) => {
+    // Subscribe to field-level updates for headerContent field (from form field)
+    useExternalChanges(headerFieldComponentId, (state, metadata) => {
         if (!widgetId || !slotName) {
             return
         }
 
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        const newContent = widget?.config?.content
+        const newHeaderContent = widget?.config?.headerContent
 
         // Check if update came from this widget's WYSIWYG (self-update)
         const sourceId = metadata?.sourceId || ''
-        // Self-update if: widget-level (bannerwidget-123) OR field-level (field-123-content) from this widget
-        const isSelfUpdate = sourceId === componentId || sourceId === fieldComponentId
-        // Form publishes with isolated-form-* so it will update WYSIWYG (not self)
+        const isSelfUpdate = sourceId === componentId || sourceId === headerFieldComponentId
 
-        if (newContent !== undefined && newContent !== configRef.current.content && !isSelfUpdate) {
-            // External update (from form field with isolated-form-* sourceId) - update WYSIWYG editor
-            if (contentEditorRef.current) {
-                contentEditorRef.current.updateConfig({ content: newContent })
+        if (newHeaderContent !== undefined && newHeaderContent !== configRef.current.headerContent && !isSelfUpdate) {
+            // External update - update WYSIWYG editor if in header mode
+            if (contentEditorRef.current && bannerMode === 'header') {
+                contentEditorRef.current.updateConfig({ content: newHeaderContent })
             }
-            // Also update our config ref
-            setConfig({ ...configRef.current, content: newContent })
+            // Update our config ref
+            setConfig({ ...configRef.current, headerContent: newHeaderContent })
+        }
+    })
+
+    // Subscribe to field-level updates for textContent field (from form field)
+    useExternalChanges(textFieldComponentId, (state, metadata) => {
+        if (!widgetId || !slotName) {
+            return
+        }
+
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
+        const newTextContent = widget?.config?.textContent
+
+        // Check if update came from this widget's WYSIWYG (self-update)
+        const sourceId = metadata?.sourceId || ''
+        const isSelfUpdate = sourceId === componentId || sourceId === textFieldComponentId
+
+        if (newTextContent !== undefined && newTextContent !== configRef.current.textContent && !isSelfUpdate) {
+            // External update - update WYSIWYG editor if in text mode
+            if (contentEditorRef.current && bannerMode === 'text') {
+                contentEditorRef.current.updateConfig({ content: newTextContent })
+            }
+            // Update our config ref
+            setConfig({ ...configRef.current, textContent: newTextContent })
         }
     })
 
@@ -152,18 +172,19 @@ const BannerWidget = ({
     // Determine text position - removed, no longer used
 
     // Content change handler - use configRef for stable reference
+    // Saves to different field based on current mode
     const handleContentChange = useCallback((newContent) => {
         if (widgetId && slotName) {
-            const updatedConfig = { ...configRef.current, content: newContent }
+            const fieldName = bannerMode === 'header' ? 'headerContent' : 'textContent'
+            const updatedConfig = { ...configRef.current, [fieldName]: newContent }
             setConfig(updatedConfig)
 
             // Publish to field-level path for form field sync
-            // Use sourceId with widget type prefix: bannerwidget-${widgetId}-field-content
-            // Content field subscribes to field-${widgetId}-content, so sourceId !== componentId
-            const fieldSourceId = `${componentId}-field-content` // bannerwidget-${widgetId}-field-content
+            const fieldComponentId = bannerMode === 'header' ? headerFieldComponentId : textFieldComponentId
+            const fieldSourceId = `${componentId}-field-${fieldName}`
             publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
-                config: { content: newContent }, // Only publish the changed field
+                config: { [fieldName]: newContent }, // Only publish the changed field
                 widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
                 slotName: slotName,
                 contextType: contextType
@@ -173,7 +194,7 @@ const BannerWidget = ({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [fieldComponentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [bannerMode, componentId, headerFieldComponentId, textFieldComponentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
     // Mode conversion handler
     const handleModeToggle = useCallback(() => {
@@ -208,14 +229,19 @@ const BannerWidget = ({
                 const allowedButtons = bannerMode === 'header'
                     ? undefined
                     : ['format', 'bold', 'italic', 'link']
+                const allowedFormatsForMode = bannerMode === 'text' ? ['<p>', '<h3>'] : undefined
+                const content = bannerMode === 'header'
+                    ? (configRef.current.headerContent || '')
+                    : (configRef.current.textContent || '')
 
                 contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
-                    content: configRef.current.content || '',
+                    content: content,
                     mode: editorMode,
                     onChange: handleContentChange,
                     placeholder: bannerMode === 'header' ? 'Enter banner header...' : 'Enter banner content...',
                     element: element,
                     allowedButtons: allowedButtons,
+                    allowedFormats: allowedFormatsForMode,
                     maxBreaks: bannerMode === 'header' ? 1 : undefined
                 })
                 contentEditorRef.current.render()
@@ -259,17 +285,20 @@ const BannerWidget = ({
         if (mode === 'editor') {
             if (contentEditorRef.current) {
                 const element = bannerMode === 'header' ? 'h2' : 'div'
+                const content = bannerMode === 'header'
+                    ? (configRef.current.headerContent || '')
+                    : (configRef.current.textContent || '')
 
                 // Only update if element matches current editor element
                 const currentElement = contentEditorRef.current.options?.element || 'div'
                 if (currentElement === element) {
                     contentEditorRef.current.updateConfig({
-                        content: configRef.current.content || ''
+                        content: content
                     })
                 }
             }
         }
-    }, [configRef.current.content, mode])
+    }, [configRef.current.headerContent, configRef.current.textContent, bannerMode, mode])
 
     // Check if using component style with Mustache template
     const componentStyle = configRef.current.componentStyle || 'default'
@@ -284,9 +313,14 @@ const BannerWidget = ({
                 const isPassthru = style.template?.trim() === '{{passthru}}'
 
                 if (!isPassthru) {
+                    // Select content based on mode
+                    const content = bannerMode === 'header'
+                        ? (configRef.current.headerContent || '')
+                        : (configRef.current.textContent || '')
+
                     // Prepare context for Mustache rendering
                     const mustacheContext = prepareComponentContext(
-                        configRef.current.content || '',
+                        content,
                         configRef.current.anchor || '',
                         style.variables || {},
                         configRef.current
@@ -294,6 +328,8 @@ const BannerWidget = ({
 
                     // Add banner specific context
                     mustacheContext.bannerMode = bannerMode
+                    mustacheContext.headerContent = configRef.current.headerContent || ''
+                    mustacheContext.textContent = configRef.current.textContent || ''
                     mustacheContext.imageSize = imageSize
                     mustacheContext.image1 = image1Url
 
@@ -426,7 +462,11 @@ const BannerWidget = ({
                 )}
                 <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
                     <div className="banner-text content">
-                        <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
+                        <div dangerouslySetInnerHTML={{
+                            __html: bannerMode === 'header'
+                                ? (configRef.current.headerContent || '')
+                                : (configRef.current.textContent || '')
+                        }} />
                     </div>
 
                     {bannerMode === 'text' && image1Url && (
@@ -440,7 +480,7 @@ const BannerWidget = ({
     }
 
     // Default rendering (no custom style)
-    const hasContent = configRef.current.content || image1 || backgroundImage
+    const hasContent = configRef.current.headerContent || configRef.current.textContent || image1 || backgroundImage
 
     if (mode === 'editor') {
         return (
@@ -473,7 +513,8 @@ BannerWidget.widgetType = 'easy_widgets.BannerWidget'
 BannerWidget.defaultConfig = {
     anchor: '',
     bannerMode: 'text',
-    content: '',
+    headerContent: '',
+    textContent: '',
     backgroundImage: null,
     imageSize: 'square',
     image1: null,

@@ -69,7 +69,8 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
                 namespace,  // Pass namespace for media browser
                 slotDimensions,  // Pass slot dimensions for imgproxy sizing
                 pageId,  // Pass pageId for theme context
-                detachedToolbar: true  // Enable global toolbar mode
+                detachedToolbar: true,  // Enable global toolbar mode
+                allowedFormats: ['<p>', '<h1>', '<h2>', '<h3>', '<h4>']  // Restrict to Paragraph, H1-H4
             })
             rendererRef.current.render()
             lastExternalContentRef.current = content

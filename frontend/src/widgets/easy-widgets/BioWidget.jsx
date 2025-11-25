@@ -34,7 +34,8 @@ const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimen
                 namespace,
                 slotDimensions,
                 pageId,
-                detachedToolbar: true
+                detachedToolbar: true,
+                allowedFormats: ['<p>', '<h2>', '<h3>']
             })
             rendererRef.current.render()
             lastExternalContentRef.current = content

@@ -101,23 +101,29 @@ export class WysiwygContextMenu {
             )
         }
 
-        // Format blocks (always available)
-        items.push(
-            {
+        // Format blocks - filter by allowedFormats if provided
+        const allowedFormats = context.allowedFormats;
+
+        // Only add Paragraph if allowed
+        if (!allowedFormats || allowedFormats.includes('<p>')) {
+            items.push({
                 label: 'Paragraph',
                 action: () => this.handleFormatBlock('<p>'),
                 isActive: context.format === 'Paragraph'
-            }
-        )
+            });
+        }
 
-        // Add heading options based on maxHeaderLevel
-        const maxHeaderLevel = context.maxHeaderLevel || 3
+        // Add heading options - filter by allowedFormats
+        const maxHeaderLevel = context.maxHeaderLevel || 3;
         for (let i = 1; i <= maxHeaderLevel; i++) {
-            items.push({
-                label: `Heading ${i}`,
-                action: () => this.handleFormatBlock(`<h${i}>`),
-                isActive: context.format === `Heading ${i}`
-            })
+            const formatValue = `<h${i}>`;
+            if (!allowedFormats || allowedFormats.includes(formatValue)) {
+                items.push({
+                    label: `Heading ${i}`,
+                    action: () => this.handleFormatBlock(formatValue),
+                    isActive: context.format === `Heading ${i}`
+                });
+            }
         }
 
         items.push({ type: 'separator' })

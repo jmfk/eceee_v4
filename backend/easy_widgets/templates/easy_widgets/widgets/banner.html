@@ -1,8 +1,8 @@
 {% load static %}
 {% load imgproxy_tags %}
 
-{# Only render if there's content #}
-{% if config.content %}
+{# Only render if there's content - check both header and text content #}
+{% if config.header_content or config.text_content %}
 
 {% if custom_style_css %}
 <style>{{ custom_style_css|safe }}</style>
@@ -16,7 +16,11 @@
 
     <div class="banner-body mode-{{ config.banner_mode|default:'text' }} image-size-{{ config.image_size|default:'square' }}">
         <div class="banner-text">
-            {{ config.content|safe }}
+            {% if config.banner_mode == 'header' %}
+                {{ config.header_content|safe }}
+            {% else %}
+                {{ config.text_content|safe }}
+            {% endif %}
         </div>
         
         {% if config.banner_mode == 'text' and config.image_1 %}

@@ -121,7 +121,7 @@ const ToolbarSeparator = () => (
 /**
  * Format dropdown component
  */
-const FormatDropdown = ({ currentFormat, maxHeaderLevel, onCommand }) => {
+const FormatDropdown = ({ currentFormat, maxHeaderLevel, allowedFormats, onCommand }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -141,13 +141,25 @@ const FormatDropdown = ({ currentFormat, maxHeaderLevel, onCommand }) => {
         }
     }, [isOpen]);
 
-    const formatOptions = [
+    // Build all possible format options
+    const allFormatOptions = [
         { value: '<p>', label: 'Paragraph' },
-        ...Array.from({ length: maxHeaderLevel || 3 }, (_, i) => ({
+        ...Array.from({ length: 6 }, (_, i) => ({
             value: `<h${i + 1}>`,
             label: `Heading ${i + 1}`
         }))
     ];
+
+    // Filter based on allowedFormats or maxHeaderLevel
+    const formatOptions = allowedFormats
+        ? allFormatOptions.filter(opt => allowedFormats.includes(opt.value))
+        : [
+            { value: '<p>', label: 'Paragraph' },
+            ...Array.from({ length: maxHeaderLevel || 3 }, (_, i) => ({
+                value: `<h${i + 1}>`,
+                label: `Heading ${i + 1}`
+            }))
+        ];
 
     const handleFormatClick = (value, label) => {
         onCommand('formatBlock', value);
@@ -237,6 +249,7 @@ const ToolbarButtons = ({ state, onCommand }) => {
                     <FormatDropdown
                         currentFormat={state.format}
                         maxHeaderLevel={state.maxHeaderLevel}
+                        allowedFormats={state.allowedFormats}
                         onCommand={onCommand}
                     />
                 </>
