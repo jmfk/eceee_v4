@@ -182,21 +182,25 @@ const BioWidget = memo(({
     const bioText = configRef.current.bioText || ''
     const textLayout = configRef.current.textLayout || 'column'
     const caption = configRef.current.caption || ''
+    const useContentMargins = configRef.current.useContentMargins || false
+    const anchor = configRef.current.anchor || ''
 
     if (mode === 'editor') {
         return (
-            <div className={`bio-widget bio-widget--${textLayout} min-h-32`}>
+            <div 
+                className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget${useContentMargins ? ' xl:pl-[80px] xl:pr-[60px]' : ''}`}
+                {...(anchor && { id: anchor })}
+            >
                 <div className="bio-widget__container">
                     {image && image.url && (
                         <div className="bio-widget__image">
                             <img 
                                 src={image.url} 
                                 alt={image.altText || ''}
-                                className="w-full h-auto rounded-lg shadow-md"
                                 loading="lazy"
                             />
-                            {image.caption && (
-                                <div className="text-sm text-gray-600 mt-2 italic">{image.caption}</div>
+                            {caption && (
+                                <div className="bio-widget__caption">{caption}</div>
                             )}
                         </div>
                     )}
@@ -209,15 +213,15 @@ const BioWidget = memo(({
                         pageId={context?.pageId}
                     />
                 </div>
-                {caption && (
-                    <div className="bio-widget__caption mt-4 text-center text-sm text-gray-600">{caption}</div>
-                )}
             </div>
         )
     }
 
     return (
-        <div className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget cms-content`}>
+        <div 
+            className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget${useContentMargins ? ' xl:pl-[80px] xl:pr-[60px]' : ''}`}
+            {...(anchor && { id: anchor })}
+        >
             <div className="bio-widget__container">
                 {image && image.url && (
                     <div className="bio-widget__image">
@@ -226,8 +230,8 @@ const BioWidget = memo(({
                             alt={image.altText || ''}
                             loading="lazy"
                         />
-                        {image.caption && (
-                            <div className="bio-widget__caption">{image.caption}</div>
+                        {caption && (
+                            <div className="bio-widget__caption">{caption}</div>
                         )}
                     </div>
                 )}
@@ -235,9 +239,6 @@ const BioWidget = memo(({
                     {bioText && <div dangerouslySetInnerHTML={{ __html: bioText }} />}
                 </div>
             </div>
-            {caption && (
-                <div className="bio-widget__caption mt-4 text-center text-sm text-gray-600">{caption}</div>
-            )}
         </div>
     )
 }, (prevProps, nextProps) => {
@@ -246,6 +247,8 @@ const BioWidget = memo(({
         prevProps.config?.image?.url === nextProps.config?.image?.url &&
         prevProps.config?.textLayout === nextProps.config?.textLayout &&
         prevProps.config?.caption === nextProps.config?.caption &&
+        prevProps.config?.useContentMargins === nextProps.config?.useContentMargins &&
+        prevProps.config?.anchor === nextProps.config?.anchor &&
         prevProps.mode === nextProps.mode &&
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&
