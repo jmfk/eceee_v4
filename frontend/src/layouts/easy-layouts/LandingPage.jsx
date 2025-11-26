@@ -39,7 +39,7 @@ export const LandingPage = ({
         <div className="grid grid-cols-3 w-full" style={{ gridTemplateColumns: '1fr minmax(0,1280px) 1fr' }}>
             <div className=""></div>
             <div className="">
-                <header className="bg-black h-[132px]">
+                <header className={`bg-black ${editable ? 'min-h-[132px]' : 'h-[132px]'}`}>
                     <WidgetSlot
                         name="header"
                         label="Page Header"
