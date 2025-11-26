@@ -232,7 +232,7 @@ class BioWidget(BaseWidget):
         )
         template_config["use_content_margins"] = (
             config.get("useContentMargins")
-            if config.get("useContentMargins") is not None
+            if "useContentMargins" in config
             else config.get("use_content_margins", False)
         )
 
