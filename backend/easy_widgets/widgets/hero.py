@@ -182,10 +182,13 @@ class HeroWidget(BaseWidget):
         padding: 0;
         overflow: hidden;
         height: 310px;
+        min-height: 310px;
+        max-height: 310px;
         width: 100%;
         background-color: var(--hero-bg-color, #000000);
         color: var(--hero-text-color, #ffffff);
         margin-bottom: 30px;
+        flex-shrink: 0;
     }
     .hero-widget:last-child {
         margin-bottom: 0;
@@ -224,7 +227,7 @@ class HeroWidget(BaseWidget):
         margin-top: 16px;
         margin-bottom: 16px;
         color: var(--hero-text-color, #ffffff);
-        background-color: rgba(0,0,0,0.5);
+        background-color: rgba(0,0,0,0.4);
         display: inline-block;
         padding: 17px 20px 12px;
     }
