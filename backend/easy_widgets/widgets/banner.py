@@ -21,7 +21,7 @@ class BannerConfig(BaseModel):
         populate_by_name=True,
     )
 
-    bannerMode: Literal["header", "text"] = Field(
+    banner_mode: Literal["header", "text"] = Field(
         "text",
         description="Banner mode: header (H2 centered) or text (H3 + paragraph with optional image)",
         json_schema_extra={
@@ -30,7 +30,7 @@ class BannerConfig(BaseModel):
             "group": "Content",
         },
     )
-    headerContent: str = Field(
+    header_content: str = Field(
         "",
         description="Header text content (plain text, shown when in header mode)",
         json_schema_extra={
@@ -41,7 +41,7 @@ class BannerConfig(BaseModel):
             "conditionalOn": {"bannerMode": ["header"]},
         },
     )
-    textContent: str = Field(
+    text_content: str = Field(
         "",
         description="Rich text content (shown when in text mode)",
         json_schema_extra={
@@ -52,7 +52,7 @@ class BannerConfig(BaseModel):
             "conditionalOn": {"bannerMode": ["text"]},
         },
     )
-    imageSize: Literal["square", "rectangle"] = Field(
+    image_size: Literal["square", "rectangle"] = Field(
         "square",
         description="Size/shape of the image",
         json_schema_extra={
@@ -62,7 +62,7 @@ class BannerConfig(BaseModel):
             "conditionalOn": {"bannerMode": ["text"]},
         },
     )
-    image1: Optional[str] = Field(
+    image_1: Optional[str] = Field(
         None,
         description="Image URL",
         json_schema_extra={
@@ -73,7 +73,7 @@ class BannerConfig(BaseModel):
             "conditionalOn": {"bannerMode": ["text"]},
         },
     )
-    backgroundImage: Optional[str] = Field(
+    background_image: Optional[str] = Field(
         None,
         description="Background image (cover)",
         json_schema_extra={
@@ -104,7 +104,7 @@ class BannerConfig(BaseModel):
         },
     )
 
-    componentStyle: str = Field(
+    component_style: str = Field(
         "default",
         description="Component style from theme",
         json_schema_extra={
@@ -113,7 +113,7 @@ class BannerConfig(BaseModel):
             "group": "Styling",
         },
     )
-    showBorder: bool = Field(
+    show_border: bool = Field(
         True,
         description="Show widget border",
         json_schema_extra={
@@ -221,14 +221,31 @@ class BannerWidget(BaseWidget):
     
     .banner-body.mode-text .banner-text {
         flex: 1; 
-        padding: 30px;
+        padding: 26px 30px 30px;
         font-size: 16px;
         font-family: 'Source Sans 3', sans-serif;
         font-weight: 300;
         line-height: 22px;
         overflow: hidden;
     }
-    
+    .banner-body.mode-text .banner-text h3 {
+        font-size: 18px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 700;
+        line-height: 22px;
+        overflow: hidden;
+        margin-top: 0;
+        margin-bottom: 3px;
+    }
+    .banner-body.mode-text .banner-text p {
+        font-size: 14px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 300;
+        line-height: 17px;
+        overflow: hidden;
+        margin-top: 0;
+        margin-bottom: 0;
+    }    
     .banner-body.mode-text .banner-images {
         display: flex;
         align-items: top;
@@ -254,24 +271,7 @@ class BannerWidget(BaseWidget):
         margin-top: 0;
         margin-bottom: 0;
     }
-    .banner-body.mode-text .banner-text h3 {
-        font-size: 18px;
-        font-family: 'Source Sans 3', sans-serif;
-        font-weight: 700;
-        line-height: 22px;
-        overflow: hidden;
-        margin-top: 0;
-        margin-bottom: 3px;
-    }
-    .banner-body.mode-text .banner-text p {
-        font-size: 14px;
-        font-family: 'Source Sans 3', sans-serif;
-        font-weight: 300;
-        line-height: 17px;
-        overflow: hidden;
-        margin-top: 0;
-        margin-bottom: 0;
-    }
+
     /* Individual image styling - square (default) */
     .banner-image {
         width: 140px;
