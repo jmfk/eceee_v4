@@ -84,6 +84,26 @@ class BannerConfig(BaseModel):
         },
     )
 
+    text_color: str = Field(
+        "#000000",
+        description="Text color",
+        json_schema_extra={
+            "component": "ColorInput",
+            "order": 4,
+            "group": "Styling",
+        },
+    )
+
+    background_color: str = Field(
+        "#ffffff",
+        description="Background color",
+        json_schema_extra={
+            "component": "ColorInput",
+            "order": 5,
+            "group": "Styling",
+        },
+    )
+
     componentStyle: str = Field(
         "default",
         description="Component style from theme",
@@ -164,6 +184,7 @@ class BannerWidget(BaseWidget):
         border-radius: 0;
         box-shadow: none;
         margin-bottom: 30px;
+        position: relative;
     }
     .banner-widget.border-disabled {
         outline: none;
@@ -188,6 +209,8 @@ class BannerWidget(BaseWidget):
         flex: 1;
         min-height: 0;
         height: 140px;
+        position: relative;
+        z-index: 1;
     }
     
     /* Text mode styles */
@@ -364,6 +387,18 @@ class BannerWidget(BaseWidget):
         Prepare template context with snake_case field conversions and layout properties.
         """
         template_config = config.copy() if config else {}
+
+        # Build inline styles for colors (direct application)
+        style_parts = []
+
+        text_color = config.get("text_color", "#000000")
+        background_color = config.get("background_color", "#ffffff")
+
+        style_parts.append(f"background-color: {background_color};")
+        style_parts.append(f"color: {text_color};")
+
+        # Join all style parts
+        template_config["banner_style"] = " ".join(style_parts)
 
         # Ensure snake_case fields for template
         template_config["banner_mode"] = config.get("bannerMode") or config.get(

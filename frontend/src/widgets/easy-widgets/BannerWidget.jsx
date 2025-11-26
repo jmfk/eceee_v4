@@ -128,6 +128,14 @@ const BannerWidget = ({
     const bannerMode = configRef.current.bannerMode || 'text'
     const image1 = configRef.current.image1
     const backgroundImage = configRef.current.backgroundImage
+    const textColor = configRef.current.textColor || '#000000'
+    const backgroundColor = configRef.current.backgroundColor || '#ffffff'
+
+    // Build inline styles for colors
+    const bannerStyle = {
+        backgroundColor: backgroundColor,
+        color: textColor
+    }
 
     // Load optimized image URLs from backend API
     useEffect(() => {
@@ -384,7 +392,7 @@ const BannerWidget = ({
                 <div
                     className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
                     id={configRef.current.anchor || undefined}
-                    style={{ position: 'relative' }}
+                    style={{ position: 'relative', ...bannerStyle }}
                 >
                     {backgroundImageUrl && (
                         <div
@@ -449,7 +457,7 @@ const BannerWidget = ({
             <div
                 className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
                 id={configRef.current.anchor || undefined}
-                style={{ position: 'relative' }}
+                style={{ position: 'relative', ...bannerStyle }}
             >
                 {backgroundImageUrl && (
                     <div
@@ -527,6 +535,8 @@ BannerWidget.defaultConfig = {
     backgroundImage: null,
     imageSize: 'square',
     image1: null,
+    textColor: '#000000',
+    backgroundColor: '#ffffff',
     componentStyle: 'default'
 }
 
