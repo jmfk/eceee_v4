@@ -261,7 +261,7 @@ class BannerWidget(BaseWidget):
         line-height: 22px;
         overflow: hidden;
         margin-top: 0;
-        margin-bottom: 0;
+        margin-bottom: 3px;
     }
     .banner-body.mode-text .banner-text p {
         font-size: 14px;
