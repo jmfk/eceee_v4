@@ -23,21 +23,21 @@
             {% endif %}
         </div>
         
-        {% if config.banner_mode == 'text' and config.image_1 %}
+        {% if config.banner_mode == 'text' and config.image1 %}
         <div class="banner-images">
             {% if config.image_size == 'rectangle' %}
                 {# Rectangle image - 280x140 (2:1 ratio), 2x: 560x280 #}
                 <img 
                     class="banner-image"
-                    src="{% imgproxy config.image_1 width=280 height=140 resize_type='fill' %}"
-                    srcset="{% imgproxy config.image_1 width=280 height=140 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=560 height=280 resize_type='fill' %} 2x"
+                    src="{% imgproxy config.image1 width=280 height=140 resize_type='fill' %}"
+                    srcset="{% imgproxy config.image1 width=280 height=140 resize_type='fill' %} 1x, {% imgproxy config.image1 width=560 height=280 resize_type='fill' %} 2x"
                     alt="" />
             {% else %}
                 {# Square image - 140x140, 2x: 280x280 #}
                 <img 
                     class="banner-image"
-                    src="{% imgproxy config.image_1 width=140 height=140 resize_type='fill' %}"
-                    srcset="{% imgproxy config.image_1 width=140 height=140 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=280 height=280 resize_type='fill' %} 2x"
+                    src="{% imgproxy config.image1 width=140 height=140 resize_type='fill' %}"
+                    srcset="{% imgproxy config.image1 width=140 height=140 resize_type='fill' %} 1x, {% imgproxy config.image1 width=280 height=280 resize_type='fill' %} 2x"
                     alt="" />
             {% endif %}
         </div>
