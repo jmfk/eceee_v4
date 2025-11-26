@@ -168,7 +168,7 @@ class ContentCardWidget(BaseWidget):
         flex-direction: column;
         width: 100%;
         height: 310px;
-        outline: 1px solid #999999;
+        outline: 1px solid rgb(0,0,0,0.3);
         border-width: 0;
         overflow: hidden;
         border-radius: 0;
@@ -288,7 +288,9 @@ class ContentCardWidget(BaseWidget):
 
         # Add content card specific context
         context["header"] = config.get("header", "")
-        context["imageSize"] = config.get("image_size") or config.get("imageSize", "square")
+        context["imageSize"] = config.get("image_size") or config.get(
+            "imageSize", "square"
+        )
 
         # Add image URL
         context["image1"] = config.get("image1") or config.get("image_1")
@@ -310,7 +312,11 @@ class ContentCardWidget(BaseWidget):
         template_config["component_style"] = config.get("componentStyle") or config.get(
             "component_style", "default"
         )
-        template_config["show_border"] = config.get("showBorder") if config.get("showBorder") is not None else config.get("show_border", True)
+        template_config["show_border"] = (
+            config.get("showBorder")
+            if config.get("showBorder") is not None
+            else config.get("show_border", True)
+        )
 
         # Convert image field from camelCase to snake_case for template
         template_config["image_1"] = config.get("image1") or config.get("image_1")

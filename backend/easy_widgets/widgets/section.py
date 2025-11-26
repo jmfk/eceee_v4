@@ -166,7 +166,7 @@ class SectionWidget(BaseWidget):
         margin-bottom: 30px;
     }
     .section-widget.border-enabled {
-        outline: 1px solid #999999;
+        outline: 1px solid rgb(0,0,0,0.3);
     }
     .section-widget:last-child {
         margin-bottom: 0;
@@ -175,7 +175,7 @@ class SectionWidget(BaseWidget):
         margin-bottom: 30px;
     }
     .section-content-only.border-enabled {
-        outline: 1px solid #999999;
+        outline: 1px solid rgb(0,0,0,0.3);
     }
     .section-content-only:last-child {
         margin-bottom: 0;
@@ -351,7 +351,7 @@ class SectionWidget(BaseWidget):
                     )
                     if not is_visible:
                         continue  # Skip hidden widgets
-                    
+
                     # Filter out inactive widgets (check both config.isActive and config.is_active)
                     is_active = widget_config.get(
                         "isActive", widget_config.get("is_active", True)

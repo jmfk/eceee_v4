@@ -158,7 +158,7 @@ class BannerWidget(BaseWidget):
         flex-direction: column;
         width: 100%;
         height: 140px;
-        outline: 1px solid #999999;
+        outline: 1px solid rgb(0,0,0,0.3);
         border-width: 0;
         overflow: hidden;
         border-radius: 0;

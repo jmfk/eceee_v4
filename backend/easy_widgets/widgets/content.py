@@ -160,7 +160,7 @@ class ContentWidget(BaseWidget):
     .content-widget.border-enabled {
         padding-top: 50px;
         padding-bottom: 50px;
-        outline: 1px solid #999999;
+        outline: 1px solid rgb(0,0,0,0.3);
     }
     """
 
