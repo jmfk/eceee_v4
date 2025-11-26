@@ -1,5 +1,6 @@
 {% load static %}
 {% load security_filters %}
+{% load imgproxy_tags %}
 
 {% if custom_style_css %}
 <style>{{ custom_style_css|safe }}</style>
@@ -7,18 +8,17 @@
 
 <div class="bio-widget bio-widget--{{ config.text_layout|default:'column' }} widget-type-{{ widget_type.css_class_name }}{% if config.use_content_margins %} xl:pl-[80px] xl:pr-[60px]{% endif %}"{% if config.anchor %} id="{{ config.anchor }}"{% endif %}>
     <div class="bio-widget__container">
-        {% if config.media_item %}
+        {% if config.image %}
         <div class="bio-widget__image">
             <img 
-                src="{{ config.media_item.url }}" 
-                alt="{{ config.media_item.alt_text }}"
-                {% if config.media_item.title %}title="{{ config.media_item.title }}"{% endif %}
-                {% if config.media_item.width %}width="{{ config.media_item.width }}"{% endif %}
-                {% if config.media_item.height %}height="{{ config.media_item.height }}"{% endif %}
+                src="{% imgproxy config.image width=280 height=140 resize_type='fill' %}"
+                srcset="{% imgproxy config.image width=280 height=140 resize_type='fill' %} 1x, {% imgproxy config.image width=560 height=280 resize_type='fill' %} 2x"
+                alt="{{ config.image.title|default:'' }}"
+                {% if config.image.description %}title="{{ config.caption }}"{% endif %}
                 loading="lazy"
             />
-            {% if config.media_item.caption %}
-            <div class="bio-widget__caption">{{ config.media_item.caption }}</div>
+            {% if config.caption %}
+            <div class="bio-widget__caption">{{ config.caption }}</div>
             {% endif %}
         </div>
         {% endif %}

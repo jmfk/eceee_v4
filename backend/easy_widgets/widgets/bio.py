@@ -40,11 +40,14 @@ class BioConfig(BaseModel):
         populate_by_name=True,
     )
 
-    mediaItem: Optional[BioMediaItem] = Field(
+    image: Optional[BioMediaItem] = Field(
         None,
         description="Image for bio",
         json_schema_extra={
-            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "order": 0,
+            "group": "Content",
         },
     )
     bioText: str = Field(
@@ -57,6 +60,16 @@ class BioConfig(BaseModel):
             "group": "Content",
         },
     )
+    caption: str = Field(
+        "",
+        description="Caption text for the bio",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "Enter caption text",
+            "order": 2,
+            "group": "Content",
+        },
+    )
     textLayout: Literal["column", "flow"] = Field(
         "column",
         description="Text layout mode: column (side-by-side) or flow (text wraps around image)",
@@ -66,7 +79,7 @@ class BioConfig(BaseModel):
                 {"value": "column", "label": "Column (side-by-side)"},
                 {"value": "flow", "label": "Flow (text wraps around)"},
             ],
-            "order": 2,
+            "order": 3,
             "group": "Layout",
         },
     )
@@ -125,8 +138,7 @@ class BioWidget(BaseWidget):
         display: block;
         width: 100%;
         margin-bottom: 30px;
-        padding-top: 50px;
-        padding-bottom: 50px;
+        padding: 0;
     }
     
     .bio-widget__container {
@@ -159,7 +171,7 @@ class BioWidget(BaseWidget):
         float: left;
         width: 33.33%;
         max-width: 400px;
-        margin: 0 30px 20px 0;
+        margin: 0 30px 30px 0;
     }
     
     .bio-widget--flow .bio-widget__text {
@@ -177,8 +189,6 @@ class BioWidget(BaseWidget):
     .bio-widget__image img {
         width: 100%;
         height: auto;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }   
    
     /* Responsive - stack on mobile */
@@ -190,14 +200,14 @@ class BioWidget(BaseWidget):
         .bio-widget--column .bio-widget__image {
             flex: 0 0 auto;
             max-width: 100%;
-            margin-bottom: 20px;
+            margin-bottom: 40px;
         }
         
         .bio-widget--flow .bio-widget__image {
             float: none;
             width: 100%;
             max-width: 100%;
-            margin: 0 0 20px 0;
+            margin: 0 0 30px 0;
         }
     }
     """
@@ -226,20 +236,10 @@ class BioWidget(BaseWidget):
             else config.get("use_content_margins", False)
         )
 
-        # Handle media item
-        media_item = config.get("mediaItem") or config.get("media_item")
-        if media_item and isinstance(media_item, dict):
-            # Convert camelCase fields to snake_case for template
-            template_config["media_item"] = {
-                "id": media_item.get("id"),
-                "url": media_item.get("url"),
-                "alt_text": media_item.get("altText", media_item.get("alt_text", "")),
-                "caption": media_item.get("caption", ""),
-                "title": media_item.get("title", ""),
-                "width": media_item.get("width"),
-                "height": media_item.get("height"),
-            }
-        else:
-            template_config["media_item"] = None
+        # Handle image - pass through directly to preserve imgproxy_base_url
+        template_config["image"] = config.get("image")
+
+        # Add caption
+        template_config["caption"] = config.get("caption", "")
 
         return template_config

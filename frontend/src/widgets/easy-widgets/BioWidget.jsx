@@ -178,24 +178,25 @@ const BioWidget = memo(({
         }
     }, [componentId, widgetId, slotName, contextType, publishUpdate, widgetPath, nestedParentWidgetId, nestedParentSlotName])
 
-    const mediaItem = configRef.current.mediaItem
+    const image = configRef.current.image
     const bioText = configRef.current.bioText || ''
     const textLayout = configRef.current.textLayout || 'column'
+    const caption = configRef.current.caption || ''
 
     if (mode === 'editor') {
         return (
             <div className={`bio-widget bio-widget--${textLayout} min-h-32`}>
                 <div className="bio-widget__container">
-                    {mediaItem && mediaItem.url && (
+                    {image && image.url && (
                         <div className="bio-widget__image">
                             <img 
-                                src={mediaItem.url} 
-                                alt={mediaItem.altText || ''}
+                                src={image.url} 
+                                alt={image.altText || ''}
                                 className="w-full h-auto rounded-lg shadow-md"
                                 loading="lazy"
                             />
-                            {mediaItem.caption && (
-                                <div className="text-sm text-gray-600 mt-2 italic">{mediaItem.caption}</div>
+                            {image.caption && (
+                                <div className="text-sm text-gray-600 mt-2 italic">{image.caption}</div>
                             )}
                         </div>
                     )}
@@ -208,6 +209,9 @@ const BioWidget = memo(({
                         pageId={context?.pageId}
                     />
                 </div>
+                {caption && (
+                    <div className="bio-widget__caption mt-4 text-center text-sm text-gray-600">{caption}</div>
+                )}
             </div>
         )
     }
@@ -215,15 +219,15 @@ const BioWidget = memo(({
     return (
         <div className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget cms-content`}>
             <div className="bio-widget__container">
-                {mediaItem && mediaItem.url && (
+                {image && image.url && (
                     <div className="bio-widget__image">
                         <img 
-                            src={mediaItem.url} 
-                            alt={mediaItem.altText || ''}
+                            src={image.url} 
+                            alt={image.altText || ''}
                             loading="lazy"
                         />
-                        {mediaItem.caption && (
-                            <div className="bio-widget__caption">{mediaItem.caption}</div>
+                        {image.caption && (
+                            <div className="bio-widget__caption">{image.caption}</div>
                         )}
                     </div>
                 )}
@@ -231,13 +235,17 @@ const BioWidget = memo(({
                     {bioText && <div dangerouslySetInnerHTML={{ __html: bioText }} />}
                 </div>
             </div>
+            {caption && (
+                <div className="bio-widget__caption mt-4 text-center text-sm text-gray-600">{caption}</div>
+            )}
         </div>
     )
 }, (prevProps, nextProps) => {
     return (
         prevProps.config?.bioText === nextProps.config?.bioText &&
-        prevProps.config?.mediaItem?.url === nextProps.config?.mediaItem?.url &&
+        prevProps.config?.image?.url === nextProps.config?.image?.url &&
         prevProps.config?.textLayout === nextProps.config?.textLayout &&
+        prevProps.config?.caption === nextProps.config?.caption &&
         prevProps.mode === nextProps.mode &&
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&
@@ -252,8 +260,9 @@ BioWidget.widgetType = 'easy_widgets.BioWidget'
 
 // Default configuration
 BioWidget.defaultConfig = {
-    mediaItem: null,
+    image: null,
     bioText: '<p>Enter biography text here. You can use the toolbar to format your text.</p>',
+    caption: '',
     textLayout: 'column'
 }
 
