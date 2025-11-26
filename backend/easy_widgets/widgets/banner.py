@@ -223,18 +223,38 @@ class BannerWidget(BaseWidget):
         width: 100%;
         padding: 30px;
         text-align: center;
-        font-size: 24px;
+        font-size: 36px;
         font-family: 'Source Sans 3', sans-serif;
-        font-weight: 400;
+        font-weight: 500;
         line-height: 32px;
         overflow: hidden;
+        margin-top: 0;
+        margin-bottom: 0;
     }
-  
+    .banner-body.mode-text .banner-text h3 {
+        font-size: 18px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 700;
+        line-height: 22px;
+        overflow: hidden;
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+    .banner-body.mode-text .banner-text p {
+        font-size: 14px;
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 300;
+        line-height: 17px;
+        overflow: hidden;
+        margin-top: 0;
+        margin-bottom: 0;
+    }
     /* Individual image styling - square (default) */
     .banner-image {
         width: 140px;
         height: 140px;
         object-fit: cover;
+        border: 5px solid white;
     }
 
     .banner-widget.border-disabled {
@@ -245,6 +265,7 @@ class BannerWidget(BaseWidget):
     .banner-body.image-size-rectangle .banner-image {
         width: 280px;
         height: 140px;
+        border: 5px solid white;
     }
     
     /* Responsive behavior */
