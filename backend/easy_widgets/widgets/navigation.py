@@ -392,8 +392,8 @@ class NavigationWidget(BaseWidget):
 
         logger = logging.getLogger(__name__)
 
-        # Support both snake_case and camelCase
-        style_name = config.get("navigation_style") or config.get("navigationStyle")
+        # Get navigation style
+        style_name = config.get("navigation_style")
 
         # Only render with custom style if a style is explicitly selected
         if not style_name or style_name == "default":

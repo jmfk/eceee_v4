@@ -333,11 +333,7 @@ class TableWidget(BaseWidget):
         template_config = super().prepare_template_context(config, context)
 
         # Ensure snake_case fields for template
-        template_config["use_content_margins"] = (
-            config.get("useContentMargins")
-            if config.get("useContentMargins") is not None
-            else config.get("use_content_margins", False)
-        )
+        template_config["use_content_margins"] = config.get("use_content_margins", False)
 
         return template_config
 

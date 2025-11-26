@@ -225,16 +225,10 @@ class BioWidget(BaseWidget):
         template_config = super().prepare_template_context(config, context)
         context = context if context else {}
 
-        # Convert camelCase to snake_case for template
-        template_config["bio_text"] = config.get("bioText", config.get("bio_text", ""))
-        template_config["text_layout"] = config.get(
-            "textLayout", config.get("text_layout", "column")
-        )
-        template_config["use_content_margins"] = (
-            config.get("useContentMargins")
-            if "useContentMargins" in config
-            else config.get("use_content_margins", False)
-        )
+        # Get snake_case fields for template
+        template_config["bio_text"] = config.get("bio_text", "")
+        template_config["text_layout"] = config.get("text_layout", "column")
+        template_config["use_content_margins"] = config.get("use_content_margins", False)
 
         # Handle image - pass through directly to preserve imgproxy_base_url
         template_config["image"] = config.get("image")

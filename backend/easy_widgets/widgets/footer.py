@@ -291,21 +291,11 @@ class FooterWidget(BaseWidget):
         template_config = config.copy() if config else {}
 
         # Ensure snake_case fields for template
-        template_config["column_count"] = config.get("columnCount") or config.get(
-            "column_count", 3
-        )
-        template_config["show_copyright"] = config.get("showCopyright") or config.get(
-            "show_copyright", True
-        )
-        template_config["copyright_text"] = config.get("copyrightText") or config.get(
-            "copyright_text", ""
-        )
-        template_config["social_links"] = config.get("socialLinks") or config.get(
-            "social_links", []
-        )
-        template_config["component_style"] = config.get("componentStyle") or config.get(
-            "component_style", "default"
-        )
+        template_config["column_count"] = config.get("column_count", 3)
+        template_config["show_copyright"] = config.get("show_copyright", True)
+        template_config["copyright_text"] = config.get("copyright_text", "")
+        template_config["social_links"] = config.get("social_links", [])
+        template_config["component_style"] = config.get("component_style", "default")
 
         # Extract layout properties from theme for dynamic sizing (similar to Banner/ContentCard)
         theme = context.get("theme") if context else None

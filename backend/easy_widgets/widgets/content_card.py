@@ -306,19 +306,11 @@ class ContentCardWidget(BaseWidget):
         template_config = config.copy() if config else {}
 
         # Ensure snake_case fields for template
-        template_config["image_size"] = config.get("imageSize") or config.get(
-            "image_size", "square"
-        )
-        template_config["component_style"] = config.get("componentStyle") or config.get(
-            "component_style", "default"
-        )
-        template_config["show_border"] = (
-            config.get("showBorder")
-            if config.get("showBorder") is not None
-            else config.get("show_border", True)
-        )
+        template_config["image_size"] = config.get("image_size", "square")
+        template_config["component_style"] = config.get("component_style", "default")
+        template_config["show_border"] = config.get("show_border", True)
 
-        # Convert image field from camelCase to snake_case for template
-        template_config["image_1"] = config.get("image1") or config.get("image_1")
+        # Get image field for template
+        template_config["image_1"] = config.get("image_1")
 
         return template_config

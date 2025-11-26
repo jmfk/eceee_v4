@@ -343,13 +343,13 @@ class BannerWidget(BaseWidget):
             return None, css
 
         # Get banner mode
-        banner_mode = config.get("banner_mode") or config.get("bannerMode", "text")
+        banner_mode = config.get("banner_mode", "text")
 
         # Select content based on mode
         content = (
-            config.get("header_content") or config.get("headerContent", "")
+            config.get("header_content", "")
             if banner_mode == "header"
-            else config.get("text_content") or config.get("textContent", "")
+            else config.get("text_content", "")
         )
 
         # Prepare context with all widget data
@@ -362,21 +362,13 @@ class BannerWidget(BaseWidget):
 
         # Add banner specific context
         context["bannerMode"] = banner_mode
-        context["headerContent"] = config.get("header_content") or config.get(
-            "headerContent", ""
-        )
-        context["textContent"] = config.get("text_content") or config.get(
-            "textContent", ""
-        )
-        context["imageSize"] = config.get("image_size") or config.get(
-            "imageSize", "square"
-        )
-        context["backgroundImage"] = config.get("background_image") or config.get(
-            "backgroundImage"
-        )
+        context["headerContent"] = config.get("header_content", "")
+        context["textContent"] = config.get("text_content", "")
+        context["imageSize"] = config.get("image_size", "square")
+        context["backgroundImage"] = config.get("background_image")
 
         # Add image URL (only for text mode)
-        context["image1"] = config.get("image1") or config.get("image_1")
+        context["image1"] = config.get("image_1")
 
         # Render template
         html = render_mustache(template_str, context)
@@ -401,31 +393,15 @@ class BannerWidget(BaseWidget):
         template_config["banner_style"] = " ".join(style_parts)
 
         # Ensure snake_case fields for template
-        template_config["banner_mode"] = config.get("bannerMode") or config.get(
-            "banner_mode", "text"
-        )
-        template_config["header_content"] = config.get("headerContent") or config.get(
-            "header_content", ""
-        )
-        template_config["text_content"] = config.get("textContent") or config.get(
-            "text_content", ""
-        )
-        template_config["image_size"] = config.get("imageSize") or config.get(
-            "image_size", "square"
-        )
-        template_config["component_style"] = config.get("componentStyle") or config.get(
-            "component_style", "default"
-        )
-        template_config["show_border"] = (
-            config.get("showBorder")
-            if config.get("showBorder") is not None
-            else config.get("show_border", True)
-        )
-        template_config["background_image"] = config.get(
-            "backgroundImage"
-        ) or config.get("background_image")
+        template_config["banner_mode"] = config.get("banner_mode", "text")
+        template_config["header_content"] = config.get("header_content", "")
+        template_config["text_content"] = config.get("text_content", "")
+        template_config["image_size"] = config.get("image_size", "square")
+        template_config["component_style"] = config.get("component_style", "default")
+        template_config["show_border"] = config.get("show_border", True)
+        template_config["background_image"] = config.get("background_image")
 
-        # Convert image field from camelCase to snake_case for template (only for text mode)
-        template_config["image_1"] = config.get("image1") or config.get("image_1")
+        # Get image field for template (only for text mode)
+        template_config["image_1"] = config.get("image_1")
 
         return template_config

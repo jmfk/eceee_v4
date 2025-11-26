@@ -388,7 +388,7 @@ class ImageWidget(BaseWidget):
         # Get theme and style for applying defaults (context may contain theme)
         theme = context.get("theme")
         style = None
-        style_name = config.get("image_style") or config.get("imageStyle")
+        style_name = config.get("image_style")
 
         if theme and style_name:
             image_styles = theme.image_styles or {}
@@ -402,32 +402,28 @@ class ImageWidget(BaseWidget):
                 )
 
         # Check if we have a collection to resolve
-        collection_id = config.get("collection_id") or config.get("collectionId")
+        collection_id = config.get("collection_id")
         if collection_id:
             # Resolve collection images
             collection_images = self.resolve_collection_images(collection_id)
 
-            # Add resolved images to media_items (converting from camelCase to snake_case for template)
+            # Add resolved images to media_items
             if collection_images:
                 template_config["media_items"] = collection_images
 
                 # Apply collection configuration if present
-                collection_config = config.get("collection_config") or config.get(
-                    "collectionConfig", {}
-                )
+                collection_config = config.get("collection_config", {})
                 if collection_config:
                     # Apply max items limit first (before randomization)
-                    max_items = collection_config.get(
-                        "max_items"
-                    ) or collection_config.get("maxItems", 0)
+                    max_items = collection_config.get("max_items", 0)
                     if max_items > 0:
                         template_config["media_items"] = template_config["media_items"][
                             :max_items
                         ]
 
-        # Ensure we have media_items and convert from camelCase if needed
+        # Ensure we have media_items
         if "media_items" not in template_config:
-            camel_case_items = template_config.get("mediaItems", [])
+            camel_case_items = template_config.get("media_items", [])
             # Convert camelCase fields to snake_case for template compatibility
             snake_case_items = []
             for item in camel_case_items:
@@ -491,7 +487,7 @@ class ImageWidget(BaseWidget):
             template_config["lightbox_group"] = None
 
         # autoPlay (carousel only)
-        auto_play_override = template_config.get("autoPlay")
+        auto_play_override = template_config.get("auto_play")
         if auto_play_override is not None:
             template_config["auto_play"] = auto_play_override
         elif style and "defaultAutoPlay" in style:
@@ -500,7 +496,7 @@ class ImageWidget(BaseWidget):
             template_config["auto_play"] = False
 
         # autoPlayInterval (carousel only)
-        auto_play_interval_override = template_config.get("autoPlayInterval")
+        auto_play_interval_override = template_config.get("auto_play_interval")
         if auto_play_interval_override is not None:
             template_config["auto_play_interval"] = auto_play_interval_override
         elif style and "defaultAutoPlayInterval" in style:
@@ -508,17 +504,9 @@ class ImageWidget(BaseWidget):
         else:
             template_config["auto_play_interval"] = 3
 
-        template_config["lightbox_style"] = template_config.get(
-            "lightboxStyle", template_config.get("lightbox_style", None)
-        )
-        template_config["imgproxy_override"] = template_config.get(
-            "imgproxyOverride", template_config.get("imgproxy_override", None)
-        )
-        template_config["use_content_margins"] = (
-            config.get("useContentMargins")
-            if config.get("useContentMargins") is not None
-            else config.get("use_content_margins", False)
-        )
+        template_config["lightbox_style"] = template_config.get("lightbox_style")
+        template_config["imgproxy_override"] = template_config.get("imgproxy_override")
+        template_config["use_content_margins"] = config.get("use_content_margins", False)
 
         # Apply randomization if enabled (widget override, then style default, then collection config)
         randomize_override = config.get("randomize")
@@ -624,8 +612,8 @@ class ImageWidget(BaseWidget):
             if result is not None:
                 return result
 
-        # Get style name (support both snake_case and camelCase)
-        style_name = config.get("image_style") or config.get("imageStyle")
+        # Get style name
+        style_name = config.get("image_style")
 
         # Only render with custom style if a style is explicitly selected
         if not style_name or style_name == "default":

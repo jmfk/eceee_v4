@@ -284,22 +284,10 @@ class ContentWidget(BaseWidget):
         context = context if context else {}
 
         # Ensure snake_case config fields are available for template
-        template_config["allow_scripts"] = config.get("allow_scripts") or config.get(
-            "allowScripts", False
-        )
-        template_config["sanitize_html"] = config.get("sanitize_html") or config.get(
-            "sanitizeHtml", True
-        )
-        template_config["show_border"] = (
-            config.get("showBorder")
-            if config.get("showBorder") is not None
-            else config.get("show_border", False)
-        )
-        template_config["use_content_margins"] = (
-            config.get("useContentMargins")
-            if config.get("useContentMargins") is not None
-            else config.get("use_content_margins", True)
-        )
+        template_config["allow_scripts"] = config.get("allow_scripts", False)
+        template_config["sanitize_html"] = config.get("sanitize_html", True)
+        template_config["show_border"] = config.get("show_border", False)
+        template_config["use_content_margins"] = config.get("use_content_margins", True)
 
         # Get content HTML
         content_html = config.get("content", "")
@@ -342,12 +330,10 @@ class ContentWidget(BaseWidget):
                     media_insert.replace_with(new_tag)
 
         # Auto-apply lightbox attributes to images if enabled
-        enable_lb = config.get("enable_lightbox") or config.get("enableLightbox", False)
+        enable_lb = config.get("enable_lightbox", False)
         if enable_lb:
-            style_key = config.get("lightbox_style") or config.get(
-                "lightboxStyle", "default"
-            )
-            group_key = config.get("lightbox_group") or config.get("lightboxGroup", "")
+            style_key = config.get("lightbox_style", "default")
+            group_key = config.get("lightbox_group", "")
             # Add data-lightbox to anchors wrapping images
             for a in soup.find_all("a"):
                 img = a.find("img")

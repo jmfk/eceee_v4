@@ -321,11 +321,7 @@ class SectionWidget(BaseWidget):
         template_config = super().prepare_template_context(config, context)
 
         # Ensure snake_case fields for template
-        template_config["show_border"] = (
-            config.get("showBorder")
-            if config.get("showBorder") is not None
-            else config.get("show_border", False)
-        )
+        template_config["show_border"] = config.get("show_border", False)
 
         # Auto-generate anchor from title if not provided
         title = config.get("title", "")
