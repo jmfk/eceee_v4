@@ -2,12 +2,12 @@
 Tests for security-focused template filters
 """
 
-import pytest
+from django.test import TestCase
 from django.template import Context, Template
 from utils.templatetags.security_filters import sanitize_html
 
 
-class TestSanitizeHtmlFilter:
+class TestSanitizeHtmlFilter(TestCase):
     """Test the sanitize_html template filter"""
 
     def test_allows_safe_html_tags(self):
@@ -103,6 +103,23 @@ class TestSanitizeHtmlFilter:
         result = sanitize_html(html)
         assert 'class="container"' in result
         assert 'id="main"' in result
+
+    def test_allows_safe_inline_styles(self):
+        """Test that safe inline styles are preserved"""
+        html = '<div style="background-color: #ffffff; color: #000000;">Content</div>'
+        result = sanitize_html(html)
+        assert "style=" in result
+        assert "background-color" in result
+        assert "#ffffff" in result
+
+    def test_preserves_banner_widget_styles(self):
+        """Test that banner widget inline styles are preserved (for nested widgets)"""
+        html = '<div class="banner-widget" style="background-color: #3b82f6; color: #ffffff;">Banner Content</div>'
+        result = sanitize_html(html)
+        assert "style=" in result
+        assert "background-color: #3b82f6" in result
+        assert "color: #ffffff" in result
+        assert "Banner Content" in result
 
     def test_removes_style_with_expression(self):
         """Test that dangerous CSS expressions are handled"""
@@ -202,7 +219,7 @@ class TestSanitizeHtmlFilter:
         assert "<a" in result
 
 
-class TestSanitizeHtmlInTemplate:
+class TestSanitizeHtmlInTemplate(TestCase):
     """Test the sanitize_html filter in Django templates"""
 
     def test_filter_in_template_without_parameter(self):
@@ -264,7 +281,7 @@ class TestSanitizeHtmlInTemplate:
         assert "<script>" not in result
 
 
-class TestStripScriptsFilter:
+class TestStripScriptsFilter(TestCase):
     """Test the strip_scripts legacy filter"""
 
     def test_strip_scripts_filter(self):
