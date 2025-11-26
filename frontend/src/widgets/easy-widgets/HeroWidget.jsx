@@ -113,6 +113,9 @@ const HeroWidget = ({
         '--hero-text-color': textColor,
         '--hero-decor-color': decorColor,
         '--hero-bg-color': backgroundColor,
+        minHeight: '310px',
+        maxHeight: '310px',
+        flexShrink: 0,
     }
 
     const backgroundStyle = image && backgroundUrl ? {
