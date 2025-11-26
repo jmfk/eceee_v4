@@ -10,6 +10,7 @@ import React from 'react';
 const API_BASE_URL = '';
 const IMGPROXY_SIGN_URL = `${API_BASE_URL}/api/v1/media/imgproxy/sign/`;
 const IMGPROXY_BATCH_SIGN_URL = `${API_BASE_URL}/api/v1/media/imgproxy/sign-batch/`;
+const IMGPROXY_RESPONSIVE_URL = `${API_BASE_URL}/api/v1/media/imgproxy/responsive/`;
 
 // In-memory cache for generated URLs (prevents duplicate API calls)
 const urlCache = new Map();
@@ -124,6 +125,133 @@ export async function getBatchImgproxyUrls(requests) {
 }
 
 /**
+ * Get responsive imgproxy URLs for different breakpoints and pixel densities
+ * 
+ * @param {string|Object} sourceUrlOrImage - Source URL or MediaFile image object
+ * @param {Object} config - Configuration options
+ * @param {Object} config.breakpoints - Breakpoint widths { mobile: 640, tablet: 1024, desktop: 1280 }
+ * @param {Object} config.slotDimensions - Optional slot dimensions from layout system
+ * @param {number} config.widthMultiplier - Multiplier for images that don't fill full slot (default: 1.0)
+ * @param {Array} config.densities - Pixel densities to generate (default: [1, 2])
+ * @param {string} config.resizeType - Resize type (default: 'fit')
+ * @param {string} config.gravity - Gravity for cropping (default: 'sm')
+ * @param {number} config.quality - Image quality (default: 85)
+ * @param {string} config.format - Output format (optional, e.g., 'webp')
+ * @returns {Promise<Object>} { srcset, sizes, urls, fallback }
+ * 
+ * @example
+ * const responsive = await getResponsiveImgproxyUrls(
+ *   image.imgproxyBaseUrl,
+ *   {
+ *     breakpoints: { mobile: 640, tablet: 1024, desktop: 1280 },
+ *     widthMultiplier: 0.5,  // Half-width image
+ *     densities: [1, 2]
+ *   }
+ * );
+ * // Use: <img srcset={responsive.srcset} sizes={responsive.sizes} src={responsive.fallback} />
+ */
+export async function getResponsiveImgproxyUrls(sourceUrlOrImage, config = {}) {
+    // Extract source URL from image object or use directly
+    let sourceUrl = sourceUrlOrImage;
+    let originalWidth = null;
+    let originalHeight = null;
+    
+    if (typeof sourceUrlOrImage === 'object' && sourceUrlOrImage !== null) {
+        sourceUrl = sourceUrlOrImage.imgproxyBaseUrl || sourceUrlOrImage.fileUrl;
+        originalWidth = sourceUrlOrImage.width || sourceUrlOrImage.originalWidth;
+        originalHeight = sourceUrlOrImage.height || sourceUrlOrImage.originalHeight;
+    }
+    
+    if (!sourceUrl) {
+        console.warn('getResponsiveImgproxyUrls: No source URL provided');
+        return { srcset: '', sizes: '', urls: {}, fallback: '' };
+    }
+
+    // Extract configuration with defaults
+    const {
+        breakpoints = { mobile: 640, tablet: 1024, desktop: 1280 },
+        slotDimensions = null,
+        widthMultiplier = 1.0,
+        densities = [1, 2],
+        resizeType = 'fit',
+        gravity = 'sm',
+        quality = 85,
+        format = null,
+    } = config;
+
+    // Use slot dimensions if provided, otherwise use standard breakpoints
+    const finalBreakpoints = slotDimensions ? {
+        mobile: slotDimensions.mobile?.width || breakpoints.mobile,
+        tablet: slotDimensions.tablet?.width || breakpoints.tablet,
+        desktop: slotDimensions.desktop?.width || breakpoints.desktop,
+    } : breakpoints;
+
+    // Generate cache key
+    const cacheKey = JSON.stringify({
+        sourceUrl,
+        breakpoints: finalBreakpoints,
+        originalWidth,
+        originalHeight,
+        widthMultiplier,
+        densities,
+        resizeType,
+        gravity,
+        quality,
+        format,
+    });
+
+    // Check cache first
+    const cached = urlCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+    }
+
+    try {
+        const response = await fetch(IMGPROXY_RESPONSIVE_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                source_url: sourceUrl,
+                breakpoints: finalBreakpoints,
+                original_width: originalWidth,
+                original_height: originalHeight,
+                resize_type: resizeType,
+                gravity,
+                quality,
+                format,
+                densities,
+                width_multiplier: widthMultiplier,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to get responsive imgproxy URLs: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Cache the result
+        urlCache.set(cacheKey, {
+            data,
+            timestamp: Date.now(),
+        });
+
+        return data;
+    } catch (error) {
+        console.error('Error getting responsive imgproxy URLs:', error);
+        // Fallback to simple single URL
+        return {
+            srcset: '',
+            sizes: '',
+            urls: {},
+            fallback: sourceUrl,
+        };
+    }
+}
+
+/**
  * Helper function to get imgproxy URL from MediaFile image object
  * 
  * @param {Object} imageObj - MediaFile image object from API
@@ -229,6 +357,7 @@ export function clearImgproxyCache() {
 export default {
     getImgproxyUrl,
     getBatchImgproxyUrls,
+    getResponsiveImgproxyUrls,
     getImgproxyUrlFromImage,
     useImgproxyUrl,
     preloadImgproxyUrls,

@@ -351,6 +351,7 @@ const PageWidgetFactory = ({
                             widgetPath={widgetPath}
                             nestedParentWidgetId={nestedParentWidgetId}
                             nestedParentSlotName={nestedParentSlotName}
+                            slotConfig={slotMetadata}
                             context={{
                                 widgetId: actualWidgetId,
                                 slotName: actualSlotName,
@@ -528,6 +529,7 @@ const PageWidgetFactory = ({
                             // Legacy nested widget context (deprecated)
                             nestedParentWidgetId={nestedParentWidgetId}
                             nestedParentSlotName={nestedParentSlotName}
+                            slotConfig={slotMetadata}
                             context={{
                                 widgetId: actualWidgetId,
                                 slotName: actualSlotName,
@@ -646,6 +648,7 @@ const PageWidgetFactory = ({
                     // Legacy nested widget context (deprecated)
                     nestedParentWidgetId={nestedParentWidgetId}
                     nestedParentSlotName={nestedParentSlotName}
+                    slotConfig={slotMetadata}
                     context={{
                         widgetId: actualWidgetId,
                         slotName: actualSlotName,

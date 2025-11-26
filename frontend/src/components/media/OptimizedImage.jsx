@@ -1,11 +1,12 @@
 /**
  * OptimizedImage component with imgproxy integration
  * 
- * Note: This component now uses client-side URL generation for simplicity.
- * For production, consider using the secure backend API via imgproxySecure.js
+ * Supports both single-size and responsive multi-breakpoint images.
+ * Uses secure backend API for imgproxy URL signing.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { getImgproxyUrl, getResponsiveImgproxyUrls } from '../../utils/imgproxySecure';
 
 const OptimizedImage = ({
     src,
@@ -19,9 +20,12 @@ const OptimizedImage = ({
     resizeType = 'fit',
     gravity = 'sm',
     responsive = false,
-    responsiveWidths = [300, 600, 900, 1200],
-    sizes = '100vw',
-    placeholder = false, // Disabled placeholder as it requires imgproxy
+    breakpoints = { mobile: 640, tablet: 1024, desktop: 1280 },
+    slotDimensions = null,
+    widthMultiplier = 1.0,
+    densities = [1, 2],
+    sizes = null, // Will be auto-generated if not provided
+    placeholder = false,
     placeholderSize = 50,
     loading = 'lazy',
     onLoad,
@@ -32,12 +36,76 @@ const OptimizedImage = ({
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
     const [showPlaceholder, setShowPlaceholder] = useState(false);
+    const [optimizedSrc, setOptimizedSrc] = useState('');
+    const [srcSet, setSrcSet] = useState('');
+    const [sizesAttr, setSizesAttr] = useState('');
 
-    // Use source URL directly - imgproxy processing happens server-side
-    // For client-side optimization, use imgproxySecure.js with async URL generation
-    const optimizedSrc = src || '';
-    const placeholderSrc = '';
-    const srcSet = '';
+    // Load optimized image URL(s)
+    useEffect(() => {
+        if (!src) {
+            setOptimizedSrc('');
+            setSrcSet('');
+            setSizesAttr('');
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadImage = async () => {
+            try {
+                if (responsive) {
+                    // Generate responsive URLs with multiple breakpoints
+                    const result = await getResponsiveImgproxyUrls(src, {
+                        breakpoints,
+                        slotDimensions,
+                        widthMultiplier,
+                        densities,
+                        resizeType,
+                        gravity,
+                        quality,
+                        format,
+                    });
+
+                    if (!cancelled) {
+                        setOptimizedSrc(result.fallback || src);
+                        setSrcSet(result.srcset || '');
+                        setSizesAttr(sizes || result.sizes || '100vw');
+                    }
+                } else {
+                    // Single size optimization
+                    const url = await getImgproxyUrl(src, {
+                        width,
+                        height,
+                        resize_type: resizeType,
+                        gravity,
+                        quality,
+                        format,
+                    });
+
+                    if (!cancelled) {
+                        setOptimizedSrc(url || src);
+                        setSrcSet('');
+                        setSizesAttr('');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading optimized image:', error);
+                if (!cancelled) {
+                    setOptimizedSrc(src);
+                    setSrcSet('');
+                    setSizesAttr('');
+                }
+            }
+        };
+
+        loadImage();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [src, responsive, width, height, resizeType, gravity, quality, format, 
+        JSON.stringify(breakpoints), JSON.stringify(slotDimensions), 
+        widthMultiplier, JSON.stringify(densities), sizes]);
 
     const handleLoad = useCallback((event) => {
         setImageLoaded(true);
@@ -85,8 +153,8 @@ const OptimizedImage = ({
             {/* Main optimized image */}
             <img
                 src={optimizedSrc}
-                srcSet={responsive ? srcSet : undefined}
-                sizes={responsive ? sizes : undefined}
+                srcSet={srcSet || undefined}
+                sizes={sizesAttr || undefined}
                 alt={alt}
                 width={width}
                 height={height}

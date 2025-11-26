@@ -12,6 +12,7 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
+import OptimizedImage from '../../components/media/OptimizedImage'
 
 /**
  * Vanilla JS Editor Wrapper Component for Bio Text
@@ -192,12 +193,16 @@ const BioWidget = memo(({
                 {...(anchor && { id: anchor })}
             >
                 <div className="bio-widget__container">
-                    {image && image.url && (
+                    {image && (image.url || image.imgproxyBaseUrl || image.fileUrl) && (
                         <div className="bio-widget__image">
-                            <img 
-                                src={image.url} 
-                                alt={image.altText || ''}
+                            <OptimizedImage
+                                src={image.imgproxyBaseUrl || image.fileUrl || image.url}
+                                alt={image.altText || image.alt || ''}
+                                responsive={true}
+                                slotDimensions={slotConfig?.dimensions}
+                                widthMultiplier={textLayout === 'row' ? 0.5 : 1.0}
                                 loading="lazy"
+                                className="w-full h-auto"
                             />
                             {caption && (
                                 <div className="bio-widget__caption">{caption}</div>
@@ -223,12 +228,16 @@ const BioWidget = memo(({
             {...(anchor && { id: anchor })}
         >
             <div className="bio-widget__container">
-                {image && image.url && (
+                {image && (image.url || image.imgproxyBaseUrl || image.fileUrl) && (
                     <div className="bio-widget__image">
-                        <img 
-                            src={image.url} 
-                            alt={image.altText || ''}
+                        <OptimizedImage
+                            src={image.imgproxyBaseUrl || image.fileUrl || image.url}
+                            alt={image.altText || image.alt || ''}
+                            responsive={true}
+                            slotDimensions={slotConfig?.dimensions}
+                            widthMultiplier={textLayout === 'row' ? 0.5 : 1.0}
                             loading="lazy"
+                            className="w-full h-auto"
                         />
                         {caption && (
                             <div className="bio-widget__caption">{caption}</div>

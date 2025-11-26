@@ -2,6 +2,8 @@
 Preview-related views for page editor
 """
 
+import os
+
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -164,6 +166,15 @@ def render_version_preview(request, page_id, version_id):
         renderer = WebPageRenderer(request=request)
         result = renderer.render(page, version=version)
 
+        # Read lightbox CSS to include in preview (since it's normally loaded via <link> tag)
+        lightbox_css = ""
+        lightbox_css_path = os.path.join(settings.BASE_DIR, "static", "css", "lightbox.css")
+        try:
+            with open(lightbox_css_path, 'r') as f:
+                lightbox_css = f.read()
+        except FileNotFoundError:
+            pass  # Lightbox CSS not found, continue without it
+
         # Build complete HTML document with base tag for proper URL resolution
         # and JavaScript to prevent navigation in preview
         html_content = f"""<!DOCTYPE html>
@@ -173,7 +184,15 @@ def render_version_preview(request, page_id, version_id):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="{base_url}">
     {result.get('meta', '')}
+    
+    <!-- Tailwind CSS - required for responsive utilities like useContentMargins -->
+    <link href="{base_url}static/css/tailwind.output.css" rel="stylesheet">
+    
     <style>
+        /* Lightbox CSS */
+        {lightbox_css}
+        
+        /* Page CSS */
         {result.get('css', '')}
     </style>
     <script>

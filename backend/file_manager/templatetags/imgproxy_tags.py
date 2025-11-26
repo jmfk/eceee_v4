@@ -288,6 +288,185 @@ def has_image(image_obj):
     return bool(_extract_url_from_image(image_obj))
 
 
+@register.inclusion_tag("imgproxy/responsive_img_tag.html")
+def imgproxy_responsive(
+    image_obj,
+    settings=None,
+    alt=None,
+    class_name=None,
+    lazy=True,
+    # Breakpoint configuration
+    mobile_width=640,
+    tablet_width=1024,
+    desktop_width=1280,
+    # Image processing options
+    width_multiplier=1.0,
+    densities=None,
+    resize_type=None,
+    gravity=None,
+    quality=None,
+    format=None,
+    **kwargs,
+):
+    """
+    Generate responsive <img> tag with srcset and sizes attributes.
+
+    Creates multiple imgproxy URLs for different breakpoints and pixel densities,
+    allowing the browser to choose the optimal image size.
+
+    Args:
+        image_obj: Image object from widget config
+        settings: Optional dict of imgproxy parameters from widget config
+        alt: Alt text (auto-generated from image metadata if not provided)
+        class_name: CSS classes for the img tag
+        lazy: Enable lazy loading (default: True)
+        mobile_width: Mobile breakpoint width (default: 640)
+        tablet_width: Tablet breakpoint width (default: 1024)
+        desktop_width: Desktop breakpoint width (default: 1280)
+        width_multiplier: Multiplier for images that don't fill full slot (default: 1.0)
+        densities: List of pixel densities (default: [1, 2])
+        resize_type: Resize type (default: 'fit')
+        gravity: Gravity for cropping (default: 'sm')
+        quality: Image quality (default: 85)
+        format: Output format (optional)
+        **kwargs: Additional imgproxy options
+
+    Returns:
+        Context dict for responsive_img_tag.html template containing:
+        - srcset: srcset attribute value
+        - sizes: sizes attribute value
+        - src: fallback URL
+        - alt: alt text
+        - class: CSS classes
+        - lazy: lazy loading flag
+
+    Examples:
+        {% imgproxy_responsive config.image %}
+        {% imgproxy_responsive config.image mobile_width=320 tablet_width=768 desktop_width=1200 %}
+        {% imgproxy_responsive config.image width_multiplier=0.5 class_name='bio-image' %}
+        {% imgproxy_responsive config.image settings=config.image_display %}
+    """
+    try:
+        # Extract URL and metadata
+        source_url = _extract_url_from_image(image_obj)
+        metadata = _extract_metadata(image_obj)
+
+        if not source_url:
+            logger.warning("imgproxy_responsive tag: No valid URL found in image object")
+            return {
+                "srcset": "",
+                "sizes": "",
+                "src": "",
+                "alt": alt or "",
+                "class": class_name,
+                "lazy": lazy,
+            }
+
+        # Set defaults
+        if densities is None:
+            densities = [1, 2]
+        if resize_type is None:
+            resize_type = "fit"
+        if gravity is None:
+            gravity = "sm"
+        if quality is None:
+            quality = 85
+
+        # Merge with settings if provided
+        if settings and isinstance(settings, dict):
+            resize_type = settings.get("resize_type", resize_type)
+            gravity = settings.get("gravity", gravity)
+            quality = settings.get("quality", quality)
+            format = settings.get("format", format)
+
+        # Build breakpoints dict
+        breakpoints = {
+            "mobile": mobile_width,
+            "tablet": tablet_width,
+            "desktop": desktop_width,
+        }
+
+        # Generate URLs for each breakpoint and density
+        srcset_parts = []
+        urls = {}
+
+        for breakpoint_name, breakpoint_width in breakpoints.items():
+            urls[breakpoint_name] = {}
+            adjusted_width = int(breakpoint_width * width_multiplier)
+
+            for density in densities:
+                density_width = adjusted_width * density
+                density_height = None
+
+                # Calculate height maintaining aspect ratio if original dimensions available
+                if metadata.get("width") and metadata.get("height"):
+                    aspect_ratio = metadata["height"] / metadata["width"]
+                    density_height = int(density_width * aspect_ratio)
+
+                    # Don't exceed original dimensions
+                    if density_width > metadata["width"]:
+                        density_width = metadata["width"]
+                        density_height = metadata["height"]
+                    elif density_height and density_height > metadata["height"]:
+                        density_height = metadata["height"]
+                        density_width = int(density_height / aspect_ratio)
+
+                # Generate URL
+                img_url = imgproxy_service.generate_url(
+                    source_url=source_url,
+                    width=density_width,
+                    height=density_height,
+                    resize_type=resize_type,
+                    gravity=gravity,
+                    quality=quality,
+                    format=format,
+                    **kwargs,
+                )
+
+                density_key = f"{density}x"
+                urls[breakpoint_name][density_key] = img_url
+                srcset_parts.append(f"{img_url} {density_width}w")
+
+        # Generate srcset string
+        srcset = ", ".join(srcset_parts)
+
+        # Generate sizes attribute
+        sizes_parts = []
+        sizes_parts.append(f"(max-width: {mobile_width}px) {int(mobile_width * width_multiplier)}px")
+        sizes_parts.append(f"(max-width: {tablet_width}px) {int(tablet_width * width_multiplier)}px")
+        sizes_parts.append(f"{int(desktop_width * width_multiplier)}px")
+        sizes = ", ".join(sizes_parts)
+
+        # Fallback URL (desktop 1x)
+        fallback = urls.get("desktop", {}).get("1x", source_url)
+
+        # Auto-generate alt text if not provided
+        if not alt:
+            alt = metadata.get("title") or metadata.get("description") or ""
+
+        return {
+            "srcset": srcset,
+            "sizes": sizes,
+            "src": fallback,
+            "alt": alt,
+            "class": class_name,
+            "lazy": lazy,
+        }
+
+    except Exception as e:
+        logger.error(f"imgproxy_responsive tag error: {e}")
+        # Fallback to simple rendering
+        source_url = _extract_url_from_image(image_obj) or ""
+        return {
+            "srcset": "",
+            "sizes": "",
+            "src": source_url,
+            "alt": alt or "",
+            "class": class_name,
+            "lazy": lazy,
+        }
+
+
 # Helper functions
 
 

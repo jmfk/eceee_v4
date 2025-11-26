@@ -19,7 +19,7 @@ from .views import (
     BulkMediaOperationsView,
 )
 from django.views.decorators.csrf import csrf_exempt
-from .views.imgproxy_sign import sign_imgproxy_url, batch_sign_imgproxy_urls
+from .views.imgproxy_sign import sign_imgproxy_url, batch_sign_imgproxy_urls, generate_responsive_imgproxy_urls
 from .views.table_import import import_table_view
 
 app_name = "file_manager"
@@ -67,6 +67,11 @@ urlpatterns = [
         "imgproxy/sign-batch/",
         csrf_exempt(batch_sign_imgproxy_urls),
         name="imgproxy-sign-batch",
+    ),
+    path(
+        "imgproxy/responsive/",
+        csrf_exempt(generate_responsive_imgproxy_urls),
+        name="imgproxy-responsive",
     ),
     # Table import endpoint
     path(

@@ -72,8 +72,8 @@ const WidgetSlot = ({
     const finalSlotType = behaviorSlotType;
 
     // Extract widgets for this specific slot
-    const localWidgets = (widgets[name] || []).filter(w => w.isVisible !== false);
-    const slotInheritedWidgets = (inheritedWidgets[name] || []).filter(w => w.isVisible !== false);
+    const localWidgets = widgets[name] || [];
+    const slotInheritedWidgets = inheritedWidgets[name] || [];
     const slotRules = slotInheritanceRules[name] || {};
 
 

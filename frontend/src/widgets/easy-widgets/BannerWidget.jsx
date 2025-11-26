@@ -9,6 +9,7 @@ import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
+import OptimizedImage from '../../components/media/OptimizedImage'
 
 /**
  * EASY Banner Widget Component
@@ -426,9 +427,17 @@ const BannerWidget = ({
                             </button>
                         </div>
 
-                        {bannerMode === 'text' && image1Url && (
+                        {bannerMode === 'text' && image1 && (
                             <div className="banner-images image">
-                                <img className="banner-image" src={image1Url} alt="" />
+                                <OptimizedImage
+                                    src={image1.imgproxyBaseUrl || image1.fileUrl || image1.url}
+                                    alt={image1.alt || image1.altText || ''}
+                                    width={imageSize === 'rectangle' ? 280 : 140}
+                                    height={140}
+                                    resizeType="fill"
+                                    loading="lazy"
+                                    className="banner-image"
+                                />
                             </div>
                         )}
                     </div>

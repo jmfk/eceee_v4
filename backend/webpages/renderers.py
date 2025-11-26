@@ -448,13 +448,18 @@ class WebPageRenderer:
 
     def _collect_page_css(self, page, layout, widgets_by_slot):
         """Collect all CSS for the page including theme, layout, and widgets."""
+        from .services.theme_css_generator import ThemeCSSGenerator
+        
         css_parts = []
 
-        # Theme CSS
+        # Theme CSS - use ThemeCSSGenerator for complete CSS including fonts
         theme = page.get_effective_theme()
-        if theme and hasattr(theme, "css_content") and theme.css_content:
-            css_parts.append(f"/* Theme: {theme.name} */")
-            css_parts.append(theme.css_content)
+        if theme:
+            generator = ThemeCSSGenerator()
+            theme_css = generator.generate_complete_css(theme, frontend_scoped=False)
+            if theme_css:
+                css_parts.append(f"/* Theme: {theme.name} */")
+                css_parts.append(theme_css)
 
         # Layout CSS
         if hasattr(layout, "css_content") and layout.css_content:

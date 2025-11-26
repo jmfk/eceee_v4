@@ -9,6 +9,7 @@ import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
+import OptimizedImage from '../../components/media/OptimizedImage'
 
 /**
  * EASY Content Card Widget Component
@@ -126,35 +127,6 @@ const ContentCardWidget = ({
     // Get image objects from config
     const imageSize = configRef.current.imageSize || 'square'
     const image1 = configRef.current.image1
-
-    // Load optimized image URLs from backend API
-    useEffect(() => {
-        const loadImages = async () => {
-            setImageLoading(true)
-
-            try {
-                // Load image URL based on imageSize
-                if (image1) {
-                    const dimensions = imageSize === 'rectangle'
-                        ? { width: 280, height: 140 }
-                        : { width: 140, height: 140 }
-                    const url = await getImgproxyUrlFromImage(image1, {
-                        ...dimensions,
-                        resizeType: 'fill'
-                    })
-                    setImage1Url(url)
-                } else {
-                    setImage1Url('')
-                }
-            } catch (error) {
-                console.error('Failed to load optimized content card images:', error)
-            } finally {
-                setImageLoading(false)
-            }
-        }
-
-        loadImages()
-    }, [image1, imageSize])
 
     // Content change handlers - use configRef for stable references
     const handleHeaderChange = useCallback((newContent) => {
@@ -350,9 +322,17 @@ const ContentCardWidget = ({
                     <div className={bodyClasses}>
                         <div className="content-card-text content" ref={contentContainerRef} />
 
-                        {image1Url && (
+                        {image1 && (
                             <div className="content-card-images image">
-                                <img className="content-card-image" src={image1Url} alt="" />
+                                <OptimizedImage
+                                    src={image1.imgproxyBaseUrl || image1.fileUrl || image1.url}
+                                    alt={image1.alt || image1.altText || ''}
+                                    width={imageSize === 'rectangle' ? 280 : 140}
+                                    height={140}
+                                    resizeType="fill"
+                                    loading="lazy"
+                                    className="content-card-image"
+                                />
                             </div>
                         )}
                     </div>
@@ -381,9 +361,17 @@ const ContentCardWidget = ({
                         <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
                     </div>
 
-                    {image1Url && (
+                    {image1 && (
                         <div className="content-card-images image">
-                            <img className="content-card-image" src={image1Url} alt="" />
+                            <OptimizedImage
+                                src={image1.imgproxyBaseUrl || image1.fileUrl || image1.url}
+                                alt={image1.alt || image1.altText || ''}
+                                width={imageSize === 'rectangle' ? 280 : 140}
+                                height={140}
+                                resizeType="fill"
+                                loading="lazy"
+                                className="content-card-image"
+                            />
                         </div>
                     )}
                 </div>
