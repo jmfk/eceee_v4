@@ -183,13 +183,12 @@ const BioWidget = memo(({
     const bioText = configRef.current.bioText || ''
     const textLayout = configRef.current.textLayout || 'column'
     const caption = configRef.current.caption || ''
-    const useContentMargins = configRef.current.useContentMargins || false
     const anchor = configRef.current.anchor || ''
 
     if (mode === 'editor') {
         return (
-            <div 
-                className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget${useContentMargins ? ' xl:pl-[80px] xl:pr-[60px]' : ''}`}
+            <div
+                className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget`}
                 {...(anchor && { id: anchor })}
             >
                 <div className="bio-widget__container">
@@ -205,7 +204,7 @@ const BioWidget = memo(({
                                 className="w-full h-auto"
                             />
                             {caption && (
-                                <div className="bio-widget__caption">{caption}</div>
+                                <div className="bio-widget__caption"><p>{caption}</p></div>
                             )}
                         </div>
                     )}
@@ -223,8 +222,8 @@ const BioWidget = memo(({
     }
 
     return (
-        <div 
-            className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget${useContentMargins ? ' xl:pl-[80px] xl:pr-[60px]' : ''}`}
+        <div
+            className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget`}
             {...(anchor && { id: anchor })}
         >
             <div className="bio-widget__container">
@@ -256,7 +255,6 @@ const BioWidget = memo(({
         prevProps.config?.image?.url === nextProps.config?.image?.url &&
         prevProps.config?.textLayout === nextProps.config?.textLayout &&
         prevProps.config?.caption === nextProps.config?.caption &&
-        prevProps.config?.useContentMargins === nextProps.config?.useContentMargins &&
         prevProps.config?.anchor === nextProps.config?.anchor &&
         prevProps.mode === nextProps.mode &&
         prevProps.themeId === nextProps.themeId &&

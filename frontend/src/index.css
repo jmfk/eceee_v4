@@ -8,6 +8,11 @@
   .widget-content {
     border-radius: 0 !important;
   }
+
+  /* Add uniform left margin to all widgets in editor */
+  .widget-item {
+    margin-left: 30px;
+  }
   :root {
     /* Primary colors */
     --color-primary-50: #eff6ff;

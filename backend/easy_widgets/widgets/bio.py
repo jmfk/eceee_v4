@@ -137,6 +137,7 @@ class BioWidget(BaseWidget):
     .bio-widget {
         display: block;
         width: 100%;
+        height: auto;
         margin-bottom: 30px;
     }
     
