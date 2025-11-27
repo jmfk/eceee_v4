@@ -996,6 +996,9 @@ export class DataManager {
 
                         // Check if skipDirty flag is set (e.g., for server auto-merge updates)
                         const shouldMarkDirty = operation.payload.skipDirty !== true;
+                        
+                        // Check if setClean flag is set (explicitly mark as clean)
+                        const shouldMarkClean = operation.payload.setClean === true;
 
                         return {
                             pages: {
@@ -1008,7 +1011,7 @@ export class DataManager {
                             },
                             metadata: {
                                 ...state.metadata,
-                                isDirty: shouldMarkDirty ? true : state.metadata.isDirty
+                                isDirty: shouldMarkClean ? false : (shouldMarkDirty ? true : state.metadata.isDirty)
                             }
                         };
                     });
@@ -1021,6 +1024,9 @@ export class DataManager {
 
                         // Check if skipDirty flag is set (e.g., for server auto-merge updates)
                         const shouldMarkDirty = operation.payload.skipDirty !== true;
+                        
+                        // Check if setClean flag is set (explicitly mark as clean)
+                        const shouldMarkClean = operation.payload.setClean === true;
 
                         return {
                             versions: {
@@ -1033,7 +1039,7 @@ export class DataManager {
                             },
                             metadata: {
                                 ...state.metadata,
-                                isDirty: shouldMarkDirty ? true : state.metadata.isDirty
+                                isDirty: shouldMarkClean ? false : (shouldMarkDirty ? true : state.metadata.isDirty)
                             }
                         };
                     });

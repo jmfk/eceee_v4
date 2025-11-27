@@ -453,7 +453,8 @@ const PageEditor = () => {
                                     widgets: conflictResult.mergedVersion.widgets
                                 },
                                 source: 'websocket_auto_merge',
-                                skipDirty: true // Don't mark as dirty since this is a server update
+                                skipDirty: true, // Don't mark as dirty since this is a server update
+                                setClean: mergedMatchesServer // Explicitly set clean if merged matches server
                             });
                         }
 
@@ -1536,10 +1537,10 @@ const PageEditor = () => {
         }
 
         // Check if resolved data matches server - if so, mark as clean
-        const matchesServer = 
+        const matchesServer =
             JSON.stringify(resolved.webpage) === JSON.stringify(conflictData.serverWebpage) &&
             JSON.stringify(resolved.version) === JSON.stringify(conflictData.serverVersion);
-        
+
         if (matchesServer) {
             // Resolved to server state - mark as clean
             setIsDirty(false);
