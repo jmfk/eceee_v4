@@ -653,47 +653,57 @@ const PageEditor = () => {
         }
     }, [isNewPage, pageId, addNotification])
 
-    // Process webpage data (WebPage model fields)
+    // Process webpage and version data
+    // Check DataManager first (for hot-reload preservation), then fall back to React Query
     useEffect(() => {
-        if (webpage && !isNewPage) {
-            setWebpageData(webpage);
-            setOriginalWebpageData(webpage); // Track original for smart saving
-
-            // Publish webpage data to UDC
-            // Note: Using a stable componentId to avoid dependency cycles
-            const webpageComponentId = `page-editor-${webpage.id}-webpage`;
-            publishUpdate(webpageComponentId, OperationTypes.INIT_PAGE, {
-                id: webpage.id,
-                data: webpage
-            });
+        if (isNewPage) return;
+        
+        // Get DataManager state to check for existing data (from websocket updates or previous load)
+        const udcState = getState();
+        const versionId = pageVersion?.versionId || pageVersion?.id;
+        const existingPage = udcState.pages?.[pageId];
+        const existingVersion = versionId ? udcState.versions?.[versionId] : null;
+        
+        // Priority 1: Use DataManager data if available (preserves websocket updates during hot-reload)
+        if (existingPage && existingVersion) {
+            setWebpageData(existingPage);
+            setPageVersionData(existingVersion);
+            setOriginalWebpageData(existingPage);
+            setOriginalPageVersionData(existingVersion);
+            
+            // Update local widgets
+            if (existingVersion.widgets) {
+                setLocalWidgets(existingVersion.widgets);
+            }
+            
+            return;
         }
-    }, [webpage, isNewPage, publishUpdate])
-
-    // Process page version data (PageVersion model fields)
-    // MUST run after webpage is initialized in UDC
-    useEffect(() => {
-        if (pageVersion && !isNewPage && webpage) {
+        
+        // Priority 2: Initialize from React Query data (first load)
+        if (webpage && pageVersion) {
             const processedVersionData = processLoadedVersionData({ ...pageVersion });
+            
+            setWebpageData(webpage);
             setPageVersionData(processedVersionData);
-            setOriginalPageVersionData(processedVersionData); // Track original for smart saving
+            setOriginalWebpageData(webpage);
+            setOriginalPageVersionData(processedVersionData);
 
-            // Publish version data to UDC (including effectiveTheme for inheritance)
-            // Note: Using pageVersion.id here instead of componentId to avoid dependency cycle
-            const initVersionAsync = async () => {
+            // Publish to UDC for future hot-reloads
+            const initDataAsync = async () => {
                 try {
                     // First ensure page exists in UDC
-                    const webpageComponentId = `page-editor-${pageId}-webpage`;
+                    const webpageComponentId = `page-editor-${webpage.id}-webpage`;
                     await publishUpdate(webpageComponentId, OperationTypes.INIT_PAGE, {
                         id: webpage.id,
                         data: webpage
                     });
 
                     // Then initialize version
-                    const versionComponentId = `page-editor-${pageId}-${pageVersion.versionId || pageVersion.id || 'current'}`;
+                    const versionComponentId = `page-editor-${pageId}-${versionId || 'current'}`;
                     const versionDataForUDC = {
                         ...processedVersionData,
-                        pageId: String(pageId), // Ensure pageId is string for consistency
-                        versionNumber: processedVersionData.versionNumber || 1 // Ensure versionNumber is set
+                        pageId: String(pageId),
+                        versionNumber: processedVersionData.versionNumber || 1
                     };
 
                     await publishUpdate(versionComponentId, OperationTypes.INIT_VERSION, {
@@ -701,13 +711,13 @@ const PageEditor = () => {
                         data: versionDataForUDC
                     });
                 } catch (error) {
-                    console.error('[PageEditor] Error initializing version in UDC:', error);
+                    console.error('[PageEditor] Error initializing data in UDC:', error);
                 }
             };
 
-            initVersionAsync();
+            initDataAsync();
         }
-    }, [pageVersion, isNewPage, webpage, publishUpdate, pageId])
+    }, [webpage, pageVersion, isNewPage, pageId, publishUpdate, getState, setLocalWidgets])
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
