@@ -70,7 +70,6 @@ export function usePageWebSocket(pageId, options = {}) {
 
             ws.onopen = () => {
                 if (!mountedRef.current) return;
-                console.log(`[WebSocket] Connected to page ${currentPageIdRef.current} editor`);
                 setIsConnected(true);
                 reconnectAttemptsRef.current = 0;
             };
@@ -81,26 +80,22 @@ export function usePageWebSocket(pageId, options = {}) {
                     const data = JSON.parse(event.data);
                     
                     if (data.type === 'connection_established') {
-                        console.log('[WebSocket] Connection confirmed:', data.message);
+                        // Connection confirmed
                     } else if (data.type === 'version_updated') {
-                        console.log('[WebSocket] Version updated:', data);
-                        
                         const updateInfo = {
                             pageId: data.page_id,
                             versionId: data.version_id,
                             updatedAt: data.updated_at,
                             updatedBy: data.updated_by,
-                            sessionId: data.session_id, // Include session_id from message
+                            sessionId: data.session_id,
                             timestamp: new Date().toISOString()
                         };
                         
                         // Check if this is our own session's save
                         if (data.session_id === sessionIdRef.current) {
-                            console.log('📡 Ignoring own session notification');
                             return; // Don't set stale or trigger callback for own saves
                         }
                         
-                        console.log('📡 Update from another session:', updateInfo);
                         setLatestUpdate(updateInfo);
                         setIsStale(true);
                         
