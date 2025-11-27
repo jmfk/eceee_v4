@@ -433,6 +433,17 @@ const PageEditor = () => {
                             setLocalWidgets(conflictResult.mergedVersion.widgets);
                         }
 
+                        // Check if merged data matches server - if so, mark as clean
+                        const mergedMatchesServer = 
+                            JSON.stringify(conflictResult.mergedWebpage) === JSON.stringify(serverWebpage) &&
+                            JSON.stringify(conflictResult.mergedVersion) === JSON.stringify(serverVersion);
+                        
+                        if (mergedMatchesServer) {
+                            // No local changes, or local changes exactly match what was saved - mark as clean
+                            setIsDirty(false);
+                        }
+                        // Otherwise, keep current dirty state (user has unsaved local changes)
+
                         // Publish update through UDC to notify ContentEditor and other components
                         if (versionId && conflictResult.mergedVersion.widgets) {
                             const udcComponentId = `page-editor-${pageId}-websocket-merge`;
