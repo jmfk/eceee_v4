@@ -15,7 +15,6 @@ export function getSessionId() {
     if (!sessionId) {
         // Generate UUID-like session ID
         sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        console.log('[Session] Created session ID:', sessionId);
     }
     return sessionId;
 }
