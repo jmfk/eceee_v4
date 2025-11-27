@@ -131,8 +131,6 @@ export function detectPageConflicts(
     localVersion,
     serverVersion
 ) {
-    console.log('[ConflictResolution] Starting deep diff analysis...');
-
     // Run deep diff on webpage data
     const webpageDiffs = deepDiff(
         originalWebpage,
@@ -164,29 +162,6 @@ export function detectPageConflicts(
             requiresRefresh = true;
             break;
         }
-    }
-
-    console.log(`[ConflictResolution] Analysis complete:`, {
-        totalDiffs: allDiffs.length,
-        conflicts: conflicts.length,
-        requiresRefresh,
-        webpageDiffs: webpageDiffs.length,
-        versionDiffs: versionDiffs.length
-    });
-    
-    // Log details of all diffs for debugging
-    if (allDiffs.length > 0) {
-        console.log('[ConflictResolution] Diff details:');
-        allDiffs.forEach(diff => {
-            console.log(`  - ${diff.pathDisplay}:`, {
-                hasConflict: diff.hasConflict,
-                localChanged: diff.localChanged,
-                serverChanged: diff.serverChanged,
-                original: diff.original,
-                local: diff.local,
-                server: diff.server
-            });
-        });
     }
 
     // Build merged data by applying non-conflicting changes

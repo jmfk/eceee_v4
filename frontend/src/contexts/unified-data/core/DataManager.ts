@@ -994,6 +994,9 @@ export class DataManager {
                         const pageId = operation.payload.id;
                         if (!pageId) return state;
 
+                        // Check if skipDirty flag is set (e.g., for server auto-merge updates)
+                        const shouldMarkDirty = operation.payload.skipDirty !== true;
+
                         return {
                             pages: {
                                 ...state.pages,
@@ -1005,7 +1008,7 @@ export class DataManager {
                             },
                             metadata: {
                                 ...state.metadata,
-                                isDirty: true
+                                isDirty: shouldMarkDirty ? true : state.metadata.isDirty
                             }
                         };
                     });
@@ -1015,6 +1018,9 @@ export class DataManager {
                     this.setState(operation, state => {
                         const versionId = operation.payload.id;
                         if (!versionId) return state;
+
+                        // Check if skipDirty flag is set (e.g., for server auto-merge updates)
+                        const shouldMarkDirty = operation.payload.skipDirty !== true;
 
                         return {
                             versions: {
@@ -1027,7 +1033,7 @@ export class DataManager {
                             },
                             metadata: {
                                 ...state.metadata,
-                                isDirty: true
+                                isDirty: shouldMarkDirty ? true : state.metadata.isDirty
                             }
                         };
                     });

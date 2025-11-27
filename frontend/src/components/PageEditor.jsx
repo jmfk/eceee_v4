@@ -400,7 +400,6 @@ const PageEditor = () => {
                     
                     // Check if a refresh is required (blocking path changed)
                     if (conflictResult.requiresRefresh) {
-                        console.log('[PageEditor] ⛔ Blocking path changed - refresh required');
                         addNotification(
                             `Page updated by ${updateInfo.updatedBy || 'another user'} - please refresh the page`,
                             'warning'
@@ -411,7 +410,6 @@ const PageEditor = () => {
                     
                     // Only show diff dialog if there are actual conflicts
                     if (conflictResult.hasConflicts) {
-                        console.log('[PageEditor] 🔴 Conflicts detected - showing diff dialog');
                         setConflictData({
                             analysis: conflictResult,
                             serverWebpage,
@@ -426,11 +424,6 @@ const PageEditor = () => {
                         );
                     } else {
                         // No conflicts - silently accept server changes
-                        console.log('[PageEditor] ✅ No conflicts - silently accepting server changes');
-                        console.log('[PageEditor] Updating state with merged data:', {
-                            mergedWebpage: conflictResult.mergedWebpage,
-                            mergedVersion: conflictResult.mergedVersion
-                        });
                         
                         // Update local state with merged data
                         setWebpageData(conflictResult.mergedWebpage);
@@ -455,8 +448,6 @@ const PageEditor = () => {
                                 skipDirty: true // Don't mark as dirty since this is a server update
                             });
                         }
-                        
-                        console.log('[PageEditor] State update complete - UI should reflect server changes now');
                         
                         addNotification(
                             `Page updated by ${updateInfo.updatedBy || 'another user'}`,
@@ -1499,26 +1490,37 @@ const PageEditor = () => {
         // Apply user's resolution decisions
         const resolved = applyConflictResolutions(conflictData.analysis, resolutions);
         
+        // Update local state with resolved data
+        setWebpageData(resolved.webpage);
+        setPageVersionData(resolved.version);
+        
+        // Update original data to the server version (what we just accepted)
+        // This way if user didn't change anything, page stays clean
+        setOriginalWebpageData(resolved.webpage);
+        setOriginalPageVersionData(resolved.version);
+        
+        // Update local widgets for UI
+        if (resolved.version.widgets) {
+            setLocalWidgets(resolved.version.widgets);
+        }
+        
+        // Publish update through UDC to notify ContentEditor
+        if (versionId && resolved.version.widgets) {
+            const udcComponentId = `page-editor-${pageId}-conflict-resolve`;
+            publishUpdate(udcComponentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
+                id: versionId,
+                updates: {
+                    widgets: resolved.version.widgets
+                },
+                source: 'conflict_resolution',
+                skipDirty: true // Don't mark as dirty - preserve existing dirty state
+            });
+        }
+        
         // Close modal
         setShowConflictModal(false);
-        
-        // Retry save with resolved data
-        try {
-            await handleActualSave({
-                ...conflictData.saveOptions,
-                resolvedData: resolved
-            });
-            
-            // Clear conflict data
-            setConflictData(null);
-        } catch (error) {
-            console.error('Failed to save after conflict resolution:', error);
-            addNotification(
-                `Save failed: ${error.message}`,
-                'error'
-            );
-        }
-    }, [conflictData, handleActualSave, addNotification]);
+        setConflictData(null);
+    }, [conflictData, versionId, pageId, publishUpdate]);
     
     const handleConflictCancel = useCallback(() => {
         setShowConflictModal(false);

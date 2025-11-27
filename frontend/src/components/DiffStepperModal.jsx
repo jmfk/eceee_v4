@@ -36,16 +36,6 @@ export default function DiffStepperModal({
     const totalConflicts = realConflicts.length;
     const currentResolution = resolutions.get(currentConflict?.field || currentConflict?.pathString);
 
-    // Log current diff item being viewed
-    useEffect(() => {
-        if (currentConflict) {
-            console.log(`[DiffStepper] Viewing conflict ${currentIndex + 1}/${totalConflicts}:`, {
-                path: currentConflict.pathDisplay || currentConflict.field,
-                hasConflict: true
-            });
-        }
-    }, [currentIndex, currentConflict, totalConflicts]);
-
     // Check if all conflicts are resolved
     const allResolved = useMemo(() => {
         return realConflicts.every(c => resolutions.get(c.field) !== null);
@@ -163,12 +153,6 @@ export default function DiffStepperModal({
             field,
             useLocal
         }));
-
-        console.log('[DiffStepper] Submitting resolutions:', {
-            total: resolutionArray.length,
-            keepLocal: resolutionArray.filter(r => r.useLocal).length,
-            useServer: resolutionArray.filter(r => !r.useLocal).length
-        });
 
         onResolve(resolutionArray);
     }, [allResolved, resolutions, onResolve]);
