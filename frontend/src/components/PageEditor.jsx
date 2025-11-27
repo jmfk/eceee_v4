@@ -231,7 +231,7 @@ const PageEditor = () => {
     // Path pattern state for dynamic URL path simulation
     const [simulatedPath, setSimulatedPath] = useState('')
     const [pathVariables, setPathVariables] = useState({})
-    
+
     // Get global clipboard state
     const { clipboardData, pasteModePaused, togglePasteMode, clearClipboardState } = useClipboard()
 
@@ -369,25 +369,22 @@ const PageEditor = () => {
 
     // Save mutation state
     const [isSaving, setIsSaving] = useState(false)
-    
+
     // Conflict resolution state
     const [conflictData, setConflictData] = useState(null)
     const [showConflictModal, setShowConflictModal] = useState(false)
-    
+
     // WebSocket for real-time notifications
     const { isStale: isVersionStale, latestUpdate, clearStaleFlag } = usePageWebSocket(
         pageId,
         {
             enabled: !isNewPage && Boolean(pageId),
             onVersionUpdated: async (updateInfo) => {
-                // Session filtering is now handled in usePageWebSocket hook
-                console.log('📡 Version updated by another session:', updateInfo);
-                
                 try {
                     // Fetch latest server version
                     const serverWebpage = await pagesApi.get(pageId);
                     const serverVersion = await pagesApi.versionCurrent(pageId);
-                    
+
                     // Detect conflicts using deep diff analysis
                     const conflictResult = detectPageConflicts(
                         originalWebpageData,
@@ -397,7 +394,7 @@ const PageEditor = () => {
                         pageVersionData,
                         serverVersion
                     );
-                    
+
                     // Check if a refresh is required (blocking path changed)
                     if (conflictResult.requiresRefresh) {
                         addNotification(
@@ -407,7 +404,7 @@ const PageEditor = () => {
                         clearStaleFlag();
                         return;
                     }
-                    
+
                     // Only show diff dialog if there are actual conflicts
                     if (conflictResult.hasConflicts) {
                         setConflictData({
@@ -417,25 +414,25 @@ const PageEditor = () => {
                             updateInfo
                         });
                         setShowConflictModal(true);
-                        
+
                         addNotification(
                             `Page updated by ${updateInfo.updatedBy || 'another user'} - conflicts detected`,
                             'info'
                         );
                     } else {
                         // No conflicts - silently accept server changes
-                        
+
                         // Update local state with merged data
                         setWebpageData(conflictResult.mergedWebpage);
                         setPageVersionData(conflictResult.mergedVersion);
                         setOriginalWebpageData(conflictResult.mergedWebpage);
                         setOriginalPageVersionData(conflictResult.mergedVersion);
-                        
+
                         // Update local widgets state for UI
                         if (conflictResult.mergedVersion.widgets) {
                             setLocalWidgets(conflictResult.mergedVersion.widgets);
                         }
-                        
+
                         // Publish update through UDC to notify ContentEditor and other components
                         if (versionId && conflictResult.mergedVersion.widgets) {
                             const udcComponentId = `page-editor-${pageId}-websocket-merge`;
@@ -448,13 +445,13 @@ const PageEditor = () => {
                                 skipDirty: true // Don't mark as dirty since this is a server update
                             });
                         }
-                        
+
                         addNotification(
                             `Page updated by ${updateInfo.updatedBy || 'another user'}`,
                             'success'
                         );
                     }
-                    
+
                     // Clear stale flag
                     clearStaleFlag();
                 } catch (error) {
@@ -657,32 +654,32 @@ const PageEditor = () => {
     // Check DataManager first (for hot-reload preservation), then fall back to React Query
     useEffect(() => {
         if (isNewPage) return;
-        
+
         // Get DataManager state to check for existing data (from websocket updates or previous load)
         const udcState = getState();
         const versionId = pageVersion?.versionId || pageVersion?.id;
         const existingPage = udcState.pages?.[pageId];
         const existingVersion = versionId ? udcState.versions?.[versionId] : null;
-        
+
         // Priority 1: Use DataManager data if available (preserves websocket updates during hot-reload)
         if (existingPage && existingVersion) {
             setWebpageData(existingPage);
             setPageVersionData(existingVersion);
             setOriginalWebpageData(existingPage);
             setOriginalPageVersionData(existingVersion);
-            
+
             // Update local widgets
             if (existingVersion.widgets) {
                 setLocalWidgets(existingVersion.widgets);
             }
-            
+
             return;
         }
-        
+
         // Priority 2: Initialize from React Query data (first load)
         if (webpage && pageVersion) {
             const processedVersionData = processLoadedVersionData({ ...pageVersion });
-            
+
             setWebpageData(webpage);
             setPageVersionData(processedVersionData);
             setOriginalWebpageData(webpage);
@@ -1217,10 +1214,10 @@ const PageEditor = () => {
             // Check for conflict
             if (saveResult.conflict) {
                 console.log('🔀 Conflict detected, attempting auto-merge...');
-                
+
                 // Fetch latest server version
                 const serverVersion = saveResult.conflict.server_version;
-                
+
                 // Detect conflicts and try auto-merge
                 const conflictAnalysis = detectPageConflicts(
                     originalWebpageData || {},
@@ -1230,7 +1227,7 @@ const PageEditor = () => {
                     currentVersionDataForSave,
                     serverVersion
                 );
-                
+
                 if (conflictAnalysis.canAutoMerge) {
                     // Auto-merge successful - retry save with merged data
                     console.log('✅ Auto-merge successful, retrying save...');
@@ -1238,7 +1235,7 @@ const PageEditor = () => {
                         'Changes auto-merged successfully',
                         'success'
                     );
-                    
+
                     // Retry save with merged data (mark as resolved to skip timestamp check)
                     return await handleActualSave({
                         ...saveOptions,
@@ -1336,7 +1333,7 @@ const PageEditor = () => {
         }
     }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, currentVersion]); // Removed loadVersionsPreserveCurrent to break circular dependency
 
-    
+
     // Smart save - analyze changes first, then show modal only if needed
     const handleSaveFromStatusBar = useCallback(async () => {
         const unresolved = errorTodoItems.filter(i => !i.checked).length
@@ -1496,24 +1493,24 @@ const PageEditor = () => {
     // Conflict resolution handlers
     const handleConflictResolve = useCallback(async (resolutions) => {
         if (!conflictData) return;
-        
+
         // Apply user's resolution decisions
         const resolved = applyConflictResolutions(conflictData.analysis, resolutions);
-        
+
         // Update local state with resolved data
         setWebpageData(resolved.webpage);
         setPageVersionData(resolved.version);
-        
+
         // Update original data to the server version (what we just accepted)
         // This way if user didn't change anything, page stays clean
         setOriginalWebpageData(resolved.webpage);
         setOriginalPageVersionData(resolved.version);
-        
+
         // Update local widgets for UI
         if (resolved.version.widgets) {
             setLocalWidgets(resolved.version.widgets);
         }
-        
+
         // Publish update through UDC to notify ContentEditor
         if (versionId && resolved.version.widgets) {
             const udcComponentId = `page-editor-${pageId}-conflict-resolve`;
@@ -1526,12 +1523,23 @@ const PageEditor = () => {
                 skipDirty: true // Don't mark as dirty - preserve existing dirty state
             });
         }
+
+        // Check if resolved data matches server - if so, mark as clean
+        const matchesServer = 
+            JSON.stringify(resolved.webpage) === JSON.stringify(conflictData.serverWebpage) &&
+            JSON.stringify(resolved.version) === JSON.stringify(conflictData.serverVersion);
         
+        if (matchesServer) {
+            // Resolved to server state - mark as clean
+            setIsDirty(false);
+        }
+        // Otherwise preserve existing dirty state
+
         // Close modal
         setShowConflictModal(false);
         setConflictData(null);
-    }, [conflictData, versionId, pageId, publishUpdate]);
-    
+    }, [conflictData, versionId, pageId, publishUpdate, setIsDirty]);
+
     const handleConflictCancel = useCallback(() => {
         setShowConflictModal(false);
         setConflictData(null);
@@ -2148,7 +2156,7 @@ const PageEditor = () => {
                     isLoading={createNewPageMutation.isPending}
                 />
             )}
-            
+
             {/* Conflict Resolution Modal */}
             {showConflictModal && conflictData && (
                 <ConflictResolutionModal
@@ -2157,7 +2165,7 @@ const PageEditor = () => {
                     onCancel={handleConflictCancel}
                 />
             )}
-            
+
             {/* Stale version warning removed - conflicts now handled via diff modal */}
         </div>
     )
