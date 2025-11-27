@@ -60,9 +60,7 @@ export function usePageWebSocket(pageId, options = {}) {
 
         // Determine WebSocket URL based on current location
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        const port = '8000'; // Django backend port
-        const wsUrl = `${protocol}//${host}:${port}/ws/pages/${currentPageIdRef.current}/editor/`;
+        const wsUrl = `${protocol}//${window.location.host}/ws/pages/${currentPageIdRef.current}/editor/`;
 
         try {
             const ws = new WebSocket(wsUrl);
