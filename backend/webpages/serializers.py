@@ -1259,6 +1259,75 @@ class PageVersionSerializer(serializers.ModelSerializer):
         components = name.split("_")
         return components[0] + "".join(word.capitalize() for word in components[1:])
 
+    def update(self, instance, validated_data):
+        """Update with timestamp-based conflict detection"""
+        # Check if client provided the timestamp they last saw
+        request = self.context.get('request')
+        if request and hasattr(request, 'data'):
+            client_updated_at = request.data.get('client_updated_at')
+            
+            if client_updated_at:
+                from django.utils.dateparse import parse_datetime
+                from rest_framework.exceptions import ValidationError
+                
+                # Parse the client timestamp
+                try:
+                    client_timestamp = parse_datetime(client_updated_at)
+                except (ValueError, TypeError):
+                    raise ValidationError({
+                        'client_updated_at': 'Invalid timestamp format'
+                    })
+                
+                # Compare with server's current updated_at
+                # Refresh from DB to get latest timestamp
+                instance.refresh_from_db()
+                
+                if instance.updated_at > client_timestamp:
+                    # Conflict detected - server has newer data
+                    # Serialize current server state for conflict resolution
+                    server_serializer = PageVersionSerializer(instance)
+                    
+                    raise ValidationError({
+                        'error': 'conflict',
+                        'message': 'This version has been modified by another user',
+                        'server_version': server_serializer.data,
+                        'server_updated_at': instance.updated_at.isoformat(),
+                        'client_updated_at': client_updated_at
+                    })
+        
+        # No conflict - proceed with normal update
+        updated_instance = super().update(instance, validated_data)
+        
+        # Broadcast version update to WebSocket clients
+        try:
+            from .consumers import broadcast_version_update
+            
+            updated_by = None
+            session_id = None
+            
+            if request:
+                # Get username if authenticated
+                if hasattr(request, 'user') and request.user.is_authenticated:
+                    updated_by = request.user.username
+                
+                # Get session ID from request header
+                session_id = request.META.get('HTTP_X_SESSION_ID')
+            
+            broadcast_version_update(
+                page_id=updated_instance.page.id,
+                version_id=updated_instance.id,
+                updated_at=updated_instance.updated_at.isoformat(),
+                updated_by=updated_by,
+                session_id=session_id
+            )
+        except Exception as e:
+            # Don't fail the update if broadcast fails
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to broadcast version update: {e}")
+        
+        return updated_instance
+
 
 class PageDataSchemaSerializer(serializers.ModelSerializer):
     """Serializer for page data JSON Schemas (system and layout scopes)."""

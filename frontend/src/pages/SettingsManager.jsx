@@ -98,8 +98,6 @@ const SettingsManager = () => {
     const { state, useExternalChanges } = useUnifiedData()
     const [themeSaveHandler, setThemeSaveHandler] = useState(null)
     const [isThemeDirty, setIsThemeDirty] = useState(false)
-    const [themeAutoSaveCountdown, setThemeAutoSaveCountdown] = useState(null)
-    const [themeAutoSaveStatus, setThemeAutoSaveStatus] = useState('idle')
 
     // Subscribe to UDC changes for theme dirty state
     useExternalChanges('settings-manager', useCallback((udcState) => {
@@ -382,10 +380,8 @@ const SettingsManager = () => {
         }
     }
 
-    const handleThemeEditorCallback = useCallback((saveHandler, countdown, status) => {
+    const handleThemeEditorCallback = useCallback((saveHandler) => {
         setThemeSaveHandler(() => saveHandler);
-        setThemeAutoSaveCountdown(countdown);
-        setThemeAutoSaveStatus(status);
     }, []);
 
     const renderTabContent = () => {
@@ -442,8 +438,6 @@ const SettingsManager = () => {
                         isDirty={isThemeDirty}
                         onSaveClick={handleThemeSave}
                         isSaving={false}
-                        autoSaveCountdown={themeAutoSaveCountdown}
-                        autoSaveStatus={themeAutoSaveStatus}
                         customStatusContent={
                             <div className="flex items-center space-x-4">
                                 <span className="text-sm text-gray-600">

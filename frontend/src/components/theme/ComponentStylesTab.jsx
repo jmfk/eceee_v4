@@ -56,7 +56,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
         // Update UDC with new style
         updateThemeField('componentStyles', updatedStyles);
 
-        // Auto-save the new style and then navigate to edit view
+        // Save the new style and then navigate to edit view
         try {
             await saveCurrentTheme();
             

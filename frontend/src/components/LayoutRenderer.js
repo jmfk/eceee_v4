@@ -69,9 +69,6 @@ class LayoutRenderer {
     this.defaultWidgetsProcessed = false; // Track if defaults have been processed
     this.savedWidgetData = new Map(); // Map of slot names to saved widget arrays
     this.isDirty = false; // Track if page has unsaved changes
-    this.autoSaveEnabled = true; // Enable automatic saving
-    this.autoSaveDelay = 2000; // Auto-save delay in milliseconds (2 seconds)
-    this.autoSaveTimeoutId = null; // Timeout ID for pending auto-save
 
     // Version management properties
     this.currentVersion = null; // Currently loaded version data
@@ -630,11 +627,6 @@ class LayoutRenderer {
       this.removeAllSlotUI();
 
       // Cancel pending auto-save
-      if (this.autoSaveTimeoutId) {
-        clearTimeout(this.autoSaveTimeoutId);
-        this.autoSaveTimeoutId = null;
-      }
-
       // Clean up event listeners
       this.eventListeners.forEach((cleanup) => {
         if (typeof cleanup === 'function') {
@@ -1968,15 +1960,6 @@ class LayoutRenderer {
   }
 
   /**
-   * Configure auto-save settings
-   * @param {Object} config - Auto-save configuration
-   */
-  setAutoSaveConfig(config = {}) {
-    this.autoSaveEnabled = config.enabled !== false;
-    this.autoSaveDelay = config.delay || 2000;
-  }
-
-  /**
    * Check if the page has unsaved changes
    * @returns {boolean} True if page is dirty (has unsaved changes)
    */
@@ -1985,7 +1968,7 @@ class LayoutRenderer {
   }
 
   /**
-   * Mark page as dirty (has unsaved changes) and trigger auto-save
+   * Mark page as dirty (has unsaved changes)
    * @param {string} reason - Reason for marking dirty (for logging)
    */
   markAsDirty(reason = 'unknown') {
@@ -1995,8 +1978,6 @@ class LayoutRenderer {
       // Execute callback for dirty state change
       this.executeCallback('onDirtyStateChanged', true, reason);
     }
-
-    // Note: Auto-save removed - unified save system handles all saves
   }
 
   /**
@@ -2006,44 +1987,9 @@ class LayoutRenderer {
     if (this.isDirty) {
       this.isDirty = false;
 
-      // Cancel pending auto-save
-      if (this.autoSaveTimeoutId) {
-        clearTimeout(this.autoSaveTimeoutId);
-        this.autoSaveTimeoutId = null;
-      }
-
       // Execute callback for dirty state change
       this.executeCallback('onDirtyStateChanged', false, 'saved');
     }
-  }
-
-  /**
-   * Trigger auto-save with debouncing
-   */
-  triggerAutoSave() {
-    // Cancel existing auto-save timeout
-    if (this.autoSaveTimeoutId) {
-      clearTimeout(this.autoSaveTimeoutId);
-    }
-
-    // Set new auto-save timeout
-    this.autoSaveTimeoutId = setTimeout(() => {
-      if (this.isDirty && this.autoSaveEnabled) {
-
-        try {
-          const widgetData = this.saveCurrentWidgetState();
-
-          // Execute callback for auto-save
-          this.executeCallback('onAutoSave', widgetData);
-
-        } catch (error) {
-          console.error('LayoutRenderer: Auto-save failed', error);
-          this.executeCallback('onAutoSaveError', error);
-        }
-      }
-      this.autoSaveTimeoutId = null;
-    }, this.autoSaveDelay);
-
   }
 
   /**

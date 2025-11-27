@@ -56,8 +56,6 @@ const SimpleFormDemo = () => {
 
             // Create form instance with demo options
             const form = new SelfContainedWidgetForm(mockWidget, {
-                autoSave: true,
-                autoSaveDelay: 1000,
                 showValidationInline: true,
                 showSaveStatus: true,
                 registry: window.widgetRegistry
@@ -206,7 +204,7 @@ const SimpleFormDemo = () => {
                                     <li>Edit any field (text, font size, color, etc.)</li>
                                     <li>Watch the real-time updates counter increase</li>
                                     <li>Notice no page rerenders or flickering</li>
-                                    <li>See auto-save status messages</li>
+                                    <li>See save status messages</li>
                                 </ol>
                             </div>
                             <div>

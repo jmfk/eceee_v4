@@ -31,7 +31,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      imgproxy:
+      redis:
         condition: service_started
     environment:
       - DEBUG=1
@@ -66,7 +66,7 @@ services:
       - "8000:8000"
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+             daphne -b 0.0.0.0 -p 8000 -v 2 config.asgi:application"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
@@ -98,7 +98,7 @@ services:
     stdin_open: true
     tty: true
 
-  # Redis for caching (optional, for future use)
+  # Redis for Django Channels WebSocket support (required)
   redis:
     image: redis:7-alpine
     platform: linux/arm64
@@ -108,6 +108,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # MinIO for S3-compatible object storage
   minio:
@@ -204,6 +209,4 @@ volumes:
 
 networks:
   default:
-    driver: bridge
-  mcp_network:
     driver: bridge

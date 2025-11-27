@@ -190,7 +190,7 @@ export const pagesApi = {
         // Add version options if widgets are being saved
         if (widgets !== null || options.description || options.autoPublish !== undefined || options.createNewVersion !== undefined) {
             payload.versionOptions = {
-                description: options.description || 'Auto-save',
+                description: options.description || 'Page update',
                 autoPublish: options.autoPublish || false,
                 createNewVersion: options.createNewVersion || false
             }

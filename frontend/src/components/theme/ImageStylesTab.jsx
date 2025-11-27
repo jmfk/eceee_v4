@@ -71,7 +71,7 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
         // Update UDC with new style
         updateThemeField('imageStyles', updatedStyles);
 
-        // Auto-save the new style and then navigate to edit view
+        // Save the new style and then navigate to edit view
         try {
             await saveCurrentTheme();
             

@@ -151,20 +151,22 @@ const OptimizedImage = ({
             )}
 
             {/* Main optimized image */}
-            <img
-                src={optimizedSrc}
-                srcSet={srcSet || undefined}
-                sizes={sizesAttr || undefined}
-                alt={alt}
-                width={width}
-                height={height}
-                loading={loading}
-                className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
-                    }`}
-                onLoad={handleLoad}
-                onError={handleError}
-                {...props}
-            />
+            {optimizedSrc && (
+                <img
+                    src={optimizedSrc}
+                    srcSet={srcSet || undefined}
+                    sizes={sizesAttr || undefined}
+                    alt={alt}
+                    width={width}
+                    height={height}
+                    loading={loading}
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+                        }`}
+                    onLoad={handleLoad}
+                    onError={handleError}
+                    {...props}
+                />
+            )}
 
             {/* Loading indicator */}
             {!imageLoaded && !imageError && !showPlaceholder && (

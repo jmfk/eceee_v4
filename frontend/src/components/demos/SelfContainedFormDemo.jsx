@@ -59,7 +59,6 @@ const SelfContainedFormDemo = () => {
     const [widgetStates, setWidgetStates] = useState(mockWidgets)
     const [realTimeUpdates, setRealTimeUpdates] = useState([])
     const [showRegistry, setShowRegistry] = useState(false)
-    const [autoSave, setAutoSave] = useState(true)
 
     const editorRef = useRef()
 
@@ -141,15 +140,6 @@ const SelfContainedFormDemo = () => {
                             {/* Settings */}
                             <div className="pt-4 border-t border-gray-200">
                                 <h4 className="font-medium text-gray-900 mb-2">Settings</h4>
-                                <label className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={autoSave}
-                                        onChange={(e) => setAutoSave(e.target.checked)}
-                                        className="rounded border-gray-300"
-                                    />
-                                    <span className="text-sm text-gray-700">Auto-save enabled</span>
-                                </label>
                             </div>
                         </div>
 
@@ -262,7 +252,6 @@ const SelfContainedFormDemo = () => {
                 onUnsavedChanges={handleUnsavedChanges}
                 widgetData={currentWidget}
                 title={`Edit ${currentWidget.name}`}
-                autoSave={autoSave}
                 showValidationInline={true}
                 showSaveStatus={true}
             />

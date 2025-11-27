@@ -1139,10 +1139,6 @@ const ReactLayoutRenderer = forwardRef(({
             }
         },
 
-        enableAutoSave: (enabled, interval = 10000) => {
-            // Auto-save functionality can be implemented here if needed
-        },
-
         // Layout-specific methods
         getLayoutName: () => layoutName,
         getLayoutMetadata: () => getLayoutMetadata(layoutName),

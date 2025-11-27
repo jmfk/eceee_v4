@@ -17,7 +17,6 @@ import { extractErrorMessage } from '../utils/errorHandling.js';
 import { useNotificationContext } from './NotificationManager';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
-import { useAutoSave } from '../hooks/useAutoSave';
 import {
     Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw, Clipboard, Download, FileUp, Files
 } from 'lucide-react';
@@ -80,9 +79,6 @@ const ThemeEditor = ({ onSave }) => {
     // Also get current state for dirty flag
     const isThemeDirty = state.metadata.isThemeDirty;
     const themeData = currentThemeData;
-
-    // Ref to store auto-save cancel function
-    const cancelAutoSaveRef = useRef(null);
 
     // Refs for style tab components to flush pending changes before save
     const componentStylesTabRef = useRef(null);
@@ -281,11 +277,6 @@ const ThemeEditor = ({ onSave }) => {
 
     // Expose save handler for external use (SettingsManager)
     const handleSaveTheme = useCallback(async () => {
-        // Cancel auto-save countdown when manually saving
-        if (cancelAutoSaveRef.current) {
-            cancelAutoSaveRef.current();
-        }
-
         // Flush pending changes from style tabs before saving
         // This ensures all uncontrolled textarea refs are saved to state
         if (activeTab === 'component-styles' && componentStylesTabRef.current) {
@@ -337,29 +328,16 @@ const ThemeEditor = ({ onSave }) => {
         }
     }, [isCreating, themeData, saveCurrentTheme, addNotification, queryClient, setThemeDirty, navigate, activeTab]);
 
-    // Auto-save hook for theme editing
-    const { countdown: autoSaveCountdown, saveStatus: autoSaveStatus, cancelAutoSave } = useAutoSave({
-        onSave: handleSaveTheme,
-        delay: 3000,
-        isDirty: isThemeDirty && isEditing, // Only auto-save when editing existing themes
-        enabled: true
-    });
-
-    // Store cancel function in ref for use in handleSaveTheme
-    useEffect(() => {
-        cancelAutoSaveRef.current = cancelAutoSave;
-    }, [cancelAutoSave]);
-
     // Provide save handler to SettingsManager when editing
     useEffect(() => {
         if (onSave && currentView === 'edit') {
-            // Pass the save function, auto-save status to SettingsManager
-            onSave(handleSaveTheme, autoSaveCountdown, autoSaveStatus);
+            // Pass the save function to SettingsManager
+            onSave(handleSaveTheme);
         } else if (onSave && currentView === 'list') {
             // Clear the save handler when not editing
-            onSave(null, null, 'idle');
+            onSave(null);
         }
-    }, [onSave, handleSaveTheme, currentView, autoSaveCountdown, autoSaveStatus, isThemeDirty]);
+    }, [onSave, handleSaveTheme, currentView, isThemeDirty]);
 
     const handleDelete = async (theme) => {
         const confirmed = await showConfirm(

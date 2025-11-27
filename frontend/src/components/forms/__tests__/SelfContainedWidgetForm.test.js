@@ -131,7 +131,6 @@ describe('SelfContainedWidgetForm', () => {
 
         // Create form instance
         form = new SelfContainedWidgetForm(widgetData, {
-            autoSave: false, // Disable auto-save for tests
             registry: new WidgetRegistry()
         })
     })
@@ -253,8 +252,7 @@ describe('SelfContainedWidgetForm', () => {
         registry.subscribe('CONFIG_CHANGE', listener)
 
         const formWithRegistry = new SelfContainedWidgetForm(widgetData, {
-            registry,
-            autoSave: false
+            registry
         })
 
         await formWithRegistry.initialize(container)
@@ -308,7 +306,7 @@ describe('Form Field Creation', () => {
             type: 'test.Widget',
             slotName: 'test',
             config: {}
-        }, { autoSave: false })
+        })
     })
 
     afterEach(() => {

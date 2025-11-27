@@ -178,8 +178,6 @@ class SelfContainedWidgetForm {
         this.debounceTimeout = null
         this.validationTimeout = null
         this.saveTimeout = null
-        this.autoSaveEnabled = options.autoSave !== false
-        this.autoSaveDelay = options.autoSaveDelay || 1000
 
         // State tracking
         this.isDirty = false
@@ -231,11 +229,6 @@ class SelfContainedWidgetForm {
 
             // Register with central registry
             this.registry.register(this)
-
-            // Setup auto-save if enabled
-            if (this.autoSaveEnabled) {
-                this.setupAutoSave()
-            }
 
             // Mark as initialized and complete initialization
             this.isInitialized = true
@@ -770,10 +763,7 @@ class SelfContainedWidgetForm {
 
             // Debounced operations
             this.debounceValidation()
-
-            if (this.autoSaveEnabled) {
-                this.debounceServerSync()
-            }
+            this.debounceServerSync()
         }
 
         // Immediate registry notification (for real-time preview)
@@ -888,7 +878,7 @@ class SelfContainedWidgetForm {
 
         this.saveTimeout = setTimeout(() => {
             this.syncToServer()
-        }, this.autoSaveDelay)
+        }, 1000)
     }
 
     /**
@@ -1041,14 +1031,6 @@ class SelfContainedWidgetForm {
         if (this.validationResults[fieldName]) {
             delete this.validationResults[fieldName]
         }
-    }
-
-    /**
-     * Setup auto-save functionality
-     */
-    setupAutoSave() {
-        // Auto-save is handled by debounceServerSync in updateField
-        // This method can be extended for additional auto-save features
     }
 
     /**

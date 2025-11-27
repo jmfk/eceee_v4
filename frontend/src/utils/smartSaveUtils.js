@@ -265,7 +265,7 @@ export function generateChangeSummary(changes) {
  * @param {Object} originalPageVersionData - Original page version data
  * @param {Object} currentPageVersionData - Current page version data
  * @param {Object} apis - API functions { pagesApi, versionsApi }
- * @param {Object} options - Save options
+ * @param {Object} options - Save options (forceNewVersion, clientUpdatedAt, etc.)
  * @returns {Promise<Object>} Save result
  */
 export async function smartSave(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData, apis, options = {}) {
@@ -296,10 +296,17 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
         strategy: strategy.strategy,
         summary: generateChangeSummary(changes),
         pageResult: null,
-        versionResult: null
+        versionResult: null,
+        conflict: null
     };
 
     try {
+        // Prepare update options with timestamp if available
+        const updateOptions = {};
+        if (options.clientUpdatedAt) {
+            updateOptions.clientUpdatedAt = options.clientUpdatedAt;
+        }
+
         // Execute saves based on strategy
         if (strategy.strategy === 'page-only') {
 
@@ -312,7 +319,7 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             if (options.forceNewVersion) {
                 results.versionResult = await versionsApi.create(versionId, versionDataForSave);
             } else {
-                results.versionResult = await versionsApi.update(versionId, versionDataForSave);
+                results.versionResult = await versionsApi.update(versionId, versionDataForSave, updateOptions);
             }
 
         } else if (strategy.strategy === 'both') {
@@ -326,7 +333,7 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             if (options.forceNewVersion) {
                 results.versionResult = await versionsApi.create(versionId, versionDataForSave);
             } else {
-                results.versionResult = await versionsApi.update(versionId, versionDataForSave);
+                results.versionResult = await versionsApi.update(versionId, versionDataForSave, updateOptions);
             }
 
         } else {
@@ -336,6 +343,13 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
         return results;
 
     } catch (error) {
+        // Check if this is a conflict error
+        if (error.response?.data?.error === 'conflict') {
+            console.log('🔀 Conflict detected:', error.response.data);
+            results.conflict = error.response.data;
+            return results;
+        }
+
         console.error('❌ Smart save failed:', error);
         throw error;
     }

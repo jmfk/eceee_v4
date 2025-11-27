@@ -38,10 +38,18 @@ export const versionsApi = {
      * Update a version (only drafts can be updated)
      * @param {number} versionId - Version ID
      * @param {Object} versionData - Updated version data
+     * @param {Object} options - Update options (includeTimestamp, etc.)
      * @returns {Promise<Object>} Updated version
      */
-    update: wrapApiCall(async (versionId, versionData) => {
-        return api.patch(endpoints.versions.detail(versionId), versionData)
+    update: wrapApiCall(async (versionId, versionData, options = {}) => {
+        const payload = { ...versionData };
+        
+        // Include timestamp for conflict detection if provided
+        if (options.clientUpdatedAt) {
+            payload.client_updated_at = options.clientUpdatedAt;
+        }
+        
+        return api.patch(endpoints.versions.detail(versionId), payload)
     }, 'versions.update'),
 
     // Granular Update Methods

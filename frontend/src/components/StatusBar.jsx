@@ -22,9 +22,6 @@ const StatusBar = ({
     validationState = { isValid: true, hasErrors: false },
     // Dirty state prop (from PageEditor)
     isDirty = false,
-    // Auto-save props
-    autoSaveCountdown = null,
-    autoSaveStatus = 'idle',
     onClearClipboard = null
 }) => {
     // Get global clipboard state
@@ -225,47 +222,18 @@ const StatusBar = ({
                         <div className="flex items-center space-x-4 text-gray-600">
                             {customStatusContent || (
                                 <div className="flex items-center space-x-4">
-                                    {/* Auto-save status display */}
-                                    {autoSaveStatus === 'countdown' && autoSaveCountdown !== null && (
-                                        <span className="flex items-center text-blue-600 font-medium">
-                                            <Save className="w-4 h-4 mr-1" />
-                                            Saving in {autoSaveCountdown}...
-                                        </span>
-                                    )}
-                                    {autoSaveStatus === 'saving' && (
-                                        <span className="flex items-center text-blue-600 font-medium">
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-1"></div>
-                                            Saving...
-                                        </span>
-                                    )}
-                                    {autoSaveStatus === 'saved' && (
-                                        <span className="flex items-center text-green-600 font-medium">
-                                            <Save className="w-4 h-4 mr-1" />
-                                            All changes saved ✓
-                                        </span>
-                                    )}
-                                    {autoSaveStatus === 'error' && (
-                                        <span className="flex items-center text-red-600 font-medium">
+                                    <span>{errors.length > 0 || warnings.length > 0 ? 'Issues Found' : 'Ready'}</span>
+                                    {errors.length > 0 && (
+                                        <span className="flex items-center text-red-600">
                                             <AlertCircle className="w-4 h-4 mr-1" />
-                                            Auto-save failed
+                                            {errors.length} Error{errors.length !== 1 ? 's' : ''}
                                         </span>
                                     )}
-                                    {autoSaveStatus === 'idle' && (
-                                        <>
-                                            <span>{errors.length > 0 || warnings.length > 0 ? 'Issues Found' : 'Ready'}</span>
-                                            {errors.length > 0 && (
-                                                <span className="flex items-center text-red-600">
-                                                    <AlertCircle className="w-4 h-4 mr-1" />
-                                                    {errors.length} Error{errors.length !== 1 ? 's' : ''}
-                                                </span>
-                                            )}
-                                            {warnings.length > 0 && (
-                                                <span className="flex items-center text-yellow-600">
-                                                    <AlertCircle className="w-4 h-4 mr-1" />
-                                                    {warnings.length} Warning{warnings.length !== 1 ? 's' : ''}
-                                                </span>
-                                            )}
-                                        </>
+                                    {warnings.length > 0 && (
+                                        <span className="flex items-center text-yellow-600">
+                                            <AlertCircle className="w-4 h-4 mr-1" />
+                                            {warnings.length} Warning{warnings.length !== 1 ? 's' : ''}
+                                        </span>
                                     )}
                                 </div>
                             )}

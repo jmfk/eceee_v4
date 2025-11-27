@@ -205,7 +205,7 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                 <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">showCaptions</code>
             </div>
 
-            {/* Add Style Form removed: creation happens via header button with auto-save and redirect */}
+            {/* Add Style Form removed: creation happens via header button and redirect */}
 
             {/* Styles List */}
             {styleEntries.length > 0 ? (

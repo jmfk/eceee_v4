@@ -151,7 +151,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                         )}
                     </h1>
 
-                    {/* Auto-save Status */}
+                    {/* Save Status */}
                     <div className="flex items-center space-x-3">
                         {hasUnsavedChanges && (
                             <span className="text-sm text-amber-600 flex items-center">

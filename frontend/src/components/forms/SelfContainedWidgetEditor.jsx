@@ -29,7 +29,6 @@ const SelfContainedWidgetEditor = forwardRef(({
     onUnsavedChanges,
     widgetData,
     title = "Edit Widget",
-    autoSave = true,
     showValidationInline = true,
     showSaveStatus = true,
     panelWidth = 400
@@ -205,7 +204,6 @@ const SelfContainedWidgetEditor = forwardRef(({
         try {
             // Create form instance
             const formOptions = {
-                autoSave,
                 showValidationInline,
                 showSaveStatus,
                 registry: window.widgetRegistry
@@ -419,18 +417,6 @@ const SelfContainedWidgetEditor = forwardRef(({
                                     title="Reset to original"
                                 >
                                     <RotateCcw className="w-4 h-4" />
-                                </button>
-                            )}
-
-                            {/* Manual save button (when auto-save is disabled) */}
-                            {!autoSave && (
-                                <button
-                                    onClick={handleSave}
-                                    disabled={!hasUnsavedChanges}
-                                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
-                                    title="Save changes"
-                                >
-                                    <Save className="w-4 h-4" />
                                 </button>
                             )}
 

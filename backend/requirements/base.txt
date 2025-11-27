@@ -45,6 +45,7 @@ django-celery-beat>=2.5.0
 redis>=4.6.0
 channels>=4.0.0
 channels-redis>=4.1.0
+daphne>=4.0.0
 
 # Image handling and S3 storage
 Pillow>=10.0.0

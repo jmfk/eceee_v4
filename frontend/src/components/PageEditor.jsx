@@ -27,7 +27,8 @@ import {
     Calendar,
     Save,
     Globe,
-    Layers
+    Layers,
+    AlertTriangle
 } from 'lucide-react'
 import { pagesApi, layoutsApi, versionsApi, themesApi, namespacesApi } from '../api'
 import { api } from '../api/client'
@@ -55,11 +56,13 @@ import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
 import { usePageInheritance } from '../hooks/usePageInheritance'
 import GlobalWysiwygToolbar from './wysiwyg/GlobalWysiwygToolbar'
 import GlobalTableToolbar from './table-toolbar/GlobalTableToolbar'
-import { useAutoSave } from '../hooks/useAutoSave'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { usePageWebSocket } from '../hooks/usePageWebSocket'
 
 import { logValidationSync } from '../utils/stateVerification'
 import { buildPathVariablesContext, getDefaultSimulatedPath } from '../utils/pathParser'
+import { detectPageConflicts, applyConflictResolutions } from '../utils/conflictResolution'
+import ConflictResolutionModal from './ConflictResolutionModal'
 
 // Helpers: error parsing and merging for To-Do items
 function mergeTodoItems(existing, incoming) {
@@ -366,14 +369,114 @@ const PageEditor = () => {
 
     // Save mutation state
     const [isSaving, setIsSaving] = useState(false)
-
-    // Auto-save hook
-    const { countdown: autoSaveCountdown, saveStatus: autoSaveStatus, cancelAutoSave } = useAutoSave({
-        onSave: saveCurrentVersion,
-        delay: 3000,
-        isDirty: isDirty && !isNewPage, // Don't auto-save new pages
-        enabled: false // TEMPORARILY DISABLED FOR DEBUGGING
-    })
+    
+    // Conflict resolution state
+    const [conflictData, setConflictData] = useState(null)
+    const [showConflictModal, setShowConflictModal] = useState(false)
+    
+    // WebSocket for real-time notifications
+    const { isStale: isVersionStale, latestUpdate, clearStaleFlag } = usePageWebSocket(
+        pageId,
+        {
+            enabled: !isNewPage && Boolean(pageId),
+            onVersionUpdated: async (updateInfo) => {
+                // Session filtering is now handled in usePageWebSocket hook
+                console.log('📡 Version updated by another session:', updateInfo);
+                
+                try {
+                    // Fetch latest server version
+                    const serverWebpage = await pagesApi.get(pageId);
+                    const serverVersion = await pagesApi.versionCurrent(pageId);
+                    
+                    // Detect conflicts using deep diff analysis
+                    const conflictResult = detectPageConflicts(
+                        originalWebpageData,
+                        webpageData,
+                        serverWebpage,
+                        originalPageVersionData,
+                        pageVersionData,
+                        serverVersion
+                    );
+                    
+                    // Check if a refresh is required (blocking path changed)
+                    if (conflictResult.requiresRefresh) {
+                        console.log('[PageEditor] ⛔ Blocking path changed - refresh required');
+                        addNotification(
+                            `Page updated by ${updateInfo.updatedBy || 'another user'} - please refresh the page`,
+                            'warning'
+                        );
+                        clearStaleFlag();
+                        return;
+                    }
+                    
+                    // Only show diff dialog if there are actual conflicts
+                    if (conflictResult.hasConflicts) {
+                        console.log('[PageEditor] 🔴 Conflicts detected - showing diff dialog');
+                        setConflictData({
+                            analysis: conflictResult,
+                            serverWebpage,
+                            serverVersion,
+                            updateInfo
+                        });
+                        setShowConflictModal(true);
+                        
+                        addNotification(
+                            `Page updated by ${updateInfo.updatedBy || 'another user'} - conflicts detected`,
+                            'info'
+                        );
+                    } else {
+                        // No conflicts - silently accept server changes
+                        console.log('[PageEditor] ✅ No conflicts - silently accepting server changes');
+                        console.log('[PageEditor] Updating state with merged data:', {
+                            mergedWebpage: conflictResult.mergedWebpage,
+                            mergedVersion: conflictResult.mergedVersion
+                        });
+                        
+                        // Update local state with merged data
+                        setWebpageData(conflictResult.mergedWebpage);
+                        setPageVersionData(conflictResult.mergedVersion);
+                        setOriginalWebpageData(conflictResult.mergedWebpage);
+                        setOriginalPageVersionData(conflictResult.mergedVersion);
+                        
+                        // Update local widgets state for UI
+                        if (conflictResult.mergedVersion.widgets) {
+                            setLocalWidgets(conflictResult.mergedVersion.widgets);
+                        }
+                        
+                        // Publish update through UDC to notify ContentEditor and other components
+                        if (versionId && conflictResult.mergedVersion.widgets) {
+                            const udcComponentId = `page-editor-${pageId}-websocket-merge`;
+                            publishUpdate(udcComponentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
+                                id: versionId,
+                                updates: {
+                                    widgets: conflictResult.mergedVersion.widgets
+                                },
+                                source: 'websocket_auto_merge',
+                                skipDirty: true // Don't mark as dirty since this is a server update
+                            });
+                        }
+                        
+                        console.log('[PageEditor] State update complete - UI should reflect server changes now');
+                        
+                        addNotification(
+                            `Page updated by ${updateInfo.updatedBy || 'another user'}`,
+                            'success'
+                        );
+                    }
+                    
+                    // Clear stale flag
+                    clearStaleFlag();
+                } catch (error) {
+                    console.error('Failed to fetch server version for diff:', error);
+                    // Fallback to simple notification
+                    addNotification(
+                        `Page updated by ${updateInfo.updatedBy || 'another user'}`,
+                        'info'
+                    );
+                }
+            }
+        }
+    )
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
@@ -1096,7 +1199,7 @@ const PageEditor = () => {
                 widgets: collectedData.widgets
             };
 
-            // Use smart save with separated data
+            // Use smart save with separated data (include timestamp for conflict detection)
             const saveResult = await smartSave(
                 originalWebpageData || {},      // Original webpage data
                 currentWebpageDataForSave,      // Current webpage data
@@ -1105,13 +1208,61 @@ const PageEditor = () => {
                 { pagesApi, versionsApi },      // API functions
                 {
                     description: saveOptions.description || 'Auto-save',
-                    forceNewVersion: saveOptions.option === 'new'
+                    forceNewVersion: saveOptions.option === 'new',
+                    clientUpdatedAt: saveOptions.resolvedData ? undefined : originalPageVersionData?.updatedAt
                 }
             );
 
-            // Update UI based on what was saved
-            let updatedWebpageData = currentWebpageDataForSave;
-            let updatedVersionData = currentVersionDataForSave;
+            // Check for conflict
+            if (saveResult.conflict) {
+                console.log('🔀 Conflict detected, attempting auto-merge...');
+                
+                // Fetch latest server version
+                const serverVersion = saveResult.conflict.server_version;
+                
+                // Detect conflicts and try auto-merge
+                const conflictAnalysis = detectPageConflicts(
+                    originalWebpageData || {},
+                    currentWebpageDataForSave,
+                    serverVersion,
+                    originalPageVersionData || {},
+                    currentVersionDataForSave,
+                    serverVersion
+                );
+                
+                if (conflictAnalysis.canAutoMerge) {
+                    // Auto-merge successful - retry save with merged data
+                    console.log('✅ Auto-merge successful, retrying save...');
+                    addNotification(
+                        'Changes auto-merged successfully',
+                        'success'
+                    );
+                    
+                    // Retry save with merged data (mark as resolved to skip timestamp check)
+                    return await handleActualSave({
+                        ...saveOptions,
+                        resolvedData: {
+                            webpage: conflictAnalysis.mergedWebpage,
+                            version: conflictAnalysis.mergedVersion
+                        }
+                    });
+                } else {
+                    // Conflicts exist - show modal for user resolution
+                    console.log('⚠️ Conflicts require manual resolution');
+                    setConflictData({
+                        analysis: conflictAnalysis,
+                        originalWebpage: currentWebpageDataForSave,
+                        originalVersion: currentVersionDataForSave,
+                        saveOptions
+                    });
+                    setShowConflictModal(true);
+                    return; // Don't proceed with save
+                }
+            }
+
+            // Handle resolved data from conflict resolution
+            let updatedWebpageData = saveOptions.resolvedData?.webpage || currentWebpageDataForSave;
+            let updatedVersionData = saveOptions.resolvedData?.version || currentVersionDataForSave;
 
             if (saveResult.pageResult) {
                 // Page was updated - merge the response into webpage data
@@ -1311,8 +1462,6 @@ const PageEditor = () => {
 
     // Simple save handlers - no modal confirmation
     const handleSave = useCallback(async () => {
-        // Cancel auto-save countdown when manually saving
-        cancelAutoSave();
         setIsSaving(true);
         try {
             await saveCurrentVersion();
@@ -1330,11 +1479,9 @@ const PageEditor = () => {
         } finally {
             setIsSaving(false);
         }
-    }, [saveCurrentVersion, setIsDirty, addNotification, cancelAutoSave]);
+    }, [saveCurrentVersion, setIsDirty, addNotification]);
 
     const handleSaveNew = useCallback(async () => {
-        // Cancel auto-save countdown when manually saving
-        cancelAutoSave();
         setIsSaving(true);
         try {
             await handleActualSave({ description: 'New version created', option: 'new' });
@@ -1343,8 +1490,44 @@ const PageEditor = () => {
         } finally {
             setIsSaving(false);
         }
-    }, [handleActualSave, cancelAutoSave]);
+    }, [handleActualSave]);
 
+    // Conflict resolution handlers
+    const handleConflictResolve = useCallback(async (resolutions) => {
+        if (!conflictData) return;
+        
+        // Apply user's resolution decisions
+        const resolved = applyConflictResolutions(conflictData.analysis, resolutions);
+        
+        // Close modal
+        setShowConflictModal(false);
+        
+        // Retry save with resolved data
+        try {
+            await handleActualSave({
+                ...conflictData.saveOptions,
+                resolvedData: resolved
+            });
+            
+            // Clear conflict data
+            setConflictData(null);
+        } catch (error) {
+            console.error('Failed to save after conflict resolution:', error);
+            addNotification(
+                `Save failed: ${error.message}`,
+                'error'
+            );
+        }
+    }, [conflictData, handleActualSave, addNotification]);
+    
+    const handleConflictCancel = useCallback(() => {
+        setShowConflictModal(false);
+        setConflictData(null);
+        addNotification(
+            'Save cancelled - conflicts not resolved',
+            'info'
+        );
+    }, [addNotification]);
 
     // Widget editor handlers
     const handleOpenWidgetEditor = useCallback((widgetData, forceOpen = true) => {
@@ -1908,8 +2091,6 @@ const PageEditor = () => {
                 webpageData={webpageData}
                 pageVersionData={pageVersionData}
                 validationState={schemaValidationState}
-                autoSaveCountdown={autoSaveCountdown}
-                autoSaveStatus={autoSaveStatus}
                 onClearClipboard={async () => {
                     await clearClipboardState();
                     addNotification('Clipboard cleared', 'info');
@@ -1955,6 +2136,17 @@ const PageEditor = () => {
                     isLoading={createNewPageMutation.isPending}
                 />
             )}
+            
+            {/* Conflict Resolution Modal */}
+            {showConflictModal && conflictData && (
+                <ConflictResolutionModal
+                    conflictResult={conflictData.analysis}
+                    onResolve={handleConflictResolve}
+                    onCancel={handleConflictCancel}
+                />
+            )}
+            
+            {/* Stale version warning removed - conflicts now handled via diff modal */}
         </div>
     )
 }

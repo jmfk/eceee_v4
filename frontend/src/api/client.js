@@ -9,6 +9,7 @@
 
 import axios from 'axios'
 import { convertKeysToCamel } from '../utils/caseConversion'
+import { getSessionId } from '../utils/sessionId'
 
 // API client configuration for Django backend with CSRF token handling
 const API_BASE_URL = ''
@@ -54,9 +55,12 @@ export const getCsrfToken = async () => {
     return null
 }
 
-// Request interceptor to add JWT token and CSRF token
+// Request interceptor to add JWT token, CSRF token, and session ID
 apiClient.interceptors.request.use(
     async (config) => {
+        // Add session ID to all requests
+        config.headers['X-Session-ID'] = getSessionId();
+        
         // Add JWT token to requests
         const accessToken = localStorage.getItem('access_token');
         if (accessToken) {

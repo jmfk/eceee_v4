@@ -169,6 +169,8 @@ THIRD_PARTY_APPS = [
     "mptt",
     # Monitoring
     "django_prometheus",
+    # WebSocket support
+    "channels",
 ]
 
 LOCAL_APPS = [
