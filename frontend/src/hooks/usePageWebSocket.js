@@ -60,7 +60,8 @@ export function usePageWebSocket(pageId, options = {}) {
 
         // Determine WebSocket URL based on current location
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/pages/${currentPageIdRef.current}/editor/`;
+        const wsBaseUrl = import.meta.env.VITE_WS_URL || `${protocol}//${window.location.host}`;
+        const wsUrl = `${wsBaseUrl}/ws/pages/${currentPageIdRef.current}/editor/`;
 
         try {
             const ws = new WebSocket(wsUrl);
@@ -113,14 +114,12 @@ export function usePageWebSocket(pageId, options = {}) {
             ws.onclose = (event) => {
                 if (!mountedRef.current) return;
                 
-                console.log('[WebSocket] Disconnected:', event.code, event.reason);
                 setIsConnected(false);
                 wsRef.current = null;
 
                 // Auto-reconnect if enabled and not exceeded max attempts
                 if (autoReconnect && reconnectAttemptsRef.current < maxReconnectAttempts) {
                     reconnectAttemptsRef.current += 1;
-                    console.log(`[WebSocket] Reconnecting in ${reconnectDelay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
                     
                     reconnectTimeoutRef.current = setTimeout(() => {
                         if (mountedRef.current) {

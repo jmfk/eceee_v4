@@ -86,6 +86,7 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:8000/api
       - REACT_APP_BACKEND_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
       - VITE_IMGPROXY_URL=http://imgproxy:8080
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
