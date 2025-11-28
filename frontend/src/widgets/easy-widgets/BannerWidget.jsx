@@ -392,7 +392,7 @@ const BannerWidget = ({
                 <div
                     className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
                     id={configRef.current.anchor || undefined}
-                    style={{ position: 'relative', ...bannerStyle }}
+                    style={{ position: 'relative', height: '140px', ...bannerStyle }}
                 >
                     {backgroundImageUrl && (
                         <div
@@ -457,7 +457,7 @@ const BannerWidget = ({
             <div
                 className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
                 id={configRef.current.anchor || undefined}
-                style={{ position: 'relative', ...bannerStyle }}
+                style={{ position: 'relative', height: '140px', ...bannerStyle }}
             >
                 {backgroundImageUrl && (
                     <div

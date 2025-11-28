@@ -252,7 +252,7 @@ div[style*="z-index"] {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px; /* Reduced from 30px for tighter spacing - can be overridden by theme design groups */
+  gap: 30px; /* Default gap between widgets - can be overridden by theme design groups */
   min-height: 100px; /* Ensure empty slots are visible */
 }
 

@@ -316,6 +316,7 @@ const ContentCardWidget = ({
                 <div
                     className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content"
                     id={configRef.current.anchor || undefined}
+                    style={{ height: '310px', marginBottom: '40px' }}
                 >
                     <div className="content-card-header header" ref={headerContainerRef} />
 
@@ -344,6 +345,7 @@ const ContentCardWidget = ({
             <div
                 className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content"
                 id={configRef.current.anchor || undefined}
+                style={{ height: '310px' }}
             >
                 {configRef.current.header && (
                     <div className="content-card-header header">
