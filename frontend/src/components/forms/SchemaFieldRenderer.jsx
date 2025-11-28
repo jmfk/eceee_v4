@@ -207,6 +207,18 @@ const SchemaFieldRenderer = ({
             return FIELD_COMPONENTS.TextInput()
         }), [componentName]) // Only recreate if componentName changes
 
+        // Memoize itemLabelTemplate function at top level (not inside useMemo)
+        const itemLabelTemplateFn = useCallback(
+            (item) => {
+                if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
+                    const propertyName = componentProps.itemLabelTemplate
+                    return item[propertyName] || ''
+                }
+                return ''
+            },
+            [componentProps.itemLabelTemplate]
+        )
+
         // Memoize fieldProps
         const fieldProps = useMemo(() => {
             const baseProps = {
@@ -217,6 +229,7 @@ const SchemaFieldRenderer = ({
                 placeholder: fieldSchema.placeholder,
                 namespace: namespace,
                 context: context,
+                fieldName: fieldName,
                 ...componentProps
             }
 
@@ -232,13 +245,9 @@ const SchemaFieldRenderer = ({
 
                 baseProps.itemSchema = itemSchema
 
-                // Handle itemLabelTemplate function - memoize this function
+                // Handle itemLabelTemplate function
                 if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
-                    const propertyName = componentProps.itemLabelTemplate
-                    baseProps.itemLabelTemplate = useCallback(
-                        (item) => item[propertyName] || '',
-                        [propertyName]
-                    )
+                    baseProps.itemLabelTemplate = itemLabelTemplateFn
                 }
             }
 
@@ -328,6 +337,7 @@ const SchemaFieldRenderer = ({
         placeholder: fieldSchema.placeholder,
         namespace: namespace,
         context: context,
+        fieldName: fieldName,
         // Map schema properties to field-specific props
         ...(fieldType === 'textarea' && {
             rows: fieldSchema.rows || 3,

@@ -1,212 +1,268 @@
-import React from 'react'
-import { Hash } from 'lucide-react'
-
 /**
- * EASY Footer Widget Component
- * Footer widget with multi-column grid layout, background styling, social links, and copyright
- * Matches backend easy_widgets.FooterWidget schema
+ * Footer Widget Component
+ * 
+ * Simple footer container with content slot and background styling.
+ * Widget type: easy_widgets.FooterWidget
  */
-const FooterWidget = ({ config = {}, mode = 'preview' }) => {
-    const {
-        columns = [],
-        columnCount = 3,
-        backgroundColor = '#1f2937',
-        backgroundImage = null,
-        backgroundSize = 'cover',
-        backgroundPosition = 'center',
-        textColor = '#f9fafb',
-        padding = '2rem 1rem',
-        margin = null,
-        textAlign = 'left',
-        cssClass = '',
-        customCss = '',
-        showCopyright = true,
-        copyrightText = '',
-        socialLinks = []
-    } = config
 
-    const currentYear = new Date().getFullYear()
-    const displayCopyright = copyrightText || `© ${currentYear} All rights reserved.`
+import React, { useState, useCallback, useMemo } from 'react';
+import SlotEditor from '../../components/editors/SlotEditor';
+import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
+import { OperationTypes } from '../../contexts/unified-data/types/operations';
+import { useWidgets } from '../../hooks/useWidgets';
+import PropTypes from 'prop-types';
 
-    // Build footer styles (keep only custom overrides, let CSS handle defaults)
-    const footerStyle = {}
+const FooterWidget = ({
+    config = {},
+    mode = 'display',
+    widgetId,
+    onWidgetEdit,
+    onOpenWidgetEditor,
+    contextType = 'page',
+    parentComponentId,
+    slotName,
+    widgetPath = [],
+    context = {},
+    // Selection props
+    selectedWidgets,
+    cutWidgets,
+    onToggleWidgetSelection,
+    isWidgetSelected,
+    isWidgetCut,
+    onDeleteCutWidgets,
+    buildWidgetPath,
+    parseWidgetPath,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition,
+    ...props
+}) => {
+    // Create this widget's own UDC componentId
+    const componentId = useMemo(() => {
+        if (widgetPath && widgetPath.length > 0) {
+            return `footer-${widgetPath.join('-')}`;
+        }
+        return `footer-${widgetId || 'unknown'}`;
+    }, [widgetId, widgetPath]);
 
-    if (backgroundColor && backgroundColor !== '#1f2937') {
-        footerStyle.backgroundColor = backgroundColor
-    }
-    if (backgroundImage) {
-        footerStyle.backgroundImage = `url(${backgroundImage})`
-        footerStyle.backgroundSize = backgroundSize
-        footerStyle.backgroundPosition = backgroundPosition
-    }
-    if (textColor && textColor !== '#f9fafb') {
-        footerStyle.color = textColor
-    }
-    if (padding && padding !== '2rem 1rem') {
-        footerStyle.padding = padding
-    }
-    if (margin) {
-        footerStyle.margin = margin
-    }
+    const { publishUpdate } = useUnifiedData(componentId);
+    const { getFilteredWidgetTypes: getWidgetTypes } = useWidgets();
 
-    // Render a column
-    const renderColumn = (column, index) => {
+    // Initialize slots data from config
+    const [slotsData, setSlotsData] = useState(
+        config.slots || { content: [] }
+    );
+
+    // Sync slotsData when config.slots changes externally
+    React.useEffect(() => {
+        if (config.slots) {
+            setSlotsData(config.slots);
+        }
+    }, [config.slots]);
+
+    // Handle slot changes - update local state first, then publish to UDC
+    const handleSlotChange = useCallback(async (slotName, widgets) => {
+        // Update local state immediately
+        setSlotsData(prevSlots => {
+            const updatedSlots = {
+                ...prevSlots,
+                [slotName]: widgets
+            };
+
+            // Publish to UDC using this widget's own componentId
+            const updatedConfig = {
+                ...config,
+                slots: updatedSlots
+            };
+
+            if (publishUpdate) {
+                publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                    id: widgetId,
+                    config: updatedConfig,
+                    slotName: props.slotName || 'main',
+                    contextType,
+                    parentComponentId,
+                    widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
+                }).catch(error => {
+                    console.error('FooterWidget: Failed to update config:', error);
+                });
+            }
+
+            return updatedSlots;
+        });
+    }, [config, publishUpdate, componentId, widgetId, contextType, props.slotName, parentComponentId, widgetPath]);
+
+    // Get filtered widget types for slots
+    const filteredWidgetTypes = getWidgetTypes ? getWidgetTypes() : [];
+
+    // Render individual widget in a slot (for display mode)
+    const renderWidget = useCallback((widget, slotName, index) => {
+        if (!widget || typeof widget !== 'object') {
+            console.warn('FooterWidget: Invalid widget data', widget);
+            return null;
+        }
+
+        const newWidgetPath = widgetPath ? [...widgetPath, slotName, index] : [slotName, index];
+
         return (
-            <div key={index} className="footer-column">
-                {column.title && (
-                    <h3 className="footer-column-title">{column.title}</h3>
-                )}
-                {column.items && column.items.length > 0 && (
-                    <ul className="footer-column-items">
-                        {column.items.map((item, itemIndex) => (
-                            <li key={itemIndex} className="footer-column-item">
-                                {item.url ? (
-                                    <a
-                                        href={item.url}
-                                        target={item.openInNewTab ? '_blank' : undefined}
-                                        rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
-                                    >
-                                        {item.label}
-                                    </a>
-                                ) : (
-                                    item.label
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-        )
+            <PageWidgetFactory
+                key={widget.id || index}
+                widget={widget}
+                slotName={slotName}
+                index={index}
+                mode={mode}
+                onEdit={onWidgetEdit}
+                onOpenWidgetEditor={onOpenWidgetEditor}
+                contextType={contextType}
+                parentComponentId={componentId}
+                widgetPath={newWidgetPath}
+                selectedWidgets={selectedWidgets}
+                cutWidgets={cutWidgets}
+                onToggleWidgetSelection={onToggleWidgetSelection}
+                isWidgetSelected={isWidgetSelected}
+                isWidgetCut={isWidgetCut}
+                onDeleteCutWidgets={onDeleteCutWidgets}
+                buildWidgetPath={buildWidgetPath}
+                parseWidgetPath={parseWidgetPath}
+                pasteModeActive={pasteModeActive}
+                onPasteAtPosition={onPasteAtPosition}
+            />
+        );
+    }, [
+        widgetPath, mode, onWidgetEdit, onOpenWidgetEditor, contextType,
+        componentId, selectedWidgets, cutWidgets, onToggleWidgetSelection,
+        isWidgetSelected, isWidgetCut, onDeleteCutWidgets, buildWidgetPath,
+        parseWidgetPath, pasteModeActive, onPasteAtPosition
+    ]);
+
+    // Build footer styles
+    const footerStyle = {};
+
+    if (config.backgroundColor) {
+        footerStyle.backgroundColor = config.backgroundColor;
+    }
+    if (config.backgroundImage) {
+        footerStyle.backgroundImage = `url(${config.backgroundImage})`;
+        footerStyle.backgroundSize = 'cover';
+        footerStyle.backgroundPosition = 'center';
+    }
+    if (config.textColor) {
+        footerStyle.color = config.textColor;
     }
 
-    // Editor mode: show simple preview with configured styles
+    // In editor mode, show SlotEditor
     if (mode === 'editor') {
+        const widgets = slotsData.content || [];
+
         return (
-            <div className="footer-widget-editor p-4">
-                <footer
-                    className={`footer-widget widget-type-easy-widgets-footerwidget rounded cms-content ${cssClass}`}
-                    style={footerStyle}
-                >
-                    <div className="footer-content">
-                        {columns && columns.length > 0 && (
-                            <div className="footer-columns">
-                                {columns.map((column, index) => renderColumn(column, index))}
-                            </div>
-                        )}
-
-                        {socialLinks.length > 0 && (
-                            <div className="footer-social-links">
-                                {socialLinks.map((link, index) => (
-                                    <a
-                                        key={index}
-                                        href={link.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="footer-social-link"
-                                        title={link.name}
-                                    >
-                                        {link.icon && <i className={link.icon}></i>}
-                                        {!link.icon && <span>{link.name}</span>}
-                                    </a>
-                                ))}
-                            </div>
-                        )}
-
-                        {showCopyright && (
-                            <div className="footer-copyright">
-                                {displayCopyright}
-                            </div>
-                        )}
-                    </div>
-
-                    {customCss && (
-                        <style dangerouslySetInnerHTML={{ __html: customCss }} />
-                    )}
-                </footer>
+            <div className="footer-widget border border-gray-200 mb-4">
+                <div className="p-1">
+                    <SlotEditor
+                        slotName="content"
+                        slotLabel="Footer Content"
+                        widgets={widgets}
+                        availableWidgetTypes={filteredWidgetTypes}
+                        parentWidgetId={widgetId}
+                        contextType={contextType}
+                        onWidgetEdit={onWidgetEdit}
+                        onOpenWidgetEditor={onOpenWidgetEditor}
+                        onSlotChange={handleSlotChange}
+                        parentComponentId={parentComponentId}
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
+                        parentSlotName={slotName}
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
+                        widgetPath={widgetPath}
+                        emptyMessage="No content in footer"
+                        className="[&_.slot-editor]:!p-0"
+                        mode="editor"
+                        showClearButton={false}
+                        compactAddButton={true}
+                    />
+                </div>
             </div>
-        )
+        );
     }
 
-    // Preview/production mode: full rendering with all config applied
+    // Display mode - simple rendering
+    const contentWidgets = slotsData.content || [];
+
     return (
         <footer
-            className={`footer-widget widget-type-easy-widgets-footerwidget cms-content ${cssClass}`}
+            className="footer-widget widget-type-easy-widgets-footerwidget cms-content"
             style={footerStyle}
         >
-            <div className="footer-content">
-                {columns && columns.length > 0 && (
-                    <div className="footer-columns">
-                        {columns.map((column, index) => renderColumn(column, index))}
-                    </div>
-                )}
-
-                {socialLinks.length > 0 && (
-                    <div className="footer-social-links">
-                        {socialLinks.map((link, index) => (
-                            <a
-                                key={index}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="footer-social-link"
-                                title={link.name}
-                            >
-                                {link.icon && <i className={link.icon}></i>}
-                                {!link.icon && <span>{link.name}</span>}
-                            </a>
-                        ))}
-                    </div>
-                )}
-
-                {showCopyright && (
-                    <div className="footer-copyright">
-                        {displayCopyright}
-                    </div>
-                )}
-            </div>
-
-            {customCss && (
-                <style dangerouslySetInnerHTML={{ __html: customCss }} />
+            {contentWidgets.length > 0 ? (
+                contentWidgets
+                    .filter(widget => widget && typeof widget === 'object')
+                    .map((widget, index) =>
+                        renderWidget(widget, 'content', index)
+                    )
+            ) : (
+                <div className="empty-slot">
+                    Footer content will appear here
+                </div>
             )}
         </footer>
-    )
-}
+    );
+};
 
-// === COLOCATED METADATA ===
-FooterWidget.displayName = 'FooterWidget'
-FooterWidget.widgetType = 'easy_widgets.FooterWidget'
+FooterWidget.propTypes = {
+    config: PropTypes.shape({
+        backgroundColor: PropTypes.string,
+        backgroundImage: PropTypes.string,
+        textColor: PropTypes.string,
+        slots: PropTypes.shape({
+            content: PropTypes.array
+        })
+    }),
+    mode: PropTypes.oneOf(['display', 'editor']),
+    widgetId: PropTypes.string,
+    onWidgetEdit: PropTypes.func,
+    onOpenWidgetEditor: PropTypes.func,
+    contextType: PropTypes.oneOf(['page', 'object']),
+    parentComponentId: PropTypes.string
+};
 
-// Default configuration matching backend schema
+FooterWidget.displayName = 'Footer';
+FooterWidget.widgetType = 'easy_widgets.FooterWidget';
+FooterWidget.description = 'Footer container with content slot and background styling options';
+
+// Define slot configuration for the editor
+FooterWidget.slotConfiguration = {
+    slots: [
+        {
+            name: "content",
+            label: "Footer Content",
+            description: "Widgets within the footer",
+            maxWidgets: null,
+            required: false
+        }
+    ]
+};
+
 FooterWidget.defaultConfig = {
-    columns: [
-        { title: '', items: [] },
-        { title: '', items: [] },
-        { title: '', items: [] }
-    ],
-    columnCount: 3,
-    backgroundColor: '#1f2937',
+    backgroundColor: null,
     backgroundImage: null,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    textColor: '#f9fafb',
-    padding: '2rem 1rem',
-    margin: null,
-    textAlign: 'left',
-    cssClass: '',
-    customCss: '',
-    showCopyright: true,
-    copyrightText: '',
-    socialLinks: []
-}
+    textColor: null,
+    slots: { content: [] }
+};
 
-// Display metadata
 FooterWidget.metadata = {
     name: 'Footer',
-    description: 'Footer with multi-column grid layout, links, social links, and copyright',
+    description: 'Footer container with content slot and background styling options',
     category: 'layout',
-    icon: Hash,
-    tags: ['footer', 'layout', 'copyright', 'social', 'grid', 'columns'],
-    specialEditor: 'FooterWidgetEditor'
-}
+    icon: null,
+    tags: ['layout', 'footer', 'container'],
+    menuItems: []
+};
 
-export default FooterWidget
+export default FooterWidget;

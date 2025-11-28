@@ -22,6 +22,17 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
     const fieldName = context?.fieldName
     const parentComponentId = context?.parentComponentId
 
+    console.log('[ItemForm] Initialized with context:', {
+        itemIndex,
+        widgetId,
+        slotName,
+        contextType,
+        fieldName,
+        parentComponentId,
+        hasInitialItem: !!initialItem,
+        context
+    })
+
     // UDC Integration
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
 
@@ -75,16 +86,17 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
         }
     })
 
-    if (!schema || !schema.fields || schema.fields.length === 0) {
-        return (
-            <div className="text-sm text-gray-500 p-4 text-center">
-                No fields defined for this item
-            </div>
-        )
-    }
-
     // Handle field changes - update ref and publish to UDC (NO re-render)
     const handleFieldChange = useCallback(async (changedFieldName, value) => {
+        console.log('[ItemForm] handleFieldChange called:', { 
+            changedFieldName, 
+            value, 
+            itemIndex,
+            fieldName,
+            widgetId,
+            slotName,
+            contextType
+        })
 
         // Update our internal ref (no state change = no re-render)
         const updatedItem = {
@@ -92,27 +104,53 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
             [changedFieldName]: value
         }
         itemRef.current = updatedItem
+        console.log('[ItemForm] Updated itemRef:', updatedItem)
 
         // Publish to UDC
         if (!publishUpdate || !widgetId || !slotName || !contextType || !fieldName) {
+            console.log('[ItemForm] UDC publish skipped - missing required context:', {
+                hasPublishUpdate: !!publishUpdate,
+                widgetId,
+                slotName,
+                contextType,
+                fieldName
+            })
             return
         }
 
         // Get current items array from UDC
         const state = getState()
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        if (widget && widget.config && widget.config[fieldName]) {
+        console.log('[ItemForm] Widget from UDC:', widget)
+        
+        if (widget && widget.config) {
             const currentItems = widget.config[fieldName] || []
             const newItems = [...currentItems]
             newItems[itemIndex] = updatedItem
+            
+            console.log('[ItemForm] Publishing update:', {
+                currentItems,
+                newItems,
+                itemIndex
+            })
+            
+            // Merge with existing config to preserve other fields
+            const updatedConfig = {
+                ...widget.config,
+                [fieldName]: newItems
+            }
+            
             // Publish full array to UDC (batched automatically by UDC)
             await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 slotName: slotName,
                 contextType: contextType,
-                config: { [fieldName]: newItems },
+                config: updatedConfig,
                 widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
             })
+            console.log('[ItemForm] UDC update published successfully')
+        } else {
+            console.log('[ItemForm] Widget or config not found, cannot publish')
         }
     }, [publishUpdate, widgetId, slotName, contextType, fieldName, itemIndex, widgetPath, componentId, getState])
 
@@ -129,6 +167,15 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
             isValid: false,
             errors: fieldErrors.map(err => err.message || err.error)
         }
+    }
+
+    // Early return AFTER all hooks
+    if (!schema || !schema.fields || schema.fields.length === 0) {
+        return (
+            <div className="text-sm text-gray-500 p-4 text-center">
+                No fields defined for this item
+            </div>
+        )
     }
 
     return (
