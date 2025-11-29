@@ -1,158 +1,18 @@
-import React, { useState, useRef, useCallback, useMemo, Suspense } from 'react'
+import React, { Suspense } from 'react'
 import { FIELD_COMPONENTS } from '../../form-fields'
 import { Loader2 } from 'lucide-react'
-import { useUnifiedData } from '../../../contexts/unified-data/context/UnifiedDataContext'
-import { OperationTypes } from '../../../contexts/unified-data/types/operations'
-import { lookupWidget } from '../../../utils/widgetUtils'
 
 /**
  * ItemForm Component
  * 
- * Renders a dynamic form for an item based on its schema.
- * UDC-integrated - gets item from UDC, publishes changes to UDC.
- * Uses UNCONTROLLED inputs for performance - DOM holds the truth.
- * Only re-renders on external UDC changes via key remount.
+ * Pure presentational component - renders form fields based on schema.
+ * Uses UNCONTROLLED inputs (defaultValue) for performance - DOM holds the truth.
+ * Receives current item data from ItemCard's itemRef (synced via UDC).
+ * Calls onFieldChange handler (provided by ItemCard) when fields change.
+ * ItemCard handles all state management and UDC integration.
  */
-const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, itemIndex }) => {
-    // Extract UDC context
-    const widgetId = context?.widgetId
-    const slotName = context?.slotName
-    const contextType = context?.contextType
-    const widgetPath = context?.widgetPath
-    const fieldName = context?.fieldName
-    const parentComponentId = context?.parentComponentId
-
-    console.log('[ItemForm] Initialized with context:', {
-        itemIndex,
-        widgetId,
-        slotName,
-        contextType,
-        fieldName,
-        parentComponentId,
-        hasInitialItem: !!initialItem,
-        context
-    })
-
-    // UDC Integration
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
-
-    // Create hierarchical componentId using parent's ID as prefix
-    const componentId = useMemo(() => {
-        if (parentComponentId) {
-            return `${parentComponentId}-item-${itemIndex}`
-        }
-        // Fallback for standalone use
-        return `item-form-${widgetId || 'preview'}-${fieldName || 'items'}-${itemIndex}`
-    }, [parentComponentId, widgetId, fieldName, itemIndex])
-
-    // Helper to get item from UDC
-    const getItemFromUDC = useCallback(() => {
-        if (widgetId && slotName && contextType && fieldName && getState) {
-            const state = getState()
-            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-            if (widget && widget.config && widget.config[fieldName]) {
-                const items = widget.config[fieldName]
-                if (Array.isArray(items) && items[itemIndex] !== undefined) {
-                    return items[itemIndex]
-                }
-            }
-        }
-        return initialItem || {}
-    }, [widgetId, slotName, contextType, fieldName, getState, widgetPath, itemIndex, initialItem])
-
-    // Ref holds current item values (source of truth between renders)
-    const itemRef = useRef(getItemFromUDC())
-
-    // Key to force remount when external changes occur
-    const [formKey, setFormKey] = useState(0)
-
-    // Subscribe to UDC for external changes ONLY
-    useExternalChanges(componentId, (state) => {
-        if (!widgetId || !slotName || !contextType || !fieldName) {
-            return
-        }
-
-        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        if (widget && widget.config && widget.config[fieldName]) {
-            const items = widget.config[fieldName]
-            if (Array.isArray(items) && items[itemIndex] !== undefined) {
-                const externalItem = items[itemIndex]
-                // Only remount if external change differs from our ref
-                if (JSON.stringify(externalItem) !== JSON.stringify(itemRef.current)) {
-                    itemRef.current = externalItem
-                    setFormKey(prev => prev + 1) // Force remount with new defaultValues
-                }
-            }
-        }
-    })
-
-    // Handle field changes - update ref and publish to UDC (NO re-render)
-    const handleFieldChange = useCallback(async (changedFieldName, value) => {
-        console.log('[ItemForm] handleFieldChange called:', { 
-            changedFieldName, 
-            value, 
-            itemIndex,
-            fieldName,
-            widgetId,
-            slotName,
-            contextType
-        })
-
-        // Update our internal ref (no state change = no re-render)
-        const updatedItem = {
-            ...itemRef.current,
-            [changedFieldName]: value
-        }
-        itemRef.current = updatedItem
-        console.log('[ItemForm] Updated itemRef:', updatedItem)
-
-        // Publish to UDC
-        if (!publishUpdate || !widgetId || !slotName || !contextType || !fieldName) {
-            console.log('[ItemForm] UDC publish skipped - missing required context:', {
-                hasPublishUpdate: !!publishUpdate,
-                widgetId,
-                slotName,
-                contextType,
-                fieldName
-            })
-            return
-        }
-
-        // Get current items array from UDC
-        const state = getState()
-        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        console.log('[ItemForm] Widget from UDC:', widget)
-        
-        if (widget && widget.config) {
-            const currentItems = widget.config[fieldName] || []
-            const newItems = [...currentItems]
-            newItems[itemIndex] = updatedItem
-            
-            console.log('[ItemForm] Publishing update:', {
-                currentItems,
-                newItems,
-                itemIndex
-            })
-            
-            // Merge with existing config to preserve other fields
-            const updatedConfig = {
-                ...widget.config,
-                [fieldName]: newItems
-            }
-            
-            // Publish full array to UDC (batched automatically by UDC)
-            await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                slotName: slotName,
-                contextType: contextType,
-                config: updatedConfig,
-                widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
-            })
-            console.log('[ItemForm] UDC update published successfully')
-        } else {
-            console.log('[ItemForm] Widget or config not found, cannot publish')
-        }
-    }, [publishUpdate, widgetId, slotName, contextType, fieldName, itemIndex, widgetPath, componentId, getState])
+const ItemForm = ({ item, schema, disabled, errors = [], onFieldChange }) => {
+    // Use item prop directly - it comes from ItemCard's itemRef.current
 
     const getFieldError = (fieldName) => {
         if (!errors || errors.length === 0) return null
@@ -179,9 +39,10 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
     }
 
     return (
-        <div key={formKey} className="space-y-4">
+        <div className="space-y-4">
             {schema.fields.map((field, idx) => {
-                const fieldValue = itemRef.current[field.name]
+                // Use item prop directly - component is uncontrolled, DOM maintains state
+                const fieldValue = item[field.name]
                 const fieldValidation = getFieldError(field.name)
 
                 // Determine which component to use
@@ -197,13 +58,13 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
                 })
 
                 const fieldProps = {
-                    label: field.title || field.label || field.name,
+                    label: field.label,
                     description: field.description,
                     required: field.required || false,
                     disabled: disabled || field.disabled || false,
                     placeholder: field.placeholder,
                     defaultValue: fieldValue, // UNCONTROLLED - only sets initial value
-                    onChange: (value) => handleFieldChange(field.name, value),
+                    onChange: (value) => onFieldChange(field.name, value),
                     validation: fieldValidation,
                     // Field-specific props
                     ...field.props
@@ -287,14 +148,14 @@ function mapFieldTypeToComponent(field) {
 ItemForm.displayName = 'ItemForm'
 
 // Memoize to prevent re-renders when parent re-renders
-// Item data comes from UDC, not props
+// Like a native input element - NEVER re-renders based on item data changes
 export default React.memo(ItemForm, (prevProps, nextProps) => {
-    // Only re-render if UI control props change
+    // Only re-render if UI control props change, NOT item data
     return (
-        prevProps.itemIndex === nextProps.itemIndex &&
         prevProps.schema === nextProps.schema &&
         prevProps.disabled === nextProps.disabled &&
         JSON.stringify(prevProps.errors) === JSON.stringify(nextProps.errors) &&
-        JSON.stringify(prevProps.context) === JSON.stringify(nextProps.context)
+        prevProps.onFieldChange === nextProps.onFieldChange
+        // Deliberately NOT comparing item - we're uncontrolled
     )
 })

@@ -264,7 +264,8 @@ const SchemaFieldRenderer = ({
             context,
             componentName,
             componentProps,
-            schema
+            schema,
+            itemLabelTemplateFn
         ])
 
         return (

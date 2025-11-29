@@ -6,6 +6,11 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget } from '../../utils/widgetUtils'
 
+// Generate unique ID for items to maintain stable React keys
+const generateItemId = () => {
+    return `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+}
+
 /**
  * ItemsListField Component
  * 
@@ -79,7 +84,12 @@ const ItemsListField = ({
     )
 
     // Ref-based data storage (no re-render on data updates)
-    const itemsRef = useRef(Array.isArray(value) ? value : [])
+    // Ensure all items have unique _itemId for stable React keys
+    const itemsRef = useRef(
+        Array.isArray(value) 
+            ? value.map(item => item._itemId ? item : { ...item, _itemId: generateItemId() })
+            : []
+    )
 
     // Manual re-render mechanism
     const [renderKey, setRenderKey] = useState(0)
@@ -101,7 +111,12 @@ const ItemsListField = ({
 
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         if (widget && widget.config && widget.config[fieldName]) {
-            const newItems = widget.config[fieldName]
+            const rawItems = widget.config[fieldName]
+            
+            // Ensure all items have _itemId for stable React keys
+            const newItems = Array.isArray(rawItems)
+                ? rawItems.map(item => item._itemId ? item : { ...item, _itemId: generateItemId() })
+                : []
 
             // Only update if items actually changed
             if (JSON.stringify(newItems) !== JSON.stringify(itemsRef.current)) {
@@ -110,10 +125,10 @@ const ItemsListField = ({
 
                 if (isSubComponentUpdate) {
                     // Silent update - just sync ref, no re-render
-                    itemsRef.current = Array.isArray(newItems) ? newItems : []
+                    itemsRef.current = newItems
                 } else {
                     // External update - sync ref AND re-render
-                    itemsRef.current = Array.isArray(newItems) ? newItems : []
+                    itemsRef.current = newItems
                     forceRerender()
                 }
             }
@@ -138,7 +153,7 @@ const ItemsListField = ({
     }, [widgetId, slotName, contextType, fieldName, widgetPath, componentId, udcPublishUpdate, onChange])
 
     // Parse the item schema to get field definitions
-    const parsedSchema = parseItemSchema(itemSchema)
+    const parsedSchema = useMemo(() => parseItemSchema(itemSchema), [itemSchema])
 
     // Auto-expand newly added items
     useEffect(() => {
@@ -199,9 +214,15 @@ const ItemsListField = ({
         if (maxItems && itemsRef.current.length >= maxItems) return
 
         // Create default item from schema or use provided default
-        const newItem = defaultItem
+        const baseItem = defaultItem
             ? (typeof defaultItem === 'function' ? defaultItem() : { ...defaultItem })
             : parsedSchema.defaultValues || {}
+        
+        // Add unique ID for stable React keys
+        const newItem = {
+            ...baseItem,
+            _itemId: generateItemId()
+        }
 
         const newItems = [...itemsRef.current, newItem]
         lastAddedIndex.current = newItems.length - 1
@@ -341,19 +362,26 @@ const ItemsListField = ({
                     ) : (
                         itemsRef.current.map((item, index) => (
                             <ItemCard
-                                key={`${renderKey}-${index}`}
+                                key={item._itemId || `fallback-${index}`}
                                 initialItem={item}
                                 index={index}
                                 labelTemplate={itemLabelTemplate}
                                 isExpanded={expandedItems.has(index)}
-                                onToggle={() => toggleItemExpansion(index)}
-                                onRemove={allowRemove ? () => handleRemoveItem(index) : null}
-                                onMoveUp={allowReorder && index > 0 ? () => handleMoveItem(index, index - 1) : null}
-                                onMoveDown={allowReorder && index < itemsRef.current.length - 1 ? () => handleMoveItem(index, index + 1) : null}
+                                onToggle={toggleItemExpansion}
+                                onRemove={allowRemove ? handleRemoveItem : null}
+                                onMoveUp={allowReorder && index > 0 ? handleMoveItem : null}
+                                onMoveDown={allowReorder && index < itemsRef.current.length - 1 ? handleMoveItem : null}
+                                canMoveUp={allowReorder && index > 0}
+                                canMoveDown={allowReorder && index < itemsRef.current.length - 1}
                                 schema={parsedSchema}
                                 disabled={disabled}
                                 errors={itemErrors[index]}
-                                context={{ ...context, fieldName, parentComponentId: componentId }}
+                                widgetId={context?.widgetId}
+                                slotName={context?.slotName}
+                                contextType={context?.contextType}
+                                widgetPath={context?.widgetPath}
+                                fieldName={fieldName}
+                                parentComponentId={componentId}
                             />
                         ))
                     )}
