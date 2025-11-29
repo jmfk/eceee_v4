@@ -70,9 +70,16 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
 
     const renderMenuItems = (items) => {
         return items.map((item, index) => (
-            <li key={index} className="">
-                <a href="#" data-href={item.url} className="">{item.label}</a>
-            </li >
+            <li key={index}>
+                <a 
+                    href={item.url} 
+                    target={item.targetBlank || item.target_blank ? "_blank" : undefined}
+                    rel={item.targetBlank || item.target_blank ? "noopener noreferrer" : undefined}
+                    className="hover:opacity-70 transition-opacity"
+                >
+                    {item.label}
+                </a>
+            </li>
         ))
     }
 
@@ -111,23 +118,21 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     if (mode === 'editor') {
         return (
             <nav className="navigation-widget">
-                <ul className="nav-container">
+                <ul className="nav-container list-none m-0 p-0 flex gap-4 items-center">
                     {localMenu && renderMenuItems(localMenu)}
                     {renderMenuItems(menuItems)}
                 </ul>
             </nav>
-
         )
     }
 
     return (
         <nav className="navigation-widget">
-            <ul className="nav-container">
+            <ul className="nav-container list-none m-0 p-0 flex gap-4 items-center">
                 {localMenu && renderMenuItems(localMenu)}
                 {renderMenuItems(menuItems)}
             </ul>
         </nav>
-
     )
 }
 
