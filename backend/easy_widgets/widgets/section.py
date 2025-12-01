@@ -161,6 +161,47 @@ class SectionWidget(BaseWidget):
     description = "Collapsible section with anchor support and internal content slot"
     template_name = "easy_widgets/widgets/section.html"
 
+    layout_parts = {
+        "section-widget": {
+            "label": "Section container (with collapse)",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "border",
+                "borderTop",
+                "borderRight",
+                "borderBottom",
+                "borderLeft",
+                "borderColor",
+                "borderWidth",
+                "borderStyle",
+                "borderRadius",
+                "backgroundColor",
+            ],
+        },
+        "section-content-only-widget": {
+            "label": "Section container (without collapse)",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "border",
+                "borderTop",
+                "borderRight",
+                "borderBottom",
+                "borderLeft",
+                "borderColor",
+                "borderWidth",
+                "borderStyle",
+                "borderRadius",
+                "backgroundColor",
+            ],
+        },
+    }
+
     widget_css = """
     .section-widget {
         margin-bottom: 30px;
@@ -171,13 +212,13 @@ class SectionWidget(BaseWidget):
     .section-widget:last-child {
         margin-bottom: 0;
     }
-    .section-content-only {
+    .section-content-only-widget {
         margin-bottom: 30px;
     }
-    .section-content-only.border-enabled {
+    .section-content-only-widget.border-enabled {
         outline: 1px solid rgb(0,0,0,0.3);
     }
-    .section-content-only:last-child {
+    .section-content-only-widget:last-child {
         margin-bottom: 0;
     }    
     .section-header {

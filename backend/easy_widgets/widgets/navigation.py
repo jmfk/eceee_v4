@@ -136,6 +136,37 @@ class NavigationWidget(BaseWidget):
     description = "Navigation widget with background image/color and text color options"
     template_name = "easy_widgets/widgets/navigation.html"
 
+    widget_css = """
+    .navigation-widget .nav-container {
+        display: flex;
+        flex-direction: column;
+        list-style: none;
+        margin: 0 0 30px 0;
+        padding: 0 0 0 30px;
+        gap: 10px;
+        align-items: top;
+        min-height: 140px;
+        height: var(--nav-height, auto);
+        width: 100%;
+    }
+    .navigation-widget .nav-container li {
+        background-color: red;
+        height: 20px;
+        width: 100%;
+    }
+    .navigation-widget .nav-container a {
+        color: inherit;
+        text-decoration: none;
+        transition: opacity 0.2s;
+    }
+
+    .navigation-widget .nav-container a:hover {
+        opacity: 0.7;
+    }
+    """
+
+    css_scope = "widget"
+
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return NavigationConfig
@@ -179,10 +210,12 @@ class NavigationWidget(BaseWidget):
                 anchor = widget_config.get("anchor")
                 if anchor and anchor.strip():
                     # Use anchor_title if available, fallback to title/header, then anchor
-                    label = (widget_config.get("anchor_title") or 
-                            widget_config.get("title") or 
-                            widget_config.get("header") or 
-                            anchor)
+                    label = (
+                        widget_config.get("anchor_title")
+                        or widget_config.get("title")
+                        or widget_config.get("header")
+                        or anchor
+                    )
                     dynamic_menu_items.append(
                         {
                             "label": label,
@@ -361,7 +394,7 @@ class NavigationWidget(BaseWidget):
         template_config["parent_children"] = parent_children
         template_config["hasParentChildren"] = len(parent_children) > 0
         template_config["isInherited"] = is_inherited
-        
+
         # Inheritance depth and helper booleans for Mustache templates
         depth = context.get("widget_inheritance_depth", 0)
         template_config["inheritanceDepth"] = depth
@@ -373,6 +406,18 @@ class NavigationWidget(BaseWidget):
         template_config["isLevel2AndBelow"] = depth >= 2
         template_config["isLevel3AndBelow"] = depth >= 3
         template_config["isDeepLevel"] = depth >= 4
+
+        # Calculate dynamic height based on total item count
+        import math
+
+        total_item_count = len(dynamic_menu_items) + len(config.get("menu_items", []))
+        if total_item_count > 0:
+            # Formula: ceil(count / 5) * 140 + (ceil(count / 5) - 1) * 30
+            rows = math.ceil(total_item_count / 5)
+            nav_container_height = rows * 140 + (rows - 1) * 30
+        else:
+            nav_container_height = 140  # Default minimum height
+        template_config["nav_container_height"] = nav_container_height
 
         return template_config
 
