@@ -189,9 +189,9 @@ const LocalStateFieldWrapper = React.memo(({
             isDirty: removedIsDirty,
             isTouched: removedIsTouched,
             isValidating: removedIsValidating,
-            fieldName: removedFieldName, // Remove fieldName from being spread to DOM
-            // Preserve context
+            // Preserve context and fieldName for components that need them
             context,
+            fieldName: extractedFieldName,
             // Keep the rest
             ...componentProps
         } = {
@@ -209,7 +209,8 @@ const LocalStateFieldWrapper = React.memo(({
             'data-local-state': true
         }
         
-        return { ...componentProps, context }
+        // Pass context and fieldName to components that need them (like ItemsListField)
+        return { ...componentProps, context, fieldName: extractedFieldName }
     }, [
         fieldProps,
         localValue, // Use localValue in dependencies
