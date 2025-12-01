@@ -25,14 +25,14 @@ Section Widget Template
         <div class="section-content">
             {# First widget - always visible #}
             {% if config.rendered_slots.content %}
-                {{ config.rendered_slots.content.0.html|sanitize_html }}
+                {{ config.rendered_slots.content.0.html|safe }}
             {% endif %}
             
             {# Remaining widgets - hidden when collapsed #}
             <div class="section-remaining-content">
                 {% for widget in config.rendered_slots.content %}
                     {% if not forloop.first %}
-                        {{ widget.html|sanitize_html }}
+                        {{ widget.html|safe }}
                     {% endif %}
                 {% endfor %}
             </div>
@@ -54,7 +54,7 @@ Section Widget Template
     {# Non-collapsible: just render content directly with anchor #}
     <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only{% if config.show_border %} border-enabled{% endif %}">
         {% for widget in config.rendered_slots.content %}
-            {{ widget.html|sanitize_html }}
+            {{ widget.html|safe }}
         {% endfor %}
     </div>
 {% endif %}

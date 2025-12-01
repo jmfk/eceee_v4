@@ -19,6 +19,51 @@ class WebPageRenderer:
         self.request = request
         self._rendered_css = set()  # Track rendered CSS to avoid duplicates
 
+    def _process_component_css(self, css_content, theme=None):
+        """
+        Process component CSS, converting breakpoint dictionaries to proper CSS with media queries.
+
+        Args:
+            css_content: CSS as string or dict with breakpoints {'sm': '...', 'md': '...', etc}
+            theme: Optional theme object for breakpoint values
+
+        Returns:
+            str: Processed CSS string ready for injection
+        """
+        # If already a string, return as-is
+        if isinstance(css_content, str):
+            return css_content
+
+        # If it's a dict, convert to CSS with media queries
+        if isinstance(css_content, dict):
+            # Get breakpoints from theme or use defaults
+            breakpoints = {"sm": 640, "md": 768, "lg": 1024, "xl": 1280}
+            if theme and hasattr(theme, "get_breakpoints"):
+                breakpoints = theme.get_breakpoints()
+
+            css_parts = []
+
+            # Base styles (sm - no media query for mobile-first)
+            base_css = css_content.get("sm") or css_content.get("default")
+            if base_css:
+                # Ensure base CSS has proper formatting
+                css_parts.append(base_css.strip())
+
+            # Generate media queries for larger breakpoints (mobile-first)
+            for bp_key in ["md", "lg", "xl"]:
+                bp_css = css_content.get(bp_key)
+                if bp_css and bp_css.strip():
+                    bp_value = breakpoints.get(bp_key)
+                    if bp_value:
+                        # Properly format media query with indentation
+                        media_query = f"@media (min-width: {bp_value}px) {{\n  {bp_css.strip()}\n}}"
+                        css_parts.append(media_query)
+
+            return "\n\n".join(css_parts) if css_parts else ""
+
+        # Fallback for unexpected types
+        return str(css_content) if css_content else ""
+
     def render(self, page, version=None, context=None):
         """
         Render a complete WebPage to HTML string.
@@ -170,7 +215,11 @@ class WebPageRenderer:
         # Allow empty strings - if Component Style is selected, respect the template output
         if custom_style_html is not None:
             if custom_style_css:
-                return f"<style>{custom_style_css}</style>\n{custom_style_html}"
+                # Process CSS to handle breakpoint dictionaries
+                processed_css = self._process_component_css(
+                    custom_style_css, enhanced_context.get("theme")
+                )
+                return f"<style>{processed_css}</style>\n{custom_style_html}"
             return custom_style_html
 
         slot_name = context.get("slot_name", "")
@@ -226,7 +275,11 @@ class WebPageRenderer:
             )
             # Inject custom CSS in passthru mode (when custom_style_css exists but custom_style_html doesn't)
             if custom_style_css:
-                widget_html = f"<style>{custom_style_css}</style>\n{widget_html}"
+                # Process CSS to handle breakpoint dictionaries
+                processed_css = self._process_component_css(
+                    custom_style_css, enhanced_context.get("theme")
+                )
+                widget_html = f"<style>{processed_css}</style>\n{widget_html}"
             return widget_html
         except Exception as e:
             return f"<!-- Error rendering widget: {e} -->"
@@ -349,7 +402,7 @@ class WebPageRenderer:
                         is_visible = widget.config.get("isVisible", True)
                     if not is_visible:
                         continue  # Skip hidden widgets
-                    
+
                     # Get layout name (handle both dict and Layout object)
                     layout = context.get("layout")
                     if hasattr(layout, "name"):
@@ -449,7 +502,7 @@ class WebPageRenderer:
     def _collect_page_css(self, page, layout, widgets_by_slot):
         """Collect all CSS for the page including theme, layout, and widgets."""
         from .services.theme_css_generator import ThemeCSSGenerator
-        
+
         css_parts = []
 
         # Theme CSS - use ThemeCSSGenerator for complete CSS including fonts

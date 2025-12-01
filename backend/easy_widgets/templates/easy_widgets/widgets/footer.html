@@ -11,7 +11,7 @@ Footer Widget Template
         style="{% if config.background_color %}background-color: {{ config.background_color }};{% endif %}{% if config.background_image %}background-image: url({{ config.background_image }}); background-size: cover; background-position: center;{% endif %}{% if config.text_color %}color: {{ config.text_color }};{% endif %}">
     {% if config.rendered_slots.content %}
         {% for widget in config.rendered_slots.content %}
-            {{ widget.html|sanitize_html }}
+            {{ widget.html|safe }}
         {% endfor %}
     {% else %}
         <div class="empty-slot">

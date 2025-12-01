@@ -5,7 +5,7 @@
         {% if config.rendered_slots.left %}
             {% for widget in config.rendered_slots.left %}
                 <div class="two-col-widget-wrapper">
-                    {{ widget.html|sanitize_html }}
+                    {{ widget.html|safe }}
                 </div>
             {% endfor %}
         {% else %}
@@ -17,7 +17,7 @@
         {% if config.rendered_slots.right %}
             {% for widget in config.rendered_slots.right %}
                 <div class="two-col-widget-wrapper">
-                    {{ widget.html|sanitize_html }}
+                    {{ widget.html|safe }}
                 </div>
             {% endfor %}
         {% else %}
