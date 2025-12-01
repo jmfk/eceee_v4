@@ -1393,13 +1393,20 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                         {(() => {
                           const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
                           const layoutParts = new Set();
+                          const groupSlots = group.slots || (group.slot ? [group.slot] : []);
 
-                          selectedWidgetTypes.forEach(wtType => {
-                            const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
-                            if (widgetMeta?.layoutParts) {
-                              Object.keys(widgetMeta.layoutParts).forEach(part => layoutParts.add(part));
-                            }
-                          });
+                          // If widget types are selected, collect layout parts from widgets
+                          if (selectedWidgetTypes.length > 0) {
+                            selectedWidgetTypes.forEach(wtType => {
+                              const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                              if (widgetMeta?.layoutParts) {
+                                Object.keys(widgetMeta.layoutParts).forEach(part => layoutParts.add(part));
+                              }
+                            });
+                          } else if (groupSlots.length > 0) {
+                            // If no widget types but slots exist, use slots as parts
+                            groupSlots.forEach(slot => layoutParts.add(slot));
+                          }
 
                           if (layoutParts.size === 0) {
                             return (
@@ -1418,20 +1425,27 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                 const partKey = `${groupIndex}-${part}`;
                                 const isPartExpanded = expandedLayoutParts[partKey] !== false; // Default to true
 
+                                // Check if this part is a slot (not from widget metadata)
+                                const isSlot = selectedWidgetTypes.length === 0 && groupSlots.includes(part);
+
                                 // Get allowed properties for this part from widget metadata
                                 let allowedProperties = null; // null = all properties allowed
-                                selectedWidgetTypes.forEach(wtType => {
-                                  const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
-                                  if (widgetMeta?.layoutParts?.[part]?.properties) {
-                                    // If any widget defines properties for this part, use them
-                                    const partConfig = widgetMeta.layoutParts[part];
-                                    if (partConfig.properties) {
-                                      allowedProperties = partConfig.properties;
+                                if (!isSlot) {
+                                  // Only check widget metadata if this is not a slot
+                                  selectedWidgetTypes.forEach(wtType => {
+                                    const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                                    if (widgetMeta?.layoutParts?.[part]?.properties) {
+                                      // If any widget defines properties for this part, use them
+                                      const partConfig = widgetMeta.layoutParts[part];
+                                      if (partConfig.properties) {
+                                        allowedProperties = partConfig.properties;
+                                      }
                                     }
-                                  }
-                                });
+                                  });
+                                }
 
                                 // Filter LAYOUT_PROPERTIES based on allowed properties
+                                // Slots get all properties (no restrictions)
                                 const availableProperties = allowedProperties
                                   ? Object.fromEntries(
                                     Object.entries(LAYOUT_PROPERTIES).filter(([prop]) =>
@@ -1440,14 +1454,23 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                   )
                                   : LAYOUT_PROPERTIES;
 
-                                // Get the label for this part from widget metadata
+                                // Get the label for this part from widget metadata or format slot name
                                 let partLabel = part;
-                                selectedWidgetTypes.forEach(wtType => {
-                                  const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
-                                  if (widgetMeta?.layoutParts?.[part]?.label) {
-                                    partLabel = widgetMeta.layoutParts[part].label;
-                                  }
-                                });
+                                if (isSlot) {
+                                  // Format slot name: capitalize first letter and replace underscores/hyphens with spaces
+                                  partLabel = part
+                                    .replace(/[-_]/g, ' ')
+                                    .split(' ')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                                    .join(' ');
+                                } else {
+                                  selectedWidgetTypes.forEach(wtType => {
+                                    const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                                    if (widgetMeta?.layoutParts?.[part]?.label) {
+                                      partLabel = widgetMeta.layoutParts[part].label;
+                                    }
+                                  });
+                                }
 
                                 return (
                                   <div key={part} className="bg-white rounded border border-gray-200">
