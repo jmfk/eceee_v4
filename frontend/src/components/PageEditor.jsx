@@ -2123,10 +2123,6 @@ const PageEditor = () => {
                 webpageData={webpageData}
                 pageVersionData={pageVersionData}
                 validationState={schemaValidationState}
-                onClearClipboard={async () => {
-                    await clearClipboardState();
-                    addNotification('Clipboard cleared', 'info');
-                }}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>

@@ -238,6 +238,8 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
+            # Disable template caching in development for immediate updates
+            "debug": DEBUG,
         },
     },
 ]
