@@ -3,9 +3,11 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) => {
     const [showPalette, setShowPalette] = useState(false);
+    const [position, setPosition] = useState({ top: 0, left: 0 });
     const buttonRef = useRef(null);
     const paletteRef = useRef(null);
     const themeColors = Object.entries(colors);
@@ -20,6 +22,30 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
         // Otherwise it's a direct hex/rgb value
         return value;
     };
+
+    // Calculate and update position
+    const updatePosition = () => {
+        if (buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setPosition({
+                top: rect.bottom + 8,
+                left: rect.left
+            });
+        }
+    };
+
+    // Update position when palette opens and on scroll/resize
+    useEffect(() => {
+        if (showPalette) {
+            updatePosition();
+            window.addEventListener('scroll', updatePosition, true);
+            window.addEventListener('resize', updatePosition);
+            return () => {
+                window.removeEventListener('scroll', updatePosition, true);
+                window.removeEventListener('resize', updatePosition);
+            };
+        }
+    }, [showPalette]);
 
     // Close palette when clicking outside
     useEffect(() => {
@@ -53,12 +79,16 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
                 title="Select color"
             />
 
-            {/* Color Palette Popover */}
-            {showPalette && (
+            {/* Color Palette Popover - Rendered via Portal */}
+            {showPalette && createPortal(
                 <div
                     ref={paletteRef}
-                    className="absolute z-[100] mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg"
-                    style={{ minWidth: '200px' }}
+                    className="fixed z-[10010] p-3 bg-white border border-gray-300 rounded-lg shadow-lg"
+                    style={{ 
+                        minWidth: '200px',
+                        top: `${position.top}px`,
+                        left: `${position.left}px`
+                    }}
                 >
                     <div className="text-xs font-semibold text-gray-700 mb-2">Theme Colors</div>
                     <div className="grid grid-cols-4 gap-2">
@@ -100,7 +130,8 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
                             className="w-full h-10 rounded border border-gray-300 cursor-pointer"
                         />
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

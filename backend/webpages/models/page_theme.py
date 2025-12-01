@@ -1544,6 +1544,14 @@ class PageTheme(models.Model):
                                 if "_" not in prop_name
                                 else prop_name.replace("_", "-")
                             )
+                            
+                            # Convert color names to CSS variables
+                            color_properties = ['color', 'background-color', 'border-color', 
+                                              'border-left-color', 'border-right-color',
+                                              'border-top-color', 'border-bottom-color']
+                            if css_prop in color_properties and self.colors and prop_value in self.colors:
+                                prop_value = f"var(--{prop_value})"
+                            
                             css_rules.append(f"  {css_prop}: {prop_value};")
 
                         # Generate CSS rule

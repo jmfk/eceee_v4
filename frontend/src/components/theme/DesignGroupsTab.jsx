@@ -440,13 +440,27 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     const cssParts = [];
     const effectiveBreakpoints = getBreakpoints({ breakpoints });
 
+    // Helper to convert property value (handle color references)
+    const formatPropertyValue = (prop, value) => {
+      const cssProp = cssPropertyToKebab(prop);
+      
+      // Check if this is a color property and value is a named color
+      const colorProperties = ['color', 'backgroundColor', 'borderColor', 'borderLeftColor',
+        'borderRightColor', 'borderTopColor', 'borderBottomColor'];
+      
+      if (colorProperties.includes(prop) && colors[value]) {
+        return `  ${cssProp}: var(--${value});\n`;
+      }
+      
+      return `  ${cssProp}: ${value};\n`;
+    };
+
     for (const [part, bpStyles] of Object.entries(layoutProperties)) {
       // Default (no media query)
       if (bpStyles.default && Object.keys(bpStyles.default).length > 0) {
         let cssRule = `.${part} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.default)) {
-          const cssProp = cssPropertyToKebab(prop);
-          cssRule += `  ${cssProp}: ${value};\n`;
+          cssRule += formatPropertyValue(prop, value);
         }
         cssRule += '}';
         cssParts.push(cssRule);
@@ -456,8 +470,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       else if (bpStyles.desktop && Object.keys(bpStyles.desktop).length > 0) {
         let cssRule = `.${part} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.desktop)) {
-          const cssProp = cssPropertyToKebab(prop);
-          cssRule += `  ${cssProp}: ${value};\n`;
+          cssRule += formatPropertyValue(prop, value);
         }
         cssRule += '}';
         cssParts.push(cssRule);
@@ -468,8 +481,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         if (bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0 && effectiveBreakpoints[bp]) {
           let cssRule = `@media (min-width: ${effectiveBreakpoints[bp]}px) {\n  .${part} {\n`;
           for (const [prop, value] of Object.entries(bpStyles[bp])) {
-            const cssProp = cssPropertyToKebab(prop);
-            cssRule += `    ${cssProp}: ${value};\n`;
+            cssRule += '  ' + formatPropertyValue(prop, value);
           }
           cssRule += '  }\n}';
           cssParts.push(cssRule);
@@ -480,8 +492,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       if (bpStyles.tablet && Object.keys(bpStyles.tablet).length > 0 && !bpStyles.md) {
         let cssRule = `@media (min-width: ${effectiveBreakpoints.md}px) {\n  .${part} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.tablet)) {
-          const cssProp = cssPropertyToKebab(prop);
-          cssRule += `    ${cssProp}: ${value};\n`;
+          cssRule += '  ' + formatPropertyValue(prop, value);
         }
         cssRule += '  }\n}';
         cssParts.push(cssRule);
@@ -491,8 +502,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       if (bpStyles.mobile && Object.keys(bpStyles.mobile).length > 0 && !bpStyles.sm) {
         let cssRule = `@media (min-width: ${effectiveBreakpoints.sm}px) {\n  .${part} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.mobile)) {
-          const cssProp = cssPropertyToKebab(prop);
-          cssRule += `    ${cssProp}: ${value};\n`;
+          cssRule += '  ' + formatPropertyValue(prop, value);
         }
         cssRule += '  }\n}';
         cssParts.push(cssRule);
