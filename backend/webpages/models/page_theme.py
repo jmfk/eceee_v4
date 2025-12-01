@@ -1383,7 +1383,6 @@ class PageTheme(models.Model):
                 ]
                 selector = ",\n".join(element_selectors)
                 css_rule = f"{selector} {{\n"
-
                 # Convert camelCase (or snake_case) to kebab-case for CSS properties
                 for property_name, property_value in styles.items():
                     # Handle both camelCase and snake_case input
@@ -1398,12 +1397,12 @@ class PageTheme(models.Model):
                     # Check for any color-related property
                     color_properties = [
                         "color",
-                        "backgroundColor",
-                        "borderColor",
-                        "borderLeftColor",
-                        "borderRightColor",
-                        "borderTopColor",
-                        "borderBottomColor",
+                        "background_color",
+                        "border_color",
+                        "border_left_color",
+                        "border_right_color",
+                        "border_top_color",
+                        "border_bottom_color",
                     ]
                     if (
                         property_name in color_properties
@@ -1512,13 +1511,15 @@ class PageTheme(models.Model):
                         # Build selectors using layout part classes
                         # base_selectors contain widget-type classes like:
                         # .widget-type-easy-widgets-contentcardwidget
-                        # 
+                        #
                         # For widget root elements (parts ending in '-widget' or named 'container'),
                         # the widget-type class and part class are on the SAME element,
                         # so we use a same-element selector (no space).
                         # For child elements, we use descendant selectors (with space).
-                        is_root_element = part.endswith('-widget') or part == 'container'
-                        
+                        is_root_element = (
+                            part.endswith("-widget") or part == "container"
+                        )
+
                         part_selectors = []
                         for base in base_selectors:
                             if base:
@@ -1533,7 +1534,7 @@ class PageTheme(models.Model):
                             else:
                                 # Fallback for global layout parts
                                 part_selectors.append(f".{part}")
-                        
+
                         selector = ",\n".join(part_selectors)
 
                         # Convert properties to CSS
@@ -1544,14 +1545,24 @@ class PageTheme(models.Model):
                                 if "_" not in prop_name
                                 else prop_name.replace("_", "-")
                             )
-                            
+
                             # Convert color names to CSS variables
-                            color_properties = ['color', 'background-color', 'border-color', 
-                                              'border-left-color', 'border-right-color',
-                                              'border-top-color', 'border-bottom-color']
-                            if css_prop in color_properties and self.colors and prop_value in self.colors:
+                            color_properties = [
+                                "color",
+                                "background-color",
+                                "border-color",
+                                "border-left-color",
+                                "border-right-color",
+                                "border-top-color",
+                                "border-bottom-color",
+                            ]
+                            if (
+                                css_prop in color_properties
+                                and self.colors
+                                and prop_value in self.colors
+                            ):
                                 prop_value = f"var(--{prop_value})"
-                            
+
                             css_rules.append(f"  {css_prop}: {prop_value};")
 
                         # Generate CSS rule
