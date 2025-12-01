@@ -142,7 +142,7 @@ class NavigationWidget(BaseWidget):
         flex-direction: column;
         list-style: none;
         margin: 0 0 30px 0;
-        padding: 0 0 0 30px;
+        padding: 0;
         gap: 10px;
         align-items: top;
         min-height: 140px;
@@ -150,7 +150,6 @@ class NavigationWidget(BaseWidget):
         width: 100%;
     }
     .navigation-widget .nav-container li {
-        background-color: red;
         height: 20px;
         width: 100%;
     }

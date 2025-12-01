@@ -22,10 +22,9 @@ const StatusBar = ({
     validationState = { isValid: true, hasErrors: false },
     // Dirty state prop (from PageEditor)
     isDirty = false,
-    onClearClipboard = null
 }) => {
     // Get global clipboard state
-    const { clipboardData, pasteModePaused, togglePasteMode } = useClipboard();
+    const { clipboardData, pasteModePaused, togglePasteMode, clearClipboardState } = useClipboard();
     const {
         notifications,
         currentNotificationIndex,
@@ -271,6 +270,13 @@ const StatusBar = ({
                                 }`}>
                                     {pasteModePaused ? 'PAUSED' : 'ACTIVE'}
                                 </span>
+                            </button>
+                            <button
+                                onClick={clearClipboardState}
+                                className="ml-1 p-1 hover:bg-red-100 rounded transition-colors"
+                                title="Clear clipboard"
+                            >
+                                <X className="w-3 h-3 text-red-600" />
                             </button>
                         </>
                     ) : (

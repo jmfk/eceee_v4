@@ -7,6 +7,7 @@
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import DjangoTemplateRenderer from '../utils/DjangoTemplateRenderer.js';
 import { formatFieldLabel } from '../utils/labelFormatting.js';
+import { cutToClipboard, readFromClipboard, clearClipboard } from '../utils/clipboardService.js';
 // Note: Widget menu items and actions are now handled by editor-specific frameworks
 // This is a placeholder for backward compatibility
 const getWidgetMenuItems = () => [];
@@ -84,8 +85,8 @@ class LayoutRenderer {
     // NEW: Widget data change callbacks for single source of truth
     this.widgetDataCallbacks = new Map(); // Map of widget data change callbacks
 
-    // Cut/Paste clipboard for widgets
-    this.widgetClipboard = null; // Stores cut widget data
+    // Server-side clipboard state tracking
+    this.clipboardHasData = false; // Tracks if server clipboard has widget data
 
     // Initialize Django Template Renderer for template processing
     this.templateRenderer = new DjangoTemplateRenderer();
@@ -763,14 +764,7 @@ class LayoutRenderer {
       menuContainer.appendChild(importButton);
     }
 
-    // Add Paste button (if clipboard has widget)
-    if (this.widgetClipboard) {
-      const pasteButton = this.createIconButton('svg:clipboard', 'bg-purple-600 hover:bg-purple-700 text-white', () => {
-        this.pasteWidget(slotName);
-      });
-      pasteButton.title = 'Paste Widget';
-      menuContainer.appendChild(pasteButton);
-    }
+    // Note: Paste button removed from slot menu - paste is available via widget context menus
 
     // Add Widget button (if enabled)
     if (this.uiConfig.showAddWidget || options.showAddWidget) {
@@ -2304,14 +2298,14 @@ class LayoutRenderer {
     if (this.editable) {
       const header = this.createWidgetHeader(id, name, widgetInstance);
       widget.appendChild(header);
-      
+
       // Check if widget is hidden
       const isVisible = widgetInstance.isVisible !== false;
       if (!isVisible) {
         widget.classList.add('widget-hidden', 'widget-collapsed');
         widget.style.opacity = '0.4';
       }
-      
+
       // Check if widget is inactive
       const isActive = widgetInstance.config?.isActive !== false;
       if (!isActive) {
@@ -2327,7 +2321,7 @@ class LayoutRenderer {
     // Hide content if widget is hidden or inactive (only in editable mode)
     const isVisible = widgetInstance.isVisible !== false;
     const isActive = widgetInstance.config?.isActive !== false;
-    
+
     if (this.editable && (!isVisible || !isActive)) {
       contentWrapper.style.display = 'none';
       // Add expand toggle to header
@@ -2374,14 +2368,14 @@ class LayoutRenderer {
     // Left side: title + active toggle
     const leftSide = document.createElement('div');
     leftSide.className = 'flex items-center gap-2';
-    
+
     const title = document.createElement('span');
     title.className = 'text-sm font-medium text-gray-700';
     title.textContent = name;
-    
+
     // Add active/inactive toggle
     const activeToggle = this.createActiveToggle(id, widgetInstance);
-    
+
     leftSide.appendChild(title);
     leftSide.appendChild(activeToggle);
 
@@ -2401,11 +2395,11 @@ class LayoutRenderer {
    */
   createActiveToggle(id, widgetInstance) {
     const isActive = widgetInstance.config?.isActive !== false;
-    
+
     const toggle = document.createElement('button');
     toggle.className = 'active-toggle text-xs px-2 py-0.5 rounded transition-colors';
     toggle.style.zIndex = '10000';
-    
+
     const updateToggleState = (active) => {
       if (active) {
         toggle.className = 'active-toggle text-xs px-2 py-0.5 rounded transition-colors bg-green-100 text-green-700 hover:bg-green-200';
@@ -2417,9 +2411,9 @@ class LayoutRenderer {
         toggle.title = 'Click to activate widget';
       }
     };
-    
+
     updateToggleState(isActive);
-    
+
     let currentState = isActive;
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2427,7 +2421,7 @@ class LayoutRenderer {
       this.toggleWidgetActive(id, widgetInstance, currentState);
       updateToggleState(currentState);
     });
-    
+
     return toggle;
   }
 
@@ -2510,15 +2504,19 @@ class LayoutRenderer {
 
     // Add cut menu item
     const cutItem = this.createMenuItem('svg:scissors', 'Cut', () => {
-      this.cutWidget(id, widgetInstance);
+      this.cutWidget(id, widgetInstance).catch(err => {
+        console.error('Failed to cut widget:', err);
+      });
       this.hideWidgetMenu(id);
     }, 'text-purple-700 hover:bg-purple-50');
     menuDropdown.appendChild(cutItem);
 
     // Add paste menu item (only show if clipboard has data)
-    if (this.widgetClipboard) {
+    if (this.clipboardHasData) {
       const pasteItem = this.createMenuItem('svg:clipboard', 'Paste', () => {
-        this.pasteWidget(widgetInstance.slotName);
+        this.pasteWidget(widgetInstance.slotName).catch(err => {
+          console.error('Failed to paste widget:', err);
+        });
         this.hideWidgetMenu(id);
       }, 'text-green-700 hover:bg-green-50');
       menuDropdown.appendChild(pasteItem);
@@ -2550,11 +2548,11 @@ class LayoutRenderer {
         isActive: isActive
       }
     };
-    
+
     // Find widget element
     const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
     if (!widgetElement) return;
-    
+
     // Toggle collapsed state
     if (isActive) {
       widgetElement.classList.remove('widget-inactive');
@@ -2571,14 +2569,14 @@ class LayoutRenderer {
       // Hide content but show expand toggle
       const content = widgetElement.querySelector('.widget-content');
       if (content) content.style.display = 'none';
-      
+
       // Add expand button if not exists
       if (!widgetElement.querySelector('.expand-toggle')) {
         const expandToggle = this.createExpandToggle(widgetId);
         widgetElement.querySelector('.widget-header').appendChild(expandToggle);
       }
     }
-    
+
     // Notify parent of config change
     if (this.widgetDataCallbacks?.widgetDataChanged) {
       this.widgetDataCallbacks.widgetDataChanged(
@@ -2587,7 +2585,7 @@ class LayoutRenderer {
         updatedWidget
       );
     }
-    
+
     this.markAsDirty(`Widget ${isActive ? 'activated' : 'deactivated'}`);
   }
 
@@ -2601,21 +2599,21 @@ class LayoutRenderer {
     toggleBtn.className = 'expand-toggle text-xs text-gray-500 hover:text-gray-700 ml-2';
     toggleBtn.innerHTML = '▼ Expand';
     toggleBtn.title = 'Temporarily show widget content';
-    
+
     let isExpanded = false;
-    
+
     toggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
       const content = widgetElement?.querySelector('.widget-content');
-      
+
       if (content) {
         isExpanded = !isExpanded;
         content.style.display = isExpanded ? '' : 'none';
         toggleBtn.innerHTML = isExpanded ? '▲ Collapse' : '▼ Expand';
       }
     });
-    
+
     return toggleBtn;
   }
 
@@ -2968,11 +2966,25 @@ class LayoutRenderer {
   }
 
   /**
+   * Update clipboard state from server
+   * Checks if server clipboard has widget data and updates internal state
+   */
+  async updateClipboardState() {
+    try {
+      const clipboardData = await readFromClipboard('widgets', true); // silent = true
+      this.clipboardHasData = !!(clipboardData && clipboardData.data && clipboardData.data.length > 0);
+    } catch (error) {
+      console.error('LayoutRenderer: Failed to check clipboard state:', error);
+      this.clipboardHasData = false;
+    }
+  }
+
+  /**
    * Cut a widget to clipboard
    * @param {string} widgetId - ID of the widget to cut
    * @param {Object} widgetInstance - Widget instance data
    */
-  cutWidget(widgetId, widgetInstance) {
+  async cutWidget(widgetId, widgetInstance) {
     const widgetElement = document.querySelector(`.rendered-widget[data-widget-id="${widgetId}"]`);
 
     if (!widgetElement) {
@@ -2988,58 +3000,95 @@ class LayoutRenderer {
       return;
     }
 
-    // Store widget data in clipboard
-    this.widgetClipboard = {
-      widget: widgetInstance,
-      sourceSlot: slotName
+    // Store widget data in server-side clipboard with metadata
+    const cutMetadata = {
+      widgets: {
+        [slotName]: [widgetId]
+      }
     };
 
-    // Remove from source slot
-    this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
+    try {
+      await cutToClipboard('widgets', [widgetInstance], cutMetadata);
 
-    // Mark as dirty
-    this.markAsDirty(`widget cut from ${slotName}`);
+      // Update local clipboard state
+      await this.updateClipboardState();
 
-    // Refresh slot menus to show paste button
-    this.refreshSlotMenus();
+      // Remove from source slot
+      this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
+
+      // Mark as dirty
+      this.markAsDirty(`widget cut from ${slotName}`);
+
+      // Refresh slot menus to show paste button
+      this.refreshSlotMenus();
+    } catch (error) {
+      console.error('LayoutRenderer: Failed to cut widget:', error);
+    }
   }
 
   /**
    * Paste widget from clipboard to target slot
    * @param {string} targetSlotName - Name of the slot to paste into
    */
-  pasteWidget(targetSlotName) {
-    if (!this.widgetClipboard) {
-      console.warn('LayoutRenderer: No widget in clipboard to paste');
-      return;
+  async pasteWidget(targetSlotName) {
+    try {
+      // Read from server-side clipboard
+      const clipboardData = await readFromClipboard('widgets', true); // silent = true
+
+      if (!clipboardData || !clipboardData.data || clipboardData.data.length === 0) {
+        console.warn('LayoutRenderer: No widget in clipboard to paste');
+        return;
+      }
+
+      const widget = clipboardData.data[0]; // Get first widget from clipboard
+
+      // Create new widget instance with new ID
+      const newWidget = {
+        ...widget,
+        id: this.generateWidgetId(),
+        slotName: targetSlotName
+      };
+
+      // Add to target slot
+      this.executeWidgetDataCallback(WIDGET_ACTIONS.ADD, targetSlotName, newWidget);
+
+      // Clear server clipboard after paste
+      await clearClipboard('widgets');
+
+      // Update local clipboard state
+      await this.updateClipboardState();
+
+      // Mark as dirty
+      this.markAsDirty(`widget pasted to ${targetSlotName}`);
+
+      // Refresh slot menus to update paste button visibility
+      this.refreshSlotMenus();
+    } catch (error) {
+      console.error('LayoutRenderer: Failed to paste widget:', error);
     }
+  }
 
-    const { widget, sourceSlot } = this.widgetClipboard;
-
-    // Create new widget instance with new ID
-    const newWidget = {
-      ...widget,
-      id: this.generateWidgetId(),
-      slotName: targetSlotName
-    };
-
-    // Add to target slot
-    this.executeWidgetDataCallback(WIDGET_ACTIONS.ADD, targetSlotName, newWidget);
-
-    // Clear clipboard
-    this.widgetClipboard = null;
-
-    // Mark as dirty
-    this.markAsDirty(`widget pasted to ${targetSlotName}`);
-
-    // Refresh slot menus to update paste button visibility
-    this.refreshSlotMenus();
+  /**
+   * Clear clipboard
+   */
+  async clearClipboard() {
+    try {
+      await clearClipboard('widgets');
+      await this.updateClipboardState();
+      this.refreshSlotMenus();
+      console.log('LayoutRenderer: Clipboard cleared');
+    } catch (error) {
+      console.error('LayoutRenderer: Failed to clear clipboard:', error);
+    }
   }
 
   /**
    * Refresh all slot menus (used after clipboard state changes)
    */
-  refreshSlotMenus() {
+  async refreshSlotMenus() {
+    // Update clipboard state before refreshing menus
+    await this.updateClipboardState();
+
     this.slotContainers.forEach((element, slotName) => {
       this.addSlotIconMenu(slotName, {
         showAddWidget: this.uiConfig.showAddWidget,
