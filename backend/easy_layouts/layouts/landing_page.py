@@ -46,9 +46,8 @@ class LandingPageLayout(BaseLayout):
         --landing-bg-outer: #9ca3af;
         --landing-bg-white: #ffffff;
         --landing-max-width: 1280px;
-        --landing-spacing: 32px;
-        --landing-footer-bg: #1f2937;
-        --landing-footer-min-height: 300px;
+        --landing-spacing: 30px;
+        --landing-footer-min-height: 310px;
         --landing-main-min-height: 310px;
     }
 
@@ -81,10 +80,16 @@ class LandingPageLayout(BaseLayout):
 
     /* Landing Page Footer */
     .landing-page-footer {
-        background-color: var(--landing-footer-bg);
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        padding: var(--landing-spacing);
         min-height: var(--landing-footer-min-height);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .landing-page-footer .slot-footer {
+        min-height: var(--landing-footer-min-height);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
     }
     """
 

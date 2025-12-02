@@ -53,8 +53,7 @@ class MainLayoutLayout(BaseLayout):
         --main-layout-gap: 30px;
         --main-layout-padding-x: 40px;
         --main-layout-padding-y: 30px;
-        --main-layout-footer-bg: #1f2937;
-        --main-layout-footer-min-height: 300px;
+        --main-layout-footer-min-height: 310px;
         --main-content-max-width-default: 650px;
         --main-content-max-width-xl: 790px;
         --main-sidebar-min-height: 310px;
@@ -110,10 +109,16 @@ class MainLayoutLayout(BaseLayout):
 
     /* Footer */
     .main-layout-footer {
-        background-color: var(--main-layout-footer-bg);
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        padding: 32px;
         min-height: var(--main-layout-footer-min-height);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .main-layout-footer .slot-footer {
+        min-height: var(--main-layout-footer-min-height);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
     }
 
     /* Tablet breakpoint (768px and up) */
