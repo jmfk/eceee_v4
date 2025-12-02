@@ -56,6 +56,7 @@ class ImageConfig(BaseModel):
         description="Named image style from the current theme (includes both gallery and carousel types)",
         json_schema_extra={
             "component": "ImageStyleSelect",
+            "title": "Image Style",
             "order": 1,
             "group": "Display Options",
             "placeholder": "Default",
@@ -147,15 +148,6 @@ class ImageConfig(BaseModel):
         description="Collection display configuration",
         json_schema_extra={
             "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
-        },
-    )
-    component_style: str = Field(
-        "default",
-        description="Component style from theme",
-        json_schema_extra={
-            "component": "ComponentStyleSelector",
-            "order": 0,
-            "group": "Display Options",
         },
     )
     useContentMargins: bool = Field(
@@ -506,7 +498,9 @@ class ImageWidget(BaseWidget):
 
         template_config["lightbox_style"] = template_config.get("lightbox_style")
         template_config["imgproxy_override"] = template_config.get("imgproxy_override")
-        template_config["use_content_margins"] = config.get("use_content_margins", False)
+        template_config["use_content_margins"] = config.get(
+            "use_content_margins", False
+        )
 
         # Apply randomization if enabled (widget override, then style default, then collection config)
         randomize_override = config.get("randomize")
