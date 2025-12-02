@@ -51,13 +51,18 @@ class ThemeCSSGenerator:
 
     def invalidate_cache(self, theme_id):
         """
-        Clear cached CSS for theme.
+        Clear cached CSS for theme (both scoped and non-scoped versions).
 
         Args:
             theme_id: Theme ID
         """
-        cache_key = self.get_cache_key(theme_id)
+        # Clear non-scoped cache (for backend rendering)
+        cache_key = self.get_cache_key(theme_id, frontend_scoped=False)
         cache.delete(cache_key)
+        
+        # Clear frontend-scoped cache (for frontend/CMS editor)
+        cache_key_scoped = self.get_cache_key(theme_id, frontend_scoped=True)
+        cache.delete(cache_key_scoped)
 
     def generate_complete_css(self, theme, frontend_scoped=False):
         """
