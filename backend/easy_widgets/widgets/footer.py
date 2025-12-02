@@ -30,8 +30,9 @@ class FooterConfig(BaseModel):
         None,
         description="Background image URL",
         json_schema_extra={
-            "component": "MediaInput",
+            "component": "ImageInput",
             "order": 2,
+            "mediaTypes": ["image"],
             "group": "Styling",
         },
     )
