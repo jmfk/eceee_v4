@@ -79,6 +79,10 @@ class FooterWidget(BaseWidget):
     .footer-widget {
         box-sizing: border-box;
         width: 100%;
+        min-height: 310px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
     }
     
     .empty-slot {
@@ -169,8 +173,25 @@ class FooterWidget(BaseWidget):
         return super().render(config, context)
 
     def prepare_template_context(self, config, context=None):
-        """Prepare context with slot rendering"""
+        """Prepare context with slot rendering and background image processing"""
+        from file_manager.imgproxy import imgproxy_service
+
         template_config = super().prepare_template_context(config, context)
+
+        # Process background image if provided
+        background_image = config.get("background_image")
+        if background_image and isinstance(background_image, dict):
+            imgproxy_base_url = background_image.get("imgproxy_base_url")
+            if imgproxy_base_url:
+                # Generate responsive image URL for footer
+                image_url = imgproxy_service.generate_url(
+                    source_url=imgproxy_base_url,
+                    width=1920,
+                    height=400,
+                    resize_type="fill",
+                )
+                if image_url:
+                    template_config["background_image"] = image_url
 
         # Get slots data (single 'content' slot)
         slots_data = config.get("slots", {"content": []})

@@ -169,7 +169,7 @@ export const LandingPage = ({
                     />
                 </main>
 
-                <footer className="bg-gray-800 shadow-sm min-h-[300px]">
+                <footer className="min-h-[300px]">
                     <WidgetSlot
                         name="footer"
                         label="Footer Content"
