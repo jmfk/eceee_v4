@@ -17,14 +17,14 @@ import { themeCSSManager } from '../utils/themeCSSManager'
  * @param {Object} options - Configuration options
  * @param {number} options.themeId - Explicit theme ID to apply
  * @param {number} options.pageId - Page ID to fetch effectiveTheme from (includes inheritance)
- * @param {string} options.scopeSelector - CSS selector to scope theme to (default: '.theme-content')
+ * @param {string} options.scopeSelector - CSS selector to scope theme to (default: '.cms-content')
  * @param {boolean} options.enabled - Whether theme application is enabled
  * @returns {Object} Theme application utilities
  */
 export const useTheme = ({
     themeId = null,
     pageId = null,
-    scopeSelector = '.theme-content',
+    scopeSelector = '.cms-content',
     enabled = true
 } = {}) => {
     const currentThemeIdRef = useRef(null)

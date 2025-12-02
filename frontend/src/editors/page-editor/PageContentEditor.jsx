@@ -9,6 +9,7 @@ import React, { forwardRef, useState, useEffect } from 'react';
 import ReactLayoutRenderer from './ReactLayoutRenderer';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { getDefaultLayout } from '../../utils/defaultLayout';
+import { useTheme } from '../../hooks/useTheme';
 
 const PageContentEditor = forwardRef(({
     layoutJson,
@@ -54,6 +55,12 @@ const PageContentEditor = forwardRef(({
         layoutJson?.name ||
         pageVersionData?.codeLayout ||
         defaultLayoutName;  // Use default layout from backend
+
+    // Apply theme CSS - ensures theme loads even on pages with no widgets
+    useTheme({
+        pageId: pageId,
+        enabled: !!pageId
+    });
 
     // Use local widgets from PageEditor (fast local state)
     const currentWidgets = localWidgets || pageVersionData?.widgets || {};

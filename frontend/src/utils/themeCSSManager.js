@@ -92,7 +92,16 @@ class ThemeCSSManager {
      * @param {string} scopeSelector - CSS selector to scope theme to
      */
     injectThemeCSS(themeId, cssContent, scopeSelector = '.theme-content') {
+        console.log('[ThemeCSSManager] injectThemeCSS() called:', {
+            themeId,
+            hasCssContent: !!cssContent,
+            cssLength: cssContent?.length,
+            scopeSelector,
+            cssPreview: cssContent?.substring(0, 150)
+        })
+
         if (!cssContent) {
+            console.warn('[ThemeCSSManager] No CSS content to inject')
             return
         }
 
@@ -101,6 +110,7 @@ class ThemeCSSManager {
         // Remove existing style element if present (shouldn't happen with ref counting)
         const existingStyle = document.getElementById(styleId)
         if (existingStyle) {
+            console.log(`[ThemeCSSManager] Removing existing style element: ${styleId}`)
             existingStyle.remove()
         }
 
@@ -112,10 +122,22 @@ class ThemeCSSManager {
         styleElement.setAttribute('data-scope', scopeSelector)
         styleElement.textContent = cssContent
 
+        console.log('[ThemeCSSManager] Appending style element to document.head:', {
+            styleId,
+            attributes: {
+                id: styleElement.id,
+                'data-theme-styles': styleElement.getAttribute('data-theme-styles'),
+                'data-theme-id': styleElement.getAttribute('data-theme-id'),
+                'data-scope': styleElement.getAttribute('data-scope')
+            }
+        })
+
         document.head.appendChild(styleElement)
 
         // Track the injected element
         this.injectedThemes.set(themeId, styleElement)
+
+        console.log('[ThemeCSSManager] Style element injected successfully. Total injected themes:', this.injectedThemes.size)
     }
 
     /**

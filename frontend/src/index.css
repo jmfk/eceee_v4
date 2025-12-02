@@ -44,17 +44,61 @@
     @apply antialiased;
   }
   
-  /* Restore default list styles that Tailwind's preflight removes */
-  ul, ol {
-    list-style: revert;
-  }
-  
-  ul {
-    list-style-type: disc;
-  }
-  
-  ol {
-    list-style-type: decimal;
+  /* CRITICAL: Restore semantic HTML inside .cms-content */
+  /* This prevents Tailwind from destroying content styles */
+  .cms-content {
+    /* Headings: restore browser defaults so theme CSS can override */
+    h1, h2, h3, h4, h5, h6 {
+      font-size: revert;
+      font-weight: revert;
+      line-height: revert;
+      margin: revert;
+    }
+    
+    /* Paragraphs */
+    p {
+      margin: revert;
+    }
+    
+    /* Lists */
+    ul, ol {
+      list-style: revert;
+      margin: revert;
+      padding: revert;
+    }
+    
+    ul {
+      list-style-type: disc;
+    }
+    
+    ol {
+      list-style-type: decimal;
+    }
+    
+    /* Links */
+    a {
+      color: revert;
+      text-decoration: revert;
+    }
+    
+    /* Other common elements */
+    blockquote {
+      margin: revert;
+      padding: revert;
+    }
+    
+    code, pre {
+      font-family: revert;
+      font-size: revert;
+    }
+    
+    strong, b {
+      font-weight: revert;
+    }
+    
+    em, i {
+      font-style: revert;
+    }
   }
 }
 
