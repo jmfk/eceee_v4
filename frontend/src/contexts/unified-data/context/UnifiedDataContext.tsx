@@ -51,6 +51,8 @@ export function UnifiedDataProvider({
                     // 2. Operation sourceId is different from this component's ID
                     const shouldTrigger = !operation?.sourceId || operation.sourceId !== componentId;
 
+                    console.log('[UDC useExternalChanges] componentId:', componentId, 'operation:', operation?.type, 'sourceId:', operation?.sourceId, 'shouldTrigger:', shouldTrigger);
+
                     if (operation && shouldTrigger) {
                         // Pass metadata including sourceId to callback
                         const metadata = {
@@ -58,6 +60,7 @@ export function UnifiedDataProvider({
                             type: operation.type,
                             timestamp: Date.now()
                         };
+                        console.log('[UDC useExternalChanges] Triggering callback for componentId:', componentId);
                         // Use current callback from ref
                         callbackRef.current(manager.getState(), metadata);
                     }

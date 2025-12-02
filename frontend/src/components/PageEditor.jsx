@@ -241,8 +241,10 @@ const PageEditor = () => {
 
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
+    const hasLocalWidgetChanges = useRef(false);
     useExternalChanges(componentId, (state, metadata) => {
         const sourceId = metadata?.sourceId || '';
+        console.log('[PageEditor] useExternalChanges callback - componentId:', componentId, 'sourceId:', sourceId, 'hasLocalWidgetChanges:', hasLocalWidgetChanges.current);
 
         // Check if update came from isolated components FIRST, before any state updates
         const isFromIsolatedComponent =
@@ -259,6 +261,7 @@ const PageEditor = () => {
             /^[a-z-]+widget-\d+/.test(sourceId);
 
         if (isFromIsolatedComponent) {
+            console.log('[PageEditor] Skipping update - isolated component:', sourceId);
             // Isolated components handle their own state and UDC subscriptions
             // Don't update any state to prevent unnecessary rerenders
             return;
@@ -268,15 +271,21 @@ const PageEditor = () => {
         setIsDirtyState(state.metadata.isDirty);
 
         // Update local widgets from external UDC changes (other components/users)
+        // BUT: Don't overwrite local unsaved widget changes - preserve user's work
         if (versionId && state.versions[versionId]?.widgets) {
-            const externalWidgets = state.versions[versionId].widgets;
-            setLocalWidgets(externalWidgets);
+            if (hasLocalWidgetChanges.current) {
+                console.log('[PageEditor] Skipping widget update - local changes present');
+            } else {
+                const externalWidgets = state.versions[versionId].widgets;
+                console.log('[PageEditor] Updating widgets from UDC:', Object.keys(externalWidgets).map(k => `${k}:${externalWidgets[k]?.length || 0}`));
+                setLocalWidgets(externalWidgets);
 
-            // Normal update for non-isolated sources (other users, other components, etc.)
-            setPageVersionData(prev => ({
-                ...prev,
-                widgets: externalWidgets
-            }));
+                // Normal update for non-isolated sources (other users, other components, etc.)
+                setPageVersionData(prev => ({
+                    ...prev,
+                    widgets: externalWidgets
+                }));
+            }
         }
     });
 
@@ -284,6 +293,7 @@ const PageEditor = () => {
     useEffect(() => {
         if (pageVersionData?.widgets) {
             setLocalWidgets(pageVersionData.widgets);
+            hasLocalWidgetChanges.current = false;
         }
     }, [pageVersionData?.widgets]);
 
@@ -321,8 +331,11 @@ const PageEditor = () => {
 
     // Fast local widget update function
     const updateLocalWidgets = useCallback((updatedWidgets, options = {}) => {
+        console.log('[PageEditor] updateLocalWidgets called:', Object.keys(updatedWidgets).length, 'slots', 'sourceId:', options.sourceId);
+        console.log('[PageEditor] Setting hasLocalWidgetChanges to true');
         // 1. Immediate local state update (fast UI)
         setLocalWidgets(updatedWidgets);
+        hasLocalWidgetChanges.current = true;
 
         // 2. Update pageVersionData for persistence layer (including any additional fields like codeLayout)
         setPageVersionData(prev => ({

@@ -242,6 +242,10 @@ export class DataManager {
 
         const hasDataChanged = this.hasDataChanged(prevState, newState);
 
+        if (hasDataChanged && operation.type?.includes('WIDGET')) {
+            console.log('[DataManager] setState - widget state changed, type:', operation.type, 'sourceId:', operation.sourceId);
+        }
+
         this.state = newState;
         
         this.state.metadata.lastUpdated = new Date().toISOString();
@@ -1450,9 +1454,11 @@ export class DataManager {
      * Dispatch an operation
      */
     dispatch(operation: Operation): void {
+        console.log('[DataManager] dispatch - type:', operation.type, 'sourceId:', operation.sourceId, 'payload:', operation.payload);
         try {
             this.processOperation(operation);
         } catch (error) {
+            console.error('[DataManager] dispatch error:', error);
             // Update error state
             this.setState(operation, state => ({
                 metadata: {

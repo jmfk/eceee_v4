@@ -5,7 +5,7 @@
  * Allows users to manage widgets in any slot regardless of the current layout.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Layout, AlertCircle } from 'lucide-react';
 import { layoutsApi } from '../api/layouts';
@@ -37,6 +37,14 @@ const AllSlotsEditor = ({
     simulatedPath,
     onSimulatedPathChange,
 }) => {
+    console.log('[AllSlotsEditor] Render - sharedComponentId:', sharedComponentId, 'widgets:', widgets);
+    
+    // Use ref to always have current widgets
+    const widgetsRef = useRef(widgets);
+    useEffect(() => {
+        widgetsRef.current = widgets;
+        console.log('[AllSlotsEditor] widgets updated:', Object.keys(widgets).map(k => `${k}:${widgets[k]?.length || 0}`));
+    }, [widgets]);
     // Fetch all slots from API
     const { data: slotsData, isLoading: isLoadingSlots } = useQuery({
         queryKey: ['allSlots'],
@@ -137,15 +145,20 @@ const AllSlotsEditor = ({
     }, []);
 
     // Handle widget actions (same as ReactLayoutRenderer)
-    const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {
-        if (!onWidgetChange) return;
+    const handleWidgetAction = useCallback((action, slotName, widget, ...args) => {
+        console.log('[AllSlotsEditor] handleWidgetAction:', action, slotName, args);
+        if (!onWidgetChange) {
+            console.warn('[AllSlotsEditor] No onWidgetChange');
+            return;
+        }
 
         switch (action) {
             case 'add': {
                 const widgetType = args[0] || 'easy_widgets.ContentWidget';
                 const insertPosition = args[1];
 
-                const updatedWidgets = { ...widgets };
+                // Use ref to get current widgets
+                const updatedWidgets = { ...widgetsRef.current };
                 const slotWidgets = [...(updatedWidgets[slotName] || [])];
 
                 // Create default widget config
@@ -162,6 +175,8 @@ const AllSlotsEditor = ({
                 }
 
                 updatedWidgets[slotName] = slotWidgets;
+                console.log('[AllSlotsEditor] Adding widget:', newWidget, 'to slot:', slotName);
+                console.log('[AllSlotsEditor] Calling onWidgetChange with sourceId:', sharedComponentId);
                 onWidgetChange(updatedWidgets, { sourceId: sharedComponentId });
                 break;
             }
@@ -198,7 +213,9 @@ const AllSlotsEditor = ({
 
             case 'delete': {
                 const deleteIndex = args[0];
-                const updatedWidgets = { ...widgets };
+                const updatedWidgets = { ...widgetsRef.current };
+                const deletedWidget = updatedWidgets[slotName]?.[deleteIndex];
+                
                 if (updatedWidgets[slotName]) {
                     updatedWidgets[slotName] = updatedWidgets[slotName].filter((_, i) => i !== deleteIndex);
                 }
@@ -209,30 +226,30 @@ const AllSlotsEditor = ({
             case 'moveUp': {
                 const moveUpIndex = args[0];
                 if (moveUpIndex > 0) {
-                    const updatedWidgets = { ...widgets };
+                    const updatedWidgets = { ...widgetsRef.current };
                     if (updatedWidgets[slotName]) {
                         const slotWidgets = [...updatedWidgets[slotName]];
                         [slotWidgets[moveUpIndex - 1], slotWidgets[moveUpIndex]] =
                             [slotWidgets[moveUpIndex], slotWidgets[moveUpIndex - 1]];
                         updatedWidgets[slotName] = slotWidgets;
+                        onWidgetChange(updatedWidgets, { sourceId: widget?.id });
                     }
-                    onWidgetChange(updatedWidgets, { sourceId: widget?.id });
                 }
                 break;
             }
 
             case 'moveDown': {
                 const moveDownIndex = args[0];
-                const slotWidgets = widgets[slotName] || [];
+                const slotWidgets = widgetsRef.current[slotName] || [];
                 if (moveDownIndex < slotWidgets.length - 1) {
-                    const updatedWidgets = { ...widgets };
+                    const updatedWidgets = { ...widgetsRef.current };
                     if (updatedWidgets[slotName]) {
                         const slotWidgetsCopy = [...updatedWidgets[slotName]];
                         [slotWidgetsCopy[moveDownIndex], slotWidgetsCopy[moveDownIndex + 1]] =
                             [slotWidgetsCopy[moveDownIndex + 1], slotWidgetsCopy[moveDownIndex]];
                         updatedWidgets[slotName] = slotWidgetsCopy;
+                        onWidgetChange(updatedWidgets, { sourceId: widget?.id });
                     }
-                    onWidgetChange(updatedWidgets, { sourceId: widget?.id });
                 }
                 break;
             }
@@ -240,7 +257,7 @@ const AllSlotsEditor = ({
             case 'configChange': {
                 const widgetId = args[0];
                 const newConfig = args[1];
-                const updatedWidgets = { ...widgets };
+                const updatedWidgets = { ...widgetsRef.current };
                 if (updatedWidgets[slotName]) {
                     updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
                         w.id === widgetId ? { ...w, config: newConfig } : w
@@ -253,7 +270,7 @@ const AllSlotsEditor = ({
             default:
                 console.warn(`Unknown widget action: ${action}`);
         }
-    }, [widgets, onWidgetChange, onOpenWidgetEditor, context, sharedComponentId]);
+    }, [onWidgetChange, onOpenWidgetEditor, context, sharedComponentId]);
 
     // Handle show widget modal
     const handleShowWidgetModal = useCallback((slotName, metadata) => {
@@ -274,10 +291,10 @@ const AllSlotsEditor = ({
 
     // Handle clear slot
     const handleClearSlot = useCallback((slotName) => {
-        const updatedWidgets = { ...widgets };
+        const updatedWidgets = { ...widgetsRef.current };
         updatedWidgets[slotName] = [];
         onWidgetChange(updatedWidgets, { sourceId: sharedComponentId });
-    }, [widgets, onWidgetChange, sharedComponentId]);
+    }, [onWidgetChange, sharedComponentId]);
 
     // Page context for widgets
     const pageContext = useMemo(() => ({
