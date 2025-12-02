@@ -156,7 +156,7 @@ const FooterWidget = ({
         const widgets = slotsData.content || [];
 
         return (
-            <div className="footer-widget border border-gray-200 mb-4">
+            <div className="footer-widget border border-gray-200 mb-4" style={footerStyle}>
                 <div className="p-1">
                     <SlotEditor
                         slotName="content"
