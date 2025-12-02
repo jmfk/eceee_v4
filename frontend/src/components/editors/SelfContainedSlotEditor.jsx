@@ -255,6 +255,15 @@ const SelfContainedSlotEditor = ({
         setIsWidgetModalOpen(false);
     }, [handleAddWidget]);
 
+    /**
+     * Handle paste to empty slot
+     */
+    const handlePasteToEmptySlot = useCallback((e) => {
+        if (pasteModeActive && onPasteAtPosition) {
+            onPasteAtPosition(slotName, 0, slotPath, e.shiftKey);
+        }
+    }, [pasteModeActive, onPasteAtPosition, slotName, slotPath]);
+
     return (
         <div className="slot-editor p-4 relative">
             <PageWidgetHeaderWithSlots
@@ -274,15 +283,31 @@ const SelfContainedSlotEditor = ({
 
             <div className="widgets-list">
                 {widgets.length === 0 ? (
-                    <div className="empty-slot text-center py-6 text-gray-500 border-2 border-dashed border-gray-300">
-                        <p className="mb-2">{defaultEmptyMessage}</p>
-                        {showAddButton && canAddWidget() && (
-                            <button
-                                className="add-first-widget text-gray-600 hover:text-gray-800 text-sm px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
-                                onClick={handleShowWidgetModal}
-                            >
-                                Add first widget
-                            </button>
+                    <div 
+                        className={`empty-slot text-center py-6 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'}`}
+                        onClick={handlePasteToEmptySlot}
+                    >
+                        {pasteModeActive ? (
+                            <>
+                                <div className="text-purple-600 font-semibold text-lg mb-2">
+                                    Click to paste here
+                                </div>
+                                <p className="text-sm text-purple-700">
+                                    Paste widget(s) into this empty slot
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="mb-2">{defaultEmptyMessage}</p>
+                                {showAddButton && canAddWidget() && (
+                                    <button
+                                        className="add-first-widget text-gray-600 hover:text-gray-800 text-sm px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                                        onClick={handleShowWidgetModal}
+                                    >
+                                        Add first widget
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 ) : (

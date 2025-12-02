@@ -49,15 +49,23 @@ const WidgetPublishingInheritanceFields = ({
         // Update local state immediately for UI responsiveness
         setLocalValues(prev => ({ ...prev, [field]: value }))
 
-        // Publish widget-level update through UDC
-        await publishUpdate(componentId, 'UPDATE_WIDGET_CONFIG', {
+        // Build the update payload
+        const updatePayload = {
             id: widgetData?.id,
             slotName: widgetData?.slotName || widgetData?.slot,
             contextType: contextType,
             widgetUpdates: {
                 [field]: value
             }
-        })
+        };
+
+        // If widget has a widgetPath (nested widget), include it for proper location
+        if (widgetData?.widgetPath && Array.isArray(widgetData.widgetPath) && widgetData.widgetPath.length > 0) {
+            updatePayload.widgetPath = widgetData.widgetPath;
+        }
+
+        // Publish widget-level update through UDC
+        await publishUpdate(componentId, 'UPDATE_WIDGET_CONFIG', updatePayload);
     }, [widgetData, contextType, componentId, publishUpdate])
 
     return (
