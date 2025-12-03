@@ -149,8 +149,10 @@ class WebPageRenderer:
         if not widget_type:
             return f'<!-- Widget type "{widget_type_name}" not found -->'
 
-        # Get base configuration
+        # Get base configuration and resolve links
+        from .services.link_resolver import resolve_links_in_config
         base_config = widget_data.get("config", {})
+        base_config = resolve_links_in_config(base_config, self.request)
 
         # Enhanced context
         enhanced_context = dict(context or {})

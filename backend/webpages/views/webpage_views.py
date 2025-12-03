@@ -1313,6 +1313,65 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["get"], url_path="anchors")
+    def anchors(self, request, pk=None):
+        """
+        Get all anchors from page widgets.
+        
+        Traverses all widgets in the page's latest version and extracts
+        anchor and anchor_title fields.
+        
+        GET /api/pages/{id}/anchors/
+        
+        Returns:
+        [
+            {"anchor": "section-1", "title": "Introduction", "widgetType": "Content"},
+            {"anchor": "contact", "title": "Contact Us", "widgetType": "Content"}
+        ]
+        """
+        page = self.get_object()
+        
+        # Get latest version (prefer published, fallback to latest draft)
+        version = page.get_current_published_version()
+        if not version:
+            version = page.get_latest_version()
+        
+        if not version:
+            return Response([], status=status.HTTP_200_OK)
+        
+        # Extract anchors from all widgets
+        anchors = []
+        widgets_data = version.widgets or {}
+        
+        for slot_name, widgets in widgets_data.items():
+            if not isinstance(widgets, list):
+                continue
+            
+            for widget in widgets:
+                if not isinstance(widget, dict):
+                    continue
+                
+                config = widget.get("configuration", widget.get("config", {}))
+                if not isinstance(config, dict):
+                    continue
+                
+                anchor = config.get("anchor")
+                if anchor:
+                    # Get widget type for display
+                    widget_type = widget.get("type") or widget.get("widget_type", "")
+                    # Extract just the widget name (e.g., "easy_widgets.Content" -> "Content")
+                    if "." in widget_type:
+                        widget_type = widget_type.split(".")[-1]
+                    
+                    anchors.append({
+                        "anchor": anchor,
+                        "title": config.get("anchor_title") or config.get("anchorTitle") or anchor,
+                        "widgetType": widget_type,
+                        "slotName": slot_name,
+                    })
+        
+        return Response(anchors, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"], url_path="deleted")
     def list_deleted(self, request):
         """Get list of soft-deleted pages"""

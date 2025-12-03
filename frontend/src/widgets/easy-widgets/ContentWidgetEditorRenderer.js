@@ -7,6 +7,7 @@
  */
 
 import { WysiwygContextMenu } from '../../components/wysiwyg/WysiwygContextMenu.js'
+import { LinkPickerModal } from '../../components/special-editors/LinkPickerModal.js'
 
 /**
  * Clean up HTML content by only allowing basic HTML elements and attributes
@@ -944,6 +945,10 @@ class ContentWidgetEditorRenderer {
         // Add context menu listener
         this.editorElement.addEventListener('contextmenu', this.handleContextMenu)
 
+        // Add click handler for links - prevent navigation in editor mode
+        const linkClickHandler = this.handleLinkClick.bind(this)
+        this.editorElement.addEventListener('click', linkClickHandler)
+
         // Add blur listener for cleanup
         const blurHandler = () => {
             // Clean up on blur
@@ -967,6 +972,7 @@ class ContentWidgetEditorRenderer {
             this.editorElement.removeEventListener('dragover', this.handleMediaInsertDragOver)
             this.editorElement.removeEventListener('drop', this.handleMediaInsertDrop)
             this.editorElement.removeEventListener('contextmenu', this.handleContextMenu)
+            this.editorElement.removeEventListener('click', linkClickHandler)
             this.editorElement.removeEventListener('blur', blurHandler)
         })
 
@@ -1466,158 +1472,45 @@ class ContentWidgetEditorRenderer {
     }
 
     /**
-     * Show link dialog for URL input
+     * Show link dialog using LinkPicker
      */
     showLinkDialog(existingHref, selectedText, linkElement, range) {
-        // Create modal overlay
-        const overlay = document.createElement('div')
-        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
-        overlay.style.zIndex = '9999'
+        // Initialize LinkPickerModal if not already done
+        if (!this.linkPickerModal) {
+            this.linkPickerModal = new LinkPickerModal()
+        }
 
-        // Create dialog
-        const dialog = document.createElement('div')
-        dialog.className = 'bg-white rounded-lg p-6 w-96 max-w-full mx-4'
+        // Get current page context from options
+        const currentPageId = this.options?.pageId || null
+        const currentSiteRootId = this.options?.siteRootId || null
 
-        // Dialog title
-        const title = document.createElement('h3')
-        title.className = 'text-lg font-semibold mb-4'
-        title.textContent = linkElement ? 'Edit Link' : 'Insert Link'
-        dialog.appendChild(title)
-
-        // URL input
-        const urlLabel = document.createElement('label')
-        urlLabel.className = 'block text-sm font-medium text-gray-700 mb-2'
-        urlLabel.textContent = 'URL'
-        dialog.appendChild(urlLabel)
-
-        const urlInput = document.createElement('input')
-        urlInput.type = 'url'
-        urlInput.className = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4'
-        urlInput.placeholder = 'https://example.com'
-        urlInput.value = existingHref
-        dialog.appendChild(urlInput)
-
-        // Text input
-        const textLabel = document.createElement('label')
-        textLabel.className = 'block text-sm font-medium text-gray-700 mb-2'
-        textLabel.textContent = 'Link Text'
-        dialog.appendChild(textLabel)
-
-        const textInput = document.createElement('input')
-        textInput.type = 'text'
-        textInput.className = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4'
-        textInput.placeholder = 'Link text'
-        textInput.value = selectedText
-        dialog.appendChild(textInput)
-
-        // Target checkbox
-        const checkboxContainer = document.createElement('div')
-        checkboxContainer.className = 'flex items-center mb-4'
-        dialog.appendChild(checkboxContainer)
-
-        const targetCheckbox = document.createElement('input')
-        targetCheckbox.type = 'checkbox'
-        targetCheckbox.id = 'link-target-checkbox'
-        targetCheckbox.className = 'mr-2'
-        targetCheckbox.checked = linkElement && linkElement.getAttribute('target') === '_blank'
-        checkboxContainer.appendChild(targetCheckbox)
-
-        const checkboxLabel = document.createElement('label')
-        checkboxLabel.htmlFor = 'link-target-checkbox'
-        checkboxLabel.className = 'text-sm text-gray-700'
-        checkboxLabel.textContent = 'Open in new tab'
-        checkboxContainer.appendChild(checkboxLabel)
-
-        // Buttons container
-        const buttonsContainer = document.createElement('div')
-        buttonsContainer.className = 'flex justify-end gap-2'
-        dialog.appendChild(buttonsContainer)
-
-        // Cancel button
-        const cancelButton = document.createElement('button')
-        cancelButton.type = 'button'
-        cancelButton.className = 'px-4 py-2 text-gray-600 hover:text-gray-800'
-        cancelButton.textContent = 'Cancel'
-        buttonsContainer.appendChild(cancelButton)
-
-        // Remove link button (only if editing existing link)
-        if (linkElement) {
-            const removeButton = document.createElement('button')
-            removeButton.type = 'button'
-            removeButton.className = 'px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700'
-            removeButton.textContent = 'Remove Link'
-            buttonsContainer.appendChild(removeButton)
-
-            removeButton.addEventListener('click', () => {
+        // Show the link picker
+        this.linkPickerModal.show({
+            url: existingHref,
+            text: selectedText,
+            openInNewTab: linkElement && linkElement.getAttribute('target') === '_blank',
+            linkElement: linkElement,
+            currentPageId: currentPageId,
+            currentSiteRootId: currentSiteRootId
+        }).then(result => {
+            if (result.action === 'remove') {
                 this.removeLink(linkElement)
-                document.body.removeChild(overlay)
-                this.editorElement.focus()
-            })
-        }
+            } else if (result.action === 'insert') {
+                const url = result.url
+                const text = result.replaceText ? result.text : selectedText
+                const openInNewTab = result.openInNewTab
 
-        // Insert/Update button
-        const insertButton = document.createElement('button')
-        insertButton.type = 'button'
-        insertButton.className = 'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700'
-        insertButton.textContent = linkElement ? 'Update Link' : 'Insert Link'
-        buttonsContainer.appendChild(insertButton)
-
-        // Event handlers
-        const handleClose = () => {
-            document.body.removeChild(overlay)
+                if (linkElement) {
+                    this.updateLink(linkElement, url, text, openInNewTab)
+                } else {
+                    this.insertLink(url, text, range, openInNewTab)
+                }
+            }
             this.editorElement.focus()
-        }
-
-        const handleInsert = () => {
-            const url = urlInput.value.trim()
-            const text = textInput.value.trim()
-            const openInNewTab = targetCheckbox.checked
-
-            if (!url) {
-                urlInput.focus()
-                return
-            }
-
-            if (linkElement) {
-                this.updateLink(linkElement, url, text, openInNewTab)
-            } else {
-                this.insertLink(url, text, range, openInNewTab)
-            }
-
-            handleClose()
-        }
-
-        // Button event listeners
-        cancelButton.addEventListener('click', handleClose)
-        insertButton.addEventListener('click', handleInsert)
-
-        // Close on overlay click
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                handleClose()
-            }
+        }).catch(() => {
+            // User cancelled
+            this.editorElement.focus()
         })
-
-        // Handle Enter key
-        const handleKeyDown = (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault()
-                handleInsert()
-            } else if (e.key === 'Escape') {
-                e.preventDefault()
-                handleClose()
-            }
-        }
-
-        urlInput.addEventListener('keydown', handleKeyDown)
-        textInput.addEventListener('keydown', handleKeyDown)
-
-        // Show dialog
-        overlay.appendChild(dialog)
-        document.body.appendChild(overlay)
-
-        // Focus URL input
-        setTimeout(() => urlInput.focus(), 100)
     }
 
     /**
@@ -1855,6 +1748,165 @@ class ContentWidgetEditorRenderer {
         }
         parent.removeChild(linkElement)
         this.handleContentChange()
+    }
+
+    /**
+     * Handle click on links in editor - prevent navigation and show link info
+     */
+    handleLinkClick(e) {
+        // Find if click was on a link
+        let target = e.target
+        while (target && target !== this.editorElement) {
+            if (target.tagName === 'A') {
+                // Prevent default navigation
+                e.preventDefault()
+                
+                const href = target.getAttribute('href') || ''
+                
+                // Check if this is a JSON link object
+                let linkInfo = null
+                if (href.startsWith('{')) {
+                    try {
+                        const linkObj = JSON.parse(href)
+                        linkInfo = this.getLinkDisplayInfo(linkObj)
+                    } catch {
+                        // Not valid JSON, treat as regular URL
+                        linkInfo = { type: 'url', display: href }
+                    }
+                } else {
+                    linkInfo = { type: 'url', display: href }
+                }
+                
+                // Show link info tooltip/popup near the link
+                this.showLinkInfoPopup(target, linkInfo)
+                
+                return
+            }
+            target = target.parentNode
+        }
+    }
+
+    /**
+     * Get display info for a link object
+     */
+    getLinkDisplayInfo(linkObj) {
+        const type = linkObj.type || 'unknown'
+        
+        switch (type) {
+            case 'internal':
+                return {
+                    type: 'internal',
+                    display: `Page ID: ${linkObj.pageId}${linkObj.anchor ? ` #${linkObj.anchor}` : ''}`,
+                    pageId: linkObj.pageId,
+                    anchor: linkObj.anchor
+                }
+            case 'external':
+                return { type: 'external', display: linkObj.url || 'External link' }
+            case 'email':
+                return { type: 'email', display: linkObj.address || 'Email link' }
+            case 'phone':
+                return { type: 'phone', display: linkObj.number || 'Phone link' }
+            case 'anchor':
+                return { type: 'anchor', display: `#${linkObj.anchor || ''}` }
+            default:
+                return { type: 'unknown', display: JSON.stringify(linkObj) }
+        }
+    }
+
+    /**
+     * Show link info popup near a link element
+     */
+    showLinkInfoPopup(linkElement, linkInfo) {
+        // Remove any existing popup
+        this.hideLinkInfoPopup()
+        
+        // Create popup
+        const popup = document.createElement('div')
+        popup.className = 'link-info-popup fixed bg-gray-800 text-white text-sm px-3 py-2 rounded shadow-lg max-w-xs z-50'
+        popup.style.pointerEvents = 'auto'
+        
+        // Type badge
+        const typeBadge = document.createElement('span')
+        typeBadge.className = 'inline-block px-1.5 py-0.5 text-xs rounded mr-2'
+        
+        switch (linkInfo.type) {
+            case 'internal':
+                typeBadge.className += ' bg-blue-600'
+                typeBadge.textContent = 'Internal'
+                break
+            case 'external':
+                typeBadge.className += ' bg-green-600'
+                typeBadge.textContent = 'External'
+                break
+            case 'email':
+                typeBadge.className += ' bg-purple-600'
+                typeBadge.textContent = 'Email'
+                break
+            case 'phone':
+                typeBadge.className += ' bg-orange-600'
+                typeBadge.textContent = 'Phone'
+                break
+            case 'anchor':
+                typeBadge.className += ' bg-gray-600'
+                typeBadge.textContent = 'Anchor'
+                break
+            default:
+                typeBadge.className += ' bg-gray-500'
+                typeBadge.textContent = 'Link'
+        }
+        
+        popup.appendChild(typeBadge)
+        
+        // Link display
+        const displayText = document.createElement('span')
+        displayText.textContent = linkInfo.display
+        displayText.className = 'break-all'
+        popup.appendChild(displayText)
+        
+        // Hint text
+        const hint = document.createElement('div')
+        hint.className = 'text-xs text-gray-400 mt-1'
+        hint.textContent = 'Double-click to edit link'
+        popup.appendChild(hint)
+        
+        // Position popup above the link
+        const rect = linkElement.getBoundingClientRect()
+        popup.style.left = `${rect.left}px`
+        popup.style.top = `${rect.top - 8}px`
+        popup.style.transform = 'translateY(-100%)'
+        
+        document.body.appendChild(popup)
+        this.linkInfoPopup = popup
+        
+        // Auto-hide after 3 seconds
+        this.linkInfoPopupTimeout = setTimeout(() => {
+            this.hideLinkInfoPopup()
+        }, 3000)
+        
+        // Hide on any click outside
+        const hideOnClick = (e) => {
+            if (!popup.contains(e.target)) {
+                this.hideLinkInfoPopup()
+                document.removeEventListener('click', hideOnClick)
+            }
+        }
+        setTimeout(() => {
+            document.addEventListener('click', hideOnClick)
+        }, 100)
+    }
+
+    /**
+     * Hide link info popup
+     */
+    hideLinkInfoPopup() {
+        if (this.linkInfoPopup) {
+            this.linkInfoPopup.remove()
+            this.linkInfoPopup = null
+        }
+        if (this.linkInfoPopupTimeout) {
+            clearTimeout(this.linkInfoPopupTimeout)
+            this.linkInfoPopupTimeout = null
+        }
     }
 
     /**

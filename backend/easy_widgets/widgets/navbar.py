@@ -20,7 +20,11 @@ class NavbarItem(BaseModel):
     )
 
     label: str = Field(..., description="Menu item label")
-    url: str = Field(..., description="Menu item URL")
+    url: str = Field(
+        ...,
+        description="Menu item URL",
+        json_schema_extra={"component": "LinkInput"},
+    )
     is_active: bool = Field(True, description="Whether this item is active")
     target_blank: bool = Field(
         False, description="Whether the link opens in a new window"
@@ -37,7 +41,11 @@ class SecondaryMenuItem(BaseModel):
     )
 
     label: str = Field(..., description="Menu item label")
-    url: str = Field(..., description="Menu item URL")
+    url: str = Field(
+        ...,
+        description="Menu item URL",
+        json_schema_extra={"component": "LinkInput"},
+    )
     is_active: bool = Field(True, description="Whether this item is active")
     target_blank: bool = Field(
         False, description="Whether the link opens in a new window"

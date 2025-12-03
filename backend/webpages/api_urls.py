@@ -18,6 +18,9 @@ from .views import (
     layout_json,
     render_page_backend,
     render_page_preview,
+    resolve_links,
+    link_display_info,
+    page_lookup,
 )
 from .views.theme_css_views import ThemeCSSView
 from .views.path_pattern_views import PathPatternViewSet
@@ -238,5 +241,9 @@ urlpatterns = [
         widget_quick_reference_detail,
         name="widget-quick-reference-detail",
     ),
+    # Link resolution endpoints
+    path("links/resolve/", resolve_links, name="links-resolve"),
+    path("links/display-info/", link_display_info, name="links-display-info"),
+    path("pages/lookup/", page_lookup, name="page-lookup"),
     path("", include(router.urls)),
 ] + widget_type_patterns

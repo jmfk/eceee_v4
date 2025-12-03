@@ -37,6 +37,8 @@ export const endpoints = {
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
         widgetInheritance: (id) => `${BASE_PATH}/webpages/pages/${id}/widget-inheritance/`,
         publicationStatus: `${BASE_PATH}/webpages/pages/publicationStatus/`,
+        anchors: (id) => `${BASE_PATH}/webpages/pages/${id}/anchors/`,
+        lookup: `${BASE_PATH}/webpages/pages/lookup/`,
         // Page tree import endpoints
         importTree: `${BASE_PATH}/webpages/pages/import-tree/`,
         importStatus: (taskId) => `${BASE_PATH}/webpages/pages/import-tree/${taskId}/status/`,
@@ -52,6 +54,12 @@ export const endpoints = {
         versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Still works, now consistent path-based
         versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`, // Still works, now consistent path-based
         versionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/` // Still works, now consistent path-based
+    },
+
+    // Links endpoints
+    links: {
+        resolve: `${BASE_PATH}/webpages/links/resolve/`,
+        displayInfo: `${BASE_PATH}/webpages/links/display-info/`
     },
 
     // Versions endpoints (CONSISTENT PATH-BASED API)
