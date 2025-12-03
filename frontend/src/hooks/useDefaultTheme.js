@@ -2,19 +2,18 @@
  * Hook for managing the default theme used in object content editors.
  * 
  * This hook provides:
- * - Access to the current default theme
- * - CSS injection for the default theme
+ * - Access to the current default theme data
  * - Methods to ensure default theme exists
+ * 
+ * Note: CSS injection should happen via useTheme with a pageId.
+ * This hook only provides theme data access.
  */
 
 import { useQuery } from '@tanstack/react-query'
-import { useTheme } from './useTheme'
 import { themesApi } from '../api'
 
 export const useDefaultTheme = ({
-    scopeSelector = '.theme-content',
-    enabled = true,
-    autoInject = true
+    enabled = true
 } = {}) => {
     // Fetch the current default theme
     const {
@@ -47,33 +46,6 @@ export const useDefaultTheme = ({
         cacheTime: 10 * 60 * 1000, // 10 minutes
     })
 
-    // Use the theme hook to inject CSS if auto-injection is enabled
-    const {
-        injectTheme,
-        removeTheme,
-        isInjected
-    } = useTheme({
-        themeId: defaultTheme?.id,
-        scopeSelector,
-        enabled: enabled && autoInject && !!defaultTheme
-    })
-
-    /**
-     * Manually inject the default theme CSS
-     */
-    const injectDefaultTheme = () => {
-        if (defaultTheme) {
-            injectTheme()
-        }
-    }
-
-    /**
-     * Remove the default theme CSS
-     */
-    const removeDefaultTheme = () => {
-        removeTheme()
-    }
-
     /**
      * Ensure a default theme exists
      */
@@ -92,9 +64,6 @@ export const useDefaultTheme = ({
         defaultTheme,
         isLoading,
         error,
-        isInjected,
-        injectDefaultTheme,
-        removeDefaultTheme,
         ensureDefaultTheme,
         refetch
     }

@@ -49,20 +49,19 @@ const ContentEditor = forwardRef(({
   // Get notification context for confirmation dialogs
   const { showConfirm } = useNotificationContext();
 
-  // Apply theme CSS using the useTheme hook
-  const themeId = pageVersionData?.theme || pageVersionData?.effectiveTheme?.id;
+  // Get page ID from webpageData (the main page record)
+  const pageId = webpageData?.id;
+
+  // Apply theme CSS using the useTheme hook (theme is derived from pageId)
   useTheme({
-    themeId: themeId,
-    enabled: !!themeId
+    pageId,
+    enabled: !!pageId
   });
 
   // Get current widgets from pageVersionData (only source of widgets)
   const currentWidgets = useMemo(() => {
     return pageVersionData?.widgets || {};
   }, [pageVersionData?.widgets]);
-
-  // Get page ID from webpageData (the main page record)
-  const pageId = webpageData?.id;
 
   // Early return if critical props are missing
   if (!webpageData && !pageVersionData) {

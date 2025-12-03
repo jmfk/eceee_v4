@@ -25,6 +25,7 @@ const TableWidget = memo(({
     nestedParentWidgetId = null,
     nestedParentSlotName = null,
     slotConfig = null,
+    context = {},
 }) => {
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
     const configRef = useRef(config);
@@ -35,8 +36,8 @@ const TableWidget = memo(({
     const componentId = `widget-${widgetId}`;
     const contextType = useEditorContext();
 
-    // Get current theme for component styles (TableWidget doesn't have context.pageId, so we don't pass it)
-    const { currentTheme } = useTheme();
+    // Get current theme for component styles
+    const { currentTheme } = useTheme({ pageId: context?.pageId, enabled: !!context?.pageId });
 
     useEffect(() => {
         if (!widgetId || !slotName) {

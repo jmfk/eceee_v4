@@ -8,25 +8,28 @@
 
 import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { themesApi, pagesApi } from '../api'
+import { pagesApi } from '../api'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { themeCSSManager } from '../utils/themeCSSManager'
 
 /**
  * Hook for applying themes to content areas
  * @param {Object} options - Configuration options
- * @param {number} options.themeId - Explicit theme ID to apply
- * @param {number} options.pageId - Page ID to fetch effectiveTheme from (includes inheritance)
+ * @param {number} options.pageId - Page ID to fetch effectiveTheme from (required, includes inheritance)
  * @param {string} options.scopeSelector - CSS selector to scope theme to (default: '.cms-content')
  * @param {boolean} options.enabled - Whether theme application is enabled
  * @returns {Object} Theme application utilities
  */
 export const useTheme = ({
-    themeId = null,
     pageId = null,
     scopeSelector = '.cms-content',
     enabled = true
 } = {}) => {
+    // Validate required parameter - only error if hook is enabled
+    if (enabled && !pageId) {
+        console.error('useTheme: pageId is required. No theme CSS will be injected.')
+    }
+
     const currentThemeIdRef = useRef(null)
     const componentIdRef = useRef(`theme-user-${Math.random().toString(36).substr(2, 9)}`)
 
@@ -37,13 +40,13 @@ export const useTheme = ({
             const response = await pagesApi.get(pageId);
             return response;
         },
-        enabled: enabled && !!pageId && !themeId,
+        enabled: enabled && !!pageId,
         staleTime: 5 * 60 * 1000
     });
 
     const pageTheme = pageData?.effectiveTheme;
 
-    // Try to get theme from UDC if no pageId or themeId provided
+    // Try to get theme from UDC as fallback
     let udcTheme = null
     try {
         const { state } = useUnifiedData()
@@ -64,50 +67,17 @@ export const useTheme = ({
                 udcTheme = state.themes[pageThemeId]
             }
         }
-
-        // Fallback to default theme from state
-        if (!udcTheme) {
-            const defaultThemeId = Object.keys(state.themes).find(id =>
-                state.themes[id]?.isDefault === true
-            )
-            if (defaultThemeId) {
-                udcTheme = state.themes[defaultThemeId]
-            }
-        }
     } catch (e) {
         // UDC not available (outside of provider context), continue without it
     }
 
-    // Fetch theme data when themeId changes
-    const { data: fetchedTheme, isLoading: fetchingTheme, error } = useQuery({
-        queryKey: ['theme', themeId],
-        queryFn: () => themesApi.get(themeId),
-        enabled: enabled && !!themeId,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        cacheTime: 10 * 60 * 1000, // 10 minutes
-    })
-
-    // Fetch default theme when no themeId or pageId provided
-    const { data: defaultTheme, isLoading: fetchingDefault } = useQuery({
-        queryKey: ['default-theme'],
-        queryFn: async () => {
-            const response = await themesApi.list();
-            const themes = Array.isArray(response) ? response : response.results || [];
-            return themes.find(t => t.isDefault === true);
-        },
-        enabled: !themeId && !pageId && enabled,
-        staleTime: 5 * 60 * 1000
-    });
-
-    // PRIORITY 1: Explicit themeId (fetched)
-    // PRIORITY 2: Page's effectiveTheme (from page API - includes inheritance)
-    // PRIORITY 3: UDC effectiveTheme (fallback)
-    // PRIORITY 4: Default theme
-    const theme = fetchedTheme || pageTheme || udcTheme || defaultTheme
-    const isLoading = fetchingTheme || fetchingPage || fetchingDefault
+    // PRIORITY 1: Page's effectiveTheme (from page API - includes inheritance)
+    // PRIORITY 2: UDC effectiveTheme (fallback for when page data not yet loaded)
+    const theme = pageTheme || udcTheme
+    const isLoading = fetchingPage
 
     // Fetch complete CSS from backend's ThemeCSSGenerator
-    const { data: themeCSS, isLoading: fetchingCSS, error: cssError } = useQuery({
+    const { data: themeCSS, isLoading: fetchingCSS, error } = useQuery({
         queryKey: ['theme-css', theme?.id, 'frontend-scoped'],
         queryFn: async () => {
             if (!theme?.id) return null
