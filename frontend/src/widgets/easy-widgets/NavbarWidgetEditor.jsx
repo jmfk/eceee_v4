@@ -1,7 +1,140 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Trash2, X, Download, FileText, Loader2, GripVertical } from 'lucide-react'
+import { Plus, Trash2, X, Download, FileText, Loader2, GripVertical, Link, ExternalLink } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { usePageChildren } from '../../hooks/usePageStructure'
 import { pagesApi } from '../../api'
+import { api } from '../../api/client'
+import { endpoints } from '../../api/endpoints'
+import LinkPicker from '../../components/LinkPicker'
+
+/**
+ * LinkDisplay - Shows link info with path lookup for internal pages
+ */
+const LinkDisplay = ({ url, onEdit, currentSiteId }) => {
+    // Parse the URL to get link object
+    const linkObj = useMemo(() => {
+        if (!url) return null
+        if (url.startsWith('{')) {
+            try {
+                return JSON.parse(url)
+            } catch {
+                return null
+            }
+        }
+        return null
+    }, [url])
+
+    // Fetch page info for internal links
+    const { data: pageInfo, isLoading } = useQuery({
+        queryKey: ['page-lookup', linkObj?.pageId, currentSiteId],
+        queryFn: async () => {
+            if (!linkObj?.pageId) return null
+            let url = `${endpoints.pages.lookup}?id=${linkObj.pageId}`
+            if (currentSiteId) {
+                url += `&currentSiteId=${currentSiteId}`
+            }
+            const response = await api.get(url)
+            return response
+        },
+        enabled: linkObj?.type === 'internal' && !!linkObj?.pageId,
+        staleTime: 60000
+    })
+
+    // Get display text based on link type
+    const getDisplayContent = () => {
+
+        if (!url) {
+            return <span className="text-gray-400 italic">No link set</span>
+        }
+
+        if (!linkObj) {
+            // Plain text URL
+            return <span className="truncate">{url}</span>
+        }
+
+        switch (linkObj.type) {
+            case 'internal':
+                if (isLoading) {
+                    return (
+                        <span className="flex items-center gap-1 text-gray-500">
+                            <Loader2 size={12} className="animate-spin" />
+                            Loading...
+                        </span>
+                    )
+                }
+                if (pageInfo) {
+                    const data = pageInfo.data || pageInfo
+                    // Build display: [Site] [Draft] Title /path/ [↗]
+                    return (
+                        <span className="flex items-center gap-1 min-w-0">
+                            {pageInfo.site && (
+                                <span className="text-purple-600 text-xs flex-shrink-0">[{pageInfo.site.title}]</span>
+                            )}
+                            {!data.isPublished && (
+                                <span className="text-orange-500 text-xs flex-shrink-0">[Draft]</span>
+                            )}
+                            <span className="truncate font-medium">{data.title}</span>
+                            <span className="text-gray-400 text-xs truncate flex-shrink-0">
+                                {data.path}
+                                {linkObj.anchor && `#${linkObj.anchor}`}
+                            </span>
+                            {linkObj.targetBlank && (
+                                <span className="text-blue-500 text-xs flex-shrink-0" title="Opens in new tab">↗</span>
+                            )}
+                        </span>
+                    )
+                }
+                return <span className="text-orange-600">Page ID: {linkObj.pageId} (not found)</span>
+            case 'external':
+                return <span className="truncate">{linkObj.url || 'External link'}</span>
+            case 'email':
+                return <span className="truncate">✉️ {linkObj.address || ''}</span>
+            case 'phone':
+                return <span className="truncate">📞 {linkObj.number || ''}</span>
+            case 'anchor':
+                return <span className="truncate">#{linkObj.anchor || ''}</span>
+            default:
+                return <span className="truncate">{url}</span>
+        }
+    }
+
+    const handleOpenPage = (e) => {
+        e.stopPropagation()
+        if (linkObj?.type === 'internal' && linkObj?.pageId) {
+            // Open page editor in new window
+            window.open(`/pages/${linkObj.pageId}/edit`, '_blank')
+        }
+    }
+
+    const handleEdit = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onEdit()
+    }
+
+    return (
+        <div className="flex items-center gap-1 min-w-0 flex-1">
+            <Link size={14} className="text-gray-400 flex-shrink-0" />
+            <button
+                type="button"
+                onClick={handleEdit}
+                className="flex-1 min-w-0 text-left text-sm text-gray-700 hover:text-blue-600 truncate"
+            >
+                {getDisplayContent()}
+            </button>
+            {linkObj?.type === 'internal' && linkObj?.pageId && (
+                <button
+                    type="button"
+                    onClick={handleOpenPage}
+                    className="p-1 text-gray-400 hover:text-blue-600 flex-shrink-0"
+                    title="Open page in new tab"
+                >
+                    <ExternalLink size={14} />
+                </button>
+            )}
+        </div>
+    )
+}
 
 /**
  * NavbarWidgetEditor Component
@@ -31,6 +164,19 @@ const NavbarWidgetEditor = ({
 
     const [selectedPageIds, setSelectedPageIds] = useState(new Set())
     const [showImportSection, setShowImportSection] = useState(false)
+
+    // LinkPicker state
+    const [linkPickerState, setLinkPickerState] = useState({
+        isOpen: false,
+        itemType: null, // 'primary' or 'secondary'
+        itemIndex: null,
+        currentLink: null
+    })
+
+    // Get site root ID for LinkPicker context
+    const siteRootId = useMemo(() => {
+        return context?.webpageData?.cachedRootId || context?.siteRootId || null
+    }, [context])
 
     // Sync state when widget config changes externally
     useEffect(() => {
@@ -197,6 +343,76 @@ const NavbarWidgetEditor = ({
         updateConfig(menuItems, reordered)
     }, [secondaryMenuItems, menuItems, updateConfig])
 
+    // Open LinkPicker for a menu item
+    const openLinkPicker = useCallback((itemType, index, currentUrl) => {
+        setLinkPickerState({
+            isOpen: true,
+            itemType,
+            itemIndex: index,
+            currentLink: currentUrl || null
+        })
+    }, [])
+
+    // Handle LinkPicker save
+    const handleLinkPickerSave = useCallback((result) => {
+        const { itemType, itemIndex } = linkPickerState
+
+        if (result.action === 'remove') {
+            // Clear the URL
+            if (itemType === 'primary') {
+                setMenuItems(prev => {
+                    const updated = [...prev]
+                    updated[itemIndex] = { ...updated[itemIndex], url: '' }
+                    updateConfig(updated, undefined)
+                    return updated
+                })
+            } else {
+                setSecondaryMenuItems(prev => {
+                    const updated = [...prev]
+                    updated[itemIndex] = { ...updated[itemIndex], url: '' }
+                    updateConfig(menuItems, updated)
+                    return updated
+                })
+            }
+        } else if (result.action === 'insert' && result.link) {
+            // Store the link object as JSON string
+            const urlValue = JSON.stringify(result.link)
+
+            if (itemType === 'primary') {
+                // Update both url and targetBlank in a single state update
+                setMenuItems(prev => {
+                    const updated = [...prev]
+                    updated[itemIndex] = {
+                        ...updated[itemIndex],
+                        url: urlValue,
+                        ...(result.targetBlank !== undefined && { targetBlank: result.targetBlank })
+                    }
+                    updateConfig(updated, undefined)
+                    return updated
+                })
+            } else {
+                setSecondaryMenuItems(prev => {
+                    const updated = [...prev]
+                    updated[itemIndex] = {
+                        ...updated[itemIndex],
+                        url: urlValue,
+                        ...(result.targetBlank !== undefined && { targetBlank: result.targetBlank })
+                    }
+                    updateConfig(menuItems, updated)
+                    return updated
+                })
+            }
+        }
+
+        // Close the picker
+        setLinkPickerState({
+            isOpen: false,
+            itemType: null,
+            itemIndex: null,
+            currentLink: null
+        })
+    }, [linkPickerState, menuItems, updateConfig])
+
     return (
         <div className="h-full flex flex-col overflow-hidden min-w-0">
             {/* Header */}
@@ -353,11 +569,6 @@ const NavbarWidgetEditor = ({
                                 <div
                                     key={index}
                                     className="border border-gray-200 rounded p-3 bg-white space-y-2 min-w-0"
-                                    draggable
-                                    onDragStart={(e) => {
-                                        e.dataTransfer.effectAllowed = 'move'
-                                        e.dataTransfer.setData('text/plain', index)
-                                    }}
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
@@ -369,7 +580,14 @@ const NavbarWidgetEditor = ({
                                     }}
                                 >
                                     <div className="flex items-start gap-2">
-                                        <div className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">
+                                        <div
+                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1"
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.effectAllowed = 'move'
+                                                e.dataTransfer.setData('text/plain', index.toString())
+                                            }}
+                                        >
                                             <GripVertical size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0 space-y-2">
@@ -380,13 +598,13 @@ const NavbarWidgetEditor = ({
                                                 placeholder="Label *"
                                                 className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
-                                            <input
-                                                type="text"
-                                                value={item.url || ''}
-                                                onChange={(e) => updateMenuItem(index, 'url', e.target.value)}
-                                                placeholder="URL *"
-                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 break-all"
-                                            />
+                                            <div className="w-full flex items-center px-2 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                                                <LinkDisplay
+                                                    url={item.url}
+                                                    onEdit={() => openLinkPicker('primary', index, item.url)}
+                                                    currentSiteId={siteRootId}
+                                                />
+                                            </div>
                                             <div className="flex gap-4">
                                                 <label className="flex items-center gap-2 text-xs text-gray-600">
                                                     <input
@@ -447,11 +665,6 @@ const NavbarWidgetEditor = ({
                                 <div
                                     key={index}
                                     className="border border-gray-200 rounded p-3 bg-white space-y-2 min-w-0"
-                                    draggable
-                                    onDragStart={(e) => {
-                                        e.dataTransfer.effectAllowed = 'move'
-                                        e.dataTransfer.setData('text/plain', index)
-                                    }}
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
@@ -463,7 +676,14 @@ const NavbarWidgetEditor = ({
                                     }}
                                 >
                                     <div className="flex items-start gap-2">
-                                        <div className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">
+                                        <div
+                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1"
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.effectAllowed = 'move'
+                                                e.dataTransfer.setData('text/plain', index.toString())
+                                            }}
+                                        >
                                             <GripVertical size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0 space-y-2">
@@ -474,13 +694,13 @@ const NavbarWidgetEditor = ({
                                                 placeholder="Label *"
                                                 className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
-                                            <input
-                                                type="text"
-                                                value={item.url || ''}
-                                                onChange={(e) => updateSecondaryMenuItem(index, 'url', e.target.value)}
-                                                placeholder="URL *"
-                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 break-all"
-                                            />
+                                            <div className="w-full flex items-center px-2 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                                                <LinkDisplay
+                                                    url={item.url}
+                                                    onEdit={() => openLinkPicker('secondary', index, item.url)}
+                                                    currentSiteId={siteRootId}
+                                                />
+                                            </div>
                                             <div className="flex gap-4">
                                                 <label className="flex items-center gap-2 text-xs text-gray-600">
                                                     <input
@@ -544,6 +764,18 @@ const NavbarWidgetEditor = ({
                     )}
                 </div>
             </div>
+
+            {/* LinkPicker Modal */}
+            <LinkPicker
+                isOpen={linkPickerState.isOpen}
+                onClose={() => setLinkPickerState({ isOpen: false, itemType: null, itemIndex: null, currentLink: null })}
+                onSave={handleLinkPickerSave}
+                initialLink={linkPickerState.currentLink}
+                initialText=""
+                currentPageId={currentPageId}
+                currentSiteRootId={siteRootId}
+                showRemoveButton={!!linkPickerState.currentLink}
+            />
         </div>
     )
 }

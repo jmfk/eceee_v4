@@ -7,6 +7,7 @@
 
 import { FloatingToolbar } from './FloatingToolbar'
 import { LinkModal } from './LinkModal'
+import { LinkPickerModal } from './LinkPickerModal'
 import { TableContextMenu } from './TableContextMenu'
 import { tableToolbarManager } from '../../utils/tableToolbarManager.js'
 
@@ -1801,7 +1802,7 @@ export class TableEditorCore {
     }
 
     /**
-     * Show link modal
+     * Show link modal using LinkPicker
      */
     async showLinkModal() {
         const textSel = this.getTextSelection()
@@ -1810,21 +1811,32 @@ export class TableEditorCore {
         // Check if selection contains existing link
         const linkElement = this.findLinkAtSelection(textSel.selection)
 
+        // Initialize LinkPickerModal if not already done
+        if (!this.linkPickerModal) {
+            this.linkPickerModal = new LinkPickerModal()
+        }
+
+        // Get current page context from options
+        const currentPageId = this.options?.pageId || null
+        const currentSiteRootId = this.options?.siteRootId || null
+
         const linkData = {
             url: linkElement?.getAttribute('href') || '',
             text: textSel.text,
             openInNewTab: linkElement?.getAttribute('target') === '_blank',
             linkElement,
-            range: textSel.range
+            currentPageId: currentPageId,
+            currentSiteRootId: currentSiteRootId
         }
 
         try {
-            const result = await this.linkModal.show(linkData)
+            const result = await this.linkPickerModal.show(linkData)
 
             if (result.action === 'remove') {
                 this.removeLink(linkElement)
             } else if (result.action === 'insert') {
-                this.insertLink(result.url, result.text, textSel.range, result.openInNewTab)
+                const text = result.replaceText ? result.text : textSel.text
+                this.insertLink(result.url, text, textSel.range, result.openInNewTab)
             }
         } catch (err) {
             // User cancelled

@@ -329,6 +329,13 @@ class ContentWidget(BaseWidget):
                     new_tag = BeautifulSoup(styled_html, "html.parser")
                     media_insert.replace_with(new_tag)
 
+        # Resolve link objects in HTML content
+        from webpages.services.link_resolver import resolve_links_in_html
+        content_str = str(soup)
+        resolved_content = resolve_links_in_html(content_str, context.get("request"))
+        if resolved_content != content_str:
+            soup = BeautifulSoup(resolved_content, "html.parser")
+
         # Auto-apply lightbox attributes to images if enabled
         enable_lb = config.get("enable_lightbox", False)
         if enable_lb:
