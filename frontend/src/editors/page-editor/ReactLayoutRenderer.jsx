@@ -982,14 +982,6 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Handle paste at specific position
     const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = [], keepClipboard = false) => {
-        console.log('[ReactLayoutRenderer] handlePasteAtPosition:', {
-            slotName,
-            position,
-            widgetPath,
-            widgetPathLength: widgetPath.length,
-            keepClipboard
-        });
-        
         if (!clipboardData || !clipboardData.data || clipboardData.data.length === 0) {
             return;
         }
@@ -1006,7 +998,6 @@ const ReactLayoutRenderer = forwardRef(({
         
         // Determine if this is a nested slot paste
         const isNested = widgetPath.length > 0;
-        console.log('[ReactLayoutRenderer] isNested:', isNested, 'widgetPath:', widgetPath);
         
         if (isNested) {
             // NORMALIZE PATH: Determine if path targets a slot or a widget
@@ -1018,8 +1009,6 @@ const ReactLayoutRenderer = forwardRef(({
                 : widgetPath;
             
             const topSlotName = effectivePath[0];
-            
-            console.log('[ReactLayoutRenderer] effectivePath:', effectivePath);
             
             // TRAVERSE WITH ANCESTOR TRACKING
             // We need to track { widget, widgetIndex, slotName } for every level to rebuild immutably
@@ -1063,8 +1052,6 @@ const ReactLayoutRenderer = forwardRef(({
                 console.error('[ReactLayoutRenderer] Could not find container or target slot');
                 return;
             }
-            
-            console.log('[ReactLayoutRenderer] Found container:', containerWidget.id, 'targetSlot:', targetSlotName);
             
             // UPDATE INNERMOST CONTAINER
             const nestedSlotWidgets = containerWidget.config?.slots?.[targetSlotName] || [];

@@ -46,13 +46,6 @@ const ThreeColumnsWidget = ({
         return `three-columns-widget-${widgetId}`;
     }, [widgetId]);
 
-    console.log('[ThreeColumnsWidget] Props received:', {
-        widgetId,
-        widgetPath,
-        slotName,
-        mode
-    });
-
     // Get UDC functions
     const { useExternalChanges, publishUpdate } = useUnifiedData();
 
@@ -207,18 +200,9 @@ const ThreeColumnsWidget = ({
     const renderWidget = useCallback((widget, slotName, index) => {
         const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
 
-        console.log('[ThreeColumnsWidget.renderWidget]', {
-            widgetId,
-            widgetPath,
-            slotName,
-            nestedWidgetId: widget.id
-        });
-
         // widgetPath already ends with this widget's ID from WidgetSlot
         // So we just need to add the slot name and nested widget ID
         const fullWidgetPath = [...widgetPath, slotName, widget.id];
-
-        console.log('[ThreeColumnsWidget.renderWidget] fullWidgetPath:', fullWidgetPath);
 
         return (
             <div key={uniqueKey} className="widget-wrapper">
