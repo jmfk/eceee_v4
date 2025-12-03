@@ -88,6 +88,7 @@ services:
       - REACT_APP_BACKEND_URL=http://localhost:8000
       - VITE_WS_URL=ws://localhost:8000
       - VITE_IMGPROXY_URL=http://imgproxy:8080
+      - VITE_ENABLE_CONTEXT_MENU_TOGGLE=true
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
     volumes:

@@ -127,7 +127,8 @@ const ContextMenuToggle = () => {
     })
   }
 
-  if (!isDevelopment || !visible) return null
+  const showToggle = isDevelopment || import.meta.env.VITE_ENABLE_CONTEXT_MENU_TOGGLE === 'true'
+  if (!showToggle || !visible) return null
 
   return (
     <div
