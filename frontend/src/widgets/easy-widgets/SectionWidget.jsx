@@ -66,7 +66,7 @@ const SectionWidget = ({
     const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
 
     // Get current theme for component styles
-    const { currentTheme } = useTheme({ pageId: context.pageId });
+    const { currentTheme } = useTheme({ pageId: context?.pageId, enabled: !!context?.pageId });
 
     // Local state management for slots data and collapse state
     const [slotsData, setSlotsData] = useState(() => {

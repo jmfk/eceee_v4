@@ -118,6 +118,10 @@ const FooterWidget = ({
                 onOpenWidgetEditor={onOpenWidgetEditor}
                 contextType={contextType}
                 parentComponentId={componentId}
+                pageId={context.pageId}
+                webpageData={context.webpageData}
+                pageVersionData={context.pageVersionData}
+                versionId={context.versionId}
                 widgetPath={newWidgetPath}
                 selectedWidgets={selectedWidgets}
                 cutWidgets={cutWidgets}
@@ -133,7 +137,7 @@ const FooterWidget = ({
         );
     }, [
         widgetPath, mode, onWidgetEdit, onOpenWidgetEditor, contextType,
-        componentId, selectedWidgets, cutWidgets, onToggleWidgetSelection,
+        componentId, context, selectedWidgets, cutWidgets, onToggleWidgetSelection,
         isWidgetSelected, isWidgetCut, onDeleteCutWidgets, buildWidgetPath,
         parseWidgetPath, pasteModeActive, onPasteAtPosition
     ]);

@@ -27,7 +27,7 @@ const ContentCardWidget = ({
     const pageId = context?.pageId
 
     // Get current theme for component styles
-    const { currentTheme } = useTheme({ pageId })
+    const { currentTheme } = useTheme({ pageId, enabled: !!pageId })
 
     // Use configRef for stable reference (prevents callback recreation issues)
     const configRef = useRef(config)

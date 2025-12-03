@@ -53,7 +53,7 @@ const ThreeColumnsWidget = ({
     const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
 
     // Get current theme for component styles
-    const { currentTheme } = useTheme({ pageId: context.pageId });
+    const { currentTheme } = useTheme({ pageId: context?.pageId, enabled: !!context?.pageId });
 
     // Local state management for slots data
     const [slotsData, setSlotsData] = useState(() => {

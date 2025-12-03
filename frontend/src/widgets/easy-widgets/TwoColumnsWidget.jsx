@@ -53,7 +53,7 @@ const TwoColumnsWidget = ({
     const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
 
     // Get current theme for component styles
-    const { currentTheme } = useTheme({ pageId: context.pageId });
+    const { currentTheme } = useTheme({ pageId: context?.pageId, enabled: !!context?.pageId });
 
     // Local state management for slots data
     // Initialize from config.slots, but maintain locally to avoid prop resets

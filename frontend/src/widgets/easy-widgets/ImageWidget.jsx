@@ -25,7 +25,7 @@ const ImageWidget = ({
     const pageId = context?.pageId;
 
     // Get current theme for image styles (includes inheritance)
-    const { currentTheme } = useTheme({ pageId })
+    const { currentTheme } = useTheme({ pageId, enabled: !!pageId })
 
     // ODC Integration
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
