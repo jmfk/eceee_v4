@@ -223,8 +223,9 @@ const TwoColumnsWidget = ({
         // Create unique key for widget
         const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
 
-        // Build full path for this widget: widgetPath + widgetId + slotName + widget.id
-        const fullWidgetPath = [...widgetPath, widgetId, slotName, widget.id];
+        // widgetPath already ends with this widget's ID from WidgetSlot
+        // So we just need to add the slot name and nested widget ID
+        const fullWidgetPath = [...widgetPath, slotName, widget.id];
 
         return (
             <div key={uniqueKey} className="widget-wrapper">
@@ -250,7 +251,7 @@ const TwoColumnsWidget = ({
                 />
             </div>
         );
-    }, [widgetPath, widgetId, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
+    }, [widgetPath, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
 
     // Show loading state while fetching widget types
     if (mode === 'editor' && isLoadingTypes) {

@@ -46,6 +46,13 @@ const ThreeColumnsWidget = ({
         return `three-columns-widget-${widgetId}`;
     }, [widgetId]);
 
+    console.log('[ThreeColumnsWidget] Props received:', {
+        widgetId,
+        widgetPath,
+        slotName,
+        mode
+    });
+
     // Get UDC functions
     const { useExternalChanges, publishUpdate } = useUnifiedData();
 
@@ -180,10 +187,10 @@ const ThreeColumnsWidget = ({
     // Get grid classes based on layout style
     const getGridClasses = useCallback((layoutStyle) => {
         if (!layoutStyle) return 'lg:grid-cols-3'
-        
+
         // Generate CSS class name matching backend convention
         const ratioClass = `three-col-ratio-${layoutStyle.replace(/:/g, '-')}`
-        
+
         // Also add Tailwind classes for immediate styling
         const ratioMap = {
             '3:2:1': 'lg:grid-cols-[3fr_2fr_1fr]',
@@ -192,14 +199,26 @@ const ThreeColumnsWidget = ({
             '1:4:1': 'lg:grid-cols-[1fr_4fr_1fr]',
         }
         const tailwindClass = ratioMap[layoutStyle] || 'lg:grid-cols-3'
-        
+
         return `${ratioClass} ${tailwindClass}`
     }, [])
 
     // Render individual widget in a slot (for display mode)
     const renderWidget = useCallback((widget, slotName, index) => {
         const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
-        const fullWidgetPath = [...widgetPath, widgetId, slotName, widget.id];
+
+        console.log('[ThreeColumnsWidget.renderWidget]', {
+            widgetId,
+            widgetPath,
+            slotName,
+            nestedWidgetId: widget.id
+        });
+
+        // widgetPath already ends with this widget's ID from WidgetSlot
+        // So we just need to add the slot name and nested widget ID
+        const fullWidgetPath = [...widgetPath, slotName, widget.id];
+
+        console.log('[ThreeColumnsWidget.renderWidget] fullWidgetPath:', fullWidgetPath);
 
         return (
             <div key={uniqueKey} className="widget-wrapper">
@@ -222,7 +241,7 @@ const ThreeColumnsWidget = ({
                 />
             </div>
         );
-    }, [widgetPath, widgetId, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
+    }, [widgetPath, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
 
     // Show loading state
     if (mode === 'editor' && isLoadingTypes) {

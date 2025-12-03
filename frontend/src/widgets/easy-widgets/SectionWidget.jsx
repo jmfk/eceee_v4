@@ -255,7 +255,8 @@ const SectionWidget = ({
     // Render individual widget in a slot (for display mode)
     const renderWidget = useCallback((widget, slotName, index) => {
         const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
-        const fullWidgetPath = [...widgetPath, widgetId, slotName, widget.id];
+        // widgetPath already ends with this widget's ID from WidgetSlot
+        const fullWidgetPath = [...widgetPath, slotName, widget.id];
 
         return (
             <>
@@ -278,7 +279,7 @@ const SectionWidget = ({
                 />
             </>
         );
-    }, [widgetPath, widgetId, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
+    }, [widgetPath, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
 
     // Show loading state while fetching widget types
     if (mode === 'editor' && isLoadingTypes) {

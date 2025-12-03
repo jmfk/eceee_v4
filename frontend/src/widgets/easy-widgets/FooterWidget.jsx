@@ -103,7 +103,9 @@ const FooterWidget = ({
             return null;
         }
 
-        const newWidgetPath = widgetPath ? [...widgetPath, slotName, index] : [slotName, index];
+        // widgetPath already ends with this widget's ID from WidgetSlot
+        // So we just need to add the slot name and nested widget ID
+        const newWidgetPath = widgetPath ? [...widgetPath, slotName, widget.id] : [slotName, widget.id];
 
         return (
             <PageWidgetFactory

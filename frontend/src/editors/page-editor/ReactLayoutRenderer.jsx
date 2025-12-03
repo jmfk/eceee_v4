@@ -982,6 +982,14 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Handle paste at specific position
     const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = [], keepClipboard = false) => {
+        console.log('[ReactLayoutRenderer] handlePasteAtPosition:', {
+            slotName,
+            position,
+            widgetPath,
+            widgetPathLength: widgetPath.length,
+            keepClipboard
+        });
+        
         if (!clipboardData || !clipboardData.data || clipboardData.data.length === 0) {
             return;
         }
@@ -990,76 +998,169 @@ const ReactLayoutRenderer = forwardRef(({
         const widgetsToPaste = clipboardData.data;
         const isCut = clipboardData.operation === 'cut';
         
+        // Generate new IDs for pasted widgets
+        const pastedWidgets = widgetsToPaste.map(w => ({
+            ...w,
+            id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }));
+        
         // Determine if this is a nested slot paste
         const isNested = widgetPath.length > 0;
+        console.log('[ReactLayoutRenderer] isNested:', isNested, 'widgetPath:', widgetPath);
         
         if (isNested) {
-            // Nested slot paste - handle container widget slots
-            // widgetPath = [topSlotName, containerId, nestedSlotName]
-            const [topSlotName, containerId, nestedSlotName] = widgetPath;
+            // NORMALIZE PATH: Determine if path targets a slot or a widget
+            // Path structure: [topSlot, widgetId, nestedSlot, widgetId, nestedSlot, ...]
+            // - Odd length = ends with slot name (empty slot paste target)
+            // - Even length = ends with widget ID (paste relative to existing widget)
+            const effectivePath = (widgetPath.length % 2 === 0)
+                ? widgetPath.slice(0, -1)  // Strip trailing widgetId
+                : widgetPath;
             
-            const slotWidgets = widgets[topSlotName] || [];
-            const containerWidget = slotWidgets.find(w => String(w.id) === String(containerId));
+            const topSlotName = effectivePath[0];
             
-            if (!containerWidget) return;
+            console.log('[ReactLayoutRenderer] effectivePath:', effectivePath);
             
-            // Get nested slot widgets
-            const nestedSlotWidgets = containerWidget.config?.slots?.[nestedSlotName] || [];
+            // TRAVERSE WITH ANCESTOR TRACKING
+            // We need to track { widget, widgetIndex, slotName } for every level to rebuild immutably
+            const ancestors = [];
+            let currentWidgets = widgets[topSlotName] || [];
+            let containerWidget = null;
+            let targetSlotName = null;
             
-            // Generate new IDs for pasted widgets
-            const pastedWidgets = widgetsToPaste.map(w => ({
-                ...w,
-                id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-            }));
+            // Iterate pairs [widgetId, slotName] starting from index 1
+            for (let i = 1; i < effectivePath.length; i += 2) {
+                const widgetId = effectivePath[i];
+                const nextSlot = effectivePath[i + 1];
+                
+                const widgetIndex = currentWidgets.findIndex(w => String(w.id) === String(widgetId));
+                const widget = currentWidgets[widgetIndex];
+                
+                if (!widget) {
+                    console.error('[ReactLayoutRenderer] Container widget not found in path', widgetId);
+                    return;
+                }
+                
+                // Track ancestor info needed for rebuilding
+                ancestors.push({
+                    widget,
+                    widgetIndex,
+                    slotName: i === 1 ? topSlotName : effectivePath[i - 1],
+                    currentWidgets
+                });
+                
+                if (i + 2 >= effectivePath.length) {
+                    // This is the innermost container
+                    containerWidget = widget;
+                    targetSlotName = nextSlot;
+                } else {
+                    // Go deeper into nested slots
+                    currentWidgets = widget.config?.slots?.[nextSlot] || [];
+                }
+            }
             
-            // Insert at position
+            if (!containerWidget || !targetSlotName) {
+                console.error('[ReactLayoutRenderer] Could not find container or target slot');
+                return;
+            }
+            
+            console.log('[ReactLayoutRenderer] Found container:', containerWidget.id, 'targetSlot:', targetSlotName);
+            
+            // UPDATE INNERMOST CONTAINER
+            const nestedSlotWidgets = containerWidget.config?.slots?.[targetSlotName] || [];
             const updatedNestedWidgets = [...nestedSlotWidgets];
             updatedNestedWidgets.splice(position, 0, ...pastedWidgets);
             
-            // Update container widget config
-            const updatedContainer = {
+            let updatedChild = {
                 ...containerWidget,
                 config: {
                     ...containerWidget.config,
                     slots: {
                         ...containerWidget.config.slots,
-                        [nestedSlotName]: updatedNestedWidgets
+                        [targetSlotName]: updatedNestedWidgets
                     }
                 }
             };
             
-            // Update top-level slot
-            const updatedSlotWidgets = slotWidgets.map(w => 
-                String(w.id) === String(containerId) ? updatedContainer : w
+            // REBUILD ANCESTORS BOTTOM-UP
+            // Start from the innermost container (last ancestor) and work up
+            // The last ancestor IS the container we just updated
+            for (let i = ancestors.length - 1; i >= 0; i--) {
+                const ancestor = ancestors[i];
+                
+                if (i === ancestors.length - 1) {
+                    // This is the container we modified - use updatedChild
+                    // Replace in its parent's widget array
+                    if (i > 0) {
+                        // There's a parent ancestor - update the parent's slot
+                        const parentAncestor = ancestors[i - 1];
+                        const parentSlotName = effectivePath[i * 2]; // The slot in parent that contains this widget
+                        const parentSlotWidgets = parentAncestor.widget.config?.slots?.[parentSlotName] || [];
+                        const updatedParentSlotWidgets = parentSlotWidgets.map((w, idx) =>
+                            idx === ancestor.widgetIndex ? updatedChild : w
+                        );
+                        updatedChild = {
+                            ...parentAncestor.widget,
+                            config: {
+                                ...parentAncestor.widget.config,
+                                slots: {
+                                    ...parentAncestor.widget.config.slots,
+                                    [parentSlotName]: updatedParentSlotWidgets
+                                }
+                            }
+                        };
+                    }
+                } else {
+                    // Middle ancestor - updatedChild is already set from previous iteration
+                    if (i > 0) {
+                        const parentAncestor = ancestors[i - 1];
+                        const parentSlotName = effectivePath[i * 2];
+                        const parentSlotWidgets = parentAncestor.widget.config?.slots?.[parentSlotName] || [];
+                        const updatedParentSlotWidgets = parentSlotWidgets.map((w, idx) =>
+                            idx === ancestor.widgetIndex ? updatedChild : w
+                        );
+                        updatedChild = {
+                            ...parentAncestor.widget,
+                            config: {
+                                ...parentAncestor.widget.config,
+                                slots: {
+                                    ...parentAncestor.widget.config.slots,
+                                    [parentSlotName]: updatedParentSlotWidgets
+                                }
+                            }
+                        };
+                    }
+                }
+            }
+            
+            // Update top-level slot with the rebuilt ancestor chain
+            const topLevelWidgets = widgets[topSlotName] || [];
+            const firstAncestor = ancestors[0];
+            const updatedTopLevelWidgets = topLevelWidgets.map((w, idx) =>
+                idx === firstAncestor.widgetIndex ? updatedChild : w
             );
             
             const updatedWidgets = {
                 ...widgets,
-                [topSlotName]: updatedSlotWidgets
+                [topSlotName]: updatedTopLevelWidgets
             };
             
             if (onWidgetChange) {
                 onWidgetChange(updatedWidgets);
             }
             
-            // Publish update
+            // Publish update for the topmost container that was modified
             await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: containerId,
+                id: firstAncestor.widget.id,
                 slotName: topSlotName,
                 contextType: contextType,
-                config: updatedContainer.config
+                config: updatedChild.config
             });
         } else {
             // Top-level slot paste
             const slotWidgets = [...(widgets[slotName] || [])];
             
-            // Generate new IDs for pasted widgets
-            const pastedWidgets = widgetsToPaste.map(w => ({
-                ...w,
-                id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-            }));
-            
-            // Insert at position
+            // Insert pasted widgets at position (IDs already generated above)
             slotWidgets.splice(position, 0, ...pastedWidgets);
             
             const updatedWidgets = {
