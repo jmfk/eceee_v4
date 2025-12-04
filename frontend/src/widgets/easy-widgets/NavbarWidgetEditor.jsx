@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Trash2, X, Download, FileText, Loader2, GripVertical } from 'lucide-react'
 import { usePageChildren } from '../../hooks/usePageStructure'
 import LinkField, { parseLinkValue } from '../../components/form-fields/LinkField'
+import ColorSelector from '../../components/theme/form-fields/ColorSelector'
 
 /**
  * NavbarWidgetEditor Component
@@ -34,11 +35,20 @@ const NavbarWidgetEditor = ({
 
     const [selectedPageIds, setSelectedPageIds] = useState(new Set())
     const [showImportSection, setShowImportSection] = useState(false)
+    const [draggedItemIndex, setDraggedItemIndex] = useState(null)
+    const [dropTargetIndex, setDropTargetIndex] = useState(null)
+    const [draggedSecondaryIndex, setDraggedSecondaryIndex] = useState(null)
+    const [dropTargetSecondaryIndex, setDropTargetSecondaryIndex] = useState(null)
 
     // Get site root ID for LinkField context
     const siteRootId = useMemo(() => {
         return context?.webpageData?.cachedRootId || context?.siteRootId || null
     }, [context])
+
+    // Get theme palette for color selectors
+    const themePalette = useMemo(() => {
+        return context?.theme?.palette || {}
+    }, [context?.theme?.palette])
 
     // Sync state when widget config changes externally
     useEffect(() => {
@@ -383,26 +393,41 @@ const NavbarWidgetEditor = ({
                             {menuItems.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="border border-gray-200 rounded bg-white min-w-0"
+                                    draggable
+                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${
+                                        draggedItemIndex === index 
+                                            ? 'opacity-50 border-blue-400' 
+                                            : dropTargetIndex === index
+                                            ? 'border-blue-500 border-2'
+                                            : 'border-gray-200'
+                                    }`}
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.effectAllowed = 'move'
+                                        e.dataTransfer.setData('text/plain', index.toString())
+                                        setDraggedItemIndex(index)
+                                    }}
+                                    onDragEnd={() => {
+                                        setDraggedItemIndex(null)
+                                        setDropTargetIndex(null)
+                                    }}
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
+                                        setDropTargetIndex(index)
+                                    }}
+                                    onDragLeave={() => {
+                                        setDropTargetIndex(null)
                                     }}
                                     onDrop={(e) => {
                                         e.preventDefault()
                                         const fromIndex = parseInt(e.dataTransfer.getData('text/plain'))
                                         moveMenuItem(fromIndex, index)
+                                        setDraggedItemIndex(null)
+                                        setDropTargetIndex(null)
                                     }}
                                 >
                                     <div className="flex items-start gap-2 p-2">
-                                        <div
-                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-3"
-                                            draggable
-                                            onDragStart={(e) => {
-                                                e.dataTransfer.effectAllowed = 'move'
-                                                e.dataTransfer.setData('text/plain', index.toString())
-                                            }}
-                                        >
+                                        <div className="text-gray-400 flex-shrink-0 pt-3">
                                             <GripVertical size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -453,26 +478,41 @@ const NavbarWidgetEditor = ({
                             {secondaryMenuItems.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="border border-gray-200 rounded bg-white min-w-0"
+                                    draggable
+                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${
+                                        draggedSecondaryIndex === index 
+                                            ? 'opacity-50 border-blue-400' 
+                                            : dropTargetSecondaryIndex === index
+                                            ? 'border-blue-500 border-2'
+                                            : 'border-gray-200'
+                                    }`}
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.effectAllowed = 'move'
+                                        e.dataTransfer.setData('text/plain', index.toString())
+                                        setDraggedSecondaryIndex(index)
+                                    }}
+                                    onDragEnd={() => {
+                                        setDraggedSecondaryIndex(null)
+                                        setDropTargetSecondaryIndex(null)
+                                    }}
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
+                                        setDropTargetSecondaryIndex(index)
+                                    }}
+                                    onDragLeave={() => {
+                                        setDropTargetSecondaryIndex(null)
                                     }}
                                     onDrop={(e) => {
                                         e.preventDefault()
                                         const fromIndex = parseInt(e.dataTransfer.getData('text/plain'))
                                         moveSecondaryMenuItem(fromIndex, index)
+                                        setDraggedSecondaryIndex(null)
+                                        setDropTargetSecondaryIndex(null)
                                     }}
                                 >
                                     <div className="flex items-start gap-2 p-2">
-                                        <div
-                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-3"
-                                            draggable
-                                            onDragStart={(e) => {
-                                                e.dataTransfer.effectAllowed = 'move'
-                                                e.dataTransfer.setData('text/plain', index.toString())
-                                            }}
-                                        >
+                                        <div className="text-gray-400 flex-shrink-0 pt-3">
                                             <GripVertical size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0 space-y-2">
@@ -485,20 +525,25 @@ const NavbarWidgetEditor = ({
                                                 labelPlaceholder="Menu item label"
                                             />
                                             {/* Extra fields for secondary items */}
-                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                                            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
                                                 <div>
-                                                    <label className="block text-xs text-gray-600 mb-1">
-                                                        Background Color
-                                                    </label>
-                                                    <input
-                                                        type="color"
-                                                        value={item.backgroundColor || '#3b82f6'}
-                                                        onChange={(e) => updateSecondaryMenuItemField(index, 'backgroundColor', e.target.value)}
-                                                        className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                                                    <ColorSelector
+                                                        label="Background Color"
+                                                        value={item.backgroundColor || ''}
+                                                        onChange={(newColor) => updateSecondaryMenuItemField(index, 'backgroundColor', newColor)}
+                                                        colors={themePalette}
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs text-gray-600 mb-1">
+                                                    <ColorSelector
+                                                        label="Text Color"
+                                                        value={item.textColor || ''}
+                                                        onChange={(newColor) => updateSecondaryMenuItemField(index, 'textColor', newColor)}
+                                                        colors={themePalette}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
                                                         Background Image
                                                     </label>
                                                     <input

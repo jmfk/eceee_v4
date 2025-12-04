@@ -15,6 +15,8 @@ const NavigationWidgetEditor = ({
 }) => {
     const config = widgetData?.config || {}
     const [menuItems, setMenuItems] = useState(config.menuItems || [])
+    const [draggedItemIndex, setDraggedItemIndex] = useState(null)
+    const [dropTargetIndex, setDropTargetIndex] = useState(null)
 
     const currentPageId = useMemo(() => {
         return context?.pageId || context?.webpageData?.id || null
@@ -114,26 +116,41 @@ const NavigationWidgetEditor = ({
                             {menuItems.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="border border-gray-200 rounded bg-white min-w-0"
+                                    draggable
+                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${
+                                        draggedItemIndex === index 
+                                            ? 'opacity-50 border-blue-400' 
+                                            : dropTargetIndex === index
+                                            ? 'border-blue-500 border-2'
+                                            : 'border-gray-200'
+                                    }`}
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.effectAllowed = 'move'
+                                        e.dataTransfer.setData('text/plain', index.toString())
+                                        setDraggedItemIndex(index)
+                                    }}
+                                    onDragEnd={() => {
+                                        setDraggedItemIndex(null)
+                                        setDropTargetIndex(null)
+                                    }}
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
+                                        setDropTargetIndex(index)
+                                    }}
+                                    onDragLeave={() => {
+                                        setDropTargetIndex(null)
                                     }}
                                     onDrop={(e) => {
                                         e.preventDefault()
                                         const fromIndex = parseInt(e.dataTransfer.getData('text/plain'))
                                         moveMenuItem(fromIndex, index)
+                                        setDraggedItemIndex(null)
+                                        setDropTargetIndex(null)
                                     }}
                                 >
                                     <div className="flex items-start gap-2 p-2">
-                                        <div
-                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-3"
-                                            draggable
-                                            onDragStart={(e) => {
-                                                e.dataTransfer.effectAllowed = 'move'
-                                                e.dataTransfer.setData('text/plain', index.toString())
-                                            }}
-                                        >
+                                        <div className="text-gray-400 flex-shrink-0 pt-3">
                                             <GripVertical size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0">

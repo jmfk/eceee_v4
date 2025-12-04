@@ -35,6 +35,7 @@ import { pagesApi } from '../api'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import FloatingDialog from './FloatingDialog'
+import { getBreadcrumbs } from '../utils/pageStructure'
 
 // Link type definitions
 const LINK_TYPES = {
@@ -136,18 +137,35 @@ const PageBrowser = ({
     onSelectPage, 
     currentSiteRootId,
     searchTerm,
-    onSearchChange 
+    onSearchChange,
+    initialParentId = null
 }) => {
     const [currentParentId, setCurrentParentId] = useState(null)
     const [breadcrumbs, setBreadcrumbs] = useState([])
+    const [hasInitialized, setHasInitialized] = useState(false)
     
-    // Initialize to site root
+    // Initialize to parent of selected page if provided
     useEffect(() => {
-        if (currentSiteRootId && currentParentId === null) {
-            setCurrentParentId(currentSiteRootId)
-            setBreadcrumbs([{ id: currentSiteRootId, title: 'Site Root' }])
+        if (initialParentId && !hasInitialized) {
+            setCurrentParentId(initialParentId)
+            setHasInitialized(true)
+            
+            // Fetch and build breadcrumbs for the parent
+            getBreadcrumbs(initialParentId)
+                .then(crumbs => {
+                    // Convert breadcrumbs to the format needed
+                    setBreadcrumbs(crumbs.map(crumb => ({
+                        id: crumb.id,
+                        title: crumb.title
+                    })))
+                })
+                .catch(err => {
+                    console.error('Failed to fetch breadcrumbs:', err)
+                    // Fallback: just set empty breadcrumbs
+                    setBreadcrumbs([])
+                })
         }
-    }, [currentSiteRootId, currentParentId])
+    }, [initialParentId, hasInitialized])
     
     // Fetch pages for current level
     const { data: pagesData, isLoading } = useQuery({
@@ -187,8 +205,8 @@ const PageBrowser = ({
     }
     
     const handleNavigateToRoot = () => {
-        setBreadcrumbs(currentSiteRootId ? [{ id: currentSiteRootId, title: 'Site Root' }] : [])
-        setCurrentParentId(currentSiteRootId || null)
+        setBreadcrumbs([])
+        setCurrentParentId(null)
     }
     
     return (
@@ -463,6 +481,7 @@ const InternalPageTab = ({
                     currentSiteRootId={currentSiteRootId}
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
+                    initialParentId={pageInfo?.parentId || null}
                 />
             </div>
             

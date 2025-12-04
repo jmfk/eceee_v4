@@ -143,7 +143,11 @@ const LinkDisplay = ({ url, onEdit, currentSiteId, disabled }) => {
                     </span>
                 )
             default:
-                return <span className="truncate">{url}</span>
+                // No link type set - check if we have a label to show
+                if (linkObj.label) {
+                    return <span className="truncate text-gray-600">{linkObj.label}</span>
+                }
+                return <span className="text-gray-400 italic">No link set</span>
         }
     }
 

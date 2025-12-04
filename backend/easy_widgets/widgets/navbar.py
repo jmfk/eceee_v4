@@ -123,6 +123,11 @@ class SecondaryMenuItem(BaseModel):
         description="Individual background color (hex or CSS color)",
         json_schema_extra={"component": "ColorInput"},
     )
+    text_color: Optional[str] = Field(
+        None,
+        description="Individual text color (hex or CSS color)",
+        json_schema_extra={"component": "ColorInput"},
+    )
     background_image: Optional[str] = Field(
         None,
         description="Individual background image URL",
@@ -165,6 +170,7 @@ class SecondaryMenuItem(BaseModel):
             "pageId": data.get("pageId"),
             "anchor": data.get("anchor"),
             "backgroundColor": self.background_color,
+            "textColor": self.text_color,
             "backgroundImage": self.background_image,
         }
 
@@ -432,6 +438,7 @@ class NavbarWidget(BaseWidget):
                 processed["backgroundColor"] = item.get("background_color") or item.get(
                     "backgroundColor"
                 )
+                processed["textColor"] = item.get("text_color") or item.get("textColor")
                 processed["backgroundImage"] = item.get("background_image") or item.get(
                     "backgroundImage"
                 )

@@ -25,10 +25,32 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
 
     // Calculate and update position
     const updatePosition = () => {
-        if (buttonRef.current) {
+        if (buttonRef.current && paletteRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
+            const paletteHeight = paletteRef.current.offsetHeight || 300; // Estimated height if not yet rendered
+            const viewportHeight = window.innerHeight;
+            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            
+            // Position above if there's not enough space below and there's more space above
+            const shouldPositionAbove = spaceBelow < paletteHeight && spaceAbove > spaceBelow;
+            
             setPosition({
-                top: rect.bottom + 8,
+                top: shouldPositionAbove ? rect.top - paletteHeight - 8 : rect.bottom + 8,
+                left: rect.left
+            });
+        } else if (buttonRef.current) {
+            // Fallback if palette ref not available yet
+            const rect = buttonRef.current.getBoundingClientRect();
+            const estimatedPaletteHeight = 300;
+            const viewportHeight = window.innerHeight;
+            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            
+            const shouldPositionAbove = spaceBelow < estimatedPaletteHeight && spaceAbove > spaceBelow;
+            
+            setPosition({
+                top: shouldPositionAbove ? rect.top - estimatedPaletteHeight - 8 : rect.bottom + 8,
                 left: rect.left
             });
         }
@@ -37,10 +59,16 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
     // Update position when palette opens and on scroll/resize
     useEffect(() => {
         if (showPalette) {
+            // Initial position calculation
             updatePosition();
+            
+            // Recalculate after palette is rendered (to get accurate height)
+            const timeoutId = setTimeout(updatePosition, 0);
+            
             window.addEventListener('scroll', updatePosition, true);
             window.addEventListener('resize', updatePosition);
             return () => {
+                clearTimeout(timeoutId);
                 window.removeEventListener('scroll', updatePosition, true);
                 window.removeEventListener('resize', updatePosition);
             };
