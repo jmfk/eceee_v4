@@ -442,7 +442,7 @@ const InternalPageTab = ({
     
     const handleSelectPage = (page) => {
         setSelectedPage(page)
-        onChange({ ...data, pageId: page.id, anchor: null })
+        onChange({ ...data, pageId: page.id, pageTitle: page.title, anchor: null })
     }
     
     const handleSelectAnchor = (anchor, anchorTitle) => {
@@ -669,8 +669,7 @@ const LinkPicker = ({
             if (linkData.anchor && linkData.anchorTitle) {
                 return linkData.anchorTitle
             }
-            // Would need page title from API
-            return ''
+            return linkData.pageTitle || ''
         }
         if (activeTab === 'external') return linkData.url || ''
         if (activeTab === 'email') return linkData.address || ''

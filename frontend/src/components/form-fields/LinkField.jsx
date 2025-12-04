@@ -258,7 +258,7 @@ const LinkField = ({
     showLabel = true,
     showIsActive = true,
     showTargetBlank = true,
-    labelPlaceholder = 'Menu item label',
+    labelPlaceholder = 'Label',
     // Context for LinkPicker
     currentPageId,
     currentSiteRootId,
@@ -335,10 +335,16 @@ const LinkField = ({
             setInternalValue('')
             onChange('')
         } else if (result.action === 'insert' && result.link) {
-            // Merge with existing label/isActive/targetBlank
+            // Auto-populate label if empty
+            let newLabel = itemLabel
+            if (!newLabel && result.title) {
+                newLabel = result.title
+            }
+            
+            // Merge with existing isActive/targetBlank
             const newObj = {
                 ...result.link,
-                label: itemLabel,
+                label: newLabel,
                 isActive: isActive,
                 targetBlank: targetBlank
             }

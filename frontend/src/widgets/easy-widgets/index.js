@@ -134,6 +134,9 @@ export { default as SectionWidget } from './SectionWidget';
 // Export utility components
 export { default as ContentWidgetEditorRenderer } from './ContentWidgetEditorRenderer';
 
+// Export special editors
+export { default as NavigationWidgetEditor } from './NavigationWidgetEditor';
+
 // Export the registerWidget utility for custom widgets
 export { registerWidget } from './registry';
 

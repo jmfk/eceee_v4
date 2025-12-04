@@ -181,22 +181,14 @@ class NavbarConfig(BaseModel):
         default_factory=list,
         description="Primary navbar menu items (left-aligned)",
         json_schema_extra={
-            "component": "ItemsListField",
-            "addButtonText": "Add Menu Item",
-            "emptyText": "No menu items added yet",
-            "itemLabelTemplate": "label",  # Use the label field for item display
-            "hidden": True,  # Hidden from UI - managed by NavbarWidgetEditor
+            "hidden": True,  # Hidden from sidebar - use special editor instead
         },
     )
     secondary_menu_items: List[SecondaryMenuItem] = Field(
         default_factory=list,
         description="Secondary navbar menu items (right-aligned, with custom colors)",
         json_schema_extra={
-            "component": "ItemsListField",
-            "addButtonText": "Add Secondary Menu Item",
-            "emptyText": "No secondary menu items added yet",
-            "itemLabelTemplate": "label",
-            "hidden": True,  # Hidden from UI - managed by NavbarWidgetEditor
+            "hidden": True,  # Hidden from sidebar - use special editor instead
         },
     )
     background_image: Optional[str] = Field(

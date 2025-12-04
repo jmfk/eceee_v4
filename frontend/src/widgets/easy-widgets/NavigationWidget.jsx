@@ -152,7 +152,8 @@ NavigationWidget.metadata = {
     description: 'Navigation menus with dropdowns, mobile hamburger menu, and branding support',
     category: 'layout',
     icon: Menu,
-    tags: ['eceee', 'navigation', 'menu', 'nav', 'mobile', 'dropdown', 'brand', 'header']
+    tags: ['eceee', 'navigation', 'menu', 'nav', 'mobile', 'dropdown', 'brand', 'header'],
+    specialEditor: 'NavigationWidgetEditor'
 }
 
 export default NavigationWidget
