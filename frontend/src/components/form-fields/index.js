@@ -13,7 +13,8 @@ export { default as BooleanInput } from './BooleanInput'
 export { default as PasswordInput } from './PasswordInput'
 export { default as EmailInput } from './EmailInput'
 export { default as URLInput } from './URLInput'
-export { default as LinkInput } from './LinkInput'
+export { default as LinkField } from './LinkField'
+export { LinkDisplay } from './LinkField'
 
 // Date/Time Components
 export { default as DateInput } from './DateInput'
@@ -92,7 +93,8 @@ export const FIELD_COMPONENTS = {
     PasswordInput: () => import('./PasswordInput'),
     EmailInput: () => import('./EmailInput'),
     URLInput: () => import('./URLInput'),
-    LinkInput: () => import('./LinkInput'),
+    LinkInput: () => import('./LinkField'),
+    LinkField: () => import('./LinkField'),
     DateInput: () => import('./DateInput'),
     DateTimeInput: () => import('./DateTimeInput'),
     TimeInput: () => import('./TimeInput'),
