@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Trash2, X, Download, FileText, Loader2, GripVertical } from 'lucide-react'
 import { usePageChildren } from '../../hooks/usePageStructure'
-import LinkPicker from '../../components/LinkPicker'
-import { LinkDisplay } from '../../components/form-fields/LinkField'
+import LinkField, { parseLinkValue } from '../../components/form-fields/LinkField'
 
 /**
  * NavbarWidgetEditor Component
  * Custom editor for the Navbar widget with subpage import functionality
+ * 
+ * Uses consolidated LinkField which stores label, isActive, targetBlank
+ * in the url field as a JSON object.
  */
 const NavbarWidgetEditor = ({
     widgetData,
@@ -25,7 +27,7 @@ const NavbarWidgetEditor = ({
     }, [context])
 
     // Fetch children pages (including unpublished for navbar configuration)
-    const { data: childrenPages = [], isLoading: isLoadingChildren, refetch: refetchChildren } = usePageChildren(
+    const { data: childrenPages = [], isLoading: isLoadingChildren } = usePageChildren(
         currentPageId,
         true // includeUnpublished: true - include unpublished pages for navbar editing
     )
@@ -33,15 +35,7 @@ const NavbarWidgetEditor = ({
     const [selectedPageIds, setSelectedPageIds] = useState(new Set())
     const [showImportSection, setShowImportSection] = useState(false)
 
-    // LinkPicker state
-    const [linkPickerState, setLinkPickerState] = useState({
-        isOpen: false,
-        itemType: null, // 'primary' or 'secondary'
-        itemIndex: null,
-        currentLink: null
-    })
-
-    // Get site root ID for LinkPicker context
+    // Get site root ID for LinkField context
     const siteRootId = useMemo(() => {
         return context?.webpageData?.cachedRootId || context?.siteRootId || null
     }, [context])
@@ -95,27 +89,31 @@ const NavbarWidgetEditor = ({
             selectedPageIds.has(child.page.id)
         )
 
-        // Convert each selected page to a menu item
+        // Convert each selected page to a menu item with consolidated link data
         selectedPages.forEach(child => {
             const page = child.page
             const pageVersion = child.currentVersion
 
-            // Generate URL from page slug path
-            const url = page.slug ? `/${page.slug}/` : `#page-${page.id}`
-
             // Use page title as label, fallback to slug
             const label = pageVersion?.title || page.title || page.slug || `Page ${page.id}`
 
-            // Check if menu item already exists (by URL or label)
-            const exists = newMenuItems.some(item =>
-                item.url === url || item.label === label
-            )
+            // Check if menu item already exists (by pageId or label)
+            const exists = newMenuItems.some(item => {
+                const linkData = parseLinkValue(item.url)
+                return linkData?.pageId === page.id || linkData?.label === label
+            })
 
             if (!exists) {
-                newMenuItems.push({
+                // Create consolidated link object
+                const linkData = {
+                    type: 'internal',
+                    pageId: page.id,
                     label: label,
-                    url: url,
-                    targetBlank: false,
+                    isActive: true,
+                    targetBlank: false
+                }
+                newMenuItems.push({
+                    url: JSON.stringify(linkData),
                     order: newMenuItems.length
                 })
             }
@@ -138,7 +136,12 @@ const NavbarWidgetEditor = ({
 
     // Add a new menu item
     const addMenuItem = useCallback(() => {
-        const newMenuItems = [...menuItems, { label: '', url: '', targetBlank: false, order: menuItems.length }]
+        const linkData = {
+            label: '',
+            isActive: true,
+            targetBlank: false
+        }
+        const newMenuItems = [...menuItems, { url: JSON.stringify(linkData), order: menuItems.length }]
         setMenuItems(newMenuItems)
         updateConfig(newMenuItems, undefined)
     }, [menuItems, updateConfig])
@@ -150,12 +153,12 @@ const NavbarWidgetEditor = ({
         updateConfig(newMenuItems, undefined)
     }, [menuItems, updateConfig])
 
-    // Update a menu item
-    const updateMenuItem = useCallback((index, field, value) => {
+    // Update a menu item's url field (contains all link data)
+    const updateMenuItemUrl = useCallback((index, newUrl) => {
         const newMenuItems = [...menuItems]
         newMenuItems[index] = {
             ...newMenuItems[index],
-            [field]: value
+            url: newUrl
         }
         setMenuItems(newMenuItems)
         updateConfig(newMenuItems, undefined)
@@ -163,10 +166,13 @@ const NavbarWidgetEditor = ({
 
     // Add a new secondary menu item
     const addSecondaryMenuItem = useCallback(() => {
-        const newSecondaryMenuItems = [...secondaryMenuItems, {
+        const linkData = {
             label: '',
-            url: '',
-            targetBlank: false,
+            isActive: true,
+            targetBlank: false
+        }
+        const newSecondaryMenuItems = [...secondaryMenuItems, {
+            url: JSON.stringify(linkData),
             order: secondaryMenuItems.length
         }]
         setSecondaryMenuItems(newSecondaryMenuItems)
@@ -180,8 +186,19 @@ const NavbarWidgetEditor = ({
         updateConfig(menuItems, newSecondaryMenuItems)
     }, [secondaryMenuItems, menuItems, updateConfig])
 
-    // Update a secondary menu item
-    const updateSecondaryMenuItem = useCallback((index, field, value) => {
+    // Update a secondary menu item's url field
+    const updateSecondaryMenuItemUrl = useCallback((index, newUrl) => {
+        const newSecondaryMenuItems = [...secondaryMenuItems]
+        newSecondaryMenuItems[index] = {
+            ...newSecondaryMenuItems[index],
+            url: newUrl
+        }
+        setSecondaryMenuItems(newSecondaryMenuItems)
+        updateConfig(menuItems, newSecondaryMenuItems)
+    }, [secondaryMenuItems, menuItems, updateConfig])
+
+    // Update a secondary menu item's extra field (backgroundColor, backgroundImage)
+    const updateSecondaryMenuItemField = useCallback((index, field, value) => {
         const newSecondaryMenuItems = [...secondaryMenuItems]
         newSecondaryMenuItems[index] = {
             ...newSecondaryMenuItems[index],
@@ -210,76 +227,6 @@ const NavbarWidgetEditor = ({
         setSecondaryMenuItems(reordered)
         updateConfig(menuItems, reordered)
     }, [secondaryMenuItems, menuItems, updateConfig])
-
-    // Open LinkPicker for a menu item
-    const openLinkPicker = useCallback((itemType, index, currentUrl) => {
-        setLinkPickerState({
-            isOpen: true,
-            itemType,
-            itemIndex: index,
-            currentLink: currentUrl || null
-        })
-    }, [])
-
-    // Handle LinkPicker save
-    const handleLinkPickerSave = useCallback((result) => {
-        const { itemType, itemIndex } = linkPickerState
-
-        if (result.action === 'remove') {
-            // Clear the URL
-            if (itemType === 'primary') {
-                setMenuItems(prev => {
-                    const updated = [...prev]
-                    updated[itemIndex] = { ...updated[itemIndex], url: '' }
-                    updateConfig(updated, undefined)
-                    return updated
-                })
-            } else {
-                setSecondaryMenuItems(prev => {
-                    const updated = [...prev]
-                    updated[itemIndex] = { ...updated[itemIndex], url: '' }
-                    updateConfig(menuItems, updated)
-                    return updated
-                })
-            }
-        } else if (result.action === 'insert' && result.link) {
-            // Store the link object as JSON string
-            const urlValue = JSON.stringify(result.link)
-
-            if (itemType === 'primary') {
-                // Update both url and targetBlank in a single state update
-                setMenuItems(prev => {
-                    const updated = [...prev]
-                    updated[itemIndex] = {
-                        ...updated[itemIndex],
-                        url: urlValue,
-                        ...(result.targetBlank !== undefined && { targetBlank: result.targetBlank })
-                    }
-                    updateConfig(updated, undefined)
-                    return updated
-                })
-            } else {
-                setSecondaryMenuItems(prev => {
-                    const updated = [...prev]
-                    updated[itemIndex] = {
-                        ...updated[itemIndex],
-                        url: urlValue,
-                        ...(result.targetBlank !== undefined && { targetBlank: result.targetBlank })
-                    }
-                    updateConfig(menuItems, updated)
-                    return updated
-                })
-            }
-        }
-
-        // Close the picker
-        setLinkPickerState({
-            isOpen: false,
-            itemType: null,
-            itemIndex: null,
-            currentLink: null
-        })
-    }, [linkPickerState, menuItems, updateConfig])
 
     return (
         <div className="h-full flex flex-col overflow-hidden min-w-0">
@@ -436,7 +383,7 @@ const NavbarWidgetEditor = ({
                             {menuItems.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="border border-gray-200 rounded p-3 bg-white space-y-2 min-w-0"
+                                    className="border border-gray-200 rounded bg-white min-w-0"
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
@@ -447,9 +394,9 @@ const NavbarWidgetEditor = ({
                                         moveMenuItem(fromIndex, index)
                                     }}
                                 >
-                                    <div className="flex items-start gap-2">
+                                    <div className="flex items-start gap-2 p-2">
                                         <div
-                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1"
+                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-3"
                                             draggable
                                             onDragStart={(e) => {
                                                 e.dataTransfer.effectAllowed = 'move'
@@ -458,46 +405,20 @@ const NavbarWidgetEditor = ({
                                         >
                                             <GripVertical size={18} />
                                         </div>
-                                        <div className="flex-1 min-w-0 space-y-2">
-                                            <input
-                                                type="text"
-                                                value={item.label || ''}
-                                                onChange={(e) => updateMenuItem(index, 'label', e.target.value)}
-                                                placeholder="Label *"
-                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        <div className="flex-1 min-w-0">
+                                            <LinkField
+                                                value={item.url}
+                                                onChange={(newUrl) => updateMenuItemUrl(index, newUrl)}
+                                                currentPageId={currentPageId}
+                                                currentSiteRootId={siteRootId}
+                                                currentSiteId={siteRootId}
+                                                labelPlaceholder="Menu item label"
                                             />
-                                            <div className="w-full flex items-center px-2 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                                                <LinkDisplay
-                                                    url={item.url}
-                                                    onEdit={() => openLinkPicker('primary', index, item.url)}
-                                                    currentSiteId={siteRootId}
-                                                />
-                                            </div>
-                                            <div className="flex gap-4">
-                                                <label className="flex items-center gap-2 text-xs text-gray-600">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={item.isActive !== false}
-                                                        onChange={(e) => updateMenuItem(index, 'isActive', e.target.checked)}
-                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                    />
-                                                    Active
-                                                </label>
-                                                <label className="flex items-center gap-2 text-xs text-gray-600">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={item.targetBlank || false}
-                                                        onChange={(e) => updateMenuItem(index, 'targetBlank', e.target.checked)}
-                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                    />
-                                                    Open in new tab
-                                                </label>
-                                            </div>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => removeMenuItem(index)}
-                                            className="text-red-600 hover:text-red-800 flex-shrink-0"
+                                            className="text-red-600 hover:text-red-800 flex-shrink-0 pt-3"
                                             title="Remove item"
                                         >
                                             <Trash2 size={18} />
@@ -532,7 +453,7 @@ const NavbarWidgetEditor = ({
                             {secondaryMenuItems.map((item, index) => (
                                 <div
                                     key={index}
-                                    className="border border-gray-200 rounded p-3 bg-white space-y-2 min-w-0"
+                                    className="border border-gray-200 rounded bg-white min-w-0"
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
@@ -543,9 +464,9 @@ const NavbarWidgetEditor = ({
                                         moveSecondaryMenuItem(fromIndex, index)
                                     }}
                                 >
-                                    <div className="flex items-start gap-2">
+                                    <div className="flex items-start gap-2 p-2">
                                         <div
-                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1"
+                                            className="cursor-move text-gray-400 hover:text-gray-600 flex-shrink-0 pt-3"
                                             draggable
                                             onDragStart={(e) => {
                                                 e.dataTransfer.effectAllowed = 'move'
@@ -555,68 +476,45 @@ const NavbarWidgetEditor = ({
                                             <GripVertical size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0 space-y-2">
-                                            <input
-                                                type="text"
-                                                value={item.label || ''}
-                                                onChange={(e) => updateSecondaryMenuItem(index, 'label', e.target.value)}
-                                                placeholder="Label *"
-                                                className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            <LinkField
+                                                value={item.url}
+                                                onChange={(newUrl) => updateSecondaryMenuItemUrl(index, newUrl)}
+                                                currentPageId={currentPageId}
+                                                currentSiteRootId={siteRootId}
+                                                currentSiteId={siteRootId}
+                                                labelPlaceholder="Menu item label"
                                             />
-                                            <div className="w-full flex items-center px-2 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                                                <LinkDisplay
-                                                    url={item.url}
-                                                    onEdit={() => openLinkPicker('secondary', index, item.url)}
-                                                    currentSiteId={siteRootId}
-                                                />
-                                            </div>
-                                            <div className="flex gap-4">
-                                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                            {/* Extra fields for secondary items */}
+                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">
+                                                        Background Color
+                                                    </label>
                                                     <input
-                                                        type="checkbox"
-                                                        checked={item.isActive !== false}
-                                                        onChange={(e) => updateSecondaryMenuItem(index, 'isActive', e.target.checked)}
-                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                        type="color"
+                                                        value={item.backgroundColor || '#3b82f6'}
+                                                        onChange={(e) => updateSecondaryMenuItemField(index, 'backgroundColor', e.target.value)}
+                                                        className="w-full h-8 border border-gray-300 rounded cursor-pointer"
                                                     />
-                                                    Active
-                                                </label>
-                                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">
+                                                        Background Image
+                                                    </label>
                                                     <input
-                                                        type="checkbox"
-                                                        checked={item.targetBlank || false}
-                                                        onChange={(e) => updateSecondaryMenuItem(index, 'targetBlank', e.target.checked)}
-                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                        type="text"
+                                                        value={item.backgroundImage || ''}
+                                                        onChange={(e) => updateSecondaryMenuItemField(index, 'backgroundImage', e.target.value)}
+                                                        placeholder="URL..."
+                                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     />
-                                                    Open in new tab
-                                                </label>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-gray-600 mb-1">
-                                                    Background Color
-                                                </label>
-                                                <input
-                                                    type="color"
-                                                    value={item.backgroundColor || '#3b82f6'}
-                                                    onChange={(e) => updateSecondaryMenuItem(index, 'backgroundColor', e.target.value)}
-                                                    className="w-full h-8 border border-gray-300 rounded cursor-pointer"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-gray-600 mb-1">
-                                                    Background Image URL
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={item.backgroundImage || ''}
-                                                    onChange={(e) => updateSecondaryMenuItem(index, 'backgroundImage', e.target.value)}
-                                                    placeholder="https://example.com/image.jpg"
-                                                    className="w-full max-w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 break-all"
-                                                />
+                                                </div>
                                             </div>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => removeSecondaryMenuItem(index)}
-                                            className="text-red-600 hover:text-red-800 flex-shrink-0"
+                                            className="text-red-600 hover:text-red-800 flex-shrink-0 pt-3"
                                             title="Remove item"
                                         >
                                             <Trash2 size={18} />
@@ -632,18 +530,6 @@ const NavbarWidgetEditor = ({
                     )}
                 </div>
             </div>
-
-            {/* LinkPicker Modal */}
-            <LinkPicker
-                isOpen={linkPickerState.isOpen}
-                onClose={() => setLinkPickerState({ isOpen: false, itemType: null, itemIndex: null, currentLink: null })}
-                onSave={handleLinkPickerSave}
-                initialLink={linkPickerState.currentLink}
-                initialText=""
-                currentPageId={currentPageId}
-                currentSiteRootId={siteRootId}
-                showRemoveButton={!!linkPickerState.currentLink}
-            />
         </div>
     )
 }

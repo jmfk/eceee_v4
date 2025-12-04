@@ -7,8 +7,9 @@
  * - Anchor selection from page widgets
  * - Auto-title from page/anchor with custom override
  * - Link text editing (optional)
- * - Open in new tab option
  * - Remove link action
+ * 
+ * Note: "Open in new tab" is now handled by LinkField, not LinkPicker.
  * 
  * Uses FloatingDialog for free-floating, draggable, resizable modal behavior.
  */
@@ -91,40 +92,34 @@ const parseLink = (linkValue) => {
 
 /**
  * Build a link object from form data
+ * Note: targetBlank is now handled by LinkField, not LinkPicker
  */
-const buildLinkObject = (type, data, targetBlank = false) => {
-    const base = targetBlank ? { targetBlank: true } : {}
-    
+const buildLinkObject = (type, data) => {
     switch (type) {
         case 'internal':
             return {
-                ...base,
                 type: 'internal',
                 pageId: data.pageId,
                 ...(data.anchor && { anchor: data.anchor })
             }
         case 'external':
             return {
-                ...base,
                 type: 'external',
                 url: data.url
             }
         case 'email':
             return {
-                ...base,
                 type: 'email',
                 address: data.address,
                 ...(data.subject && { subject: data.subject })
             }
         case 'phone':
             return {
-                ...base,
                 type: 'phone',
                 number: data.number
             }
         case 'anchor':
             return {
-                ...base,
                 type: 'anchor',
                 anchor: data.anchor
             }
@@ -654,7 +649,6 @@ const LinkPicker = ({
     const [customTitle, setCustomTitle] = useState('')
     const [replaceText, setReplaceText] = useState(false)
     const [linkText, setLinkText] = useState(initialText)
-    const [targetBlank, setTargetBlank] = useState(false)
     
     // Reset state when modal opens with new data
     useEffect(() => {
@@ -666,7 +660,6 @@ const LinkPicker = ({
             setCustomTitle('')
             setReplaceText(false)
             setLinkText(initialText)
-            setTargetBlank(newParsed.data.targetBlank || false)
         }
     }, [isOpen, initialLink, initialText])
     
@@ -692,7 +685,7 @@ const LinkPicker = ({
     }
     
     const handleSave = () => {
-        const link = buildLinkObject(activeTab, linkData, targetBlank)
+        const link = buildLinkObject(activeTab, linkData)
         if (!link) return
         
         onSave({
@@ -700,7 +693,6 @@ const LinkPicker = ({
             title: useCustomTitle ? customTitle : autoTitle,
             text: replaceText ? linkText : undefined,
             replaceText,
-            targetBlank,
             action: 'insert'
         })
         onClose()
@@ -883,21 +875,6 @@ const LinkPicker = ({
                             )}
                         </div>
                     )}
-                    
-                    {/* Open in new tab */}
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="targetBlank"
-                            checked={targetBlank}
-                            onChange={(e) => setTargetBlank(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <label htmlFor="targetBlank" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                            Open in new tab
-                            <ExternalLink className="w-3 h-3 text-gray-400" />
-                        </label>
-                    </div>
                 </div>
             </div>
         </FloatingDialog>

@@ -52,7 +52,7 @@
             {% for item in config.menu_items %}
                 <a 
                     href="{{ item.url }}"
-                    {% if item.target_blank %}target="_blank" rel="noopener noreferrer"{% endif %}
+                    {% if item.targetBlank %}target="_blank" rel="noopener noreferrer"{% endif %}
                     @click="isMobileMenuOpen = false"
                     style="display: block; padding: 0.5rem 1rem; font-size: 0.875rem; color: #374151; text-decoration: none; transition: background-color 0.2s;"
                     onmouseover="this.style.backgroundColor='#f3f4f6'"
@@ -68,7 +68,7 @@
                     {% for item in config.secondary_menu_items %}
                         <a 
                             href="{{ item.url }}"
-                            {% if item.target_blank %}target="_blank" rel="noopener noreferrer"{% endif %}
+                            {% if item.targetBlank %}target="_blank" rel="noopener noreferrer"{% endif %}
                             @click="isMobileMenuOpen = false"
                             style="
                                 display: block; 
@@ -79,9 +79,9 @@
                                 transition: opacity 0.2s;
                                 margin: 0.25rem 0.5rem;
                                 border-radius: 4px;
-                                {% if item.background_color %}background-color: {{ item.background_color }};{% else %}background-color: #3b82f6;{% endif %}
-                                {% if item.background_image %}
-                                    background-image: url('{{ item.background_image.imgproxy_base_url|default:item.background_image }}');
+                                {% if item.backgroundColor %}background-color: {{ item.backgroundColor }};{% else %}background-color: #3b82f6;{% endif %}
+                                {% if item.backgroundImage %}
+                                    background-image: url('{{ item.backgroundImage.imgproxy_base_url|default:item.backgroundImage }}');
                                     background-size: cover;
                                     background-position: center;
                                     background-repeat: no-repeat;
@@ -108,7 +108,7 @@
                 <li class="navbar-menu-item">
                     <a 
                         href="{{ item.url }}"
-                        {% if item.target_blank %}target="_blank" rel="noopener noreferrer"{% endif %}
+                        {% if item.targetBlank %}target="_blank" rel="noopener noreferrer"{% endif %}
                         class="navbar-link"
                         style="color: #ffffff; font-size: 0.875rem; font-weight: 500; text-decoration: none; transition: opacity 0.2s ease-in-out; white-space: nowrap;"
                         onmouseover="this.style.opacity='0.8'"
@@ -134,7 +134,7 @@
                 <li class="navbar-menu-item">
                     <a 
                         href="{{ item.url }}"
-                        {% if item.target_blank %}target="_blank" rel="noopener noreferrer"{% endif %}
+                        {% if item.targetBlank %}target="_blank" rel="noopener noreferrer"{% endif %}
                         class="navbar-link navbar-secondary-link"
                         style="
                             color: #ffffff; 
@@ -149,9 +149,9 @@
                             height: 26px;
                             line-height: 22px;
                             margin-top: 2px;
-                            {% if item.background_color %}background-color: {{ item.background_color }};{% endif %}
-                            {% if item.background_image %}
-                                background-image: url('{{ item.background_image.imgproxy_base_url|default:item.background_image }}');
+                            {% if item.backgroundColor %}background-color: {{ item.backgroundColor }};{% endif %}
+                            {% if item.backgroundImage %}
+                                background-image: url('{{ item.backgroundImage.imgproxy_base_url|default:item.backgroundImage }}');
                                 background-size: cover;
                                 background-position: center;
                                 background-repeat: no-repeat;

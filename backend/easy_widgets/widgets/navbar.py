@@ -11,44 +11,112 @@ from file_manager.imgproxy import imgproxy_service
 from utils.dict_utils import DictToObj
 
 
+def _parse_link_data(url_field: str) -> dict:
+    """Parse url field as JSON to extract link data"""
+    import json
+
+    if not url_field:
+        return {}
+    if isinstance(url_field, str) and url_field.startswith("{"):
+        try:
+            return json.loads(url_field)
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _get_link_url(data: dict) -> str:
+    """Get the actual URL/href from link data"""
+    link_type = data.get("type")
+    if link_type == "internal":
+        # For internal links, pageId needs to be resolved to path
+        return data.get("pageId", "")
+    elif link_type == "external":
+        return data.get("url", "")
+    elif link_type == "email":
+        return f"mailto:{data.get('address', '')}"
+    elif link_type == "phone":
+        return f"tel:{data.get('number', '')}"
+    elif link_type == "anchor":
+        return f"#{data.get('anchor', '')}"
+    return ""
+
+
 class NavbarItem(BaseModel):
-    """Navbar menu item"""
+    """
+    Navbar menu item with consolidated link data.
+
+    The url field stores a JSON object containing:
+    - type: 'internal' | 'external' | 'email' | 'phone' | 'anchor'
+    - pageId/url/address/number/anchor: target reference
+    - label: display text
+    - isActive: whether item is visible
+    - targetBlank: whether to open in new tab
+    """
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,  # Allow both snake_case and camelCase
     )
 
-    label: str = Field(..., description="Menu item label")
     url: str = Field(
         ...,
-        description="Menu item URL",
-        json_schema_extra={"component": "LinkInput"},
-    )
-    is_active: bool = Field(True, description="Whether this item is active")
-    target_blank: bool = Field(
-        False, description="Whether the link opens in a new window"
+        description="Menu item link data (JSON with type, target, label, isActive, targetBlank)",
+        json_schema_extra={"component": "LinkField"},
     )
     order: int = Field(0, description="Display order")
 
+    @property
+    def label(self) -> str:
+        """Extract label from link data"""
+        return _parse_link_data(self.url).get("label", "")
+
+    @property
+    def is_active(self) -> bool:
+        """Extract isActive from link data"""
+        return _parse_link_data(self.url).get("isActive", True)
+
+    @property
+    def target_blank(self) -> bool:
+        """Extract targetBlank from link data"""
+        return _parse_link_data(self.url).get("targetBlank", False)
+
+    @property
+    def link_url(self) -> str:
+        """Get the actual URL/href from link data"""
+        return _get_link_url(_parse_link_data(self.url))
+
+    def to_template_dict(self) -> dict:
+        """Convert to dict for template rendering with resolved properties"""
+        data = _parse_link_data(self.url)
+        return {
+            "label": data.get("label", ""),
+            "url": _get_link_url(data),
+            "isActive": data.get("isActive", True),
+            "targetBlank": data.get("targetBlank", False),
+            "type": data.get("type", ""),
+            "pageId": data.get("pageId"),
+            "anchor": data.get("anchor"),
+        }
+
 
 class SecondaryMenuItem(BaseModel):
-    """Secondary navbar menu item with custom styling"""
+    """
+    Secondary navbar menu item with custom styling.
+
+    The url field stores consolidated link data (same as NavbarItem).
+    Additional fields for styling are kept separate.
+    """
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
     )
 
-    label: str = Field(..., description="Menu item label")
     url: str = Field(
         ...,
-        description="Menu item URL",
-        json_schema_extra={"component": "LinkInput"},
-    )
-    is_active: bool = Field(True, description="Whether this item is active")
-    target_blank: bool = Field(
-        False, description="Whether the link opens in a new window"
+        description="Menu item link data (JSON with type, target, label, isActive, targetBlank)",
+        json_schema_extra={"component": "LinkField"},
     )
     background_color: Optional[str] = Field(
         None,
@@ -64,6 +132,41 @@ class SecondaryMenuItem(BaseModel):
         },
     )
     order: int = Field(0, description="Display order")
+
+    @property
+    def label(self) -> str:
+        """Extract label from link data"""
+        return _parse_link_data(self.url).get("label", "")
+
+    @property
+    def is_active(self) -> bool:
+        """Extract isActive from link data"""
+        return _parse_link_data(self.url).get("isActive", True)
+
+    @property
+    def target_blank(self) -> bool:
+        """Extract targetBlank from link data"""
+        return _parse_link_data(self.url).get("targetBlank", False)
+
+    @property
+    def link_url(self) -> str:
+        """Get the actual URL/href from link data"""
+        return _get_link_url(_parse_link_data(self.url))
+
+    def to_template_dict(self) -> dict:
+        """Convert to dict for template rendering with resolved properties"""
+        data = _parse_link_data(self.url)
+        return {
+            "label": data.get("label", ""),
+            "url": _get_link_url(data),
+            "isActive": data.get("isActive", True),
+            "targetBlank": data.get("targetBlank", False),
+            "type": data.get("type", ""),
+            "pageId": data.get("pageId"),
+            "anchor": data.get("anchor"),
+            "backgroundColor": self.background_color,
+            "backgroundImage": self.background_image,
+        }
 
 
 class NavbarConfig(BaseModel):
@@ -281,88 +384,132 @@ class NavbarWidget(BaseWidget):
         # Join all style parts with a space
         template_config["navbar_style"] = " ".join(style_parts)
 
-        # Filter menu items based on publication status (public site only)
-        filtered_menu_items = self._filter_published_menu_items(
+        # Process and filter menu items
+        processed_menu_items = self._process_menu_items(
             config.get("menu_items", []), context
         )
-        # Filter out inactive items
-        filtered_menu_items = [
-            item for item in filtered_menu_items if item.get("is_active", True)
-        ]
-        # Sort by order field
-        filtered_menu_items = sorted(
-            filtered_menu_items, key=lambda x: x.get("order", 0)
-        )
-        template_config["menu_items"] = filtered_menu_items
+        template_config["menu_items"] = processed_menu_items
 
         # Same for secondary menu items
-        filtered_secondary = self._filter_published_menu_items(
-            config.get("secondary_menu_items", []), context
+        processed_secondary = self._process_menu_items(
+            config.get("secondary_menu_items", []), context, is_secondary=True
         )
-        # Filter out inactive items
-        filtered_secondary = [
-            item for item in filtered_secondary if item.get("is_active", True)
-        ]
-        # Sort by order field
-        filtered_secondary = sorted(filtered_secondary, key=lambda x: x.get("order", 0))
-        template_config["secondary_menu_items"] = filtered_secondary
+        template_config["secondary_menu_items"] = processed_secondary
 
         return template_config
 
-    def _filter_published_menu_items(self, menu_items, context):
-        """Filter menu items based on hostname-aware page lookup and publication status"""
+    def _process_menu_items(self, menu_items, context, is_secondary=False):
+        """
+        Process menu items: extract link data, filter by publication status, sort.
+
+        Menu items now store consolidated link data in the url field as JSON:
+        { type, pageId/url/..., label, isActive, targetBlank }
+        """
         from webpages.models import WebPage
 
         if not menu_items:
-            return menu_items
+            return []
 
-        # Get hostname from request to find root page
-        request = context.get("request")
-        if not request:
-            return menu_items
+        # Get hostname from request
+        request = context.get("request") if context else None
+        hostname = request.get_host().lower() if request else None
 
-        hostname = request.get_host().lower()
+        # Process each item to extract link data
+        processed_items = []
+        internal_page_ids = {}  # pageId -> [item_indices]
 
-        # Separate items into internal URLs and external/special URLs
-        internal_urls = {}  # url -> [items]
-        external_items = []
+        for idx, item in enumerate(menu_items):
+            url_field = item.get("url", "")
+            link_data = _parse_link_data(url_field)
 
-        for item in menu_items:
-            url = item.get("url", "")
+            # Skip inactive items
+            if not link_data.get("isActive", True):
+                continue
 
-            # Keep external URLs, anchors, and special protocols
-            if (
-                "://" in url
-                or url.startswith("#")
-                or url.startswith("mailto:")
-                or url.startswith("tel:")
-                or not url
-            ):
-                external_items.append(item)
-            elif url.startswith("/"):
-                # Internal URL - add to lookup dict
-                if url not in internal_urls:
-                    internal_urls[url] = []
-                internal_urls[url].append(item)
-            else:
-                external_items.append(item)
+            # Build processed item with extracted data
+            processed = {
+                "label": link_data.get("label", ""),
+                "isActive": link_data.get("isActive", True),
+                "targetBlank": link_data.get("targetBlank", False),
+                "type": link_data.get("type", ""),
+                "order": item.get("order", idx),
+            }
 
-        if not internal_urls:
-            return external_items
+            # Add secondary item extra fields
+            if is_secondary:
+                processed["backgroundColor"] = item.get("background_color") or item.get(
+                    "backgroundColor"
+                )
+                processed["backgroundImage"] = item.get("background_image") or item.get(
+                    "backgroundImage"
+                )
 
-        # Single batch query using cached fields - ultra fast!
-        published_pages = WebPage.objects.filter(
-            cached_path__in=internal_urls.keys(),
-            is_currently_published=True,  # Use cached publication status!
-            is_deleted=False,
-            cached_root_hostnames__contains=[hostname],  # Filter by hostname!
-        )
-        published_paths = set(published_pages.values_list("cached_path", flat=True))
+            link_type = link_data.get("type")
 
-        # Build result list
-        result = list(external_items)
-        for path, items in internal_urls.items():
-            if path in published_paths:
-                result.extend(items)
+            if link_type == "internal":
+                page_id = link_data.get("pageId")
+                if page_id:
+                    # Mark for batch lookup
+                    if page_id not in internal_page_ids:
+                        internal_page_ids[page_id] = []
+                    internal_page_ids[page_id].append(len(processed_items))
+                    processed["pageId"] = page_id
+                    processed["anchor"] = link_data.get("anchor")
+                    processed["url"] = ""  # Will be resolved after batch lookup
+                    processed_items.append(processed)
+            elif link_type == "external":
+                processed["url"] = link_data.get("url", "")
+                processed_items.append(processed)
+            elif link_type == "email":
+                processed["url"] = f"mailto:{link_data.get('address', '')}"
+                processed_items.append(processed)
+            elif link_type == "phone":
+                processed["url"] = f"tel:{link_data.get('number', '')}"
+                processed_items.append(processed)
+            elif link_type == "anchor":
+                processed["url"] = f"#{link_data.get('anchor', '')}"
+                processed_items.append(processed)
+            elif not link_type:
+                # Legacy or empty item - skip or handle
+                pass
 
-        return result
+        # Batch lookup for internal pages
+        if internal_page_ids:
+            page_query = WebPage.objects.filter(
+                id__in=internal_page_ids.keys(),
+                is_deleted=False,
+            )
+
+            # Filter by publication status and hostname if available
+            if hostname:
+                page_query = page_query.filter(
+                    is_currently_published=True,
+                    cached_root_hostnames__contains=[hostname],
+                )
+
+            # Build lookup of id -> path
+            page_paths = {p.id: p.cached_path for p in page_query}
+
+            # Update processed items with resolved paths
+            valid_indices = set()
+            for page_id, indices in internal_page_ids.items():
+                path = page_paths.get(page_id)
+                if path:
+                    for idx in indices:
+                        anchor = processed_items[idx].get("anchor")
+                        processed_items[idx]["url"] = (
+                            f"{path}#{anchor}" if anchor else path
+                        )
+                        valid_indices.add(idx)
+
+            # Filter out items with unresolved internal links
+            processed_items = [
+                item
+                for idx, item in enumerate(processed_items)
+                if idx in valid_indices or item.get("type") != "internal"
+            ]
+
+        # Sort by order
+        processed_items = sorted(processed_items, key=lambda x: x.get("order", 0))
+
+        return processed_items
