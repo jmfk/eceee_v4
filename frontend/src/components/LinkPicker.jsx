@@ -51,7 +51,7 @@ const LINK_TYPES = {
  */
 const parseLink = (linkValue) => {
     if (!linkValue) return { type: 'internal', data: {} }
-    
+
     // If it's a string, try to parse as JSON
     if (typeof linkValue === 'string') {
         try {
@@ -82,12 +82,12 @@ const parseLink = (linkValue) => {
             return { type: 'external', data: { url: linkValue } }
         }
     }
-    
+
     // Already an object
     if (typeof linkValue === 'object' && linkValue.type) {
         return { type: linkValue.type, data: linkValue }
     }
-    
+
     return { type: 'internal', data: {} }
 }
 
@@ -132,9 +132,9 @@ const buildLinkObject = (type, data) => {
 /**
  * Page Browser Component - Hierarchical navigation
  */
-const PageBrowser = ({ 
-    selectedPageId, 
-    onSelectPage, 
+const PageBrowser = ({
+    selectedPageId,
+    onSelectPage,
     currentSiteRootId,
     searchTerm,
     onSearchChange,
@@ -142,31 +142,39 @@ const PageBrowser = ({
 }) => {
     const [currentParentId, setCurrentParentId] = useState(null)
     const [breadcrumbs, setBreadcrumbs] = useState([])
-    const [hasInitialized, setHasInitialized] = useState(false)
-    
+    const [initializedForParentId, setInitializedForParentId] = useState(null)
+
     // Initialize to parent of selected page if provided
+    // Changed dependency: track which parentId we initialized for instead of boolean flag
     useEffect(() => {
-        if (initialParentId && !hasInitialized) {
+        // Only initialize if we have a parentId and haven't initialized for this specific parentId yet
+        if (initialParentId && initialParentId !== initializedForParentId) {
             setCurrentParentId(initialParentId)
-            setHasInitialized(true)
-            
+            setInitializedForParentId(initialParentId)
+
             // Fetch and build breadcrumbs for the parent
             getBreadcrumbs(initialParentId)
                 .then(crumbs => {
                     // Convert breadcrumbs to the format needed
-                    setBreadcrumbs(crumbs.map(crumb => ({
-                        id: crumb.id,
+                    const formattedCrumbs = crumbs.map(crumb => ({
+                        id: crumb.pageId,
                         title: crumb.title
-                    })))
+                    }))
+                    setBreadcrumbs(formattedCrumbs)
                 })
                 .catch(err => {
                     console.error('Failed to fetch breadcrumbs:', err)
                     // Fallback: just set empty breadcrumbs
                     setBreadcrumbs([])
                 })
+        } else if (!initialParentId && initializedForParentId !== null) {
+            // Reset if initialParentId becomes null
+            setCurrentParentId(null)
+            setBreadcrumbs([])
+            setInitializedForParentId(null)
         }
-    }, [initialParentId, hasInitialized])
-    
+    }, [initialParentId, initializedForParentId])
+
     // Fetch pages for current level
     const { data: pagesData, isLoading } = useQuery({
         queryKey: ['link-picker-pages', currentParentId, searchTerm],
@@ -187,15 +195,15 @@ const PageBrowser = ({
         },
         staleTime: 30000
     })
-    
+
     const pages = pagesData || []
-    
+
     const handleNavigateInto = (page) => {
         setCurrentParentId(page.id)
         setBreadcrumbs(prev => [...prev, { id: page.id, title: page.title }])
         onSearchChange('')
     }
-    
+
     const handleNavigateUp = () => {
         if (breadcrumbs.length > 1) {
             const newBreadcrumbs = breadcrumbs.slice(0, -1)
@@ -203,12 +211,12 @@ const PageBrowser = ({
             setCurrentParentId(newBreadcrumbs[newBreadcrumbs.length - 1]?.id || null)
         }
     }
-    
+
     const handleNavigateToRoot = () => {
-        setBreadcrumbs([])
-        setCurrentParentId(null)
+        setBreadcrumbs(currentSiteRootId ? [{ id: currentSiteRootId, title: 'Site Root' }] : [])
+        setCurrentParentId(currentSiteRootId || null)
     }
-    
+
     return (
         <div className="flex flex-col h-full">
             {/* Search */}
@@ -224,7 +232,7 @@ const PageBrowser = ({
                     />
                 </div>
             </div>
-            
+
             {/* Breadcrumb navigation */}
             {!searchTerm && breadcrumbs.length > 0 && (
                 <div className="flex items-center gap-1 p-2 border-b border-gray-200 bg-gray-50">
@@ -250,15 +258,14 @@ const PageBrowser = ({
                     {/* Select current folder button */}
                     {currentParentId && (
                         <button
-                            onClick={() => onSelectPage({ 
-                                id: currentParentId, 
-                                title: breadcrumbs[breadcrumbs.length - 1]?.title 
+                            onClick={() => onSelectPage({
+                                id: currentParentId,
+                                title: breadcrumbs[breadcrumbs.length - 1]?.title
                             })}
-                            className={`px-2 py-1 text-xs rounded flex-shrink-0 ${
-                                selectedPageId === currentParentId
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                            }`}
+                            className={`px-2 py-1 text-xs rounded flex-shrink-0 ${selectedPageId === currentParentId
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                }`}
                             title="Select this page"
                         >
                             Select
@@ -266,7 +273,7 @@ const PageBrowser = ({
                     )}
                 </div>
             )}
-            
+
             {/* Page list */}
             <div className="flex-1 overflow-y-auto">
                 {isLoading ? (
@@ -282,9 +289,8 @@ const PageBrowser = ({
                         {pages.map(page => (
                             <div
                                 key={page.id}
-                                className={`flex items-center gap-2 p-2 hover:bg-gray-50 cursor-pointer ${
-                                    selectedPageId === page.id ? 'bg-blue-50 border-l-2 border-blue-500' : ''
-                                }`}
+                                className={`flex items-center gap-2 p-2 hover:bg-gray-50 cursor-pointer ${selectedPageId === page.id ? 'bg-blue-50 border-l-2 border-blue-500' : ''
+                                    }`}
                             >
                                 <button
                                     onClick={() => onSelectPage(page)}
@@ -339,10 +345,10 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
         enabled: !!pageId,
         staleTime: 30000
     })
-    
+
     // Ensure anchors is always an array
     const anchors = Array.isArray(anchorsData) ? anchorsData : []
-    
+
     if (!pageId) {
         return (
             <div className="text-sm text-gray-500 p-2">
@@ -350,7 +356,7 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
             </div>
         )
     }
-    
+
     if (isLoading) {
         return (
             <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
@@ -359,7 +365,7 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
             </div>
         )
     }
-    
+
     if (anchors.length === 0) {
         return (
             <div className="text-sm text-gray-500 p-2">
@@ -367,14 +373,13 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
             </div>
         )
     }
-    
+
     return (
         <div className="divide-y divide-gray-100 max-h-32 overflow-y-auto">
             <button
                 onClick={() => onSelectAnchor(null, null)}
-                className={`w-full text-left p-2 hover:bg-gray-50 text-sm ${
-                    !selectedAnchor ? 'bg-blue-50' : ''
-                }`}
+                className={`w-full text-left p-2 hover:bg-gray-50 text-sm ${!selectedAnchor ? 'bg-blue-50' : ''
+                    }`}
             >
                 <span className="text-gray-600">No anchor (link to page)</span>
             </button>
@@ -382,9 +387,8 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
                 <button
                     key={idx}
                     onClick={() => onSelectAnchor(anchor.anchor, anchor.title)}
-                    className={`w-full text-left p-2 hover:bg-gray-50 ${
-                        selectedAnchor === anchor.anchor ? 'bg-blue-50' : ''
-                    }`}
+                    className={`w-full text-left p-2 hover:bg-gray-50 ${selectedAnchor === anchor.anchor ? 'bg-blue-50' : ''
+                        }`}
                 >
                     <div className="text-sm font-medium text-gray-900">
                         #{anchor.anchor}
@@ -401,27 +405,27 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
 /**
  * Internal Page Tab Content
  */
-const InternalPageTab = ({ 
-    data, 
-    onChange, 
+const InternalPageTab = ({
+    data,
+    onChange,
     currentPageId,
-    currentSiteRootId 
+    currentSiteRootId
 }) => {
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedPage, setSelectedPage] = useState(null)
-    
+
     // Fetch selected page info if we have a pageId
     const { data: pageInfo } = useQuery({
         queryKey: ['page-lookup', data.pageId],
         queryFn: async () => {
             if (!data.pageId) return null
             const response = await api.get(`${endpoints.pages.lookup}?id=${data.pageId}`)
-            return response
+            return response.data
         },
         enabled: !!data.pageId,
         staleTime: 60000
     })
-    
+
     // Look up page by path if we have a legacyPath
     const { data: pathLookupResult } = useQuery({
         queryKey: ['page-lookup-path', data.legacyPath],
@@ -433,8 +437,8 @@ const InternalPageTab = ({
             const response = await pagesApi.list({ search: cleanPath, page_size: 10 })
             const results = response.results || []
             // Find exact match by cached_path or slug
-            const exactMatch = results.find(p => 
-                p.cachedPath === data.legacyPath || 
+            const exactMatch = results.find(p =>
+                p.cachedPath === data.legacyPath ||
                 p.cachedPath === `/${cleanPath}/` ||
                 p.slug === cleanPath
             )
@@ -443,7 +447,7 @@ const InternalPageTab = ({
         enabled: !!data.legacyPath && !data.pageId,
         staleTime: 60000
     })
-    
+
     // When path lookup finds a page, update the data to use pageId
     useEffect(() => {
         if (pathLookupResult && !data.pageId) {
@@ -451,26 +455,26 @@ const InternalPageTab = ({
             setSelectedPage(pathLookupResult)
         }
     }, [pathLookupResult, data, onChange])
-    
+
     useEffect(() => {
         if (pageInfo) {
             setSelectedPage(pageInfo)
         }
     }, [pageInfo])
-    
+
     const handleSelectPage = (page) => {
         setSelectedPage(page)
         onChange({ ...data, pageId: page.id, pageTitle: page.title, anchor: null })
     }
-    
+
     const handleSelectAnchor = (anchor, anchorTitle) => {
-        onChange({ 
-            ...data, 
+        onChange({
+            ...data,
             anchor,
             anchorTitle: anchorTitle || anchor
         })
     }
-    
+
     return (
         <div className="grid grid-cols-2 gap-4 h-80">
             {/* Page browser */}
@@ -484,7 +488,7 @@ const InternalPageTab = ({
                     initialParentId={pageInfo?.parentId || null}
                 />
             </div>
-            
+
             {/* Selected page info and anchors */}
             <div className="border border-gray-200 rounded-md overflow-hidden flex flex-col">
                 {selectedPage ? (
@@ -626,7 +630,7 @@ const AnchorTab = ({ data, onChange, currentPageId }) => {
                     />
                 </div>
             </div>
-            
+
             {currentPageId && (
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -660,7 +664,7 @@ const LinkPicker = ({
 }) => {
     // Parse initial link
     const parsed = useMemo(() => parseLink(initialLink), [initialLink])
-    
+
     // State
     const [activeTab, setActiveTab] = useState(parsed.type)
     const [linkData, setLinkData] = useState(parsed.data)
@@ -668,7 +672,7 @@ const LinkPicker = ({
     const [customTitle, setCustomTitle] = useState('')
     const [replaceText, setReplaceText] = useState(false)
     const [linkText, setLinkText] = useState(initialText)
-    
+
     // Reset state when modal opens with new data
     useEffect(() => {
         if (isOpen) {
@@ -681,7 +685,7 @@ const LinkPicker = ({
             setLinkText(initialText)
         }
     }, [isOpen, initialLink, initialText])
-    
+
     // Auto-title based on link type and selection
     const autoTitle = useMemo(() => {
         if (activeTab === 'internal' && linkData.pageId) {
@@ -696,16 +700,16 @@ const LinkPicker = ({
         if (activeTab === 'anchor') return `#${linkData.anchor || ''}`
         return ''
     }, [activeTab, linkData])
-    
+
     const handleTabChange = (newTab) => {
         setActiveTab(newTab)
         setLinkData({})
     }
-    
+
     const handleSave = () => {
         const link = buildLinkObject(activeTab, linkData)
         if (!link) return
-        
+
         onSave({
             link,
             title: useCustomTitle ? customTitle : autoTitle,
@@ -715,7 +719,7 @@ const LinkPicker = ({
         })
         onClose()
     }
-    
+
     const handleRemove = () => {
         onSave({
             link: null,
@@ -723,7 +727,7 @@ const LinkPicker = ({
         })
         onClose()
     }
-    
+
     // Validation
     const isValid = useMemo(() => {
         switch (activeTab) {
@@ -741,7 +745,7 @@ const LinkPicker = ({
                 return false
         }
     }, [activeTab, linkData])
-    
+
     // Dialog title with icon
     const dialogTitle = (
         <span className="flex items-center gap-2">
@@ -749,7 +753,7 @@ const LinkPicker = ({
             {initialLink ? 'Edit Link' : 'Insert Link'}
         </span>
     )
-    
+
     // Footer content
     const footerContent = (
         <div className="flex items-center justify-between px-4 py-3">
@@ -781,7 +785,7 @@ const LinkPicker = ({
             </div>
         </div>
     )
-    
+
     return (
         <FloatingDialog
             isOpen={isOpen}
@@ -801,18 +805,17 @@ const LinkPicker = ({
                     <button
                         key={type}
                         onClick={() => handleTabChange(type)}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                            activeTab === type
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === type
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
                     >
                         <Icon className="w-4 h-4" />
                         {label}
                     </button>
                 ))}
             </div>
-            
+
             {/* Content */}
             <div className="p-4">
                 {activeTab === 'internal' && (
@@ -833,13 +836,13 @@ const LinkPicker = ({
                     <PhoneTab data={linkData} onChange={setLinkData} />
                 )}
                 {activeTab === 'anchor' && (
-                    <AnchorTab 
-                        data={linkData} 
+                    <AnchorTab
+                        data={linkData}
                         onChange={setLinkData}
                         currentPageId={currentPageId}
                     />
                 )}
-                
+
                 {/* Common options */}
                 <div className="mt-6 pt-4 border-t border-gray-200 space-y-4">
                     {/* Title */}
@@ -866,7 +869,7 @@ const LinkPicker = ({
                             />
                         )}
                     </div>
-                    
+
                     {/* Link text (if we have initial text) */}
                     {initialText && (
                         <div>
