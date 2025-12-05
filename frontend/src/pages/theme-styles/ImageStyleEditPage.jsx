@@ -23,7 +23,7 @@ const ImageStyleEditPage = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { addNotification } = useGlobalNotifications();
-    const { initTheme, switchTheme, updateThemeField, saveCurrentTheme, getState } = useUnifiedData();
+    const { initTheme, switchTheme, updateThemeField, saveCurrentTheme, getState, setIsDirty } = useUnifiedData();
 
     const [template, setTemplate] = useState('');
     const [css, setCss] = useState({ default: '' }); // Changed to object for breakpoint support
@@ -145,9 +145,10 @@ const ImageStyleEditPage = () => {
 
     // Check if dirty
     const keyChanged = newKey !== styleKey;
-    const isDirty = initialData && (
+    const isDirty = !!initialData && (
         template !== initialData.template ||
         JSON.stringify(css) !== JSON.stringify(initialData.css) ||
+        JSON.stringify(variables) !== JSON.stringify(initialData.variables) ||
         name !== initialData.name ||
         description !== initialData.description ||
         styleType !== initialData.styleType ||
@@ -164,6 +165,20 @@ const ImageStyleEditPage = () => {
         JSON.stringify(lightboxConfig) !== JSON.stringify(initialData.lightboxConfig) ||
         keyChanged
     );
+
+    // Debug logging
+    useEffect(() => {
+        console.log('=== ImageStyleEditPage isDirty Debug ===');
+        console.log('initialData:', initialData);
+        console.log('isDirty:', isDirty);
+        console.log('==========================================');
+    }, [initialData, isDirty]);
+
+    // Sync local dirty state to UDC
+    useEffect(() => {
+        console.log('🔄 Syncing isDirty to UDC:', isDirty);
+        setIsDirty(isDirty);
+    }, [isDirty, setIsDirty]);
 
     const handleSave = async () => {
         if (!name.trim()) {
@@ -225,6 +240,9 @@ const ImageStyleEditPage = () => {
             
             queryClient.invalidateQueries(['theme', themeId]);
             addNotification({ type: 'success', message: 'Image style saved' });
+            
+            // Reset dirty state
+            setIsDirty(false);
             
             // Update initial data to match saved state
             const newInitialData = {

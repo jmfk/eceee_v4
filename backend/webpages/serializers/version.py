@@ -166,29 +166,6 @@ class PageVersionSerializer(serializers.ModelSerializer):
         if "widgets" in data and isinstance(data["widgets"], dict):
             data["widgets"] = self._convert_widgets_to_camel_case(data["widgets"])
 
-        # Debug logging for navbar menu items being sent to frontend
-        import json
-
-        if "widgets" in data and isinstance(data["widgets"], dict):
-            for slot_name, widgets in data["widgets"].items():
-                if isinstance(widgets, list):
-                    for widget in widgets:
-                        if (
-                            isinstance(widget, dict)
-                            and "config" in widget
-                            and "menuItems" in widget["config"]
-                        ):
-                            for item in widget["config"]["menuItems"]:
-                                if "url" in item:
-                                    try:
-                                        url_json = (
-                                            json.loads(item["url"])
-                                            if isinstance(item["url"], str)
-                                            else item["url"]
-                                        )
-                                    except:
-                                        pass
-
         return data
 
     def _convert_widgets_to_camel_case(self, widgets_data):
@@ -355,22 +332,6 @@ class WidgetUpdateSerializer(serializers.ModelSerializer):
 
                 converted_widgets[slot_name].append(converted_widget)
 
-        # Debug logging for navbar menu items
-        import json
-
-        for slot_name, widgets in converted_widgets.items():
-            for widget in widgets:
-                if "config" in widget and "menu_items" in widget["config"]:
-                    for item in widget["config"]["menu_items"]:
-                        if "url" in item:
-                            try:
-                                url_json = (
-                                    json.loads(item["url"])
-                                    if isinstance(item["url"], str)
-                                    else item["url"]
-                                )
-                            except:
-                                pass
         return converted_widgets
 
     def _convert_camel_to_snake(self, obj):
@@ -526,4 +487,3 @@ class PageVersionComparisonSerializer(serializers.Serializer):
 
     class Meta:
         fields = ["version1", "version2", "changes"]
-

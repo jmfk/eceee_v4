@@ -19,22 +19,16 @@ import LinkPicker from '../LinkPicker'
 
 /**
  * Parse a link value to get the link object
+ * Now expects objects directly (no JSON parsing needed)
  */
 const parseLinkValue = (value) => {
     if (!value) return null
-    
-    if (typeof value === 'string' && value.startsWith('{')) {
-        try {
-            return JSON.parse(value)
-        } catch {
-            return null
-        }
-    }
-    
+
+    // Value should already be an object
     if (typeof value === 'object' && value.type) {
         return value
     }
-    
+
     return null
 }
 
@@ -43,7 +37,7 @@ const parseLinkValue = (value) => {
  */
 const buildLinkObject = (linkData, label, isActive, targetBlank) => {
     if (!linkData) return null
-    
+
     return {
         ...linkData,
         label: label || '',
@@ -56,6 +50,7 @@ const buildLinkObject = (linkData, label, isActive, targetBlank) => {
  * LinkDisplay - Shows rich link info with page lookup for internal pages
  */
 const LinkDisplay = ({ url, onEdit, currentSiteId, disabled }) => {
+    // url is now already an object (not a string)
     const linkObj = useMemo(() => parseLinkValue(url), [url])
 
     // Fetch page info for internal links
@@ -188,11 +183,10 @@ const LinkDisplay = ({ url, onEdit, currentSiteId, disabled }) => {
                 type="button"
                 onClick={handleEdit}
                 disabled={disabled}
-                className={`flex-1 min-w-0 text-left text-sm truncate ${
-                    disabled 
-                        ? 'text-gray-500 cursor-not-allowed' 
-                        : 'text-gray-700 hover:text-blue-600'
-                }`}
+                className={`flex-1 min-w-0 text-left text-sm truncate ${disabled
+                    ? 'text-gray-500 cursor-not-allowed'
+                    : 'text-gray-700 hover:text-blue-600'
+                    }`}
             >
                 {getDisplayContent()}
             </button>
@@ -272,33 +266,32 @@ const LinkField = ({
 }) => {
     // Internal state for uncontrolled mode
     const [internalValue, setInternalValue] = useState(() => {
-        const parsed = parseLinkValue(defaultValue)
-        return parsed ? JSON.stringify(parsed) : ''
+        return parseLinkValue(defaultValue) || null
     })
-    
+
     const [isPickerOpen, setIsPickerOpen] = useState(false)
-    
+
     // Use controlled value if provided, otherwise internal state
-    const currentValueStr = value !== undefined ? value : internalValue
-    const currentValue = useMemo(() => parseLinkValue(currentValueStr), [currentValueStr])
-    
+    const currentValueObj = value !== undefined ? value : internalValue
+    const currentValue = useMemo(() => parseLinkValue(currentValueObj), [currentValueObj])
+
     // Extract fields from current value
     const itemLabel = currentValue?.label || ''
     const isActive = currentValue?.isActive !== false
     const targetBlank = currentValue?.targetBlank || false
-    
+
     // Get context from props or context object
     const pageId = currentPageId || context?.pageId || null
     const siteRootId = currentSiteRootId || context?.siteRootId || context?.webpageData?.cachedRootId || null
     const siteId = currentSiteId || context?.siteId || context?.webpageData?.cachedRootId || null
-    
+
     // Update the full link object
     const updateValue = useCallback((updates) => {
         const newObj = {
             ...(currentValue || {}),
             ...updates
         }
-        
+
         // Only create object if we have link data
         if (!newObj.type && !updates.type) {
             // No link data yet, just store label/isActive/targetBlank
@@ -307,44 +300,39 @@ const LinkField = ({
                 isActive: updates.isActive !== undefined ? updates.isActive : isActive,
                 targetBlank: updates.targetBlank !== undefined ? updates.targetBlank : targetBlank
             }
-            const newStr = JSON.stringify(partialObj)
-            setInternalValue(newStr)
-            onChange(newStr)
+            setInternalValue(partialObj)
+            onChange(partialObj)
             return
         }
-        
-        const newStr = JSON.stringify(newObj)
-        setInternalValue(newStr)
-        onChange(newStr)
+
+        setInternalValue(newObj)
+        onChange(newObj)
     }, [currentValue, itemLabel, isActive, targetBlank, onChange])
-    
+
     // Handle label change
     const handleLabelChange = useCallback((e) => {
         updateValue({ label: e.target.value })
     }, [updateValue])
-    
+
     // Handle isActive toggle
     const handleIsActiveChange = useCallback((newValue) => {
         updateValue({ isActive: newValue })
     }, [updateValue])
-    
+
     // Handle targetBlank toggle
     const handleTargetBlankChange = useCallback((newValue) => {
         updateValue({ targetBlank: newValue })
     }, [updateValue])
-    
+
     // Handle LinkPicker save
     const handlePickerSave = useCallback((result) => {
         if (result.action === 'remove') {
-            setInternalValue('')
-            onChange('')
+            setInternalValue(null)
+            onChange(null)
         } else if (result.action === 'insert' && result.link) {
-            // Auto-populate label if empty
-            let newLabel = itemLabel
-            if (!newLabel && result.title) {
-                newLabel = result.title
-            }
-            
+            // Use title from LinkPicker, or keep existing label
+            const newLabel = result.title || itemLabel
+
             // Merge with existing isActive/targetBlank
             const newObj = {
                 ...result.link,
@@ -352,23 +340,22 @@ const LinkField = ({
                 isActive: isActive,
                 targetBlank: targetBlank
             }
-            const newStr = JSON.stringify(newObj)
-            setInternalValue(newStr)
-            onChange(newStr)
+            setInternalValue(newObj)
+            onChange(newObj)
         }
         setIsPickerOpen(false)
     }, [itemLabel, isActive, targetBlank, onChange])
-    
+
     // Handle clear
     const handleClear = useCallback((e) => {
         e.stopPropagation()
-        setInternalValue('')
-        onChange('')
+        setInternalValue(null)
+        onChange(null)
     }, [onChange])
-    
+
     const hasError = validation && !validation.isValid
     const hasLink = currentValue && currentValue.type
-    
+
     return (
         <div className="space-y-2">
             {/* Field label */}
@@ -378,7 +365,7 @@ const LinkField = ({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
             )}
-            
+
             {/* Main container */}
             <div className={`border rounded-lg overflow-hidden ${hasError ? 'border-red-500' : 'border-gray-300'} ${disabled ? 'bg-gray-50' : 'bg-white'}`}>
                 {/* Label input */}
@@ -397,11 +384,11 @@ const LinkField = ({
                         />
                     </div>
                 )}
-                
+
                 {/* Link display/picker */}
                 <div className={`flex items-center gap-2 px-3 py-2 ${showLabel ? '' : ''}`}>
                     <LinkDisplay
-                        url={currentValueStr}
+                        url={currentValueObj}
                         onEdit={() => !disabled && setIsPickerOpen(true)}
                         currentSiteId={siteId}
                         disabled={disabled}
@@ -417,7 +404,7 @@ const LinkField = ({
                         </button>
                     )}
                 </div>
-                
+
                 {/* Toggles row */}
                 {(showIsActive || showTargetBlank) && (
                     <div className="flex items-center gap-4 px-3 py-2 border-t border-gray-200 bg-gray-50">
@@ -440,25 +427,25 @@ const LinkField = ({
                     </div>
                 )}
             </div>
-            
+
             {/* Description */}
             {description && !hasError && (
                 <p className="text-xs text-gray-500">{description}</p>
             )}
-            
+
             {/* Validation errors */}
             {hasError && validation.errors && (
                 <p className="text-xs text-red-500">
                     {validation.errors.join(', ')}
                 </p>
             )}
-            
+
             {/* LinkPicker Modal */}
             <LinkPicker
                 isOpen={isPickerOpen}
                 onClose={() => setIsPickerOpen(false)}
                 onSave={handlePickerSave}
-                initialLink={currentValueStr}
+                initialLink={currentValueObj}
                 initialText=""
                 currentPageId={pageId}
                 currentSiteRootId={siteRootId}
@@ -471,6 +458,6 @@ const LinkField = ({
 LinkField.displayName = 'LinkField'
 
 // Export LinkDisplay separately for use in custom editors
-export { LinkDisplay, parseLinkValue }
+export { LinkDisplay }
 
 export default LinkField

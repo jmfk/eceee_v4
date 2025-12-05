@@ -710,9 +710,11 @@ const LinkPicker = ({
         const link = buildLinkObject(activeTab, linkData)
         if (!link) return
 
+        const titleToSave = useCustomTitle ? customTitle : autoTitle
+
         onSave({
             link,
-            title: useCustomTitle ? customTitle : autoTitle,
+            title: titleToSave,
             text: replaceText ? linkText : undefined,
             replaceText,
             action: 'insert'

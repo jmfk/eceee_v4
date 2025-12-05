@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, Save, Eye, Copy, Check } from 'lucide-react';
 import { themesApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import CodeEditorPanel from '../../components/theme/CodeEditorPanel';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import { scenarios, getScenarioById } from '../../utils/componentStyleScenarios';
@@ -21,6 +22,7 @@ const ComponentStyleEditPage = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { addNotification } = useGlobalNotifications();
+    const { setIsDirty } = useUnifiedData();
 
     const [template, setTemplate] = useState('');
     const [css, setCss] = useState({ default: '' }); // Changed to object for breakpoint support
@@ -71,13 +73,35 @@ const ComponentStyleEditPage = () => {
 
     // Check if dirty
     const keyChanged = newKey !== styleKey;
-    const isDirty = initialData && (
+    const isDirty = !!initialData && (
         template !== initialData.template ||
         JSON.stringify(css) !== JSON.stringify(initialData.css) ||
+        JSON.stringify(variables) !== JSON.stringify(initialData.variables) ||
         name !== initialData.name ||
         description !== initialData.description ||
         keyChanged
     );
+
+    // Debug logging
+    useEffect(() => {
+        console.log('=== ComponentStyleEditPage isDirty Debug ===');
+        console.log('initialData:', initialData);
+        console.log('Current values:', { template, css, variables, name, description, newKey, styleKey });
+        console.log('keyChanged:', keyChanged);
+        console.log('template changed:', template !== initialData?.template);
+        console.log('css changed:', JSON.stringify(css) !== JSON.stringify(initialData?.css));
+        console.log('variables changed:', JSON.stringify(variables) !== JSON.stringify(initialData?.variables));
+        console.log('name changed:', name !== initialData?.name);
+        console.log('description changed:', description !== initialData?.description);
+        console.log('isDirty:', isDirty);
+        console.log('==========================================');
+    }, [initialData, template, css, variables, name, description, newKey, styleKey, keyChanged, isDirty]);
+
+    // Sync local dirty state to UDC
+    useEffect(() => {
+        console.log('🔄 Syncing isDirty to UDC:', isDirty);
+        setIsDirty(isDirty);
+    }, [isDirty, setIsDirty]);
 
     // Update mutation
     const updateMutation = useMutation({
@@ -106,6 +130,9 @@ const ComponentStyleEditPage = () => {
                 type: 'success',
                 message: 'Component style saved successfully',
             });
+            
+            // Reset dirty state
+            setIsDirty(false);
             
             // If key changed, navigate to new URL
             if (variables.targetKey !== styleKey) {

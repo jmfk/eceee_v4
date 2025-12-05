@@ -373,14 +373,6 @@ const SectionWidget = ({
                         mode="editor"
                         showClearButton={false}
                         compactAddButton={true}
-                        // Selection props
-                        selectedWidgets={selectedWidgets}
-                        cutWidgets={cutWidgets}
-                        onToggleWidgetSelection={onToggleWidgetSelection}
-                        isWidgetSelected={isWidgetSelected}
-                        isWidgetCut={isWidgetCut}
-                        buildWidgetPath={buildWidgetPath}
-                        parseWidgetPath={parseWidgetPath}
                     />
                 </div>
             </div>
