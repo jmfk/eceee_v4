@@ -9,103 +9,12 @@ from pydantic.alias_generators import to_camel
 from webpages.widget_registry import BaseWidget, register_widget_type
 from file_manager.imgproxy import imgproxy_service
 from utils.dict_utils import DictToObj
-
-
-def _parse_link_data(url_field: str) -> dict:
-    """Parse url field as JSON to extract link data"""
-    import json
-
-    if not url_field:
-        return {}
-    if isinstance(url_field, str) and url_field.startswith("{"):
-        try:
-            return json.loads(url_field)
-        except json.JSONDecodeError:
-            return {}
-    return {}
-
-
-def _get_link_url(data: dict) -> str:
-    """Get the actual URL/href from link data"""
-    link_type = data.get("type")
-    if link_type == "internal":
-        # For internal links, pageId needs to be resolved to path
-        return data.get("pageId", "")
-    elif link_type == "external":
-        return data.get("url", "")
-    elif link_type == "email":
-        return f"mailto:{data.get('address', '')}"
-    elif link_type == "phone":
-        return f"tel:{data.get('number', '')}"
-    elif link_type == "anchor":
-        return f"#{data.get('anchor', '')}"
-    return ""
+from easy_widgets.models import LinkData
 
 
 class NavbarItem(BaseModel):
     """
-    Navbar menu item with consolidated link data.
-
-    The url field stores a JSON object containing:
-    - type: 'internal' | 'external' | 'email' | 'phone' | 'anchor'
-    - pageId/url/address/number/anchor: target reference
-    - label: display text
-    - isActive: whether item is visible
-    - targetBlank: whether to open in new tab
-    """
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,  # Allow both snake_case and camelCase
-    )
-
-    url: str = Field(
-        ...,
-        description="Menu item link data (JSON with type, target, label, isActive, targetBlank)",
-        json_schema_extra={"component": "LinkField"},
-    )
-    order: int = Field(0, description="Display order")
-
-    @property
-    def label(self) -> str:
-        """Extract label from link data"""
-        return _parse_link_data(self.url).get("label", "")
-
-    @property
-    def is_active(self) -> bool:
-        """Extract isActive from link data"""
-        return _parse_link_data(self.url).get("isActive", True)
-
-    @property
-    def target_blank(self) -> bool:
-        """Extract targetBlank from link data"""
-        return _parse_link_data(self.url).get("targetBlank", False)
-
-    @property
-    def link_url(self) -> str:
-        """Get the actual URL/href from link data"""
-        return _get_link_url(_parse_link_data(self.url))
-
-    def to_template_dict(self) -> dict:
-        """Convert to dict for template rendering with resolved properties"""
-        data = _parse_link_data(self.url)
-        return {
-            "label": data.get("label", ""),
-            "url": _get_link_url(data),
-            "isActive": data.get("isActive", True),
-            "targetBlank": data.get("targetBlank", False),
-            "type": data.get("type", ""),
-            "pageId": data.get("pageId"),
-            "anchor": data.get("anchor"),
-        }
-
-
-class SecondaryMenuItem(BaseModel):
-    """
-    Secondary navbar menu item with custom styling.
-
-    The url field stores consolidated link data (same as NavbarItem).
-    Additional fields for styling are kept separate.
+    Navbar menu item with link data.
     """
 
     model_config = ConfigDict(
@@ -113,10 +22,26 @@ class SecondaryMenuItem(BaseModel):
         populate_by_name=True,
     )
 
-    url: str = Field(
+    link_data: LinkData = Field(
         ...,
-        description="Menu item link data (JSON with type, target, label, isActive, targetBlank)",
-        json_schema_extra={"component": "LinkField"},
+        description="Menu item link data",
+    )
+    order: int = Field(0, description="Display order")
+
+
+class SecondaryMenuItem(BaseModel):
+    """
+    Secondary navbar menu item with custom styling.
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    link_data: LinkData = Field(
+        ...,
+        description="Menu item link data",
     )
     background_color: Optional[str] = Field(
         None,
@@ -137,42 +62,6 @@ class SecondaryMenuItem(BaseModel):
         },
     )
     order: int = Field(0, description="Display order")
-
-    @property
-    def label(self) -> str:
-        """Extract label from link data"""
-        return _parse_link_data(self.url).get("label", "")
-
-    @property
-    def is_active(self) -> bool:
-        """Extract isActive from link data"""
-        return _parse_link_data(self.url).get("isActive", True)
-
-    @property
-    def target_blank(self) -> bool:
-        """Extract targetBlank from link data"""
-        return _parse_link_data(self.url).get("targetBlank", False)
-
-    @property
-    def link_url(self) -> str:
-        """Get the actual URL/href from link data"""
-        return _get_link_url(_parse_link_data(self.url))
-
-    def to_template_dict(self) -> dict:
-        """Convert to dict for template rendering with resolved properties"""
-        data = _parse_link_data(self.url)
-        return {
-            "label": data.get("label", ""),
-            "url": _get_link_url(data),
-            "isActive": data.get("isActive", True),
-            "targetBlank": data.get("targetBlank", False),
-            "type": data.get("type", ""),
-            "pageId": data.get("pageId"),
-            "anchor": data.get("anchor"),
-            "backgroundColor": self.background_color,
-            "textColor": self.text_color,
-            "backgroundImage": self.background_image,
-        }
 
 
 class NavbarConfig(BaseModel):
@@ -257,6 +146,7 @@ class NavbarWidget(BaseWidget):
     name = "Navbar"
     description = "Navigation bar with configurable menu items"
     template_name = "easy_widgets/widgets/navbar.html"
+    mustache_template_name = "easy_widgets/widgets/navbar.mustache"
 
     widget_css = """
         /* Navbar Widget - Override only conflicting theme styles */
@@ -295,51 +185,56 @@ class NavbarWidget(BaseWidget):
 
     def render_with_style(self, config, theme):
         """
-        Render navbar with custom component style from theme.
+        Render navbar with Mustache template (default or custom from theme).
 
         Args:
-            config: Widget configuration
+            config: Widget configuration (already prepared via prepare_template_context)
             theme: PageTheme instance
 
         Returns:
-            Tuple of (html, css) or None for default rendering
+            Tuple of (html, css) - always returns Mustache-rendered output
         """
         from webpages.utils.mustache_renderer import (
             render_mustache,
-            prepare_component_context,
+            load_mustache_template,
         )
-        from django.template.loader import render_to_string
 
         style_name = config.get("component_style", "default")
-        if not style_name or style_name == "default":
+
+        # Check if using custom theme component style
+        if style_name and style_name != "default" and theme:
+            styles = theme.component_styles or {}
+            style = styles.get(style_name)
+
+            if style:
+                # Use theme's custom Mustache template
+                template = style.get("template", "")
+                css = style.get("css", "")
+
+                # Prepare context for theme template
+                context = {
+                    **config,
+                    **(style.get("variables", {})),
+                }
+
+                html = render_mustache(template, context)
+                return html, css
+
+        # Use default Mustache template
+        try:
+            template = load_mustache_template(self.mustache_template_name)
+            html = render_mustache(template, config)
+            return html, ""
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error rendering navbar with Mustache template: {e}")
+            # Return None to fall back to Django template
             return None
-
-        styles = theme.component_styles or {}
-        style = styles.get(style_name)
-        if not style:
-            return None
-
-        # Prepare template context first
-        prepared_config = self.prepare_template_context(config, {"theme": theme})
-
-        # Render the navbar HTML using the default template first
-        navbar_html = render_to_string(self.template_name, {"config": prepared_config})
-
-        # Prepare context with rendered navbar as content
-        context = prepare_component_context(
-            content=navbar_html,
-            anchor="",
-            style_vars=style.get("variables", {}),
-            config=prepared_config,  # Pass processed config for granular control
-        )
-
-        # Render with style template
-        html = render_mustache(style.get("template", ""), context)
-        css = style.get("css", "")
-        return html, css
 
     def prepare_template_context(self, config, context=None):
-        """Prepare navbar menu items and background styling"""
+        """Prepare navbar menu items and background styling for Mustache template"""
         template_config = super().prepare_template_context(config, context)
         context_obj = DictToObj(context)
 
@@ -380,28 +275,32 @@ class NavbarWidget(BaseWidget):
         style_parts.append("height: 28px;")
 
         # Join all style parts with a space
-        template_config["navbar_style"] = " ".join(style_parts)
+        template_config["navbarStyle"] = " ".join(style_parts)
 
         # Process and filter menu items
         processed_menu_items = self._process_menu_items(
             config.get("menu_items", []), context
         )
-        template_config["menu_items"] = processed_menu_items
+        template_config["menuItems"] = processed_menu_items
 
         # Same for secondary menu items
         processed_secondary = self._process_menu_items(
             config.get("secondary_menu_items", []), context, is_secondary=True
         )
-        template_config["secondary_menu_items"] = processed_secondary
+        template_config["secondaryMenuItems"] = processed_secondary
+        template_config["hasSecondaryMenuItems"] = len(processed_secondary) > 0
+
+        # Add hamburger breakpoint
+        template_config["hamburgerBreakpoint"] = config.get("hamburger_breakpoint", 768)
+
+        # Add widget type CSS class
+        template_config["widgetTypeCssClass"] = "navbar"
 
         return template_config
 
     def _process_menu_items(self, menu_items, context, is_secondary=False):
         """
         Process menu items: extract link data, filter by publication status, sort.
-
-        Menu items now store consolidated link data in the url field as JSON:
-        { type, pageId/url/..., label, isActive, targetBlank }
         """
         from webpages.models import WebPage
 
@@ -414,65 +313,66 @@ class NavbarWidget(BaseWidget):
 
         # Process each item to extract link data
         processed_items = []
-        internal_page_ids = {}  # pageId -> [item_indices]
+        internal_page_ids = {}  # page_id -> [item_indices]
 
         for idx, item in enumerate(menu_items):
-            url_field = item.get("url", "")
-            link_data = _parse_link_data(url_field)
+            link_data = LinkData(**item.get("link_data"))
 
             # Skip inactive items
-            if not link_data.get("isActive", True):
+            if not link_data.is_active:
                 continue
 
-            # Build processed item with extracted data
+            order = item.get("order", idx)
+
+            # Build processed item with extracted data (camelCase for Mustache)
             processed = {
-                "label": link_data.get("label", ""),
-                "isActive": link_data.get("isActive", True),
-                "targetBlank": link_data.get("targetBlank", False),
-                "type": link_data.get("type", ""),
-                "order": item.get("order", idx),
+                "label": link_data.label,
+                "isActive": link_data.is_active,
+                "targetBlank": link_data.target_blank,
+                "type": link_data.type,
+                "order": order,
             }
 
             # Add secondary item extra fields
             if is_secondary:
-                processed["backgroundColor"] = item.get("background_color") or item.get(
-                    "backgroundColor"
-                )
-                processed["textColor"] = item.get("text_color") or item.get("textColor")
-                processed["backgroundImage"] = item.get("background_image") or item.get(
-                    "backgroundImage"
-                )
+                bg_color = item.get("background_color")
+                txt_color = item.get("text_color")
+                bg_image = item.get("background_image")
 
-            link_type = link_data.get("type")
+                # Extract imgproxy_base_url if background_image is a dict
+                if bg_image and isinstance(bg_image, dict):
+                    bg_image = bg_image.get("imgproxy_base_url") or bg_image.get("url")
 
-            if link_type == "internal":
-                page_id = link_data.get("pageId")
-                if page_id:
-                    # Mark for batch lookup
-                    if page_id not in internal_page_ids:
-                        internal_page_ids[page_id] = []
-                    internal_page_ids[page_id].append(len(processed_items))
-                    processed["pageId"] = page_id
-                    processed["anchor"] = link_data.get("anchor")
+                processed["backgroundColor"] = bg_color
+                processed["textColor"] = txt_color
+                processed["backgroundImage"] = bg_image
+
+            if link_data.type == "internal":
+                if link_data.page_id:
+                    # Mark for batch lookup by ID
+                    if link_data.page_id not in internal_page_ids:
+                        internal_page_ids[link_data.page_id] = []
+                    internal_page_ids[link_data.page_id].append(len(processed_items))
+                    processed["page_id"] = link_data.page_id
+                    processed["anchor"] = link_data.anchor
                     processed["url"] = ""  # Will be resolved after batch lookup
                     processed_items.append(processed)
-            elif link_type == "external":
-                processed["url"] = link_data.get("url", "")
+            elif link_data.type == "external":
+                processed["url"] = link_data.url or ""
                 processed_items.append(processed)
-            elif link_type == "email":
-                processed["url"] = f"mailto:{link_data.get('address', '')}"
+            elif link_data.type == "email":
+                processed["url"] = f"mailto:{link_data.address or ''}"
                 processed_items.append(processed)
-            elif link_type == "phone":
-                processed["url"] = f"tel:{link_data.get('number', '')}"
+            elif link_data.type == "phone":
+                processed["url"] = f"tel:{link_data.number or ''}"
                 processed_items.append(processed)
-            elif link_type == "anchor":
-                processed["url"] = f"#{link_data.get('anchor', '')}"
+            elif link_data.type == "anchor":
+                processed["url"] = f"#{link_data.anchor or ''}"
                 processed_items.append(processed)
-            elif not link_type:
-                # Legacy or empty item - skip or handle
-                pass
 
         # Batch lookup for internal pages
+        valid_indices = set()
+
         if internal_page_ids:
             page_query = WebPage.objects.filter(
                 id__in=internal_page_ids.keys(),
@@ -490,7 +390,6 @@ class NavbarWidget(BaseWidget):
             page_paths = {p.id: p.cached_path for p in page_query}
 
             # Update processed items with resolved paths
-            valid_indices = set()
             for page_id, indices in internal_page_ids.items():
                 path = page_paths.get(page_id)
                 if path:

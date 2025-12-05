@@ -3,6 +3,70 @@ Mustache template renderer for component styles, gallery styles, and carousel st
 """
 
 import chevron
+from django.template.loader import get_template
+from django.template import TemplateDoesNotExist
+
+
+def load_mustache_template(template_name):
+    """
+    Load a Mustache template file using Django's template finder.
+    
+    Args:
+        template_name: Template path (e.g., "easy_widgets/widgets/navbar.mustache")
+        
+    Returns:
+        str: Raw template string
+        
+    Raises:
+        TemplateDoesNotExist: If template file is not found
+    """
+    from django.template.loader import select_template
+    import os
+    
+    try:
+        # Use Django's template engine to find the template location
+        # but don't parse it (since Mustache syntax conflicts with Django syntax)
+        from django.template import engines
+        
+        # Get Django template engine
+        django_engine = engines['django']
+        
+        # Find the template file using Django's loader
+        template_path = None
+        for template_dir in django_engine.engine.dirs:
+            full_path = os.path.join(template_dir, template_name)
+            if os.path.exists(full_path):
+                template_path = full_path
+                break
+        
+        # Also check app directories
+        if not template_path:
+            for loader in django_engine.engine.template_loaders:
+                try:
+                    # Use get_template_sources to find the template
+                    for origin in loader.get_template_sources(template_name):
+                        if os.path.exists(origin.name):
+                            template_path = origin.name
+                            break
+                    if template_path:
+                        break
+                except (AttributeError, ImportError):
+                    continue
+        
+        if not template_path:
+            raise TemplateDoesNotExist(f"Mustache template not found: {template_name}")
+        
+        # Read the raw template source without Django parsing
+        with open(template_path, 'r', encoding='utf-8') as f:
+            return f.read()
+            
+    except TemplateDoesNotExist:
+        raise
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading Mustache template '{template_name}': {e}")
+        raise
 
 
 def render_mustache(template, context):

@@ -1,0 +1,16 @@
+<nav class="navigation-widget widget-type-{{widgetTypeCssClass}}" style="--nav-height: {{navContainerHeight}}px;">
+    {{#hasItems}}
+    <ul class="nav-container">
+        {{#items}}
+            {{#isActive}}
+            <li>
+                <a href="{{url}}"{{#targetBlank}} target="_blank" rel="noopener noreferrer"{{/targetBlank}}>
+                    {{label}}
+                </a>
+            </li>
+            {{/isActive}}
+        {{/items}}
+    </ul>
+    {{/hasItems}}
+</nav>
+

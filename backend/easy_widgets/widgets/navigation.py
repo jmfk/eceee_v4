@@ -71,6 +71,7 @@ class NavigationWidget(BaseWidget):
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
     template_name = "easy_widgets/widgets/navigation.html"
+    mustache_template_name = "easy_widgets/widgets/navigation.mustache"
 
     widget_css = """
     .navigation-widget .nav-container {
@@ -107,9 +108,9 @@ class NavigationWidget(BaseWidget):
 
     def prepare_template_context(self, config, context=None):
         """
-        Prepare navigation menu items based on configuration.
+        Prepare navigation menu items based on configuration for Mustache template.
 
-        Provides template variables:
+        Provides template variables (camelCase for Mustache):
         - items: Combined static and dynamic menu items
         - staticItems: Manually configured menu items
         - dynamicItems: Auto-generated items from child pages
@@ -134,15 +135,20 @@ class NavigationWidget(BaseWidget):
         # Sort by order if present, otherwise maintain current order
         all_items = sorted(all_items, key=lambda x: x.get("order", 0))
 
-        # Provide all template variables
+        # Provide all template variables (camelCase for Mustache)
         template_config["items"] = all_items
         template_config["staticItems"] = static_items
         template_config["dynamicItems"] = dynamic_items
         template_config["itemCount"] = len(all_items)
         template_config["hasItems"] = len(all_items) > 0
 
-        # Legacy compatibility - keep menu_items for old templates
-        template_config["menu_items"] = all_items
+        # Add widget type CSS class
+        template_config["widgetTypeCssClass"] = "navigation"
+
+        # Add nav container height
+        template_config["navContainerHeight"] = config.get(
+            "nav_container_height", "auto"
+        )
 
         return template_config
 
@@ -193,9 +199,7 @@ class NavigationWidget(BaseWidget):
                     "label": page.title or page.slug,
                     "url": page.cached_path or f"/{page.slug}",
                     "targetBlank": False,
-                    "target_blank": False,  # Both formats for compatibility
                     "isActive": True,
-                    "is_active": True,  # Both formats for compatibility
                     "type": "internal",
                     "order": page.order if page.order is not None else idx,
                 }
@@ -244,10 +248,11 @@ class NavigationWidget(BaseWidget):
 
             order = item.get("order", idx)
 
+            # Use camelCase for Mustache templates
             processed = {
                 "label": link_data.label,
-                "is_active": link_data.is_active,
-                "target_blank": link_data.target_blank,
+                "isActive": link_data.is_active,
+                "targetBlank": link_data.target_blank,
                 "type": link_data.type,
                 "order": order,
             }
@@ -316,51 +321,51 @@ class NavigationWidget(BaseWidget):
 
     def render_with_style(self, config, theme=None):
         """
-        Render navigation using theme's component styles with Mustache templates.
+        Render navigation using Mustache template (default or custom from theme).
 
         Args:
             config: Widget configuration (already prepared via prepare_template_context)
             theme: PageTheme instance
 
         Returns:
-            Tuple of (html, css) or None if no custom style
+            Tuple of (html, css) - always returns Mustache-rendered output
         """
-        from webpages.utils.mustache_renderer import render_mustache
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            load_mustache_template,
+        )
 
         # Get navigation style
         style_name = config.get("navigation_style")
 
-        # Only render with custom style if a style is explicitly selected
-        if not style_name or style_name == "default":
-            return None
-
-        # Get style from theme
-        style = None
-        if theme:
+        # Check if using custom theme component style
+        if style_name and style_name != "default" and theme:
             styles = theme.component_styles or {}
             style = styles.get(style_name)
 
-        # If style not found, return None to use default template
-        if not style:
+            if style:
+                # Use theme's custom Mustache template
+                template = style.get("template", "")
+                css = style.get("css", "")
+
+                # Prepare context for theme template
+                context = {
+                    **config,
+                    **(style.get("variables", {})),
+                }
+
+                html = render_mustache(template, context)
+                return html, css
+
+        # Use default Mustache template
+        try:
+            template = load_mustache_template(self.mustache_template_name)
+            html = render_mustache(template, config)
+            return html, ""
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error rendering navigation with Mustache template: {e}")
+            # Return None to fall back to Django template
             return None
-
-        # Get all menu item collections
-        all_items = config.get("items", [])
-        static_items = config.get("staticItems", [])
-        dynamic_items = config.get("dynamicItems", [])
-
-        # Prepare context for Mustache rendering with all required variables
-        context = {
-            "items": all_items,
-            "staticItems": static_items,
-            "dynamicItems": dynamic_items,
-            "itemCount": config.get("itemCount", 0),
-            "hasItems": config.get("hasItems", False),
-            # Style-specific variables
-            **(style.get("variables") or {}),
-        }
-
-        # Render template
-        html = render_mustache(style.get("template", ""), context)
-        css = style.get("css", "")
-        return html, css
