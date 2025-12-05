@@ -171,7 +171,8 @@ const SaveVersionControl = ({
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     disabled={isSaving}
-                    className="font-medium px-2 py-1 text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-r border-l border-blue-800 transition-colors flex items-center justify-center"
+                    className={`font-medium px-2 py-1 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-r border-l border-blue-800 transition-colors flex items-center justify-center ${isOpen ? 'bg-blue-800' : 'bg-blue-700 hover:bg-blue-800'
+                        }`}
                     title="More save options"
                 >
                     <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
@@ -220,9 +221,8 @@ const SaveVersionControl = ({
                                 key={version.id}
                                 onClick={() => handleVersionSelect(version.id)}
                                 disabled={isSelected}
-                                className={`w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 border-b border-gray-100 last:border-b-0 disabled:cursor-not-allowed ${
-                                    isSelected ? status.bgColor : ''
-                                }`}
+                                className={`w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 border-b border-gray-100 last:border-b-0 disabled:cursor-not-allowed ${isSelected ? status.bgColor : ''
+                                    }`}
                             >
                                 <div className="flex items-center space-x-3">
                                     <StatusIcon className={`w-4 h-4 flex-shrink-0 ${status.color}`} />
