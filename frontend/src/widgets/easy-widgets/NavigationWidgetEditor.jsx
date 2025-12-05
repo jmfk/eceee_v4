@@ -38,9 +38,15 @@ const NavigationWidgetEditor = ({
     // Helper to update config
     const updateConfig = useCallback((newMenuItems) => {
         if (onConfigChange) {
+            // Clean up: remove legacy top-level fields (url, targetBlank, label)
+            // These should only exist inside linkData
+            const cleanedItems = newMenuItems.map(item => {
+                const { url, targetBlank, label, ...cleanItem } = item
+                return cleanItem
+            })
             onConfigChange({
                 ...config,
-                menuItems: newMenuItems
+                menuItems: cleanedItems
             })
         }
     }, [config, onConfigChange])
@@ -52,7 +58,7 @@ const NavigationWidgetEditor = ({
             isActive: true,
             targetBlank: false
         }
-        const newMenuItems = [...menuItems, { url: JSON.stringify(linkData), order: menuItems.length }]
+        const newMenuItems = [...menuItems, { linkData: linkData, order: menuItems.length }]
         setMenuItems(newMenuItems)
         updateConfig(newMenuItems)
     }, [menuItems, updateConfig])
@@ -64,12 +70,12 @@ const NavigationWidgetEditor = ({
         updateConfig(newMenuItems)
     }, [menuItems, updateConfig])
 
-    // Update a menu item's url field
-    const updateMenuItemUrl = useCallback((index, newUrl) => {
+    // Update a menu item's linkData field
+    const updateMenuItemLinkData = useCallback((index, newLinkData) => {
         const newMenuItems = [...menuItems]
         newMenuItems[index] = {
             ...newMenuItems[index],
-            url: newUrl
+            linkData: newLinkData
         }
         setMenuItems(newMenuItems)
         updateConfig(newMenuItems)
@@ -117,13 +123,12 @@ const NavigationWidgetEditor = ({
                                 <div
                                     key={index}
                                     draggable
-                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${
-                                        draggedItemIndex === index 
-                                            ? 'opacity-50 border-blue-400' 
+                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${draggedItemIndex === index
+                                            ? 'opacity-50 border-blue-400'
                                             : dropTargetIndex === index
-                                            ? 'border-blue-500 border-2'
-                                            : 'border-gray-200'
-                                    }`}
+                                                ? 'border-blue-500 border-2'
+                                                : 'border-gray-200'
+                                        }`}
                                     onDragStart={(e) => {
                                         e.dataTransfer.effectAllowed = 'move'
                                         e.dataTransfer.setData('text/plain', index.toString())
@@ -155,8 +160,8 @@ const NavigationWidgetEditor = ({
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <LinkField
-                                                value={item.url}
-                                                onChange={(newUrl) => updateMenuItemUrl(index, newUrl)}
+                                                value={item.linkData}
+                                                onChange={(newLinkData) => updateMenuItemLinkData(index, newLinkData)}
                                                 currentPageId={currentPageId}
                                                 currentSiteRootId={siteRootId}
                                                 currentSiteId={siteRootId}

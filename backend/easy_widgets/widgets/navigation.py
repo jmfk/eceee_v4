@@ -2,129 +2,29 @@
 Navigation widget implementation.
 """
 
-import json
-from typing import Type, Optional, List, Literal, Union, Dict, Any
+from typing import Type, Optional, List, Literal
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-
-
-def _parse_link_data(url_field: str) -> dict:
-    """Parse url field as JSON to extract link data"""
-    if not url_field:
-        return {}
-    if isinstance(url_field, str) and url_field.startswith("{"):
-        try:
-            return json.loads(url_field)
-        except json.JSONDecodeError:
-            return {}
-    return {}
-
-
-def _get_link_url(data: dict) -> str:
-    """Get the actual URL/href from link data"""
-    link_type = data.get("type")
-    if link_type == "internal":
-        return data.get("pageId", "")
-    elif link_type == "external":
-        return data.get("url", "")
-    elif link_type == "email":
-        return f"mailto:{data.get('address', '')}"
-    elif link_type == "phone":
-        return f"tel:{data.get('number', '')}"
-    elif link_type == "anchor":
-        return f"#{data.get('anchor', '')}"
-    return ""
+from easy_widgets.models import LinkData
 
 
 class NavigationItem(BaseModel):
     """
-    Navigation menu item with consolidated link data.
-
-    The url field stores a JSON object containing:
-    - type: 'internal' | 'external' | 'email' | 'phone' | 'anchor'
-    - pageId/url/address/number/anchor: target reference
-    - label: display text
-    - isActive: whether item is visible
-    - targetBlank: whether to open in new tab
+    Navigation menu item with link data.
     """
 
     model_config = ConfigDict(
         alias_generator=to_camel,
-        populate_by_name=True,  # Allow both snake_case and camelCase
+        populate_by_name=True,
     )
 
-    url: str = Field(
+    link_data: LinkData = Field(
         ...,
-        description="Menu item link data (JSON with type, target, label, isActive, targetBlank)",
-        json_schema_extra={"component": "LinkField"},
+        description="Menu item link data",
     )
     order: int = Field(0, description="Display order")
-
-    @property
-    def label(self) -> str:
-        """Extract label from link data"""
-        return self._get_link_data().get("label", "")
-
-    @property
-    def is_active(self) -> bool:
-        """Extract isActive from link data"""
-        return self._get_link_data().get("isActive", True)
-
-    @property
-    def target_blank(self) -> bool:
-        """Extract targetBlank from link data"""
-        return self._get_link_data().get("targetBlank", False)
-
-    @property
-    def link_url(self) -> str:
-        """Get the actual URL/href from link data"""
-        data = self._get_link_data()
-        link_type = data.get("type")
-        if link_type == "internal":
-            # For internal links, we need to resolve pageId to path
-            # This is typically done in the template or render context
-            return data.get("pageId", "")
-        elif link_type == "external":
-            return data.get("url", "")
-        elif link_type == "email":
-            return f"mailto:{data.get('address', '')}"
-        elif link_type == "phone":
-            return f"tel:{data.get('number', '')}"
-        elif link_type == "anchor":
-            return f"#{data.get('anchor', '')}"
-        return ""
-
-    def _get_link_data(self) -> dict:
-        """Parse url field as JSON"""
-        import json
-
-        if not self.url:
-            return {}
-        if isinstance(self.url, str) and self.url.startswith("{"):
-            try:
-                return json.loads(self.url)
-            except json.JSONDecodeError:
-                return {}
-        return {}
-
-    def to_template_dict(self) -> dict:
-        """Convert to dict for template rendering with resolved properties"""
-        data = self._get_link_data()
-        return {
-            "label": data.get("label", ""),
-            "url": self.link_url,
-            "isActive": data.get("isActive", True),
-            "targetBlank": data.get("targetBlank", False),
-            "type": data.get("type", ""),
-            "pageId": data.get("pageId"),
-            "anchor": data.get("anchor"),
-        }
-
-
-# Update forward reference
-NavigationItem.model_rebuild()
 
 
 class NavigationConfig(BaseModel):
@@ -137,9 +37,18 @@ class NavigationConfig(BaseModel):
 
     menu_items: List[NavigationItem] = Field(
         default_factory=list,
-        description="Navigation menu items",
+        description="Navigation menu items (static)",
         json_schema_extra={
             "hidden": True,  # Hidden from sidebar - use special editor instead
+        },
+    )
+
+    include_subpages: bool = Field(
+        False,
+        description="Automatically include child pages as menu items",
+        json_schema_extra={
+            "component": "CheckboxInput",
+            "order": 1,
         },
     )
 
@@ -150,6 +59,7 @@ class NavigationConfig(BaseModel):
             "component": "ComponentStyleSelect",
             "label": "Navigation Style",
             "description": "Select a component style from the theme",
+            "order": 2,
         },
     )
 
@@ -198,25 +108,106 @@ class NavigationWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """
         Prepare navigation menu items based on configuration.
+
+        Provides template variables:
+        - items: Combined static and dynamic menu items
+        - staticItems: Manually configured menu items
+        - dynamicItems: Auto-generated items from child pages
+        - itemCount: Total number of items
+        - hasItems: Boolean indicating if any items exist
         """
         # Start with base config
         template_config = super().prepare_template_context(config, context)
         context = context if context else {}
 
-        # Process static menu_items (from LinkField JSON format)
-        processed_menu_items = self._process_menu_items(
-            config.get("menu_items", []), context
-        )
-        template_config["menu_items"] = processed_menu_items
+        # Process static menu_items (manually configured)
+        static_items = self._process_menu_items(config.get("menu_items", []), context)
+
+        # Generate dynamic items from child pages if enabled
+        dynamic_items = []
+        if config.get("include_subpages", False):
+            dynamic_items = self._generate_subpage_items(context)
+
+        # Combine static and dynamic items
+        all_items = static_items + dynamic_items
+
+        # Sort by order if present, otherwise maintain current order
+        all_items = sorted(all_items, key=lambda x: x.get("order", 0))
+
+        # Provide all template variables
+        template_config["items"] = all_items
+        template_config["staticItems"] = static_items
+        template_config["dynamicItems"] = dynamic_items
+        template_config["itemCount"] = len(all_items)
+        template_config["hasItems"] = len(all_items) > 0
+
+        # Legacy compatibility - keep menu_items for old templates
+        template_config["menu_items"] = all_items
 
         return template_config
+
+    def _generate_subpage_items(self, context):
+        """
+        Generate navigation items from child pages of the current page.
+
+        Returns list of items with:
+        - label: Page title
+        - url: Page path
+        - targetBlank: Always False
+        - isActive: Always True
+        - order: Based on page order
+        """
+        from webpages.models import WebPage
+
+        # Get current page from context
+        webpage_data = context.get("webpage_data") if context else None
+        if not webpage_data:
+            return []
+
+        current_page_id = webpage_data.get("id")
+        if not current_page_id:
+            return []
+
+        # Get hostname for filtering
+        request = context.get("request") if context else None
+        hostname = request.get_host().lower() if request else None
+
+        # Query child pages
+        child_pages = WebPage.objects.filter(
+            parent_id=current_page_id,
+            is_deleted=False,
+        ).order_by("order", "id")
+
+        # Filter by publication status and hostname if available
+        if hostname:
+            child_pages = child_pages.filter(
+                is_currently_published=True,
+                cached_root_hostnames__contains=[hostname],
+            )
+
+        # Convert to navigation items
+        items = []
+        for idx, page in enumerate(child_pages):
+            items.append(
+                {
+                    "label": page.title or page.slug,
+                    "url": page.cached_path or f"/{page.slug}",
+                    "targetBlank": False,
+                    "target_blank": False,  # Both formats for compatibility
+                    "isActive": True,
+                    "is_active": True,  # Both formats for compatibility
+                    "type": "internal",
+                    "order": page.order if page.order is not None else idx,
+                }
+            )
+
+        return items
 
     def _process_menu_items(self, menu_items, context):
         """
         Process menu items: extract link data, filter by publication status.
 
-        Menu items now store consolidated link data in the url field as JSON:
-        { type, pageId/url/..., label, isActive, targetBlank }
+        Handles both old format (dict with url field) and new format (NavigationItem with link_data).
         """
         from webpages.models import WebPage
 
@@ -229,50 +220,64 @@ class NavigationWidget(BaseWidget):
 
         # Process each item
         processed_items = []
-        internal_page_ids = {}  # pageId -> [item_indices]
+        internal_page_ids = {}  # page_id -> [item_indices]
 
         for idx, item in enumerate(menu_items):
-            url_field = item.get("url", "")
-            link_data = _parse_link_data(url_field)
-
-            # Skip inactive items
-            if not link_data.get("isActive", True):
+            # Only support new format: {'link_data': {...}, 'order': 0}
+            link_data_dict = item.get("link_data")
+            # print("link_data_dict", link_data_dict)
+            # print("item", item)
+            # print("idx", idx)
+            if not link_data_dict:
+                # Skip items without link_data field
                 continue
 
+            try:
+                link_data = LinkData(**link_data_dict)
+            except Exception:
+                # Skip items that can't be parsed as LinkData
+                continue
+
+            # Skip inactive items
+            if not link_data.is_active:
+                continue
+
+            order = item.get("order", idx)
+
             processed = {
-                "label": link_data.get("label", ""),
-                "isActive": link_data.get("isActive", True),
-                "targetBlank": link_data.get("targetBlank", False),
-                "type": link_data.get("type", ""),
-                "order": item.get("order", idx),
+                "label": link_data.label,
+                "is_active": link_data.is_active,
+                "target_blank": link_data.target_blank,
+                "type": link_data.type,
+                "order": order,
             }
 
-            link_type = link_data.get("type")
-
-            if link_type == "internal":
-                page_id = link_data.get("pageId")
-                if page_id:
-                    if page_id not in internal_page_ids:
-                        internal_page_ids[page_id] = []
-                    internal_page_ids[page_id].append(len(processed_items))
-                    processed["pageId"] = page_id
-                    processed["anchor"] = link_data.get("anchor")
+            if link_data.type == "internal":
+                if link_data.page_id:
+                    # Mark for batch lookup by ID
+                    if link_data.page_id not in internal_page_ids:
+                        internal_page_ids[link_data.page_id] = []
+                    internal_page_ids[link_data.page_id].append(len(processed_items))
+                    processed["page_id"] = link_data.page_id
+                    processed["anchor"] = link_data.anchor
                     processed["url"] = ""
                     processed_items.append(processed)
-            elif link_type == "external":
-                processed["url"] = link_data.get("url", "")
+            elif link_data.type == "external":
+                processed["url"] = link_data.url or ""
                 processed_items.append(processed)
-            elif link_type == "email":
-                processed["url"] = f"mailto:{link_data.get('address', '')}"
+            elif link_data.type == "email":
+                processed["url"] = f"mailto:{link_data.address or ''}"
                 processed_items.append(processed)
-            elif link_type == "phone":
-                processed["url"] = f"tel:{link_data.get('number', '')}"
+            elif link_data.type == "phone":
+                processed["url"] = f"tel:{link_data.number or ''}"
                 processed_items.append(processed)
-            elif link_type == "anchor":
-                processed["url"] = f"#{link_data.get('anchor', '')}"
+            elif link_data.type == "anchor":
+                processed["url"] = f"#{link_data.anchor or ''}"
                 processed_items.append(processed)
 
         # Batch lookup for internal pages
+        valid_indices = set()
+
         if internal_page_ids:
             page_query = WebPage.objects.filter(
                 id__in=internal_page_ids.keys(),
@@ -287,7 +292,7 @@ class NavigationWidget(BaseWidget):
 
             page_paths = {p.id: p.cached_path for p in page_query}
 
-            valid_indices = set()
+            # Update processed items with resolved paths
             for page_id, indices in internal_page_ids.items():
                 path = page_paths.get(page_id)
                 if path:
@@ -305,6 +310,7 @@ class NavigationWidget(BaseWidget):
                 if idx in valid_indices or item.get("type") != "internal"
             ]
 
+        # print("processed_items", processed_items)
         # Sort by order
         return sorted(processed_items, key=lambda x: x.get("order", 0))
 
@@ -338,17 +344,18 @@ class NavigationWidget(BaseWidget):
         if not style:
             return None
 
-        # Get menu items
-        menu_items = config.get("menu_items", [])
+        # Get all menu item collections
+        all_items = config.get("items", [])
+        static_items = config.get("staticItems", [])
+        dynamic_items = config.get("dynamicItems", [])
 
-        if not menu_items:
-            return None
-
-        # Prepare context for Mustache rendering
+        # Prepare context for Mustache rendering with all required variables
         context = {
-            "items": menu_items,
-            "itemCount": len(menu_items),
-            "hasItems": len(menu_items) > 0,
+            "items": all_items,
+            "staticItems": static_items,
+            "dynamicItems": dynamic_items,
+            "itemCount": config.get("itemCount", 0),
+            "hasItems": config.get("hasItems", False),
             # Style-specific variables
             **(style.get("variables") or {}),
         }

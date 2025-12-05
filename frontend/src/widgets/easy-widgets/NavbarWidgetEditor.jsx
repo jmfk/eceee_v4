@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Trash2, X, Download, FileText, Loader2, GripVertical } from 'lucide-react'
 import { usePageChildren } from '../../hooks/usePageStructure'
-import LinkField, { parseLinkValue } from '../../components/form-fields/LinkField'
+import LinkField from '../../components/form-fields/LinkField'
 import ColorSelector from '../../components/theme/form-fields/ColorSelector'
 
 /**
  * NavbarWidgetEditor Component
  * Custom editor for the Navbar widget with subpage import functionality
  * 
- * Uses consolidated LinkField which stores label, isActive, targetBlank
- * in the url field as a JSON object.
+ * Uses LinkField which stores link data as a proper object (not stringified JSON).
  */
 const NavbarWidgetEditor = ({
     widgetData,
@@ -67,10 +66,24 @@ const NavbarWidgetEditor = ({
     // Helper to update config
     const updateConfig = useCallback((newMenuItems, newSecondaryMenuItems) => {
         if (onConfigChange) {
+            // Clean up: remove legacy top-level fields (url, targetBlank, label)
+            // These should only exist inside linkData
+            const cleanedMenuItems = newMenuItems.map(item => {
+                const { url, targetBlank, label, ...cleanItem } = item
+                return cleanItem
+            })
+
+            const cleanedSecondaryMenuItems = newSecondaryMenuItems !== undefined
+                ? newSecondaryMenuItems.map(item => {
+                    const { url, targetBlank, label, ...cleanItem } = item
+                    return cleanItem
+                })
+                : config.secondaryMenuItems
+
             onConfigChange({
                 ...config,
-                menuItems: newMenuItems,
-                secondaryMenuItems: newSecondaryMenuItems !== undefined ? newSecondaryMenuItems : config.secondaryMenuItems
+                menuItems: cleanedMenuItems,
+                secondaryMenuItems: cleanedSecondaryMenuItems
             })
         }
     }, [config, onConfigChange])
@@ -109,12 +122,11 @@ const NavbarWidgetEditor = ({
 
             // Check if menu item already exists (by pageId or label)
             const exists = newMenuItems.some(item => {
-                const linkData = parseLinkValue(item.url)
-                return linkData?.pageId === page.id || linkData?.label === label
+                return item.linkData?.pageId === page.id || item.linkData?.label === label
             })
 
             if (!exists) {
-                // Create consolidated link object
+                // Create link data object (no JSON.stringify)
                 const linkData = {
                     type: 'internal',
                     pageId: page.id,
@@ -123,7 +135,7 @@ const NavbarWidgetEditor = ({
                     targetBlank: false
                 }
                 newMenuItems.push({
-                    url: JSON.stringify(linkData),
+                    linkData: linkData,
                     order: newMenuItems.length
                 })
             }
@@ -151,7 +163,7 @@ const NavbarWidgetEditor = ({
             isActive: true,
             targetBlank: false
         }
-        const newMenuItems = [...menuItems, { url: JSON.stringify(linkData), order: menuItems.length }]
+        const newMenuItems = [...menuItems, { linkData: linkData, order: menuItems.length }]
         setMenuItems(newMenuItems)
         updateConfig(newMenuItems, undefined)
     }, [menuItems, updateConfig])
@@ -163,12 +175,12 @@ const NavbarWidgetEditor = ({
         updateConfig(newMenuItems, undefined)
     }, [menuItems, updateConfig])
 
-    // Update a menu item's url field (contains all link data)
-    const updateMenuItemUrl = useCallback((index, newUrl) => {
+    // Update a menu item's linkData field
+    const updateMenuItemLinkData = useCallback((index, newLinkData) => {
         const newMenuItems = [...menuItems]
         newMenuItems[index] = {
             ...newMenuItems[index],
-            url: newUrl
+            linkData: newLinkData
         }
         setMenuItems(newMenuItems)
         updateConfig(newMenuItems, undefined)
@@ -182,7 +194,7 @@ const NavbarWidgetEditor = ({
             targetBlank: false
         }
         const newSecondaryMenuItems = [...secondaryMenuItems, {
-            url: JSON.stringify(linkData),
+            linkData: linkData,
             order: secondaryMenuItems.length
         }]
         setSecondaryMenuItems(newSecondaryMenuItems)
@@ -196,12 +208,12 @@ const NavbarWidgetEditor = ({
         updateConfig(menuItems, newSecondaryMenuItems)
     }, [secondaryMenuItems, menuItems, updateConfig])
 
-    // Update a secondary menu item's url field
-    const updateSecondaryMenuItemUrl = useCallback((index, newUrl) => {
+    // Update a secondary menu item's linkData field
+    const updateSecondaryMenuItemLinkData = useCallback((index, newLinkData) => {
         const newSecondaryMenuItems = [...secondaryMenuItems]
         newSecondaryMenuItems[index] = {
             ...newSecondaryMenuItems[index],
-            url: newUrl
+            linkData: newLinkData
         }
         setSecondaryMenuItems(newSecondaryMenuItems)
         updateConfig(menuItems, newSecondaryMenuItems)
@@ -394,13 +406,12 @@ const NavbarWidgetEditor = ({
                                 <div
                                     key={index}
                                     draggable
-                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${
-                                        draggedItemIndex === index 
-                                            ? 'opacity-50 border-blue-400' 
-                                            : dropTargetIndex === index
+                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${draggedItemIndex === index
+                                        ? 'opacity-50 border-blue-400'
+                                        : dropTargetIndex === index
                                             ? 'border-blue-500 border-2'
                                             : 'border-gray-200'
-                                    }`}
+                                        }`}
                                     onDragStart={(e) => {
                                         e.dataTransfer.effectAllowed = 'move'
                                         e.dataTransfer.setData('text/plain', index.toString())
@@ -432,8 +443,8 @@ const NavbarWidgetEditor = ({
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <LinkField
-                                                value={item.url}
-                                                onChange={(newUrl) => updateMenuItemUrl(index, newUrl)}
+                                                value={item.linkData}
+                                                onChange={(newLinkData) => updateMenuItemLinkData(index, newLinkData)}
                                                 currentPageId={currentPageId}
                                                 currentSiteRootId={siteRootId}
                                                 currentSiteId={siteRootId}
@@ -479,13 +490,12 @@ const NavbarWidgetEditor = ({
                                 <div
                                     key={index}
                                     draggable
-                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${
-                                        draggedSecondaryIndex === index 
-                                            ? 'opacity-50 border-blue-400' 
-                                            : dropTargetSecondaryIndex === index
+                                    className={`border rounded bg-white min-w-0 cursor-move transition-all ${draggedSecondaryIndex === index
+                                        ? 'opacity-50 border-blue-400'
+                                        : dropTargetSecondaryIndex === index
                                             ? 'border-blue-500 border-2'
                                             : 'border-gray-200'
-                                    }`}
+                                        }`}
                                     onDragStart={(e) => {
                                         e.dataTransfer.effectAllowed = 'move'
                                         e.dataTransfer.setData('text/plain', index.toString())
@@ -517,12 +527,12 @@ const NavbarWidgetEditor = ({
                                         </div>
                                         <div className="flex-1 min-w-0 space-y-2">
                                             <LinkField
-                                                value={item.url}
-                                                onChange={(newUrl) => updateSecondaryMenuItemUrl(index, newUrl)}
+                                                value={item.linkData}
+                                                onChange={(newLinkData) => updateSecondaryMenuItemLinkData(index, newLinkData)}
                                                 currentPageId={currentPageId}
                                                 currentSiteRootId={siteRootId}
                                                 currentSiteId={siteRootId}
-                                                labelPlaceholder="Menu item label"
+                                                labelPlaceholder="Menu label"
                                             />
                                             {/* Extra fields for secondary items */}
                                             <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
