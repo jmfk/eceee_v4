@@ -49,10 +49,11 @@ const ComponentStyleEditPage = () => {
         if (themeData) {
             const styles = themeData.componentStyles || {};
             const style = styles[styleKey];
+
             if (style) {
-                // Migrate legacy string CSS to object format
+                // EDIT MODE: Existing style found
                 const cssData = migrateLegacyCSS(style.css || '');
-                
+
                 const initialStyle = {
                     template: style.template || '',
                     css: cssData,
@@ -62,6 +63,22 @@ const ComponentStyleEditPage = () => {
                 };
                 setTemplate(initialStyle.template);
                 setCss(cssData);
+                setVariables(initialStyle.variables);
+                setName(initialStyle.name);
+                setDescription(initialStyle.description);
+                setInitialData(initialStyle);
+                setNewKey(styleKey);
+            } else {
+                // CREATE MODE: New style being created
+                const initialStyle = {
+                    template: '',
+                    css: { default: '' },
+                    variables: {},
+                    name: '',
+                    description: '',
+                };
+                setTemplate(initialStyle.template);
+                setCss(initialStyle.css);
                 setVariables(initialStyle.variables);
                 setName(initialStyle.name);
                 setDescription(initialStyle.description);
@@ -82,24 +99,8 @@ const ComponentStyleEditPage = () => {
         keyChanged
     );
 
-    // Debug logging
-    useEffect(() => {
-        console.log('=== ComponentStyleEditPage isDirty Debug ===');
-        console.log('initialData:', initialData);
-        console.log('Current values:', { template, css, variables, name, description, newKey, styleKey });
-        console.log('keyChanged:', keyChanged);
-        console.log('template changed:', template !== initialData?.template);
-        console.log('css changed:', JSON.stringify(css) !== JSON.stringify(initialData?.css));
-        console.log('variables changed:', JSON.stringify(variables) !== JSON.stringify(initialData?.variables));
-        console.log('name changed:', name !== initialData?.name);
-        console.log('description changed:', description !== initialData?.description);
-        console.log('isDirty:', isDirty);
-        console.log('==========================================');
-    }, [initialData, template, css, variables, name, description, newKey, styleKey, keyChanged, isDirty]);
-
     // Sync local dirty state to UDC
     useEffect(() => {
-        console.log('🔄 Syncing isDirty to UDC:', isDirty);
         setIsDirty(isDirty);
     }, [isDirty, setIsDirty]);
 
@@ -107,15 +108,15 @@ const ComponentStyleEditPage = () => {
     const updateMutation = useMutation({
         mutationFn: ({ updatedStyle, targetKey }) => {
             const styles = { ...(themeData.componentStyles || {}) };
-            
+
             // If key changed, delete old key
             if (targetKey !== styleKey) {
                 delete styles[styleKey];
             }
-            
+
             // Set new/updated style
             styles[targetKey] = updatedStyle;
-            
+
             // Exclude image field to avoid file upload error
             const { image, ...themeDataWithoutImage } = themeData;
             return themesApi.update(themeId, {
@@ -130,10 +131,10 @@ const ComponentStyleEditPage = () => {
                 type: 'success',
                 message: 'Component style saved successfully',
             });
-            
+
             // Reset dirty state
             setIsDirty(false);
-            
+
             // If key changed, navigate to new URL
             if (variables.targetKey !== styleKey) {
                 navigate(`/settings/themes/${themeId}/component-styles/${variables.targetKey}`);
@@ -152,20 +153,20 @@ const ComponentStyleEditPage = () => {
             addNotification({ type: 'error', message: 'Display name is required' });
             return;
         }
-        
+
         const sanitizedKey = (newKey.trim() || name.trim()).toLowerCase().replace(/\s+/g, '-');
-        
+
         if (!sanitizedKey) {
             addNotification({ type: 'error', message: 'Key cannot be empty' });
             return;
         }
-        
+
         const styles = themeData.componentStyles || {};
         if (sanitizedKey !== styleKey && styles[sanitizedKey]) {
             addNotification({ type: 'error', message: 'A style with this key already exists' });
             return;
         }
-        
+
         updateMutation.mutate({
             updatedStyle: {
                 name,
@@ -275,11 +276,10 @@ const ComponentStyleEditPage = () => {
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setShowPreview(!showPreview)}
-                                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                    showPreview 
+                                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${showPreview
                                         ? 'bg-gray-600 text-white hover:bg-gray-700'
                                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
+                                    }`}
                             >
                                 <Eye className="w-4 h-4" />
                                 Preview
@@ -384,7 +384,7 @@ const ComponentStyleEditPage = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     CSS Styles (Optional)
                                 </label>
-                                
+
                                 {/* Breakpoint Tabs */}
                                 <div className="flex gap-1 mb-2 border-b border-gray-200">
                                     {['default', 'sm', 'md', 'lg', 'xl'].map(bp => (
@@ -392,23 +392,22 @@ const ComponentStyleEditPage = () => {
                                             key={bp}
                                             type="button"
                                             onClick={() => setActiveBreakpoint(bp)}
-                                            className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
-                                                activeBreakpoint === bp
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${activeBreakpoint === bp
                                                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                            }`}
+                                                }`}
                                         >
                                             {getBreakpointLabel(bp, themeData)}
                                         </button>
                                     ))}
                                 </div>
-                                
+
                                 <CodeEditorPanel
                                     data={css[activeBreakpoint] || ''}
                                     onChange={(value) => setCss({ ...css, [activeBreakpoint]: value })}
                                     mode="css"
                                 />
-                                
+
                                 <p className="text-xs text-gray-500 mt-2">
                                     💡 Styles cascade: Default applies to all sizes, then each breakpoint overrides at min-width.
                                 </p>
@@ -421,7 +420,7 @@ const ComponentStyleEditPage = () => {
                         {/* Quick Reference */}
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             <h4 className="text-sm font-semibold text-gray-900 mb-3">📋 Quick Reference</h4>
-                            
+
                             {/* Scenario Selector */}
                             <div className="mb-4">
                                 <label className="block text-xs font-medium text-gray-700 mb-2">

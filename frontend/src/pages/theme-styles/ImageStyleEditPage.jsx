@@ -44,7 +44,7 @@ const ImageStyleEditPage = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [lightboxExpanded, setLightboxExpanded] = useState(false);
     const [activeBreakpoint, setActiveBreakpoint] = useState('default');
-    
+
     // New lightbox and default settings
     const [enableLightbox, setEnableLightbox] = useState(true);
     const [lightboxTemplate, setLightboxTemplate] = useState('');
@@ -93,14 +93,14 @@ const ImageStyleEditPage = () => {
                 if (udcState.metadata.currentThemeId !== idStr) {
                     switchTheme(idStr);
                 }
-            } catch (_) {}
+            } catch (_) { }
 
             const styles = themeData.image_styles || themeData.imageStyles || {};
             const style = styles[styleKey];
             if (style) {
                 // Migrate legacy string CSS to object format
                 const cssData = migrateLegacyCSS(style.css || '');
-                
+
                 const initialStyle = {
                     template: style.template || '',
                     css: cssData,
@@ -166,17 +166,8 @@ const ImageStyleEditPage = () => {
         keyChanged
     );
 
-    // Debug logging
-    useEffect(() => {
-        console.log('=== ImageStyleEditPage isDirty Debug ===');
-        console.log('initialData:', initialData);
-        console.log('isDirty:', isDirty);
-        console.log('==========================================');
-    }, [initialData, isDirty]);
-
     // Sync local dirty state to UDC
     useEffect(() => {
-        console.log('🔄 Syncing isDirty to UDC:', isDirty);
         setIsDirty(isDirty);
     }, [isDirty, setIsDirty]);
 
@@ -185,20 +176,20 @@ const ImageStyleEditPage = () => {
             addNotification({ type: 'error', message: 'Display name is required' });
             return;
         }
-        
+
         const sanitizedKey = (newKey.trim() || name.trim()).toLowerCase().replace(/\s+/g, '-');
-        
+
         if (!sanitizedKey) {
             addNotification({ type: 'error', message: 'Key cannot be empty' });
             return;
         }
-        
+
         const styles = themeData.image_styles || themeData.imageStyles || {};
         if (sanitizedKey !== styleKey && styles[sanitizedKey]) {
             addNotification({ type: 'error', message: 'A style with this key already exists' });
             return;
         }
-        
+
         // Build updated styles map
         const updatedStyles = { ...styles };
         if (sanitizedKey !== styleKey) {
@@ -225,25 +216,25 @@ const ImageStyleEditPage = () => {
                 defaultAutoPlayInterval,
             } : {}),
         };
-        
+
         setIsSaving(true);
-        
+
         try {
             const udcState = getState();
             if (udcState.metadata.currentThemeId !== String(themeId)) {
                 switchTheme(String(themeId));
             }
-            
+
             updateThemeField('imageStyles', updatedStyles);
-            
+
             await saveCurrentTheme();
-            
+
             queryClient.invalidateQueries(['theme', themeId]);
             addNotification({ type: 'success', message: 'Image style saved' });
-            
+
             // Reset dirty state
             setIsDirty(false);
-            
+
             // Update initial data to match saved state
             const newInitialData = {
                 template,
@@ -265,7 +256,7 @@ const ImageStyleEditPage = () => {
                 description,
             };
             setInitialData(newInitialData);
-            
+
             if (sanitizedKey !== styleKey) {
                 navigate(`/settings/themes/${themeId}/image-styles/${sanitizedKey}`, { replace: true });
             }
@@ -310,10 +301,10 @@ const ImageStyleEditPage = () => {
     };
 
     const currentScenario = getScenarioById(selectedScenario);
-    
+
     // Filter scenarios by current styleType
     const availableScenarios = getScenariosByType(styleType);
-    
+
     // Update selected scenario when styleType changes
     useEffect(() => {
         if (availableScenarios.length > 0 && !availableScenarios.find(s => s.id === selectedScenario)) {
@@ -323,12 +314,12 @@ const ImageStyleEditPage = () => {
 
     const previewHTML = () => {
         if (!template) return '';
-        
+
         try {
             const context = styleType === 'carousel'
                 ? prepareCarouselContext(sampleImages, { showCaptions: true }, variables, imgproxyConfig)
                 : prepareGalleryContext(sampleImages, { showCaptions: true }, variables, imgproxyConfig, lightboxConfig);
-            
+
             return renderMustache(template, context);
         } catch (error) {
             return `<div class="error">Preview error: ${error.message}</div>`;
@@ -474,22 +465,20 @@ const ImageStyleEditPage = () => {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setStyleType('gallery')}
-                                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition ${
-                                                styleType === 'gallery'
+                                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition ${styleType === 'gallery'
                                                     ? 'bg-blue-50 border-blue-600 text-blue-700'
                                                     : 'border-gray-300 hover:bg-gray-50'
-                                            }`}
+                                                }`}
                                         >
                                             <Grid3X3 className="h-4 w-4" />
                                             Gallery
                                         </button>
                                         <button
                                             onClick={() => setStyleType('carousel')}
-                                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition ${
-                                                styleType === 'carousel'
+                                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition ${styleType === 'carousel'
                                                     ? 'bg-purple-50 border-purple-600 text-purple-700'
                                                     : 'border-gray-300 hover:bg-gray-50'
-                                            }`}
+                                                }`}
                                         >
                                             <Play className="h-4 w-4" />
                                             Carousel
@@ -747,7 +736,7 @@ const ImageStyleEditPage = () => {
                         {/* CSS Editor with Breakpoints */}
                         <div className="bg-white rounded-lg border p-6">
                             <h3 className="font-semibold text-gray-900 mb-4">CSS Styles</h3>
-                            
+
                             {/* Breakpoint Tabs */}
                             <div className="flex gap-1 mb-2 border-b border-gray-200">
                                 {['default', 'sm', 'md', 'lg', 'xl'].map(bp => (
@@ -755,17 +744,16 @@ const ImageStyleEditPage = () => {
                                         key={bp}
                                         type="button"
                                         onClick={() => setActiveBreakpoint(bp)}
-                                        className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
-                                            activeBreakpoint === bp
+                                        className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${activeBreakpoint === bp
                                                 ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                        }`}
+                                            }`}
                                     >
                                         {getBreakpointLabel(bp, themeData)}
                                     </button>
                                 ))}
                             </div>
-                            
+
                             <textarea
                                 value={css[activeBreakpoint] || ''}
                                 onChange={(e) => setCss({ ...css, [activeBreakpoint]: e.target.value })}
@@ -773,7 +761,7 @@ const ImageStyleEditPage = () => {
                                 placeholder=".my-style { }"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                             />
-                            
+
                             <p className="text-xs text-gray-500 mt-2">
                                 💡 Styles cascade: Default applies to all sizes, then each breakpoint overrides at min-width.
                             </p>
@@ -785,7 +773,7 @@ const ImageStyleEditPage = () => {
                         {/* Quick Reference */}
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             <h4 className="text-sm font-semibold text-gray-900 mb-3">📋 Quick Reference</h4>
-                            
+
                             {/* Scenario Selector */}
                             <div className="mb-4">
                                 <label className="block text-xs font-medium text-gray-700 mb-2">
