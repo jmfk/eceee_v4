@@ -467,6 +467,7 @@ const WidgetEditorPanel = forwardRef(({
                             versionId: context?.versionId || pageVersionData?.versionId,
                             webpageData: context?.webpageData || webpageData,
                             pageVersionData: context?.pageVersionData || pageVersionData,
+                            theme: pageVersionData?.effectiveTheme,
                             contextType
                         }}
                     />

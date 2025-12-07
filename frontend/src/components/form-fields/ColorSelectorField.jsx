@@ -24,7 +24,13 @@ const ColorSelectorField = ({
     // Extract theme palette/colors from context
     // Support both 'palette' (old) and 'colors' (current backend field)
     const themePalette = useMemo(() => {
-        return context?.theme?.palette || context?.theme?.colors || {};
+        console.log('ColorSelectorField - Full context:', context);
+        console.log('ColorSelectorField - Theme object:', context?.theme);
+        console.log('ColorSelectorField - Colors:', context?.theme?.colors);
+        console.log('ColorSelectorField - Palette:', context?.theme?.palette);
+        const colors = context?.theme?.palette || context?.theme?.colors || {};
+        console.log('ColorSelectorField - Final colors:', colors);
+        return colors;
     }, [context?.theme?.palette, context?.theme?.colors]);
 
     const hasError = validation && !validation.isValid;
