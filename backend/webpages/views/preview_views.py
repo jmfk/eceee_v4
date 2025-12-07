@@ -7,6 +7,8 @@ import os
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -46,6 +48,10 @@ def render_version_preview(request, page_id, version_id):
     for display in an iframe. Only authenticated users with page editing
     permissions can access this endpoint.
 
+    Authentication can be provided via:
+    - Standard Authorization header (for API calls)
+    - Query parameter 'token' with JWT access token (for iframe src)
+
     Args:
         request: HTTP request
         page_id: ID of the WebPage
@@ -54,6 +60,27 @@ def render_version_preview(request, page_id, version_id):
     Returns:
         HttpResponse with complete HTML page including CSS and meta tags
     """
+
+    # Handle JWT token authentication from query parameter (for iframe)
+    token = request.GET.get('token')
+    if token and not request.user.is_authenticated:
+        try:
+            # Validate the JWT token
+            jwt_auth = JWTAuthentication()
+            # Create a mock request with the token in the header
+            from django.http import HttpRequest
+            mock_request = HttpRequest()
+            mock_request.META = {'HTTP_AUTHORIZATION': f'Bearer {token}'}
+            
+            # Authenticate and get the user
+            validated = jwt_auth.authenticate(mock_request)
+            if validated is not None:
+                request.user, _ = validated
+        except (InvalidToken, TokenError) as e:
+            return HttpResponse(
+                f"<html><body><h1>Unauthorized</h1><p>Invalid authentication token: {str(e)}</p></body></html>",
+                status=401,
+            )
 
     # Check if user has permission to edit pages
     # For now, we'll allow any authenticated user. In production, you might

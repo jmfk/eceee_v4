@@ -162,9 +162,18 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         pageVersionData.id || pageVersionData.versionId
     );
 
-    const previewUrl = hostname
+    // Build preview URL with authentication token (if using JWT)
+    let previewUrl = hostname
         ? `${protocol}://${hostname}${previewPath}`
         : previewPath;
+    
+    // In production mode or when JWT tokens are available, append token as query parameter
+    // In dev mode with session auth, cookies will handle authentication
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
+        const separator = previewUrl.includes('?') ? '&' : '?';
+        previewUrl = `${previewUrl}${separator}token=${encodeURIComponent(accessToken)}`;
+    }
 
     return (
         <div className="h-full bg-gray-50 flex flex-col">
