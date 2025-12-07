@@ -190,7 +190,9 @@ class PageWidgetData(BaseModel):
         description="How this widget behaves with parent widgets",
     )
     is_visible: bool = Field(True, description="Whether the widget is visible")
-    is_active: bool = Field(True, description="Whether the widget is active and should be rendered")
+    is_active: bool = Field(
+        True, description="Whether the widget is active and should be rendered"
+    )
 
     # Backward compatibility - deprecated fields
     inherit_from_parent: Optional[bool] = Field(
@@ -205,6 +207,7 @@ class PageDataSnapshot(BaseModel):
     """Page data snapshot stored in PageVersion.page_data"""
 
     title: str = Field(..., description="Page title")
+    short_title: Optional[str] = Field(None, description="Short title for navigation")
     slug: str = Field(..., description="Page slug")
     description: Optional[str] = Field(None, description="Page description")
     code_layout: Optional[str] = Field(None, description="Layout name")

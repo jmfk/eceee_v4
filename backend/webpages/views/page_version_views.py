@@ -179,7 +179,6 @@ class PageVersionViewSet(viewsets.ModelViewSet):
 
         # Return full version data for consistency
         full_serializer = PageVersionSerializer(version)
-        print("full_serializer.data", full_serializer.data)
         return Response(full_serializer.data)
 
     @action(detail=True, methods=["patch"], url_path="page-data")

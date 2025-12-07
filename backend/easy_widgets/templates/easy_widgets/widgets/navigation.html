@@ -7,7 +7,7 @@
         {% for item in config.items %}
             {% if item.is_active or item.isActive %}
             <li>
-                <a href="{{ item.url }}"{% if item.targetBlank or item.target_blank %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                <a href="{{ item.url }}"{% if item.targetBlank or item.target_blank %} target="_blank" rel="noopener noreferrer"{% endif %}{% if item.pageTitle %} title="{{ item.pageTitle }}"{% endif %}>
                     {{ item.label }}
                 </a>
             </li>

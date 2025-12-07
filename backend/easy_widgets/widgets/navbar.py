@@ -331,6 +331,7 @@ class NavbarWidget(BaseWidget):
                 "targetBlank": link_data.target_blank,
                 "type": link_data.type,
                 "order": order,
+                "pageTitle": link_data.page_title,  # For title attribute
             }
 
             # Add secondary item extra fields

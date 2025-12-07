@@ -51,6 +51,7 @@
                 <a 
                     href="{{url}}"
                     {{#targetBlank}}target="_blank" rel="noopener noreferrer"{{/targetBlank}}
+                    {{#pageTitle}}title="{{pageTitle}}"{{/pageTitle}}
                     @click="isMobileMenuOpen = false"
                     style="display: block; padding: 0.5rem 1rem; font-size: 0.875rem; color: #374151; text-decoration: none; transition: background-color 0.2s;"
                     onmouseover="this.style.backgroundColor='#f3f4f6'"
@@ -107,6 +108,7 @@
                     <a 
                         href="{{url}}"
                         {{#targetBlank}}target="_blank" rel="noopener noreferrer"{{/targetBlank}}
+                        {{#pageTitle}}title="{{pageTitle}}"{{/pageTitle}}
                         class="navbar-link"
                         style="color: #ffffff; font-size: 0.875rem; font-weight: 500; text-decoration: none; transition: opacity 0.2s ease-in-out; white-space: nowrap;"
                         onmouseover="this.style.opacity='0.8'"

@@ -182,11 +182,12 @@ class NavigationWidget(BaseWidget):
         # Get current page data
         webpage_data = context.get("webpage_data") or {}
         current_page_id = webpage_data.get("id")
-
         # Serialize current page for template
         current_page = {
             "id": webpage_data.get("id"),
             "title": webpage_data.get("title"),
+            "short_title": webpage_data.get("short_title"),
+            "label": webpage_data.get("short_title") or webpage_data.get("title"),
             "slug": webpage_data.get("slug"),
             "path": webpage_data.get("path") or webpage_data.get("cached_path"),
         }
@@ -203,7 +204,7 @@ class NavigationWidget(BaseWidget):
                     parent_id=current_page_id,
                     is_deleted=False,
                 )
-                .select_related("current_published_version")
+                .select_related("latest_version")
                 .order_by("sort_order", "id")
             )
 
@@ -216,17 +217,14 @@ class NavigationWidget(BaseWidget):
             for page in child_query:
                 # Try to get shortTitle from page_data
                 title = page.title
-                if (
-                    page.current_published_version
-                    and page.current_published_version.page_data
-                ):
-                    page_data = page.current_published_version.page_data
+                if page.latest_version and page.latest_version.page_data:
+                    page_data = page.latest_version.page_data
                     short_title = page_data.get("shortTitle") or page_data.get(
                         "short_title"
                     )
-                    if short_title:
+                    # Guard against responsive breakpoint objects
+                    if short_title and isinstance(short_title, str):
                         title = short_title
-
                 current_children.append(
                     {
                         "id": page.id,
@@ -246,15 +244,14 @@ class NavigationWidget(BaseWidget):
             # Try to get shortTitle from parent's page_data
             parent_label = parent.title
             if (
-                hasattr(parent, "current_published_version")
-                and parent.current_published_version
-                and parent.current_published_version.page_data
+                hasattr(parent, "latest_version")
+                and parent.latest_version
+                and parent.latest_version.page_data
             ):
-                page_data = parent.current_published_version.page_data
-                short_title = page_data.get("shortTitle") or page_data.get(
-                    "short_title"
-                )
-                if short_title:
+                page_data = parent.latest_version.page_data
+                short_title = page_data.get("short_title")
+                # Guard against responsive breakpoint objects
+                if short_title and isinstance(short_title, str):
                     parent_label = short_title
 
             parent_page = {
@@ -271,7 +268,7 @@ class NavigationWidget(BaseWidget):
                     parent_id=parent.id,
                     is_deleted=False,
                 )
-                .select_related("current_published_version")
+                .select_related("latest_version")
                 .order_by("sort_order", "id")
             )
 
@@ -284,15 +281,11 @@ class NavigationWidget(BaseWidget):
             for page in parent_child_query:
                 # Try to get shortTitle from page_data
                 title = page.title
-                if (
-                    page.current_published_version
-                    and page.current_published_version.page_data
-                ):
-                    page_data = page.current_published_version.page_data
-                    short_title = page_data.get("shortTitle") or page_data.get(
-                        "short_title"
-                    )
-                    if short_title:
+                if page.latest_version and page.latest_version.page_data:
+                    page_data = page.latest_version.page_data
+                    short_title = page_data.get("short_title")
+                    # Guard against responsive breakpoint objects
+                    if short_title and isinstance(short_title, str):
                         title = short_title
 
                 parent_children.append(
@@ -370,13 +363,13 @@ class NavigationWidget(BaseWidget):
         request = context.get("request") if context else None
         hostname = request.get_host().lower() if request else None
 
-        # Query child pages with their current published versions to get page_data
+        # Query child pages with their latest versions to get page_data
         child_pages = (
             WebPage.objects.filter(
                 parent_id=current_page_id,
                 is_deleted=False,
             )
-            .select_related("current_published_version")
+            .select_related("latest_version")
             .order_by("sort_order", "id")
         )
 
@@ -392,15 +385,11 @@ class NavigationWidget(BaseWidget):
         for idx, page in enumerate(child_pages):
             # Try to get shortTitle from page_data, fallback to title
             label = page.title
-            if (
-                page.current_published_version
-                and page.current_published_version.page_data
-            ):
-                page_data = page.current_published_version.page_data
-                short_title = page_data.get("shortTitle") or page_data.get(
-                    "short_title"
-                )
-                if short_title:
+            if page.latest_version and page.latest_version.page_data:
+                page_data = page.latest_version.page_data
+                short_title = page_data.get("short_title")
+                # Guard against responsive breakpoint objects
+                if short_title and isinstance(short_title, str):
                     label = short_title
 
             items.append(
@@ -438,9 +427,6 @@ class NavigationWidget(BaseWidget):
         for idx, item in enumerate(menu_items):
             # Only support new format: {'link_data': {...}, 'order': 0}
             link_data_dict = item.get("link_data")
-            # print("link_data_dict", link_data_dict)
-            # print("item", item)
-            # print("idx", idx)
             if not link_data_dict:
                 # Skip items without link_data field
                 continue
@@ -464,6 +450,7 @@ class NavigationWidget(BaseWidget):
                 "targetBlank": link_data.target_blank,
                 "type": link_data.type,
                 "order": order,
+                "pageTitle": link_data.page_title,  # For title attribute
             }
 
             if link_data.type == "internal":
@@ -524,7 +511,6 @@ class NavigationWidget(BaseWidget):
                 if idx in valid_indices or item.get("type") != "internal"
             ]
 
-        # print("processed_items", processed_items)
         # Sort by order
         return sorted(processed_items, key=lambda x: x.get("order", 0))
 

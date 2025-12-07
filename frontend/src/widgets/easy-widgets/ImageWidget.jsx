@@ -8,6 +8,7 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import { renderMustache, prepareGalleryContext, prepareCarouselContext, prepareComponentContext } from '../../utils/mustacheRenderer'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
+import { generateCSSFromBreakpoints } from '../../utils/cssBreakpointUtils'
 
 /**
  * EASY Image Widget Component
@@ -436,7 +437,7 @@ const ImageWidget = ({
                         <ComponentStyleRenderer
                             template={style.template}
                             context={mustacheContext}
-                            css={style.css}
+                            css={generateCSSFromBreakpoints(style.css, currentTheme)}
                             styleId={styleId}
                             className=""
                         />
@@ -448,7 +449,7 @@ const ImageWidget = ({
 
                 return (
                     <div data-style-id={styleId}>
-                        {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
+                        {style.css && <style>{`[data-style-id="${styleId}"] { ${generateCSSFromBreakpoints(style.css, currentTheme)} }`}</style>}
                         {renderDefaultImage()}
                     </div>
                 );
@@ -488,7 +489,7 @@ const ImageWidget = ({
 
                 return (
                     <div className={wrapperClass}>
-                        {style.css && <style>{style.css}</style>}
+                        {style.css && <style>{generateCSSFromBreakpoints(style.css, currentTheme)}</style>}
                         <div dangerouslySetInnerHTML={{ __html: html }} />
                     </div>
                 )

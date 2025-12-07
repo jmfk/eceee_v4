@@ -200,7 +200,7 @@ const PageBrowser = ({
 
     const handleNavigateInto = (page) => {
         setCurrentParentId(page.id)
-        setBreadcrumbs(prev => [...prev, { id: page.id, title: page.title }])
+        setBreadcrumbs(prev => [...prev, { id: page.id, title: page.shortTitle || page.title }])
         onSearchChange('')
     }
 
@@ -297,7 +297,7 @@ const PageBrowser = ({
                                     className="flex-1 min-w-0 text-left"
                                 >
                                     <div className="text-sm font-medium text-gray-900 truncate">
-                                        {page.title}
+                                        {page.shortTitle || page.title}
                                     </div>
                                     <div className="text-xs text-gray-500 truncate">
                                         {page.cachedPath || page.slug}
@@ -464,7 +464,13 @@ const InternalPageTab = ({
 
     const handleSelectPage = (page) => {
         setSelectedPage(page)
-        onChange({ ...data, pageId: page.id, pageTitle: page.title, anchor: null })
+        onChange({
+            ...data,
+            pageId: page.id,
+            pageTitle: page.title,
+            pageShortTitle: page.shortTitle,
+            anchor: null
+        })
     }
 
     const handleSelectAnchor = (anchor, anchorTitle) => {
@@ -495,7 +501,7 @@ const InternalPageTab = ({
                     <>
                         <div className="p-3 border-b border-gray-200 bg-gray-50">
                             <div className="text-sm font-medium text-gray-900">
-                                {selectedPage.title}
+                                {selectedPage.shortTitle || selectedPage.title}
                             </div>
                             <div className="text-xs text-gray-500">
                                 {selectedPage.path || selectedPage.cachedPath}
@@ -692,7 +698,7 @@ const LinkPicker = ({
             if (linkData.anchor && linkData.anchorTitle) {
                 return linkData.anchorTitle
             }
-            return linkData.pageTitle || ''
+            return linkData.pageShortTitle || linkData.pageTitle || ''
         }
         if (activeTab === 'external') return linkData.url || ''
         if (activeTab === 'email') return linkData.address || ''

@@ -61,6 +61,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     scheduled_version_id = serializers.SerializerMethodField()
     scheduled_version_number = serializers.SerializerMethodField()
     scheduled_effective_date = serializers.SerializerMethodField()
+    
+    # Short title from page_data
+    short_title = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -113,6 +116,8 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "scheduled_version_id",
             "scheduled_version_number",
             "scheduled_effective_date",
+            # Short title
+            "short_title",
         ]
         read_only_fields = [
             "id",
@@ -415,6 +420,24 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
         # Has unpublished changes if latest version is newer than published
         return latest_version.version_number > published_version.version_number
+
+    def get_short_title(self, obj):
+        """Get short title from page_data if available"""
+        # Try to get from current published version
+        current_version = obj.get_current_published_version()
+        if not current_version:
+            # Fall back to latest version for editor
+            current_version = obj.get_latest_version()
+        
+        if current_version and current_version.page_data:
+            # Check both camelCase and snake_case
+            short_title = current_version.page_data.get("shortTitle") or current_version.page_data.get("short_title")
+            if short_title:
+                # Guard against responsive breakpoint objects - only return if it's a string
+                if isinstance(short_title, str):
+                    return short_title
+        
+        return None
 
     # Scheduled version methods
     def get_scheduled_version_id(self, obj):

@@ -48,6 +48,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
         description: webpageData?.description || '',
         pathPatternKey: webpageData?.pathPatternKey || '',
         hostnames: webpageData?.hostnames || [],
+        shortTitle: pageVersionData?.pageData?.shortTitle || '',
         metaTitle: pageVersionData?.metaTitle || '',
         metaDescription: pageVersionData?.metaDescription || '',
         codeLayout: pageVersionData?.codeLayout || '',
@@ -71,6 +72,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                     hostnames: updatedPageData.hostnames || prev.hostnames,
                 }),
                 ...(updatedVersionData && {
+                    shortTitle: updatedVersionData.pageData?.shortTitle || prev.shortTitle,
                     metaTitle: updatedVersionData.metaTitle || prev.metaTitle,
                     metaDescription: updatedVersionData.metaDescription || prev.metaDescription,
                     codeLayout: updatedVersionData.codeLayout || prev.codeLayout,
@@ -103,6 +105,28 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
             updates: { [field]: value }
         })
     }, [componentId, context.versionId, publishUpdate])
+
+    // Handle page_data field changes (nested in PageVersion.page_data)
+    const handlePageDataFieldChange = useCallback((field: string, value: any) => {
+        // Update local state immediately
+        setLocalValues(prev => ({ ...prev, [field]: value }))
+
+        // Get current page_data from version
+        const state = getState()
+        const versionData: any = state.versions?.[context.versionId]
+        const currentPageData = versionData?.pageData || {}
+
+        // Publish to UDC with updated page_data
+        publishUpdate(componentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
+            id: String(context.versionId),
+            updates: {
+                pageData: {
+                    ...currentPageData,
+                    [field]: value
+                }
+            }
+        })
+    }, [componentId, context.versionId, publishUpdate, getState])
 
     // Expose save method to parent
     useImperativeHandle(ref, () => ({
@@ -148,8 +172,8 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                             </label>
                             <input
                                 type="text"
-                                value={localValues.metaTitle}
-                                onChange={(e) => handleVersionFieldChange('metaTitle', e.target.value)}
+                                value={localValues.shortTitle}
+                                onChange={(e) => handlePageDataFieldChange('shortTitle', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="Shorter version for navigation menus"
                             />

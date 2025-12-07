@@ -303,10 +303,19 @@ class WebPageRenderer:
             depth += 1
             current = current.parent
         
+        # Extract shortTitle from page_data if available
+        short_title = None
+        if page_version.page_data:
+            short_title = page_version.page_data.get("shortTitle") or page_version.page_data.get("short_title")
+            # Guard against responsive breakpoint objects
+            if short_title and not isinstance(short_title, str):
+                short_title = None
+        
         # Serialize page data for widgets (matches frontend pageData structure)
         webpage_data = {
             "id": page.id,
             "title": page.title,
+            "short_title": short_title,
             "slug": page.slug,
             "path": page.cached_path or f"/{page.slug}",
             "cached_path": page.cached_path,

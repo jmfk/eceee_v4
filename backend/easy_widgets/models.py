@@ -14,7 +14,7 @@ class LinkData(BaseModel):
     Link data model for menu items.
     
     Supports different link types with appropriate fields for each:
-    - internal: page_id, anchor
+    - internal: page_id, anchor, page_title, page_short_title
     - external: url
     - email: address
     - phone: number
@@ -29,6 +29,8 @@ class LinkData(BaseModel):
     
     type: Literal["internal", "external", "email", "phone", "anchor"]
     page_id: Optional[int] = None
+    page_title: Optional[str] = None
+    page_short_title: Optional[str] = None
     url: Optional[str] = None
     address: Optional[str] = None
     number: Optional[str] = None

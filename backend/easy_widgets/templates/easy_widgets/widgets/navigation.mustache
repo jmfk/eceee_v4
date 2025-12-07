@@ -4,7 +4,7 @@
         {{#items}}
             {{#isActive}}
             <li>
-                <a href="{{url}}"{{#targetBlank}} target="_blank" rel="noopener noreferrer"{{/targetBlank}}>
+                <a href="{{url}}"{{#targetBlank}} target="_blank" rel="noopener noreferrer"{{/targetBlank}}{{#pageTitle}} title="{{pageTitle}}"{{/pageTitle}}>
                     {{label}}
                 </a>
             </li>

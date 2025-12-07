@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { renderMustache } from '../utils/mustacheRenderer'
+import { generateCSSFromBreakpoints } from '../utils/cssBreakpointUtils'
 
 /**
  * ComponentStyleRenderer
@@ -11,7 +12,7 @@ import { renderMustache } from '../utils/mustacheRenderer'
 const ComponentStyleRenderer = ({
     template,      // Mustache template string
     context = {},  // Template context data
-    css = '',      // Scoped CSS
+    css = '',      // Scoped CSS (string or breakpoint object)
     styleId,       // Unique ID for scoping
     className = ''
 }) => {
@@ -24,8 +25,11 @@ const ComponentStyleRenderer = ({
     useEffect(() => {
         if (!css || !styleId) return
 
-        // Ensure css is a string
-        const cssString = typeof css === 'string' ? css : ''
+        // Handle both string CSS and responsive breakpoint objects
+        const cssString = typeof css === 'string' 
+            ? css 
+            : generateCSSFromBreakpoints(css, context.theme)
+        
         if (!cssString) return
 
         // Create or update style element

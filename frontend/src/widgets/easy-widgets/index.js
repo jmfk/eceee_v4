@@ -37,32 +37,61 @@ import SectionWidget from './SectionWidget';
  * 
  * These are EASY-specific widgets with their own namespace (easy_widgets.*)
  * They are separate from default widgets and don't override them.
+ * 
+ * Uses lazy initialization to avoid circular dependency issues.
  */
-export const EASY_WIDGET_REGISTRY = {
-    // EASY-specific widgets (new widgets, not overrides)
-    'easy_widgets.FooterWidget': registerWidget(FooterWidget, 'easy_widgets.FooterWidget'),
-    'easy_widgets.ContentWidget': registerWidget(ContentWidget, 'easy_widgets.ContentWidget'),
-    'easy_widgets.ContentCardWidget': registerWidget(ContentCardWidget, 'easy_widgets.ContentCardWidget'),
-    'easy_widgets.BannerWidget': registerWidget(BannerWidget, 'easy_widgets.BannerWidget'),
-    'easy_widgets.BioWidget': registerWidget(BioWidget, 'easy_widgets.BioWidget'),
-    'easy_widgets.ImageWidget': registerWidget(ImageWidget, 'easy_widgets.ImageWidget'),
-    'easy_widgets.TableWidget': registerWidget(TableWidget, 'easy_widgets.TableWidget'),
-    'easy_widgets.HeaderWidget': registerWidget(HeaderWidget, 'easy_widgets.HeaderWidget'),
-    'easy_widgets.HeadlineWidget': registerWidget(HeadlineWidget, 'easy_widgets.HeadlineWidget'),
-    'easy_widgets.HeroWidget': registerWidget(HeroWidget, 'easy_widgets.HeroWidget'),
-    'easy_widgets.NavbarWidget': registerWidget(NavbarWidget, 'easy_widgets.NavbarWidget'),
-    'easy_widgets.NavigationWidget': registerWidget(NavigationWidget, 'easy_widgets.NavigationWidget'),
-    'easy_widgets.SidebarWidget': registerWidget(SidebarWidget, 'easy_widgets.SidebarWidget'),
-    'easy_widgets.FormsWidget': registerWidget(FormsWidget, 'easy_widgets.FormsWidget'),
-    'easy_widgets.TwoColumnsWidget': registerWidget(TwoColumnsWidget, 'easy_widgets.TwoColumnsWidget'),
-    'easy_widgets.ThreeColumnsWidget': registerWidget(ThreeColumnsWidget, 'easy_widgets.ThreeColumnsWidget'),
-    'easy_widgets.PathDebugWidget': registerWidget(PathDebugWidget, 'easy_widgets.PathDebugWidget'),
-    'easy_widgets.NewsListWidget': registerWidget(NewsListWidget, 'easy_widgets.NewsListWidget'),
-    'easy_widgets.NewsDetailWidget': registerWidget(NewsDetailWidget, 'easy_widgets.NewsDetailWidget'),
-    'easy_widgets.TopNewsPlugWidget': registerWidget(TopNewsPlugWidget, 'easy_widgets.TopNewsPlugWidget'),
-    'easy_widgets.SidebarTopNewsWidget': registerWidget(SidebarTopNewsWidget, 'easy_widgets.SidebarTopNewsWidget'),
-    'easy_widgets.SectionWidget': registerWidget(SectionWidget, 'easy_widgets.SectionWidget'),
+let _registryCache = null;
+
+const initializeRegistry = () => {
+    if (_registryCache) return _registryCache;
+    
+    _registryCache = {
+        // EASY-specific widgets (new widgets, not overrides)
+        'easy_widgets.FooterWidget': registerWidget(FooterWidget, 'easy_widgets.FooterWidget'),
+        'easy_widgets.ContentWidget': registerWidget(ContentWidget, 'easy_widgets.ContentWidget'),
+        'easy_widgets.ContentCardWidget': registerWidget(ContentCardWidget, 'easy_widgets.ContentCardWidget'),
+        'easy_widgets.BannerWidget': registerWidget(BannerWidget, 'easy_widgets.BannerWidget'),
+        'easy_widgets.BioWidget': registerWidget(BioWidget, 'easy_widgets.BioWidget'),
+        'easy_widgets.ImageWidget': registerWidget(ImageWidget, 'easy_widgets.ImageWidget'),
+        'easy_widgets.TableWidget': registerWidget(TableWidget, 'easy_widgets.TableWidget'),
+        'easy_widgets.HeaderWidget': registerWidget(HeaderWidget, 'easy_widgets.HeaderWidget'),
+        'easy_widgets.HeadlineWidget': registerWidget(HeadlineWidget, 'easy_widgets.HeadlineWidget'),
+        'easy_widgets.HeroWidget': registerWidget(HeroWidget, 'easy_widgets.HeroWidget'),
+        'easy_widgets.NavbarWidget': registerWidget(NavbarWidget, 'easy_widgets.NavbarWidget'),
+        'easy_widgets.NavigationWidget': registerWidget(NavigationWidget, 'easy_widgets.NavigationWidget'),
+        'easy_widgets.SidebarWidget': registerWidget(SidebarWidget, 'easy_widgets.SidebarWidget'),
+        'easy_widgets.FormsWidget': registerWidget(FormsWidget, 'easy_widgets.FormsWidget'),
+        'easy_widgets.TwoColumnsWidget': registerWidget(TwoColumnsWidget, 'easy_widgets.TwoColumnsWidget'),
+        'easy_widgets.ThreeColumnsWidget': registerWidget(ThreeColumnsWidget, 'easy_widgets.ThreeColumnsWidget'),
+        'easy_widgets.PathDebugWidget': registerWidget(PathDebugWidget, 'easy_widgets.PathDebugWidget'),
+        'easy_widgets.NewsListWidget': registerWidget(NewsListWidget, 'easy_widgets.NewsListWidget'),
+        'easy_widgets.NewsDetailWidget': registerWidget(NewsDetailWidget, 'easy_widgets.NewsDetailWidget'),
+        'easy_widgets.TopNewsPlugWidget': registerWidget(TopNewsPlugWidget, 'easy_widgets.TopNewsPlugWidget'),
+        'easy_widgets.SidebarTopNewsWidget': registerWidget(SidebarTopNewsWidget, 'easy_widgets.SidebarTopNewsWidget'),
+        'easy_widgets.SectionWidget': registerWidget(SectionWidget, 'easy_widgets.SectionWidget'),
+    };
+    
+    return _registryCache;
 };
+
+export const EASY_WIDGET_REGISTRY = new Proxy({}, {
+    get(target, prop) {
+        const registry = initializeRegistry();
+        return registry[prop];
+    },
+    has(target, prop) {
+        const registry = initializeRegistry();
+        return prop in registry;
+    },
+    ownKeys(target) {
+        const registry = initializeRegistry();
+        return Object.keys(registry);
+    },
+    getOwnPropertyDescriptor(target, prop) {
+        const registry = initializeRegistry();
+        return Object.getOwnPropertyDescriptor(registry, prop);
+    }
+});
 
 /**
  * Get EASY widget component by type
