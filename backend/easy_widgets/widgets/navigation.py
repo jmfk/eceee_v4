@@ -243,9 +243,24 @@ class NavigationWidget(BaseWidget):
         parent_children = []
 
         if parent:
+            # Try to get shortTitle from parent's page_data
+            parent_label = parent.title
+            if (
+                hasattr(parent, "current_published_version")
+                and parent.current_published_version
+                and parent.current_published_version.page_data
+            ):
+                page_data = parent.current_published_version.page_data
+                short_title = page_data.get("shortTitle") or page_data.get(
+                    "short_title"
+                )
+                if short_title:
+                    parent_label = short_title
+
             parent_page = {
                 "id": parent.id,
                 "title": parent.title,
+                "label": parent_label,
                 "slug": parent.slug,
                 "path": parent.cached_path or f"/{parent.slug}",
             }
