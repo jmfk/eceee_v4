@@ -116,6 +116,8 @@ class NavigationWidget(BaseWidget):
         - dynamicItems: Auto-generated items from child pages
         - itemCount: Total number of items
         - hasItems: Boolean indicating if any items exist
+        - Page hierarchy: currentPage, currentChildren, parentPage, etc.
+        - Inheritance: isInherited, inheritanceDepth, depth helpers
         """
         # Start with base config
         template_config = super().prepare_template_context(config, context)
@@ -141,6 +143,10 @@ class NavigationWidget(BaseWidget):
         template_config["dynamicItems"] = dynamic_items
         template_config["itemCount"] = len(all_items)
         template_config["hasItems"] = len(all_items) > 0
+        template_config["staticItemCount"] = len(static_items)
+        template_config["hasStaticItems"] = len(static_items) > 0
+        template_config["dynamicItemCount"] = len(dynamic_items)
+        template_config["hasDynamicItems"] = len(dynamic_items) > 0
 
         # Add widget type CSS class
         template_config["widgetTypeCssClass"] = "navigation"
@@ -150,14 +156,185 @@ class NavigationWidget(BaseWidget):
             "nav_container_height", "auto"
         )
 
+        # Add page hierarchy context for component style templates
+        hierarchy_context = self._get_page_hierarchy_context(context)
+        template_config.update(hierarchy_context)
+
         return template_config
+
+    def _get_page_hierarchy_context(self, context):
+        """
+        Get page hierarchy context variables for Mustache templates.
+
+        Provides variables matching frontend prepareNavigationContext():
+        - currentPage, currentChildren, hasCurrentChildren
+        - parentPage, parentChildren, hasParentChildren
+        - isInherited, inheritanceDepth, depth helpers
+
+        Args:
+            context: Rendering context with webpage_data, parent, inherited_from
+
+        Returns:
+            dict: Page hierarchy context for Mustache template
+        """
+        from webpages.models import WebPage
+
+        # Get current page data
+        webpage_data = context.get("webpage_data") or {}
+        current_page_id = webpage_data.get("id")
+
+        # Serialize current page for template
+        current_page = {
+            "id": webpage_data.get("id"),
+            "title": webpage_data.get("title"),
+            "slug": webpage_data.get("slug"),
+            "path": webpage_data.get("path") or webpage_data.get("cached_path"),
+        }
+
+        # Get hostname for filtering
+        request = context.get("request")
+        hostname = request.get_host().lower() if request else None
+
+        # Query current page children
+        current_children = []
+        if current_page_id:
+            child_query = (
+                WebPage.objects.filter(
+                    parent_id=current_page_id,
+                    is_deleted=False,
+                )
+                .select_related("current_published_version")
+                .order_by("sort_order", "id")
+            )
+
+            if hostname:
+                child_query = child_query.filter(
+                    is_currently_published=True,
+                    cached_root_hostnames__contains=[hostname],
+                )
+
+            for page in child_query:
+                # Try to get shortTitle from page_data
+                title = page.title
+                if (
+                    page.current_published_version
+                    and page.current_published_version.page_data
+                ):
+                    page_data = page.current_published_version.page_data
+                    short_title = page_data.get("shortTitle") or page_data.get(
+                        "short_title"
+                    )
+                    if short_title:
+                        title = short_title
+
+                current_children.append(
+                    {
+                        "id": page.id,
+                        "title": page.title,  # Keep original title
+                        "label": title,  # Short title or title for display
+                        "slug": page.slug,
+                        "path": page.cached_path or f"/{page.slug}",
+                    }
+                )
+
+        # Get parent page data
+        parent = context.get("parent")
+        parent_page = {}
+        parent_children = []
+
+        if parent:
+            parent_page = {
+                "id": parent.id,
+                "title": parent.title,
+                "slug": parent.slug,
+                "path": parent.cached_path or f"/{parent.slug}",
+            }
+
+            # Query parent's children (siblings of current page)
+            parent_child_query = (
+                WebPage.objects.filter(
+                    parent_id=parent.id,
+                    is_deleted=False,
+                )
+                .select_related("current_published_version")
+                .order_by("sort_order", "id")
+            )
+
+            if hostname:
+                parent_child_query = parent_child_query.filter(
+                    is_currently_published=True,
+                    cached_root_hostnames__contains=[hostname],
+                )
+
+            for page in parent_child_query:
+                # Try to get shortTitle from page_data
+                title = page.title
+                if (
+                    page.current_published_version
+                    and page.current_published_version.page_data
+                ):
+                    page_data = page.current_published_version.page_data
+                    short_title = page_data.get("shortTitle") or page_data.get(
+                        "short_title"
+                    )
+                    if short_title:
+                        title = short_title
+
+                parent_children.append(
+                    {
+                        "id": page.id,
+                        "title": page.title,  # Keep original title
+                        "label": title,  # Short title or title for display
+                        "slug": page.slug,
+                        "path": page.cached_path or f"/{page.slug}",
+                    }
+                )
+
+        # Check inheritance context
+        # The renderer adds this as 'widget_inherited_from' in enhanced_context
+        inherited_from = context.get("widget_inherited_from") or context.get(
+            "inherited_from"
+        )
+        is_inherited = bool(inherited_from)
+
+        # Calculate inheritance depth from webpage_data
+        # Depth represents how deep the current page is in the hierarchy
+        # 0 = root page, 1 = first level child, 2 = second level child, etc.
+        depth = webpage_data.get("depth", 0)
+
+        return {
+            # Page context (camelCase for Mustache)
+            "currentPage": current_page,
+            "currentChildren": current_children,
+            "hasCurrentChildren": len(current_children) > 0,
+            "currentChildrenCount": len(current_children),
+            "dynamicItems": current_children,
+            "hasDynamicItems": len(current_children) > 0,
+            "dynamicItemCount": len(current_children),
+            "parentPage": parent_page,
+            "parentChildren": parent_children,
+            "hasParentChildren": len(parent_children) > 0,
+            "parentChildrenCount": len(parent_children),
+            # Inheritance context
+            "isInherited": is_inherited,
+            "inheritanceDepth": depth,
+            # Depth helpers for Mustache conditionals
+            "isRoot": depth == 0,
+            "isLevel1": depth == 1,
+            "isLevel2": depth == 2,
+            "isLevel3": depth == 3,
+            "isLevel1AndBelow": depth >= 1,
+            "isLevel2AndBelow": depth >= 2,
+            "isLevel3AndBelow": depth >= 3,
+            "isDeepLevel": depth >= 4,
+        }
 
     def _generate_subpage_items(self, context):
         """
         Generate navigation items from child pages of the current page.
 
         Returns list of items with:
-        - label: Page title
+        - label: Short title if available, otherwise page title
         - url: Page path
         - targetBlank: Always False
         - isActive: Always True
@@ -178,11 +355,15 @@ class NavigationWidget(BaseWidget):
         request = context.get("request") if context else None
         hostname = request.get_host().lower() if request else None
 
-        # Query child pages
-        child_pages = WebPage.objects.filter(
-            parent_id=current_page_id,
-            is_deleted=False,
-        ).order_by("order", "id")
+        # Query child pages with their current published versions to get page_data
+        child_pages = (
+            WebPage.objects.filter(
+                parent_id=current_page_id,
+                is_deleted=False,
+            )
+            .select_related("current_published_version")
+            .order_by("sort_order", "id")
+        )
 
         # Filter by publication status and hostname if available
         if hostname:
@@ -194,14 +375,27 @@ class NavigationWidget(BaseWidget):
         # Convert to navigation items
         items = []
         for idx, page in enumerate(child_pages):
+            # Try to get shortTitle from page_data, fallback to title
+            label = page.title
+            if (
+                page.current_published_version
+                and page.current_published_version.page_data
+            ):
+                page_data = page.current_published_version.page_data
+                short_title = page_data.get("shortTitle") or page_data.get(
+                    "short_title"
+                )
+                if short_title:
+                    label = short_title
+
             items.append(
                 {
-                    "label": page.title or page.slug,
+                    "label": label or page.slug,
                     "url": page.cached_path or f"/{page.slug}",
                     "targetBlank": False,
                     "isActive": True,
                     "type": "internal",
-                    "order": page.order if page.order is not None else idx,
+                    "order": page.sort_order if page.sort_order is not None else idx,
                 }
             )
 

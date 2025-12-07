@@ -318,6 +318,7 @@
             <h2>Navigation Widget Variables</h2>
             <p>The Navigation widget provides special variables for building dynamic navigation menus:</p>
             
+            <h3>Menu Items</h3>
             <table>
                 <thead>
                     <tr>
@@ -333,16 +334,6 @@
                         <td>All navigation items (combines dynamic + static items)</td>
                     </tr>
                     <tr>
-                        <td><code>dynamicItems</code></td>
-                        <td><span class="badge badge-type">Array</span></td>
-                        <td>Auto-generated items from page sections or submenu configuration</td>
-                    </tr>
-                    <tr>
-                        <td><code>staticItems</code></td>
-                        <td><span class="badge badge-type">Array</span></td>
-                        <td>Manually configured menu items</td>
-                    </tr>
-                    <tr>
                         <td><code>itemCount</code></td>
                         <td><span class="badge badge-type">Number</span></td>
                         <td>Total number of navigation items</td>
@@ -352,11 +343,41 @@
                         <td><span class="badge badge-type">Boolean</span></td>
                         <td>True if there are any navigation items</td>
                     </tr>
+                    <tr>
+                        <td><code>staticItems</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Manually configured menu items</td>
+                    </tr>
+                    <tr>
+                        <td><code>staticItemCount</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Number of static menu items</td>
+                    </tr>
+                    <tr>
+                        <td><code>hasStaticItems</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if there are static menu items</td>
+                    </tr>
+                    <tr>
+                        <td><code>dynamicItems</code></td>
+                        <td><span class="badge badge-type">Array</span></td>
+                        <td>Auto-generated items from child pages (when includeSubpages is enabled)</td>
+                    </tr>
+                    <tr>
+                        <td><code>dynamicItemCount</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Number of dynamic menu items</td>
+                    </tr>
+                    <tr>
+                        <td><code>hasDynamicItems</code></td>
+                        <td><span class="badge badge-type">Boolean</span></td>
+                        <td>True if there are dynamic menu items</td>
+                    </tr>
                 </tbody>
             </table>
 
             <div class="note">
-                <strong>Note:</strong> Navigation items have the structure: <code>{label, url, isActive, targetBlank}</code>
+                <strong>Note:</strong> Navigation menu items have the structure: <code>{label, url, isActive, targetBlank, type, order}</code>
             </div>
         </section>
 
@@ -389,6 +410,11 @@
                         <td>True if parent page has children</td>
                     </tr>
                     <tr>
+                        <td><code>parentChildrenCount</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Number of child pages of the parent page</td>
+                    </tr>
+                    <tr>
                         <td><code>currentPage</code></td>
                         <td><span class="badge badge-type">Object</span></td>
                         <td>PageMetadata object for the current page being viewed</td>
@@ -402,6 +428,11 @@
                         <td><code>hasCurrentChildren</code></td>
                         <td><span class="badge badge-type">Boolean</span></td>
                         <td>True if current page has children</td>
+                    </tr>
+                    <tr>
+                        <td><code>currentChildrenCount</code></td>
+                        <td><span class="badge badge-type">Number</span></td>
+                        <td>Number of child pages of the current page</td>
                     </tr>
                     <tr>
                         <td><code>ownerPage</code></td>

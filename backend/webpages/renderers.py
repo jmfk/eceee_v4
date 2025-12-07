@@ -296,11 +296,29 @@ class WebPageRenderer:
         if effective_theme:
             theme_css_url = f"/api/v1/webpages/themes/{effective_theme.id}/styles.css"
 
+        # Calculate page depth by walking up parent chain
+        depth = 0
+        current = page
+        while current.parent:
+            depth += 1
+            current = current.parent
+        
+        # Serialize page data for widgets (matches frontend pageData structure)
+        webpage_data = {
+            "id": page.id,
+            "title": page.title,
+            "slug": page.slug,
+            "path": page.cached_path or f"/{page.slug}",
+            "cached_path": page.cached_path,
+            "depth": depth,
+        }
+        
         context = {
             "page": page,
             "current_page": page,
             "page_version": page_version,
             "page_data": page_version.page_data,
+            "webpage_data": webpage_data,  # Serialized page data for widgets
             "widgets": page_version.widgets,  # All widgets by slot (matches frontend context)
             "version_number": page_version.version_number,
             "publication_status": page_version.get_publication_status(),
