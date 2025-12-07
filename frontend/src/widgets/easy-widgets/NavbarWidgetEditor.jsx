@@ -44,10 +44,11 @@ const NavbarWidgetEditor = ({
         return context?.webpageData?.cachedRootId || context?.siteRootId || null
     }, [context])
 
-    // Get theme palette for color selectors
+    // Get theme palette/colors for color selectors
+    // Support both 'palette' (old) and 'colors' (current backend field)
     const themePalette = useMemo(() => {
-        return context?.theme?.palette || {}
-    }, [context?.theme?.palette])
+        return context?.theme?.palette || context?.theme?.colors || {}
+    }, [context?.theme?.palette, context?.theme?.colors])
 
     // Sync state when widget config changes externally
     useEffect(() => {

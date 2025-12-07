@@ -200,10 +200,13 @@ const SchemaFieldRenderer = ({
 
         // Memoize FieldComponent
         const FieldComponent = useMemo(() => React.lazy(() => {
-            if (FIELD_COMPONENTS[componentName]) {
-                return FIELD_COMPONENTS[componentName]()
+            // Map ColorInput to ColorSelector for theme palette support
+            const actualComponentName = componentName === 'ColorInput' ? 'ColorSelector' : componentName;
+            
+            if (FIELD_COMPONENTS[actualComponentName]) {
+                return FIELD_COMPONENTS[actualComponentName]()
             }
-            console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
+            console.warn(`Field component '${actualComponentName}' not found, falling back to TextInput`)
             return FIELD_COMPONENTS.TextInput()
         }), [componentName]) // Only recreate if componentName changes
 

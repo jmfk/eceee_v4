@@ -126,10 +126,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
                                 <button
                                     key={name}
                                     type="button"
-                                    onClick={() => {
-                                        onChange(name);
-                                        setShowPalette(false);
-                                    }}
+                                    onClick={() => onChange(name)}
                                     className={`group relative w-10 h-10 rounded border-2 transition-all ${isSelected
                                             ? 'border-blue-600 ring-2 ring-blue-200'
                                             : 'border-gray-300 hover:border-gray-400'
@@ -151,10 +148,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
                         <input
                             type="color"
                             value={getCurrentColor()}
-                            onChange={(e) => {
-                                onChange(e.target.value);
-                                setShowPalette(false);
-                            }}
+                            onChange={(e) => onChange(e.target.value)}
                             className="w-full h-10 rounded border border-gray-300 cursor-pointer"
                         />
                     </div>

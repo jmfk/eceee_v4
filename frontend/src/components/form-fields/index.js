@@ -30,6 +30,7 @@ export { default as TagInput } from './TagInput'
 
 // Advanced Components
 export { default as ColorInput } from './ColorInput'
+export { default as ColorSelectorField } from './ColorSelectorField'
 export { default as ComponentStyleSelector } from './ComponentStyleSelector'
 export { default as SliderInput } from './SliderInput'
 export { default as DateRangeInput } from './DateRangeInput'
@@ -104,6 +105,8 @@ export const FIELD_COMPONENTS = {
     CheckboxInput: () => import('./CheckboxInput'),
     TagInput: () => import('./TagInput'),
     ColorInput: () => import('./ColorInput'),
+    ColorSelector: () => import('./ColorSelectorField'),
+    ColorSelectorField: () => import('./ColorSelectorField'),
     SliderInput: () => import('./SliderInput'),
     DateRangeInput: () => import('./DateRangeInput'),
     ImageStyleSelect: () => import('./ImageStyleSelect'),
