@@ -139,19 +139,8 @@
                         {% if item.targetBlank %}target="_blank" rel="noopener noreferrer"{% endif %}
                         class="navbar-link navbar-secondary-link"
                         style="
-                            color: #ffffff; 
-                            font-size: 0.875rem; 
-                            font-weight: 500; 
-                            text-decoration: none; 
-                            transition: opacity 0.2s ease-in-out; 
-                            white-space: nowrap;
-                            padding: 2px 12px;
-                            display: inline-block;
-                            border-radius: 4px 4px 0 0;
-                            height: 26px;
-                            line-height: 22px;
-                            margin-top: 2px;
                             {% if item.backgroundColor %}background-color: {{ item.backgroundColor }};{% endif %}
+                            {% if item.textColor %}color: {{ item.textColor }};{% endif %}
                             {% if item.backgroundImage %}
                                 background-image: url('{{ item.backgroundImage.imgproxy_base_url|default:item.backgroundImage }}');
                                 background-size: cover;
