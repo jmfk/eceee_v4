@@ -162,12 +162,25 @@ class NavbarWidget(BaseWidget):
 
         .navbar-menu-item {
             list-style: none !important;
-            font-size: 16px;
+            font-size: 14px;
             margin-top: 0px;
             font-family: "Source Sans 3", sans-serif;
             font-weight: 300;
             line-height: 22px;
             margin-bottom: 0px;            
+        }
+
+        .navbar-menu-item  a {
+            font-size: 14px;
+            color: #ffffff;
+            font-family: "Source Sans 3", sans-serif;
+            font-weight: 500;
+        }
+
+        .navbar-secondary-menu .navbar-menu-item  {
+            border-radius: 0 0 0 0;
+            padding: 0 12px 1px;
+            margin-top: 2px;
         }
 
         .navbar-link {
@@ -238,6 +251,10 @@ class NavbarWidget(BaseWidget):
         template_config = super().prepare_template_context(config, context)
         context_obj = DictToObj(context)
 
+        # Get theme colors for CSS variable conversion
+        theme = context.get("theme") if context else None
+        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
+
         # Build complete inline style string in Python
         style_parts = []
 
@@ -267,12 +284,16 @@ class NavbarWidget(BaseWidget):
         if not background_color:
             background_color = "#3b82f6"
 
+        # Convert color name to CSS variable if it's in theme colors
+        if background_color and background_color in theme_colors:
+            background_color = f"var(--{background_color})"
+
         if background_color:
             style_parts.append(f"background-color: {background_color};")
 
         # Add fixed styles
-        style_parts.append("box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);")
-        style_parts.append("height: 28px;")
+        # style_parts.append("box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);")
+        # style_parts.append("height: 28px;")
 
         # Join all style parts with a space
         template_config["navbarStyle"] = " ".join(style_parts)
@@ -311,6 +332,10 @@ class NavbarWidget(BaseWidget):
         request = context.get("request") if context else None
         hostname = request.get_host().lower() if request else None
 
+        # Get theme colors for CSS variable conversion
+        theme = context.get("theme") if context else None
+        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
+
         # Process each item to extract link data
         processed_items = []
         internal_page_ids = {}  # page_id -> [item_indices]
@@ -343,6 +368,12 @@ class NavbarWidget(BaseWidget):
                 # Extract imgproxy_base_url if background_image is a dict
                 if bg_image and isinstance(bg_image, dict):
                     bg_image = bg_image.get("imgproxy_base_url") or bg_image.get("url")
+
+                # Convert color names to CSS variables
+                if bg_color and bg_color in theme_colors:
+                    bg_color = f"var(--{bg_color})"
+                if txt_color and txt_color in theme_colors:
+                    txt_color = f"var(--{txt_color})"
 
                 processed["backgroundColor"] = bg_color
                 processed["textColor"] = txt_color
@@ -379,19 +410,40 @@ class NavbarWidget(BaseWidget):
                 id__in=internal_page_ids.keys(),
                 is_deleted=False,
                 is_currently_published=True,
-            )
+            ).values("id", "cached_path", "cached_root_hostnames")
 
-            # Build lookup of id -> path
-            page_paths = {p.id: p.cached_path for p in page_query}
+            # Build lookup with hostname info
+            page_data = {
+                p["id"]: {
+                    "path": p["cached_path"],
+                    "hostnames": p["cached_root_hostnames"],
+                }
+                for p in page_query
+            }
 
             # Update processed items with resolved paths
             for page_id, indices in internal_page_ids.items():
-                path = page_paths.get(page_id)
-                if path:
+                data = page_data.get(page_id)
+                if data:
+                    path = data["path"]
+                    target_hostnames = data["hostnames"]
+
+                    # Check if target page is on different hostname
+                    url = path
+                    if target_hostnames and hostname:
+                        target_hostname = target_hostnames[0]
+                        if target_hostname.lower() != hostname.lower():
+                            # Build absolute URL with protocol
+                            if target_hostname.startswith(("localhost", "127.0.0.1")):
+                                protocol = "http"
+                            else:
+                                protocol = "https"
+                            url = f"{protocol}://{target_hostname}{path}"
+
                     for idx in indices:
                         anchor = processed_items[idx].get("anchor")
                         processed_items[idx]["url"] = (
-                            f"{path}#{anchor}" if anchor else path
+                            f"{url}#{anchor}" if anchor else url
                         )
                         valid_indices.add(idx)
 
