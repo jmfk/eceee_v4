@@ -19,6 +19,82 @@ const getImageUrl = (image) => {
 }
 
 /**
+ * Process menu items to extract link_data structure
+ * Handles both new format (with link_data) and old format (direct fields)
+ */
+const processMenuItems = (items) => {
+    if (!items || !Array.isArray(items)) return []
+    
+    return items.map((item, index) => {
+        // Check if item has link_data field (new format)
+        if (item.linkData || item.link_data) {
+            const linkData = item.linkData || item.link_data
+            const order = item.order !== undefined ? item.order : index
+            
+            return {
+                label: linkData.label,
+                url: linkData.url || '',
+                isActive: linkData.isActive !== false && linkData.is_active !== false,
+                targetBlank: linkData.targetBlank || linkData.target_blank || false,
+                type: linkData.type || 'external',
+                order,
+            }
+        }
+        
+        // Old format - direct fields (backwards compatibility)
+        return {
+            label: item.label,
+            url: item.url || '',
+            isActive: item.isActive !== false && item.is_active !== false,
+            targetBlank: item.targetBlank || item.target_blank || false,
+            type: item.type || 'external',
+            order: item.order !== undefined ? item.order : index,
+        }
+    })
+}
+
+/**
+ * Process secondary menu items to extract link_data and styling
+ * Handles both new format (with link_data) and old format (direct fields)
+ */
+const processSecondaryMenuItems = (items) => {
+    if (!items || !Array.isArray(items)) return []
+    
+    return items.map((item, index) => {
+        // Check if item has link_data field (new format)
+        if (item.linkData || item.link_data) {
+            const linkData = item.linkData || item.link_data
+            const order = item.order !== undefined ? item.order : index
+            
+            return {
+                label: linkData.label,
+                url: linkData.url || '',
+                isActive: linkData.isActive !== false && linkData.is_active !== false,
+                targetBlank: linkData.targetBlank || linkData.target_blank || false,
+                type: linkData.type || 'external',
+                backgroundColor: item.backgroundColor || item.background_color,
+                textColor: item.textColor || item.text_color,
+                backgroundImage: item.backgroundImage || item.background_image,
+                order,
+            }
+        }
+        
+        // Old format - direct fields (backwards compatibility)
+        return {
+            label: item.label,
+            url: item.url || '',
+            isActive: item.isActive !== false && item.is_active !== false,
+            targetBlank: item.targetBlank || item.target_blank || false,
+            type: item.type || 'external',
+            backgroundColor: item.backgroundColor || item.background_color,
+            textColor: item.textColor || item.text_color,
+            backgroundImage: item.backgroundImage || item.background_image,
+            order: item.order !== undefined ? item.order : index,
+        }
+    })
+}
+
+/**
  * EASY Navbar Widget Component
  * Renders a navigation bar with configurable menu items and responsive overflow
  */
@@ -28,13 +104,18 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
         secondaryMenuItems = [],
         backgroundImage = null,
         backgroundPosition = 'center',
+        backgroundAlignment = 'center',
         backgroundColor = null,
         hamburgerBreakpoint = 768,
     } = config
 
-    // Filter active items (undefined/null treated as active for backwards compatibility)
-    const activeMenuItems = menuItems.filter(item => item.isActive !== false)
-    const activeSecondaryMenuItems = secondaryMenuItems.filter(item => item.isActive !== false)
+    // Process menu items to extract link_data (handles both new and old formats)
+    const processedMenuItems = processMenuItems(menuItems)
+    const processedSecondaryMenuItems = processSecondaryMenuItems(secondaryMenuItems)
+
+    // Filter active items
+    const activeMenuItems = processedMenuItems.filter(item => item.isActive !== false)
+    const activeSecondaryMenuItems = processedSecondaryMenuItems.filter(item => item.isActive !== false)
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [isOverflowMenuOpen, setIsOverflowMenuOpen] = useState(false)
@@ -283,7 +364,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
         ...(imageUrl && {
             backgroundImage: `url('${imageUrl}')`,
             backgroundSize: 'cover',
-            backgroundPosition: backgroundPosition,
+            backgroundPosition: backgroundAlignment || backgroundPosition,
             backgroundRepeat: 'no-repeat',
         }),
         ...(backgroundColor && { backgroundColor }),
