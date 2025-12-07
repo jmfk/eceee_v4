@@ -47,8 +47,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
-            "gallery_styles",
-            "carousel_styles",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
@@ -82,8 +80,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
-            "gallery_styles",
-            "carousel_styles",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
@@ -519,7 +515,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     zip_file.writestr(f"image/{image_name}", theme.image.read())
                 except Exception as e:
                     # Log error but continue
-                    print(f"Failed to add image to export: {str(e)}")
+                    logger.warning(f"Failed to add image to export: {str(e)}")
 
         # Prepare response
         zip_buffer.seek(0)

@@ -88,7 +88,7 @@ export function detectConflicts(existingData, newData, section, level) {
 
     if (level === 'full') {
         // Check each section for conflicts
-        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'galleryStyles', 'carouselStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             const sectionConflicts = detectSectionConflicts(
@@ -151,8 +151,8 @@ function detectSectionConflicts(existing, incoming, sectionName) {
                 path: 'designGroups',
             });
         }
-    } else {
-        // Object-based sections (colors, componentStyles, galleryStyles, etc.)
+        } else {
+        // Object-based sections (colors, componentStyles, imageStyles, etc.)
         Object.keys(incoming).forEach(key => {
             if (existing[key] !== undefined) {
                 conflicts.push({
@@ -227,7 +227,7 @@ export function mergeThemeData(existing, incoming, level, section, resolutions =
 
     if (level === 'full') {
         // Merge all sections
-        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'galleryStyles', 'carouselStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             if (incoming[sectionName]) {
@@ -312,16 +312,28 @@ function mergeSectionData(existing, incoming, sectionName, resolutions) {
             const conflictKey = key;
             const resolution = resolutions[`${sectionName}.${conflictKey}`];
 
+            // Normalize imageStyles to ensure required fields
+            let normalizedValue = value;
+            if (sectionName === 'imageStyles' && typeof value === 'object' && value !== null) {
+                normalizedValue = {
+                    ...value,
+                    // Ensure styleType is always set (default to 'gallery')
+                    styleType: value.styleType || 'gallery',
+                    // Ensure template exists
+                    template: value.template || '<div class="image-gallery">\n  {{#images}}\n    <img src="{{url}}" alt="{{alt}}" loading="lazy">\n  {{/images}}\n</div>'
+                };
+            }
+
             if (!merged[key]) {
                 // No conflict, add it
-                merged[key] = value;
+                merged[key] = normalizedValue;
             } else if (resolution === 'overwrite') {
                 // Replace existing
-                merged[key] = value;
+                merged[key] = normalizedValue;
             } else if (resolution === 'rename') {
                 // Add with new name
                 const newKey = resolutions[`${sectionName}.${conflictKey}.newName`];
-                merged[newKey] = value;
+                merged[newKey] = normalizedValue;
             }
             // If 'keep', do nothing
         });

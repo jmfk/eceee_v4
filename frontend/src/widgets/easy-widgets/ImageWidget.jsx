@@ -468,12 +468,8 @@ const ImageWidget = ({
     const useCustomStyle = localConfig.imageStyle && localConfig.imageStyle !== 'default' && items.length > 0
 
     if (useCustomStyle && currentTheme) {
-        const displayType = localConfig.displayType || 'gallery'
-        const styles = displayType === 'carousel'
-            ? currentTheme.carouselStyles || {}
-            : currentTheme.galleryStyles || {}
-
-        const style = styles[localConfig.imageStyle]
+        const imageStyles = currentTheme.imageStyles || {}
+        const style = imageStyles[localConfig.imageStyle]
 
         if (style) {
             try {

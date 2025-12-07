@@ -17,6 +17,7 @@ import StyleAIHelper from '../../components/theme/StyleAIHelper';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { imageStyleScenarios, getScenarioById, getScenariosByType } from '../../utils/imageStyleScenarios';
 import { migrateLegacyCSS, generateCSSFromBreakpoints, getBreakpointLabel } from '../../utils/cssBreakpointUtils';
+import { normalizeThemeData } from '../../utils/themeDataNormalizer';
 
 const ImageStyleEditPage = () => {
     const { themeId, styleKey } = useParams();
@@ -64,29 +65,32 @@ const ImageStyleEditPage = () => {
     // Initialize UDC theme if needed and load style data when theme loads
     useEffect(() => {
         if (themeData) {
+            // Normalize theme data before using (handles legacy fields)
+            const normalizedData = normalizeThemeData(themeData);
+            
             // Ensure theme exists in UDC and is current
             try {
                 const udcState = getState();
-                const idStr = String(themeData.id);
+                const idStr = String(normalizedData.id);
                 const hasTheme = !!udcState.themes[idStr];
                 if (!hasTheme) {
                     // Map API theme to UDC camelCase structure
                     const themeForUDC = {
                         id: idStr,
-                        name: themeData.name || '',
-                        description: themeData.description || '',
-                        fonts: themeData.fonts || {},
-                        colors: themeData.colors || {},
-                        designGroups: themeData.designGroups || { groups: [] },
-                        componentStyles: themeData.componentStyles || {},
-                        imageStyles: themeData.imageStyles || themeData.image_styles || {},
-                        tableTemplates: themeData.tableTemplates || {},
-                        image: themeData.image || null,
-                        isActive: themeData.isActive ?? true,
-                        isDefault: themeData.isDefault ?? false,
-                        createdAt: themeData.createdAt || new Date().toISOString(),
-                        updatedAt: themeData.updatedAt || new Date().toISOString(),
-                        createdBy: themeData.createdBy,
+                        name: normalizedData.name || '',
+                        description: normalizedData.description || '',
+                        fonts: normalizedData.fonts || {},
+                        colors: normalizedData.colors || {},
+                        designGroups: normalizedData.designGroups || { groups: [] },
+                        componentStyles: normalizedData.componentStyles || {},
+                        imageStyles: normalizedData.imageStyles || {},
+                        tableTemplates: normalizedData.tableTemplates || {},
+                        image: normalizedData.image || null,
+                        isActive: normalizedData.isActive ?? true,
+                        isDefault: normalizedData.isDefault ?? false,
+                        createdAt: normalizedData.createdAt || new Date().toISOString(),
+                        updatedAt: normalizedData.updatedAt || new Date().toISOString(),
+                        createdBy: normalizedData.createdBy,
                     };
                     initTheme(idStr, themeForUDC);
                 }
@@ -95,7 +99,7 @@ const ImageStyleEditPage = () => {
                 }
             } catch (_) { }
 
-            const styles = themeData.image_styles || themeData.imageStyles || {};
+            const styles = normalizedData.imageStyles || {};
             const style = styles[styleKey];
             if (style) {
                 // Migrate legacy string CSS to object format
@@ -184,6 +188,13 @@ const ImageStyleEditPage = () => {
             return;
         }
 
+        // Validate required fields
+        const finalStyleType = styleType || 'gallery';  // Default to gallery if somehow missing
+        if (!template?.trim()) {
+            addNotification({ type: 'error', message: 'Template is required' });
+            return;
+        }
+
         const styles = themeData.image_styles || themeData.imageStyles || {};
         if (sanitizedKey !== styleKey && styles[sanitizedKey]) {
             addNotification({ type: 'error', message: 'A style with this key already exists' });
@@ -203,7 +214,7 @@ const ImageStyleEditPage = () => {
             variables,
             imgproxyConfig,
             lightboxConfig,
-            styleType,
+            styleType: finalStyleType,  // Ensure styleType is always set
             usageType,
             alpine,
             enableLightbox,
@@ -211,7 +222,7 @@ const ImageStyleEditPage = () => {
             defaultShowCaptions,
             defaultLightboxGroup,
             defaultRandomize,
-            ...(styleType === 'carousel' ? {
+            ...(finalStyleType === 'carousel' ? {
                 defaultAutoPlay,
                 defaultAutoPlayInterval,
             } : {}),

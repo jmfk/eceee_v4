@@ -7,6 +7,7 @@ import { versionsApi } from '../../../api/versions';
 import { objectInstancesApi } from '../../../api/objectStorage';
 import { StateChangeCallback, VersionData, PageData } from '../types/state';
 import { defaultEqualityFn } from '../utils/equality';
+import { normalizeThemeData } from '../../../utils/themeDataNormalizer';
 
 // Create the context
 const UnifiedDataContext = createContext<UnifiedDataContextValue | null>(null);
@@ -351,9 +352,12 @@ export function UnifiedDataProvider({
 
         // Filter out image-related fields (uploaded separately)
         const { image, imageFile, imagePreview, ...themeDataToSave } = themeData;
+        
+        // Normalize theme data before saving (defensive - ensures clean data)
+        const normalizedData = normalizeThemeData(themeDataToSave);
 
-        // Save theme data
-        const result = await themesApi.update(currentThemeId, themeDataToSave);
+        // Save normalized theme data
+        const result = await themesApi.update(currentThemeId, normalizedData);
 
         // Update dirty state
         if (result) {

@@ -34,8 +34,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         'colors': 'colors',
         'typography': 'designGroups',
         'component-styles': 'componentStyles',
-        'gallery-styles': 'galleryStyles',
-        'carousel-styles': 'carouselStyles',
+        'image-styles': 'imageStyles',
         'table-templates': 'tableTemplates',
     };
 
@@ -45,8 +44,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             colors: themeData?.colors || {},
             designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
-            galleryStyles: themeData?.galleryStyles || {},
-            carouselStyles: themeData?.carouselStyles || {},
+            imageStyles: themeData?.imageStyles || {},
             tableTemplates: themeData?.tableTemplates || {},
         };
 
@@ -100,8 +98,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             colors: themeData?.colors || {},
             designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
-            galleryStyles: themeData?.galleryStyles || {},
-            carouselStyles: themeData?.carouselStyles || {},
+            imageStyles: themeData?.imageStyles || {},
             tableTemplates: themeData?.tableTemplates || {},
         };
 
@@ -170,8 +167,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                 colors: themeData?.colors || {},
                 designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
-                galleryStyles: themeData?.galleryStyles || {},
-                carouselStyles: themeData?.carouselStyles || {},
+                imageStyles: themeData?.imageStyles || {},
                 tableTemplates: themeData?.tableTemplates || {},
             };
         } else {
@@ -200,8 +196,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                 colors: themeData?.colors || {},
                 designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
-                galleryStyles: themeData?.galleryStyles || {},
-                carouselStyles: themeData?.carouselStyles || {},
+                imageStyles: themeData?.imageStyles || {},
                 tableTemplates: themeData?.tableTemplates || {},
             };
         } else {
@@ -249,8 +244,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             colors: 'Colors',
             designGroups: 'Design Groups',
             componentStyles: 'Component Styles',
-            galleryStyles: 'Gallery Styles',
-            carouselStyles: 'Carousel Styles',
+            imageStyles: 'Image Styles',
             tableTemplates: 'Table Templates',
         };
         return labels[section] || section;

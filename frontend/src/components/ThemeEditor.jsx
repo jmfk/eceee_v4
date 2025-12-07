@@ -17,6 +17,7 @@ import { extractErrorMessage } from '../utils/errorHandling.js';
 import { useNotificationContext } from './NotificationManager';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
+import { normalizeThemeData } from '../utils/themeDataNormalizer';
 import {
     Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw, Clipboard, Download, FileUp, Files
 } from 'lucide-react';
@@ -141,27 +142,28 @@ const ThemeEditor = ({ onSave }) => {
             };
             initTheme(newThemeId, emptyTheme);
         } else if (isEditing && selectedThemeData) {
+            // Normalize theme data before initializing UDC (handles legacy fields)
+            const normalizedData = normalizeThemeData(selectedThemeData);
+            
             // Initialize theme from fresh server data
             const themeForUDC = {
-                id: String(selectedThemeData.id),
-                name: selectedThemeData.name || '',
-                description: selectedThemeData.description || '',
-                fonts: selectedThemeData.fonts || {},
-                colors: selectedThemeData.colors || {},
-                designGroups: selectedThemeData.designGroups || selectedThemeData.typography || { groups: [] },
-                componentStyles: selectedThemeData.componentStyles || {},
-                imageStyles: selectedThemeData.imageStyles || {},
-                galleryStyles: selectedThemeData.galleryStyles || {},  // Deprecated
-                carouselStyles: selectedThemeData.carouselStyles || {},  // Deprecated
-                tableTemplates: selectedThemeData.tableTemplates || {},
-                image: selectedThemeData.image || null,
-                isActive: selectedThemeData.isActive ?? true,
-                isDefault: selectedThemeData.isDefault ?? false,
-                createdAt: selectedThemeData.createdAt || new Date().toISOString(),
-                updatedAt: selectedThemeData.updatedAt || new Date().toISOString(),
-                createdBy: selectedThemeData.createdBy,
+                id: String(normalizedData.id),
+                name: normalizedData.name || '',
+                description: normalizedData.description || '',
+                fonts: normalizedData.fonts || {},
+                colors: normalizedData.colors || {},
+                designGroups: normalizedData.designGroups || normalizedData.typography || { groups: [] },
+                componentStyles: normalizedData.componentStyles || {},
+                imageStyles: normalizedData.imageStyles || {},
+                tableTemplates: normalizedData.tableTemplates || {},
+                image: normalizedData.image || null,
+                isActive: normalizedData.isActive ?? true,
+                isDefault: normalizedData.isDefault ?? false,
+                createdAt: normalizedData.createdAt || new Date().toISOString(),
+                updatedAt: normalizedData.updatedAt || new Date().toISOString(),
+                createdBy: normalizedData.createdBy,
             };
-            initTheme(String(selectedThemeData.id), themeForUDC);
+            initTheme(String(normalizedData.id), themeForUDC);
         }
     }, [themeId, isCreating, isEditing, selectedThemeData, initTheme]);
 
@@ -384,8 +386,6 @@ const ThemeEditor = ({ onSave }) => {
                 designGroups: pastedData.designGroups || {},
                 componentStyles: pastedData.componentStyles || {},
                 imageStyles: pastedData.imageStyles || {},
-                galleryStyles: pastedData.galleryStyles || {},
-                carouselStyles: pastedData.carouselStyles || {},
                 tableTemplates: pastedData.tableTemplates || {},
             };
 

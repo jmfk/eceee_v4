@@ -270,7 +270,7 @@ const ThemeSelector = ({
                                                         </div>
 
                                                         {/* Available Styles */}
-                                                        {(theme.componentStyles || theme.galleryStyles || theme.carouselStyles || theme.tableTemplates) && (
+                                                        {(theme.componentStyles || theme.imageStyles || theme.tableTemplates) && (
                                                             <div className="mb-3 p-2 bg-gray-50 rounded border border-gray-200">
                                                                 <div className="text-xs font-medium text-gray-700 mb-2">Available Templates</div>
                                                                 <div className="grid grid-cols-2 gap-2">
@@ -286,24 +286,12 @@ const ThemeSelector = ({
                                                                             </div>
                                                                         </div>
                                                                     )}
-                                                                    {theme.galleryStyles && Object.keys(theme.galleryStyles).length > 0 && (
+                                                                    {theme.imageStyles && Object.keys(theme.imageStyles).length > 0 && (
                                                                         <div>
-                                                                            <div className="text-xs font-medium text-gray-700 mb-0.5">Gallery:</div>
+                                                                            <div className="text-xs font-medium text-gray-700 mb-0.5">Image Styles:</div>
                                                                             <div className="flex flex-wrap gap-1">
-                                                                                {Object.keys(theme.galleryStyles).map(styleName => (
-                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
-                                                                                        {styleName}
-                                                                                    </span>
-                                                                                ))}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                    {theme.carouselStyles && Object.keys(theme.carouselStyles).length > 0 && (
-                                                                        <div>
-                                                                            <div className="text-xs font-medium text-gray-700 mb-0.5">Carousel:</div>
-                                                                            <div className="flex flex-wrap gap-1">
-                                                                                {Object.keys(theme.carouselStyles).map(styleName => (
-                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+                                                                                {Object.entries(theme.imageStyles).map(([styleName, style]) => (
+                                                                                    <span key={styleName} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700" title={style.styleType}>
                                                                                         {styleName}
                                                                                     </span>
                                                                                 ))}
