@@ -495,7 +495,11 @@ const SectionWidget = ({
 
                             {!config.enableCollapse && (
                                 /* No collapse enabled - show all widgets without banner */
-                                slotsData.content.slice(1).map((widget, index) => renderWidget(widget, 'content', index + 1))
+                                slotsData.content.slice(1).map((widget, index) => (
+                                    <div key={widget.id || `content-${index + 1}`}>
+                                        {renderWidget(widget, 'content', index + 1)}
+                                    </div>
+                                ))
                             )}
                         </>
                     ) : (

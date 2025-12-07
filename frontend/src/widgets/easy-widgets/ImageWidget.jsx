@@ -474,7 +474,7 @@ const ImageWidget = ({
         if (style) {
             try {
                 // Prepare context for Mustache rendering
-                const context = displayType === 'carousel'
+                const context = (localConfig.displayType || 'gallery') === 'carousel'
                     ? prepareCarouselContext(items, localConfig, style.variables)
                     : prepareGalleryContext(items, localConfig, style.variables, style.lightboxConfig)
 
