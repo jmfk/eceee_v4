@@ -95,10 +95,22 @@ const processSecondaryMenuItems = (items) => {
 }
 
 /**
+ * Convert color value to CSS variable if it's a named color from theme palette
+ */
+const formatColorValue = (colorValue, themeColors) => {
+    if (!colorValue || !themeColors) return colorValue
+    // If the value is a key in the theme colors, wrap it in var()
+    if (themeColors[colorValue]) {
+        return `var(--${colorValue})`
+    }
+    return colorValue
+}
+
+/**
  * EASY Navbar Widget Component
  * Renders a navigation bar with configurable menu items and responsive overflow
  */
-const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
+const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     const {
         menuItems = [],
         secondaryMenuItems = [],
@@ -108,6 +120,9 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
         backgroundColor = null,
         hamburgerBreakpoint = 768,
     } = config
+
+    // Get theme colors for CSS variable conversion
+    const themeColors = context?.theme?.colors || context?.theme?.palette || {}
 
     // Process menu items to extract link_data (handles both new and old formats)
     const processedMenuItems = processMenuItems(menuItems)
@@ -280,6 +295,13 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             ? "navbar-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
             : "navbar-link text-white text-sm font-medium no-underline hover:opacity-80 transition-opacity"
 
+        const linkStyle = !isInDropdown ? {
+            fontSize: '14px',
+            color: '#ffffff',
+            fontFamily: '"Source Sans 3", sans-serif',
+            fontWeight: 500
+        } : {}
+
         return (
             <a
                 key={index}
@@ -288,6 +310,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                 target={item.targetBlank ? '_blank' : undefined}
                 rel={item.targetBlank ? 'noopener noreferrer' : undefined}
                 className={linkClasses}
+                style={linkStyle}
                 onClick={(e) => {
                     if (mode === 'editor') {
                         e.preventDefault()
@@ -306,20 +329,16 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     const renderSecondaryMenuItem = (item, index, isInDropdown = false) => {
-        const itemBgColor = item.backgroundColor || '#3b82f6'
         const itemBgImage = getImageUrl(item.backgroundImage)
 
+        // Convert color values to CSS variables if needed
+        const bgColor = formatColorValue(item.backgroundColor, themeColors)
+        const txtColor = formatColorValue(item.textColor, themeColors)
+
         const itemStyle = {
-            color: '#ffffff',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            textDecoration: 'none',
-            transition: 'opacity 0.2s ease-in-out',
-            whiteSpace: 'nowrap',
-            padding: '4px 12px',
-            display: 'inline-block',
-            borderRadius: '4px',
-            backgroundColor: itemBgColor,
+            // Only apply item-specific overrides
+            ...(bgColor && { backgroundColor: bgColor }),
+            ...(txtColor && { color: txtColor }),
             ...(itemBgImage && {
                 backgroundImage: `url('${itemBgImage}')`,
                 backgroundSize: 'cover',
@@ -359,6 +378,9 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
     // Extract image URL from image object or string
     const imageUrl = getImageUrl(backgroundImage)
 
+    // Convert background color to CSS variable if needed
+    const formattedBgColor = formatColorValue(backgroundColor, themeColors)
+
     // Build inline styles for background
     const navStyles = {
         ...(imageUrl && {
@@ -367,11 +389,11 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
             backgroundPosition: backgroundAlignment || backgroundPosition,
             backgroundRepeat: 'no-repeat',
         }),
-        ...(backgroundColor && { backgroundColor }),
+        ...(formattedBgColor && { backgroundColor: formattedBgColor }),
     }
 
     // Determine if we should use default background color
-    const shouldUseDefaultBg = !imageUrl && !backgroundColor
+    const shouldUseDefaultBg = !imageUrl && !formattedBgColor
 
     // Empty state for editor
     if (mode === 'editor' && (!activeMenuItems || activeMenuItems.length === 0)) {
@@ -453,6 +475,15 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                             key={index}
                             className="navbar-menu-item"
                             ref={(el) => (itemRefs.current[index] = el)}
+                            style={{
+                                listStyle: 'none',
+                                fontSize: '14px',
+                                marginTop: '0px',
+                                fontFamily: '"Source Sans 3", sans-serif',
+                                fontWeight: 300,
+                                lineHeight: '22px',
+                                marginBottom: '0px'
+                            }}
                         >
                             {renderMenuItem(item, index, false)}
                         </li>
@@ -515,7 +546,21 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                         style={{ listStyle: 'none' }}
                     >
                         {activeSecondaryMenuItems.map((item, index) => (
-                            <li key={index} className="navbar-menu-item">
+                            <li 
+                                key={index} 
+                                className="navbar-menu-item"
+                                style={{
+                                    listStyle: 'none',
+                                    fontSize: '14px',
+                                    marginTop: '0px',
+                                    fontFamily: '"Source Sans 3", sans-serif',
+                                    fontWeight: 300,
+                                    lineHeight: '22px',
+                                    marginBottom: '0px',
+                                    borderRadius: '4px 4px 0 0',
+                                    padding: '0 12px 3px'
+                                }}
+                            >
                                 {renderSecondaryMenuItem(item, index, false)}
                             </li>
                         ))}
@@ -526,19 +571,19 @@ const NavbarWidget = ({ config = {}, mode = 'preview' }) => {
                 {activeSecondaryMenuItems.length > 0 && (
                     <div className="absolute opacity-0 pointer-events-none flex gap-1 right-[20px]">
                         {activeSecondaryMenuItems.map((item, index) => {
-                            const itemBgColor = item.backgroundColor || '#3b82f6'
                             const itemBgImage = getImageUrl(item.backgroundImage)
+                            const bgColor = formatColorValue(item.backgroundColor, themeColors)
+                            const txtColor = formatColorValue(item.textColor, themeColors)
                             return (
                                 <span
                                     key={`measure-secondary-${index}`}
                                     ref={(el) => {
                                         secondaryItemRefs.current[index] = el
                                     }}
-                                    className="text-white text-sm font-medium whitespace-nowrap"
+                                    className="navbar-secondary-link text-white text-sm font-medium whitespace-nowrap"
                                     style={{
-                                        padding: '4px 12px',
-                                        borderRadius: '4px',
-                                        backgroundColor: itemBgColor,
+                                        ...(bgColor && { backgroundColor: bgColor }),
+                                        ...(txtColor && { color: txtColor }),
                                         ...(itemBgImage && {
                                             backgroundImage: `url('${itemBgImage}')`,
                                             backgroundSize: 'cover',
