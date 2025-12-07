@@ -3,6 +3,7 @@ import { Plus, Trash2, X, Download, FileText, Loader2, GripVertical } from 'luci
 import { usePageChildren } from '../../hooks/usePageStructure'
 import LinkField from '../../components/form-fields/LinkField'
 import ColorSelector from '../../components/theme/form-fields/ColorSelector'
+import ImageInput from '../../components/form-fields/ImageInput'
 
 /**
  * NavbarWidgetEditor Component
@@ -15,6 +16,7 @@ const NavbarWidgetEditor = ({
     isAnimating = false,
     isClosing = false,
     onConfigChange,
+    namespace = null,
     context = {}
 }) => {
     const config = widgetData?.config || {}
@@ -554,15 +556,12 @@ const NavbarWidgetEditor = ({
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Background Image
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={item.backgroundImage || ''}
-                                                        onChange={(e) => updateSecondaryMenuItemField(index, 'backgroundImage', e.target.value)}
-                                                        placeholder="URL..."
-                                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    <ImageInput
+                                                        label="Background Image"
+                                                        value={item.backgroundImage || null}
+                                                        onChange={(newValue) => updateSecondaryMenuItemField(index, 'backgroundImage', newValue)}
+                                                        namespace={namespace}
+                                                        mediaTypes={['image']}
                                                     />
                                                 </div>
                                             </div>
