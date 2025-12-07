@@ -24,6 +24,40 @@ const HeadlineWidget = ({
 }) => {
     const pageId = context?.pageId
 
+    // Inject widget CSS styles
+    useEffect(() => {
+        const styleId = 'headline-widget-styles'
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement('style')
+            style.id = styleId
+            style.textContent = `
+                .headline-widget {
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    width: 100%;
+                    min-height: 140px;
+                    outline: 1px solid rgb(0,0,0,0.3);
+                    border-width: 0;
+                    overflow: hidden;
+                    margin-bottom: 30px;
+                }
+                .headline-widget.border-disabled {
+                    outline: none;
+                }
+                .headline-widget:last-child {
+                    margin-bottom: 0;
+                }
+                
+                .headline-content {
+                    padding: 0;
+                    margin: 0;
+                }
+            `
+            document.head.appendChild(style)
+        }
+    }, [])
+
     // Get current theme for component styles
     const { currentTheme } = useTheme({ pageId, enabled: !!pageId })
 
@@ -124,7 +158,7 @@ const HeadlineWidget = ({
                     mode: 'inline-rich',
                     onChange: handleContentChange,
                     placeholder: 'Enter headline...',
-                    element: 'h2',
+                    element: configRef.current.headerLevel || 'h1',
                     allowedButtons: ['bold', 'italic', 'link']
                 })
                 contentEditorRef.current.render()
@@ -153,11 +187,12 @@ const HeadlineWidget = ({
         if (mode === 'editor') {
             if (contentEditorRef.current) {
                 contentEditorRef.current.updateConfig({
-                    content: configRef.current.content || ''
+                    content: configRef.current.content || '',
+                    element: configRef.current.headerLevel || 'h1'
                 })
             }
         }
-    }, [configRef.current.content, mode])
+    }, [configRef.current.content, configRef.current.headerLevel, mode])
 
     // Check if using component style with Mustache template
     const componentStyle = configRef.current.componentStyle || 'default'
@@ -216,27 +251,31 @@ const HeadlineWidget = ({
 
     // Default rendering helper function
     function renderDefaultHeadline() {
+        const HeaderTag = configRef.current.headerLevel || 'h1'
+        const borderClass = configRef.current.showBorder === false ? 'border-disabled' : ''
+
         if (mode === 'editor') {
             return (
                 <div
-                    className="headline-widget widget-type-easy-widgets-headlinewidget container cms-content"
+                    className={`headline-widget widget-type-easy-widgets-headlinewidget container cms-content ${borderClass}`}
                     id={configRef.current.anchor || undefined}
                 >
-                    <div className="headline-content" ref={contentContainerRef}>
+                    <HeaderTag className="headline-content" ref={contentContainerRef}>
                         {/* Editor will be initialized here */}
-                    </div>
+                    </HeaderTag>
                 </div>
             )
         }
 
         return (
             <div
-                className="headline-widget widget-type-easy-widgets-headlinewidget container cms-content"
+                className={`headline-widget widget-type-easy-widgets-headlinewidget container cms-content ${borderClass}`}
                 id={configRef.current.anchor || undefined}
             >
-                <div className="headline-content">
-                    <div dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }} />
-                </div>
+                <HeaderTag
+                    className="headline-content"
+                    dangerouslySetInnerHTML={{ __html: configRef.current.content || '' }}
+                />
             </div>
         )
     }
@@ -245,11 +284,7 @@ const HeadlineWidget = ({
     const hasContent = configRef.current.content
 
     if (mode === 'editor') {
-        return (
-            <div className="headline-widget-editor">
-                {renderDefaultHeadline()}
-            </div>
-        )
+        return renderDefaultHeadline()
     }
 
     // Preview mode
@@ -276,7 +311,8 @@ HeadlineWidget.defaultConfig = {
     anchor: '',
     content: '',
     componentStyle: 'default',
-    showBorder: true
+    showBorder: true,
+    headerLevel: 'h1'
 }
 
 // Display metadata

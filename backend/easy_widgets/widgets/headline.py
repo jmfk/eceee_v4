@@ -31,6 +31,23 @@ class HeadlineConfig(BaseModel):
             "group": "Content",
         },
     )
+    headerLevel: str = Field(
+        "h1",
+        description="HTML header level",
+        json_schema_extra={
+            "component": "SegmentedControlInput",
+            "options": [
+                {"value": "h1", "label": "H1"},
+                {"value": "h2", "label": "H2"},
+                {"value": "h3", "label": "H3"},
+                {"value": "h4", "label": "H4"},
+                {"value": "h5", "label": "H5"},
+                {"value": "h6", "label": "H6"},
+            ],
+            "order": 1.5,
+            "group": "Content",
+        },
+    )
     componentStyle: str = Field(
         "default",
         description="Component style from theme",
@@ -111,11 +128,8 @@ class HeadlineWidget(BaseWidget):
     }
     
     .headline-content {
-        flex: 1; 
-        padding: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        padding: 0;
+        margin: 0;
     }
     
     /* Responsive behavior */
@@ -174,7 +188,7 @@ class HeadlineWidget(BaseWidget):
             content=config.get("content", ""),
             anchor=config.get("anchor", ""),
             style_vars=style.get("variables", {}),
-            config=config,  # Pass raw config for granular control
+            config=config,  # Pass raw config for granular control (includes header_level)
         )
 
         # Render template
@@ -190,5 +204,6 @@ class HeadlineWidget(BaseWidget):
         # Ensure snake_case fields for template
         template_config["component_style"] = config.get("component_style", "default")
         template_config["show_border"] = config.get("show_border", True)
+        template_config["header_level"] = config.get("header_level", "h1")
 
         return template_config

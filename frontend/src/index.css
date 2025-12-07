@@ -600,12 +600,6 @@ div[style*="z-index"] {
 /* Enhanced widget wrapper in HTML slots */
 .widget-wrapper {
   position: relative;
-  transition: all 0.2s ease-in-out;
-}
-
-.widget-wrapper:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Responsive design for slot management */

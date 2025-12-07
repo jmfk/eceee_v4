@@ -8,9 +8,9 @@
 {% endif %}
 
 <div class="headline-widget widget-type-{{ widget_type.css_class_name }} cms-content{% if not config.show_border %} border-disabled{% endif %}"{% if config.anchor %} id="{{ config.anchor }}"{% endif %}>
-    <div class="headline-content">
+    <{{ config.header_level|default:"h1" }} class="headline-content">
         {{ config.content|safe }}
-    </div>
+    </{{ config.header_level|default:"h1" }}>
 </div>
 
 {% endif %}{# End check for empty headline #}
