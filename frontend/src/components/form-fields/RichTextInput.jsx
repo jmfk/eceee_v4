@@ -20,6 +20,10 @@ const RichTextInput = ({
     placeholder,
     rows = 6,
     toolbar = 'basic',
+    // Custom props that shouldn't be spread to DOM
+    context,
+    formData,
+    fieldName,
     ...props
 }) => {
     // Get validation status for styling
