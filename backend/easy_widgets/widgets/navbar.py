@@ -378,14 +378,8 @@ class NavbarWidget(BaseWidget):
             page_query = WebPage.objects.filter(
                 id__in=internal_page_ids.keys(),
                 is_deleted=False,
+                is_currently_published=True,
             )
-
-            # Filter by publication status and hostname if available
-            if hostname:
-                page_query = page_query.filter(
-                    is_currently_published=True,
-                    cached_root_hostnames__contains=[hostname],
-                )
 
             # Build lookup of id -> path
             page_paths = {p.id: p.cached_path for p in page_query}
