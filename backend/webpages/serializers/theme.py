@@ -237,22 +237,26 @@ class PageThemeSerializer(serializers.ModelSerializer):
         if not isinstance(value, dict):
             raise serializers.ValidationError("Image styles must be a JSON object")
 
-        # Validate each style has required fields
+        # Auto-fix and validate each style
         for style_name, style_config in value.items():
             if not isinstance(style_config, dict):
                 raise serializers.ValidationError(
                     f"Image style '{style_name}' must be an object"
                 )
 
+            # Auto-fix: Add missing template with default value
             if "template" not in style_config:
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' must have a 'template' field"
+                style_config["template"] = (
+                    '<div class="image-gallery">\n'
+                    '  {{#images}}\n'
+                    '    <img src="{{url}}" alt="{{alt}}" loading="lazy">\n'
+                    '  {{/images}}\n'
+                    '</div>'
                 )
 
+            # Auto-fix: Add missing styleType with default value
             if "styleType" not in style_config:
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' must have a 'styleType' field"
-                )
+                style_config["styleType"] = "gallery"
 
             if style_config["styleType"] not in ["gallery", "carousel"]:
                 raise serializers.ValidationError(
