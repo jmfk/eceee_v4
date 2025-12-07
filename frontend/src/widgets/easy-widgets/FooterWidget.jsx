@@ -5,12 +5,13 @@
  * Widget type: easy_widgets.FooterWidget
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import SlotEditor from '../../components/editors/SlotEditor';
 import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
+import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure';
 import PropTypes from 'prop-types';
 
 const FooterWidget = ({
@@ -54,12 +55,45 @@ const FooterWidget = ({
         config.slots || { content: [] }
     );
 
+    // Background image state
+    const [backgroundUrl, setBackgroundUrl] = useState('');
+    const [imageLoading, setImageLoading] = useState(false);
+
     // Sync slotsData when config.slots changes externally
     React.useEffect(() => {
         if (config.slots) {
             setSlotsData(config.slots);
         }
     }, [config.slots]);
+
+    // Load optimized background image URL from backend API
+    useEffect(() => {
+        const loadBackgroundImage = async () => {
+            const image = config.backgroundImage;
+            if (!image) {
+                setBackgroundUrl('');
+                return;
+            }
+
+            setImageLoading(true);
+
+            try {
+                // Large footer background size (1920x400)
+                const url = await getImgproxyUrlFromImage(image, {
+                    width: 1920,
+                    height: 400,
+                    resizeType: 'fill'
+                });
+                setBackgroundUrl(url);
+            } catch (error) {
+                console.error('Failed to load optimized footer background image:', error);
+            } finally {
+                setImageLoading(false);
+            }
+        };
+
+        loadBackgroundImage();
+    }, [config.backgroundImage]);
 
     // Handle slot changes - update local state first, then publish to UDC
     const handleSlotChange = useCallback(async (slotName, widgets) => {
@@ -148,8 +182,8 @@ const FooterWidget = ({
     if (config.backgroundColor) {
         footerStyle.backgroundColor = config.backgroundColor;
     }
-    if (config.backgroundImage) {
-        footerStyle.backgroundImage = `url(${config.backgroundImage})`;
+    if (config.backgroundImage && backgroundUrl) {
+        footerStyle.backgroundImage = `url('${backgroundUrl}')`;
         footerStyle.backgroundSize = 'cover';
         footerStyle.backgroundPosition = 'center';
     }
