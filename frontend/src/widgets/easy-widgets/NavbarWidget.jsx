@@ -348,8 +348,19 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
         }
 
         if (isInDropdown) {
+            // Mobile menu styles (match backend template lines 70-86)
             itemStyle.display = 'block'
+            itemStyle.padding = '0.5rem 1rem'
+            itemStyle.fontSize = '0.875rem'
+            itemStyle.color = '#ffffff'
+            itemStyle.textDecoration = 'none'
+            itemStyle.transition = 'opacity 0.2s'
             itemStyle.margin = '0.25rem 0.5rem'
+            itemStyle.borderRadius = '4px'
+            // Apply default background if none specified
+            if (!bgColor) {
+                itemStyle.backgroundColor = '#3b82f6'
+            }
         }
 
         return (
@@ -545,25 +556,52 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                         className="navbar-menu-list navbar-secondary-menu flex gap-1 m-0 p-0 pr-[20px] items-center ml-auto"
                         style={{ listStyle: 'none' }}
                     >
-                        {activeSecondaryMenuItems.map((item, index) => (
-                            <li 
-                                key={index} 
-                                className="navbar-menu-item"
-                                style={{
-                                    listStyle: 'none',
-                                    fontSize: '14px',
-                                    marginTop: '0px',
-                                    fontFamily: '"Source Sans 3", sans-serif',
-                                    fontWeight: 300,
-                                    lineHeight: '22px',
-                                    marginBottom: '0px',
-                                    borderRadius: '4px 4px 0 0',
-                                    padding: '0 12px 3px'
-                                }}
-                            >
-                                {renderSecondaryMenuItem(item, index, false)}
-                            </li>
-                        ))}
+                        {activeSecondaryMenuItems.map((item, index) => {
+                            const itemBgImage = getImageUrl(item.backgroundImage)
+                            const bgColor = formatColorValue(item.backgroundColor, themeColors)
+                            const txtColor = formatColorValue(item.textColor, themeColors)
+
+                            return (
+                                <li 
+                                    key={index} 
+                                    className="navbar-menu-item"
+                                    style={{
+                                        listStyle: 'none',
+                                        fontSize: '14px',
+                                        marginTop: '0px',
+                                        fontFamily: '"Source Sans 3", sans-serif',
+                                        fontWeight: 300,
+                                        lineHeight: '22px',
+                                        marginBottom: '0px',
+                                        borderRadius: '4px 4px 0 0',
+                                        padding: '0 12px 3px',
+                                        ...(bgColor && { backgroundColor: bgColor }),
+                                        ...(txtColor && { color: txtColor }),
+                                        ...(itemBgImage && {
+                                            backgroundImage: `url('${itemBgImage}')`,
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center',
+                                            backgroundRepeat: 'no-repeat',
+                                        }),
+                                    }}
+                                >
+                                    <a
+                                        href={mode === 'editor' ? '#' : item.url}
+                                        data-href={item.url}
+                                        target={item.targetBlank ? '_blank' : undefined}
+                                        rel={item.targetBlank ? 'noopener noreferrer' : undefined}
+                                        className="navbar-link navbar-secondary-link hover:opacity-80"
+                                        onClick={(e) => {
+                                            if (mode === 'editor') {
+                                                e.preventDefault()
+                                            }
+                                        }}
+                                    >
+                                        {item.label}
+                                    </a>
+                                </li>
+                            )
+                        })}
                     </ul>
                 )}
 

@@ -54,8 +54,6 @@
                     {{#pageTitle}}title="{{pageTitle}}"{{/pageTitle}}
                     @click="isMobileMenuOpen = false"
                     style="display: block; padding: 0.5rem 1rem; font-size: 0.875rem; color: #374151; text-decoration: none; transition: background-color 0.2s;"
-                    onmouseover="this.style.backgroundColor='#f3f4f6'"
-                    onmouseout="this.style.backgroundColor='transparent'"
                 >
                 {{label}}
                 </a>
@@ -86,8 +84,6 @@
                                     background-repeat: no-repeat;
                                 {{/backgroundImage}}
                             "
-                            onmouseover="this.style.opacity='0.8'"
-                            onmouseout="this.style.opacity='1'"
                         >
                         {{label}}
                         </a>
@@ -110,9 +106,6 @@
                         {{#targetBlank}}target="_blank" rel="noopener noreferrer"{{/targetBlank}}
                         {{#pageTitle}}title="{{pageTitle}}"{{/pageTitle}}
                         class="navbar-link"
-                        style="color: #ffffff; font-size: 0.875rem; font-weight: 500; text-decoration: none; transition: opacity 0.2s ease-in-out; white-space: nowrap;"
-                        onmouseover="this.style.opacity='0.8'"
-                        onmouseout="this.style.opacity='1'"
                     >
                         {{label}}
                     </a>
@@ -131,34 +124,20 @@
             style="display: flex; gap: 0.25rem; list-style: none; margin: 0 0 0 auto; padding: 0 20px 0 0; align-items: flex-end; flex: 0 1 auto;"
         >
             {{#secondaryMenuItems}}
-                <li class="navbar-menu-item">
-                    <a 
-                        href="{{url}}"
-                        {{#targetBlank}}target="_blank" rel="noopener noreferrer"{{/targetBlank}}
-                        class="navbar-link navbar-secondary-link"
-                        style="
-                            color: #ffffff; 
-                            font-size: 0.875rem; 
-                            font-weight: 500; 
-                            text-decoration: none; 
-                            transition: opacity 0.2s ease-in-out; 
-                            white-space: nowrap;
-                            padding: 2px 12px;
-                            display: inline-block;
-                            border-radius: 4px 4px 0 0;
-                            height: 26px;
-                            line-height: 22px;
-                            margin-top: 2px;
+                <li class="navbar-menu-item" style="
                             {{#backgroundColor}}background-color: {{backgroundColor}};{{/backgroundColor}}
+                            {{#textColor}}color: {{textColor}};{{/textColor}}
                             {{#backgroundImage}}
                                 background-image: url('{{backgroundImage}}');
                                 background-size: cover;
                                 background-position: center;
                                 background-repeat: no-repeat;
                             {{/backgroundImage}}
-                        "
-                        onmouseover="this.style.opacity='0.8'"
-                        onmouseout="this.style.opacity='1'"
+                        ">
+                    <a 
+                        href="{{url}}"
+                        {{#targetBlank}}target="_blank" rel="noopener noreferrer"{{/targetBlank}}
+                        class="navbar-link navbar-secondary-link"
                     >
                      {{label}}
                     </a>
