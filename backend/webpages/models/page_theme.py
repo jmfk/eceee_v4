@@ -1349,18 +1349,18 @@ class PageTheme(models.Model):
                     ]
             else:
                 # Both widget type and slot targeting (all combinations)
-                # Use descendant selector since slot is on outer div, widget-type on inner div
+                # Use child combinator (>) to prevent cascading to nested widgets
                 for wt in widget_types:
                     for slot in slots:
                         wt_normalized = normalize_for_css(wt)
                         slot_normalized = normalize_for_css(slot)
                         if scope:
                             base_selectors.append(
-                                f"{scope}.slot-{slot_normalized} .widget-type-{wt_normalized}"
+                                f"{scope}.slot-{slot_normalized} > .widget-type-{wt_normalized}"
                             )
                         else:
                             base_selectors.append(
-                                f".slot-{slot_normalized} .widget-type-{wt_normalized}"
+                                f".slot-{slot_normalized} > .widget-type-{wt_normalized}"
                             )
 
             # Apply frontend scoping if requested

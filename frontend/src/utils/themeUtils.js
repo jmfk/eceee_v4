@@ -124,15 +124,15 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             });
         } else {
             // Both widget type and slot targeting (all combinations)
-            // Use descendant selector since slot is on outer div, widget-type on inner div
+            // Use child combinator (>) to prevent cascading to nested widgets
             widgetTypes.forEach(type => {
                 slots.forEach(slot => {
                     const typeNormalized = normalizeForCSS(type);
                     const slotNormalized = normalizeForCSS(slot);
                     if (scope) {
-                        baseSelectors.push(`${scope}.slot-${slotNormalized} .widget-type-${typeNormalized}`);
+                        baseSelectors.push(`${scope}.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
                     } else {
-                        baseSelectors.push(`.slot-${slotNormalized} .widget-type-${typeNormalized}`);
+                        baseSelectors.push(`.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
                     }
                 });
             });
