@@ -46,6 +46,25 @@ class ThreeColumnsWidget(BaseWidget):
     )
     template_name = "easy_widgets/widgets/three_columns.html"
 
+    layout_parts = {
+        "three-columns-widget": {
+            "label": "Three Columns container",
+            "properties": [
+                "width",
+                "height",
+                "min-height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+                "fontFamily",
+                "fontSize",
+                "lineHeight",
+                "gap",
+            ],
+        },
+    }
+
     widget_css = """
     .three-columns-widget {
         display: grid;
@@ -233,15 +252,19 @@ class ThreeColumnsWidget(BaseWidget):
                     try:
                         # Filter out hidden widgets (check both config.isVisible and config.is_visible)
                         widget_config = widget_data.get("config", {})
-                        is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
+                        is_visible = widget_config.get(
+                            "isVisible", widget_config.get("is_visible", True)
+                        )
                         if not is_visible:
                             continue  # Skip hidden widgets
-                        
+
                         # Filter out inactive widgets (check both config.isActive and config.is_active)
-                        is_active = widget_config.get("isActive", widget_config.get("is_active", True))
+                        is_active = widget_config.get(
+                            "isActive", widget_config.get("is_active", True)
+                        )
                         if not is_active:
                             continue  # Skip inactive widgets
-                        
+
                         # Add sort_order if missing (use array index to preserve order)
                         if (
                             "sort_order" not in widget_data

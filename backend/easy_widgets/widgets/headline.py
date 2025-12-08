@@ -104,6 +104,7 @@ class HeadlineWidget(BaseWidget):
             "properties": [
                 "width",
                 "height",
+                "min-height",
                 "padding",
                 "margin",
                 "backgroundColor",
