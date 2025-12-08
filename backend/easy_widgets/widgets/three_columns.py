@@ -63,6 +63,15 @@ class ThreeColumnsWidget(BaseWidget):
                 "gap",
             ],
         },
+        "three-col-widget-wrapper": {
+            "label": "Three Columns Wrappercontainer",
+            "properties": [
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
     }
 
     widget_css = """
