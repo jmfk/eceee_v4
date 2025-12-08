@@ -778,6 +778,8 @@ const MediaBrowser = ({
                             onChange={handleSearchChange}
                             namespace={namespace}
                             placeholder="Search media files..."
+                            autoSearch={true}
+                            autoSearchDelay={500}
                         />
                     </div>
 
