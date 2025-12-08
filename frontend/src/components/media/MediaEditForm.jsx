@@ -361,10 +361,10 @@ const MediaEditForm = ({
                 </div>
             )}
 
-            <div className="flex gap-6">
-                {/* File Preview */}
-                <div className="flex-shrink-0">
-                    <div className="w-48 h-48 bg-gray-100 rounded-lg overflow-hidden border border-gray-300 flex items-center justify-center">
+            {/* File Preview */}
+            <div className="mb-6">
+                <div className="flex flex-col items-center">
+                    <div className="w-full max-w-2xl bg-gray-100 rounded-lg overflow-hidden border border-gray-300 flex items-center justify-center">
                         {(file.fileType === 'image' || file.file_type === 'image') ? (
                             <OptimizedImage
                                 src={mode === 'approve'
@@ -372,22 +372,24 @@ const MediaEditForm = ({
                                     : file.imgproxyBaseUrl || file.fileUrl
                                 }
                                 alt={file.title || file.originalFilename}
-                                width={200}
-                                height={200}
-                                className="w-full h-full object-cover"
+                                width={800}
+                                height={600}
+                                className="w-full h-auto max-h-96 object-contain"
                                 fallback={
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                    <div className="w-full h-64 flex items-center justify-center bg-gray-200">
                                         <FileText className="w-16 h-16 text-gray-400" />
                                     </div>
                                 }
                             />
                         ) : (
-                            <FileText className="w-16 h-16 text-gray-400" />
+                            <div className="w-full h-64 flex items-center justify-center">
+                                <FileText className="w-16 h-16 text-gray-400" />
+                            </div>
                         )}
                     </div>
-                    <div className="mt-2 text-sm text-gray-600 text-center">
-                        <p className="truncate">{file.originalFilename}</p>
-                        <p>{formatFileSize(file.fileSize)}</p>
+                    <div className="mt-3 text-sm text-gray-600 text-center">
+                        <p className="font-medium">{file.originalFilename}</p>
+                        <p className="text-gray-500">{formatFileSize(file.fileSize)}</p>
                     </div>
                     
                     {/* Replace File Button - Only show in edit mode */}
@@ -403,7 +405,7 @@ const MediaEditForm = ({
                             <button
                                 onClick={handleReplaceFileClick}
                                 disabled={replacingFile}
-                                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                className="mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                             >
                                 {replacingFile ? (
                                     <>
@@ -420,9 +422,10 @@ const MediaEditForm = ({
                         </>
                     )}
                 </div>
+            </div>
 
-                {/* Form Fields */}
-                <div className="flex-1 space-y-4">
+            {/* Form Fields */}
+            <div className="space-y-4">
                     {/* Title */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -543,27 +546,26 @@ const MediaEditForm = ({
                         </div>
                     )}
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-3 pt-4">
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || Object.keys(validationErrors).length > 0}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {saving ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Save className="w-4 h-4" />
-                            )}
-                            {saving ? 'Saving...' : (mode === 'approve' ? 'Approve' : 'Save Changes')}
-                        </button>
-                        <button
-                            onClick={onCancel}
-                            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                    </div>
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                    <button
+                        onClick={handleSave}
+                        disabled={saving || Object.keys(validationErrors).length > 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {saving ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Save className="w-4 h-4" />
+                        )}
+                        {saving ? 'Saving...' : (mode === 'approve' ? 'Approve' : 'Save Changes')}
+                    </button>
+                    <button
+                        onClick={onCancel}
+                        className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    >
+                        Cancel
+                    </button>
                 </div>
             </div>
         </div>

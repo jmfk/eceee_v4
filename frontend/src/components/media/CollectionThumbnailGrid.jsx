@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { FolderOpen } from 'lucide-react';
+import { getImageAspectRatio, getGridSpan, getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout';
 
 const CollectionThumbnailGrid = ({ collection, className = '' }) => {
     // Helper function to determine grid layout based on file count
@@ -52,22 +53,32 @@ const CollectionThumbnailGrid = ({ collection, className = '' }) => {
                     display: 'grid',
                     gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
                     gridTemplateRows: `repeat(${layout.rows}, 1fr)`,
+                    gridAutoFlow: 'dense',
                     gap: '1px'
                 }}
             >
-                {filledImages.map((file, index) => (
-                    <div key={`${file.id}-${index}`} className="relative overflow-hidden bg-gray-200">
-                        <img
-                            src={file.imgproxyBaseUrl || file.imgproxy_base_url}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            style={{ display: 'block' }}
-                            onError={(e) => {
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
-                ))}
+                {filledImages.map((file, index) => {
+                    const gridStyle = getGridStyle(file);
+                    const objectFitClass = getObjectFitClass(file);
+                    
+                    return (
+                        <div 
+                            key={`${file.id}-${index}`} 
+                            className="relative overflow-hidden bg-gray-200"
+                            style={gridStyle}
+                        >
+                            <img
+                                src={file.imgproxyBaseUrl || file.imgproxy_base_url}
+                                alt=""
+                                className={`w-full h-full ${objectFitClass}`}
+                                style={{ display: 'block' }}
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                }}
+                            />
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

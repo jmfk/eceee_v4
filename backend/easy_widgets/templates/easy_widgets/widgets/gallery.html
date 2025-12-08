@@ -67,9 +67,24 @@
         {% else %}
             <!-- Grid, Masonry, or Lightbox layouts -->
             <div class="gallery-grid" 
-                 style="grid-template-columns: repeat({{ config.columns|default:3 }}, 1fr);">
+                 style="grid-template-columns: repeat({{ config.columns|default:3 }}, 1fr); grid-auto-flow: dense;">
                 {% for image in config.images %}
-                    <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                    {% comment %}Calculate aspect ratio for grid spanning{% endcomment %}
+                    {% if image.width and image.height %}
+                        {% widthratio image.width image.height 100 as aspect_ratio_x100 %}
+                        {% if aspect_ratio_x100 > 130 %}
+                            {% comment %}Horizontal: aspect > 1.3{% endcomment %}
+                            <div class="gallery-item" data-index="{{ forloop.counter0 }}" style="grid-column: span 2;">
+                        {% elif aspect_ratio_x100 < 70 %}
+                            {% comment %}Vertical: aspect < 0.7{% endcomment %}
+                            <div class="gallery-item" data-index="{{ forloop.counter0 }}" style="grid-row: span 2;">
+                        {% else %}
+                            {% comment %}Square: 0.7 <= aspect <= 1.3{% endcomment %}
+                            <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                        {% endif %}
+                    {% else %}
+                        <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                    {% endif %}
                         <div class="image-container">
                             {% if config.enable_lightbox %}
                                 <a data-lightbox
@@ -79,19 +94,55 @@
                                    data-lightbox-alt="{{ image.alt_text }}"
                                    href="{{ image.url }}"
                                    style="cursor: pointer;">
-                                    <img src="{{ image.thumbnail|default:image.url }}" 
-                                         alt="{{ image.alt_text }}"
-                                         class="gallery-image"
-                                         loading="lazy">
+                                    {% if image.width and image.height %}
+                                        {% widthratio image.width image.height 100 as aspect_ratio_x100 %}
+                                        {% if aspect_ratio_x100 > 130 or aspect_ratio_x100 < 70 %}
+                                            <img src="{{ image.thumbnail|default:image.url }}" 
+                                                 alt="{{ image.alt_text }}"
+                                                 class="gallery-image"
+                                                 style="object-fit: contain;"
+                                                 loading="lazy">
+                                        {% else %}
+                                            <img src="{{ image.thumbnail|default:image.url }}" 
+                                                 alt="{{ image.alt_text }}"
+                                                 class="gallery-image"
+                                                 style="object-fit: cover;"
+                                                 loading="lazy">
+                                        {% endif %}
+                                    {% else %}
+                                        <img src="{{ image.thumbnail|default:image.url }}" 
+                                             alt="{{ image.alt_text }}"
+                                             class="gallery-image"
+                                             style="object-fit: cover;"
+                                             loading="lazy">
+                                    {% endif %}
                                     <div class="image-overlay">
                                         <i class="icon-expand" aria-hidden="true"></i>
                                     </div>
                                 </a>
                             {% else %}
-                                <img src="{{ image.thumbnail|default:image.url }}" 
-                                     alt="{{ image.alt_text }}"
-                                     class="gallery-image"
-                                     loading="lazy">
+                                {% if image.width and image.height %}
+                                    {% widthratio image.width image.height 100 as aspect_ratio_x100 %}
+                                    {% if aspect_ratio_x100 > 130 or aspect_ratio_x100 < 70 %}
+                                        <img src="{{ image.thumbnail|default:image.url }}" 
+                                             alt="{{ image.alt_text }}"
+                                             class="gallery-image"
+                                             style="object-fit: contain;"
+                                             loading="lazy">
+                                    {% else %}
+                                        <img src="{{ image.thumbnail|default:image.url }}" 
+                                             alt="{{ image.alt_text }}"
+                                             class="gallery-image"
+                                             style="object-fit: cover;"
+                                             loading="lazy">
+                                    {% endif %}
+                                {% else %}
+                                    <img src="{{ image.thumbnail|default:image.url }}" 
+                                         alt="{{ image.alt_text }}"
+                                         class="gallery-image"
+                                         style="object-fit: cover;"
+                                         loading="lazy">
+                                {% endif %}
                             {% endif %}
                         </div>
                         

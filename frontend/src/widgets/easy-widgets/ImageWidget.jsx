@@ -9,6 +9,7 @@ import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import { renderMustache, prepareGalleryContext, prepareCarouselContext, prepareComponentContext } from '../../utils/mustacheRenderer'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { generateCSSFromBreakpoints } from '../../utils/cssBreakpointUtils'
+import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 
 /**
  * EASY Image Widget Component
@@ -299,37 +300,42 @@ const ImageWidget = ({
         const columns = resolvedImageStyle.galleryColumns
 
         return (
-            <div className={`grid ${gridClasses[columns] || 'grid-cols-2 md:grid-cols-3'} ${styleClasses}`}>
-                {items.map((item, index) => (
-                    <div key={index} className="gallery-item">
-                        {item.type === 'video' ? (
-                            <video
-                                className="w-full h-48 object-cover rounded cursor-pointer"
-                                poster={item.thumbnail}
-                                muted
-                                onClick={() => {
-                                    // Play/pause functionality
-                                    const video = event.target
-                                    video.paused ? video.play() : video.pause()
-                                }}
-                            >
-                                <source src={item.url} type="video/mp4" />
-                            </video>
-                        ) : (
-                            <img
-                                src={item.url}
-                                alt={item.altText || `Gallery image ${index + 1}`}
-                                className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={(localConfig.enableLightbox !== false) ? () => {
-                                    // TODO: Implement lightbox modal
-                                } : undefined}
-                            />
-                        )}
-                        {(localConfig.showCaptions !== false) && item.caption && (
-                            <p className="text-sm text-gray-600 mt-1">{item.caption}</p>
-                        )}
-                    </div>
-                ))}
+            <div className={`grid ${gridClasses[columns] || 'grid-cols-2 md:grid-cols-3'} ${styleClasses}`} style={{ gridAutoFlow: 'dense' }}>
+                {items.map((item, index) => {
+                    const gridStyle = getGridStyle(item);
+                    const objectFitClass = getObjectFitClass(item);
+                    
+                    return (
+                        <div key={index} className="gallery-item" style={gridStyle}>
+                            {item.type === 'video' ? (
+                                <video
+                                    className="w-full h-48 object-cover rounded cursor-pointer"
+                                    poster={item.thumbnail}
+                                    muted
+                                    onClick={() => {
+                                        // Play/pause functionality
+                                        const video = event.target
+                                        video.paused ? video.play() : video.pause()
+                                    }}
+                                >
+                                    <source src={item.url} type="video/mp4" />
+                                </video>
+                            ) : (
+                                <img
+                                    src={item.url}
+                                    alt={item.altText || `Gallery image ${index + 1}`}
+                                    className={`w-full h-48 ${objectFitClass} rounded cursor-pointer hover:opacity-90 transition-opacity`}
+                                    onClick={(localConfig.enableLightbox !== false) ? () => {
+                                        // TODO: Implement lightbox modal
+                                    } : undefined}
+                                />
+                            )}
+                            {(localConfig.showCaptions !== false) && item.caption && (
+                                <p className="text-sm text-gray-600 mt-1">{item.caption}</p>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         )
     }

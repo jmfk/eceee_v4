@@ -237,6 +237,15 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Aspect ratio-based object-fit classes for image grids */
+  .object-contain {
+    object-fit: contain;
+  }
+
+  .object-cover {
+    object-fit: cover;
+  }
 }
 
 /* Dark mode styles */

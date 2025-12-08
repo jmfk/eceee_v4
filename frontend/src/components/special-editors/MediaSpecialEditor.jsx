@@ -19,6 +19,7 @@ import { ImageWidget } from '../../widgets'
 import { useTheme } from '../../hooks/useTheme'
 import FloatingMessage from '../common/FloatingMessage'
 import ImageStyleSelect from '../form-fields/ImageStyleSelect'
+import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 
 const MediaSpecialEditor = ({
     widgetData,
@@ -1919,6 +1920,23 @@ const MediaSpecialEditor = ({
                                     </div>
                                     <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
                                         <p className="text-white text-xs font-medium truncate">{image.title}</p>
+                                        {image.tags && image.tags.length > 0 && (
+                                            <div className="flex gap-1 mt-1 flex-wrap">
+                                                {image.tags.slice(0, 4).map(tag => (
+                                                    <span
+                                                        key={tag.id}
+                                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[60px]"
+                                                        style={{
+                                                            backgroundColor: tag.color || '#3B82F6',
+                                                            color: '#fff'
+                                                        }}
+                                                        title={tag.name}
+                                                    >
+                                                        {tag.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )
@@ -2156,23 +2174,28 @@ const MediaSpecialEditor = ({
 
             <div className="flex-1 overflow-y-auto p-4">
                 {collectionImages.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
-                        {collectionImages.map((image, index) => (
-                            <div
-                                key={image.id || index}
-                                className="relative bg-gray-100 rounded overflow-hidden aspect-square border"
-                            >
-                                {image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl ? (
-                                    <img
-                                        src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
-                                        alt={image.title}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <Image className="w-8 h-8 text-gray-400" />
-                                    </div>
-                                )}
+                    <div className="grid grid-cols-3 gap-2" style={{ gridAutoFlow: 'dense' }}>
+                        {collectionImages.map((image, index) => {
+                            const gridStyle = getGridStyle(image);
+                            const objectFitClass = getObjectFitClass(image);
+                            
+                            return (
+                                <div
+                                    key={image.id || index}
+                                    className="relative bg-gray-100 rounded overflow-hidden aspect-square border"
+                                    style={gridStyle}
+                                >
+                                    {image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl ? (
+                                        <img
+                                            src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
+                                            alt={image.title}
+                                            className={`w-full h-full ${objectFitClass}`}
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <Image className="w-8 h-8 text-gray-400" />
+                                        </div>
+                                    )}
                                 <div className="absolute top-1 right-1 flex gap-1">
                                     <button
                                         className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
@@ -2194,12 +2217,13 @@ const MediaSpecialEditor = ({
                                     >
                                         <Trash2 className="w-3 h-3" />
                                     </button>
+                                    </div>
+                                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                                        <p className="text-white text-xs font-medium truncate">{image.title}</p>
+                                    </div>
                                 </div>
-                                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-                                    <p className="text-white text-xs font-medium truncate">{image.title}</p>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="text-center py-8 text-gray-500">

@@ -7,9 +7,24 @@
              data-enable-lightbox="{{ config.enable_lightbox|yesno:'true,false' }}">
             
             <div class="gallery-grid" 
-                 style="grid-template-columns: repeat({{ config.gallery_columns|default:3 }}, 1fr);">
+                 style="grid-template-columns: repeat({{ config.gallery_columns|default:3 }}, 1fr); grid-auto-flow: dense;">
                 {% for item in config.media_items %}
-                    <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                    {% comment %}Calculate aspect ratio for grid spanning{% endcomment %}
+                    {% if item.width and item.height %}
+                        {% widthratio item.width item.height 100 as aspect_ratio_x100 %}
+                        {% if aspect_ratio_x100 > 130 %}
+                            {% comment %}Horizontal: aspect > 1.3{% endcomment %}
+                            <div class="gallery-item" data-index="{{ forloop.counter0 }}" style="grid-column: span 2;">
+                        {% elif aspect_ratio_x100 < 70 %}
+                            {% comment %}Vertical: aspect < 0.7{% endcomment %}
+                            <div class="gallery-item" data-index="{{ forloop.counter0 }}" style="grid-row: span 2;">
+                        {% else %}
+                            {% comment %}Square: 0.7 <= aspect <= 1.3{% endcomment %}
+                            <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                        {% endif %}
+                    {% else %}
+                        <div class="gallery-item" data-index="{{ forloop.counter0 }}">
+                    {% endif %}
                         <div class="image-container">
                             {% if item.type == 'video' %}
                                 <video 
@@ -29,18 +44,43 @@
                                         data-lightbox-style="{{ config.lightbox_style|default:config.image_style|default:'default' }}"
                                     {% endif %}
                                 >
-                                    <img 
-                                        src="{{ item.thumbnail_url|default:item.url }}" 
-                                        {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
-                                        {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
-                                        {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
-                                        alt="{{ item.alt_text }}"
-                                        class="gallery-image"
-                                        loading="lazy"
-                                        {% if config.enable_lightbox %}
-                                            style="cursor: pointer;"
+                                    {% if item.width and item.height %}
+                                        {% widthratio item.width item.height 100 as aspect_ratio_x100 %}
+                                        {% if aspect_ratio_x100 > 130 or aspect_ratio_x100 < 70 %}
+                                            <img 
+                                                src="{{ item.thumbnail_url|default:item.url }}" 
+                                                {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                                {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                                {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
+                                                alt="{{ item.alt_text }}"
+                                                class="gallery-image"
+                                                loading="lazy"
+                                                style="{% if config.enable_lightbox %}cursor: pointer; {% endif %}object-fit: contain;"
+                                            >
+                                        {% else %}
+                                            <img 
+                                                src="{{ item.thumbnail_url|default:item.url }}" 
+                                                {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                                {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                                {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
+                                                alt="{{ item.alt_text }}"
+                                                class="gallery-image"
+                                                loading="lazy"
+                                                style="{% if config.enable_lightbox %}cursor: pointer; {% endif %}object-fit: cover;"
+                                            >
                                         {% endif %}
-                                    >
+                                    {% else %}
+                                        <img 
+                                            src="{{ item.thumbnail_url|default:item.url }}" 
+                                            {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
+                                            {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
+                                            {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
+                                            alt="{{ item.alt_text }}"
+                                            class="gallery-image"
+                                            loading="lazy"
+                                            style="{% if config.enable_lightbox %}cursor: pointer; {% endif %}object-fit: cover;"
+                                        >
+                                    {% endif %}
                                 </a>
                             {% endif %}
                             

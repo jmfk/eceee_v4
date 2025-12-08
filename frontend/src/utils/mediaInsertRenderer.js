@@ -4,6 +4,7 @@
  */
 
 import { mediaApi } from '../api';
+import { getImageAspectRatio, getGridSpan } from './imageGridLayout';
 
 /**
  * Fetch media data by ID and type
@@ -128,7 +129,7 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
     // Use 1/3 of slot width for gallery thumbnails
     const thumbnailWidth = Math.round(slotWidth * 0.33);
 
-    // Render as a simple grid gallery
+    // Render as a simple grid gallery with aspect ratio-based spanning
     const imageElements = files.map(file => {
         // Calculate height based on original aspect ratio if available
         const originalWidth = file.width || file.originalWidth;
@@ -143,13 +144,27 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
             thumbnailHeight
         );
         const alt = file.alt || file.title || file.original_filename || 'Image';
+        
+        // Calculate grid span based on aspect ratio
+        const aspectRatio = getImageAspectRatio(file);
+        const { colSpan, rowSpan, objectFit } = getGridSpan(aspectRatio);
+        
+        // Build inline styles for grid spanning
+        const gridStyles = [];
+        if (colSpan > 1) {
+            gridStyles.push(`grid-column: span ${colSpan}`);
+        }
+        if (rowSpan > 1) {
+            gridStyles.push(`grid-row: span ${rowSpan}`);
+        }
+        const styleAttr = gridStyles.length > 0 ? ` style="${gridStyles.join('; ')}"` : '';
 
-        return `<div class="media-gallery-item">
-            <img src="${imageUrl}" alt="${escapeHtml(alt)}" loading="lazy" />
+        return `<div class="media-gallery-item"${styleAttr}>
+            <img src="${imageUrl}" alt="${escapeHtml(alt)}" loading="lazy" style="object-fit: ${objectFit}" />
         </div>`;
     }).join('');
 
-    return `<div class="media-gallery">${imageElements}</div>`;
+    return `<div class="media-gallery" style="grid-auto-flow: dense">${imageElements}</div>`;
 }
 
 /**

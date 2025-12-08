@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react'
 import { X, ChevronDown, ChevronUp, Eye, Tag } from 'lucide-react'
 import { getImageUrl, formatFileSize } from './ImageValidationUtils'
 import MediaItemTagEditor from '../media/MediaItemTagEditor'
+import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 
 const ImageDisplaySection = ({
     images,
@@ -41,10 +42,10 @@ const ImageDisplaySection = ({
                                             alt={image.title || image.originalFilename || 'Image'}
                                             className="w-full h-full object-cover"
                                         />
-                                    )}
-                                </div>
-                            )
-                        })}
+                                        )}
+                                    </div>
+                                );
+                            })}
                         {displayImages.length > 3 && (
                             <div className="w-10 h-10 rounded-lg border-2 border-white bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
                                 +{displayImages.length - 3}
@@ -79,20 +80,23 @@ const ImageDisplaySection = ({
                 {/* Expanded view with individual image controls */}
                 {isExpanded && (
                     <div className="p-4">
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid grid-cols-4 gap-3" style={{ gridAutoFlow: 'dense' }}>
                             {displayImages.map((image, index) => {
                                 const thumbnailUrl = getThumbnailUrl
                                     ? getThumbnailUrl(image, 150)
                                     : (image.thumbnailUrl || getImageUrl(image))
                                 const isEditingTags = editingTagsForImage === image.id
+                                const gridStyle = getGridStyle(image)
+                                const objectFitClass = getObjectFitClass(image)
+                                
                                 return (
-                                    <div key={image.id || index} className="relative group">
+                                    <div key={image.id || index} className="relative group" style={gridStyle}>
                                         <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                                             {thumbnailUrl && (
                                                 <img
                                                     src={thumbnailUrl}
                                                     alt={image.title || image.originalFilename || 'Image'}
-                                                    className="w-full h-full object-cover"
+                                                    className={`w-full h-full ${objectFitClass}`}
                                                 />
                                             )}
                                         </div>
