@@ -188,7 +188,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Success response
      */
     clearCache: wrapApiCall(async (themeId) => {
-        return api.post(`${endpoints.themes.detail(themeId)}/clear_cache/`)
+        return api.post(`${endpoints.themes.detail(themeId)}clear_cache/`)
     }, 'themes.clearCache'),
 
     /**
