@@ -77,6 +77,8 @@ Section Widget Template
             sectionWidget.classList.remove('section-collapsed');
         } else {
             sectionWidget.classList.add('section-collapsed');
+            // Scroll to top of section when collapsing
+            sectionWidget.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     };
 })();
