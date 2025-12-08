@@ -88,54 +88,68 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
     // Generate CSS for each applicable group
     for (const group of applicableGroups) {
-        // Get widget types and slots (handle both new array format and old single value)
-        const widgetTypes = group.widget_types?.length > 0
-            ? group.widget_types
-            : (group.widget_type ? [group.widget_type] : []);
-        const slots = group.slots?.length > 0
-            ? group.slots
-            : (group.slot ? [group.slot] : []);
-
         // Build all selector combinations using CSS classes
         let baseSelectors = [];
 
-        if (widgetTypes.length === 0 && slots.length === 0) {
-            // Global - no targeting
-            baseSelectors.push(scope || '');
-        } else if (widgetTypes.length === 0 && slots.length > 0) {
-            // Slot targeting only
-            slots.forEach(slot => {
-                const slotNormalized = normalizeForCSS(slot);
-                if (scope) {
-                    baseSelectors.push(`${scope}.slot-${slotNormalized}`);
-                } else {
-                    baseSelectors.push(`.slot-${slotNormalized}`);
-                }
-            });
-        } else if (widgetTypes.length > 0 && slots.length === 0) {
-            // Widget type targeting only
-            widgetTypes.forEach(type => {
-                const typeNormalized = normalizeForCSS(type);
-                if (scope) {
-                    baseSelectors.push(`${scope}.widget-type-${typeNormalized}`);
-                } else {
-                    baseSelectors.push(`.widget-type-${typeNormalized}`);
-                }
-            });
+        // Check targeting mode
+        if (group.targetingMode === 'css-classes' && group.targetCssClasses) {
+            // CSS Classes mode - parse and use custom selectors
+            const customSelectors = group.targetCssClasses
+                .split(/[\n,]/)
+                .map(s => s.trim())
+                .filter(Boolean);
+            baseSelectors = customSelectors;
+            
+            // Note: In css-classes mode, selectors are used exactly as provided
+            // Frontend scoping is still applied if requested
         } else {
-            // Both widget type and slot targeting (all combinations)
-            // Use child combinator (>) to prevent cascading to nested widgets
-            widgetTypes.forEach(type => {
+            // Widget/Slot mode (default)
+            // Get widget types and slots (handle both new array format and old single value)
+            const widgetTypes = group.widget_types?.length > 0
+                ? group.widget_types
+                : (group.widget_type ? [group.widget_type] : []);
+            const slots = group.slots?.length > 0
+                ? group.slots
+                : (group.slot ? [group.slot] : []);
+
+            if (widgetTypes.length === 0 && slots.length === 0) {
+                // Global - no targeting
+                baseSelectors.push(scope || '');
+            } else if (widgetTypes.length === 0 && slots.length > 0) {
+                // Slot targeting only
                 slots.forEach(slot => {
-                    const typeNormalized = normalizeForCSS(type);
                     const slotNormalized = normalizeForCSS(slot);
                     if (scope) {
-                        baseSelectors.push(`${scope}.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
+                        baseSelectors.push(`${scope}.slot-${slotNormalized}`);
                     } else {
-                        baseSelectors.push(`.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
+                        baseSelectors.push(`.slot-${slotNormalized}`);
                     }
                 });
-            });
+            } else if (widgetTypes.length > 0 && slots.length === 0) {
+                // Widget type targeting only
+                widgetTypes.forEach(type => {
+                    const typeNormalized = normalizeForCSS(type);
+                    if (scope) {
+                        baseSelectors.push(`${scope}.widget-type-${typeNormalized}`);
+                    } else {
+                        baseSelectors.push(`.widget-type-${typeNormalized}`);
+                    }
+                });
+            } else {
+                // Both widget type and slot targeting (all combinations)
+                // Use child combinator (>) to prevent cascading to nested widgets
+                widgetTypes.forEach(type => {
+                    slots.forEach(slot => {
+                        const typeNormalized = normalizeForCSS(type);
+                        const slotNormalized = normalizeForCSS(slot);
+                        if (scope) {
+                            baseSelectors.push(`${scope}.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
+                        } else {
+                            baseSelectors.push(`.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
+                        }
+                    });
+                });
+            }
         }
 
         // Apply frontend scoping if requested

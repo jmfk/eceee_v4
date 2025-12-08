@@ -338,6 +338,24 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
+  const handleUpdateTargetingMode = (index, mode) => {
+    const updatedGroups = [...groups];
+    updatedGroups[index] = {
+      ...updatedGroups[index],
+      targetingMode: mode,
+    };
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+  };
+
+  const handleUpdateTargetCssClasses = (index, cssClasses) => {
+    const updatedGroups = [...groups];
+    updatedGroups[index] = {
+      ...updatedGroups[index],
+      targetCssClasses: cssClasses,
+    };
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+  };
+
   const handleToggleDefault = (index) => {
     const updatedGroups = groups.map((group, i) => ({
       ...group,
@@ -1185,7 +1203,14 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                       />
 
                       {/* Targeting Badge */}
-                      {(group.widgetTypes?.length > 0 || group.widgetType || group.slots?.length > 0 || group.slot) ? (
+                      {group.targetingMode === 'css-classes' && group.targetCssClasses ? (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-purple-50 text-purple-700 text-xs rounded-md border border-purple-200">
+                          <Code className="w-3 h-3" />
+                          <span className="font-mono max-w-[200px] truncate" title={group.targetCssClasses}>
+                            {group.targetCssClasses.split(/[\n,]/).filter(Boolean).length} selector{group.targetCssClasses.split(/[\n,]/).filter(Boolean).length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      ) : (group.widgetTypes?.length > 0 || group.widgetType || group.slots?.length > 0 || group.slot) ? (
                         <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-md border border-blue-200">
                           <Package className="w-3 h-3" />
                           <span>
@@ -1329,44 +1354,83 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                     {expandedTargeting[groupIndex] && (
                       <div className="px-4 pb-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Widget Types (multi-select) */}
-                          <div>
-                            <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
-                            <select
-                              multiple
-                              value={group.widgetTypes || (group.widgetType ? [group.widgetType] : [])}
-                              onChange={(e) => {
-                                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
-                                handleUpdateWidgetTypes(groupIndex, selectedOptions);
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                              disabled={isLoadingTypes}
-                            >
-                              {isLoadingTypes ? (
-                                <option disabled>Loading widget types...</option>
-                              ) : (
-                                widgetTypes.map(wt => (
-                                  <option key={wt.type} value={wt.type}>{wt.name}</option>
-                                ))
-                              )}
-                            </select>
-                            <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
-                          </div>
-
-                          {/* Slots (comma-separated) */}
-                          <div>
-                            <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
-                            <input
-                              type="text"
-                              value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
-                              onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="main, sidebar, footer (comma-separated)"
-                            />
-                            <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
-                          </div>
+                        {/* Targeting Mode Toggle */}
+                        <div className="mb-4 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateTargetingMode(groupIndex, 'widget-slot')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                              (group.targetingMode || 'widget-slot') === 'widget-slot'
+                                ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                            }`}
+                          >
+                            Widget/Slot
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateTargetingMode(groupIndex, 'css-classes')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                              group.targetingMode === 'css-classes'
+                                ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                            }`}
+                          >
+                            CSS Classes
+                          </button>
                         </div>
+
+                        {(group.targetingMode || 'widget-slot') === 'widget-slot' ? (
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Widget Types (multi-select) */}
+                            <div>
+                              <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
+                              <select
+                                multiple
+                                value={group.widgetTypes || (group.widgetType ? [group.widgetType] : [])}
+                                onChange={(e) => {
+                                  const selectedOptions = Array.from(e.target.selectedOptions, option => option.value).filter(Boolean);
+                                  handleUpdateWidgetTypes(groupIndex, selectedOptions);
+                                }}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                                disabled={isLoadingTypes}
+                              >
+                                {isLoadingTypes ? (
+                                  <option disabled>Loading widget types...</option>
+                                ) : (
+                                  widgetTypes.map(wt => (
+                                    <option key={wt.type} value={wt.type}>{wt.name}</option>
+                                  ))
+                                )}
+                              </select>
+                              <div className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Empty = all widgets</div>
+                            </div>
+
+                            {/* Slots (comma-separated) */}
+                            <div>
+                              <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
+                              <input
+                                type="text"
+                                value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
+                                onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="main, sidebar, footer (comma-separated)"
+                              />
+                              <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-xs text-gray-700 font-medium mb-1">Target CSS Selectors:</label>
+                            <textarea
+                              value={group.targetCssClasses || ''}
+                              onChange={(e) => handleUpdateTargetCssClasses(groupIndex, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                              placeholder=".my-custom-class, .another-class&#10;.complex > .selector&#10;#specific-id"
+                            />
+                            <div className="text-xs text-gray-500 mt-1">Enter CSS selectors (one per line or comma-separated). Used exactly as entered.</div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

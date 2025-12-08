@@ -76,9 +76,28 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
                         {groups.map((group, index) => (
                             <option key={index} value={index}>
                                 {group.name || `Group ${index + 1}`}
+                                {group.targetingMode === 'css-classes' && group.targetCssClasses ? ' (CSS)' : ''}
                             </option>
                         ))}
                     </select>
+                    
+                    {/* Show targeting info for selected group */}
+                    {groups[selectedGroupIndex] && (
+                        <div className="mt-2 text-xs text-gray-600">
+                            {groups[selectedGroupIndex].targetingMode === 'css-classes' && groups[selectedGroupIndex].targetCssClasses ? (
+                                <div className="flex items-start gap-2">
+                                    <span className="font-medium">CSS Targeting:</span>
+                                    <code className="flex-1 bg-gray-100 px-2 py-1 rounded font-mono text-xs">
+                                        {groups[selectedGroupIndex].targetCssClasses.split(/[\n,]/).filter(Boolean).join(', ')}
+                                    </code>
+                                </div>
+                            ) : (
+                                <div>
+                                    <span className="font-medium">Widget/Slot Targeting</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -34,7 +34,9 @@ class PageTheme(models.Model):
             "Each group can have an 'isDefault' boolean field to mark it as the base/default group for style inheritance. "
             "Groups can also include 'layoutProperties' to define responsive layout and styling settings "
             "(width, height, padding, margin, gap, background-color, color, border properties, etc.) "
-            "for widget layout parts (e.g., container, header, image, content) across mobile-first breakpoints (sm, md, lg, xl)."
+            "for widget layout parts (e.g., container, header, image, content) across mobile-first breakpoints (sm, md, lg, xl). "
+            "Supports two targeting modes via 'targetingMode' field: 'widget-slot' (default) for widget_types/slots arrays, "
+            "or 'css-classes' for custom CSS selectors defined in 'targetCssClasses' field (string with comma or newline-separated selectors)."
         ),
     )
     component_styles = models.JSONField(
