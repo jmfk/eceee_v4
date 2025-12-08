@@ -20,13 +20,20 @@ import LinkPicker from '../LinkPicker'
 /**
  * Parse a link value to get the link object
  * Now expects objects directly (no JSON parsing needed)
+ * Returns null only if value is falsy, otherwise returns the object
+ * (even if incomplete, to allow rendering of label-only items)
  */
 const parseLinkValue = (value) => {
     if (!value) return null
 
     // Value should already be an object
-    if (typeof value === 'object' && value.type) {
+    if (typeof value === 'object') {
         return value
+    }
+
+    // Fallback for string values (legacy format)
+    if (typeof value === 'string') {
+        return null
     }
 
     return null
@@ -71,15 +78,32 @@ const LinkDisplay = ({ url, onEdit, currentSiteId, disabled }) => {
 
     // Get display content based on link type
     const getDisplayContent = () => {
+        // No url provided at all
         if (!url) {
             return <span className="text-gray-400 italic">No link set</span>
         }
 
+        // url is provided but not a valid object (shouldn't happen, but defensive)
         if (!linkObj) {
-            // Plain text URL (legacy format)
-            return <span className="truncate">{url}</span>
+            // Check if it's a string (legacy format)
+            if (typeof url === 'string') {
+                return <span className="truncate">{url}</span>
+            }
+            // Invalid format - don't try to render the object
+            return <span className="text-gray-400 italic">No link set</span>
         }
 
+        // Handle incomplete link objects (no type field yet)
+        if (!linkObj.type) {
+            // If we have a label, show it
+            if (linkObj.label && typeof linkObj.label === 'string' && linkObj.label.trim()) {
+                return <span className="truncate text-gray-600">{linkObj.label}</span>
+            }
+            // No type and no label - incomplete/new link
+            return <span className="text-gray-400 italic">No link set</span>
+        }
+
+        // Handle complete link objects with type
         switch (linkObj.type) {
             case 'internal':
                 if (isLoading) {
@@ -138,8 +162,8 @@ const LinkDisplay = ({ url, onEdit, currentSiteId, disabled }) => {
                     </span>
                 )
             default:
-                // No link type set - check if we have a label to show
-                if (linkObj.label) {
+                // Unknown type - check if we have a label to show
+                if (linkObj.label && typeof linkObj.label === 'string' && linkObj.label.trim()) {
                     return <span className="truncate text-gray-600">{linkObj.label}</span>
                 }
                 return <span className="text-gray-400 italic">No link set</span>
