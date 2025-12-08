@@ -176,11 +176,23 @@ class NavbarWidget(BaseWidget):
             font-family: "Source Sans 3", sans-serif;
             font-weight: 500;
         }
-
-        .navbar-secondary-menu .navbar-menu-item  {
+        .navbar-secondary-menu {
+            display: flex;
+            gap: 0;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            align-items: flex-end;
+        }
+        .navbar-secondary-menu .navbar-menu-item {
+            text-align: left;
+            width: 140px;
+            padding: 2px 11px 3px;
+            margin-top: 3px;
+            box-shadow: inset -2px -2px 2px rgba(0, 0, 0, 0.2);
+        }
+        .navbar-secondary-menu .navbar-menu-item a {
             border-radius: 0 0 0 0;
-            padding: 0 12px 1px;
-            margin-top: 2px;
         }
 
         .navbar-link {
