@@ -44,6 +44,25 @@ class TwoColumnsWidget(BaseWidget):
     description = "Simple two-column layout with left and right slots for widgets"
     template_name = "easy_widgets/widgets/two_column.html"
 
+    layout_parts = {
+        "two-columns-widget": {
+            "label": "Two Columns container",
+            "properties": [
+                "width",
+                "height",
+                "min-height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+                "fontFamily",
+                "fontSize",
+                "lineHeight",
+                "gap",
+            ],
+        },
+    }
+
     widget_css = """
     .two-columns-widget {
         display: grid;
@@ -205,15 +224,19 @@ class TwoColumnsWidget(BaseWidget):
                     try:
                         # Filter out hidden widgets (check both config.isVisible and config.is_visible)
                         widget_config = widget_data.get("config", {})
-                        is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
+                        is_visible = widget_config.get(
+                            "isVisible", widget_config.get("is_visible", True)
+                        )
                         if not is_visible:
                             continue  # Skip hidden widgets
-                        
+
                         # Filter out inactive widgets (check both config.isActive and config.is_active)
-                        is_active = widget_config.get("isActive", widget_config.get("is_active", True))
+                        is_active = widget_config.get(
+                            "isActive", widget_config.get("is_active", True)
+                        )
                         if not is_active:
                             continue  # Skip inactive widgets
-                        
+
                         # Add sort_order if missing (use array index to preserve order)
                         if (
                             "sort_order" not in widget_data
