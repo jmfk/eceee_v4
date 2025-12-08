@@ -15,13 +15,7 @@ Section Widget Template
          {% if config.anchor %}id="{{ config.anchor }}"{% endif %}
          data-section-id="{{ config.anchor|default:'' }}"
          {% if config.accordion_mode %}data-accordion-mode="true"{% endif %}>
-        
-        {% if config.title %}
-        <div class="section-header">
-            <span class="section-title">{{ config.title }}</span>
-        </div>
-        {% endif %}
-        
+              
         <div class="section-content">
             {# First widget - always visible #}
             {% if config.rendered_slots.content %}

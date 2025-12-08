@@ -448,12 +448,7 @@ const SectionWidget = ({
             <div className={`section-widget mb-6 ${isCollapsed ? 'section-collapsed' : ''}`}
                 data-section-id={config.anchor || ''}
                 data-accordion-mode={config.accordionMode ? 'true' : 'false'}>
-                {config.title && (
-                    <div className="section-header p-4 font-semibold text-xl"
-                        id={config.anchor}>
-                        {config.title}
-                    </div>
-                )}
+
                 <div className="section-content px-4 pb-4">
                     {hasContent ? (
                         <>
