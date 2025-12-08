@@ -310,8 +310,11 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     def replace_file(self, request, pk=None):
         """Replace the file in storage while preserving all metadata."""
         from ..security import SecurityAuditLogger
+        from django.db import transaction
 
         media_file = self.get_object()
+        old_file_path = media_file.file_path
+        old_file_hash = media_file.file_hash
 
         # Check if file is provided
         if "file" not in request.FILES:
@@ -352,32 +355,89 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            # Delete old file from storage
-            old_file_path = media_file.file_path
-            try:
-                if old_file_path:
-                    default_storage.delete(old_file_path)
-                    logger.info(f"Deleted old file: {old_file_path}")
-            except Exception as e:
-                logger.warning(f"Failed to delete old file {old_file_path}: {e}")
-                # Continue anyway - we'll upload the new file
-
             # Upload new file using S3MediaStorage
             s3_storage = S3MediaStorage()
             upload_result = s3_storage.upload_file(
                 uploaded_file, folder_path=f"{media_file.namespace.slug}/media"
             )
+            new_file_hash = upload_result["file_hash"]
+            new_file_path = upload_result["file_path"]
 
-            # Update MediaFile fields with new file information
-            media_file.file_path = upload_result["file_path"]
-            media_file.file_size = upload_result["file_size"]
-            media_file.content_type = upload_result["content_type"]
-            media_file.file_hash = upload_result["file_hash"]
-            media_file.width = upload_result.get("width")
-            media_file.height = upload_result.get("height")
-            media_file.original_filename = uploaded_file.name
-            media_file.last_modified_by = request.user
-            media_file.save()
+            # Scenario 1: Same hash as current file (no-op replacement)
+            if new_file_hash == old_file_hash:
+                logger.info(f"Replacement file has same hash as current file {media_file.id}, no changes needed")
+                # Delete the newly uploaded file since it's identical to what we already have
+                try:
+                    s3_storage.delete_file(new_file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to delete duplicate upload {new_file_path}: {e}")
+                
+                # Return current file unchanged
+                serializer = self.get_serializer(media_file)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            # Check for hash conflicts with other files
+            existing_file_with_hash = (
+                MediaFile.objects.with_deleted()
+                .filter(file_hash=new_file_hash)
+                .exclude(id=media_file.id)
+                .first()
+            )
+
+            with transaction.atomic():
+                if existing_file_with_hash:
+                    if existing_file_with_hash.is_deleted:
+                        # Scenario 3: Hash matches soft-deleted file
+                        logger.info(
+                            f"New file hash matches soft-deleted file {existing_file_with_hash.id}, "
+                            f"hard deleting it before replacement"
+                        )
+                        # Hard delete the soft-deleted record to free up the hash
+                        existing_file_with_hash.delete(force=True)
+                    else:
+                        # Scenario 2: Hash matches different active file
+                        logger.info(
+                            f"New file hash matches existing active file {existing_file_with_hash.id}, "
+                            f"reusing existing S3 object"
+                        )
+                        # Delete the newly uploaded duplicate from S3
+                        try:
+                            s3_storage.delete_file(new_file_path)
+                        except Exception as e:
+                            logger.warning(f"Failed to delete duplicate upload {new_file_path}: {e}")
+                        
+                        # Point to the existing file's S3 object instead
+                        upload_result["file_path"] = existing_file_with_hash.file_path
+                        # Keep the new hash for the update below
+
+                # Delete old file from storage (if not referenced elsewhere)
+                if old_file_path and old_file_path != upload_result["file_path"]:
+                    # Check if other files reference the same S3 object
+                    other_files_with_same_path = (
+                        MediaFile.objects.with_deleted()
+                        .filter(file_hash=old_file_hash)
+                        .exclude(id=media_file.id)
+                        .exists()
+                    )
+                    
+                    if not other_files_with_same_path:
+                        try:
+                            default_storage.delete(old_file_path)
+                            logger.info(f"Deleted old file: {old_file_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to delete old file {old_file_path}: {e}")
+
+                # Scenario 4: Unique hash - proceed with normal replacement
+                # Update MediaFile fields with new file information
+                media_file.file_path = upload_result["file_path"]
+                media_file.file_size = upload_result["file_size"]
+                media_file.content_type = upload_result["content_type"]
+                media_file.file_hash = upload_result["file_hash"]
+                media_file.width = upload_result.get("width")
+                media_file.height = upload_result.get("height")
+                media_file.original_filename = uploaded_file.name
+                media_file.last_modified_by = request.user
+                media_file.save()
 
             # Log the file replacement
             SecurityAuditLogger.log_file_upload(
