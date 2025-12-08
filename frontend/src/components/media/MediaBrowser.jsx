@@ -636,6 +636,24 @@ const MediaBrowser = ({
                         {file.dimensions && (
                             <p className="text-xs text-gray-400">{file.dimensions}</p>
                         )}
+                        {/* Tags */}
+                        {file.tags && file.tags.length > 0 && (
+                            <div className="flex gap-1 mt-1.5 flex-wrap">
+                                {file.tags.slice(0, 4).map(tag => (
+                                    <span
+                                        key={tag.id}
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[70px]"
+                                        style={{
+                                            backgroundColor: tag.color || '#3B82F6',
+                                            color: '#fff'
+                                        }}
+                                        title={tag.name}
+                                    >
+                                        {tag.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             ))}
@@ -671,6 +689,24 @@ const MediaBrowser = ({
                         <div className="flex flex-col justify-center">
                             <span className="font-medium text-gray-900 truncate">{file.title}</span>
                             <span className="text-sm text-gray-500 truncate">{file.originalFilename || file.original_filename}</span>
+                            {/* Tags */}
+                            {file.tags && file.tags.length > 0 && (
+                                <div className="flex gap-1 mt-1 flex-wrap">
+                                    {file.tags.slice(0, 4).map(tag => (
+                                        <span
+                                            key={tag.id}
+                                            className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[80px]"
+                                            style={{
+                                                backgroundColor: tag.color || '#3B82F6',
+                                                color: '#fff'
+                                            }}
+                                            title={tag.name}
+                                        >
+                                            {tag.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="col-span-2 text-sm text-gray-600 capitalize flex items-center">{file.fileType || file.file_type}</div>

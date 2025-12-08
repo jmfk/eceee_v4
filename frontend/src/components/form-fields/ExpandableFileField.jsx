@@ -803,6 +803,24 @@ const ExpandableFileField = ({
                                                             {file.description}
                                                         </div>
                                                     )}
+                                                    {/* Tags */}
+                                                    {file.tags && file.tags.length > 0 && (
+                                                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                                                            {file.tags.slice(0, 4).map(tag => (
+                                                                <span
+                                                                    key={tag.id}
+                                                                    className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[80px]"
+                                                                    style={{
+                                                                        backgroundColor: tag.color || '#3B82F6',
+                                                                        color: '#fff'
+                                                                    }}
+                                                                    title={tag.name}
+                                                                >
+                                                                    {tag.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Selection Indicator */}

@@ -305,6 +305,24 @@ const MediaPicker = ({
                             {file.dimensions}
                         </div>
                     )}
+                    {/* Tags */}
+                    {file.tags && file.tags.length > 0 && (
+                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                            {file.tags.slice(0, 4).map(tag => (
+                                <span
+                                    key={tag.id}
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[70px]"
+                                    style={{
+                                        backgroundColor: tag.color || '#3B82F6',
+                                        color: '#fff'
+                                    }}
+                                    title={tag.name}
+                                >
+                                    {tag.name}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Hover actions */}
@@ -383,18 +401,23 @@ const MediaPicker = ({
                     {file.tags && file.tags.length > 0 && (
                         <div className="flex items-center gap-1 mt-2">
                             <Tag className="w-3 h-3 text-gray-400" />
-                            <div className="flex gap-1">
-                                {file.tags.slice(0, 3).map(tag => (
+                            <div className="flex gap-1 flex-wrap">
+                                {file.tags.slice(0, 4).map(tag => (
                                     <span
                                         key={tag.id}
-                                        className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full"
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[80px]"
+                                        style={{
+                                            backgroundColor: tag.color || '#3B82F6',
+                                            color: '#fff'
+                                        }}
+                                        title={tag.name}
                                     >
                                         {tag.name}
                                     </span>
                                 ))}
-                                {file.tags.length > 3 && (
+                                {file.tags.length > 4 && (
                                     <span className="text-xs text-gray-400">
-                                        +{file.tags.length - 3} more
+                                        +{file.tags.length - 4} more
                                     </span>
                                 )}
                             </div>

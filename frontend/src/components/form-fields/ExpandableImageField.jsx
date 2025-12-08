@@ -53,6 +53,27 @@ const ImageGridItem = React.memo(({ image, isSelected, thumbnailUrl, onSelect, i
                     </div>
                 )}
             </div>
+            
+            {/* Tags */}
+            {image.tags && image.tags.length > 0 && (
+                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/60 to-transparent">
+                    <div className="flex gap-1 flex-wrap">
+                        {image.tags.slice(0, 4).map(tag => (
+                            <span
+                                key={tag.id}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[60px]"
+                                style={{
+                                    backgroundColor: tag.color || '#3B82F6',
+                                    color: '#fff'
+                                }}
+                                title={tag.name}
+                            >
+                                {tag.name}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 })
@@ -920,6 +941,24 @@ const ExpandableImageField = ({
                                                     {image.description && (
                                                         <div className="text-xs text-gray-400 mt-1 truncate">
                                                             {image.description}
+                                                        </div>
+                                                    )}
+                                                    {/* Tags */}
+                                                    {image.tags && image.tags.length > 0 && (
+                                                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                                                            {image.tags.slice(0, 4).map(tag => (
+                                                                <span
+                                                                    key={tag.id}
+                                                                    className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[80px]"
+                                                                    style={{
+                                                                        backgroundColor: tag.color || '#3B82F6',
+                                                                        color: '#fff'
+                                                                    }}
+                                                                    title={tag.name}
+                                                                >
+                                                                    {tag.name}
+                                                                </span>
+                                                            ))}
                                                         </div>
                                                     )}
                                                 </div>
