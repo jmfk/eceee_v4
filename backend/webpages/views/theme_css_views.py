@@ -73,7 +73,9 @@ class ThemeCSSView(View):
             response["Pragma"] = "no-cache"
             response["Expires"] = "0"
         else:
-            # Cache for 24 hours in production (browser caching)
-            response["Cache-Control"] = "public, max-age=86400"
+            # Cache for 1 year - URL version changes when content updates
+            response["Cache-Control"] = "public, max-age=31536000, immutable"
+            # Add Last-Modified header for better cache validation
+            response["Last-Modified"] = theme.updated_at.strftime('%a, %d %b %Y %H:%M:%S GMT')
 
         return response

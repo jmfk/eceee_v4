@@ -294,7 +294,8 @@ class WebPageRenderer:
         # Build theme CSS URL if theme exists
         theme_css_url = None
         if effective_theme:
-            theme_css_url = f"/api/v1/webpages/themes/{effective_theme.id}/styles.css"
+            version = int(effective_theme.updated_at.timestamp())
+            theme_css_url = f"/api/v1/webpages/themes/{effective_theme.id}/styles.css?v={version}"
 
         # Calculate page depth by walking up parent chain
         depth = 0

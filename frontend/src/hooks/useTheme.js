@@ -83,7 +83,8 @@ export const useTheme = ({
             if (!theme?.id) return null
 
             // Fetch complete CSS from backend endpoint with frontend scoping
-            const url = `/api/v1/webpages/themes/${theme.id}/styles.css?frontend_scoped=true`
+            const version = Date.parse(theme.updatedAt || theme.updated_at)
+            const url = `/api/v1/webpages/themes/${theme.id}/styles.css?frontend_scoped=true&v=${version}`
             const response = await fetch(url)
             if (!response.ok) {
                 throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
@@ -144,7 +145,8 @@ export const useTheme = ({
 
         try {
             // Fetch complete CSS from backend
-            const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?frontend_scoped=true`)
+            const version = Date.parse(themeData.updatedAt || themeData.updated_at)
+            const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?frontend_scoped=true&v=${version}`)
             if (!response.ok) {
                 throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
             }
@@ -193,7 +195,8 @@ export const useTheme = ({
         generateThemeCSS: async (themeData) => {
             if (!themeData?.id) return ''
             try {
-                const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?frontend_scoped=true`)
+                const version = Date.parse(themeData.updatedAt || themeData.updated_at)
+                const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?frontend_scoped=true&v=${version}`)
                 if (!response.ok) return ''
                 return await response.text()
             } catch {
