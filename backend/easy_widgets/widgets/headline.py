@@ -100,10 +100,17 @@ class HeadlineWidget(BaseWidget):
 
     layout_parts = {
         "headline-widget": {
-            "label": "Main widget container",
+            "label": "Headline container",
             "properties": [
                 "width",
                 "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+                "fontFamily",
+                "fontSize",
+                "lineHeight",
             ],
         },
     }

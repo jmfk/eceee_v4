@@ -73,8 +73,25 @@ class NavigationWidget(BaseWidget):
     template_name = "easy_widgets/widgets/navigation.html"
     mustache_template_name = "easy_widgets/widgets/navigation.mustache"
 
+    layout_parts = {
+        "nav-container": {
+            "label": "Navigation container",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+                "fontFamily",
+                "fontSize",
+                "lineHeight",
+            ],
+        },
+    }
+
     widget_css = """
-    .navigation-widget .nav-container {
+    .nav-container {
         display: flex;
         flex-direction: column;
         list-style: none;
@@ -85,17 +102,17 @@ class NavigationWidget(BaseWidget):
         height: var(--nav-height, auto);
         width: 100%;
     }
-    .navigation-widget .nav-container li {
+    .nav-container li {
         height: 24px;
         width: 100%;
     }
-    .navigation-widget .nav-container a {
+    .nav-container a {
         color: inherit;
         text-decoration: none;
         transition: opacity 0.2s;
     }
 
-    .navigation-widget .nav-container a:hover {
+    .nav-container a:hover {
         opacity: 0.7;
     }
     """
