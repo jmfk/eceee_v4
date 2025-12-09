@@ -209,13 +209,6 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [metadataExpanded, setMetadataExpanded] = useState(true);
 
-    // Upload state
-    const [selectedFiles, setSelectedFiles] = useState([]);
-    const [isDragOver, setIsDragOver] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const fileInputRef = useRef(null);
-
     // Collection Files View State (from old CollectionFilesView)
     const [existingFiles, setExistingFiles] = useState([]);
     const [existingLoading, setExistingLoading] = useState(true);
@@ -293,66 +286,6 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
         }
     };
 
-    // File upload handlers
-    const handleFileSelect = useCallback((files) => {
-        const fileArray = Array.from(files);
-        setSelectedFiles(fileArray);
-    }, []);
-
-    const handleFileInputChange = (event) => {
-        handleFileSelect(event.target.files);
-    };
-
-    const handleDrop = useCallback((event) => {
-        event.preventDefault();
-        setIsDragOver(false);
-        handleFileSelect(event.dataTransfer.files);
-    }, [handleFileSelect]);
-
-    const handleDragOver = useCallback((event) => {
-        event.preventDefault();
-        setIsDragOver(true);
-    }, []);
-
-    const handleDragLeave = useCallback((event) => {
-        event.preventDefault();
-        setIsDragOver(false);
-    }, []);
-
-    const handleRemoveSelectedFile = (index) => {
-        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleUpload = async () => {
-        if (selectedFiles.length === 0) return;
-
-        try {
-            setUploading(true);
-            setUploadProgress(0);
-
-            const result = await mediaCollectionsApi.uploadFiles(
-                collection.id,
-                selectedFiles,
-                (progress) => setUploadProgress(progress)
-            )();
-
-            addNotification(
-                `Successfully uploaded ${result.uploadedCount || 0} file(s)`,
-                'success'
-            );
-
-            // Clear selected files and reload collection files
-            setSelectedFiles([]);
-            setUploadProgress(0);
-            await loadExistingFiles();
-        } catch (error) {
-            console.error('Upload error:', error);
-            addNotification(extractErrorMessage(error), 'error');
-        } finally {
-            setUploading(false);
-        }
-    };
-
     // Handle removing a file from collection
     const handleRemoveFile = async (fileId) => {
         try {
@@ -422,8 +355,6 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
             </div>
         );
     };
-
-    const canUpload = formData.tagIds.length > 0;
 
     return (
         <div className="h-full flex flex-col bg-gray-50">
@@ -532,105 +463,6 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                         )}
                     </div>
 
-                    {/* Upload Section */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Files</h3>
-                        
-                        {!canUpload ? (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="text-sm font-medium text-amber-900">Upload Disabled</p>
-                                        <p className="text-sm text-amber-700 mt-1">
-                                            Please add at least one tag to this collection before uploading files.
-                                            Files uploaded to a collection automatically inherit all collection tags.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div
-                                    className={`
-                                        border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
-                                        ${isDragOver
-                                            ? 'border-blue-500 bg-blue-50 scale-[1.02]'
-                                            : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
-                                        }
-                                        ${uploading ? 'pointer-events-none opacity-50' : ''}
-                                    `}
-                                    onDrop={handleDrop}
-                                    onDragOver={handleDragOver}
-                                    onDragLeave={handleDragLeave}
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                                    <p className="text-sm text-gray-700 mb-1">
-                                        Drag and drop files here, or click to browse
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        Files will be auto-approved with collection tags
-                                    </p>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        multiple
-                                        accept="image/*,application/pdf,.doc,.docx,video/*,audio/*"
-                                        onChange={handleFileInputChange}
-                                        className="hidden"
-                                        disabled={uploading}
-                                    />
-                                </div>
-
-                                {selectedFiles.length > 0 && (
-                                    <div className="mt-4 space-y-2">
-                                        <p className="text-sm font-medium text-gray-700">
-                                            Selected Files ({selectedFiles.length})
-                                        </p>
-                                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                                            {selectedFiles.map((file, index) => (
-                                                <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
-                                                    <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                                                    <button
-                                                        onClick={() => handleRemoveSelectedFile(index)}
-                                                        className="text-red-600 hover:text-red-700"
-                                                        disabled={uploading}
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        
-                                        {uploading ? (
-                                            <div className="mt-4">
-                                                <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                                                    <span>Uploading...</span>
-                                                    <span>{uploadProgress}%</span>
-                                                </div>
-                                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                                    <div 
-                                                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                                        style={{ width: `${uploadProgress}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={handleUpload}
-                                                className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <Upload className="w-4 h-4" />
-                                                Upload {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''}
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-
                     {/* Collection Files Section */}
                     <div className="bg-white rounded-lg border border-gray-200">
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -672,7 +504,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                                     <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                                     <h4 className="text-sm font-medium text-gray-900 mb-1">No files in collection</h4>
                                     <p className="text-sm text-gray-600">
-                                        {canUpload ? 'Upload files using the form above.' : 'Add tags to enable uploads.'}
+                                        Add files from available files on the right.
                                     </p>
                                 </div>
                             ) : (
@@ -1940,7 +1772,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         const AccessIcon = accessInfo.icon;
 
         return (
-            <div key={collection.id} className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 p-4">
+            <div 
+                key={collection.id} 
+                className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 p-4 cursor-pointer"
+                onClick={() => handleEdit(collection)}
+            >
                 <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
@@ -1999,16 +1835,6 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                handleViewFiles(collection);
-                            }}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="View Files"
-                        >
-                            <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
                                 handleDownloadZip(collection);
                             }}
                             className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
@@ -2048,7 +1874,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         const AccessIcon = accessInfo.icon;
 
         return (
-            <div key={collection.id} className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 overflow-hidden">
+            <div 
+                key={collection.id} 
+                className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer"
+                onClick={() => handleEdit(collection)}
+            >
                 {/* Thumbnail Grid - Top Section */}
                 {renderThumbnailGrid(collection)}
 
@@ -2071,16 +1901,6 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                             </div>
                         </div>
                         <div className="flex items-center gap-1 ml-3">
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewFiles(collection);
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                title="View Files"
-                            >
-                                <Eye className="w-4 h-4" />
-                            </button>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
