@@ -57,7 +57,8 @@ const MediaBrowser = ({
     hideShowDeleted = false, // Hide the "Show Deleted" button
     hideTypeFilter = false, // Hide the type filter dropdown
     onPendingApprovalChange, // Callback when pending approval state changes
-    hideInlineApprovalForm = false // Hide the inline approval form (when using external pending tab)
+    hideInlineApprovalForm = false, // Hide the inline approval form (when using external pending tab)
+    onPendingFilesCreated // Callback when files are uploaded to pending state
 }) => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -420,9 +421,16 @@ const MediaBrowser = ({
                                 status: existing.status
                             }));
 
-                            setPendingApprovalFiles(pendingForApproval);
-                            setShowApprovalForm(true);
                             setUploadState('idle');
+
+                            // If callback provided, notify parent to switch to pending tab
+                            if (onPendingFilesCreated) {
+                                onPendingFilesCreated(pendingForApproval);
+                            } else if (!hideInlineApprovalForm) {
+                                // Fallback: show inline approval form if no callback
+                                setPendingApprovalFiles(pendingForApproval);
+                                setShowApprovalForm(true);
+                            }
 
                             addNotification(
                                 `Reusing ${existingPendingFiles.length} existing pending file(s)`,
@@ -449,10 +457,17 @@ const MediaBrowser = ({
 
             // Check if uploaded files are pending (need approval)
             if (uploadedCount > 0 && uploadedFiles.length > 0) {
-                // Files were uploaded to pending state - show approval form
-                setPendingApprovalFiles(uploadedFiles);
-                setShowApprovalForm(true);
+                // Files were uploaded to pending state
                 setUploadState('idle');
+
+                // If callback provided, notify parent to switch to pending tab
+                if (onPendingFilesCreated) {
+                    onPendingFilesCreated(uploadedFiles);
+                } else if (!hideInlineApprovalForm) {
+                    // Fallback: show inline approval form if no callback
+                    setPendingApprovalFiles(uploadedFiles);
+                    setShowApprovalForm(true);
+                }
                 // Don't show success notification yet - wait for approval
             } else if (uploadedCount > 0) {
                 // Files were directly approved (shouldn't happen with current backend)
@@ -523,9 +538,16 @@ const MediaBrowser = ({
                                     status: existing.status
                                 }));
 
-                                setPendingApprovalFiles(pendingForApproval);
-                                setShowApprovalForm(true);
                                 setUploadState('idle');
+
+                                // If callback provided, notify parent to switch to pending tab
+                                if (onPendingFilesCreated) {
+                                    onPendingFilesCreated(pendingForApproval);
+                                } else if (!hideInlineApprovalForm) {
+                                    // Fallback: show inline approval form if no callback
+                                    setPendingApprovalFiles(pendingForApproval);
+                                    setShowApprovalForm(true);
+                                }
 
                                 addNotification(
                                     `Reusing ${existingPendingFiles.length} existing pending file(s)`,

@@ -81,9 +81,11 @@ const MediaManager = ({
         if (onFilesLoaded) onFilesLoaded();
     };
 
-    useEffect(() => {
-        if (pendingCount !== 0) setActiveTab('pending');
-    }, [pendingCount]);
+    // Handle files uploaded to pending state - switch to pending tab
+    const handlePendingFilesCreated = (pendingFiles) => {
+        setActiveTab('pending');
+        loadPendingCount(); // Refresh count
+    };
 
     // Tab configuration
     const tabs = [
@@ -166,6 +168,7 @@ const MediaManager = ({
                         namespace={namespace}
                         showUploader={true} // MediaBrowser handles its own upload
                         refreshTrigger={refreshTrigger} // Trigger refresh when files are processed
+                        onPendingFilesCreated={handlePendingFilesCreated} // Switch to pending tab on upload
                     />
                 )}
 
