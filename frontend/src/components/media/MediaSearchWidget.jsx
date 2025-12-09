@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Plus, Hash, Search, Loader2, Tag } from 'lucide-react'
+import { X, Hash, Search, Loader2, Tag } from 'lucide-react'
 import { mediaApi } from '../../api'
 
 const MediaSearchWidget = ({
@@ -8,7 +8,7 @@ const MediaSearchWidget = ({
     disabled = false,
     namespace,
     placeholder = "Search by title or tags...",
-    autoSearch = false, // Auto-trigger search after typing 2+ characters
+    autoSearch = true, // Auto-trigger search after typing (debounced)
     autoSearchDelay = 500 // Delay in ms for auto-search (debounce)
 }) => {
     const [inputValue, setInputValue] = useState('')
@@ -110,11 +110,11 @@ const MediaSearchWidget = ({
         setShowSuggestions(value.length > 0)
         setSelectedIndex(-1)
 
-        // Trigger server-side search
+        // Trigger server-side search for tag suggestions
         searchTags(value)
 
-        // Auto-search: automatically add text search term after delay
-        if (autoSearch && value.trim().length >= 2) {
+        // Auto-search: trigger search when user types
+        if (autoSearch) {
             // Clear existing auto-search timeout
             if (autoSearchTimeoutRef.current) {
                 clearTimeout(autoSearchTimeoutRef.current);
@@ -122,31 +122,37 @@ const MediaSearchWidget = ({
 
             // Set new auto-search timeout
             autoSearchTimeoutRef.current = setTimeout(() => {
-                // Only auto-add if the value hasn't changed and is still >= 2 chars
-                if (inputRef.current && inputRef.current.value.trim().length >= 2) {
-                    addSearchTerm(inputRef.current.value.trim(), 'text')
-                }
+                // Update search with current text value (keep it in input, don't make pill)
+                triggerTextSearch(inputRef.current ? inputRef.current.value.trim() : value.trim())
             }, autoSearchDelay);
-        } else if (autoSearchTimeoutRef.current) {
-            // Clear timeout if value is too short
-            clearTimeout(autoSearchTimeoutRef.current);
         }
+    }
+
+    // Trigger text search without creating a pill
+    const triggerTextSearch = (text) => {
+        // Get current tag terms (exclude text type)
+        const tagTerms = searchTerms.filter(term => term.type === 'tag')
+        
+        // Create new search terms array with tags plus new text (if any)
+        const newSearchTerms = text.trim() 
+            ? [...tagTerms, { value: text.trim(), type: 'text' }]
+            : tagTerms
+        
+        onChange(newSearchTerms)
     }
 
     const handleKeyDown = (e) => {
         if (!showSuggestions || isSearching) {
             if (e.key === 'Enter') {
                 e.preventDefault()
-                addSearchTerm(inputValue.trim())
+                // Just trigger search with current text, don't close suggestions
+                triggerTextSearch(inputValue.trim())
             }
             return
         }
 
-        // Calculate total options (suggestions + create new option if applicable)
-        const hasCreateOption = inputValue.trim() && !suggestions.some(tag =>
-            tag.name.toLowerCase() === inputValue.toLowerCase()
-        )
-        const totalOptions = suggestions.length + (hasCreateOption ? 1 : 0)
+        // Only show tag suggestions in dropdown
+        const totalOptions = suggestions.length
 
         switch (e.key) {
             case 'ArrowDown':
@@ -161,17 +167,12 @@ const MediaSearchWidget = ({
                 break
             case 'Enter':
                 e.preventDefault()
-                if (selectedIndex >= 0) {
-                    if (selectedIndex < suggestions.length && suggestions[selectedIndex]) {
-                        // Selected an existing tag
-                        addSearchTerm(suggestions[selectedIndex].name, 'tag')
-                    } else if (hasCreateOption && selectedIndex === suggestions.length) {
-                        // Selected the "create new" option
-                        addSearchTerm(inputValue.trim(), 'text')
-                    }
+                if (selectedIndex >= 0 && selectedIndex < suggestions.length && suggestions[selectedIndex]) {
+                    // Selected an existing tag - add as tag pill
+                    addTagTerm(suggestions[selectedIndex].name)
                 } else {
-                    // No selection, create new search term
-                    addSearchTerm(inputValue.trim(), 'text')
+                    // No selection, just search with text (don't add pill)
+                    triggerTextSearch(inputValue.trim())
                 }
                 break
             case 'Escape':
@@ -181,70 +182,49 @@ const MediaSearchWidget = ({
         }
     }
 
-    const addSearchTerm = async (termValue, termType = null) => {
-        if (!termValue) return
+    const addTagTerm = (tagName) => {
+        if (!tagName) return
 
-        // Normalize term value for comparison
-        const normalizedValue = termValue.trim()
+        // Normalize tag name for comparison
+        const normalizedValue = tagName.trim()
 
-        // Check for duplicates (case-insensitive) in current search terms
+        // Check for duplicates (case-insensitive) in current tag terms
         const isDuplicate = searchTerms.some(existingTerm =>
-            existingTerm.value.toLowerCase() === normalizedValue.toLowerCase()
+            existingTerm.type === 'tag' && existingTerm.value.toLowerCase() === normalizedValue.toLowerCase()
         )
         if (isDuplicate) return
 
-        // Determine if this is a tag or free text
-        let type = termType
-        if (!type) {
-            // Check if this term exists in our available tags
-            const existingTag = availableTags.find(tag =>
-                tag.name.toLowerCase() === normalizedValue.toLowerCase()
-            )
-            type = existingTag ? 'tag' : 'text'
-        }
+        // Get current search terms
+        const tagTerms = searchTerms.filter(term => term.type === 'tag')
+        const textTerms = searchTerms.filter(term => term.type === 'text')
 
-        // Restrict to only one text search term
-        if (type === 'text') {
-            const existingTextTerms = searchTerms.filter(term => term.type === 'text')
-            if (existingTextTerms.length > 0) {
-                // Replace the existing text term
-                const newSearchTerms = searchTerms.filter(term => term.type !== 'text')
-                newSearchTerms.push({
-                    value: normalizedValue,
-                    type: 'text'
-                })
-                onChange(newSearchTerms)
-            } else {
-                // Add new text term
-                const newSearchTerms = [...searchTerms, {
-                    value: normalizedValue,
-                    type: 'text'
-                }]
-                onChange(newSearchTerms)
-            }
-        } else {
-            // Add tag normally
-            const newSearchTerms = [...searchTerms, {
-                value: normalizedValue,
-                type: type
-            }]
-            onChange(newSearchTerms)
-        }
-
-        setInputValue('')
+        // Add new tag
+        const newSearchTerms = [
+            ...tagTerms,
+            { value: normalizedValue, type: 'tag' },
+            ...textTerms
+        ]
+        
+        onChange(newSearchTerms)
+        
+        // Don't clear input - keep text search active
         setShowSuggestions(false)
         setSelectedIndex(-1)
     }
 
     const removeSearchTerm = (termToRemove) => {
-        const newSearchTerms = searchTerms.filter(term =>
-            term.value !== termToRemove.value
-        )
-        onChange(newSearchTerms)
+        if (termToRemove.type === 'tag') {
+            // Remove tag pill
+            const newSearchTerms = searchTerms.filter(term =>
+                !(term.type === 'tag' && term.value === termToRemove.value)
+            )
+            onChange(newSearchTerms)
+        }
+        // Don't handle text type removal - text stays in input field
     }
 
     const handleSuggestionClick = (tag) => {
-        addSearchTerm(tag.name, 'tag')
+        addTagTerm(tag.name)
     }
 
     // Close suggestions when clicking outside
@@ -264,23 +244,8 @@ const MediaSearchWidget = ({
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    // Get pill styling based on term type
-    const getPillStyling = (term) => {
-        if (term.type === 'tag') {
-            return "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-        } else {
-            return "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800"
-        }
-    }
-
-    // Get icon for term type
-    const getTermIcon = (term) => {
-        if (term.type === 'tag') {
-            return <Hash className="w-3 h-3 mr-1" />
-        } else {
-            return <Search className="w-3 h-3 mr-1" />
-        }
-    }
+    // Only show tag pills (text search is in the input field)
+    const tagTerms = searchTerms.filter(term => term.type === 'tag')
 
     return (
         <div className="space-y-2">
@@ -305,16 +270,6 @@ const MediaSearchWidget = ({
                                 disabled={disabled || isLoading}
                             />
                         </div>
-                        {inputValue.trim() && (
-                            <button
-                                type="button"
-                                onClick={() => addSearchTerm(inputValue.trim(), 'text')}
-                                className="ml-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={isLoading || isSearching}
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
-                        )}
                     </div>
 
                     {/* Suggestions Dropdown */}
@@ -352,43 +307,30 @@ const MediaSearchWidget = ({
                             ))}
 
                             {/* Show no results message */}
-                            {!isSearching && suggestions.length === 0 && availableTags.length === 0 && (
+                            {!isSearching && suggestions.length === 0 && (
                                 <div className="px-4 py-3 text-center text-gray-500">
-                                    <span className="text-sm">No tags found</span>
+                                    <span className="text-sm">No matching tags found. Press Enter to search text.</span>
                                 </div>
-                            )}
-
-                            {/* Create new search term option */}
-                            {!isSearching && inputValue.trim() && !suggestions.some(tag => tag.name.toLowerCase() === inputValue.toLowerCase()) && (
-                                <button
-                                    type="button"
-                                    onClick={() => addSearchTerm(inputValue.trim(), 'text')}
-                                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center ${suggestions.length > 0 ? 'border-t border-gray-200' : ''} ${selectedIndex === suggestions.length ? 'bg-gray-50 text-gray-700' : 'text-gray-900'
-                                        }`}
-                                >
-                                    <Search className="w-4 h-4 mr-2 text-gray-400" />
-                                    <span>Search for: <strong>"{inputValue.trim()}"</strong></span>
-                                </button>
                             )}
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Selected Search Terms Display */}
-            {searchTerms.length > 0 && (
+            {/* Selected Tag Pills (text search stays in input field) */}
+            {tagTerms.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                    {searchTerms.map((term, index) => (
+                    {tagTerms.map((term, index) => (
                         <span
                             key={index}
-                            className={getPillStyling(term)}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
                         >
-                            {getTermIcon(term)}
+                            <Hash className="w-3 h-3 mr-1" />
                             {term.value}
                             {!disabled && (
                                 <button
                                     onClick={() => removeSearchTerm(term)}
-                                    className={`ml-2 ${term.type === 'tag' ? 'text-blue-600 hover:text-blue-800' : 'text-gray-600 hover:text-gray-800'}`}
+                                    className="ml-2 text-blue-600 hover:text-blue-800"
                                     type="button"
                                 >
                                     <X className="w-3 h-3" />
@@ -407,7 +349,7 @@ const MediaSearchWidget = ({
                         ? "Loading available tags..."
                         : isSearching
                             ? "Searching for tags..."
-                            : "Type to search tags (blue pills) or add text search (gray pill) to search titles and tags. Multiple tags work as AND filters."
+                            : "Type to search files by text. Click tags to add filters (blue pills). Multiple tags work as AND filters."
                 }
             </p>
         </div>

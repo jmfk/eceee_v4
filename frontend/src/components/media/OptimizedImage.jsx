@@ -136,14 +136,19 @@ const OptimizedImage = ({
         );
     }
 
+    // Extract object-fit class from className prop (if present)
+    const objectFitMatch = className.match(/object-(cover|contain|fill|none|scale-down)/);
+    const objectFitClass = objectFitMatch ? objectFitMatch[0] : 'object-cover';
+    const wrapperClassName = className.replace(/object-(cover|contain|fill|none|scale-down)/, '').trim();
+
     return (
-        <div className={`relative overflow-hidden ${className}`} style={style}>
+        <div className={`relative overflow-hidden ${wrapperClassName}`} style={style}>
             {/* Placeholder image */}
             {showPlaceholder && placeholderSrc && (
                 <img
                     src={placeholderSrc}
                     alt=""
-                    className="absolute inset-0 w-full h-full object-cover filter blur-sm scale-110 transition-opacity duration-300"
+                    className={`absolute inset-0 w-full h-full ${objectFitClass} filter blur-sm scale-110 transition-opacity duration-300`}
                     style={{
                         opacity: imageLoaded ? 0 : 1,
                     }}
@@ -160,7 +165,7 @@ const OptimizedImage = ({
                     width={width}
                     height={height}
                     loading={loading}
-                    className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+                    className={`w-full h-full ${objectFitClass} transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
                         }`}
                     onLoad={handleLoad}
                     onError={handleError}

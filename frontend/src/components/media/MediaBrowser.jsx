@@ -30,7 +30,8 @@ import {
     Edit3,
     ArrowLeft,
     RefreshCw,
-    Trash2
+    Trash2,
+    Eye
 } from 'lucide-react';
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
@@ -40,8 +41,9 @@ import MediaEditForm from './MediaEditForm';
 import MediaSearchWidget from './MediaSearchWidget';
 import DuplicateResolveDialog from './DuplicateResolveDialog';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
+import ImageQuickView from './ImageQuickView';
 import { extractErrorMessage } from '../../utils/errorHandling';
-import { getImageAspectRatio, getGridSpan, getGridStyle } from '../../utils/imageGridLayout';
+import { getImageAspectRatio, getGridSpan, getGridStyle, isExtendedImage } from '../../utils/imageGridLayout';
 
 const MediaBrowser = ({
     onFileSelect,
@@ -82,6 +84,7 @@ const MediaBrowser = ({
 
     const [editingFile, setEditingFile] = useState(null);
     const [currentView, setCurrentView] = useState('library'); // 'library' | 'edit'
+    const [quickViewImage, setQuickViewImage] = useState(null);
 
     const { addNotification } = useGlobalNotifications();
 
@@ -90,7 +93,7 @@ const MediaBrowser = ({
     paginationRef.current = pagination;
 
     // Memoize filters and fileTypes to prevent unnecessary re-renders
-    const memoizedFilters = useMemo(() => filters, [filters.fileType, filters.tags, filters.collections]);
+    const memoizedFilters = useMemo(() => filters, [filters.fileType, filters.tags, filters.collections, filters.showDeleted]);
     const memoizedFileTypes = useMemo(() => fileTypes, [fileTypes]);
 
     // Load files
@@ -110,8 +113,7 @@ const MediaBrowser = ({
                 page: currentPage,
                 pageSize: currentPageSize,
                 namespace: namespace,
-                show_deleted: memoizedFilters.showDeleted,
-                ...memoizedFilters
+                show_deleted: memoizedFilters.showDeleted
             };
 
             // Add text search (only one allowed)
@@ -124,9 +126,23 @@ const MediaBrowser = ({
                 params.tag_names = tagTerms.map(term => term.value);
             }
 
-            // Apply file type filter if specified
-            if (memoizedFileTypes.length > 0) {
-                params.fileType = memoizedFileTypes[0]; // Simple implementation
+            // Apply file type filter from dropdown if specified
+            if (memoizedFilters.fileType) {
+                params.file_type = memoizedFilters.fileType;
+            }
+
+            // Apply file type filter from prop if specified (and no dropdown filter)
+            if (!memoizedFilters.fileType && memoizedFileTypes.length > 0) {
+                params.file_type = memoizedFileTypes[0]; // Simple implementation
+            }
+
+            // Apply tag and collection filters
+            if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
+                params.tags = memoizedFilters.tags;
+            }
+
+            if (memoizedFilters.collections && memoizedFilters.collections.length > 0) {
+                params.collections = memoizedFilters.collections;
             }
 
             const result = await mediaApi.search.search(params);
@@ -155,7 +171,7 @@ const MediaBrowser = ({
         if (namespace) {
             loadFiles(true);
         }
-    }, [namespace, searchTerms]);
+    }, [namespace, searchTerms, memoizedFilters]);
 
     // Reload files when refreshTrigger changes (from external source like file approval)
     useEffect(() => {
@@ -204,6 +220,12 @@ const MediaBrowser = ({
         if (onFileSelect) {
             onFileSelect([]);
         }
+    };
+
+    // Handle quick view button click
+    const handleQuickViewClick = (file, event) => {
+        event.stopPropagation(); // Prevent file selection
+        setQuickViewImage(file);
     };
 
     // Handle edit button click
@@ -535,10 +557,10 @@ const MediaBrowser = ({
                     alt={file.title || file.original_filename || 'Media file'}
                     width={size}
                     height={size}
-                    className={`-full h-full object-${objectFit}`}
+                    className={`w-full h-full object-${objectFit}`}
                     loading="lazy"
                     fallback={
-                        <div className="-full h-full flex items-center justify-center bg-gray-100">
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
                             <FileImage className="w-8 h-8 text-blue-500" />
                         </div>
                     }
@@ -569,41 +591,43 @@ const MediaBrowser = ({
         );
     };
 
-    // Render grid view with masonry layout
+    // Render grid view with dynamic sizing for wide images
     const renderGridView = () => (
-        <div className="grid grid-cols-6 md:grid-cols-9 lg:grid-cols-12 gap-4 p-4" style={{ gridAutoFlow: 'dense' }}>
+        <div className="grid grid-cols-6 md:grid-cols-9 lg:grid-cols-12 gap-4 p-4" style={{ gridAutoRows: 'auto' }}>
             {files.map((file) => {
                 const aspectRatio = getImageAspectRatio(file);
-                const { colSpan, rowSpan, orientation } = getGridSpan(aspectRatio);
-                const gridStyle = getGridStyle(file);
+                const { colSpan, orientation } = getGridSpan(aspectRatio);
+                const isExtended = isExtendedImage(aspectRatio);
+                const isImage = file.fileType === 'image' || file.file_type === 'image';
+                const isTall = aspectRatio && aspectRatio < 0.7; // Tall images have aspect ratio < 0.7
 
-                // Calculate image size based on grid span and actual aspect ratio
-                // Base cell is ~150px, calculate the display size
-                const baseCellSize = 150;
-                const displayWidth = colSpan * baseCellSize;
-                const displayHeight = rowSpan * baseCellSize;
+                // Use dynamic column span from getGridSpan
+                const gridStyle = {
+                    gridColumn: `span ${colSpan}`
+                };
 
-                // Calculate imgproxy size based on actual image dimensions
-                // Don't render larger than the original image
-                let imgWidth, imgHeight;
-                if (aspectRatio && file.width && file.height) {
-                    // Calculate what fits in the display area while maintaining aspect ratio
-                    const displayAspect = displayWidth / displayHeight;
-                    if (aspectRatio > displayAspect) {
-                        // Image is wider than display area, constrain by width
-                        imgWidth = Math.min(displayWidth * 2, file.width); // 2x for retina
-                        imgHeight = Math.round(imgWidth / aspectRatio);
-                    } else {
-                        // Image is taller than display area, constrain by height
-                        imgHeight = Math.min(displayHeight * 2, file.height); // 2x for retina
-                        imgWidth = Math.round(imgHeight * aspectRatio);
-                    }
-                } else {
-                    // Fallback if no dimensions available
-                    imgWidth = displayWidth * 2;
-                    imgHeight = displayHeight * 2;
+                // Calculate proper image size for retina displays (@2x)
+                // Base cell width is ~150px per 4-column span on a 12-column grid
+                // For a 1200px container: 12 cols = 1200px, 4 cols = 400px
+                // With retina (@2x) we need 800px for 4-col, 1600px for 8-col, 2400px for 12-col
+                const baseCellWidth = 400; // Approximate width of 4-column cell
+                const imageWidth = Math.floor((colSpan / 4) * baseCellWidth * 2); // 2x for retina
+
+                // Determine object-fit based on image dimensions vs display area
+                // Wide images: use 'contain' to show full image with space above/below
+                // Tall images: use 'contain' to show full image with space left/right
+                // Square/normal images: use 'cover' to crop and fill the space
+                let objectFit = 'cover'; // default: crop
+                if (colSpan >= 6) {
+                    // Wide images (6+ columns) always use contain to show full image
+                    objectFit = 'contain';
+                } else if (aspectRatio && aspectRatio > 1.7) {
+                    // Images wider than standard (aspect ratio > 1.7) use contain
+                    objectFit = 'contain';
+                } else if (isTall) {
+                    // Tall images use contain to show full height with space on sides
+                    objectFit = 'contain';
                 }
-                const imageSize = Math.max(imgWidth, imgHeight);
 
                 return (
                     <div
@@ -617,8 +641,19 @@ const MediaBrowser = ({
                         `}
                         style={gridStyle}
                         onClick={() => handleFileClick(file)}
-                        title={`${orientation} - ${colSpan}x${rowSpan} - AR: ${aspectRatio ? aspectRatio.toFixed(2) : 'unknown'}`}
+                        title={`${orientation}${aspectRatio ? ` - AR: ${aspectRatio.toFixed(2)}` : ''}`}
                     >
+                        {/* Quick View Button (for extended images only) */}
+                        {isExtended && isImage && !file.is_deleted && (
+                            <button
+                                onClick={(e) => handleQuickViewClick(file, e)}
+                                className="absolute top-2 left-2 z-10 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-full shadow-md transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                title="Quick view full image"
+                            >
+                                <Eye className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+
                         {/* Action Buttons */}
                         <div className="absolute top-2 right-2 z-10 flex gap-1">
                             {file.is_deleted ? (
@@ -656,8 +691,8 @@ const MediaBrowser = ({
                             </div>
                         )}
 
-                        <div className="-full flex-1 min-h-[150px] p-2 flex items-center justify-center bg-gray-50">
-                            {renderThumbnail(file, imageSize, 'contain')}
+                        <div className={`w-full flex-1 p-2 flex items-center justify-center bg-gray-50 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}>
+                            {renderThumbnail(file, imageWidth, objectFit)}
                         </div>
                         <div className="p-3 border-t border-gray-100 flex-shrink-0">
                             <h4
@@ -671,11 +706,6 @@ const MediaBrowser = ({
                             </p>
                             {(file.width && file.height) && (
                                 <p className="text-xs text-gray-400">{file.width}x{file.height}</p>
-                            )}
-                            {aspectRatio && (
-                                <p className="text-xs text-blue-600 font-medium">
-                                    {orientation} ({colSpan}x{rowSpan}) • AR: {aspectRatio.toFixed(2)}
-                                </p>
                             )}
                             {/* Tags */}
                             {file.tags && file.tags.length > 0 && (
@@ -877,22 +907,6 @@ const MediaBrowser = ({
                             </select>
                         )}
 
-                        {!hideShowDeleted && (
-                            <button
-                                onClick={() => handleFilterChange('showDeleted', !filters.showDeleted)}
-                                className={`
-                                    flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-md transition-colors whitespace-nowrap
-                                    ${filters.showDeleted
-                                        ? 'bg-red-600 text-white border-red-600'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                                    }
-                                `}
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                Show Deleted
-                            </button>
-                        )}
-
                         {/* Select All / Deselect All Button */}
                         {selectionMode === 'multiple' && files.length > 0 && (
                             <button
@@ -1082,6 +1096,14 @@ const MediaBrowser = ({
                     duplicates={duplicateFiles}
                     onResolve={handleDuplicateResolve}
                     onCancel={handleDuplicateCancel}
+                />
+            )}
+
+            {/* Image Quick View Modal */}
+            {quickViewImage && (
+                <ImageQuickView
+                    image={quickViewImage}
+                    onClose={() => setQuickViewImage(null)}
                 />
             )}
 

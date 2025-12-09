@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { X, ChevronDown, ChevronUp, Eye, Tag } from 'lucide-react'
+import { X, Eye, Tag, Plus } from 'lucide-react'
 import { getImageUrl, formatFileSize } from './ImageValidationUtils'
 import MediaItemTagEditor from '../media/MediaItemTagEditor'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
@@ -8,9 +8,8 @@ const ImageDisplaySection = ({
     images,
     multiple,
     maxFiles,
-    isExpanded,
-    setIsExpanded,
     onRemoveImage,
+    onOpenModal,
     getThumbnailUrl,
     namespace = null,
     onImageTagsChanged = null
@@ -25,7 +24,7 @@ const ImageDisplaySection = ({
         return (
             <div className="bg-white rounded-lg">
                 {/* Header */}
-                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-4 border-b border-gray-200">
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-4">
                     <div className="flex -space-x-2">
                         {displayImages.slice(0, 3).map((image, index) => {
                             const thumbnailUrl = getThumbnailUrl
@@ -59,26 +58,22 @@ const ImageDisplaySection = ({
                             {maxFiles && ` (${displayImages.length}/${maxFiles})`}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
-                            Click to manage selection
+                            Click button to select more
                         </div>
                     </div>
 
                     <button
                         type="button"
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
+                        onClick={onOpenModal}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors whitespace-nowrap"
                     >
-                        Manage Images
-                        {isExpanded ? (
-                            <ChevronUp className="w-4 h-4" />
-                        ) : (
-                            <ChevronDown className="w-4 h-4" />
-                        )}
+                        <Plus className="w-4 h-4" />
+                        Select More
                     </button>
                 </div>
 
-                {/* Expanded view with individual image controls */}
-                {isExpanded && (
+                {/* Compact view with individual image controls */}
+                <div className="border-t border-gray-200">
                     <div className="p-4">
                         <div className="grid grid-cols-4 gap-3" style={{ gridAutoFlow: 'dense' }}>
                             {displayImages.map((image, index) => {
@@ -163,7 +158,7 @@ const ImageDisplaySection = ({
                             })}
                         </div>
                     </div>
-                )}
+                </div>
             </div>
         )
     }
@@ -176,7 +171,7 @@ const ImageDisplaySection = ({
 
     return (
         <div className="bg-white rounded-lg">
-            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-4 border-b border-gray-200">
+            <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 p-4">
                 <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                     {thumbnailUrl && (
                         <img
@@ -197,63 +192,25 @@ const ImageDisplaySection = ({
                     </div>
                 </div>
 
-                {/* Only show expand/collapse button */}
+                {/* Change/Add button to open modal */}
                 <button
                     type="button"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    title={isExpanded ? 'Collapse' : 'Expand'}
+                    onClick={onOpenModal}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors whitespace-nowrap"
                 >
-                    {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
-                    ) : (
-                        <ChevronDown className="w-4 h-4" />
-                    )}
+                    <Plus className="w-4 h-4" />
+                    {multiple ? 'Add More' : 'Change'}
+                </button>
+
+                {/* Remove button */}
+                <button
+                    onClick={(event) => onRemoveImage(image.id, event)}
+                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                    title="Remove image"
+                >
+                    <X className="w-4 h-4" />
                 </button>
             </div>
-
-            {/* Expanded actions section */}
-            {isExpanded && (
-                <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-4">
-                    {/* Tags section */}
-                    {namespace && (
-                        <div>
-                            <MediaItemTagEditor
-                                mediaFile={{ id: image.id, tags: image.tags || [] }}
-                                namespace={namespace}
-                                onTagsChanged={onImageTagsChanged}
-                                compact={false}
-                            />
-                        </div>
-                    )}
-
-                    {/* Action buttons */}
-                    <div className="flex items-center justify-end gap-2">
-                        {/* Preview button */}
-                        {thumbnailUrl && (
-                            <button
-                                type="button"
-                                onClick={() => window.open(getImageUrl(image), '_blank')}
-                                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 bg-white border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
-                                title="View full size"
-                            >
-                                <Eye className="w-4 h-4" />
-                                View
-                            </button>
-                        )}
-
-                        {/* Remove button */}
-                        <button
-                            onClick={(event) => onRemoveImage(image.id, event)}
-                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 bg-white border border-red-300 rounded-md hover:bg-red-50 transition-colors"
-                            title="Remove image"
-                        >
-                            <X className="w-4 h-4" />
-                            Remove
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

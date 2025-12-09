@@ -33,12 +33,58 @@ export function getImageAspectRatio(image) {
 }
 
 /**
+ * Determine if an image has an extended aspect ratio (tall or wide)
+ * that would have previously used multi-cell grid spans
+ * @param {number|null} aspectRatio - Image aspect ratio
+ * @returns {boolean} - True if image is extended (tall or wide)
+ */
+export function isExtendedImage(aspectRatio) {
+    if (aspectRatio === null || aspectRatio === undefined) {
+        return false;
+    }
+
+    // Image is extended if it's very wide or very tall
+    return (
+        aspectRatio > ASPECT_RATIO_THRESHOLDS.WIDE || // Wide images
+        aspectRatio < ASPECT_RATIO_THRESHOLDS.TALL    // Tall images
+    );
+}
+
+/**
+ * Get orientation label for an image based on aspect ratio
+ * @param {number|null} aspectRatio - Image aspect ratio
+ * @returns {string} - Orientation label
+ */
+export function getImageOrientation(aspectRatio) {
+    if (aspectRatio === null || aspectRatio === undefined) {
+        return 'square';
+    }
+
+    if (aspectRatio > ASPECT_RATIO_THRESHOLDS.ULTRA_ULTRA_WIDE) {
+        return 'ultra-ultra-wide';
+    }
+    if (aspectRatio > ASPECT_RATIO_THRESHOLDS.ULTRA_WIDE) {
+        return 'ultra-wide';
+    }
+    if (aspectRatio > ASPECT_RATIO_THRESHOLDS.WIDE) {
+        return 'wide';
+    }
+    if (aspectRatio < ASPECT_RATIO_THRESHOLDS.ULTRA_TALL) {
+        return 'ultra-tall';
+    }
+    if (aspectRatio < ASPECT_RATIO_THRESHOLDS.TALL) {
+        return 'tall';
+    }
+    return 'square';
+}
+
+/**
  * Determine grid span and object-fit based on aspect ratio
+ * Wide images get 2x1 or 4x1, tall images and square images get 1x1
  * @param {number|null} aspectRatio - Image aspect ratio
  * @returns {Object} - { colSpan, rowSpan, objectFit, orientation }
  */
 export function getGridSpan(aspectRatio) {
-    // Default to single cell with cover if aspect ratio unknown
     if (aspectRatio === null || aspectRatio === undefined) {
         return {
             colSpan: 4,
@@ -48,62 +94,42 @@ export function getGridSpan(aspectRatio) {
         };
     }
 
-    // Ultra-ultra-wide image - spans full width (12x1)
+    // Ultra-ultra-wide images - 4x1
     if (aspectRatio > ASPECT_RATIO_THRESHOLDS.ULTRA_ULTRA_WIDE) {
         return {
             colSpan: 12,
             rowSpan: 1,
-            objectFit: 'contain',
+            objectFit: 'cover',
             orientation: 'ultra-ultra-wide'
         };
     }
 
-    // Ultra-wide image - spans 4 columns (4x1)
+    // Ultra-wide images - 4x1
     if (aspectRatio > ASPECT_RATIO_THRESHOLDS.ULTRA_WIDE) {
         return {
             colSpan: 8,
             rowSpan: 1,
-            objectFit: 'contain',
+            objectFit: 'cover',
             orientation: 'ultra-wide'
         };
     }
 
-    // Wide image - spans 3 columns (3x1)
+    // Wide images - 2x1
     if (aspectRatio > ASPECT_RATIO_THRESHOLDS.WIDE) {
         return {
             colSpan: 6,
             rowSpan: 1,
-            objectFit: 'contain',
+            objectFit: 'cover',
             orientation: 'wide'
         };
     }
 
-    // Ultra-tall image - spans 4 columns and 3 rows (4x3)
-    if (aspectRatio < ASPECT_RATIO_THRESHOLDS.ULTRA_TALL) {
-        return {
-            colSpan: 4,
-            rowSpan: 3,
-            objectFit: 'contain',
-            orientation: 'ultra-tall'
-        };
-    }
-
-    // Tall image - spans 2 rows (1x2)
-    if (aspectRatio < ASPECT_RATIO_THRESHOLDS.TALL) {
-        return {
-            colSpan: 1,
-            rowSpan: 2,
-            objectFit: 'contain',
-            orientation: 'tall'
-        };
-    }
-
-    // Square image - 4x1 cell (same as ultra-wide)
+    // All other images (tall and square) - 1x1
     return {
         colSpan: 4,
         rowSpan: 1,
         objectFit: 'cover',
-        orientation: 'square'
+        orientation: getImageOrientation(aspectRatio)
     };
 }
 
