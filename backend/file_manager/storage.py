@@ -135,6 +135,38 @@ class S3MediaStorage(Storage):
 
         return result
 
+    def upload_thumbnail(self, thumbnail_bytes: bytes, original_file_path: str) -> str:
+        """
+        Upload generated thumbnail to S3.
+
+        Args:
+            thumbnail_bytes: Thumbnail image bytes (JPEG format)
+            original_file_path: Original file's S3 path
+
+        Returns:
+            S3 path where thumbnail was stored
+        """
+        # Generate thumbnail path by adding _thumb before extension
+        base_path, ext = os.path.splitext(original_file_path)
+        thumbnail_path = f"{base_path}_thumb.jpg"
+
+        try:
+            # Upload thumbnail to S3
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=thumbnail_path,
+                Body=thumbnail_bytes,
+                ContentType="image/jpeg",
+                **self.object_parameters,
+            )
+
+            logger.info(f"Uploaded thumbnail to S3: {thumbnail_path}")
+            return thumbnail_path
+
+        except Exception as e:
+            logger.error(f"Failed to upload thumbnail for {original_file_path}: {e}")
+            raise
+
     def _get_key(self, name: str) -> str:
         """
         Get the S3 key for a file.

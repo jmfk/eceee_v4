@@ -962,24 +962,28 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                             <div className="flex gap-4 items-start">
                                                                 {/* Thumbnail */}
                                                                 <div className="flex-shrink-0">
-                                                                    <div className="w-24 h-24 bg-gray-200 rounded overflow-hidden border border-gray-300">
-                                                                        {file.fileType === 'image' ? (
-                                                                            <img
-                                                                                src={`/api/v1/media/pending-files/${file.id}/preview/`}
-                                                                                alt={formData?.title || file.originalFilename}
-                                                                                className="w-full h-full object-cover"
-                                                                                onError={(e) => {
-                                                                                    e.target.style.display = 'none';
-                                                                                    e.target.nextSibling.style.display = 'flex';
-                                                                                }}
-                                                                            />
-                                                                        ) : null}
-                                                                        <div className={`w-full h-full flex items-center justify-center ${file.fileType === 'image' ? 'hidden' : 'flex'}`}>
-                                                                            <div className="text-gray-500 text-sm">
-                                                                                {getFileTypeIcon(file.fileType)}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
+                                                    <div className="w-24 h-24 bg-gray-200 rounded overflow-hidden border border-gray-300">
+                                                        {file.fileType === 'image' ? (
+                                                            <img
+                                                                src={`/api/v1/media/pending-files/${file.id}/preview/`}
+                                                                alt={formData?.title || file.originalFilename}
+                                                                className="w-full h-full object-contain"
+                                                                style={{
+                                                                    maxWidth: file.width ? `${file.width}px` : undefined,
+                                                                    maxHeight: file.height ? `${file.height}px` : undefined
+                                                                }}
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none';
+                                                                    e.target.nextSibling.style.display = 'flex';
+                                                                }}
+                                                            />
+                                                        ) : null}
+                                                        <div className={`w-full h-full flex items-center justify-center ${file.fileType === 'image' ? 'hidden' : 'flex'}`}>
+                                                            <div className="text-gray-500 text-sm">
+                                                                {getFileTypeIcon(file.fileType)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                                 </div>
 
                                                                 {/* File Details */}
@@ -1231,7 +1235,11 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                             <img
                                                                                 src={`/api/v1/media/pending-files/${file.id}/preview/`}
                                                                                 alt={file.originalFilename}
-                                                                                className="w-full h-full object-cover"
+                                                                                className="w-full h-full object-contain"
+                                                                                style={{
+                                                                                    maxWidth: file.width ? `${file.width}px` : undefined,
+                                                                                    maxHeight: file.height ? `${file.height}px` : undefined
+                                                                                }}
                                                                                 onError={(e) => {
                                                                                     e.target.style.display = 'none';
                                                                                     e.target.nextSibling.style.display = 'flex';

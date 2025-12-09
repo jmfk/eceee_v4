@@ -646,6 +646,8 @@ const MediaBrowser = ({
                     alt={file.title || file.original_filename || 'Media file'}
                     width={size}
                     height={size}
+                    actualWidth={file.width}
+                    actualHeight={file.height}
                     className={`w-full h-full object-${objectFit}`}
                     loading="lazy"
                     fallback={
@@ -702,21 +704,9 @@ const MediaBrowser = ({
                 const baseCellWidth = 400; // Approximate width of 4-column cell
                 const imageWidth = Math.floor((colSpan / 4) * baseCellWidth * 2); // 2x for retina
 
-                // Determine object-fit based on image dimensions vs display area
-                // Wide images: use 'contain' to show full image with space above/below
-                // Tall images: use 'contain' to show full image with space left/right
-                // Square/normal images: use 'cover' to crop and fill the space
-                let objectFit = 'cover'; // default: crop
-                if (colSpan >= 6) {
-                    // Wide images (6+ columns) always use contain to show full image
-                    objectFit = 'contain';
-                } else if (aspectRatio && aspectRatio > 1.7) {
-                    // Images wider than standard (aspect ratio > 1.7) use contain
-                    objectFit = 'contain';
-                } else if (isTall) {
-                    // Tall images use contain to show full height with space on sides
-                    objectFit = 'contain';
-                }
+                // Always use 'contain' to prevent upscaling and maintain aspect ratio
+                // This ensures images never display larger than their actual dimensions
+                const objectFit = 'contain';
 
                 return (
                     <div

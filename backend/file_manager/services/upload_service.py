@@ -147,7 +147,7 @@ class FileUploadService:
 
         try:
             with transaction.atomic():
-                return PendingMediaFile.objects.create(
+                pending_file = PendingMediaFile.objects.create(
                     original_filename=file.name,
                     file_path=upload_result["file_path"],
                     file_size=upload_result["file_size"],
@@ -165,6 +165,16 @@ class FileUploadService:
                     uploaded_by=user,
                     expires_at=timezone.now() + timedelta(hours=24),
                 )
+
+                # Trigger background processing for documents
+                if file_type == "document":
+                    from ..tasks import process_document_text, generate_document_thumbnail
+
+                    # Trigger tasks asynchronously
+                    generate_document_thumbnail.delay(str(pending_file.id), is_pending=True)
+                    process_document_text.delay(str(pending_file.id), is_pending=True)
+
+                return pending_file
         except IntegrityError as e:
             # Handle duplicate file hash constraint OUTSIDE atomic block
             # This happens when the same file (same hash) is uploaded again

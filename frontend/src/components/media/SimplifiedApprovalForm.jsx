@@ -246,7 +246,11 @@ const SimplifiedApprovalForm = ({
                         <img
                             src={previewUrl}
                             alt={file.originalFilename}
-                            className="w-20 h-20 object-cover rounded"
+                            className="w-20 h-20 object-contain rounded"
+                            style={{
+                                maxWidth: file.width ? `${file.width}px` : undefined,
+                                maxHeight: file.height ? `${file.height}px` : undefined
+                            }}
                             onError={(e) => {
                                 // Hide broken image and show fallback
                                 e.target.style.display = 'none';

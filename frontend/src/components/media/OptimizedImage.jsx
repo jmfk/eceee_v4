@@ -13,6 +13,8 @@ const OptimizedImage = ({
     alt,
     width,
     height,
+    actualWidth, // Actual image dimensions (to prevent upscaling)
+    actualHeight,
     className = '',
     style = {},
     quality = 85,
@@ -167,6 +169,10 @@ const OptimizedImage = ({
                     loading={loading}
                     className={`w-full h-full ${objectFitClass} transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
                         }`}
+                    style={{
+                        maxWidth: actualWidth ? `${actualWidth}px` : (width ? `${width}px` : '100%'),
+                        maxHeight: actualHeight ? `${actualHeight}px` : (height ? `${height}px` : '100%')
+                    }}
                     onLoad={handleLoad}
                     onError={handleError}
                     {...props}

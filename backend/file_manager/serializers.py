@@ -565,9 +565,13 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         return None
 
     def get_thumbnail_url(self, obj):
-        """Get pre-generated thumbnail URL (150x150)."""
+        """Get pre-generated thumbnail URL (150x150 for images, or document thumbnail)."""
         if obj.is_image:
             return obj.get_imgproxy_thumbnail_url(size=150)
+        elif obj.file_type == 'document' and obj.has_thumbnail():
+            from .storage import S3MediaStorage
+            storage = S3MediaStorage()
+            return storage.get_public_url(obj.get_thumbnail_path())
         return None
 
     def to_representation(self, instance):
@@ -869,6 +873,7 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
     )
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PendingMediaFile
@@ -894,6 +899,7 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
             "expires_at",
             "uploaded_by",
             "uploaded_by_name",
+            "thumbnail_url",
         ]
 
     def get_file_size_human(self, obj):
@@ -903,6 +909,14 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
                 return f"{obj.file_size:.1f} {unit}"
             obj.file_size /= 1024.0
         return f"{obj.file_size:.1f} PB"
+
+    def get_thumbnail_url(self, obj):
+        """Get document thumbnail URL if available."""
+        if obj.file_type == 'document' and obj.has_thumbnail():
+            from .storage import S3MediaStorage
+            storage = S3MediaStorage()
+            return storage.get_public_url(obj.get_thumbnail_path())
+        return None
 
 
 class MediaFileApprovalSerializer(serializers.Serializer):

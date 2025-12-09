@@ -359,6 +359,26 @@ class PendingMediaFile(models.Model):
 
         return timezone.now() > self.expires_at
 
+    def get_thumbnail_path(self):
+        """
+        Get S3 path for document thumbnail if exists.
+
+        Returns:
+            Thumbnail S3 path or None
+        """
+        if not self.metadata:
+            return None
+        return self.metadata.get('thumbnail_path')
+
+    def has_thumbnail(self):
+        """
+        Check if document has generated thumbnail.
+
+        Returns:
+            True if thumbnail exists, False otherwise
+        """
+        return bool(self.get_thumbnail_path())
+
     @classmethod
     def cleanup_expired(cls):
         """Clean up expired pending files."""
@@ -1051,6 +1071,26 @@ class MediaFile(models.Model):
 
         storage = S3MediaStorage()
         return storage.get_public_url(self.file_path)
+
+    def get_thumbnail_path(self):
+        """
+        Get S3 path for document thumbnail if exists.
+
+        Returns:
+            Thumbnail S3 path or None
+        """
+        if not self.metadata:
+            return None
+        return self.metadata.get('thumbnail_path')
+
+    def has_thumbnail(self):
+        """
+        Check if document has generated thumbnail.
+
+        Returns:
+            True if thumbnail exists, False otherwise
+        """
+        return bool(self.get_thumbnail_path())
 
 
 class MediaUsage(models.Model):
