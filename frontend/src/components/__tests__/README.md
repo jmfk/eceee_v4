@@ -53,12 +53,10 @@ docker-compose exec frontend npm test
 - **`SlotManager.test.jsx`** - Layout slot management
 
 ### Media System Tests
-- **`MediaPicker.test.jsx`** - Media selection modal and file picker
 - **`MediaBrowser.test.jsx`** - Media library browser and grid view
 - **`MediaField.test.jsx`** - Schema-driven form media fields
 - **`MediaWidgetEditors.test.jsx`** - Widget editors with media integration
 - **`MediaManagerPage.test.jsx`** - Complete media management interface
-- **`MediaIntegration.test.jsx`** - End-to-end media workflows
 
 ### Specialized Component Tests
 - **`BulkPublishingOperations.test.jsx`** - Mass publishing workflows

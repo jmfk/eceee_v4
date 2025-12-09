@@ -162,7 +162,14 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             if new_tag_ids:
                 # Add new tags to existing file
                 existing_file.tags.add(*new_tag_ids)
-                existing_file.save()
+            
+            # Handle annotation update if provided
+            annotation = request.data.get("annotation")
+            if annotation:
+                existing_file.metadata = existing_file.metadata or {}
+                existing_file.metadata["annotation"] = annotation
+            
+            existing_file.save()
 
             # Handle collection assignment if requested
             collection_id = request.data.get("collection_id")
@@ -210,6 +217,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 title=serializer.validated_data["title"],
                 slug=serializer.validated_data.get("slug"),
                 description=serializer.validated_data.get("description", ""),
+                annotation=serializer.validated_data.get("annotation", ""),
                 tags=serializer.validated_data.get("tag_ids", []),
                 access_level=serializer.validated_data.get("access_level", "public"),
             )
@@ -334,6 +342,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     title=approval_data["title"],
                     slug=approval_data.get("slug"),
                     description=approval_data.get("description", ""),
+                    annotation=approval_data.get("annotation", ""),
                     tags=tag_ids,
                     access_level=approval_data.get("access_level", "public"),
                 )

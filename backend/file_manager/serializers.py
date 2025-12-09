@@ -925,6 +925,7 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255)
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
+    annotation = serializers.CharField(required=False, allow_blank=True)
     tag_ids = serializers.ListField(
         child=serializers.CharField(), required=True, allow_empty=False
     )
@@ -972,6 +973,7 @@ class BulkApprovalItemSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255)
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
+    annotation = serializers.CharField(required=False, allow_blank=True)
     tag_ids = serializers.ListField(
         child=serializers.CharField(), required=True, allow_empty=False
     )

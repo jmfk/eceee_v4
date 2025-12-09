@@ -17,7 +17,6 @@ export { default as MediaApprovalForm } from './MediaApprovalForm';
 export { default as MediaMetadataForm } from './MediaMetadataForm';
 
 // Utility components
-export { default as MediaPicker } from './MediaPicker';
 export { default as OptimizedImage } from './OptimizedImage';
 export { default as BulkOperations } from './BulkOperations';
 export { default as UploadQueue } from './UploadQueue';

@@ -247,7 +247,7 @@ class PendingMediaFile(models.Model):
         return f"{self.original_filename} ({self.status})"
 
     def approve_and_create_media_file(
-        self, title, slug=None, description="", tags=None, access_level="public"
+        self, title, slug=None, description="", annotation="", tags=None, access_level="public"
     ):
         """
         Approve this pending file and create a MediaFile instance.
@@ -256,6 +256,7 @@ class PendingMediaFile(models.Model):
             title: Title for the media file
             slug: Optional slug (auto-generated if not provided)
             description: Optional description
+            annotation: Optional annotation text (stored in metadata)
             tags: List of tag IDs to associate
             access_level: Access level for the file
 
@@ -295,6 +296,12 @@ class PendingMediaFile(models.Model):
                 created_by=self.uploaded_by,
                 last_modified_by=self.uploaded_by,
             )
+
+            # Store annotation in metadata if provided
+            if annotation:
+                media_file.metadata = media_file.metadata or {}
+                media_file.metadata["annotation"] = annotation
+                media_file.save()
 
             # Associate tags if provided
             if tags:

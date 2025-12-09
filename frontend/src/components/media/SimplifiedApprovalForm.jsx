@@ -46,6 +46,7 @@ const SimplifiedApprovalForm = ({
             initialApprovals[file.id] = {
                 title: aiTitle || file.originalFilename?.replace(/\.[^/.]+$/, '') || '',
                 tags: Array.isArray(aiTags) ? aiTags.map(tag => ({ name: tag })) : [],
+                annotation: '',
                 approved: true // Default to approved
             };
         });
@@ -140,6 +141,7 @@ const SimplifiedApprovalForm = ({
                     title: approval.title.trim(),
                     tagIds: tagIds,
                     description: '',
+                    annotation: approval.annotation || '',
                     accessLevel: 'public'
                 };
             });
@@ -167,6 +169,7 @@ const SimplifiedApprovalForm = ({
                         title: approval.title,
                         tagIds: approval.tagIds,
                         description: approval.description,
+                        annotation: approval.annotation,
                         accessLevel: approval.accessLevel
                     }
                 )();
@@ -393,6 +396,24 @@ const SimplifiedApprovalForm = ({
                                         {errors.title}
                                     </p>
                                 )}
+                            </div>
+
+                            {/* Annotation Input */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Annotation (optional)
+                                </label>
+                                <textarea
+                                    value={approval.annotation || ''}
+                                    onChange={(e) => updateApproval(file.id, 'annotation', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Optional annotation text"
+                                    rows={2}
+                                    disabled={processing}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Additional annotation text displayed in the user interface
+                                </p>
                             </div>
 
                             {/* Tags Input */}

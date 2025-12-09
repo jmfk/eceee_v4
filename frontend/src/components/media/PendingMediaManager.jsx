@@ -76,6 +76,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                     title: title,
                     slug: generateSlug(title),
                     tags: file.aiSuggestedTags || [],
+                    annotation: '',
                     accessLevel: 'public'
                 }
             }));
@@ -725,6 +726,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                             title: formData.title,
                             slug: formData.slug,
                             tagIds: tagIds,
+                            annotation: formData.annotation || '',
                             accessLevel: formData.accessLevel,
                             collectionId: selectedCollection === 'new' ? null : (selectedCollection || null),
                             collectionName: selectedCollection === 'new' ? newCollectionName : null
@@ -1320,6 +1322,23 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                                     </div>
                                                                                 )}
                                                                             </div>
+                                                                        </div>
+
+                                                                        {/* Annotation Section */}
+                                                                        <div>
+                                                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                                Annotation (optional)
+                                                                            </label>
+                                                                            <textarea
+                                                                                value={formData.annotation || ''}
+                                                                                onChange={(e) => updateFormData(file.id, 'annotation', e.target.value)}
+                                                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                                placeholder="Optional annotation text"
+                                                                                rows={2}
+                                                                            />
+                                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                                Additional annotation text displayed in the user interface
+                                                                            </p>
                                                                         </div>
 
                                                                         {/* Tags Section */}
