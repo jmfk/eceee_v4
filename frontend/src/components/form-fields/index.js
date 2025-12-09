@@ -128,6 +128,7 @@ export const FIELD_COMPONENTS = {
     BannerModeSelector: () => import('./BannerModeSelector'),
     // Media Components
     ImageInput: () => import('./ImageInput'),
+    ImageField: () => import('./ImageInput'), // Alias for ImageInput
     FileInput: () => import('./FileInput'),
     DocumentInput: () => import('./DocumentInput'),
     VideoInput: () => import('./VideoInput'),

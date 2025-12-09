@@ -12,6 +12,7 @@ from django.db import IntegrityError
 
 from ..models import MediaFile, PendingMediaFile
 from ..security import SecurityAuditLogger
+from ..serializers import PendingMediaFileListSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -263,27 +264,15 @@ class DuplicateFileHandler:
             user,
         )
 
+        # Serialize the pending file to dict for JSON response
+        serializer = PendingMediaFileListSerializer(updated_pending)
+
+        # Just return the pending file without an error - it will show up in pending files list
+        # No need to ask the user, they can see it in the pending section
         return DuplicateCheckResult(
             has_duplicates=True,
-            errors=[
-                {
-                    "filename": uploaded_file.name,
-                    "error": (
-                        f"This file is already awaiting approval (uploaded {existing_pending.created_at.strftime('%Y-%m-%d %H:%M')}). "
-                        "Would you like to replace it or keep both?"
-                    ),
-                    "status": "needs_action",
-                    "reason": "duplicate_pending",
-                    "existing_file": {
-                        "id": str(updated_pending.id),
-                        "original_filename": updated_pending.original_filename,
-                        "status": updated_pending.status,
-                        "created_at": updated_pending.created_at.isoformat(),
-                        "is_pending": True,
-                    },
-                }
-            ],
-            pending_files=[],
+            errors=[],  # No error - this is expected behavior
+            pending_files=[serializer.data],
             existing_pending=updated_pending,
         )
 

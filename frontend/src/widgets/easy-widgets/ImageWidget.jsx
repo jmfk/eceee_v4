@@ -304,7 +304,7 @@ const ImageWidget = ({
                 {items.map((item, index) => {
                     const gridStyle = getGridStyle(item);
                     const objectFitClass = getObjectFitClass(item);
-                    
+
                     return (
                         <div key={index} className="gallery-item" style={gridStyle}>
                             {item.type === 'video' ? (
@@ -584,18 +584,144 @@ ImageWidget.widgetType = 'easy_widgets.ImageWidget'
 // Default configuration
 ImageWidget.defaultConfig = {
     mediaItems: [],
+    collectionId: null,
     displayType: 'gallery',
-    imageStyle: null, // Will use theme default or fallback to legacy values
+    imageStyle: null,
+    componentStyle: 'default',
     enableLightbox: true,
     autoPlay: false,
     autoPlayInterval: 3,
     showCaptions: true,
+    randomize: false,
+    collectionConfig: {
+        randomize: false,
+        maxItems: 0
+    },
     // Backward compatibility
     imageUrl: '',
     altText: '',
     caption: '',
-    alignment: 'center', // Legacy fallback
-    galleryColumns: 3 // Legacy fallback
+    alignment: 'center',
+    galleryColumns: 3
+}
+
+// Schema for schema-driven form
+ImageWidget.schema = {
+    mediaItems: {
+        type: 'array',
+        format: 'media',
+        mediaTypes: ['image', 'video'],
+        allowCollections: false,
+        label: 'Media Items',
+        description: 'Select images or videos for this widget',
+        multiple: true,
+        namespace: null, // Will be set from context
+        conditionalOn: {
+            field: 'collectionId',
+            condition: 'empty'
+        }
+    },
+    collectionId: {
+        type: 'string',
+        format: 'collection',
+        label: 'Collection',
+        description: 'Select a collection to display (overrides individual items)',
+        namespace: null // Will be set from context
+    },
+    displayType: {
+        type: 'string',
+        enum: ['gallery', 'carousel'],
+        label: 'Display Type',
+        description: 'How to display multiple images',
+        default: 'gallery'
+    },
+    imageStyle: {
+        type: 'string',
+        format: 'imageStyle',
+        label: 'Image Style',
+        description: 'Custom image style from theme (gallery or carousel)',
+        conditionalOn: {
+            field: 'componentStyle',
+            condition: 'equals',
+            value: 'default'
+        }
+    },
+    componentStyle: {
+        type: 'string',
+        format: 'componentStyle',
+        label: 'Component Style',
+        description: 'Advanced: Custom component style (overrides image style)',
+        default: 'default'
+    },
+    enableLightbox: {
+        type: 'boolean',
+        label: 'Enable Lightbox',
+        description: 'Allow clicking images to open in lightbox',
+        default: true
+    },
+    showCaptions: {
+        type: 'boolean',
+        label: 'Show Captions',
+        description: 'Display image captions',
+        default: true
+    },
+    randomize: {
+        type: 'boolean',
+        label: 'Randomize Order',
+        description: 'Randomize the order of individual images',
+        default: false,
+        conditionalOn: {
+            field: 'collectionId',
+            condition: 'empty'
+        }
+    },
+    autoPlay: {
+        type: 'boolean',
+        label: 'Auto Play Carousel',
+        description: 'Automatically advance carousel slides',
+        default: false,
+        conditionalOn: {
+            field: 'displayType',
+            condition: 'equals',
+            value: 'carousel'
+        }
+    },
+    autoPlayInterval: {
+        type: 'number',
+        label: 'Auto Play Interval (seconds)',
+        description: 'Seconds between carousel slides',
+        default: 3,
+        min: 1,
+        max: 30,
+        conditionalOn: {
+            field: 'autoPlay',
+            condition: 'equals',
+            value: true
+        }
+    },
+    collectionConfig: {
+        type: 'object',
+        label: 'Collection Settings',
+        description: 'Configure how collections are displayed',
+        properties: {
+            randomize: {
+                type: 'boolean',
+                label: 'Randomize Collection',
+                default: false
+            },
+            maxItems: {
+                type: 'number',
+                label: 'Max Items',
+                description: '0 for unlimited',
+                default: 0,
+                min: 0
+            }
+        },
+        conditionalOn: {
+            field: 'collectionId',
+            condition: 'notEmpty'
+        }
+    }
 }
 
 // Display metadata
@@ -604,8 +730,8 @@ ImageWidget.metadata = {
     description: 'Images, galleries, and videos with multiple display modes and responsive design',
     category: 'media',
     icon: Image,
-    tags: ['eceee', 'image', 'picture', 'photo', 'video', 'gallery', 'media', 'carousel'],
-    specialEditor: 'MediaSpecialEditor' // Declare which special editor to use
+    tags: ['eceee', 'image', 'picture', 'photo', 'video', 'gallery', 'media', 'carousel']
+    // No longer uses specialEditor - now uses schema-driven form
 }
 
 export default ImageWidget

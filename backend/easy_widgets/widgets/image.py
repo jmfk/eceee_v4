@@ -49,7 +49,14 @@ class ImageConfig(BaseModel):
         default_factory=list,
         description="List of images/videos to display",
         json_schema_extra={
-            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
+            "component": "ImageField",
+            "format": "media",
+            "mediaTypes": ["image", "video"],
+            "multiple": True,
+            "allowCollections": False,
+            "order": 0,
+            "group": "Media",
+            "title": "Media Items",
         },
     )
     imageStyle: Optional[str] = Field(
