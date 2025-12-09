@@ -985,9 +985,3 @@ class BulkApprovalSerializer(serializers.Serializer):
         allow_empty=False,
         max_length=50,  # Limit bulk operations
     )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Pass context to child serializers
-        if hasattr(self, "context"):
-            self.fields["approvals"].child.context = self.context

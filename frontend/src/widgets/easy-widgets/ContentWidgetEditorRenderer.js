@@ -2102,7 +2102,7 @@ class ContentWidgetEditorRenderer {
     async openMediaEditModal(mediaElement, initialConfig, mediaData, mediaLoadError = null) {
         const React = await import('react')
         const ReactDOM = await import('react-dom/client')
-        const { default: MediaEditModal } = await import('@/components/media/MediaEditModal.jsx')
+        const { default: MediaInsertModal } = await import('@/components/media/MediaInsertModal.jsx')
         const { GlobalNotificationProvider } = await import('@/contexts/GlobalNotificationContext.jsx')
         const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
         const { namespacesApi } = await import('@/api')
@@ -2157,13 +2157,13 @@ class ContentWidgetEditorRenderer {
         root.render(
             React.createElement(QueryClientProvider, { client: queryClient },
                 React.createElement(GlobalNotificationProvider, {},
-                    React.createElement(MediaEditModal, {
+                    React.createElement(MediaInsertModal, {
                         isOpen: true,
                         onClose: handleClose,
                         onSave: handleSave,
                         onDelete: handleDelete,
                         initialConfig: { ...initialConfig, mediaType: initialConfig.mediaType },
-                        mediaData: mediaData,
+                        initialMediaData: mediaData,
                         mediaLoadError: mediaLoadError,
                         namespace: namespace,
                         pageId: this.pageId

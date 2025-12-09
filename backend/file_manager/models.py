@@ -268,6 +268,10 @@ class PendingMediaFile(models.Model):
         logger = logging.getLogger(__name__)
 
         try:
+            # Ensure we have a namespace
+            if not self.namespace:
+                raise ValueError("PendingMediaFile has no namespace. Cannot approve without a namespace.")
+            
             # Create the MediaFile using atomic helper
             # This will handle any soft-deleted files with the same hash
             media_file = MediaFile.create_with_hash_cleanup(
@@ -625,6 +629,17 @@ class MediaFile(models.Model):
 
             # Create the new MediaFile
             kwargs["file_hash"] = file_hash
+            
+            # Generate slug if not provided
+            if not kwargs.get("slug"):
+                # Create a temporary instance to use the slug generation method
+                # Include namespace to avoid RelatedObjectDoesNotExist
+                temp_instance = cls(
+                    title=kwargs.get("title", "untitled"),
+                    namespace=kwargs.get("namespace")
+                )
+                kwargs["slug"] = temp_instance._generate_unique_slug()
+            
             new_file = cls.objects.create(**kwargs)
 
             return new_file

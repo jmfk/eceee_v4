@@ -55,7 +55,9 @@ const MediaBrowser = ({
     refreshTrigger = 0, // External trigger to force refresh
     prefilterTags = [], // Initial tag filter (array of tag IDs)
     hideShowDeleted = false, // Hide the "Show Deleted" button
-    hideTypeFilter = false // Hide the type filter dropdown
+    hideTypeFilter = false, // Hide the type filter dropdown
+    onPendingApprovalChange, // Callback when pending approval state changes
+    hideInlineApprovalForm = false // Hide the inline approval form (when using external pending tab)
 }) => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -85,6 +87,25 @@ const MediaBrowser = ({
     const [editingFile, setEditingFile] = useState(null);
     const [currentView, setCurrentView] = useState('library'); // 'library' | 'edit'
     const [quickViewImage, setQuickViewImage] = useState(null);
+
+    // Ref for approval form to scroll into view
+    const approvalFormRef = useRef(null);
+
+    // Notify parent when pending approval state changes
+    useEffect(() => {
+        if (onPendingApprovalChange) {
+            onPendingApprovalChange(showApprovalForm && pendingApprovalFiles.length > 0, pendingApprovalFiles);
+        }
+    }, [showApprovalForm, pendingApprovalFiles, onPendingApprovalChange]);
+
+    // Scroll to approval form when it appears
+    useEffect(() => {
+        if (showApprovalForm && pendingApprovalFiles.length > 0 && approvalFormRef.current) {
+            setTimeout(() => {
+                approvalFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+    }, [showApprovalForm, pendingApprovalFiles]);
 
     const { addNotification } = useGlobalNotifications();
 
@@ -376,9 +397,43 @@ const MediaBrowser = ({
                 );
 
                 if (duplicatesNeedingAction.length > 0) {
-                    // Store the files for retry after user decision
+                    // Check if ALL duplicates are pending files (already uploaded, awaiting approval)
+                    const allArePending = duplicatesNeedingAction.every(
+                        err => err.reason === 'duplicate_pending'
+                    );
+
+                    if (allArePending) {
+                        // Auto-reuse: Add existing pending files to approval form
+                        const existingPendingFiles = duplicatesNeedingAction
+                            .map(err => err.existing_file)
+                            .filter(file => file && file.is_pending);
+
+                        if (existingPendingFiles.length > 0) {
+                            // Convert to pending file format for approval form
+                            const pendingForApproval = existingPendingFiles.map(existing => ({
+                                id: existing.id,
+                                originalFilename: existing.original_filename || existing.filename,
+                                fileType: existing.file_type || 'image',
+                                contentType: existing.content_type,
+                                fileSize: existing.file_size,
+                                createdAt: existing.created_at,
+                                status: existing.status
+                            }));
+
+                            setPendingApprovalFiles(pendingForApproval);
+                            setShowApprovalForm(true);
+                            setUploadState('idle');
+
+                            addNotification(
+                                `Reusing ${existingPendingFiles.length} existing pending file(s)`,
+                                'info'
+                            );
+                            return;
+                        }
+                    }
+
+                    // For non-pending duplicates, show the dialog
                     setPendingUploadFiles(files);
-                    // Show duplicate resolution dialog
                     setDuplicateFiles(duplicatesNeedingAction);
                     setDuplicateDialogOpen(true);
                     setUploadState('idle');
@@ -445,9 +500,43 @@ const MediaBrowser = ({
                     );
 
                     if (duplicatesNeedingAction.length > 0) {
-                        // Store the files for retry after user decision
+                        // Check if ALL duplicates are pending files (already uploaded, awaiting approval)
+                        const allArePending = duplicatesNeedingAction.every(
+                            err => err.reason === 'duplicate_pending'
+                        );
+
+                        if (allArePending) {
+                            // Auto-reuse: Add existing pending files to approval form
+                            const existingPendingFiles = duplicatesNeedingAction
+                                .map(err => err.existing_file)
+                                .filter(file => file && file.is_pending);
+
+                            if (existingPendingFiles.length > 0) {
+                                // Convert to pending file format for approval form
+                                const pendingForApproval = existingPendingFiles.map(existing => ({
+                                    id: existing.id,
+                                    originalFilename: existing.original_filename || existing.filename,
+                                    fileType: existing.file_type || 'image',
+                                    contentType: existing.content_type,
+                                    fileSize: existing.file_size,
+                                    createdAt: existing.created_at,
+                                    status: existing.status
+                                }));
+
+                                setPendingApprovalFiles(pendingForApproval);
+                                setShowApprovalForm(true);
+                                setUploadState('idle');
+
+                                addNotification(
+                                    `Reusing ${existingPendingFiles.length} existing pending file(s)`,
+                                    'info'
+                                );
+                                return;
+                            }
+                        }
+
+                        // For non-pending duplicates, show the dialog
                         setPendingUploadFiles(files);
-                        // Show duplicate resolution dialog
                         setDuplicateFiles(duplicatesNeedingAction);
                         setDuplicateDialogOpen(true);
                         setUploadState('idle');
@@ -1028,8 +1117,8 @@ const MediaBrowser = ({
                 )}
 
                 {/* Simplified Approval Form */}
-                {showApprovalForm && pendingApprovalFiles.length > 0 && (
-                    <div className="border-t border-gray-200 bg-blue-50 p-4 m-4 rounded-lg">
+                {!hideInlineApprovalForm && showApprovalForm && pendingApprovalFiles.length > 0 && (
+                    <div ref={approvalFormRef} className="border-t border-gray-200 bg-blue-50 p-4 m-4 rounded-lg">
                         <SimplifiedApprovalForm
                             pendingFiles={pendingApprovalFiles}
                             namespace={namespace}

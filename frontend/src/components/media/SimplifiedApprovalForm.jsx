@@ -14,7 +14,8 @@ import {
     AlertCircle,
     CheckCircle,
     Sparkles,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Tags
 } from 'lucide-react';
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
@@ -30,6 +31,7 @@ const SimplifiedApprovalForm = ({
     const [fileApprovals, setFileApprovals] = useState({});
     const [validationErrors, setValidationErrors] = useState({});
     const [processing, setProcessing] = useState(false);
+    const [bulkTags, setBulkTags] = useState([]);
 
     const { addNotification } = useGlobalNotifications();
 
@@ -134,7 +136,7 @@ const SimplifiedApprovalForm = ({
                 });
 
                 return {
-                    fileId: file.id,
+                    pendingFileId: file.id,
                     title: approval.title.trim(),
                     tagIds: tagIds,
                     description: '',
@@ -160,7 +162,7 @@ const SimplifiedApprovalForm = ({
                 // Single file approval
                 const approval = approvals[0];
                 const result = await mediaApi.pendingFiles.approve(
-                    approval.fileId,
+                    approval.pendingFileId,
                     {
                         title: approval.title,
                         tagIds: approval.tagIds,
@@ -197,11 +199,69 @@ const SimplifiedApprovalForm = ({
         }
     };
 
+    // Apply bulk tags to all files
+    const applyBulkTags = () => {
+        if (bulkTags.length === 0) {
+            addNotification('Please select tags to apply', 'warning');
+            return;
+        }
+
+        setFileApprovals(prev => {
+            const updated = { ...prev };
+            pendingFiles.forEach(file => {
+                if (updated[file.id]) {
+                    // Merge bulk tags with existing tags (avoid duplicates)
+                    const existingTagNames = new Set(
+                        updated[file.id].tags.map(t => t.name || t.id)
+                    );
+                    const newTags = bulkTags.filter(
+                        tag => !existingTagNames.has(tag.name || tag.id)
+                    );
+                    updated[file.id].tags = [...updated[file.id].tags, ...newTags];
+                }
+            });
+            return updated;
+        });
+
+        addNotification(
+            `Applied ${bulkTags.length} tag(s) to ${pendingFiles.length} file(s)`,
+            'success'
+        );
+        setBulkTags([]);
+    };
+
     // Render preview thumbnail for a file
     const renderThumbnail = (file) => {
+        // For pending files, use direct preview URL (bypass imgproxy)
+        // Pending files don't have fileUrl yet, and their preview endpoint
+        // serves the raw file directly - no need for imgproxy optimization
         const previewUrl = file.fileUrl || `/api/v1/media/pending-files/${file.id}/preview/`;
+        const isPendingFile = !file.fileUrl; // If no fileUrl, it's a pending file
 
         if (file.fileType === 'image') {
+            // For pending files, use regular img tag (bypass imgproxy)
+            if (isPendingFile) {
+                return (
+                    <div className="relative w-20 h-20">
+                        <img
+                            src={previewUrl}
+                            alt={file.originalFilename}
+                            className="w-20 h-20 object-cover rounded"
+                            onError={(e) => {
+                                // Hide broken image and show fallback
+                                e.target.style.display = 'none';
+                                const fallback = e.target.nextElementSibling;
+                                if (fallback) fallback.style.display = 'flex';
+                            }}
+                        />
+                        <div className="w-20 h-20 hidden items-center justify-center bg-gray-100 rounded absolute inset-0">
+                            <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                    </div>
+                );
+            }
+            
+            // For approved files with fileUrl, use OptimizedImage with imgproxy
             return (
                 <OptimizedImage
                     src={previewUrl}
@@ -246,6 +306,42 @@ const SimplifiedApprovalForm = ({
                     Please provide a title and at least one tag for each file before approving.
                 </p>
             </div>
+
+            {/* Bulk Tag All Section */}
+            {pendingFiles.length > 1 && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                        <Tags className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold text-purple-900">
+                                    Tag All Files
+                                </h4>
+                            </div>
+                            <p className="text-xs text-purple-700">
+                                Add tags to all {pendingFiles.length} files at once
+                            </p>
+                            <div className="flex items-end gap-2">
+                                <div className="flex-1">
+                                    <MediaTagWidget
+                                        tags={bulkTags}
+                                        onChange={setBulkTags}
+                                        namespace={namespace}
+                                        disabled={processing}
+                                    />
+                                </div>
+                                <button
+                                    onClick={applyBulkTags}
+                                    disabled={bulkTags.length === 0 || processing}
+                                    className="px-3 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                                >
+                                    Apply to All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* File List */}
             <div className="space-y-3 max-h-96 overflow-y-auto">

@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useRef, useMemo } from 'react'
 import { Image } from 'lucide-react'
-import { mediaApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
-import ImageUploadSection from './ImageUploadSection'
 import ImageDisplaySection from './ImageDisplaySection'
-import ImagePickerModal from './ImagePickerModal'
+import MediaInsertModal from '../media/MediaInsertModal'
 import {
     validateImageFile,
     getImageUrl,
@@ -12,12 +10,12 @@ import {
 } from './ImageValidationUtils'
 
 /**
- * ExpandableImageField - Image field with modal picker
+ * ExpandableImageField - Image field with unified media modal
  * 
  * Features:
  * - Compact preview mode showing selected images
- * - Full-screen modal for image selection
- * - Upload functionality with drag & drop
+ * - Full-screen MediaInsertModal for image selection
+ * - Upload functionality via MediaBrowser
  * - Auto-tags and collection assignment
  */
 const ExpandableImageField = ({
@@ -43,7 +41,9 @@ const ExpandableImageField = ({
     // Default collection for uploads
     defaultCollection = null,
     // Max files limit
-    maxFiles = null
+    maxFiles = null,
+    // Allow collection selection
+    allowCollections = false
 }) => {
     // Memoize constraints to prevent recreation on every render
     const imageConstraints = useMemo(() => {
@@ -60,19 +60,9 @@ const ExpandableImageField = ({
         }
         return { ...defaultConstraints, ...constraints }
     }, [constraints])
-    
-    const [isModalOpen, setIsModalOpen] = useState(false)
 
-    // Upload state
-    const [uploadFiles, setUploadFiles] = useState([])
-    const [uploading, setUploading] = useState(false)
-    const [uploadTags, setUploadTags] = useState([])
+    const [isModalOpen, setIsModalOpen] = useState(false)
     const [dragOver, setDragOver] = useState(false)
-    const [uploadErrors, setUploadErrors] = useState([])
-    const [showForceUpload, setShowForceUpload] = useState(false)
-    const [collectionOverride, setCollectionOverride] = useState(null)
-    const [originalAutoTags, setOriginalAutoTags] = useState([])
-    const [animatingItemId, setAnimatingItemId] = useState(null)
 
     const { addNotification } = useGlobalNotifications()
     const fieldRef = useRef(null)
@@ -85,63 +75,6 @@ const ExpandableImageField = ({
         return value ? [value] : []
     }, [value, multiple])
 
-    // Parse auto-tags array into tag objects
-    const parseAutoTags = useCallback(async (autoTagsConfig) => {
-        if (!autoTagsConfig || !namespace) return []
-
-        // Handle both string (legacy) and array (new) formats
-        let tagsToProcess = []
-
-        if (typeof autoTagsConfig === 'string') {
-            const tagNames = autoTagsConfig.split(',').map(name => name.trim()).filter(name => name.length > 0)
-            tagsToProcess = tagNames.map(name => ({ name }))
-        } else if (Array.isArray(autoTagsConfig)) {
-            tagsToProcess = autoTagsConfig.filter(tag => tag && tag.name)
-        } else {
-            return []
-        }
-
-        if (tagsToProcess.length === 0) return []
-
-        try {
-            const tagPromises = tagsToProcess.map(async (tagConfig) => {
-                const tagName = tagConfig.name
-                try {
-                    if (tagConfig.id) {
-                        return tagConfig
-                    }
-
-                    const response = await mediaApi.tags.list({
-                        namespace,
-                        name: tagName,
-                        pageSize: 1
-                    })()
-
-                    if (response.results?.length > 0) {
-                        return response.results[0]
-                    }
-
-                    const slug = tagName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-                    return await mediaApi.tags.create({
-                        name: tagName,
-                        slug: slug,
-                        namespace,
-                        description: `Auto-generated tag: ${tagName}`
-                    })()
-                } catch (error) {
-                    console.warn(`Failed to get/create tag "${tagName}":`, error)
-                    return null
-                }
-            })
-
-            const tags = await Promise.all(tagPromises)
-            return tags.filter(tag => tag !== null)
-        } catch (error) {
-            console.warn('Failed to parse auto-tags:', error)
-            return []
-        }
-    }, [namespace])
-
     // Get image URL - use backend-provided thumbnail for optimal performance
     const getThumbnailUrl = useCallback((image, size = 150) => {
         // Use backend-provided thumbnail if available (pre-generated 150x150)
@@ -152,58 +85,25 @@ const ExpandableImageField = ({
         return getImageUrl(image)
     }, [])
 
-    // Initialize upload tags with auto-tags when component mounts
-    useEffect(() => {
-        const initializeWithAutoTags = async () => {
-            if (autoTags && namespace) {
-                try {
-                    const tags = await parseAutoTags(autoTags)
-                    if (tags.length > 0) {
-                        setOriginalAutoTags(tags)
-                        if (uploadTags.length === 0) {
-                            setUploadTags(tags)
-                        }
-                    }
-                } catch (error) {
-                    console.warn('Failed to initialize auto-tags:', error)
-                }
-            }
-        }
-
-        initializeWithAutoTags()
-    }, [autoTags, namespace, parseAutoTags])
-
-    // Handle image selection
-    const handleImageSelect = useCallback((image, event) => {
+    // Handle media selection from modal
+    const handleMediaSelect = useCallback((selected) => {
         if (multiple) {
-            const currentImages = Array.isArray(value) ? value : []
-            const isAlreadySelected = currentImages.some(img => img.id === image.id)
+            // For multiple selection, selected is an array
+            const selectedArray = Array.isArray(selected) ? selected : [selected]
 
-            if (isAlreadySelected) {
-                onChange(currentImages.filter(img => img.id !== image.id))
+            // Validate max items
+            if (maxItems && selectedArray.length > maxItems) {
+                addNotification(`Maximum ${maxItems} images allowed`, 'warning')
+                onChange(selectedArray.slice(0, maxItems))
             } else {
-                if (maxItems && currentImages.length >= maxItems) {
-                    addNotification(`Maximum ${maxItems} images allowed`, 'warning')
-                    return
-                }
-
-                setAnimatingItemId(image.id)
-                onChange([...currentImages, image])
-                
-                setTimeout(() => {
-                    setAnimatingItemId(null)
-                }, 600)
+                onChange(selectedArray)
             }
         } else {
-            setAnimatingItemId(image.id)
-            onChange(image)
-            
-            setTimeout(() => {
-                setAnimatingItemId(null)
-                setIsModalOpen(false)
-            }, 600)
+            // For single selection
+            onChange(selected)
         }
-    }, [multiple, value, maxItems, addNotification, onChange])
+        setIsModalOpen(false)
+    }, [multiple, maxItems, onChange, addNotification])
 
     // Remove an image from field
     const handleRemoveImage = useCallback((imageId, event) => {
@@ -215,68 +115,13 @@ const ExpandableImageField = ({
         }
     }, [multiple, value, onChange])
 
-    // Drag and drop handlers
+    // Drag and drop handlers (open modal when files dropped)
     const handleDrop = useCallback((e) => {
         e.preventDefault()
         setDragOver(false)
-
-        if (!isModalOpen) {
-            setIsModalOpen(true)
-        }
-
-        const droppedFiles = Array.from(e.dataTransfer.files)
-        const validFiles = []
-        const invalidFiles = []
-        const uploadOnlyFiles = []
-
-        const currentImageCount = multiple ? (Array.isArray(value) ? value.length : 0) : 0
-
-        droppedFiles.forEach(file => {
-            if (!isImageFile(file)) {
-                invalidFiles.push({ file, errors: ['Only image files are allowed'] })
-                return
-            }
-
-            const validation = validateImageFile(file, imageConstraints, currentImageCount, maxFiles)
-            if (validation.isValid) {
-                if (validation.canAddToField) {
-                    validFiles.push(file)
-                } else {
-                    uploadOnlyFiles.push({ file, fieldErrors: validation.fieldErrors })
-                }
-            } else {
-                invalidFiles.push({ file, errors: validation.uploadErrors })
-            }
-        })
-
-        if (validFiles.length > 0) {
-            setUploadFiles(validFiles)
-
-            if (autoTags && ((typeof autoTags === 'string' && autoTags.trim()) || (Array.isArray(autoTags) && autoTags.length > 0))) {
-                parseAutoTags(autoTags).then(tags => {
-                    if (tags.length > 0) {
-                        setUploadTags(tags)
-                    }
-                }).catch(error => {
-                    console.warn('Failed to initialize auto-tags:', error)
-                })
-            }
-        }
-
-        if (uploadOnlyFiles.length > 0) {
-            const warningMessages = uploadOnlyFiles.map(({ file, fieldErrors }) =>
-                `${file.name}: ${fieldErrors.join(', ')} - will be uploaded to media library only`
-            )
-            addNotification(`Type mismatch warnings:\n${warningMessages.join('\n')}`, 'warning')
-        }
-
-        if (invalidFiles.length > 0) {
-            const errorMessages = invalidFiles.map(({ file, errors }) =>
-                `${file.name}: ${errors.join(', ')}`
-            )
-            addNotification(`Upload rejected:\n${errorMessages.join('\n')}`, 'error')
-        }
-    }, [imageConstraints, maxFiles, addNotification, autoTags, parseAutoTags, setUploadFiles, setUploadTags, multiple, value, isModalOpen])
+        // Open modal - user can upload there
+        setIsModalOpen(true)
+    }, [])
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault()
@@ -288,151 +133,23 @@ const ExpandableImageField = ({
         setDragOver(false)
     }, [])
 
-    const handleFileInputChange = useCallback((e) => {
-        const selectedFiles = Array.from(e.target.files)
-        const validFiles = []
-        const invalidFiles = []
-        const uploadOnlyFiles = []
-
-        const currentImageCount = multiple ? (Array.isArray(value) ? value.length : 0) : 0
-
-        selectedFiles.forEach(file => {
-            if (!isImageFile(file)) {
-                invalidFiles.push({ file, errors: ['Only image files are allowed'] })
-                return
-            }
-
-            const validation = validateImageFile(file, imageConstraints, currentImageCount, maxFiles)
-            if (validation.isValid) {
-                if (validation.canAddToField) {
-                    validFiles.push(file)
-                } else {
-                    uploadOnlyFiles.push({ file, fieldErrors: validation.fieldErrors })
-                }
-            } else {
-                invalidFiles.push({ file, errors: validation.uploadErrors })
-            }
-        })
-        
-        if (validFiles.length > 0) {
-            setUploadFiles(validFiles)
-            if (autoTags && ((typeof autoTags === 'string' && autoTags.trim()) || (Array.isArray(autoTags) && autoTags.length > 0))) {
-                parseAutoTags(autoTags).then(tags => {
-                    if (tags.length > 0) {
-                        setUploadTags(tags)
-                    }
-                }).catch(error => {
-                    console.warn('Failed to initialize auto-tags:', error)
-                })
-            }
-        }
-
-        if (uploadOnlyFiles.length > 0) {
-            const warningMessages = uploadOnlyFiles.map(({ file, fieldErrors }) =>
-                `${file.name}: ${fieldErrors.join(', ')} - will be uploaded to media library only`
-            )
-            addNotification(`Type mismatch warnings:\n${warningMessages.join('\n')}`, 'warning')
-        }
-
-        if (invalidFiles.length > 0) {
-            const errorMessages = invalidFiles.map(({ file, errors }) =>
-                `${file.name}: ${errors.join(', ')}`
-            )
-            addNotification(`Upload rejected:\n${errorMessages.join('\n')}`, 'error')
-        }
-
-        e.target.value = ''
-    }, [imageConstraints, maxFiles, addNotification, autoTags, parseAutoTags, setUploadFiles, setUploadTags, multiple, value])
-
     const hasImages = displayImages.length > 0
     const hasError = showValidation && validation && !validation.isValid
     const errorMessage = hasError ? validation.message : null
 
-    const handleUploadComplete = useCallback(() => {
-        setIsModalOpen(false)
-    }, [])
-
-    // Get effective collection (considering override)
-    const getEffectiveCollection = useCallback(() => {
-        if (collectionOverride === false) return null
-        return defaultCollection
-    }, [collectionOverride, defaultCollection])
-
-    // Handle collection removal
-    const handleRemoveDefaultCollection = useCallback(() => {
-        setCollectionOverride(false)
-        addNotification('Images will not be added to any collection', 'info')
-    }, [addNotification])
-
-    // Restore original auto-tags
-    const handleRestoreAutoTags = useCallback(() => {
-        if (originalAutoTags.length > 0) {
-            setUploadTags([...originalAutoTags])
-            addNotification(`Restored ${originalAutoTags.length} default tag${originalAutoTags.length !== 1 ? 's' : ''}`, 'info')
-        }
-    }, [originalAutoTags, addNotification])
-
-    // Memoize upload section props to prevent unnecessary rerenders
-    const uploadSectionProps = useMemo(() => ({
-        uploadFiles,
-        setUploadFiles,
-        uploading,
-        setUploading,
-        uploadTags,
-        setUploadTags,
-        uploadErrors,
-        setUploadErrors,
-        showForceUpload,
-        setShowForceUpload,
-        dragOver,
-        namespace,
-        constraints: imageConstraints,
-        defaultCollection: getEffectiveCollection(),
-        onRemoveDefaultCollection: handleRemoveDefaultCollection,
-        originalAutoTags,
-        onRestoreAutoTags: handleRestoreAutoTags,
-        maxFiles,
-        value,
-        multiple,
-        onChange,
-        onUploadComplete: handleUploadComplete,
-        parseAutoTags,
-        autoTags,
-        handleDrop,
-        handleDragOver,
-        handleDragLeave,
-        handleFileInputChange
-    }), [
-        uploadFiles, setUploadFiles, uploading, setUploading, uploadTags, setUploadTags,
-        uploadErrors, setUploadErrors, showForceUpload, setShowForceUpload, dragOver,
-        namespace, imageConstraints, getEffectiveCollection, handleRemoveDefaultCollection,
-        originalAutoTags, handleRestoreAutoTags, maxFiles, value, multiple,
-        onChange, handleUploadComplete, parseAutoTags, autoTags, handleDrop,
-        handleDragOver, handleDragLeave, handleFileInputChange
-    ])
-
-    // Memoize display section props
-    const displaySectionProps = useMemo(() => ({
-        images: displayImages,
-        multiple,
-        maxFiles,
-        onRemoveImage: (imageId, event) => handleRemoveImage(imageId, event),
-        onOpenModal: () => setIsModalOpen(true),
-        getThumbnailUrl,
-        namespace,
-        onImageTagsChanged: (updatedFile) => {
-            if (multiple) {
-                const updatedImages = (Array.isArray(value) ? value : []).map(img =>
-                    img.id === updatedFile.id ? { ...img, tags: updatedFile.tags } : img
-                )
-                onChange(updatedImages)
-            } else {
-                if (value && value.id === updatedFile.id) {
-                    onChange({ ...value, tags: updatedFile.tags })
-                }
+    // Handle image tags change
+    const handleImageTagsChanged = useCallback((updatedFile) => {
+        if (multiple) {
+            const updatedImages = (Array.isArray(value) ? value : []).map(img =>
+                img.id === updatedFile.id ? { ...img, tags: updatedFile.tags } : img
+            )
+            onChange(updatedImages)
+        } else {
+            if (value && value.id === updatedFile.id) {
+                onChange({ ...value, tags: updatedFile.tags })
             }
         }
-    }), [displayImages, multiple, maxFiles, handleRemoveImage, getThumbnailUrl, namespace, value, onChange])
+    }, [multiple, value, onChange])
 
     return (
         <div ref={fieldRef} className="space-y-3">
@@ -461,14 +178,22 @@ const ExpandableImageField = ({
             >
                 {hasImages ? (
                     /* Selected Images Display */
-                    <ImageDisplaySection {...displaySectionProps} />
+                    <ImageDisplaySection
+                        images={displayImages}
+                        multiple={multiple}
+                        maxFiles={maxFiles}
+                        onRemoveImage={handleRemoveImage}
+                        onOpenModal={() => setIsModalOpen(true)}
+                        getThumbnailUrl={getThumbnailUrl}
+                        namespace={namespace}
+                        onImageTagsChanged={handleImageTagsChanged}
+                    />
                 ) : (
                     /* Empty State with Dropzone */
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(true)}
-                        className={`w-full flex items-center justify-center gap-2 p-6 transition-colors ${
-                            hasError
+                        className={`w-full flex items-center justify-center gap-2 p-6 transition-colors ${hasError
                                 ? 'border-dashed hover:bg-red-50'
                                 : dragOver
                                     ? 'border-dashed bg-blue-100'
@@ -499,26 +224,16 @@ const ExpandableImageField = ({
                 </div>
             )}
 
-            {/* Image Picker Modal */}
-            <ImagePickerModal
+            {/* Media Insert Modal (Field Mode) */}
+            <MediaInsertModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                value={value}
-                onChange={onChange}
+                mode="field"
+                onSelect={handleMediaSelect}
                 multiple={multiple}
-                maxItems={maxItems}
+                allowCollections={allowCollections}
+                selectedFiles={displayImages}
                 namespace={namespace}
-                imageConstraints={imageConstraints}
-                autoTags={autoTags}
-                defaultCollection={defaultCollection}
-                maxFiles={maxFiles}
-                allowedFileTypes={allowedFileTypes}
-                allowedMimeTypes={allowedMimeTypes}
-                parseAutoTags={parseAutoTags}
-                uploadSectionProps={uploadSectionProps}
-                getThumbnailUrl={getThumbnailUrl}
-                handleImageSelect={handleImageSelect}
-                animatingItemId={animatingItemId}
             />
         </div>
     )

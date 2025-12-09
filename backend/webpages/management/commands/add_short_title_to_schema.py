@@ -68,3 +68,4 @@ class Command(BaseCommand):
             self.stdout.write(f"  - {prop_name}: {prop.get('title', 'No title')}")
 
         self.stdout.write(self.style.SUCCESS("\n✅ Done!"))
+

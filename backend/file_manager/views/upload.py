@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from ..models import MediaFile, PendingMediaFile, MediaCollection
-from ..serializers import MediaUploadSerializer, MediaFileDetailSerializer
+from ..serializers import MediaUploadSerializer, MediaFileDetailSerializer, PendingMediaFileListSerializer
 from ..services import (
     FileUploadService,
     DuplicateFileHandler,
@@ -123,7 +123,17 @@ class MediaUploadView(APIView):
                 )
                 
                 if extraction_result.success:
-                    uploaded_files.extend(extraction_result.files)
+                    # Serialize MediaFile instances to dicts
+                    for media_file in extraction_result.files:
+                        if isinstance(media_file, PendingMediaFile):
+                            serializer = PendingMediaFileListSerializer(media_file)
+                            uploaded_files.append(serializer.data)
+                        elif isinstance(media_file, dict):
+                            uploaded_files.append(media_file)
+                        else:
+                            # MediaFile instance - serialize it
+                            serializer = MediaFileDetailSerializer(media_file)
+                            uploaded_files.append(serializer.data)
                     
                 if extraction_result.errors:
                     errors.extend(extraction_result.errors)

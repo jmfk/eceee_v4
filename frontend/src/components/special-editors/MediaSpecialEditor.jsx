@@ -1,6 +1,19 @@
 /**
  * MediaSpecialEditor Component
  * 
+ * @deprecated This component is deprecated in favor of schema-driven forms with ImageField/MediaInsertModal.
+ * 
+ * Migration guide:
+ * - Remove `specialEditor: 'MediaSpecialEditor'` from widget metadata
+ * - Add a schema definition to the widget (see ImageWidget.schema for example)
+ * - Use format: 'media' for image fields in schema
+ * - The schema-driven form will automatically use MediaInsertModal in field mode
+ * 
+ * This component is kept temporarily for backward compatibility.
+ * It will be removed in a future version.
+ * 
+ * ---
+ * 
  * Simplified, focused media management interface specifically for ImageWidget.
  * Provides distinct workflows for individual images vs collections with proper metadata handling.
  */
@@ -1345,10 +1358,10 @@ const MediaSpecialEditor = ({
                                                     setEditingTagsForImage(isEditingTags ? null : image.id)
                                                 }}
                                                 className={`p-1 bg-white rounded shadow-sm border ${isEditingTags
-                                                        ? 'border-blue-500 text-blue-600'
-                                                        : (image.tags && image.tags.length > 0)
-                                                            ? 'border-blue-300 text-blue-600'
-                                                            : 'border-gray-200 text-gray-700'
+                                                    ? 'border-blue-500 text-blue-600'
+                                                    : (image.tags && image.tags.length > 0)
+                                                        ? 'border-blue-300 text-blue-600'
+                                                        : 'border-gray-200 text-gray-700'
                                                     } hover:text-blue-600 hover:border-blue-300 transition-colors`}
                                                 title={`${(image.tags || []).length} tag${(image.tags || []).length !== 1 ? 's' : ''}`}
                                             >

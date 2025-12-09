@@ -202,15 +202,15 @@ const ImageDisplaySection = ({
                     {multiple ? 'Add More' : 'Change'}
                 </button>
 
-                {/* Remove button */}
-                <button
-                    onClick={(event) => onRemoveImage(image.id, event)}
+                        {/* Remove button */}
+                        <button
+                            onClick={(event) => onRemoveImage(image.id, event)}
                     className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-                    title="Remove image"
-                >
-                    <X className="w-4 h-4" />
-                </button>
-            </div>
+                            title="Remove image"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
         </div>
     )
 }

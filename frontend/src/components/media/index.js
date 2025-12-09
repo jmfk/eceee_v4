@@ -24,4 +24,3 @@ export { default as UploadQueue } from './UploadQueue';
 
 // WYSIWYG editor components
 export { default as MediaInsertModal } from './MediaInsertModal';
-export { default as MediaEditModal } from './MediaEditModal';
