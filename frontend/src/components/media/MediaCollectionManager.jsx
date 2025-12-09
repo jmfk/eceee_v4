@@ -501,9 +501,14 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                                         Tags * <span className="text-xs text-gray-500">(Required for uploads)</span>
                                     </label>
                                     <MediaTagWidget
-                                        selectedTagIds={formData.tagIds}
-                                        onChange={(tagIds) => setFormData(prev => ({ ...prev, tagIds }))}
-                                        availableTags={availableTags}
+                                        tags={formData.tagIds
+                                            .map(id => availableTags.find(tag => tag.id === id))
+                                            .filter(Boolean)
+                                        }
+                                        onChange={(tagObjects) => {
+                                            const tagIds = tagObjects.map(tag => tag.id);
+                                            setFormData(prev => ({ ...prev, tagIds }));
+                                        }}
                                         namespace={namespace}
                                     />
                                 </div>
