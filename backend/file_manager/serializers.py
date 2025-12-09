@@ -299,6 +299,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     absolute_url = serializers.SerializerMethodField()
     uuid_url = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
+    annotation = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaFile
@@ -321,6 +322,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "absolute_url",
             "uuid_url",
             "download_url",
+            "annotation",
             "created_at",
             "created_by",
             "created_by_name",
@@ -359,6 +361,12 @@ class MediaFileListSerializer(serializers.ModelSerializer):
         except:
             return None
 
+    def get_annotation(self, obj):
+        """Get annotation from metadata."""
+        if hasattr(obj, 'metadata') and obj.metadata and isinstance(obj.metadata, dict):
+            return obj.metadata.get("annotation", "")
+        return ""
+
 
 class MediaFileDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer for individual media files."""
@@ -396,6 +404,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     # imgproxy base URL for dynamic resizing
     imgproxy_base_url = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
+    annotation = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = MediaFile
@@ -430,6 +439,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "file_url",
             "imgproxy_base_url",
             "thumbnail_url",
+            "annotation",
             "created_at",
             "updated_at",
             "created_by",
@@ -522,7 +532,15 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         """Update media file with tags and collections."""
         tag_ids = validated_data.pop("tag_ids", None)
         collection_ids = validated_data.pop("collection_ids", None)
+        annotation = validated_data.pop("annotation", None)
         validated_data["last_modified_by"] = self.context["request"].user
+
+        # Handle annotation in metadata
+        if annotation is not None and hasattr(instance, 'metadata'):
+            if not instance.metadata:
+                instance.metadata = {}
+            instance.metadata["annotation"] = annotation
+            instance.save(update_fields=["metadata"])
 
         media_file = super().update(instance, validated_data)
 
@@ -551,6 +569,15 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         if obj.is_image:
             return obj.get_imgproxy_thumbnail_url(size=150)
         return None
+
+    def to_representation(self, instance):
+        """Add annotation from metadata to representation."""
+        representation = super().to_representation(instance)
+        if hasattr(instance, 'metadata') and instance.metadata and isinstance(instance.metadata, dict):
+            representation["annotation"] = instance.metadata.get("annotation", "")
+        else:
+            representation["annotation"] = ""
+        return representation
 
 
 class MediaUploadSerializer(serializers.Serializer):

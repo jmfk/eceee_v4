@@ -1344,13 +1344,12 @@ const MediaSpecialEditor = ({
                                                     e.stopPropagation()
                                                     setEditingTagsForImage(isEditingTags ? null : image.id)
                                                 }}
-                                                className={`p-1 bg-white rounded shadow-sm border ${
-                                                    isEditingTags 
-                                                        ? 'border-blue-500 text-blue-600' 
+                                                className={`p-1 bg-white rounded shadow-sm border ${isEditingTags
+                                                        ? 'border-blue-500 text-blue-600'
                                                         : (image.tags && image.tags.length > 0)
                                                             ? 'border-blue-300 text-blue-600'
                                                             : 'border-gray-200 text-gray-700'
-                                                } hover:text-blue-600 hover:border-blue-300 transition-colors`}
+                                                    } hover:text-blue-600 hover:border-blue-300 transition-colors`}
                                                 title={`${(image.tags || []).length} tag${(image.tags || []).length !== 1 ? 's' : ''}`}
                                             >
                                                 <Tag className="w-3 h-3" />
@@ -2178,7 +2177,7 @@ const MediaSpecialEditor = ({
                         {collectionImages.map((image, index) => {
                             const gridStyle = getGridStyle(image);
                             const objectFitClass = getObjectFitClass(image);
-                            
+
                             return (
                                 <div
                                     key={image.id || index}
@@ -2196,27 +2195,27 @@ const MediaSpecialEditor = ({
                                             <Image className="w-8 h-8 text-gray-400" />
                                         </div>
                                     )}
-                                <div className="absolute top-1 right-1 flex gap-1">
-                                    <button
-                                        className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                                        title="View"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            // TODO: Implement image preview
-                                        }}
-                                    >
-                                        <Eye className="w-3 h-3" />
-                                    </button>
-                                    <button
-                                        className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
-                                        title="Remove from collection"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            // TODO: Implement remove from collection
-                                        }}
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
+                                    <div className="absolute top-1 right-1 flex gap-1">
+                                        <button
+                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                            title="View"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                // TODO: Implement image preview
+                                            }}
+                                        >
+                                            <Eye className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
+                                            title="Remove from collection"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                // TODO: Implement remove from collection
+                                            }}
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
                                     </div>
                                     <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
                                         <p className="text-white text-xs font-medium truncate">{image.title}</p>
@@ -2656,6 +2655,26 @@ const MediaSpecialEditor = ({
                                 </p>
                             </div>
 
+                            {/* Annotation */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Annotation
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editingItem.data.annotation || ''}
+                                    onChange={(e) => setEditingItem(prev => ({
+                                        ...prev,
+                                        data: { ...prev.data, annotation: e.target.value }
+                                    }))}
+                                    placeholder="Enter annotation text (optional)"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Additional annotation text shown in smaller font
+                                </p>
+                            </div>
+
                             {/* Lightbox Settings */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
                                 <div>
@@ -2718,6 +2737,7 @@ const MediaSpecialEditor = ({
                                             ...updatedMediaItems[editingItem.index],
                                             altText: editingItem.data.altText,
                                             caption: editingItem.data.caption,
+                                            annotation: editingItem.data.annotation,
                                             enableLightbox: editingItem.data.enableLightbox,
                                             lightboxStyle: editingItem.data.lightboxStyle,
                                             lightboxGroup: editingItem.data.lightboxGroup

@@ -78,6 +78,7 @@ export interface MediaFile {
   tags: string[];
   collections: string[];
   uploadedAt: string;
+  annotation?: string;
 }
 
 // Helper type to ensure functions are awaited

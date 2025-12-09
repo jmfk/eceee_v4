@@ -28,6 +28,7 @@ class ImageMediaItem(BaseModel):
         ..., min_length=1, description="Alternative text for accessibility"
     )
     caption: Optional[str] = Field(None, description="Optional caption")
+    annotation: Optional[str] = Field(None, description="Annotation text for the image")
     title: Optional[str] = Field(None, description="Image title")
     photographer: Optional[str] = Field(None, description="Photographer or source")
     source: Optional[str] = Field(None, description="Image source")
@@ -340,6 +341,11 @@ class ImageWidget(BaseWidget):
                     thumbnail_url = file_url
                     full_url = file_url
 
+                # Get annotation from metadata
+                annotation = ""
+                if hasattr(media_file, 'metadata') and media_file.metadata and isinstance(media_file.metadata, dict):
+                    annotation = media_file.metadata.get("annotation", "")
+
                 media_items.append(
                     {
                         "id": str(media_file.id),
@@ -347,6 +353,7 @@ class ImageWidget(BaseWidget):
                         "type": media_type,
                         "alt_text": media_file.title or "",  # Use title as alt text
                         "caption": media_file.description or "",
+                        "annotation": annotation,
                         "title": media_file.title or "",
                         "photographer": "",  # Not available in MediaFile model
                         "source": "",  # Not available in MediaFile model
@@ -426,6 +433,7 @@ class ImageWidget(BaseWidget):
                         "type": item.get("type", "image"),
                         "alt_text": item.get("altText", ""),
                         "caption": item.get("caption", ""),
+                        "annotation": item.get("annotation", ""),
                         "title": item.get("title", ""),
                         "photographer": item.get("photographer", ""),
                         "source": item.get("source", ""),

@@ -209,6 +209,13 @@ class PendingMediaFile(models.Model):
         null=True, blank=True, help_text="AI confidence score for suggestions (0.0-1.0)"
     )
 
+    # Additional metadata
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional metadata (e.g., annotation, custom fields)",
+    )
+
     # Organization
     namespace = models.ForeignKey(
         Namespace, on_delete=models.CASCADE, help_text="Namespace this file belongs to"
@@ -478,6 +485,13 @@ class MediaFile(models.Model):
     )
     ai_confidence_score = models.FloatField(
         null=True, blank=True, help_text="AI confidence score for suggestions (0.0-1.0)"
+    )
+
+    # Additional metadata
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional metadata (e.g., annotation, custom fields)",
     )
 
     # Organization

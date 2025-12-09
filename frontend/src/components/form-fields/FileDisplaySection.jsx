@@ -93,6 +93,11 @@ const FileDisplaySection = ({
                                     {file.dimensions}
                                 </div>
                             )}
+                            {file.annotation && (
+                                <div className="text-xs text-gray-400 italic truncate mt-1">
+                                    {file.annotation}
+                                </div>
+                            )}
                         </div>
 
                         {/* Actions */}

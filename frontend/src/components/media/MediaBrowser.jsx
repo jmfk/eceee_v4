@@ -41,6 +41,7 @@ import MediaSearchWidget from './MediaSearchWidget';
 import DuplicateResolveDialog from './DuplicateResolveDialog';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import { extractErrorMessage } from '../../utils/errorHandling';
+import { getImageAspectRatio, getGridSpan, getGridStyle } from '../../utils/imageGridLayout';
 
 const MediaBrowser = ({
     onFileSelect,
@@ -522,7 +523,7 @@ const MediaBrowser = ({
     };
 
     // Render file thumbnail
-    const renderThumbnail = (file, size = 150) => {
+    const renderThumbnail = (file, size = 150, objectFit = 'cover') => {
         const fileType = file.fileType;
         const originalUrl = file.imgproxyBaseUrl || file.fileUrl;
 
@@ -534,10 +535,10 @@ const MediaBrowser = ({
                     alt={file.title || file.original_filename || 'Media file'}
                     width={size}
                     height={size}
-                    className="w-full h-full object-cover rounded"
+                    className={`-full h-full object-${objectFit}`}
                     loading="lazy"
                     fallback={
-                        <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
+                        <div className="-full h-full flex items-center justify-center bg-gray-100">
                             <FileImage className="w-8 h-8 text-blue-500" />
                         </div>
                     }
@@ -562,101 +563,142 @@ const MediaBrowser = ({
         };
 
         return (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
+            <div className="-full h-full flex items-center justify-center bg-gray-100 rounded">
                 {getFileIcon(fileType)}
             </div>
         );
     };
 
-    // Render grid view
+    // Render grid view with masonry layout
     const renderGridView = () => (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4">
-            {files.map((file) => (
-                <div
-                    key={file.id}
-                    className={`
-                        group cursor-pointer rounded-lg border-2 transition-all duration-200 hover:shadow-md relative
-                        ${isFileSelected(file)
-                            ? 'border-blue-500 bg-blue-50 shadow-md'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }
-                    `}
-                    onClick={() => handleFileClick(file)}
-                >
-                    {/* Action Buttons */}
-                    <div className="absolute top-2 right-2 z-10 flex gap-1">
-                        {file.is_deleted ? (
-                            <>
-                                <button
-                                    onClick={(e) => handleRestoreClick(file, e)}
-                                    className="p-1.5 bg-green-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-green-600"
-                                    title="Restore file"
-                                >
-                                    <RefreshCw className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                    onClick={(e) => handleForceDeleteClick(file, e)}
-                                    className="p-1.5 bg-red-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-red-600"
-                                    title="Permanently delete file"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                            </>
-                        ) : (
-                            <button
-                                onClick={(e) => handleEditClick(file, e)}
-                                className="p-1.5 bg-white rounded-full shadow-md transition-opacity duration-200 hover:bg-gray-50"
-                                title="Edit file"
-                            >
-                                <Edit3 className="w-3.5 h-3.5 text-gray-600" />
-                            </button>
-                        )}
-                    </div>
+        <div className="grid grid-cols-6 md:grid-cols-9 lg:grid-cols-12 gap-4 p-4" style={{ gridAutoFlow: 'dense' }}>
+            {files.map((file) => {
+                const aspectRatio = getImageAspectRatio(file);
+                const { colSpan, rowSpan, orientation } = getGridSpan(aspectRatio);
+                const gridStyle = getGridStyle(file);
 
-                    {/* Deleted Status Badge */}
-                    {file.is_deleted && (
-                        <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-md">
-                            Deleted
-                        </div>
-                    )}
+                // Calculate image size based on grid span and actual aspect ratio
+                // Base cell is ~150px, calculate the display size
+                const baseCellSize = 150;
+                const displayWidth = colSpan * baseCellSize;
+                const displayHeight = rowSpan * baseCellSize;
 
-                    <div className="aspect-square p-2">
-                        {renderThumbnail(file, 200)}
-                    </div>
-                    <div className="p-3 border-t border-gray-100">
-                        <h4
-                            className="text-sm font-medium text-gray-900 truncate mb-1"
-                            title={file.title}
-                        >
-                            {file.title}
-                        </h4>
-                        <p className="text-xs text-gray-500 mb-1">
-                            {file.fileType || file.file_type} • {formatFileSize(file.fileSize || file.file_size)}
-                        </p>
-                        {file.dimensions && (
-                            <p className="text-xs text-gray-400">{file.dimensions}</p>
-                        )}
-                        {/* Tags */}
-                        {file.tags && file.tags.length > 0 && (
-                            <div className="flex gap-1 mt-1.5 flex-wrap">
-                                {file.tags.slice(0, 4).map(tag => (
-                                    <span
-                                        key={tag.id}
-                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[70px]"
-                                        style={{
-                                            backgroundColor: tag.color || '#3B82F6',
-                                            color: '#fff'
-                                        }}
-                                        title={tag.name}
+                // Calculate imgproxy size based on actual image dimensions
+                // Don't render larger than the original image
+                let imgWidth, imgHeight;
+                if (aspectRatio && file.width && file.height) {
+                    // Calculate what fits in the display area while maintaining aspect ratio
+                    const displayAspect = displayWidth / displayHeight;
+                    if (aspectRatio > displayAspect) {
+                        // Image is wider than display area, constrain by width
+                        imgWidth = Math.min(displayWidth * 2, file.width); // 2x for retina
+                        imgHeight = Math.round(imgWidth / aspectRatio);
+                    } else {
+                        // Image is taller than display area, constrain by height
+                        imgHeight = Math.min(displayHeight * 2, file.height); // 2x for retina
+                        imgWidth = Math.round(imgHeight * aspectRatio);
+                    }
+                } else {
+                    // Fallback if no dimensions available
+                    imgWidth = displayWidth * 2;
+                    imgHeight = displayHeight * 2;
+                }
+                const imageSize = Math.max(imgWidth, imgHeight);
+
+                return (
+                    <div
+                        key={file.id}
+                        className={`
+                            group cursor-pointer border-2 transition-all duration-200 hover:shadow-md relative flex flex-col
+                            ${isFileSelected(file)
+                                ? 'border-blue-500 bg-blue-50 shadow-md'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }
+                        `}
+                        style={gridStyle}
+                        onClick={() => handleFileClick(file)}
+                        title={`${orientation} - ${colSpan}x${rowSpan} - AR: ${aspectRatio ? aspectRatio.toFixed(2) : 'unknown'}`}
+                    >
+                        {/* Action Buttons */}
+                        <div className="absolute top-2 right-2 z-10 flex gap-1">
+                            {file.is_deleted ? (
+                                <>
+                                    <button
+                                        onClick={(e) => handleRestoreClick(file, e)}
+                                        className="p-1.5 bg-green-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-green-600"
+                                        title="Restore file"
                                     >
-                                        {tag.name}
-                                    </span>
-                                ))}
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleForceDeleteClick(file, e)}
+                                        className="p-1.5 bg-red-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-red-600"
+                                        title="Permanently delete file"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={(e) => handleEditClick(file, e)}
+                                    className="p-1.5 bg-white rounded-full shadow-md transition-opacity duration-200 hover:bg-gray-50"
+                                    title="Edit file"
+                                >
+                                    <Edit3 className="w-3.5 h-3.5 text-gray-600" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Deleted Status Badge */}
+                        {file.is_deleted && (
+                            <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-md">
+                                Deleted
                             </div>
                         )}
+
+                        <div className="-full flex-1 min-h-[150px] p-2 flex items-center justify-center bg-gray-50">
+                            {renderThumbnail(file, imageSize, 'contain')}
+                        </div>
+                        <div className="p-3 border-t border-gray-100 flex-shrink-0">
+                            <h4
+                                className="text-sm font-medium text-gray-900 truncate mb-1"
+                                title={file.title}
+                            >
+                                {file.title}
+                            </h4>
+                            <p className="text-xs text-gray-500 mb-1">
+                                {file.fileType || file.file_type} • {formatFileSize(file.fileSize || file.file_size)}
+                            </p>
+                            {(file.width && file.height) && (
+                                <p className="text-xs text-gray-400">{file.width}x{file.height}</p>
+                            )}
+                            {aspectRatio && (
+                                <p className="text-xs text-blue-600 font-medium">
+                                    {orientation} ({colSpan}x{rowSpan}) • AR: {aspectRatio.toFixed(2)}
+                                </p>
+                            )}
+                            {/* Tags */}
+                            {file.tags && file.tags.length > 0 && (
+                                <div className="flex gap-1 mt-1.5 flex-wrap">
+                                    {file.tags.slice(0, 4).map(tag => (
+                                        <span
+                                            key={tag.id}
+                                            className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[70px]"
+                                            style={{
+                                                backgroundColor: tag.color || '#3B82F6',
+                                                color: '#fff'
+                                            }}
+                                            title={tag.name}
+                                        >
+                                            {tag.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 

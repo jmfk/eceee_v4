@@ -33,6 +33,7 @@ const MediaEditForm = ({
     const [formData, setFormData] = useState({
         title: '',
         description: '',
+        annotation: '',
         tags: [],
         accessLevel: 'public',
         slug: ''
@@ -75,6 +76,7 @@ const MediaEditForm = ({
             setFormData({
                 title: file.title || file.originalFilename?.replace(/\.[^/.]+$/, '') || '',
                 description: file.description || '',
+                annotation: file.annotation || '',
                 tags: tagsArray,
                 accessLevel: file.accessLevel || 'public',
                 slug: file.slug || ''
@@ -304,6 +306,7 @@ const MediaEditForm = ({
                 result = await mediaApi.pendingFiles.approve(file.id, {
                     title: formData.title,
                     description: formData.description,
+                    annotation: formData.annotation,
                     slug: formData.slug,
                     tag_ids: tagIds,
                     access_level: formData.accessLevel
@@ -313,6 +316,7 @@ const MediaEditForm = ({
                 result = await mediaApi.files.update(file.id, {
                     title: formData.title,
                     description: formData.description,
+                    annotation: formData.annotation,
                     slug: formData.slug,
                     tag_ids: tagIds,
                     access_level: formData.accessLevel
@@ -478,6 +482,24 @@ const MediaEditForm = ({
                         )}
                         <p className="text-xs text-gray-500 mt-1">
                             URL-friendly identifier (lowercase, alphanumeric, hyphens only)
+                        </p>
+                    </div>
+
+                    {/* Annotation */}
+                    <div>
+                        <label htmlFor="annotation" className="block text-sm font-medium text-gray-700 mb-2">
+                            Annotation
+                        </label>
+                        <input
+                            id="annotation"
+                            type="text"
+                            value={formData.annotation}
+                            onChange={(e) => updateFormData('annotation', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Optional annotation text"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Additional annotation text displayed in the user interface
                         </p>
                     </div>
 
