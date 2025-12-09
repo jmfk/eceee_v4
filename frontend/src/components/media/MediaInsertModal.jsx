@@ -351,6 +351,16 @@ const MediaInsertModal = ({
         // The inline warning/approval form in MediaBrowser is disabled in favor of the pending tab
     };
 
+    const handlePendingFilesCreated = async (files) => {
+        // When files are uploaded, immediately switch to pending tab and load them
+        if (files && files.length > 0) {
+            setPendingFiles(files);
+            setMediaSelectionType('pending');
+            // Also reload the full pending files list to ensure we have everything
+            await loadPendingFiles();
+        }
+    };
+
     const handleApprovalComplete = async (approvedFiles) => {
         // Reload pending files list
         await loadPendingFiles();
@@ -447,18 +457,18 @@ const MediaInsertModal = ({
                                 </p>
                             )}
 
-                            {/* Tab Toggle - only show if collections allowed */}
-                            {allowCollections && (
-                                <div className="flex gap-2 mb-4 border-b border-gray-200">
-                                    <button
-                                        onClick={() => setMediaSelectionType('image')}
-                                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'image'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-gray-600 hover:text-gray-900'
-                                            }`}
-                                    >
-                                        {multiple ? 'Select Images' : 'Select Image'}
-                                    </button>
+                            {/* Tab Toggle - always show Browse and Pending, add Collections if allowed */}
+                            <div className="flex gap-2 mb-4 border-b border-gray-200">
+                                <button
+                                    onClick={() => setMediaSelectionType('image')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'image'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    {multiple ? 'Select Images' : 'Select Image'}
+                                </button>
+                                {allowCollections && (
                                     <button
                                         onClick={() => setMediaSelectionType('collection')}
                                         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'collection'
@@ -468,22 +478,22 @@ const MediaInsertModal = ({
                                     >
                                         Select Collection
                                     </button>
-                                    <button
-                                        onClick={() => setMediaSelectionType('pending')}
-                                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'pending'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-gray-600 hover:text-gray-900'
-                                            }`}
-                                    >
-                                        Pending Files
-                                        {pendingFiles.length > 0 && (
-                                            <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
-                                                {pendingFiles.length}
-                                            </span>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
+                                )}
+                                <button
+                                    onClick={() => setMediaSelectionType('pending')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'pending'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    Pending Files
+                                    {pendingFiles.length > 0 && (
+                                        <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                            {pendingFiles.length}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
 
                             {/* Content based on selection type */}
                             {mediaSelectionType === 'collection' ? (
@@ -550,6 +560,7 @@ const MediaInsertModal = ({
                                     hideTypeFilter={true}
                                     hideInlineApprovalForm={true}
                                     onPendingApprovalChange={handlePendingApprovalChange}
+                                    onPendingFilesCreated={handlePendingFilesCreated}
                                 />
                             )}
                         </div>

@@ -43,7 +43,7 @@ const ExpandableImageField = ({
     // Max files limit
     maxFiles = null,
     // Allow collection selection
-    allowCollections = false
+    allowCollections = true
 }) => {
     // Memoize constraints to prevent recreation on every render
     const imageConstraints = useMemo(() => {
@@ -194,10 +194,10 @@ const ExpandableImageField = ({
                         type="button"
                         onClick={() => setIsModalOpen(true)}
                         className={`w-full flex items-center justify-center gap-2 p-6 transition-colors ${hasError
-                                ? 'border-dashed hover:bg-red-50'
-                                : dragOver
-                                    ? 'border-dashed bg-blue-100'
-                                    : 'border-dashed hover:bg-blue-50'
+                            ? 'border-dashed hover:bg-red-50'
+                            : dragOver
+                                ? 'border-dashed bg-blue-100'
+                                : 'border-dashed hover:bg-blue-50'
                             }`}
                     >
                         <Image className={`w-6 h-6 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`} />
