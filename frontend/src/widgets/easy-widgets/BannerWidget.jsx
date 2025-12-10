@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { FileText, Type, AlignLeft } from 'lucide-react'
+import { FileText, Type, AlignLeft, ImagePlus, Layers } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -10,6 +10,7 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import OptimizedImage from '../../components/media/OptimizedImage'
+import MediaSelectModal from '../../components/media/MediaSelectModal'
 
 /**
  * EASY Banner Widget Component
@@ -21,8 +22,9 @@ const BannerWidget = ({
     widgetId = null,
     slotName = null,
     onConfigChange = null,
-    context,
-    widgetPath = []
+    context = {},
+    widgetPath = [],
+    namespace = null
 }) => {
     const pageId = context?.pageId
 
@@ -47,6 +49,10 @@ const BannerWidget = ({
     const [image1Url, setImage1Url] = useState('')
     const [backgroundImageUrl, setBackgroundImageUrl] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
+
+    // State for image edit modal
+    const [showImageModal, setShowImageModal] = useState(false)
+    const [editingField, setEditingField] = useState(null)
 
     // Refs for editor renderers
     const contentEditorRef = useRef(null)
@@ -131,10 +137,16 @@ const BannerWidget = ({
     const textColor = configRef.current.textColor || '#000000'
     const backgroundColor = configRef.current.backgroundColor || '#ffffff'
 
-    // Build inline styles for colors
+    // Build inline styles for colors and background image
     const bannerStyle = {
         backgroundColor: backgroundColor,
-        color: textColor
+        color: textColor,
+        ...(backgroundImageUrl ? {
+            backgroundImage: `url('${backgroundImageUrl}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+        } : {})
     }
 
     // Load optimized image URLs from backend API
@@ -226,6 +238,23 @@ const BannerWidget = ({
             onConfigChange(updatedConfig)
         }
     }, [bannerMode, widgetId, slotName, componentId, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    // Image change handler for quick edit
+    const handleImageChange = useCallback((fieldName, newImage) => {
+        const updatedConfig = { ...configRef.current, [fieldName]: newImage }
+        setConfig(updatedConfig)
+        forceRerender({})
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            config: updatedConfig,
+            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+            slotName: slotName,
+            contextType: contextType
+        })
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
+        }
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
     // Initialize editor in editor mode
     useEffect(() => {
@@ -390,30 +419,25 @@ const BannerWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
+                    className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content relative group"
                     id={configRef.current.anchor || undefined}
                     style={{ position: 'relative', height: '140px', ...bannerStyle }}
                 >
-                    {backgroundImageUrl && (
-                        <div
-                            className="banner-background background"
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                backgroundImage: `url('${backgroundImageUrl}')`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                                backgroundRepeat: 'no-repeat',
-                                zIndex: 0,
-                                opacity: 0.8
-                            }}
-                        />
-                    )}
-                    <div className={bodyClasses} style={{ position: 'relative' }}>
-                        <div className="banner-text content" style={{ position: 'relative' }} ref={contentContainerRef}>
+                    {/* Background image edit icon */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingField('backgroundImage')
+                            setShowImageModal(true)
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-80 hover:opacity-100 transition-all"
+                        title="Edit background image"
+                        style={{ zIndex: 10000, pointerEvents: 'auto' }}
+                    >
+                        <Layers className="w-4 h-4 text-gray-600" />
+                    </button>
+                    <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
+                        <div className="banner-text content" style={{ position: 'relative', zIndex: 1 }} ref={contentContainerRef}>
                             {/* Mode toggle button */}
                             <button
                                 onClick={handleModeToggle}
@@ -436,7 +460,19 @@ const BannerWidget = ({
                         </div>
 
                         {bannerMode === 'text' && image1 && (
-                            <div className="banner-images image">
+                            <div className="banner-images image relative group/image">
+                                {/* Image1 edit icon */}
+                                <button
+                                    onClick={() => {
+                                        setEditingField('image1')
+                                        setShowImageModal(true)
+                                    }}
+                                    className={`absolute top-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover/image:opacity-80 transition-all z-[100] ${backgroundImage ? 'right-14' : 'right-2'}`}
+                                    title="Edit image"
+                                    style={{ pointerEvents: 'auto' }}
+                                >
+                                    <ImagePlus className="w-4 h-4 text-gray-600" />
+                                </button>
                                 <OptimizedImage
                                     src={image1.imgproxyBaseUrl || image1.fileUrl || image1.url}
                                     alt={image1.alt || image1.altText || ''}
@@ -449,6 +485,32 @@ const BannerWidget = ({
                             </div>
                         )}
                     </div>
+                    {/* Media Insert Modal */}
+                    {showImageModal && (
+                        <MediaSelectModal
+                            isOpen={showImageModal}
+                            onClose={() => {
+                                setShowImageModal(false)
+                                setEditingField(null)
+                            }}
+                            onSelect={(selectedItems) => {
+                                if (selectedItems === null) {
+                                        // Handle remove - set to null
+                                        handleImageChange(editingField, null)
+                                    } else if (selectedItems && selectedItems.length > 0) {
+                                        handleImageChange(editingField, selectedItems[0])
+                                    }
+                                    setShowImageModal(false)
+                                    setEditingField(null)
+                                }}
+                                mediaTypes={['image']}
+                                allowCollections={false}
+                                currentSelection={editingField === 'backgroundImage' ? backgroundImage : image1}
+                                namespace={namespace || context?.namespace}
+                                pageId={pageId}
+                                customTitle={editingField === 'backgroundImage' ? 'Edit Banner Background Image' : 'Edit Banner Image'}
+                            />
+                    )}
                 </div>
             )
         }
@@ -459,24 +521,6 @@ const BannerWidget = ({
                 id={configRef.current.anchor || undefined}
                 style={{ position: 'relative', height: '140px', ...bannerStyle }}
             >
-                {backgroundImageUrl && (
-                    <div
-                        className="banner-background background"
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            backgroundImage: `url('${backgroundImageUrl}')`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat',
-                            zIndex: 0,
-                            opacity: 0.8
-                        }}
-                    />
-                )}
                 <div className={bodyClasses} style={{ position: 'relative' }}>
                     <div className="banner-text content">
                         <div dangerouslySetInnerHTML={{

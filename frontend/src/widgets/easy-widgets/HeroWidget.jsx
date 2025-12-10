@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Layers } from 'lucide-react'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
+import MediaSelectModal from '../../components/media/MediaSelectModal'
 
 /**
  * EASY Hero Widget Component
@@ -17,7 +18,10 @@ const HeroWidget = ({
     widgetId = null,
     slotName = null,
     onConfigChange = null,
-    widgetPath = []
+    widgetPath = [],
+    context = {},
+    namespace = null,
+    pageId = null
 }) => {
     // Use configRef for stable reference (prevents callback recreation issues)
     const configRef = useRef(config)
@@ -29,6 +33,10 @@ const HeroWidget = ({
     // State for optimized image URL
     const [backgroundUrl, setBackgroundUrl] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
+    
+    // State for image edit modal
+    const [showImageModal, setShowImageModal] = useState(false)
+    const [editingField, setEditingField] = useState(null)
 
     // UDC Integration
     const { publishUpdate, getState, useExternalChanges } = useUnifiedData()
@@ -116,11 +124,8 @@ const HeroWidget = ({
         minHeight: '310px',
         maxHeight: '310px',
         flexShrink: 0,
+        ...(image && backgroundUrl ? { backgroundImage: `url('${backgroundUrl}')` } : {})
     }
-
-    const backgroundStyle = image && backgroundUrl ? {
-        backgroundImage: `url('${backgroundUrl}')`,
-    } : null
 
     // Content change handlers - use configRef for stable references
     const handleHeaderChange = useCallback((newContent) => {
@@ -171,6 +176,23 @@ const HeroWidget = ({
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
+        }
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    // Image change handler for quick edit
+    const handleImageChange = useCallback((fieldName, newImage) => {
+        const updatedConfig = { ...configRef.current, [fieldName]: newImage }
+        setConfig(updatedConfig)
+        forceRerender({})
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            config: updatedConfig,
+            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+            slotName: slotName,
+            contextType: contextType
+        })
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
         }
     }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
@@ -273,18 +295,54 @@ const HeroWidget = ({
         }
 
         return (
-            <div className="hero-widget widget-type-easy-widgets-herowidget cms-content" style={heroStyle}>
+            <div className="hero-widget widget-type-easy-widgets-herowidget cms-content relative group" style={heroStyle}>
                 {imageLoading && (
                     <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
                         Optimizing image...
                     </div>
                 )}
-                {backgroundStyle && <div className="hero-background" style={backgroundStyle} />}
+                {/* Background image edit icon */}
+                <button
+                    onClick={() => {
+                        setEditingField('image')
+                        setShowImageModal(true)
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover:opacity-80 transition-all z-10"
+                    title="Edit background image"
+                >
+                    <Layers className="w-4 h-4 text-gray-600" />
+                </button>
                 <div className="hero-content">
                     <div className="before-text" ref={beforeTextContainerRef} />
                     <div ref={headerContainerRef} />
                     <div className="after-text" ref={afterTextContainerRef} />
                 </div>
+                {/* Media Insert Modal */}
+                {showImageModal && (
+                    <MediaSelectModal
+                        isOpen={showImageModal}
+                        onClose={() => {
+                            setShowImageModal(false)
+                            setEditingField(null)
+                        }}
+                        onSelect={(selectedItems) => {
+                            if (selectedItems === null) {
+                                // Handle remove - set to null
+                                handleImageChange(editingField, null)
+                            } else if (selectedItems && selectedItems.length > 0) {
+                                handleImageChange(editingField, selectedItems[0])
+                            }
+                            setShowImageModal(false)
+                            setEditingField(null)
+                        }}
+                        mediaTypes={['image']}
+                        allowCollections={false}
+                        currentSelection={image}
+                        namespace={namespace || context?.namespace}
+                        pageId={pageId || context?.pageId}
+                        customTitle="Edit Hero Background Image"
+                    />
+                )}
             </div>
         )
     }
@@ -296,7 +354,6 @@ const HeroWidget = ({
 
     return (
         <div className="hero-widget widget-type-easy-widgets-herowidget cms-content" style={heroStyle}>
-            {backgroundStyle && <div className="hero-background" style={backgroundStyle} />}
             <div className="hero-content">
                 {beforeText && (
                     <h5 className="before-text">

@@ -57,6 +57,8 @@ class HeroConfig(BaseModel):
             "component": "ImageInput",
             "order": 4,
             "mediaTypes": ["image"],
+            "allowCollections": False,
+            "multiple": False,
         },
     )
 
@@ -121,14 +123,6 @@ class HeroWidget(BaseWidget):
                 "color",
             ],
         },
-        "hero-background": {
-            "label": "Background image",
-            "properties": [
-                "width",
-                "height",
-                "opacity",
-            ],
-        },
         "hero-content": {
             "label": "Text content overlay",
             "properties": [
@@ -186,6 +180,9 @@ class HeroWidget(BaseWidget):
         max-height: 310px;
         width: 100%;
         background-color: var(--hero-bg-color, #000000);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
         color: var(--hero-text-color, #ffffff);
         margin-bottom: 30px;
         flex-shrink: 0;
@@ -193,22 +190,9 @@ class HeroWidget(BaseWidget):
     .hero-widget:last-child {
         margin-bottom: 0;
     }   
-
-    .hero-background {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        z-index: 0;
-    }
     
     .hero-content {
         position: relative;
-        z-index: 1;
         max-width: 1200px;
         margin: 0 auto;
         text-align: center;
