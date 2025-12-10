@@ -25,6 +25,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
     const [parsedData, setParsedData] = useState(null);
     const [conflicts, setConflicts] = useState([]);
     const [showConflictDialog, setShowConflictDialog] = useState(false);
+    const [mergeMode, setMergeMode] = useState('add'); // 'replace' or 'add'
     const fileInputRef = useRef(null);
     const { addNotification } = useGlobalNotifications();
 
@@ -32,6 +33,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
     const tabToSection = {
         'fonts': 'fonts',
         'colors': 'colors',
+        'breakpoints': 'breakpoints',
         'typography': 'designGroups',
         'component-styles': 'componentStyles',
         'image-styles': 'imageStyles',
@@ -42,6 +44,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         const data = {
             fonts: themeData?.fonts || {},
             colors: themeData?.colors || {},
+            breakpoints: themeData?.breakpoints || {},
             designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
             imageStyles: themeData?.imageStyles || {},
@@ -96,6 +99,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         const data = {
             fonts: themeData?.fonts || {},
             colors: themeData?.colors || {},
+            breakpoints: themeData?.breakpoints || {},
             designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
             imageStyles: themeData?.imageStyles || {},
@@ -157,14 +161,21 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             return;
         }
 
-        // Detect conflicts
         const { level, section, data } = parsedData;
 
+        // If replace mode, skip conflict detection and directly apply
+        if (mergeMode === 'replace') {
+            applyPaste({}, true);
+            return;
+        }
+
+        // Add mode: detect conflicts but auto-resolve as overwrite
         let existingData;
         if (level === 'full') {
             existingData = {
                 fonts: themeData?.fonts || {},
                 colors: themeData?.colors || {},
+                breakpoints: themeData?.breakpoints || {},
                 designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
                 imageStyles: themeData?.imageStyles || {},
@@ -177,16 +188,20 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         const detectedConflicts = detectConflicts(existingData, data, section, level);
 
         if (detectedConflicts.length > 0) {
-            setConflicts(detectedConflicts);
-            setShowConflictDialog(true);
-            setShowPasteModal(false);
+            // Auto-resolve all conflicts as 'overwrite' for add mode
+            const autoResolutions = {};
+            detectedConflicts.forEach(conflict => {
+                const key = `${conflict.section}.${conflict.key}`;
+                autoResolutions[key] = 'overwrite';
+            });
+            applyPaste(autoResolutions, false);
         } else {
             // No conflicts, merge directly
-            applyPaste({});
+            applyPaste({}, false);
         }
     };
 
-    const applyPaste = (resolutions) => {
+    const applyPaste = (resolutions, replaceMode = false) => {
         const { level, section, data } = parsedData;
 
         let existingData;
@@ -194,6 +209,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             existingData = {
                 fonts: themeData?.fonts || {},
                 colors: themeData?.colors || {},
+                breakpoints: themeData?.breakpoints || {},
                 designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
                 imageStyles: themeData?.imageStyles || {},
@@ -203,7 +219,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             existingData = themeData?.[section] || {};
         }
 
-        const merged = mergeThemeData(existingData, data, level, section, resolutions);
+        const merged = mergeThemeData(existingData, data, level, section, resolutions, replaceMode);
 
         // Apply update
         if (level === 'full') {
@@ -242,6 +258,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         const labels = {
             fonts: 'Fonts',
             colors: 'Colors',
+            breakpoints: 'Breakpoints',
             designGroups: 'Design Groups',
             componentStyles: 'Component Styles',
             imageStyles: 'Image Styles',
@@ -323,6 +340,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                                     setShowPasteModal(false);
                                     setPasteText('');
                                     setParsedData(null);
+                                    setMergeMode('add');
                                 }}
                                 className="text-gray-400 hover:text-gray-600"
                             >
@@ -332,6 +350,46 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
 
                         {/* Content */}
                         <div className="px-6 py-4 space-y-4">
+                            {/* Merge Mode Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Import Mode
+                                </label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="mergeMode"
+                                            value="add"
+                                            checked={mergeMode === 'add'}
+                                            onChange={(e) => setMergeMode(e.target.value)}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm text-gray-700">
+                                            Add to existing (overwrite conflicts)
+                                        </span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="mergeMode"
+                                            value="replace"
+                                            checked={mergeMode === 'replace'}
+                                            onChange={(e) => setMergeMode(e.target.value)}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm text-gray-700">
+                                            Replace existing
+                                        </span>
+                                    </label>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {mergeMode === 'add' 
+                                        ? 'Merges imported data with existing, automatically overwriting conflicts'
+                                        : 'Completely replaces all data in imported sections'}
+                                </p>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Paste JSON or upload file
@@ -392,6 +450,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                                     setShowPasteModal(false);
                                     setPasteText('');
                                     setParsedData(null);
+                                    setMergeMode('add');
                                 }}
                                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                             >

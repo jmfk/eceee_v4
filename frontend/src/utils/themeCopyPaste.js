@@ -88,7 +88,7 @@ export function detectConflicts(existingData, newData, section, level) {
 
     if (level === 'full') {
         // Check each section for conflicts
-        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             const sectionConflicts = detectSectionConflicts(
@@ -151,7 +151,21 @@ function detectSectionConflicts(existing, incoming, sectionName) {
                 path: 'designGroups',
             });
         }
-        } else {
+    } else if (sectionName === 'breakpoints') {
+        // Breakpoints is an object-based section (sm, md, lg, xl)
+        Object.keys(incoming).forEach(key => {
+            if (existing[key] !== undefined) {
+                conflicts.push({
+                    section: sectionName,
+                    key,
+                    type: 'object',
+                    existing: existing[key],
+                    incoming: incoming[key],
+                    path: key,
+                });
+            }
+        });
+    } else {
         // Object-based sections (colors, componentStyles, imageStyles, etc.)
         Object.keys(incoming).forEach(key => {
             if (existing[key] !== undefined) {
@@ -221,45 +235,58 @@ function detectItemConflicts(existing, incoming, sectionName) {
  * @param {String} level - 'full', 'section', or 'item'
  * @param {String} section - Section name for section/item level
  * @param {Object} resolutions - Conflict resolutions { conflictKey: 'keep'|'overwrite'|'rename', newName }
+ * @param {Boolean} replaceMode - If true, completely replace sections instead of merging
  */
-export function mergeThemeData(existing, incoming, level, section, resolutions = {}) {
+export function mergeThemeData(existing, incoming, level, section, resolutions = {}, replaceMode = false) {
     const result = { ...existing };
 
     if (level === 'full') {
         // Merge all sections
-        const sections = ['fonts', 'colors', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             if (incoming[sectionName]) {
-                result[sectionName] = mergeSectionData(
-                    existing[sectionName] || {},
-                    incoming[sectionName],
-                    sectionName,
-                    resolutions
-                );
+                if (replaceMode) {
+                    // Replace mode: completely replace the section
+                    result[sectionName] = incoming[sectionName];
+                } else {
+                    result[sectionName] = mergeSectionData(
+                        existing[sectionName] || {},
+                        incoming[sectionName],
+                        sectionName,
+                        resolutions
+                    );
+                }
             }
         });
 
-        // Also include image if present (metadata, not a section)
-        if (incoming.image) {
-            result.image = incoming.image;
-        }
+        // Note: Metadata (image, name, description, etc.) is intentionally excluded from copy/paste
     } else if (level === 'section') {
         // Merge specific section
-        result[section] = mergeSectionData(
-            existing[section] || {},
-            incoming,
-            section,
-            resolutions
-        );
+        if (replaceMode) {
+            // Replace mode: completely replace the section
+            result[section] = incoming;
+        } else {
+            result[section] = mergeSectionData(
+                existing[section] || {},
+                incoming,
+                section,
+                resolutions
+            );
+        }
     } else if (level === 'item') {
         // Merge individual item
-        result[section] = mergeItemData(
-            existing[section] || {},
-            incoming,
-            section,
-            resolutions
-        );
+        if (replaceMode) {
+            // Replace mode: for item level, replace the entire section
+            result[section] = incoming;
+        } else {
+            result[section] = mergeItemData(
+                existing[section] || {},
+                incoming,
+                section,
+                resolutions
+            );
+        }
     }
 
     return result;
@@ -304,6 +331,29 @@ function mergeSectionData(existing, incoming, sectionName, resolutions) {
             // Keep existing
             return existing;
         }
+    } else if (sectionName === 'breakpoints') {
+        // Breakpoints is an object-based section
+        const merged = { ...existing };
+
+        Object.entries(incoming).forEach(([key, value]) => {
+            const conflictKey = key;
+            const resolution = resolutions[`${sectionName}.${conflictKey}`];
+
+            if (!merged[key]) {
+                // No conflict, add it
+                merged[key] = value;
+            } else if (resolution === 'overwrite') {
+                // Replace existing
+                merged[key] = value;
+            } else if (resolution === 'rename') {
+                // Add with new name
+                const newKey = resolutions[`${sectionName}.${conflictKey}.newName`];
+                merged[newKey] = value;
+            }
+            // If 'keep', do nothing
+        });
+
+        return merged;
     } else {
         // Object-based sections
         const merged = { ...existing };
