@@ -331,7 +331,10 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     def get_imgproxy_base_url(self, obj):
         """Get imgproxy base URL for dynamic resizing."""
         if obj.is_image:
-            return obj.get_file_url()
+            # Use storage.url() which returns s3:// protocol URLs for imgproxy
+            # instead of get_file_url() which returns HTTPS URLs
+            from django.core.files.storage import default_storage
+            return default_storage.url(obj.file_path)
         return None
 
     def get_thumbnail_url(self, obj):
@@ -561,7 +564,10 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     def get_imgproxy_base_url(self, obj):
         """Get imgproxy base URL for dynamic resizing."""
         if obj.is_image:
-            return obj.get_file_url()
+            # Use storage.url() which returns s3:// protocol URLs for imgproxy
+            # instead of get_file_url() which returns HTTPS URLs
+            from django.core.files.storage import default_storage
+            return default_storage.url(obj.file_path)
         return None
 
     def get_thumbnail_url(self, obj):

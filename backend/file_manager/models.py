@@ -1014,10 +1014,11 @@ class MediaFile(models.Model):
             return self.get_file_url()
 
         from .imgproxy import get_thumbnail_url
-        from .storage import S3MediaStorage
+        from django.core.files.storage import default_storage
 
-        storage = S3MediaStorage()
-        source_url = storage.get_public_url(self.file_path)
+        # Use storage.url() which returns s3:// protocol URLs for imgproxy
+        # instead of get_public_url() which returns HTTPS URLs
+        source_url = default_storage.url(self.file_path)
 
         return get_thumbnail_url(source_url=source_url, size=size)
 
