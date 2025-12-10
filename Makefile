@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch
+.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -39,6 +39,8 @@ help: ## Show this help message
 	@echo "  migrate-schemas-only      Migrate schemas only"
 	@echo "  migrate-pagedata-only     Migrate page data only"
 	@echo "  migrate-widgets-only      Migrate widgets only"
+	@echo "  migrate-widget-images-dry Dry run widget image migration (preview)"
+	@echo "  migrate-widget-images     Migrate widget images to full MediaFile objects"
 	@echo ""
 	@echo "Object Type Schemas:"
 	@echo "  import-schemas            Import all JSON schemas to ObjectTypes"
@@ -134,6 +136,13 @@ migrate-pagedata-only:
 
 migrate-widgets-only:
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --widgets-only --backup
+
+# Widget Image Migration
+migrate-widget-images-dry:
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_widget_images --dry-run --verbose
+
+migrate-widget-images:
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_widget_images --backup
 
 # Object Type Schema Management
 import-schemas: ## Import all JSON schemas to ObjectTypeDefinitions
