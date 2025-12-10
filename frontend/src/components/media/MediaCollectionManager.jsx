@@ -92,31 +92,77 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
     };
 
     const handleCreateTag = async (tagName) => {
-        if (!tagName || !tagName.trim()) return;
+        console.log('[CompactTagInput] handleCreateTag called with:', tagName);
+        if (!tagName || !tagName.trim()) {
+            console.log('[CompactTagInput] handleCreateTag: tagName is empty, returning');
+            return;
+        }
 
         const normalizedTagName = tagName.trim();
+        console.log('[CompactTagInput] handleCreateTag: normalized tag name:', normalizedTagName);
 
-        // Check for duplicates (case-insensitive)
+        // Check for duplicates (case-insensitive) in available tags
         const isDuplicate = availableTags.some(tag =>
             tag.name.toLowerCase() === normalizedTagName.toLowerCase()
         );
         if (isDuplicate) {
+            console.log('[CompactTagInput] handleCreateTag: tag already exists in availableTags');
             addNotification('Tag already exists', 'error');
             return;
         }
 
+        // Before creating, do a server-side lookup to check if tag exists
+        // This handles cases where the tag exists but wasn't in search results
+        try {
+            console.log('[CompactTagInput] handleCreateTag: searching for tag with namespace:', namespace, 'search term:', normalizedTagName);
+            const searchResult = await mediaTagsApi.list({
+                namespace,
+                search: normalizedTagName,
+                page_size: 50 // Get enough results to find exact match
+            })();
+            
+            console.log('[CompactTagInput] handleCreateTag: search result:', searchResult);
+            const searchTags = searchResult.results || searchResult || [];
+            console.log('[CompactTagInput] handleCreateTag: searchTags array:', searchTags);
+            const exactMatch = searchTags.find(tag =>
+                tag?.name?.toLowerCase() === normalizedTagName.toLowerCase()
+            );
+
+            if (exactMatch) {
+                console.log('[CompactTagInput] handleCreateTag: found exact match in search results:', exactMatch);
+                // Tag exists in database, use it
+                if (onTagCreated) {
+                    onTagCreated(exactMatch);
+                }
+                addTag(exactMatch);
+                addNotification(`Tag "${normalizedTagName}" added`, 'success');
+                return;
+            }
+            console.log('[CompactTagInput] handleCreateTag: no exact match found in search results');
+        } catch (error) {
+            console.error('[CompactTagInput] handleCreateTag: Failed to search for existing tag:', error);
+            console.error('[CompactTagInput] handleCreateTag: Error details:', error.response?.data || error.message);
+            // Continue to create new tag
+        }
+
+        console.log('[CompactTagInput] handleCreateTag: creating new tag...');
         setIsCreatingTag(true);
         try {
             const slug = normalizedTagName.toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-+|-+$/g, '');
+            console.log('[CompactTagInput] handleCreateTag: generated slug:', slug);
 
-            const newTag = await mediaTagsApi.create({
+            const tagData = {
                 name: normalizedTagName,
                 slug: slug,
                 namespace: namespace,
                 description: `User-created tag: ${normalizedTagName}`
-            })();
+            };
+            console.log('[CompactTagInput] handleCreateTag: creating tag with data:', tagData);
+
+            const newTag = await mediaTagsApi.create(tagData)();
+            console.log('[CompactTagInput] handleCreateTag: tag created successfully:', newTag);
 
             // Notify parent to update available tags list
             if (onTagCreated) {
@@ -127,7 +173,9 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
             addTag(newTag);
             addNotification(`Tag "${normalizedTagName}" created successfully`, 'success');
         } catch (error) {
-            console.error('Failed to create tag:', error);
+            console.error('[CompactTagInput] handleCreateTag: Failed to create tag:', error);
+            console.error('[CompactTagInput] handleCreateTag: Error response:', error.response?.data || error.message);
+            console.error('[CompactTagInput] handleCreateTag: Full error object:', error);
             addNotification(
                 error.message || `Failed to create tag "${normalizedTagName}"`,
                 'error'
@@ -1389,9 +1437,14 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
                                     Tags
                                 </label>
                                 <MediaTagWidget
-                                    selectedTagIds={formData.tagIds}
-                                    onChange={(tagIds) => setFormData(prev => ({ ...prev, tagIds }))}
-                                    availableTags={availableTags}
+                                    tags={formData.tagIds
+                                        .map(id => availableTags.find(tag => tag.id === id))
+                                        .filter(Boolean)
+                                    }
+                                    onChange={(tagObjects) => {
+                                        const tagIds = tagObjects.map(tag => tag.id);
+                                        setFormData(prev => ({ ...prev, tagIds }));
+                                    }}
                                     namespace={namespace}
                                 />
                             </div>
@@ -2352,11 +2405,15 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                     </label>
                                     <div className="border border-gray-300 rounded-lg p-3">
                                         <MediaTagWidget
+                                            tags={formData.tagIds
+                                                .map(id => availableTags.find(tag => tag.id === id))
+                                                .filter(Boolean)
+                                            }
+                                            onChange={(tagObjects) => {
+                                                const tagIds = tagObjects.map(tag => tag.id);
+                                                setFormData(prev => ({ ...prev, tagIds }));
+                                            }}
                                             namespace={namespace}
-                                            selectedTags={formData.tagIds}
-                                            onTagsChange={(tagIds) => setFormData(prev => ({ ...prev, tagIds }))}
-                                            availableTags={availableTags}
-                                            onTagsUpdate={loadAvailableTags}
                                         />
                                     </div>
                                 </div>

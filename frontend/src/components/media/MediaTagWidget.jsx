@@ -15,7 +15,11 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
 
     // Debounced search function for server-side tag lookup
     const searchTags = useCallback(async (searchQuery) => {
-        if (!namespace) return;
+        console.log('[MediaTagWidget] searchTags called with:', searchQuery, 'namespace:', namespace);
+        if (!namespace) {
+            console.log('[MediaTagWidget] searchTags: no namespace, returning');
+            return;
+        }
 
         // Clear previous timeout
         if (searchTimeoutRef.current) {
@@ -24,6 +28,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
 
         // Don't search for empty queries
         if (!searchQuery.trim()) {
+            console.log('[MediaTagWidget] searchTags: empty query, clearing availableTags');
             setAvailableTags([]);
             setIsSearching(false);
             return;
@@ -34,15 +39,20 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
         // Debounce the search by 300ms
         searchTimeoutRef.current = setTimeout(async () => {
             try {
-                const result = await mediaApi.tags.list({
+                const searchParams = {
                     namespace,
                     search: searchQuery.trim(),
                     page_size: 20 // Limit results for performance
-                })();
+                };
+                console.log('[MediaTagWidget] searchTags: calling API with params:', searchParams);
+                const result = await mediaApi.tags.list(searchParams)();
+                console.log('[MediaTagWidget] searchTags: API result:', result);
                 const tags = result.results || result || [];
+                console.log('[MediaTagWidget] searchTags: extracted tags:', tags);
                 setAvailableTags(Array.isArray(tags) ? tags : []);
             } catch (error) {
-                console.error('Failed to search media tags:', error);
+                console.error('[MediaTagWidget] searchTags: Failed to search media tags:', error);
+                console.error('[MediaTagWidget] searchTags: Error details:', error.response?.data || error.message);
                 setAvailableTags([]);
             } finally {
                 setIsSearching(false);
@@ -151,16 +161,24 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
     }
 
     const addTag = async (tagName) => {
-        if (!tagName) return
+        console.log('[MediaTagWidget] addTag called with:', tagName);
+        if (!tagName) {
+            console.log('[MediaTagWidget] addTag: tagName is empty, returning');
+            return;
+        }
 
         // Normalize tag name for comparison
         const normalizedTagName = tagName.trim()
+        console.log('[MediaTagWidget] addTag: normalized tag name:', normalizedTagName);
 
         // Check for duplicates (case-insensitive) in current tags
         const isDuplicate = tags.some(existingTag =>
             existingTag?.name?.toLowerCase() === normalizedTagName.toLowerCase()
         )
-        if (isDuplicate) return
+        if (isDuplicate) {
+            console.log('[MediaTagWidget] addTag: tag already in selected tags, returning');
+            return;
+        }
 
         // Check if this tag already exists in our available tags
         const existingTag = availableTags.find(tag =>
@@ -168,6 +186,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
         )
 
         if (existingTag) {
+            console.log('[MediaTagWidget] addTag: found tag in availableTags:', existingTag);
             // Tag exists, add the full tag object (with ID)
             const newTags = [...tags, existingTag]
             onChange(newTags)
@@ -177,30 +196,82 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
             return
         }
 
-        // Create the tag on backend immediately to get an ID
+        console.log('[MediaTagWidget] addTag: tag not in availableTags, searching server...');
+        // Before creating, do a server-side lookup to check if tag exists
+        // This handles cases where the tag exists but wasn't in search results
+        try {
+            setIsSearching(true);
+            console.log('[MediaTagWidget] addTag: searching for tag with namespace:', namespace, 'search term:', normalizedTagName);
+            const searchResult = await mediaApi.tags.list({
+                namespace,
+                search: normalizedTagName,
+                page_size: 50 // Get enough results to find exact match
+            })();
+            
+            console.log('[MediaTagWidget] addTag: search result:', searchResult);
+            const searchTags = searchResult.results || searchResult || [];
+            console.log('[MediaTagWidget] addTag: searchTags array:', searchTags);
+            const exactMatch = searchTags.find(tag =>
+                tag?.name?.toLowerCase() === normalizedTagName.toLowerCase()
+            );
+
+            if (exactMatch) {
+                console.log('[MediaTagWidget] addTag: found exact match in search results:', exactMatch);
+                // Tag exists in database, use it
+                setAvailableTags(prev => {
+                    const exists = prev.some(tag => tag.id === exactMatch.id);
+                    return exists ? prev : [...prev, exactMatch];
+                });
+                const newTags = [...tags, exactMatch];
+                onChange(newTags);
+                setInputValue('');
+                setShowSuggestions(false);
+                setSelectedIndex(-1);
+                setIsSearching(false);
+                return;
+            }
+            console.log('[MediaTagWidget] addTag: no exact match found in search results');
+            setIsSearching(false);
+        } catch (error) {
+            console.error('[MediaTagWidget] addTag: Failed to search for existing tag:', error);
+            console.error('[MediaTagWidget] addTag: Error details:', error.response?.data || error.message);
+            setIsSearching(false);
+            // Continue to create new tag
+        }
+
+        console.log('[MediaTagWidget] addTag: creating new tag...');
+        // Tag doesn't exist, create it on backend
         try {
             const slug = normalizedTagName.toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-+|-+$/g, '');
+            console.log('[MediaTagWidget] addTag: generated slug:', slug);
 
-            const newTag = await mediaApi.tags.create({
+            const tagData = {
                 name: normalizedTagName,
                 slug: slug,
                 namespace: namespace,
                 description: `User-created tag: ${normalizedTagName}`
-            })();
+            };
+            console.log('[MediaTagWidget] addTag: creating tag with data:', tagData);
+            
+            const newTag = await mediaApi.tags.create(tagData)();
+            console.log('[MediaTagWidget] addTag: tag created successfully:', newTag);
 
             // Add the newly created tag object to available tags
             setAvailableTags(prev => [...prev, newTag]);
 
             // Add the full tag object (with ID)
             const newTags = [...tags, newTag]
+            console.log('[MediaTagWidget] addTag: calling onChange with new tags:', newTags);
             onChange(newTags)
             setInputValue('')
             setShowSuggestions(false)
             setSelectedIndex(-1)
         } catch (error) {
-            console.error('Failed to create tag:', error);
+            console.error('[MediaTagWidget] addTag: Failed to create tag:', error);
+            console.error('[MediaTagWidget] addTag: Error response:', error.response?.data || error.message);
+            console.error('[MediaTagWidget] addTag: Full error object:', error);
             // You could show a notification here if you have access to notification context
         }
     }
