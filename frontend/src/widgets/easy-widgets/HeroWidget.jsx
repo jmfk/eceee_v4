@@ -295,7 +295,7 @@ const HeroWidget = ({
         }
 
         return (
-            <div className="hero-widget widget-type-easy-widgets-herowidget cms-content relative group" style={heroStyle}>
+            <div className="hero-widget widget-type-easy-widgets-herowidget relative group" style={heroStyle}>
                 {imageLoading && (
                     <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
                         Optimizing image...
@@ -353,7 +353,7 @@ const HeroWidget = ({
     }
 
     return (
-        <div className="hero-widget widget-type-easy-widgets-herowidget cms-content" style={heroStyle}>
+        <div className="hero-widget widget-type-easy-widgets-herowidget" style={heroStyle}>
             <div className="hero-content">
                 {beforeText && (
                     <h5 className="before-text">

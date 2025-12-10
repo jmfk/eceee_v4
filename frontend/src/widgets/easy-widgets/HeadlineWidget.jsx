@@ -257,7 +257,7 @@ const HeadlineWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className={`headline-widget widget-type-easy-widgets-headlinewidget container cms-content ${borderClass}`}
+                    className={`headline-widget widget-type-easy-widgets-headlinewidget container ${borderClass}`}
                     id={configRef.current.anchor || undefined}
                 >
                     <HeaderTag className="headline-content" ref={contentContainerRef}>
@@ -269,7 +269,7 @@ const HeadlineWidget = ({
 
         return (
             <div
-                className={`headline-widget widget-type-easy-widgets-headlinewidget container cms-content ${borderClass}`}
+                className={`headline-widget widget-type-easy-widgets-headlinewidget container ${borderClass}`}
                 id={configRef.current.anchor || undefined}
             >
                 <HeaderTag

@@ -97,7 +97,7 @@ class ThemeCSSGenerator:
 
         # 2-3. Widget Type Styles CSS (defaults from registered widgets)
         # These provide baseline styles that design groups can override
-        widget_css = self._generate_widget_css()
+        widget_css = self._generate_widget_css(frontend_scoped=frontend_scoped)
         if widget_css:
             css_parts.append(widget_css)
 
@@ -244,8 +244,12 @@ class ThemeCSSGenerator:
 
         return "\n\n".join(css_parts) if len(css_parts) > 1 else ""
 
-    def _generate_widget_css(self):
-        """Generate CSS from all registered widget types"""
+    def _generate_widget_css(self, frontend_scoped=False):
+        """Generate CSS from all registered widget types
+        
+        Args:
+            frontend_scoped: If True, prepend .cms-content to widget selectors
+        """
         from webpages.widget_registry import widget_type_registry
 
         css_parts = ["/* Widget Type Styles */"]
@@ -259,9 +263,15 @@ class ThemeCSSGenerator:
             if not widget_type.widget_css:
                 continue
 
-            # Add widget CSS
+            # Add widget CSS with optional scoping
             css_parts.append(f"/* Widget: {widget_type.name} ({widget_type.type}) */")
-            css_parts.append(widget_type.widget_css)
+            
+            widget_css = widget_type.widget_css
+            if frontend_scoped:
+                # Scope all widget selectors with .cms-content
+                widget_css = self._scope_css_selectors(widget_css, '.cms-content')
+            
+            css_parts.append(widget_css)
 
             # Collect widget CSS variables
             if hasattr(widget_type, "css_variables") and widget_type.css_variables:
@@ -279,3 +289,76 @@ class ThemeCSSGenerator:
             css_parts.insert(1, variables_css)
 
         return "\n\n".join(css_parts) if len(css_parts) > 1 else ""
+
+    def _scope_css_selectors(self, css_content, scope_prefix):
+        """Prepend scope prefix to all CSS selectors
+        
+        Args:
+            css_content: CSS string
+            scope_prefix: Prefix to add (e.g., '.cms-content')
+            
+        Returns:
+            Scoped CSS string
+        """
+        import re
+        
+        lines = []
+        in_media_query = False
+        media_query_depth = 0
+        
+        for line in css_content.split('\n'):
+            stripped = line.strip()
+            
+            # Track media query nesting
+            if stripped.startswith('@media'):
+                in_media_query = True
+                media_query_depth += stripped.count('{') - stripped.count('}')
+                lines.append(line)
+                continue
+            
+            # Update media query depth
+            if in_media_query:
+                media_query_depth += line.count('{') - line.count('}')
+                if media_query_depth <= 0:
+                    in_media_query = False
+                    media_query_depth = 0
+            
+            # Skip @-rules, empty lines, and closing braces
+            if (stripped.startswith('@') or 
+                not stripped or 
+                stripped == '}' or
+                stripped.startswith('/*') or
+                stripped.endswith('*/') or
+                ':' in stripped and '{' not in stripped):
+                lines.append(line)
+                continue
+            
+            # Check if this line contains a selector (has '{' and is not a property)
+            if '{' in line and not stripped.startswith('}'):
+                # Extract the selector part (before the '{')
+                parts = line.split('{', 1)
+                if len(parts) == 2:
+                    selector_part = parts[0].strip()
+                    rest = parts[1]
+                    
+                    # Split multiple selectors by comma
+                    selectors = [s.strip() for s in selector_part.split(',')]
+                    scoped_selectors = []
+                    
+                    for selector in selectors:
+                        # Don't scope :root or keyframe selectors
+                        if selector.startswith(':root') or '%' in selector:
+                            scoped_selectors.append(selector)
+                        else:
+                            scoped_selectors.append(f"{scope_prefix} {selector}")
+                    
+                    # Reconstruct the line
+                    indent = line[:len(line) - len(line.lstrip())]
+                    scoped_line = f"{indent}{', '.join(scoped_selectors)} {{{rest}"
+                    lines.append(scoped_line)
+                else:
+                    lines.append(line)
+            else:
+                lines.append(line)
+        
+        return '\n'.join(lines)

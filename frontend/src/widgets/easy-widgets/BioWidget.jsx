@@ -104,7 +104,7 @@ const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimen
         }
     }, [])
 
-    return <div ref={containerRef} className="bio-widget__text cms-content" />
+    return <div ref={containerRef} className="bio-widget__text" />
 })
 
 /**
@@ -303,7 +303,7 @@ const BioWidget = memo(({
                         )}
                     </div>
                 )}
-                <div className="bio-widget__text cms-content">
+                <div className="bio-widget__text">
                     {bioText && <div dangerouslySetInnerHTML={{ __html: bioText }} />}
                 </div>
             </div>

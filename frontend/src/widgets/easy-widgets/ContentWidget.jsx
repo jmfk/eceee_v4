@@ -142,7 +142,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
         }
     }, [])
 
-    return <div ref={containerRef} className="cms-content" />
+    return <div ref={containerRef} className="" />
 })
 
 /**
@@ -238,7 +238,7 @@ const ContentWidget = memo(({
     }
 
     return (
-        <div className="content-widget widget-type-easy-widgets-contentwidget min-h-32 cms-content">
+        <div className="content-widget widget-type-easy-widgets-contentwidget min-h-32">
             {configRef.current.content && <div dangerouslySetInnerHTML={{ __html: configRef.current.content }} />}
         </div>
     )
