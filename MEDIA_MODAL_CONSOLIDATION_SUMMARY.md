@@ -189,3 +189,4 @@ ImageWidget.schema = {
 - ✅ Schema-driven approach is opt-in via schema definition
 - ✅ MediaPicker still available for legacy code (tests, docs)
 
+
