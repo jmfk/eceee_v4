@@ -35,6 +35,7 @@ const SectionWidget = ({
     widgetId,
     onWidgetEdit,
     onOpenWidgetEditor,
+    onConfigChange,
     contextType = 'page',
     parentComponentId,
     slotName,
@@ -79,6 +80,8 @@ const SectionWidget = ({
 
     // Track the widget ID to detect when we're rendering a different widget
     const previousWidgetIdRef = useRef(widgetId);
+    // Track if we've already generated anchor to prevent infinite loops
+    const anchorGeneratedRef = useRef(false);
 
     // Only update from props when widgetId changes (different widget) or on mount
     useEffect(() => {
@@ -87,47 +90,55 @@ const SectionWidget = ({
             setSlotsData(config.slots || { content: [] });
             setIsExpanded(config.startExpanded !== false);
             previousWidgetIdRef.current = widgetId;
+            anchorGeneratedRef.current = false;
         }
     }, [widgetId, config.slots, config.startExpanded]);
 
     // Auto-generate anchor from title when title changes
     useEffect(() => {
-        if (mode === 'editor' && config.title && !config.anchor && onWidgetEdit) {
+        if (mode === 'editor' && config.title && !config.anchor && !anchorGeneratedRef.current && onConfigChange) {
             const newAnchor = slugify(config.title);
             if (newAnchor) {
-                // Update config with generated anchor
-                onWidgetEdit({
+                anchorGeneratedRef.current = true;
+                // Update config with generated anchor - onConfigChange expects just (newConfig)
+                onConfigChange({
                     ...config,
                     anchor: newAnchor
                 });
             }
         }
-    }, [config.title, config.anchor, mode, onWidgetEdit]);
+        // Reset flag if anchor is cleared
+        if (config.anchor) {
+            anchorGeneratedRef.current = true;
+        } else if (!config.title) {
+            anchorGeneratedRef.current = false;
+        }
+    }, [config.title, config.anchor, mode, onConfigChange]);
 
     // Handle inline editing of title
     const handleTitleClick = useCallback((e) => {
         e.stopPropagation();
         const newTitle = prompt('Enter section title:', config.title || '');
-        if (newTitle !== null && onWidgetEdit) {
-            onWidgetEdit({
+        if (newTitle !== null && onConfigChange) {
+            onConfigChange({
                 ...config,
                 title: newTitle,
                 anchor: newTitle ? slugify(newTitle) : config.anchor
             });
         }
-    }, [config, onWidgetEdit]);
+    }, [config, onConfigChange]);
 
     // Handle inline editing of anchor
     const handleAnchorClick = useCallback((e) => {
         e.stopPropagation();
         const newAnchor = prompt('Enter section anchor/slug:', config.anchor || '');
-        if (newAnchor !== null && onWidgetEdit) {
-            onWidgetEdit({
+        if (newAnchor !== null && onConfigChange) {
+            onConfigChange({
                 ...config,
                 anchor: newAnchor ? slugify(newAnchor) : newAnchor
             });
         }
-    }, [config, onWidgetEdit]);
+    }, [config, onConfigChange]);
 
     // Subscribe to external UDC changes for this specific widget
     useExternalChanges(componentId, (state) => {
@@ -517,6 +528,7 @@ SectionWidget.propTypes = {
     widgetId: PropTypes.string,
     onWidgetEdit: PropTypes.func,
     onOpenWidgetEditor: PropTypes.func,
+    onConfigChange: PropTypes.func,
     contextType: PropTypes.oneOf(['page', 'object']),
     parentComponentId: PropTypes.string
 };

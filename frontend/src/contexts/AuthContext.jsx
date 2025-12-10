@@ -159,6 +159,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     const queueRequest = (request) => {
+        // Skip queueing if request doesn't have config (e.g., WebSocket verification events)
+        // Only queue actual API requests that can be retried
+        if (!request || !request.config) {
+            return;
+        }
+
         // Create a unique key for deduplication
         const requestKey = `${request.config.method}-${request.config.url}-${JSON.stringify(request.config.data)}`;
 
