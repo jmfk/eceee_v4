@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Image, FolderOpen, X, Eye } from 'lucide-react'
-import MediaInsertModal from '../media/MediaInsertModal'
+import MediaSelectModal from '../media/MediaSelectModal'
 
 /**
  * MediaField - Form field component for media selection
@@ -205,16 +205,16 @@ const MediaField = ({
                 </div>
             )}
 
-            {/* MediaInsertModal (Field Mode) */}
+            {/* MediaSelectModal */}
             {showMediaPicker && (
-                <MediaInsertModal
+                <MediaSelectModal
                     isOpen={showMediaPicker}
                     onClose={() => setShowMediaPicker(false)}
-                    mode="field"
                     onSelect={handleMediaSelect}
                     multiple={multiple}
                     allowCollections={mediaTypes.includes('image')}
-                    selectedFiles={displayFiles}
+                    currentSelection={multiple ? null : displayFiles[0]}
+                    mediaTypes={mediaTypes}
                     namespace={namespace}
                 />
             )}

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react'
 import { Image } from 'lucide-react'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import ImageDisplaySection from './ImageDisplaySection'
-import MediaInsertModal from '../media/MediaInsertModal'
+import MediaSelectModal from '../media/MediaSelectModal'
 import {
     validateImageFile,
     getImageUrl,
@@ -224,15 +224,14 @@ const ExpandableImageField = ({
                 </div>
             )}
 
-            {/* Media Insert Modal (Field Mode) */}
-            <MediaInsertModal
+            {/* Media Select Modal */}
+            <MediaSelectModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                mode="field"
                 onSelect={handleMediaSelect}
                 multiple={multiple}
                 allowCollections={allowCollections}
-                selectedFiles={displayImages}
+                currentSelection={multiple ? null : (displayImages && displayImages[0])}
                 namespace={namespace}
             />
         </div>

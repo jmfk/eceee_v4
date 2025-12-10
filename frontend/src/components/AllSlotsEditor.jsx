@@ -24,6 +24,7 @@ const AllSlotsEditor = ({
     onVersionChange,
     onOpenWidgetEditor,
     context,
+    namespace,
     // Local widget state management
     sharedComponentId,
     publishWidgetOperation,
@@ -507,6 +508,7 @@ const SlotAccordionItem = ({
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
+                        namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
                         allowedWidgetTypes={slotMetadata.allowedWidgetTypes || ['*']}

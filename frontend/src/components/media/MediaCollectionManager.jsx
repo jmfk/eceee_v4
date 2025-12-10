@@ -329,7 +329,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                         <img 
                             src={file.thumbnailUrl} 
                             alt={file.title}
-                            className="w-full h-full object-cover"
+                            className="max-w-full max-h-full object-cover"
                         />
                     </div>
                 ) : (
@@ -341,6 +341,11 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                     <p className="text-sm font-medium text-gray-900 truncate" title={file.title}>
                         {file.title}
                     </p>
+                    {file.annotation && (
+                        <p className="text-xs text-gray-600 mt-1 truncate" title={file.annotation}>
+                            {file.annotation}
+                        </p>
+                    )}
                     <p className="text-xs text-gray-500 mt-1">
                         {formatFileSize(file.fileSize)}
                     </p>
@@ -738,7 +743,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                         <img
                             src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
-                            className="w-full h-full object-cover"
+                            className="max-w-full max-h-full object-cover"
                             onError={(e) => {
                                 // Fallback to icon if image fails to load
                                 e.target.style.display = 'none';
@@ -757,6 +762,11 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                     <h4 className="text-xs font-medium text-gray-900 truncate mb-1">
                         {file.title || file.originalFilename}
                     </h4>
+                    {file.annotation && (
+                        <p className="text-xs text-gray-600 mb-1 truncate" title={file.annotation}>
+                            {file.annotation}
+                        </p>
+                    )}
                     <div className="flex items-center justify-between text-xs text-gray-500">
                         <span className="truncate">{file.title || file.originalFilename}</span>
                         <span className="capitalize ml-2 flex-shrink-0">{file.fileType}</span>
@@ -780,7 +790,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                         <img
                             src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
-                            className="w-full h-full object-cover"
+                            className="max-w-full max-h-full object-cover"
                             onError={(e) => {
                                 // Fallback to icon if image fails to load
                                 e.target.style.display = 'none';
@@ -800,6 +810,11 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                     <h4 className="text-xs font-medium text-gray-900 truncate">
                         {file.title || file.originalFilename}
                     </h4>
+                    {file.annotation && (
+                        <p className="text-xs text-gray-600 mt-0.5 truncate" title={file.annotation}>
+                            {file.annotation}
+                        </p>
+                    )}
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                         <span className="truncate">{file.title || file.originalFilename}</span>
                         <span className="capitalize ml-2 flex-shrink-0">{file.fileType}</span>
@@ -841,7 +856,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                         <img
                             src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
-                            className="w-full h-full object-cover"
+                            className="max-w-full max-h-full object-cover"
                             onError={(e) => {
                                 // Fallback to icon if image fails to load
                                 e.target.style.display = 'none';
@@ -860,6 +875,11 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                     <h4 className="text-xs font-medium text-gray-900 truncate mb-1">
                         {file.title || file.originalFilename}
                     </h4>
+                    {file.annotation && (
+                        <p className="text-xs text-gray-600 mb-1 truncate" title={file.annotation}>
+                            {file.annotation}
+                        </p>
+                    )}
                     <div className="flex items-center justify-between text-xs text-gray-500">
                         <span className="truncate">{file.title || file.originalFilename}</span>
                         <span className="capitalize ml-2 flex-shrink-0">{file.fileType}</span>
@@ -883,7 +903,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                         <img
                             src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
-                            className="w-full h-full object-cover"
+                            className="max-w-full max-h-full object-cover"
                             onError={(e) => {
                                 // Fallback to icon if image fails to load
                                 e.target.style.display = 'none';
@@ -903,6 +923,11 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                     <h4 className="text-xs font-medium text-gray-900 truncate">
                         {file.title || file.originalFilename}
                     </h4>
+                    {file.annotation && (
+                        <p className="text-xs text-gray-600 mt-0.5 truncate" title={file.annotation}>
+                            {file.annotation}
+                        </p>
+                    )}
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                         <span className="truncate">{file.title || file.originalFilename}</span>
                         <span className="capitalize ml-2 flex-shrink-0">{file.fileType}</span>
@@ -1753,7 +1778,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                             <img
                                 src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                                 alt=""
-                                className="w-full h-full object-cover"
+                                className="max-w-full max-h-full object-cover"
                                 style={{ display: 'block' }}
                                 onError={(e) => {
                                     e.target.style.display = 'none';

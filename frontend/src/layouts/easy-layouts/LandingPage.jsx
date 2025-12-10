@@ -17,6 +17,7 @@ export const LandingPage = ({
     onWidgetAction,
     editable = true,
     pageContext = {},
+    namespace,
     onShowWidgetModal,
     onClearSlot,
     // Inheritance props
@@ -48,6 +49,7 @@ export const LandingPage = ({
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
+                        namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
                         behavior={{
@@ -78,6 +80,7 @@ export const LandingPage = ({
                     onWidgetAction={onWidgetAction}
                     editable={editable}
                     pageContext={pageContext}
+                    namespace={namespace}
                     onShowWidgetModal={onShowWidgetModal}
                     onClearSlot={onClearSlot}
                     behavior={{
@@ -108,6 +111,7 @@ export const LandingPage = ({
                     onWidgetAction={onWidgetAction}
                     editable={editable}
                     pageContext={pageContext}
+                    namespace={namespace}
                     onShowWidgetModal={onShowWidgetModal}
                     onClearSlot={onClearSlot}
                     behavior={{
@@ -140,6 +144,7 @@ export const LandingPage = ({
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
+                        namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
                         behavior={{
@@ -178,6 +183,7 @@ export const LandingPage = ({
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
+                        namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
                         behavior={{

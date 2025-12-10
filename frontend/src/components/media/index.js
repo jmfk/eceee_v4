@@ -21,5 +21,6 @@ export { default as OptimizedImage } from './OptimizedImage';
 export { default as BulkOperations } from './BulkOperations';
 export { default as UploadQueue } from './UploadQueue';
 
-// WYSIWYG editor components
-export { default as MediaInsertModal } from './MediaInsertModal';
+// Modal components
+export { default as MediaInsertModal } from './MediaInsertModal'; // WYSIWYG editor insert/edit
+export { default as MediaSelectModal } from './MediaSelectModal'; // Widget field selection

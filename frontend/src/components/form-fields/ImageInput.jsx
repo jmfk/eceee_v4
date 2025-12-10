@@ -24,6 +24,7 @@ const ImageInput = ({
     autoTags = '', // Comma-separated string of auto-tags for uploads
     defaultCollection = null, // Default collection object for uploads
     maxFiles = null, // Maximum number of images allowed in field
+    allowCollections = false,
     ...props
 }) => {
     return (
@@ -44,6 +45,7 @@ const ImageInput = ({
             autoTags={autoTags}
             defaultCollection={defaultCollection}
             maxFiles={maxFiles}
+            allowCollections={allowCollections}
             showValidation={true}
             {...props}
         />

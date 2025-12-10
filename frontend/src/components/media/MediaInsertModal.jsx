@@ -1,11 +1,12 @@
 /**
  * MediaInsertModal Component
- * Unified modal for ALL media operations - supports WYSIWYG insert/edit and form field modes
+ * Modal for WYSIWYG editor media operations - insert and edit with configuration
  * 
  * Modes (auto-detected):
  * - Insert mode: onInsert prop exists → Two-step process (select → configure) for new content
  * - Edit mode: onSave prop exists → Edit existing media with Save/Delete buttons
- * - Field mode: onSelect prop exists → Single-step selection for form fields
+ * 
+ * Note: For simple media selection in widget fields, use MediaSelectModal instead
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -33,30 +34,20 @@ const MediaInsertModal = ({
     onDelete,
     initialConfig,
     initialMediaData,
-    mediaLoadError,
-
-    // Field mode props  
-    mode = 'editor', // 'editor' | 'field' (for backward compat, but auto-detected now)
-    onSelect, // Callback for field mode (simpler than onInsert)
-    multiple = false, // Allow multiple selection in field mode
-    allowCollections = true, // Whether to show collections tab
-    selectedFiles = [], // Currently selected files (for field mode)
+    mediaLoadError
 }) => {
     // Auto-detect mode based on callbacks
     const isEditMode = !!onSave;
     const isInsertMode = !!onInsert;
-    const isFieldMode = !!onSelect;
 
-    // For theme loading, use editor mode if not field mode
-    const { currentTheme } = useTheme({ pageId, enabled: !isFieldMode });
+    // Load theme for configuration options
+    const { currentTheme } = useTheme({ pageId, enabled: true });
     const [step, setStep] = useState('select'); // 'select' or 'configure'
     const [selectedMedia, setSelectedMedia] = useState(null);
-    const [selectedMediaItems, setSelectedMediaItems] = useState(selectedFiles || []); // For multiple selection in field mode
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'
     const [showOverrideSettings, setShowOverrideSettings] = useState(false);
     const [mediaSelectionType, setMediaSelectionType] = useState('image');
     const [collections, setCollections] = useState([]);
-    const [loadingCollections, setLoadingCollections] = useState(false);
     const [pendingFiles, setPendingFiles] = useState([]);
     const [loadingPendingFiles, setLoadingPendingFiles] = useState(false);
 
@@ -164,33 +155,28 @@ const MediaInsertModal = ({
                     setErrorMessage(null);
                 }
             } else {
-                // Insert or field mode: reset to defaults
+                // Insert mode: reset to defaults
                 setStep('select');
                 setSelectedMedia(null);
-                setSelectedMediaItems(selectedFiles || []);
                 setMediaType('image');
                 setMediaSelectionType('image');
                 setIsChangingMedia(false);
                 setErrorMessage(null);
-
-                // Only reset config in insert mode
-                if (isInsertMode) {
-                    setConfig({
-                        width: 'full',
-                        align: 'center',
-                        caption: '',
-                        altText: '',
-                        galleryStyle: null,
-                        enableLightbox: false,
-                        lightboxStyle: 'default',
-                        lightboxGroup: '',
-                        // Override settings
-                        showCaptions: undefined,
-                        randomize: undefined,
-                        autoPlay: undefined,
-                        autoPlayInterval: undefined
-                    });
-                }
+                setConfig({
+                    width: 'full',
+                    align: 'center',
+                    caption: '',
+                    altText: '',
+                    galleryStyle: null,
+                    enableLightbox: false,
+                    lightboxStyle: 'default',
+                    lightboxGroup: '',
+                    // Override settings
+                    showCaptions: undefined,
+                    randomize: undefined,
+                    autoPlay: undefined,
+                    autoPlayInterval: undefined
+                });
             }
         }
 
@@ -247,45 +233,26 @@ const MediaInsertModal = ({
 
     // When media is selected from browser
     const handleMediaSelect = (media) => {
-        if (isFieldMode) {
-            // Field mode: handle selection differently based on multiple setting
-            if (multiple) {
-                // Toggle selection for multiple mode
-                const isSelected = selectedMediaItems.some(item => item.id === media.id);
-                if (isSelected) {
-                    setSelectedMediaItems(prev => prev.filter(item => item.id !== media.id));
-                } else {
-                    setSelectedMediaItems(prev => [...prev, media]);
-                }
-            } else {
-                // Single selection: select and call onSelect immediately
-                if (onSelect) {
-                    onSelect(media);
-                }
-                onClose();
-            }
-        } else {
-            // Insert or Edit mode: proceed to configuration step
-            setSelectedMedia(media);
+        // Insert or Edit mode: proceed to configuration step
+        setSelectedMedia(media);
 
-            // Determine media type based on selection
-            const type = media.files ? 'collection' : 'image';
-            setMediaType(type);
+        // Determine media type based on selection
+        const type = media.files ? 'collection' : 'image';
+        setMediaType(type);
 
-            // Set default caption and altText to media title (only in insert mode or if empty)
-            if (isInsertMode || !config.caption) {
-                setConfig(prev => ({
-                    ...prev,
-                    caption: media.title || '',
-                    altText: media.title || ''
-                }));
-            }
-
-            // Move to configure step and clear changing state
-            setStep('configure');
-            setIsChangingMedia(false);
-            setErrorMessage(null);
+        // Set default caption and altText to media title (only in insert mode or if empty)
+        if (isInsertMode || !config.caption) {
+            setConfig(prev => ({
+                ...prev,
+                caption: media.title || '',
+                altText: media.title || ''
+            }));
         }
+
+        // Move to configure step and clear changing state
+        setStep('configure');
+        setIsChangingMedia(false);
+        setErrorMessage(null);
     };
 
     const handleConfigChange = (field, value) => {
@@ -296,23 +263,16 @@ const MediaInsertModal = ({
     };
 
     const handleInsert = () => {
-        if (isFieldMode) {
-            // Field mode with multiple selection
-            if (multiple && onSelect) {
-                onSelect(selectedMediaItems);
-            }
-        } else {
-            // Insert mode
-            if (!selectedMedia) return;
+        // Insert mode
+        if (!selectedMedia) return;
 
-            if (onInsert) {
-                onInsert({
-                    mediaData: selectedMedia,
-                    mediaType: mediaType,
-                    mediaId: selectedMedia.id,
-                    ...config
-                });
-            }
+        if (onInsert) {
+            onInsert({
+                mediaData: selectedMedia,
+                mediaType: mediaType,
+                mediaId: selectedMedia.id,
+                ...config
+            });
         }
 
         onClose();
@@ -396,25 +356,20 @@ const MediaInsertModal = ({
 
     if (!isOpen) return null;
 
-    // Determine modal size based on mode
-    const modalSizeClass = isFieldMode
-        ? 'w-[90vw] h-[90vh]'
-        : 'w-full max-w-6xl max-h-[90vh]';
-
-    const modalContent = (
+    return (
         <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black/50">
-            <div className={`bg-white rounded-lg shadow-xl flex flex-col ${modalSizeClass}`}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center gap-3">
                         <ImageIcon className="w-6 h-6 text-blue-600" />
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-900">
-                                {step === 'select'
-                                    ? (isChangingMedia ? 'Change Media' : 'Select Media')
-                                    : (isEditMode ? 'Edit Media' : 'Configure Media Insert')
-                                }
-                            </h2>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            {step === 'select'
+                                ? (isChangingMedia ? 'Change Media' : 'Select Media')
+                                : (isEditMode ? 'Edit Media' : 'Configure Media Insert')
+                            }
+                        </h2>
                             {step === 'configure' && selectedMedia && (
                                 <p className="text-sm text-gray-600 mt-1">
                                     Selected: {selectedMedia.title || selectedMedia.original_filename}
@@ -451,11 +406,6 @@ const MediaInsertModal = ({
                                     Select a new image or collection to replace the current media.
                                 </p>
                             )}
-                            {isFieldMode && multiple && selectedMediaItems.length > 0 && (
-                                <p className="text-sm text-blue-600 mb-4 font-medium">
-                                    {selectedMediaItems.length} item{selectedMediaItems.length !== 1 ? 's' : ''} selected
-                                </p>
-                            )}
 
                             {/* Tab Toggle - always show Browse and Pending, add Collections if allowed */}
                             <div className="flex gap-2 mb-4 border-b border-gray-200">
@@ -466,19 +416,17 @@ const MediaInsertModal = ({
                                         : 'border-transparent text-gray-600 hover:text-gray-900'
                                         }`}
                                 >
-                                    {multiple ? 'Select Images' : 'Select Image'}
+                                    Select Image
                                 </button>
-                                {allowCollections && (
-                                    <button
-                                        onClick={() => setMediaSelectionType('collection')}
-                                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'collection'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-gray-600 hover:text-gray-900'
-                                            }`}
-                                    >
-                                        Select Collection
-                                    </button>
-                                )}
+                                <button
+                                    onClick={() => setMediaSelectionType('collection')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'collection'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    Select Collection
+                                </button>
                                 <button
                                     onClick={() => setMediaSelectionType('pending')}
                                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'pending'
@@ -552,7 +500,7 @@ const MediaInsertModal = ({
                             ) : (
                                 <MediaBrowser
                                     onFileSelect={handleMediaSelect}
-                                    selectionMode={isFieldMode && multiple ? 'multiple' : 'single'}
+                                    selectionMode="single"
                                     fileTypes={['image']}
                                     namespace={namespace}
                                     showUploader={true}
@@ -761,15 +709,7 @@ const MediaInsertModal = ({
                         >
                             Cancel
                         </button>
-                        {isFieldMode && multiple ? (
-                            <button
-                                onClick={handleInsert}
-                                disabled={selectedMediaItems.length === 0}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
-                            >
-                                Select {selectedMediaItems.length > 0 ? `(${selectedMediaItems.length})` : ''}
-                            </button>
-                        ) : step === 'configure' && isInsertMode ? (
+                        {step === 'configure' && isInsertMode ? (
                             <button
                                 onClick={handleInsert}
                                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
@@ -798,9 +738,6 @@ const MediaInsertModal = ({
             />
         </div>
     );
-
-    // Use portal for field mode to escape parent containers
-    return isFieldMode ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default MediaInsertModal;

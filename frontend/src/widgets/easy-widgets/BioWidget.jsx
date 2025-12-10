@@ -6,13 +6,14 @@
  */
 
 import React, { useRef, useEffect, useCallback, memo, useState } from 'react'
-import { User } from 'lucide-react'
+import { User, ImagePlus } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import OptimizedImage from '../../components/media/OptimizedImage'
+import MediaSelectModal from '../../components/media/MediaSelectModal'
 
 /**
  * Vanilla JS Editor Wrapper Component for Bio Text
@@ -133,6 +134,10 @@ const BioWidget = memo(({
     }
     const componentId = `widget-${widgetId}`
     const contextType = useEditorContext()
+    
+    // State for image edit modal
+    const [showImageModal, setShowImageModal] = useState(false)
+    const [editingField, setEditingField] = useState(null)
 
     useEffect(() => {
         if (!widgetId || !slotName) {
@@ -179,6 +184,24 @@ const BioWidget = memo(({
         }
     }, [componentId, widgetId, slotName, contextType, publishUpdate, widgetPath, nestedParentWidgetId, nestedParentSlotName])
 
+    // Image change handler for quick edit
+    const handleImageChange = useCallback((fieldName, newImage) => {
+        const updatedConfig = { ...configRef.current, [fieldName]: newImage }
+        setConfig(updatedConfig)
+        forceRerender({})
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            config: updatedConfig,
+            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+            slotName: slotName,
+            contextType: contextType,
+            ...(nestedParentWidgetId && {
+                parentWidgetId: nestedParentWidgetId,
+                parentSlotName: nestedParentSlotName
+            })
+        })
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, nestedParentWidgetId, nestedParentSlotName])
+
     const image = configRef.current.image
     const bioText = configRef.current.bioText || ''
     const textLayout = configRef.current.textLayout || 'column'
@@ -188,12 +211,23 @@ const BioWidget = memo(({
     if (mode === 'editor') {
         return (
             <div
-                className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget`}
+                className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget relative group`}
                 {...(anchor && { id: anchor })}
             >
                 <div className="bio-widget__container">
                     {image && (image.url || image.imgproxyBaseUrl || image.fileUrl) && (
-                        <div className="bio-widget__image">
+                        <div className="bio-widget__image relative group/image">
+                            {/* Image edit icon */}
+                            <button
+                                onClick={() => {
+                                    setEditingField('image')
+                                    setShowImageModal(true)
+                                }}
+                                className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
+                                title="Edit bio image"
+                            >
+                                <ImagePlus className="w-5 h-5 text-gray-700" />
+                            </button>
                             <OptimizedImage
                                 src={image.imgproxyBaseUrl || image.fileUrl || image.url}
                                 alt={image.altText || image.alt || ''}
@@ -217,6 +251,32 @@ const BioWidget = memo(({
                         pageId={context?.pageId}
                     />
                 </div>
+                {/* Media Insert Modal */}
+                {showImageModal && (
+                    <MediaSelectModal
+                        isOpen={showImageModal}
+                        onClose={() => {
+                            setShowImageModal(false)
+                            setEditingField(null)
+                        }}
+                        onSelect={(selectedItems) => {
+                            if (selectedItems === null) {
+                                // Handle remove - set to null
+                                handleImageChange(editingField, null)
+                            } else if (selectedItems && selectedItems.length > 0) {
+                                handleImageChange(editingField, selectedItems[0])
+                            }
+                            setShowImageModal(false)
+                            setEditingField(null)
+                        }}
+                        mediaTypes={['image']}
+                        allowCollections={false}
+                        currentSelection={image}
+                        namespace={namespace || context?.namespace}
+                        pageId={context?.pageId}
+                        customTitle="Edit Bio Image"
+                    />
+                )}
             </div>
         )
     }

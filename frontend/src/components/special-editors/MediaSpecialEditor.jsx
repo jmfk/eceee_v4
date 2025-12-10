@@ -995,7 +995,7 @@ const MediaSpecialEditor = ({
                                         <img
                                             src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
                                             alt={image.title}
-                                            className="w-full h-full object-cover"
+                                            className="max-w-full max-h-full object-cover"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center">
@@ -2201,7 +2201,7 @@ const MediaSpecialEditor = ({
                                         <img
                                             src={image.thumbnailUrl || image.imgproxyBaseUrl || image.fileUrl}
                                             alt={image.title}
-                                            className={`w-full h-full ${objectFitClass}`}
+                                            className={`max-w-full max-h-full ${objectFitClass}`}
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center">

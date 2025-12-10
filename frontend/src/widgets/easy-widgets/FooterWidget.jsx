@@ -6,12 +6,14 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Layers } from 'lucide-react';
 import SlotEditor from '../../components/editors/SlotEditor';
 import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure';
+import MediaSelectModal from '../../components/media/MediaSelectModal';
 import PropTypes from 'prop-types';
 
 const FooterWidget = ({
@@ -58,6 +60,10 @@ const FooterWidget = ({
     // Background image state
     const [backgroundUrl, setBackgroundUrl] = useState('');
     const [imageLoading, setImageLoading] = useState(false);
+    
+    // State for image edit modal
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [editingField, setEditingField] = useState(null);
 
     // Sync slotsData when config.slots changes externally
     React.useEffect(() => {
@@ -94,6 +100,18 @@ const FooterWidget = ({
 
         loadBackgroundImage();
     }, [config.backgroundImage]);
+
+    // Image change handler for quick edit
+    const handleImageChange = useCallback((fieldName, newImage) => {
+        const updatedConfig = { ...config, [fieldName]: newImage };
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            config: updatedConfig,
+            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+            slotName: slotName,
+            contextType: contextType
+        });
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, config]);
 
     // Handle slot changes - update local state first, then publish to UDC
     const handleSlotChange = useCallback(async (slotName, widgets) => {
@@ -196,7 +214,18 @@ const FooterWidget = ({
         const widgets = slotsData.content || [];
 
         return (
-            <div className="footer-widget border border-gray-200 mb-4" style={footerStyle}>
+            <div className="footer-widget border border-gray-200 mb-4 relative group" style={footerStyle}>
+                {/* Background image edit icon */}
+                <button
+                    onClick={() => {
+                        setEditingField('backgroundImage');
+                        setShowImageModal(true);
+                    }}
+                    className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    title="Edit background image"
+                >
+                    <Layers className="w-5 h-5 text-gray-700" />
+                </button>
                 <div className="p-1">
                     <SlotEditor
                         slotName="content"
@@ -228,6 +257,32 @@ const FooterWidget = ({
                         compactAddButton={true}
                     />
                 </div>
+                {/* Media Insert Modal */}
+                {showImageModal && (
+                    <MediaSelectModal
+                        isOpen={showImageModal}
+                        onClose={() => {
+                            setShowImageModal(false);
+                            setEditingField(null);
+                        }}
+                        onSelect={(selectedItems) => {
+                            if (selectedItems === null) {
+                                // Handle remove - set to null
+                                handleImageChange(editingField, null);
+                            } else if (selectedItems && selectedItems.length > 0) {
+                                handleImageChange(editingField, selectedItems[0]);
+                            }
+                            setShowImageModal(false);
+                            setEditingField(null);
+                        }}
+                        mediaTypes={['image']}
+                        allowCollections={false}
+                        currentSelection={backgroundImage}
+                        namespace={context?.namespace}
+                        pageId={context?.pageId}
+                        customTitle="Edit Footer Background Image"
+                    />
+                )}
             </div>
         );
     }

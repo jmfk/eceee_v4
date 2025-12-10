@@ -10,6 +10,7 @@ export const MainLayout = ({
     onWidgetAction,
     editable = true,
     pageContext = {},
+    namespace,
     onShowWidgetModal,
     onClearSlot,
     onImportContent,
@@ -42,6 +43,7 @@ export const MainLayout = ({
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
+                        namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
                         onImportContent={onImportContent}
@@ -74,6 +76,7 @@ export const MainLayout = ({
                     onWidgetAction={onWidgetAction}
                     editable={editable}
                     pageContext={pageContext}
+                    namespace={namespace}
                     onShowWidgetModal={onShowWidgetModal}
                     onClearSlot={onClearSlot}
                     onImportContent={onImportContent}
@@ -105,6 +108,7 @@ export const MainLayout = ({
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
+                        namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
                         onImportContent={onImportContent}
@@ -139,6 +143,7 @@ export const MainLayout = ({
                             onWidgetAction={onWidgetAction}
                             editable={editable}
                             pageContext={pageContext}
+                            namespace={namespace}
                             onShowWidgetModal={onShowWidgetModal}
                             onClearSlot={onClearSlot}
                             onImportContent={onImportContent}
@@ -172,6 +177,7 @@ export const MainLayout = ({
                             onWidgetAction={onWidgetAction}
                             editable={editable}
                             pageContext={pageContext}
+                            namespace={namespace}
                             onShowWidgetModal={onShowWidgetModal}
                             onClearSlot={onClearSlot}
                             onImportContent={onImportContent}
@@ -207,6 +213,7 @@ export const MainLayout = ({
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
+                        namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
                         onImportContent={onImportContent}

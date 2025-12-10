@@ -1964,6 +1964,7 @@ const PageEditor = () => {
                                                     layoutJson={layoutData}
                                                     editable={true}
                                                     onOpenWidgetEditor={handleOpenWidgetEditor}
+                                                    namespace={namespace}
                                                     // PageEditor-specific props
                                                     currentVersion={currentVersion}
                                                     availableVersions={availableVersions}
@@ -1985,7 +1986,8 @@ const PageEditor = () => {
                                                     // Editor context
                                                     context={{
                                                         pageId: webpageData?.id,
-                                                        mode: 'edit'
+                                                        mode: 'edit',
+                                                        namespace: namespace
                                                     }}
                                                 />
                                             </div>
@@ -2008,8 +2010,10 @@ const PageEditor = () => {
                                 context={{
                                     pageId: webpageData?.id || pageId,
                                     versionId: pageVersionData?.id || versionId,
-                                    contextType: 'page'
+                                    contextType: 'page',
+                                    namespace: namespace
                                 }}
+                                namespace={namespace}
                                 sharedComponentId={componentId}
                                 publishWidgetOperation={publishWidgetOperation}
                                 inheritedWidgets={inheritedWidgets}

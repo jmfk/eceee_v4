@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { FileText } from 'lucide-react'
+import { FileText, ImagePlus } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -10,6 +10,7 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import OptimizedImage from '../../components/media/OptimizedImage'
+import MediaSelectModal from '../../components/media/MediaSelectModal'
 
 /**
  * EASY Content Card Widget Component
@@ -21,8 +22,9 @@ const ContentCardWidget = ({
     widgetId = null,
     slotName = null,
     onConfigChange = null,
-    context,
-    widgetPath = []
+    context = {},
+    widgetPath = [],
+    namespace = null
 }) => {
     const pageId = context?.pageId
 
@@ -52,6 +54,10 @@ const ContentCardWidget = ({
     // State for optimized image URLs
     const [image1Url, setImage1Url] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
+    
+    // State for image edit modal
+    const [showImageModal, setShowImageModal] = useState(false)
+    const [editingField, setEditingField] = useState(null)
 
     // Initialize from UDC state on mount
     useEffect(() => {
@@ -170,6 +176,23 @@ const ContentCardWidget = ({
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
+        }
+    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+
+    // Image change handler for quick edit
+    const handleImageChange = useCallback((fieldName, newImage) => {
+        const updatedConfig = { ...configRef.current, [fieldName]: newImage }
+        setConfig(updatedConfig)
+        forceRerender({})
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            config: updatedConfig,
+            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+            slotName: slotName,
+            contextType: contextType
+        })
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
         }
     }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
 
@@ -314,7 +337,7 @@ const ContentCardWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content"
+                    className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content relative group"
                     id={configRef.current.anchor || undefined}
                     style={{ height: '310px', marginBottom: '40px' }}
                 >
@@ -324,7 +347,18 @@ const ContentCardWidget = ({
                         <div className="content-card-text content" ref={contentContainerRef} />
 
                         {image1 && (
-                            <div className="content-card-images image">
+                            <div className="content-card-images image relative group/image">
+                                {/* Image edit icon */}
+                                <button
+                                    onClick={() => {
+                                        setEditingField('image1')
+                                        setShowImageModal(true)
+                                    }}
+                                    className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
+                                    title="Edit card image"
+                                >
+                                    <ImagePlus className="w-5 h-5 text-gray-700" />
+                                </button>
                                 <OptimizedImage
                                     src={image1.imgproxyBaseUrl || image1.fileUrl || image1.url}
                                     alt={image1.alt || image1.altText || ''}
@@ -337,6 +371,32 @@ const ContentCardWidget = ({
                             </div>
                         )}
                     </div>
+                    {/* Media Insert Modal */}
+                    {showImageModal && (
+                        <MediaSelectModal
+                            isOpen={showImageModal}
+                            onClose={() => {
+                                setShowImageModal(false)
+                                setEditingField(null)
+                            }}
+                            onSelect={(selectedItems) => {
+                                if (selectedItems === null) {
+                                    // Handle remove - set to null
+                                    handleImageChange(editingField, null)
+                                } else if (selectedItems && selectedItems.length > 0) {
+                                    handleImageChange(editingField, selectedItems[0])
+                                }
+                                setShowImageModal(false)
+                                setEditingField(null)
+                            }}
+                            mediaTypes={['image']}
+                            allowCollections={false}
+                            currentSelection={image1}
+                            namespace={namespace || context?.namespace}
+                            pageId={pageId}
+                            customTitle="Edit Card Image"
+                        />
+                    )}
                 </div>
             )
         }

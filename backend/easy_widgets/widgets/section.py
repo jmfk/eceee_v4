@@ -222,9 +222,7 @@ class SectionWidget(BaseWidget):
         margin-bottom: 0;
     }    
     .section-header {
-        padding: 1rem;
-        font-weight: 600;
-        font-size: 1.25rem;
+        padding: 30px;
         user-select: none;
     }
     

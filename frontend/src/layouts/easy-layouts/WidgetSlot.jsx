@@ -25,6 +25,7 @@ const WidgetSlot = ({
     onWidgetAction,
     editable = true,
     pageContext = {},
+    namespace,
     // Simplified prop structure - behavior only (no styling)
     behavior = {},
     // Legacy props for backward compatibility
@@ -315,6 +316,7 @@ const WidgetSlot = ({
                         onVersionChange={pageContext?.onVersionChange}
                         onPublishingAction={pageContext?.onPublishingAction}
                         onOpenWidgetEditor={pageContext?.onOpenWidgetEditor}
+                        namespace={namespace}
                         // Context props for widgets
                         parentComponentId={pageContext?.parentComponentId}
                         contextType={pageContext?.contextType}

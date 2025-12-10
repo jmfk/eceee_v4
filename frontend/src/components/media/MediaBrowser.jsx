@@ -120,7 +120,6 @@ const MediaBrowser = ({
 
     // Load files
     const loadFiles = useCallback(async (resetPage = false, customPage = null, customPageSize = null) => {
-
         setLoading(true);
 
         try {
@@ -189,7 +188,6 @@ const MediaBrowser = ({
 
     // Load files on mount and when dependencies change
     useEffect(() => {
-
         if (namespace) {
             loadFiles(true);
         }

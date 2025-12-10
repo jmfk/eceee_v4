@@ -22,6 +22,7 @@ const ReactLayoutRenderer = forwardRef(({
     widgets = {},
     onWidgetChange,
     editable = true,
+    namespace,
     // PageEditor-specific props
     currentVersion,
     webpageData,
@@ -1337,6 +1338,7 @@ const ReactLayoutRenderer = forwardRef(({
                 onWidgetAction={handleWidgetAction}
                 editable={editable}
                 pageContext={pageContext}
+                namespace={namespace}
                 onShowWidgetModal={handleShowWidgetModal}
                 onImportContent={handleImportContent}
                 onClearSlot={handleClearSlot}

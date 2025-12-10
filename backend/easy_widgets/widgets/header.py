@@ -27,6 +27,8 @@ class HeaderConfig(BaseModel):
             "order": 1,
             "mediaTypes": ["image"],
             "group": "mobile",
+            "allowCollections": False,
+            "multiple": False,
         },
     )
 
@@ -78,6 +80,8 @@ class HeaderConfig(BaseModel):
             "order": 5,
             "mediaTypes": ["image"],
             "group": "tablet",
+            "allowCollections": False,
+            "multiple": False,
         },
     )
 
@@ -234,8 +238,8 @@ class HeaderWidget(BaseWidget):
 
         # Prepare context with rendered header as content
         context = prepare_component_context(
-            content=header_html, 
-            anchor="", 
+            content=header_html,
+            anchor="",
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
         )
