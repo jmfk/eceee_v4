@@ -62,9 +62,9 @@ class BannerConfig(BaseModel):
             "conditionalOn": {"bannerMode": ["text"]},
         },
     )
-    image_1: Optional[str] = Field(
+    image_1: Optional[dict] = Field(
         None,
-        description="Image URL",
+        description="MediaFile object for image",
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
@@ -73,9 +73,9 @@ class BannerConfig(BaseModel):
             "conditionalOn": {"bannerMode": ["text"]},
         },
     )
-    background_image: Optional[str] = Field(
+    background_image: Optional[dict] = Field(
         None,
-        description="Background image (cover)",
+        description="MediaFile object for background image (cover)",
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
@@ -399,9 +399,25 @@ class BannerWidget(BaseWidget):
         template_config["image_size"] = config.get("image_size", "square")
         template_config["component_style"] = config.get("component_style", "default")
         template_config["show_border"] = config.get("show_border", True)
-        template_config["background_image"] = config.get("background_image")
+        
+        # Handle background_image (now a dict MediaFile object)
+        background_image = config.get("background_image")
+        if background_image and isinstance(background_image, dict):
+            # Extract URL from MediaFile object
+            bg_url = background_image.get("imgproxy_base_url") or background_image.get("file_url")
+            template_config["background_image_url"] = bg_url
+        else:
+            template_config["background_image_url"] = None
+        template_config["background_image"] = background_image
 
-        # Get image field for template (only for text mode)
-        template_config["image_1"] = config.get("image_1")
+        # Handle image_1 (now a dict MediaFile object, only for text mode)
+        image_1 = config.get("image_1")
+        if image_1 and isinstance(image_1, dict):
+            # Extract URL from MediaFile object
+            image_url = image_1.get("imgproxy_base_url") or image_1.get("file_url")
+            template_config["image_1_url"] = image_url
+        else:
+            template_config["image_1_url"] = None
+        template_config["image_1"] = image_1
 
         return template_config

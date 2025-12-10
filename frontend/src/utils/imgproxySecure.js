@@ -267,10 +267,25 @@ export async function getResponsiveImgproxyUrls(sourceUrlOrImage, config = {}) {
 export async function getImgproxyUrlFromImage(imageObj, options = {}) {
     if (!imageObj) return '';
 
-    // Extract source URL from image object (camelCase for JS)
-    const sourceUrl = imageObj.imgproxyBaseUrl || imageObj.fileUrl;
+    // Try camelCase first (from API via djangorestframework-camel-case)
+    let sourceUrl = imageObj.imgproxyBaseUrl || imageObj.fileUrl;
+    
+    // Fallback to snake_case (for any legacy data or direct DB access)
     if (!sourceUrl) {
-        console.warn('getImgproxyUrlFromImage: No valid URL in image object');
+        sourceUrl = imageObj.imgproxy_base_url || imageObj.file_url;
+    }
+    
+    if (!sourceUrl) {
+        console.error('getImgproxyUrlFromImage: No valid URL in image object', {
+            imageObject: imageObj,
+            hasImgproxyBaseUrl: !!imageObj.imgproxyBaseUrl,
+            hasImgproxy_base_url: !!imageObj.imgproxy_base_url,
+            hasFileUrl: !!imageObj.fileUrl,
+            hasFile_url: !!imageObj.file_url,
+            availableKeys: Object.keys(imageObj),
+            imageObjType: typeof imageObj,
+            isDict: imageObj && typeof imageObj === 'object' && !Array.isArray(imageObj)
+        });
         return '';
     }
 

@@ -19,9 +19,9 @@ class HeaderConfig(BaseModel):
     )
 
     # Mobile settings (grouped)
-    mobile_image: Optional[str] = Field(
+    mobile_image: Optional[dict] = Field(
         None,
-        description="Header image for mobile",
+        description="MediaFile object for mobile header image",
         json_schema_extra={
             "component": "ImageInput",
             "order": 1,
@@ -72,9 +72,9 @@ class HeaderConfig(BaseModel):
     )
 
     # Tablet settings (grouped)
-    tablet_image: Optional[str] = Field(
+    tablet_image: Optional[dict] = Field(
         None,
-        description="Header image for tablet",
+        description="MediaFile object for tablet header image",
         json_schema_extra={
             "component": "ImageInput",
             "order": 5,
@@ -125,9 +125,9 @@ class HeaderConfig(BaseModel):
     )
 
     # Desktop settings (grouped)
-    image: Optional[str] = Field(
+    image: Optional[dict] = Field(
         None,
-        description="Header image for desktop",
+        description="MediaFile object for desktop header image",
         json_schema_extra={
             "component": "ImageInput",
             "order": 9,

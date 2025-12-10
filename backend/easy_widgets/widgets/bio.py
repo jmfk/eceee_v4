@@ -40,9 +40,9 @@ class BioConfig(BaseModel):
         populate_by_name=True,
     )
 
-    image: Optional[BioMediaItem] = Field(
+    image: Optional[dict] = Field(
         None,
-        description="Image for bio",
+        description="MediaFile object for bio image",
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
@@ -230,8 +230,15 @@ class BioWidget(BaseWidget):
         template_config["text_layout"] = config.get("text_layout", "column")
         template_config["use_content_margins"] = config.get("use_content_margins", False)
 
-        # Handle image - pass through directly to preserve imgproxy_base_url
-        template_config["image"] = config.get("image")
+        # Handle image (now a dict MediaFile object)
+        image = config.get("image")
+        if image and isinstance(image, dict):
+            # Extract URL from MediaFile object
+            image_url = image.get("imgproxy_base_url") or image.get("file_url")
+            template_config["image_url"] = image_url
+        else:
+            template_config["image_url"] = None
+        template_config["image"] = image
 
         # Add caption
         template_config["caption"] = config.get("caption", "")

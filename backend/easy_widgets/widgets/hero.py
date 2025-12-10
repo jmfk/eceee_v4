@@ -50,9 +50,9 @@ class HeroConfig(BaseModel):
         },
     )
 
-    image: Optional[str] = Field(
+    image: Optional[dict] = Field(
         None,
-        description="Background or featured image",
+        description="MediaFile object for background or featured image",
         json_schema_extra={
             "component": "ImageInput",
             "order": 4,

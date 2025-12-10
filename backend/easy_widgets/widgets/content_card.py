@@ -51,9 +51,9 @@ class ContentCardConfig(BaseModel):
             "group": "Layout",
         },
     )
-    image1: Optional[str] = Field(
+    image1: Optional[dict] = Field(
         None,
-        description="Image URL",
+        description="MediaFile object for image",
         json_schema_extra={
             "component": "ImageInput",
             "mediaTypes": ["image"],
@@ -310,7 +310,15 @@ class ContentCardWidget(BaseWidget):
         template_config["component_style"] = config.get("component_style", "default")
         template_config["show_border"] = config.get("show_border", True)
 
-        # Get image field for template
-        template_config["image_1"] = config.get("image_1")
+        # Handle image1 (now a dict MediaFile object)
+        image1 = config.get("image1")
+        if image1 and isinstance(image1, dict):
+            # Extract URL from MediaFile object
+            image_url = image1.get("imgproxy_base_url") or image1.get("file_url")
+            template_config["image1_url"] = image_url
+        else:
+            template_config["image1_url"] = None
+        template_config["image_1"] = image1
+        template_config["image1"] = image1
 
         return template_config

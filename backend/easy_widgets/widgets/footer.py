@@ -26,9 +26,9 @@ class FooterConfig(BaseModel):
             "group": "Styling",
         },
     )
-    background_image: Optional[str] = Field(
+    background_image: Optional[dict] = Field(
         None,
-        description="Background image URL",
+        description="MediaFile object for background image",
         json_schema_extra={
             "component": "ImageInput",
             "order": 2,
