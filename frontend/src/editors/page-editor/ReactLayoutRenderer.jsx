@@ -80,17 +80,17 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Widget selection state: Set<widgetPath> where widgetPath = "slotName/widgetId" or "slotName/containerId/nestedSlot/nestedWidgetId"
     const [selectedWidgets, setSelectedWidgets] = useState(() => new Set());
-    
+
     // Cut widgets state: tracks widgets that have been cut (waiting for paste)
     // Set<widgetPath>
     const [cutWidgets, setCutWidgets] = useState(() => new Set());
-    
+
     // Toolbar collapse state
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
-    
+
     // Get global clipboard state
     const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard();
-    
+
     // Helper: Build widget path string from slotName and widgetId (and optional nested path)
     const buildWidgetPath = useCallback((slotName, widgetId, nestedPath = null) => {
         if (nestedPath) {
@@ -98,7 +98,7 @@ const ReactLayoutRenderer = forwardRef(({
         }
         return `${slotName}/${widgetId}`;
     }, []);
-    
+
     // Helper: Parse widget path to extract components
     const parseWidgetPath = useCallback((widgetPath) => {
         const parts = widgetPath.split('/');
@@ -315,10 +315,10 @@ const ReactLayoutRenderer = forwardRef(({
 
                 // Start with current widgets state
                 let updatedWidgets = { ...widgets };
-                
+
                 // Store pasted widget ID to ensure we don't accidentally delete it
                 const pastedWidgetId = pastedWidget.id;
-                
+
                 // Add the pasted widget FIRST to ensure correct insert position
                 const slotWidgetsPaste = [...(updatedWidgets[slotName] || [])];
                 slotWidgetsPaste.splice(insertPosition, 0, pastedWidget);
@@ -328,27 +328,27 @@ const ReactLayoutRenderer = forwardRef(({
                 // The pasted widget has a new ID, so it won't be deleted
                 if (clipboardMetadata && clipboardMetadata.operation === 'cut' && clipboardMetadata.metadata) {
                     const cutMetadata = clipboardMetadata.metadata;
-                    
+
                     // Check if this is a cross-page cut/paste operation
                     const sourcePageId = cutMetadata.pageId;
                     const currentPageId = context?.pageId || webpageData?.id;
                     const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
-                    
+
                     if (!isCrossPage) {
                         // For same-page operations, remove widgets from updatedWidgets
                         let widgetsDeleted = false;
-                        
+
                         // Handle new format with widget paths
                         if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
                             for (const widgetPath of cutMetadata.widgetPaths) {
                                 const parsed = parseWidgetPath(widgetPath);
                                 if (!parsed) continue;
-                                
+
                                 if (!parsed.isNested) {
                                     // Top-level widget - remove from the slot
                                     if (updatedWidgets[parsed.slotName]) {
                                         const originalLength = updatedWidgets[parsed.slotName].length;
-                                        
+
                                         // Filter out the widget to delete, but keep the pasted widget if it's in the same slot
                                         // Use String() to ensure type matching and also check both string and number formats
                                         updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(
@@ -360,9 +360,9 @@ const ReactLayoutRenderer = forwardRef(({
                                                 return widgetIdStr !== parsedIdStr && widgetIdStr !== pastedIdStr;
                                             }
                                         );
-                                        
+
                                         const removed = originalLength - updatedWidgets[parsed.slotName].length;
-                                        
+
                                         if (removed > 0) {
                                             widgetsDeleted = true;
                                             // Publish UDC operation
@@ -381,11 +381,11 @@ const ReactLayoutRenderer = forwardRef(({
                                         if (containerWidget && containerWidget.config && containerWidget.config.slots) {
                                             const nestedSlotWidgets = containerWidget.config.slots[parsed.nestedSlot] || [];
                                             const originalLength = nestedSlotWidgets.length;
-                                            
+
                                             containerWidget.config.slots[parsed.nestedSlot] = nestedSlotWidgets.filter(
                                                 w => w && String(w.id) !== String(parsed.nestedWidgetId)
                                             );
-                                            
+
                                             const removed = originalLength - containerWidget.config.slots[parsed.nestedSlot].length;
                                             if (removed > 0) {
                                                 widgetsDeleted = true;
@@ -393,7 +393,7 @@ const ReactLayoutRenderer = forwardRef(({
                                                 updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].map(w =>
                                                     String(w.id) === String(parsed.containerId) ? containerWidget : w
                                                 );
-                                                
+
                                                 // Publish UDC operation
                                                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                                                     id: parsed.containerId,
@@ -410,7 +410,7 @@ const ReactLayoutRenderer = forwardRef(({
                             // Handle backward-compatible format (old format)
                             for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
                                 const keyParts = key.split('/');
-                                
+
                                 if (keyParts.length === 3) {
                                     // Nested widget
                                     const [slotName, containerId, nestedSlot] = keyParts;
@@ -419,7 +419,7 @@ const ReactLayoutRenderer = forwardRef(({
                                         if (containerWidget && containerWidget.config && containerWidget.config.slots) {
                                             const nestedSlotWidgets = containerWidget.config.slots[nestedSlot] || [];
                                             const originalLength = nestedSlotWidgets.length;
-                                            
+
                                             containerWidget.config.slots[nestedSlot] = nestedSlotWidgets.filter(
                                                 w => {
                                                     if (!w) return false;
@@ -428,15 +428,15 @@ const ReactLayoutRenderer = forwardRef(({
                                                     return !widgetIds.map(String).includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
                                                 }
                                             );
-                                            
+
                                             const removed = originalLength - containerWidget.config.slots[nestedSlot].length;
-                                            
+
                                             if (removed > 0) {
                                                 widgetsDeleted = true;
                                                 updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
                                                     String(w.id) === String(containerId) ? containerWidget : w
                                                 );
-                                                
+
                                                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                                                     id: containerId,
                                                     slotName: slotName,
@@ -449,10 +449,10 @@ const ReactLayoutRenderer = forwardRef(({
                                 } else {
                                     // Top-level widget
                                     const slotName = key;
-                                    
+
                                     if (updatedWidgets[slotName]) {
                                         const originalLength = updatedWidgets[slotName].length;
-                                        
+
                                         // Filter out widgets to delete, but keep the pasted widget
                                         // Use String() to ensure type matching
                                         updatedWidgets[slotName] = updatedWidgets[slotName].filter(
@@ -466,9 +466,9 @@ const ReactLayoutRenderer = forwardRef(({
                                                 return !widgetIdsStr.includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
                                             }
                                         );
-                                        
+
                                         const removed = originalLength - updatedWidgets[slotName].length;
-                                        
+
                                         if (removed > 0) {
                                             for (const widgetId of widgetIds) {
                                                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
@@ -481,7 +481,7 @@ const ReactLayoutRenderer = forwardRef(({
                                 }
                             }
                         }
-                        
+
                         // ALWAYS clear cut state and selection after paste (even if deletion didn't work)
                         // This ensures the UI updates correctly
                         setCutWidgets(new Set());
@@ -492,7 +492,7 @@ const ReactLayoutRenderer = forwardRef(({
                             for (const widgetPath of cutMetadata.widgetPaths) {
                                 const parsed = parseWidgetPath(widgetPath);
                                 if (!parsed) continue;
-                                
+
                                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                     id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
                                     contextType: contextType,
@@ -510,7 +510,7 @@ const ReactLayoutRenderer = forwardRef(({
                                 }
                             }
                         }
-                        
+
                         // Clear selection for cross-page operations too
                         setCutWidgets(new Set());
                         setSelectedWidgets(new Set());
@@ -619,7 +619,7 @@ const ReactLayoutRenderer = forwardRef(({
     const selectAllInSlot = useCallback((slotName) => {
         const slotWidgets = widgets[slotName] || [];
         if (slotWidgets.length === 0) return;
-        
+
         setSelectedWidgets(prev => {
             const newSet = new Set(prev);
             slotWidgets.forEach(widget => {
@@ -652,13 +652,13 @@ const ReactLayoutRenderer = forwardRef(({
     // Get selected widgets - now handles both top-level and nested widgets
     const getSelectedWidgets = useCallback(() => {
         const selected = [];
-        
+
         selectedWidgets.forEach(widgetPath => {
             const parsed = parseWidgetPath(widgetPath);
             if (!parsed) {
                 return;
             }
-            
+
             if (!parsed.isNested) {
                 // Top-level widget
                 const slotWidgets = widgets[parsed.slotName] || [];
@@ -685,7 +685,7 @@ const ReactLayoutRenderer = forwardRef(({
                 }
             }
         });
-        
+
         return selected;
     }, [selectedWidgets, widgets, parseWidgetPath]);
 
@@ -757,7 +757,7 @@ const ReactLayoutRenderer = forwardRef(({
     const handleCopySelected = useCallback(async () => {
         const selected = getSelectedWidgets();
         if (selected.length === 0) return;
-        
+
         const widgetsToCopy = selected.map(item => item.widget);
         await copyWidgetsToClipboard(widgetsToCopy);
         // Immediately refresh clipboard state in current window
@@ -769,16 +769,16 @@ const ReactLayoutRenderer = forwardRef(({
         if (selected.length === 0) {
             return;
         }
-        
+
         const widgetsToCut = selected.map(item => item.widget);
-        
+
         // Build metadata for cut operation (track which widgets to delete using widget paths)
         const cutMetadata = {
             pageId: context?.pageId || webpageData?.id, // Store source pageId for cross-page cut/paste
             widgetPaths: selected.map(item => item.widgetPath),
             widgets: {} // Keep backward compatibility: { slotName: [widgetIds] }
         };
-        
+
         // Build backward-compatible format for top-level widgets
         selected.forEach(({ widget, slotName, nestedSlot, containerWidget }) => {
             if (!nestedSlot) {
@@ -796,7 +796,7 @@ const ReactLayoutRenderer = forwardRef(({
                 cutMetadata.widgets[nestedKey].push(widget.id);
             }
         });
-        
+
         // Mark widgets as cut (visual indicator) - use widget paths
         setCutWidgets(prev => {
             const newSet = new Set(prev);
@@ -805,7 +805,7 @@ const ReactLayoutRenderer = forwardRef(({
             });
             return newSet;
         });
-        
+
         await cutWidgetsToClipboard(widgetsToCut, cutMetadata);
         // Immediately refresh clipboard state in current window
         await refreshClipboard();
@@ -814,12 +814,12 @@ const ReactLayoutRenderer = forwardRef(({
     const handleDeleteCutWidgets = useCallback(async (cutMetadata) => {
         // Delete widgets that were cut and pasted
         // Supports both new format (widgetPaths) and old format (widgets object)
-        
+
         // Check if this is a cross-page cut/paste operation
         const sourcePageId = cutMetadata.pageId;
         const currentPageId = context?.pageId || webpageData?.id;
         const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
-        
+
         // For cross-page operations, we need to publish REMOVE_WIDGET operations to UDC
         // for the source page, not the current page
         if (isCrossPage) {
@@ -828,7 +828,7 @@ const ReactLayoutRenderer = forwardRef(({
                 for (const widgetPath of cutMetadata.widgetPaths) {
                     const parsed = parseWidgetPath(widgetPath);
                     if (!parsed) continue;
-                    
+
                     // Publish to UDC for the source page
                     await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                         id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
@@ -850,17 +850,17 @@ const ReactLayoutRenderer = forwardRef(({
             }
             return; // Don't update local widgets for cross-page operations
         }
-        
+
         // For same-page operations, update local widgets
         const updatedWidgets = { ...widgets };
         let hasChanges = false;
-        
+
         // Handle new format with widget paths
         if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
             for (const widgetPath of cutMetadata.widgetPaths) {
                 const parsed = parseWidgetPath(widgetPath);
                 if (!parsed) continue;
-                
+
                 if (!parsed.isNested) {
                     // Top-level widget
                     if (updatedWidgets[parsed.slotName]) {
@@ -868,7 +868,7 @@ const ReactLayoutRenderer = forwardRef(({
                         updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(
                             widget => widget.id !== parsed.widgetId
                         );
-                        
+
                         if (updatedWidgets[parsed.slotName].length !== originalLength) {
                             hasChanges = true;
                             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
@@ -886,20 +886,20 @@ const ReactLayoutRenderer = forwardRef(({
                         if (containerWidget && containerWidget.config && containerWidget.config.slots) {
                             const nestedSlotWidgets = containerWidget.config.slots[parsed.nestedSlot] || [];
                             const originalLength = nestedSlotWidgets.length;
-                            
+
                             containerWidget.config.slots[parsed.nestedSlot] = nestedSlotWidgets.filter(
                                 w => w && String(w.id) !== String(parsed.nestedWidgetId)
                             );
-                            
+
                             const removed = originalLength - containerWidget.config.slots[parsed.nestedSlot].length;
-                            
+
                             if (removed > 0) {
                                 hasChanges = true;
                                 // Update the container widget
                                 updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].map(w =>
                                     String(w.id) === String(parsed.containerId) ? containerWidget : w
                                 );
-                                
+
                                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                                     id: parsed.containerId,
                                     slotName: parsed.slotName,
@@ -912,13 +912,13 @@ const ReactLayoutRenderer = forwardRef(({
                 }
             }
         }
-        
+
         // Handle backward-compatible format (old format)
         if (cutMetadata.widgets && typeof cutMetadata.widgets === 'object') {
             for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
                 // Check if this is a nested key (format: "slotName/containerId/nestedSlot")
                 const keyParts = key.split('/');
-                
+
                 if (keyParts.length === 3) {
                     // Nested widget
                     const [slotName, containerId, nestedSlot] = keyParts;
@@ -927,19 +927,19 @@ const ReactLayoutRenderer = forwardRef(({
                         if (containerWidget && containerWidget.config && containerWidget.config.slots) {
                             const nestedSlotWidgets = containerWidget.config.slots[nestedSlot] || [];
                             const originalLength = nestedSlotWidgets.length;
-                            
+
                             containerWidget.config.slots[nestedSlot] = nestedSlotWidgets.filter(
                                 w => w && !widgetIds.map(String).includes(String(w.id))
                             );
-                            
+
                             const removed = originalLength - containerWidget.config.slots[nestedSlot].length;
-                            
+
                             if (removed > 0) {
                                 hasChanges = true;
                                 updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
                                     String(w.id) === String(containerId) ? containerWidget : w
                                 );
-                                
+
                                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                                     id: containerId,
                                     slotName: slotName,
@@ -957,7 +957,7 @@ const ReactLayoutRenderer = forwardRef(({
                         updatedWidgets[slotName] = updatedWidgets[slotName].filter(
                             widget => !widgetIds.includes(widget.id)
                         );
-                        
+
                         if (updatedWidgets[slotName].length !== originalLength) {
                             hasChanges = true;
                             for (const widgetId of widgetIds) {
@@ -971,11 +971,11 @@ const ReactLayoutRenderer = forwardRef(({
                 }
             }
         }
-        
+
         if (hasChanges && onWidgetChange) {
             onWidgetChange(updatedWidgets, { sourceId: 'cut-operation' });
         }
-        
+
         // Clear cut state and selection
         setCutWidgets(new Set());
         setSelectedWidgets(new Set());
@@ -986,20 +986,20 @@ const ReactLayoutRenderer = forwardRef(({
         if (!clipboardData || !clipboardData.data || clipboardData.data.length === 0) {
             return;
         }
-        
+
         // Get widget(s) from clipboard
         const widgetsToPaste = clipboardData.data;
         const isCut = clipboardData.operation === 'cut';
-        
+
         // Generate new IDs for pasted widgets
         const pastedWidgets = widgetsToPaste.map(w => ({
             ...w,
             id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         }));
-        
+
         // Determine if this is a nested slot paste
         const isNested = widgetPath.length > 0;
-        
+
         if (isNested) {
             // NORMALIZE PATH: Determine if path targets a slot or a widget
             // Path structure: [topSlot, widgetId, nestedSlot, widgetId, nestedSlot, ...]
@@ -1008,29 +1008,29 @@ const ReactLayoutRenderer = forwardRef(({
             const effectivePath = (widgetPath.length % 2 === 0)
                 ? widgetPath.slice(0, -1)  // Strip trailing widgetId
                 : widgetPath;
-            
+
             const topSlotName = effectivePath[0];
-            
+
             // TRAVERSE WITH ANCESTOR TRACKING
             // We need to track { widget, widgetIndex, slotName } for every level to rebuild immutably
             const ancestors = [];
             let currentWidgets = widgets[topSlotName] || [];
             let containerWidget = null;
             let targetSlotName = null;
-            
+
             // Iterate pairs [widgetId, slotName] starting from index 1
             for (let i = 1; i < effectivePath.length; i += 2) {
                 const widgetId = effectivePath[i];
                 const nextSlot = effectivePath[i + 1];
-                
+
                 const widgetIndex = currentWidgets.findIndex(w => String(w.id) === String(widgetId));
                 const widget = currentWidgets[widgetIndex];
-                
+
                 if (!widget) {
                     console.error('[ReactLayoutRenderer] Container widget not found in path', widgetId);
                     return;
                 }
-                
+
                 // Track ancestor info needed for rebuilding
                 ancestors.push({
                     widget,
@@ -1038,7 +1038,7 @@ const ReactLayoutRenderer = forwardRef(({
                     slotName: i === 1 ? topSlotName : effectivePath[i - 1],
                     currentWidgets
                 });
-                
+
                 if (i + 2 >= effectivePath.length) {
                     // This is the innermost container
                     containerWidget = widget;
@@ -1048,17 +1048,17 @@ const ReactLayoutRenderer = forwardRef(({
                     currentWidgets = widget.config?.slots?.[nextSlot] || [];
                 }
             }
-            
+
             if (!containerWidget || !targetSlotName) {
                 console.error('[ReactLayoutRenderer] Could not find container or target slot');
                 return;
             }
-            
+
             // UPDATE INNERMOST CONTAINER
             const nestedSlotWidgets = containerWidget.config?.slots?.[targetSlotName] || [];
             const updatedNestedWidgets = [...nestedSlotWidgets];
             updatedNestedWidgets.splice(position, 0, ...pastedWidgets);
-            
+
             let updatedChild = {
                 ...containerWidget,
                 config: {
@@ -1069,13 +1069,13 @@ const ReactLayoutRenderer = forwardRef(({
                     }
                 }
             };
-            
+
             // REBUILD ANCESTORS BOTTOM-UP
             // Start from the innermost container (last ancestor) and work up
             // The last ancestor IS the container we just updated
             for (let i = ancestors.length - 1; i >= 0; i--) {
                 const ancestor = ancestors[i];
-                
+
                 if (i === ancestors.length - 1) {
                     // This is the container we modified - use updatedChild
                     // Replace in its parent's widget array
@@ -1120,23 +1120,23 @@ const ReactLayoutRenderer = forwardRef(({
                     }
                 }
             }
-            
+
             // Update top-level slot with the rebuilt ancestor chain
             const topLevelWidgets = widgets[topSlotName] || [];
             const firstAncestor = ancestors[0];
             const updatedTopLevelWidgets = topLevelWidgets.map((w, idx) =>
                 idx === firstAncestor.widgetIndex ? updatedChild : w
             );
-            
+
             const updatedWidgets = {
                 ...widgets,
                 [topSlotName]: updatedTopLevelWidgets
             };
-            
+
             if (onWidgetChange) {
                 onWidgetChange(updatedWidgets);
             }
-            
+
             // Publish update for the topmost container that was modified
             await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: firstAncestor.widget.id,
@@ -1147,19 +1147,19 @@ const ReactLayoutRenderer = forwardRef(({
         } else {
             // Top-level slot paste
             const slotWidgets = [...(widgets[slotName] || [])];
-            
+
             // Insert pasted widgets at position (IDs already generated above)
             slotWidgets.splice(position, 0, ...pastedWidgets);
-            
+
             const updatedWidgets = {
                 ...widgets,
                 [slotName]: slotWidgets
             };
-            
+
             if (onWidgetChange) {
                 onWidgetChange(updatedWidgets);
             }
-            
+
             // Publish ADD_WIDGET operations for each pasted widget
             for (let i = 0; i < pastedWidgets.length; i++) {
                 const widget = pastedWidgets[i];
@@ -1173,12 +1173,12 @@ const ReactLayoutRenderer = forwardRef(({
                 });
             }
         }
-        
+
         // Handle cut operation - delete from source
         if (isCut && clipboardData.metadata) {
             await handleDeleteCutWidgets(clipboardData.metadata);
         }
-        
+
         // Clear clipboard after paste unless shift key was held (or it's a cut operation - always clear for cut)
         if (!keepClipboard || isCut) {
             await clearClipboardState();
@@ -1236,7 +1236,7 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Calculate selected count for toolbar
     const selectedCount = getSelectedCount();
-    
+
     // ESC and right-click handlers to pause paste mode
     useEffect(() => {
         const handleEscape = (e) => {
@@ -1245,7 +1245,7 @@ const ReactLayoutRenderer = forwardRef(({
                 togglePasteMode();
             }
         };
-        
+
         const handleContextMenu = (e) => {
             if (pasteModeActive && !pasteModePaused) {
                 e.preventDefault();
@@ -1253,16 +1253,16 @@ const ReactLayoutRenderer = forwardRef(({
                 togglePasteMode();
             }
         };
-        
+
         document.addEventListener('keydown', handleEscape);
         document.addEventListener('contextmenu', handleContextMenu);
-        
+
         return () => {
             document.removeEventListener('keydown', handleEscape);
             document.removeEventListener('contextmenu', handleContextMenu);
         };
     }, [pasteModeActive, pasteModePaused, togglePasteMode]);
-    
+
     // Reset toolbar collapse when selection changes
     useEffect(() => {
         if (selectedCount === 0) {
@@ -1273,7 +1273,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Render the layout component
     // Make this div act like an iframe - break out of parent constraints and use full viewport width
     return (
-        <div className="react-layout-renderer w-full h-full relative">
+        <div className="react-layout-renderer w-full h-full relative cms-content">
             {/* Bulk Action Toolbar - Floating */}
             {selectedCount > 0 && (
                 <>

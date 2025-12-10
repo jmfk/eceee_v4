@@ -24,13 +24,13 @@ const getImageUrl = (image) => {
  */
 const processMenuItems = (items) => {
     if (!items || !Array.isArray(items)) return []
-    
+
     return items.map((item, index) => {
         // Check if item has link_data field (new format)
         if (item.linkData || item.link_data) {
             const linkData = item.linkData || item.link_data
             const order = item.order !== undefined ? item.order : index
-            
+
             return {
                 label: linkData.label,
                 url: linkData.url || '',
@@ -40,7 +40,7 @@ const processMenuItems = (items) => {
                 order,
             }
         }
-        
+
         // Old format - direct fields (backwards compatibility)
         return {
             label: item.label,
@@ -59,13 +59,13 @@ const processMenuItems = (items) => {
  */
 const processSecondaryMenuItems = (items) => {
     if (!items || !Array.isArray(items)) return []
-    
+
     return items.map((item, index) => {
         // Check if item has link_data field (new format)
         if (item.linkData || item.link_data) {
             const linkData = item.linkData || item.link_data
             const order = item.order !== undefined ? item.order : index
-            
+
             return {
                 label: linkData.label,
                 url: linkData.url || '',
@@ -78,7 +78,7 @@ const processSecondaryMenuItems = (items) => {
                 order,
             }
         }
-        
+
         // Old format - direct fields (backwards compatibility)
         return {
             label: item.label,
@@ -486,15 +486,6 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                             key={index}
                             className="navbar-menu-item"
                             ref={(el) => (itemRefs.current[index] = el)}
-                            style={{
-                                listStyle: 'none',
-                                fontSize: '14px',
-                                marginTop: '0px',
-                                fontFamily: '"Source Sans 3", sans-serif',
-                                fontWeight: 300,
-                                lineHeight: '22px',
-                                marginBottom: '0px'
-                            }}
                         >
                             {renderMenuItem(item, index, false)}
                         </li>
@@ -562,19 +553,10 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                             const txtColor = formatColorValue(item.textColor, themeColors)
 
                             return (
-                                <li 
-                                    key={index} 
+                                <li
+                                    key={index}
                                     className="navbar-menu-item"
                                     style={{
-                                        listStyle: 'none',
-                                        fontSize: '14px',
-                                        marginTop: '0px',
-                                        fontFamily: '"Source Sans 3", sans-serif',
-                                        fontWeight: 300,
-                                        lineHeight: '22px',
-                                        marginBottom: '0px',
-                                        borderRadius: '4px 4px 0 0',
-                                        padding: '0 12px 3px',
                                         ...(bgColor && { backgroundColor: bgColor }),
                                         ...(txtColor && { color: txtColor }),
                                         ...(itemBgImage && {

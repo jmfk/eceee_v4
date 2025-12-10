@@ -419,7 +419,7 @@ const BannerWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content relative group"
+                    className="banner-widget widget-type-easy-widgets-bannerwidget container relative group"
                     id={configRef.current.anchor || undefined}
                     style={{ position: 'relative', height: '140px', ...bannerStyle }}
                 >
@@ -517,7 +517,7 @@ const BannerWidget = ({
 
         return (
             <div
-                className="banner-widget widget-type-easy-widgets-bannerwidget container cms-content"
+                className="banner-widget widget-type-easy-widgets-bannerwidget container"
                 id={configRef.current.anchor || undefined}
                 style={{ position: 'relative', height: '140px', ...bannerStyle }}
             >

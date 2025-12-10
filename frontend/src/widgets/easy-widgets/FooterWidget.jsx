@@ -292,7 +292,7 @@ const FooterWidget = ({
 
     return (
         <footer
-            className="footer-widget widget-type-easy-widgets-footerwidget cms-content"
+            className="footer-widget widget-type-easy-widgets-footerwidget"
             style={footerStyle}
         >
             {contentWidgets.length > 0 ? (

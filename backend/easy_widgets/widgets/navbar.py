@@ -187,9 +187,9 @@ class NavbarWidget(BaseWidget):
         .navbar-secondary-menu .navbar-menu-item {
             text-align: left;
             width: 140px;
-            padding: 2px 11px 3px;
-            margin-top: 3px;
-            box-shadow: inset -2px -2px 2px rgba(0, 0, 0, 0.2);
+            padding: 2px 11px 2px;
+            margin-top: 2px;
+            box-shadow: inset -1px -1px 1px rgba(0, 0, 0, 0.2);
         }
         .navbar-secondary-menu .navbar-menu-item a {
             border-radius: 0 0 0 0;

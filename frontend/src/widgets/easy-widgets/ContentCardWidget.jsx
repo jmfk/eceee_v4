@@ -337,7 +337,7 @@ const ContentCardWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content relative group"
+                    className="content-card-widget widget-type-easy-widgets-contentcardwidget container relative group"
                     id={configRef.current.anchor || undefined}
                     style={{ height: '310px', marginBottom: '40px' }}
                 >
@@ -403,7 +403,7 @@ const ContentCardWidget = ({
 
         return (
             <div
-                className="content-card-widget widget-type-easy-widgets-contentcardwidget container cms-content"
+                className="content-card-widget widget-type-easy-widgets-contentcardwidget container"
                 id={configRef.current.anchor || undefined}
                 style={{ height: '310px' }}
             >
