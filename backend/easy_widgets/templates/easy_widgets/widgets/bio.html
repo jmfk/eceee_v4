@@ -11,8 +11,8 @@
         {% if config.image %}
         <div class="bio-widget__image">
             <img 
-                src="{% imgproxy config.image width=280 height=140 resize_type='fill' %}"
-                srcset="{% imgproxy config.image width=280 height=140 resize_type='fill' %} 1x, {% imgproxy config.image width=560 height=280 resize_type='fill' %} 2x"
+                src="{% imgproxy config.image width=280 resize_type='fit' %}"
+                srcset="{% imgproxy config.image width=280 resize_type='fit' %} 1x, {% imgproxy config.image width=560 resize_type='fit' %} 2x"
                 alt="{{ config.image.title|default:'' }}"
                 {% if config.image.description %}title="{{ config.caption }}"{% endif %}
                 loading="lazy"

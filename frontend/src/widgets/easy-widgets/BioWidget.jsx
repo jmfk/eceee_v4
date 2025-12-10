@@ -234,6 +234,7 @@ const BioWidget = memo(({
                                 responsive={true}
                                 slotDimensions={slotConfig?.dimensions}
                                 widthMultiplier={textLayout === 'row' ? 0.5 : 1.0}
+                                resizeType="fit"
                                 loading="lazy"
                                 className="w-full h-auto"
                             />
@@ -295,6 +296,7 @@ const BioWidget = memo(({
                             responsive={true}
                             slotDimensions={slotConfig?.dimensions}
                             widthMultiplier={textLayout === 'row' ? 0.5 : 1.0}
+                            resizeType="fit"
                             loading="lazy"
                             className="w-full h-auto"
                         />
