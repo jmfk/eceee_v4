@@ -1,6 +1,6 @@
 {% load static %}
 
-<div class="hero-widget widget-type-{{ widget_type.css_class_name }} cms-content" style="{{ hero_style }}{% if config.background_image_url %} background-image: url('{{ config.background_image_url }}');{% endif %}">
+<div class="hero-widget widget-type-{{ widget_type.css_class_name }} cms-content" style="{{ hero_style }}{% if config.background_image_url_2x %} background-image: image-set(url('{{ config.background_image_url }}') 1x, url('{{ config.background_image_url_2x }}') 2x);{% elif config.background_image_url %} background-image: url('{{ config.background_image_url }}');{% endif %}">
     <div class="hero-content">
         {% if config.before_text %}
             <h5 class="before-text">{{ config.before_text|linebreaksbr }}</h5>

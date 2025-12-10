@@ -346,20 +346,29 @@ class HeroWidget(BaseWidget):
         style_parts.append(f"--hero-decor-color: {decor_color};")
         style_parts.append(f"--hero-bg-color: {background_color};")
 
-        # Process background image if provided
+        # Process background image if provided (1x and 2x)
         image = config.get("image")
         if image:
             imgproxy_base_url = image.get("imgproxy_base_url")
             if imgproxy_base_url:
-                # Generate responsive image URL (large hero size)
-                image_url = imgproxy_service.generate_url(
+                # Generate responsive image URL (large hero size: 1920x1080 @ 1x, 3840x2160 @ 2x)
+                image_url_1x = imgproxy_service.generate_url(
                     source_url=imgproxy_base_url,
                     width=1920,
                     height=1080,
                     resize_type="fill",
                 )
-                if image_url:
-                    template_config["background_image_url"] = image_url
+                image_url_2x = imgproxy_service.generate_url(
+                    source_url=imgproxy_base_url,
+                    width=3840,
+                    height=2160,
+                    resize_type="fill",
+                )
+                if image_url_1x and image_url_2x:
+                    template_config["background_image_url"] = image_url_1x
+                    template_config["background_image_url_2x"] = image_url_2x
+                elif image_url_1x:
+                    template_config["background_image_url"] = image_url_1x
 
         # Join all style parts
         template_config["hero_style"] = " ".join(style_parts)

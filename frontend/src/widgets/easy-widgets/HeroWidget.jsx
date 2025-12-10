@@ -30,8 +30,9 @@ const HeroWidget = ({
         configRef.current = newConfig
     }
 
-    // State for optimized image URL
+    // State for optimized image URL (1x and 2x for retina)
     const [backgroundUrl, setBackgroundUrl] = useState('')
+    const [backgroundUrl2x, setBackgroundUrl2x] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
     
     // State for image edit modal
@@ -93,19 +94,26 @@ const HeroWidget = ({
         const loadImage = async () => {
             if (!image) {
                 setBackgroundUrl('')
+                setBackgroundUrl2x('')
                 return
             }
 
             setImageLoading(true)
 
             try {
-                // Large hero size (1920x1080)
-                const url = await getImgproxyUrlFromImage(image, {
+                // Large hero size (1920x1080 @ 1x, 3840x2160 @ 2x)
+                const url1x = await getImgproxyUrlFromImage(image, {
                     width: 1920,
                     height: 1080,
                     resizeType: 'fill'
                 })
-                setBackgroundUrl(url)
+                const url2x = await getImgproxyUrlFromImage(image, {
+                    width: 3840,
+                    height: 2160,
+                    resizeType: 'fill'
+                })
+                setBackgroundUrl(url1x)
+                setBackgroundUrl2x(url2x)
             } catch (error) {
                 console.error('Failed to load optimized hero image:', error)
             } finally {
@@ -124,7 +132,11 @@ const HeroWidget = ({
         minHeight: '310px',
         maxHeight: '310px',
         flexShrink: 0,
-        ...(image && backgroundUrl ? { backgroundImage: `url('${backgroundUrl}')` } : {})
+        ...(image && backgroundUrl && backgroundUrl2x ? { 
+            backgroundImage: `image-set(url('${backgroundUrl}') 1x, url('${backgroundUrl2x}') 2x)` 
+        } : image && backgroundUrl ? { 
+            backgroundImage: `url('${backgroundUrl}')` 
+        } : {})
     }
 
     // Content change handlers - use configRef for stable references

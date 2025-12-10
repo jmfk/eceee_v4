@@ -9,9 +9,9 @@
 {% endif %}
 
 <div class="banner-widget widget-type-{{ widget_type.css_class_name }} cms-content{% if config.show_border %} border-enabled{% endif %}" style="{{ config.banner_style }}"{% if config.anchor %} id="{{ config.anchor }}"{% endif %}>
-    {# Background image if provided - full width #}
+    {# Background image if provided - full width with retina support #}
     {% if config.background_image %}
-        <div class="banner-background" style="background-image: url('{% imgproxy config.background_image width=1920 height=600 resize_type='fill' %}');"></div>
+        <div class="banner-background" style="background-image: image-set(url('{% imgproxy config.background_image width=1920 height=600 resize_type='fill' %}') 1x, url('{% imgproxy config.background_image width=3840 height=1200 resize_type='fill' %}') 2x);"></div>
     {% endif %}
 
     <div class="banner-body mode-{{ config.banner_mode|default:'text' }} image-size-{{ config.image_size|default:'square' }}">

@@ -276,8 +276,9 @@ class HeaderWidget(BaseWidget):
         mobile_image = config.get("mobile_image")
         tablet_image = config.get("tablet_image")
 
-        # Generate desktop image URL
+        # Generate desktop image URL (1x and 2x)
         desktop_url = None
+        desktop_url_2x = None
         if image:
             imgproxy_base_url = image.get("imgproxy_base_url")
             desktop_url = imgproxy_service.generate_url(
@@ -286,11 +287,20 @@ class HeaderWidget(BaseWidget):
                 height=desktop_height,
                 resize_type="fill",
             )
-            if desktop_url:
+            desktop_url_2x = imgproxy_service.generate_url(
+                source_url=imgproxy_base_url,
+                width=desktop_width * 2,
+                height=desktop_height * 2,
+                resize_type="fill",
+            )
+            if desktop_url and desktop_url_2x:
+                style_parts.append(f"--desktop-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);")
+            elif desktop_url:
                 style_parts.append(f"--desktop-bg-image: url('{desktop_url}');")
 
-        # Generate tablet image URL (fallback to desktop if not specified)
+        # Generate tablet image URL (1x and 2x, fallback to desktop if not specified)
         tablet_url = None
+        tablet_url_2x = None
         if tablet_image:
             imgproxy_base_url = tablet_image.get("imgproxy_base_url")
             tablet_url = imgproxy_service.generate_url(
@@ -299,13 +309,24 @@ class HeaderWidget(BaseWidget):
                 height=tablet_height,
                 resize_type="fill",
             )
-        if tablet_url:
+            tablet_url_2x = imgproxy_service.generate_url(
+                source_url=imgproxy_base_url,
+                width=tablet_width * 2,
+                height=tablet_height * 2,
+                resize_type="fill",
+            )
+        if tablet_url and tablet_url_2x:
+            style_parts.append(f"--tablet-bg-image: image-set(url('{tablet_url}') 1x, url('{tablet_url_2x}') 2x);")
+        elif tablet_url:
             style_parts.append(f"--tablet-bg-image: url('{tablet_url}');")
+        elif desktop_url and desktop_url_2x:
+            style_parts.append(f"--tablet-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);")
         elif desktop_url:
             style_parts.append(f"--tablet-bg-image: url('{desktop_url}');")
 
-        # Generate mobile image URL (fallback to tablet or desktop if not specified)
+        # Generate mobile image URL (1x and 2x, fallback to tablet or desktop if not specified)
         mobile_url = None
+        mobile_url_2x = None
         if mobile_image:
             imgproxy_base_url = mobile_image.get("imgproxy_base_url")
             mobile_url = imgproxy_service.generate_url(
@@ -314,10 +335,22 @@ class HeaderWidget(BaseWidget):
                 height=mobile_height,
                 resize_type="fill",
             )
-        if mobile_url:
+            mobile_url_2x = imgproxy_service.generate_url(
+                source_url=imgproxy_base_url,
+                width=mobile_width * 2,
+                height=mobile_height * 2,
+                resize_type="fill",
+            )
+        if mobile_url and mobile_url_2x:
+            style_parts.append(f"--mobile-bg-image: image-set(url('{mobile_url}') 1x, url('{mobile_url_2x}') 2x);")
+        elif mobile_url:
             style_parts.append(f"--mobile-bg-image: url('{mobile_url}');")
+        elif tablet_url and tablet_url_2x:
+            style_parts.append(f"--mobile-bg-image: image-set(url('{tablet_url}') 1x, url('{tablet_url_2x}') 2x);")
         elif tablet_url:
             style_parts.append(f"--mobile-bg-image: url('{tablet_url}');")
+        elif desktop_url and desktop_url_2x:
+            style_parts.append(f"--mobile-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);")
         elif desktop_url:
             style_parts.append(f"--mobile-bg-image: url('{desktop_url}');")
 

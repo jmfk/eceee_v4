@@ -45,9 +45,10 @@ const BannerWidget = ({
     const textFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-textContent`, [widgetId])
     const contextType = useEditorContext()
 
-    // State for optimized image URLs
+    // State for optimized image URLs (1x and 2x for retina)
     const [image1Url, setImage1Url] = useState('')
     const [backgroundImageUrl, setBackgroundImageUrl] = useState('')
+    const [backgroundImageUrl2x, setBackgroundImageUrl2x] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
 
     // State for image edit modal
@@ -141,7 +142,12 @@ const BannerWidget = ({
     const bannerStyle = {
         backgroundColor: backgroundColor,
         color: textColor,
-        ...(backgroundImageUrl ? {
+        ...(backgroundImageUrl && backgroundImageUrl2x ? {
+            backgroundImage: `image-set(url('${backgroundImageUrl}') 1x, url('${backgroundImageUrl2x}') 2x)`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+        } : backgroundImageUrl ? {
             backgroundImage: `url('${backgroundImageUrl}')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -155,16 +161,23 @@ const BannerWidget = ({
             setImageLoading(true)
 
             try {
-                // Load background image
+                // Load background image (1x and 2x)
                 if (backgroundImage) {
-                    const url = await getImgproxyUrlFromImage(backgroundImage, {
+                    const url1x = await getImgproxyUrlFromImage(backgroundImage, {
                         width: 1920,
                         height: 600,
                         resizeType: 'fill'
                     })
-                    setBackgroundImageUrl(url)
+                    const url2x = await getImgproxyUrlFromImage(backgroundImage, {
+                        width: 3840,
+                        height: 1200,
+                        resizeType: 'fill'
+                    })
+                    setBackgroundImageUrl(url1x)
+                    setBackgroundImageUrl2x(url2x)
                 } else {
                     setBackgroundImageUrl('')
+                    setBackgroundImageUrl2x('')
                 }
 
                 // Load image URL based on imageSize (only for text mode)
