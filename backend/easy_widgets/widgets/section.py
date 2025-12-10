@@ -220,7 +220,12 @@ class SectionWidget(BaseWidget):
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 70px;
+        height: 30px;
+        outline: 1px solid rgb(0,0,0,0.3);
+        border-width: 0;
+        overflow: hidden;
+        border-radius: 0;
+        box-shadow: none;
         padding: 0;
         cursor: pointer;
         user-select: none;
