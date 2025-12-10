@@ -20,6 +20,20 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
         self.page_id = self.scope['url_route']['kwargs']['page_id']
         self.room_group_name = f'page_editor_{self.page_id}'
         
+        # Check authentication
+        user = self.scope.get('user')
+        if not user or not user.is_authenticated:
+            # Send auth failure message before closing
+            await self.accept()
+            await self.send(text_data=json.dumps({
+                'type': 'auth_failure',
+                'message': 'Authentication required',
+                'code': 'UNAUTHORIZED'
+            }))
+            # Close with custom auth failure code (4003)
+            await self.close(code=4003)
+            return
+        
         # Join room group
         await self.channel_layer.group_add(
             self.room_group_name,

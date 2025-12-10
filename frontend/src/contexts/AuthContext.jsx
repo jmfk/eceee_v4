@@ -214,6 +214,8 @@ export const AuthProvider = ({ children }) => {
         await checkAuthStatus();
         // Retry all queued requests after successful login
         await retryQueuedRequests();
+        // Notify WebSocket hooks to reconnect
+        window.dispatchEvent(new CustomEvent('websocket-reconnect'));
     };
 
     const logout = async () => {

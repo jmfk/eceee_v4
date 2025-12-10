@@ -31,6 +31,7 @@ export function usePageWebSocket(pageId, options = {}) {
     const currentPageIdRef = useRef(pageId);
     const onVersionUpdatedRef = useRef(onVersionUpdated);
     const sessionIdRef = useRef(sessionId);
+    const authFailureDetectedRef = useRef(false);
 
     // Keep refs updated without triggering reconnections
     useEffect(() => {
@@ -80,6 +81,9 @@ export function usePageWebSocket(pageId, options = {}) {
                     
                     if (data.type === 'connection_established') {
                         // Connection confirmed
+                    } else if (data.type === 'auth_failure') {
+                        // Explicit auth failure from backend
+                        authFailureDetectedRef.current = true;
                     } else if (data.type === 'version_updated') {
                         const updateInfo = {
                             pageId: data.page_id,
@@ -111,14 +115,50 @@ export function usePageWebSocket(pageId, options = {}) {
                 console.error('[WebSocket] Error:', error);
             };
 
-            ws.onclose = (event) => {
+            ws.onclose = async (event) => {
                 if (!mountedRef.current) return;
                 
                 setIsConnected(false);
                 wsRef.current = null;
 
-                // Auto-reconnect if enabled and not exceeded max attempts
-                if (autoReconnect && reconnectAttemptsRef.current < maxReconnectAttempts) {
+                // Check if this is an auth failure
+                const isAuthFailure = authFailureDetectedRef.current || 
+                                     event.code === 4003 || // Custom auth failure code
+                                     event.code === 1008;   // Policy violation
+                
+                if (isAuthFailure) {
+                    console.log('[WebSocket] Auth failure detected, verifying session...');
+                    
+                    // Verify session with API call
+                    try {
+                        const response = await fetch('/api/v1/webpages/pages/', {
+                            credentials: 'include',
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`
+                            }
+                        });
+                        
+                        if (response.status === 401) {
+                            // Confirmed auth failure - dispatch session expired event
+                            console.log('[WebSocket] Session expired confirmed, showing login overlay');
+                            window.dispatchEvent(new CustomEvent('session-expired', {
+                                detail: {
+                                    url: '/api/v1/webpages/pages/',
+                                    method: 'GET',
+                                    source: 'websocket'
+                                }
+                            }));
+                            // Don't auto-reconnect on auth failure
+                            authFailureDetectedRef.current = true;
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('[WebSocket] Session verification failed:', error);
+                    }
+                }
+
+                // Auto-reconnect if enabled, not auth failure, and not exceeded max attempts
+                if (autoReconnect && !authFailureDetectedRef.current && reconnectAttemptsRef.current < maxReconnectAttempts) {
                     reconnectAttemptsRef.current += 1;
                     
                     reconnectTimeoutRef.current = setTimeout(() => {
@@ -180,6 +220,32 @@ export function usePageWebSocket(pageId, options = {}) {
             }
         };
     }, []); // Empty dependency array - only run once on mount/unmount
+
+    // Listen for websocket-reconnect event after successful re-authentication
+    useEffect(() => {
+        const handleReconnect = () => {
+            console.log('[WebSocket] Reconnect event received, re-establishing connection...');
+            // Clear auth failure flag
+            authFailureDetectedRef.current = false;
+            // Reset reconnect attempts
+            reconnectAttemptsRef.current = 0;
+            // Clear any pending reconnect timeout
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+                reconnectTimeoutRef.current = null;
+            }
+            // Reconnect
+            if (enabled && currentPageIdRef.current) {
+                connect();
+            }
+        };
+
+        window.addEventListener('websocket-reconnect', handleReconnect);
+        
+        return () => {
+            window.removeEventListener('websocket-reconnect', handleReconnect);
+        };
+    }, [enabled, connect]);
 
     return {
         isConnected,
