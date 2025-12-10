@@ -5,7 +5,6 @@
  * Special editors are now declared in widget metadata for better modularity.
  */
 import React, { useCallback, useEffect, useMemo } from 'react'
-import MediaSpecialEditor from './MediaSpecialEditor'
 import TableSpecialEditor from './TableSpecialEditor'
 import NavbarWidgetEditor from '../../widgets/easy-widgets/NavbarWidgetEditor'
 import NavigationWidgetEditor from '../../widgets/easy-widgets/NavigationWidgetEditor'
@@ -17,7 +16,6 @@ import { getWidgetMetadata } from '../../widgets'
 
 // Map of special editor names to components
 const SPECIAL_EDITOR_COMPONENTS = {
-    'MediaSpecialEditor': MediaSpecialEditor,
     'TableSpecialEditor': TableSpecialEditor,
     'NavbarWidgetEditor': NavbarWidgetEditor,
     'NavigationWidgetEditor': NavigationWidgetEditor,
@@ -25,7 +23,6 @@ const SPECIAL_EDITOR_COMPONENTS = {
 
 // Legacy registry for backward compatibility (deprecated - use widget metadata instead)
 const LEGACY_SPECIAL_EDITORS = {
-    'easy_widgets.ImageWidget': 'MediaSpecialEditor',
 }
 
 /**

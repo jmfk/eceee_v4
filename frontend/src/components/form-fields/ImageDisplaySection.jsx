@@ -1,8 +1,10 @@
-import React, { useCallback, useState } from 'react'
-import { X, Eye, Tag, Plus } from 'lucide-react'
+import React, { useCallback, useState, useEffect } from 'react'
+import { X, Eye, Tag, Plus, FolderOpen } from 'lucide-react'
 import { getImageUrl, formatFileSize } from './ImageValidationUtils'
 import MediaItemTagEditor from '../media/MediaItemTagEditor'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
+import CollectionThumbnailGrid from '../media/CollectionThumbnailGrid'
+import { mediaCollectionsApi } from '../../api'
 
 const ImageDisplaySection = ({
     images,
@@ -165,6 +167,126 @@ const ImageDisplaySection = ({
 
     // Single image or single image in multiple mode
     const image = displayImages[0]
+    const isCollection = image?.type === "collection" || (image?.id && (image?.fileCount !== undefined || image?.sampleImages !== undefined || image?.slug !== undefined) && !image?.url && !image?.fileUrl)
+    
+    // State for collection data and files
+    const [collectionData, setCollectionData] = useState(null)
+    const [collectionFiles, setCollectionFiles] = useState([])
+    const [loadingCollection, setLoadingCollection] = useState(false)
+    
+    // Fetch collection data and files when it's a collection
+    useEffect(() => {
+        if (isCollection && image?.id) {
+            const loadCollection = async () => {
+                setLoadingCollection(true)
+                try {
+                    const [collection, filesResult] = await Promise.all([
+                        mediaCollectionsApi.get(image.id)(),
+                        mediaCollectionsApi.getFiles(image.id, { page_size: 9 })()
+                    ])
+                    setCollectionData(collection)
+                    const files = filesResult.results || filesResult || []
+                    setCollectionFiles(files.slice(0, 9)) // Get first 9 images
+                } catch (error) {
+                    console.error('Failed to load collection:', error)
+                    setCollectionData(null)
+                    setCollectionFiles([])
+                } finally {
+                    setLoadingCollection(false)
+                }
+            }
+            loadCollection()
+        } else {
+            setCollectionData(null)
+            setCollectionFiles([])
+        }
+    }, [isCollection, image?.id])
+    
+    // For collections, we'll show a collection preview with thumbnails (1-9 images in 3x3 grid)
+    if (isCollection) {
+        // Determine grid layout based on number of files (1-9 images)
+        const fileCount = collectionFiles.length
+        const getGridCols = (count) => {
+            if (count === 1) return 1
+            if (count <= 4) return 2
+            return 3 // 5-9 images use 3 columns
+        }
+        const gridCols = getGridCols(fileCount)
+        
+        return (
+            <div className="bg-white rounded-lg">
+                <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 p-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                        {loadingCollection ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <FolderOpen className="w-6 h-6 text-gray-400 animate-pulse" />
+                            </div>
+                        ) : collectionFiles.length > 0 ? (
+                            <div 
+                                className="w-full h-full grid gap-0.5"
+                                style={{
+                                    gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+                                    gridTemplateRows: `repeat(${gridCols}, 1fr)`
+                                }}
+                            >
+                                {collectionFiles.map((file, index) => {
+                                    const thumbnailUrl = file.imgproxyBaseUrl || file.imgproxy_base_url || file.thumbnailUrl || file.thumbnail_url || file.url || file.fileUrl
+                                    return (
+                                        <div key={file.id || index} className="relative overflow-hidden bg-gray-200">
+                                            {thumbnailUrl ? (
+                                                <img
+                                                    src={thumbnailUrl}
+                                                    alt=""
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none'
+                                                    }}
+                                                />
+                                            ) : null}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <FolderOpen className="w-6 h-6 text-gray-400" />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="min-w-0 overflow-hidden">
+                        <div className="text-sm font-medium text-gray-900 truncate" title={collectionData?.title || "Collection"}>
+                            {collectionData?.title || "Collection"}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                            {collectionData?.fileCount || collectionData?.file_count || 0} image{(collectionData?.fileCount || collectionData?.file_count || 0) !== 1 ? 's' : ''}
+                        </div>
+                    </div>
+
+                    {/* Change button to open modal */}
+                    <button
+                        type="button"
+                        onClick={onOpenModal}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors whitespace-nowrap"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Change
+                    </button>
+
+                    {/* Remove button */}
+                    <button
+                        onClick={(event) => onRemoveImage(image.id, event)}
+                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                        title="Remove collection"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+        )
+    }
+    
+    // Regular image display
     const thumbnailUrl = getThumbnailUrl
         ? getThumbnailUrl(image, 150)
         : (image.thumbnailUrl || getImageUrl(image))

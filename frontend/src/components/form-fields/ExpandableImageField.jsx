@@ -72,6 +72,8 @@ const ExpandableImageField = ({
         if (multiple) {
             return Array.isArray(value) ? value : []
         }
+        // For single selection, if it's a collection, we'll show collection preview
+        // Otherwise show the image
         return value ? [value] : []
     }, [value, multiple])
 
@@ -101,7 +103,18 @@ const ExpandableImageField = ({
         } else {
             // For single selection, extract first item if array
             const singleItem = Array.isArray(selected) ? selected[0] : selected
-            onChange(singleItem)
+
+            // If it's a collection (has files property), store as {id, type: "collection"}
+            if (singleItem && singleItem.files) {
+                // It's a collection - store only the ID and type marker
+                onChange({
+                    id: singleItem.id,
+                    type: "collection"
+                })
+            } else {
+                // It's a regular image - store as MediaFile object
+                onChange(singleItem)
+            }
         }
         setIsModalOpen(false)
     }, [multiple, maxItems, onChange, addNotification])

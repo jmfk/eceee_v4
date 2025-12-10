@@ -137,7 +137,11 @@ const SliderInput = React.memo(({
                                         style={{
                                             background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`
                                         }}
-                                        {...props}
+                                        {...(() => {
+                                            // Filter out non-DOM props before spreading
+                                            const { isOverride, conditionalOn, ...domProps } = props;
+                                            return domProps;
+                                        })()}
                                     />
 
                                     {/* Marks */}
@@ -197,7 +201,11 @@ const SliderInput = React.memo(({
                                 style={{
                                     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`
                                 }}
-                                {...props}
+                                {...(() => {
+                                    // Filter out non-DOM props before spreading
+                                    const { isOverride, conditionalOn, ...domProps } = props;
+                                    return domProps;
+                                })()}
                             />
 
                             {/* Marks */}

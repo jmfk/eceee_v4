@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Image } from 'lucide-react'
-import { mediaCollectionsApi, namespacesApi } from '../../api'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -10,6 +9,7 @@ import { renderMustache, prepareGalleryContext, prepareCarouselContext, prepareC
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { generateCSSFromBreakpoints } from '../../utils/cssBreakpointUtils'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
+import { mediaCollectionsApi } from '../../api/media'
 
 /**
  * EASY Image Widget Component
@@ -36,8 +36,8 @@ const ImageWidget = ({
 
     const [localConfig, setLocalConfig] = useState(config)
 
-    // State for collection images
-    const [collectionImages, setCollectionImages] = useState([])
+    // Collection resolution state
+    const [collectionMediaItems, setCollectionMediaItems] = useState([])
     const [loadingCollection, setLoadingCollection] = useState(false)
 
     // Carousel state - always initialized to avoid hook order issues
@@ -61,13 +61,6 @@ const ImageWidget = ({
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         if (widget && widget.config && hasWidgetContentChanged(localConfig, widget.config)) {
             setLocalConfig(widget.config)
-
-            // Trigger re-render if collection settings changed
-            const newCollectionId = widget.config.collectionId
-            if (newCollectionId !== (localConfig.collectionId || null)) {
-                // The useEffect above will handle reloading collection images
-                // when collectionId changes in the next render cycle
-            }
         }
     })
 
@@ -101,81 +94,81 @@ const ImageWidget = ({
         }
     }, [localConfig.imageStyle, currentTheme, localConfig.alignment, localConfig.galleryColumns])
 
-    // Memoize collection config to prevent unnecessary re-renders
-    const stableCollectionConfig = React.useMemo(() => ({
-        randomize: localConfig.collectionConfig?.randomize || false,
-        maxItems: localConfig.collectionConfig?.maxItems || 0
-    }), [localConfig.collectionConfig?.randomize, localConfig.collectionConfig?.maxItems])
+    // Check if image field is a collection and resolve it
+    const isCollection = useMemo(() => {
+        const image = localConfig.image
+        if (!image || typeof image !== 'object') return false
+        // Check for explicit type marker
+        if (image.type === 'collection') {
+            return true
+        }
+        // Check for collection-specific properties (fileCount, sampleImages, slug)
+        // A MediaFile would have url/fileUrl, but not fileCount or slug
+        const hasCollectionProps = image.fileCount !== undefined || image.sampleImages !== undefined || image.slug !== undefined
+        const hasFileProps = image.url || image.fileUrl || image.imgproxyBaseUrl
+        // If it has collection properties but no file URL properties, and has an ID, it's a collection
+        return hasCollectionProps && !hasFileProps && !!image.id
+    }, [localConfig.image])
 
-    // Load collection images when collectionId is present
+    // Resolve collection files when image is a collection
     useEffect(() => {
-        const loadCollectionImages = async () => {
-            if (!(localConfig.collectionId)) {
-                setCollectionImages([])
-                return
-            }
+        const image = localConfig.image
+        if (!isCollection || !image?.id) {
+            setCollectionMediaItems([])
+            return
+        }
 
+        const fetchCollectionFiles = async () => {
             setLoadingCollection(true)
             try {
-                // Get default namespace
-                const defaultNamespace = await namespacesApi.getDefault()
-                const namespace = defaultNamespace?.slug
+                const result = await mediaCollectionsApi.getFiles(image.id, { page_size: 100 })()
+                const files = result.results || result || []
 
-                if (namespace) {
-                    // Fetch collection images
-                    const result = await mediaCollectionsApi.getFiles(localConfig.collectionId, {
-                        namespace,
-                        pageSize: 100
-                    })()
-
-                    const images = result.results || result || []
-
-                    // Convert to mediaItems format
-                    const collectionMediaItems = images.map(image => ({
-                        id: image.id,
-                        url: image.imgproxyBaseUrl || image.fileUrl,
-                        type: 'image',
-                        title: image.title || '',
-                        altText: image.altText || image.title || '',
-                        caption: image.description || '',
-                        photographer: image.photographer || '',
-                        source: image.source || '',
-                        width: image.width,
-                        height: image.height,
-                        thumbnailUrl: image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl
-                    }))
-
-                    // Apply collection configuration
-                    let finalImages = collectionMediaItems
-
-                    // Apply randomization if requested
-                    if (stableCollectionConfig.randomize) {
-                        finalImages = [...finalImages].sort(() => Math.random() - 0.5)
+                // Convert collection files to media_items format
+                const mediaItems = files.map(file => {
+                    // Get URL - prefer imgproxyBaseUrl for images, fallback to fileUrl/url
+                    // For display, use imgproxyBaseUrl if available (it's the full-size processed URL)
+                    const fullUrl = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''
+                    // Thumbnail URL - prefer thumbnailUrl, fallback to imgproxyBaseUrl or fullUrl
+                    const thumbUrl = file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl || file.imgproxy_base_url || fullUrl || ''
+                    return {
+                        id: String(file.id),
+                        url: fullUrl,
+                        type: file.fileType === 'video' ? 'video' : 'image',
+                        altText: file.title || file.altText || 'Image',
+                        caption: file.description || file.caption || '',
+                        annotation: file.metadata?.annotation || '',
+                        title: file.title || '',
+                        photographer: '',
+                        source: '',
+                        width: file.width,
+                        height: file.height,
+                        thumbnailUrl: thumbUrl
                     }
-
-                    // Apply max items limit
-                    if (stableCollectionConfig.maxItems > 0) {
-                        finalImages = finalImages.slice(0, stableCollectionConfig.maxItems)
-                    }
-
-                    setCollectionImages(finalImages)
-                }
+                })
+                setCollectionMediaItems(mediaItems)
             } catch (error) {
-                console.error('Failed to load collection images:', error)
-                setCollectionImages([])
+                console.error('Failed to load collection files:', error)
+                setCollectionMediaItems([])
             } finally {
                 setLoadingCollection(false)
             }
         }
 
-        loadCollectionImages()
-    }, [localConfig.collectionId, stableCollectionConfig])
+        fetchCollectionFiles()
+    }, [isCollection, localConfig.image])
 
-    // Determine which images to use: collection images or individual media items
-    let effectiveMediaItems = localConfig.collectionId ? collectionImages : (localConfig.mediaItems || [])
+    // Backend now provides media_items in config (resolved from image field)
+    // Use media_items directly from config, or resolved collection files
+    let effectiveMediaItems = localConfig.mediaItems || localConfig.media_items || []
 
-    // Apply randomization for free images if enabled (collection randomization is already handled above)
-    if (!localConfig.collectionId && localConfig.randomize && effectiveMediaItems.length > 0) {
+    // If we have resolved collection files, use those instead
+    if (isCollection && collectionMediaItems.length > 0) {
+        effectiveMediaItems = collectionMediaItems
+    }
+
+    // Apply randomization if enabled (backend handles collection randomization, but we can still randomize here for backward compat)
+    if (localConfig.randomize && effectiveMediaItems.length > 0) {
         effectiveMediaItems = [...effectiveMediaItems].sort(() => Math.random() - 0.5)
     }
 
@@ -199,17 +192,6 @@ const ImageWidget = ({
         return () => clearInterval(interval)
     }, [localConfig.displayType, isPlaying, items.length, localConfig.autoPlayInterval])
 
-    // Show loading state when collection is being loaded
-    if (localConfig.collectionId && loadingCollection) {
-        return (
-            <div className={`image-widget ${mode === 'editor' ? 'p-4' : ''}`}>
-                <div className="bg-gray-100 h-32 rounded flex items-center justify-center text-gray-500">
-                    <Image className="h-6 w-6 mr-2 animate-pulse" />
-                    Loading collection...
-                </div>
-            </div>
-        )
-    }
 
     const alignmentClasses = {
         left: 'text-left',
@@ -254,6 +236,10 @@ const ImageWidget = ({
     }
 
     const renderMediaItem = (item, index = 0) => {
+        if (!item || !item.url) {
+            return null
+        }
+
         if (item.type === 'video') {
             return (
                 <video
@@ -321,14 +307,16 @@ const ImageWidget = ({
                                     <source src={item.url} type="video/mp4" />
                                 </video>
                             ) : (
-                                <img
-                                    src={item.url}
-                                    alt={item.altText || `Gallery image ${index + 1}`}
-                                    className={`w-full h-48 ${objectFitClass} rounded cursor-pointer hover:opacity-90 transition-opacity`}
-                                    onClick={(localConfig.enableLightbox !== false) ? () => {
-                                        // TODO: Implement lightbox modal
-                                    } : undefined}
-                                />
+                                item.url ? (
+                                    <img
+                                        src={item.url}
+                                        alt={item.altText || `Gallery image ${index + 1}`}
+                                        className={`w-full h-48 ${objectFitClass} rounded cursor-pointer hover:opacity-90 transition-opacity`}
+                                        onClick={(localConfig.enableLightbox !== false) ? () => {
+                                            // TODO: Implement lightbox modal
+                                        } : undefined}
+                                    />
+                                ) : null
                             )}
                             {(localConfig.showCaptions !== false) && item.caption && (
                                 <p className="text-sm text-gray-600 mt-1">{item.caption}</p>
@@ -607,25 +595,14 @@ ImageWidget.defaultConfig = {
 
 // Schema for schema-driven form
 ImageWidget.schema = {
-    mediaItems: {
-        type: 'array',
-        format: 'media',
-        mediaTypes: ['image', 'video'],
-        allowCollections: false,
-        label: 'Media Items',
-        description: 'Select images or videos for this widget',
-        multiple: true,
-        namespace: null, // Will be set from context
-        conditionalOn: {
-            field: 'collectionId',
-            condition: 'empty'
-        }
-    },
-    collectionId: {
-        type: 'string',
-        format: 'collection',
-        label: 'Collection',
-        description: 'Select a collection to display (overrides individual items)',
+    image: {
+        type: 'object',
+        component: 'ImageInput',
+        mediaTypes: ['image'],
+        allowCollections: true,
+        multiple: false,
+        label: 'Image or Collection',
+        description: 'Select a single image or collection to display',
         namespace: null // Will be set from context
     },
     displayType: {
@@ -668,12 +645,8 @@ ImageWidget.schema = {
     randomize: {
         type: 'boolean',
         label: 'Randomize Order',
-        description: 'Randomize the order of individual images',
-        default: false,
-        conditionalOn: {
-            field: 'collectionId',
-            condition: 'empty'
-        }
+        description: 'Randomize the order of images',
+        default: false
     },
     autoPlay: {
         type: 'boolean',
@@ -699,29 +672,6 @@ ImageWidget.schema = {
             value: true
         }
     },
-    collectionConfig: {
-        type: 'object',
-        label: 'Collection Settings',
-        description: 'Configure how collections are displayed',
-        properties: {
-            randomize: {
-                type: 'boolean',
-                label: 'Randomize Collection',
-                default: false
-            },
-            maxItems: {
-                type: 'number',
-                label: 'Max Items',
-                description: '0 for unlimited',
-                default: 0,
-                min: 0
-            }
-        },
-        conditionalOn: {
-            field: 'collectionId',
-            condition: 'notEmpty'
-        }
-    }
 }
 
 // Display metadata

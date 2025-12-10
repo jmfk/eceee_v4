@@ -45,18 +45,17 @@ class ImageConfig(BaseModel):
         populate_by_name=True,
     )
 
-    mediaItems: List[ImageMediaItem] = Field(
-        default_factory=list,
-        description="List of images/videos to display",
+    image: Optional[dict] = Field(
+        None,
+        description="Single image (MediaFile object) or collection (MediaCollection with type: 'collection')",
         json_schema_extra={
-            "component": "ImageField",
-            "format": "media",
-            "mediaTypes": ["image", "video"],
-            "multiple": True,
-            "allowCollections": False,
+            "component": "ImageInput",
             "order": 0,
             "group": "Media",
-            "title": "Media Items",
+            "mediaTypes": ["image"],
+            "allowCollections": True,
+            "multiple": False,
+            "title": "Image or Collection",
         },
     )
     imageStyle: Optional[str] = Field(
@@ -143,21 +142,6 @@ class ImageConfig(BaseModel):
         },
     )
 
-    # Collection support (managed by MediaSpecialEditor)
-    collectionId: Optional[str] = Field(
-        None,
-        description="ID of selected media collection",
-        json_schema_extra={
-            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
-        },
-    )
-    collectionConfig: Optional[dict] = Field(
-        None,
-        description="Collection display configuration",
-        json_schema_extra={
-            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
-        },
-    )
     useContentMargins: bool = Field(
         False,
         description="Use content margins (extra left/right padding on larger screens)",
@@ -300,6 +284,53 @@ class ImageWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return ImageConfig
 
+    def is_collection(self, image_obj):
+        """
+        Check if image field contains a collection.
+
+        Args:
+            image_obj: The image field value (dict or None)
+
+        Returns:
+            tuple: (is_collection: bool, collection_id: str or None)
+        """
+        if not image_obj or not isinstance(image_obj, dict):
+            return False, None
+
+        # Check for explicit type marker
+        if image_obj.get("type") == "collection":
+            collection_id = image_obj.get("id")
+            return True, collection_id
+
+        # Check for collectionId property (backward compatibility)
+        if "collectionId" in image_obj:
+            collection_id = image_obj.get("collectionId")
+            return True, collection_id
+
+        # Check for collection-specific properties (fileCount, sampleImages, slug)
+        # A MediaFile would have url/fileUrl/imgproxyBaseUrl, but not fileCount or slug
+        has_collection_props = (
+            "fileCount" in image_obj
+            or "file_count" in image_obj
+            or "sampleImages" in image_obj
+            or "sample_images" in image_obj
+            or "slug" in image_obj
+        )
+        has_file_props = (
+            image_obj.get("url")
+            or image_obj.get("fileUrl")
+            or image_obj.get("file_url")
+            or image_obj.get("imgproxyBaseUrl")
+            or image_obj.get("imgproxy_base_url")
+        )
+
+        # If it has collection properties but no file URL properties, and has an ID, it's a collection
+        if has_collection_props and not has_file_props and image_obj.get("id"):
+            collection_id = image_obj.get("id")
+            return True, collection_id
+
+        return False, None
+
     def resolve_collection_images(self, collection_id, namespace=None):
         """
         Resolve collection ID to actual media items for rendering.
@@ -350,7 +381,11 @@ class ImageWidget(BaseWidget):
 
                 # Get annotation from metadata
                 annotation = ""
-                if hasattr(media_file, 'metadata') and media_file.metadata and isinstance(media_file.metadata, dict):
+                if (
+                    hasattr(media_file, "metadata")
+                    and media_file.metadata
+                    and isinstance(media_file.metadata, dict)
+                ):
                     annotation = media_file.metadata.get("annotation", "")
 
                 media_items.append(
@@ -407,51 +442,103 @@ class ImageWidget(BaseWidget):
                     style_name
                 )
 
-        # Check if we have a collection to resolve
-        collection_id = config.get("collection_id")
-        if collection_id:
-            # Resolve collection images
+        # Handle new image field (single image or collection)
+        image = config.get("image")
+        is_collection, collection_id = self.is_collection(image)
+
+        # Backward compatibility: check for old collectionId field
+        if not is_collection and not collection_id:
+            old_collection_id = config.get("collection_id") or config.get(
+                "collectionId"
+            )
+            if old_collection_id:
+                collection_id = old_collection_id
+                is_collection = True
+                logger.warning(
+                    "ImageWidget: Using deprecated 'collectionId' field. "
+                    "Please migrate to using 'image' field with type: 'collection'"
+                )
+
+        if is_collection and collection_id:
+            # Resolve collection images in real-time
             collection_images = self.resolve_collection_images(collection_id)
 
             # Add resolved images to media_items
             if collection_images:
                 template_config["media_items"] = collection_images
 
-                # Apply collection configuration if present
-                collection_config = config.get("collection_config", {})
+                # Apply collection configuration if present (backward compatibility)
+                collection_config = config.get("collection_config") or config.get(
+                    "collectionConfig", {}
+                )
                 if collection_config:
                     # Apply max items limit first (before randomization)
-                    max_items = collection_config.get("max_items", 0)
+                    max_items = collection_config.get(
+                        "max_items"
+                    ) or collection_config.get("maxItems", 0)
                     if max_items > 0:
                         template_config["media_items"] = template_config["media_items"][
                             :max_items
                         ]
+        elif image and not is_collection:
+            # Single image: convert to media_items array format
+            if isinstance(image, dict):
+                # Convert camelCase to snake_case for template
+                media_item = {
+                    "id": image.get("id"),
+                    "url": image.get("url")
+                    or image.get("fileUrl")
+                    or image.get("imgproxyBaseUrl", ""),
+                    "type": image.get("type", "image"),
+                    "alt_text": image.get("altText")
+                    or image.get("alt_text")
+                    or image.get("title", ""),
+                    "caption": image.get("caption") or image.get("description", ""),
+                    "annotation": image.get("annotation", ""),
+                    "title": image.get("title", ""),
+                    "photographer": image.get("photographer", ""),
+                    "source": image.get("source", ""),
+                    "width": image.get("width"),
+                    "height": image.get("height"),
+                    "thumbnail_url": image.get("thumbnailUrl")
+                    or image.get("thumbnail_url")
+                    or image.get("url")
+                    or image.get("fileUrl", ""),
+                }
+                template_config["media_items"] = [media_item]
 
-        # Ensure we have media_items
+        # Backward compatibility: handle old mediaItems field
         if "media_items" not in template_config:
-            camel_case_items = template_config.get("media_items", [])
-            # Convert camelCase fields to snake_case for template compatibility
-            snake_case_items = []
-            for item in camel_case_items:
-                if isinstance(item, dict):
-                    snake_case_item = {
-                        "id": item.get("id"),
-                        "url": item.get("url"),
-                        "type": item.get("type", "image"),
-                        "alt_text": item.get("altText", ""),
-                        "caption": item.get("caption", ""),
-                        "annotation": item.get("annotation", ""),
-                        "title": item.get("title", ""),
-                        "photographer": item.get("photographer", ""),
-                        "source": item.get("source", ""),
-                        "width": item.get("width"),
-                        "height": item.get("height"),
-                        "thumbnail_url": item.get("thumbnailUrl"),
-                    }
-                    snake_case_items.append(snake_case_item)
-                else:
-                    snake_case_items.append(item)
-            template_config["media_items"] = snake_case_items
+            camel_case_items = config.get("mediaItems") or config.get("media_items", [])
+            if camel_case_items:
+                logger.warning(
+                    "ImageWidget: Using deprecated 'mediaItems' field. "
+                    "Please migrate to using 'image' field"
+                )
+                # Convert camelCase fields to snake_case for template compatibility
+                snake_case_items = []
+                for item in camel_case_items:
+                    if isinstance(item, dict):
+                        snake_case_item = {
+                            "id": item.get("id"),
+                            "url": item.get("url"),
+                            "type": item.get("type", "image"),
+                            "alt_text": item.get("altText", ""),
+                            "caption": item.get("caption", ""),
+                            "annotation": item.get("annotation", ""),
+                            "title": item.get("title", ""),
+                            "photographer": item.get("photographer", ""),
+                            "source": item.get("source", ""),
+                            "width": item.get("width"),
+                            "height": item.get("height"),
+                            "thumbnail_url": item.get("thumbnailUrl"),
+                        }
+                        snake_case_items.append(snake_case_item)
+                    else:
+                        snake_case_items.append(item)
+                template_config["media_items"] = snake_case_items
+            else:
+                template_config["media_items"] = []
 
         # Convert other camelCase config fields to snake_case for template
         template_config["display_type"] = template_config.get(
@@ -517,14 +604,14 @@ class ImageWidget(BaseWidget):
             "use_content_margins", False
         )
 
-        # Apply randomization if enabled (widget override, then style default, then collection config)
+        # Apply randomization if enabled (widget override, then style default)
         randomize_override = config.get("randomize")
         if randomize_override is not None:
             should_randomize = randomize_override
         elif style and "defaultRandomize" in style:
             should_randomize = style["defaultRandomize"]
         else:
-            # Check collection config as fallback
+            # Backward compatibility: check old collection config
             collection_config = config.get("collection_config") or config.get(
                 "collectionConfig", {}
             )

@@ -122,7 +122,9 @@ export default function ValidatedInput({
             'conditionalOn', 'itemSchema', 'itemLabelTemplate',
             // Widget/form-specific props
             'onFieldChange', 'onFieldValidation', 'validateOnChange',
-            'validateOnBlur', 'isDirty', 'isTouched'
+            'validateOnBlur', 'isDirty', 'isTouched',
+            // Pydantic schema extra props
+            'isOverride'
         ]
 
         // Filter props to only include valid HTML attributes

@@ -10,7 +10,7 @@
  * - Optional collection selection
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Image as ImageIcon, FolderOpen, Loader2, AlertCircle, Check, Trash2 } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
@@ -26,15 +26,15 @@ const MediaSelectModal = ({
     onSelect, // Callback when media is selected: (selectedItems) => void
     namespace,
     pageId,
-    
+
     // Selection options
     mediaTypes = ['image'], // Array of allowed types: 'image', 'video', etc.
     allowCollections = true, // Whether to show collections tab
     multiple = false, // Allow multiple selection
-    
+
     // Current selection (for showing "currently selected")
     currentSelection = null, // Current image/collection object
-    
+
     // UI customization
     customTitle = null, // e.g., "Select Hero Background Image"
 }) => {
@@ -42,13 +42,25 @@ const MediaSelectModal = ({
     const [collections, setCollections] = useState([]);
     const [loadingCollections, setLoadingCollections] = useState(false);
     const [pendingFiles, setPendingFiles] = useState([]);
+
+    // Ensure collections is always an array - memoized to prevent recalculation
+    const safeCollections = useMemo(() => {
+        if (Array.isArray(collections)) {
+            return collections;
+        }
+        if (collections && typeof collections === 'object') {
+            // Handle case where API returns {results: [...]} directly
+            return collections.results || [];
+        }
+        return [];
+    }, [collections]);
     const [loadingPendingFiles, setLoadingPendingFiles] = useState(false);
     const [selectedItems, setSelectedItems] = useState([]);
-    
+
     // Pending approval state
     const [hasPendingApprovals, setHasPendingApprovals] = useState(false);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
-    
+
     // Track if we've initialized to prevent infinite loops
     const initializedRef = useRef(false);
     const prevOpenRef = useRef(isOpen);
@@ -71,13 +83,16 @@ const MediaSelectModal = ({
 
     // Load collections
     useEffect(() => {
-        if (!isOpen || !allowCollections) return;
+        if (!isOpen || !allowCollections) {
+            return;
+        }
 
         const loadCollections = async () => {
             setLoadingCollections(true);
             try {
-                const response = await mediaCollectionsApi.list({ namespace });
-                setCollections(response.results || response || []);
+                const response = await mediaCollectionsApi.list({ namespace })();
+                const collectionsData = response.results || response || [];
+                setCollections(Array.isArray(collectionsData) ? collectionsData : []);
             } catch (error) {
                 console.error('Error loading collections:', error);
                 setCollections([]);
@@ -273,7 +288,7 @@ const MediaSelectModal = ({
                                 <div className="flex items-center justify-center h-64">
                                     <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
                                 </div>
-                            ) : collections.length === 0 ? (
+                            ) : safeCollections.length === 0 ? (
                                 <div className="flex items-center justify-center h-64">
                                     <div className="text-center">
                                         <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -282,17 +297,16 @@ const MediaSelectModal = ({
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {collections.map(collection => {
+                                    {safeCollections.map(collection => {
                                         const isSelected = selectedItems.some(item => item.id === collection.id);
                                         return (
                                             <div
                                                 key={collection.id}
                                                 onClick={() => handleCollectionSelect(collection)}
-                                                className={`cursor-pointer border rounded-lg overflow-hidden transition-all ${
-                                                    isSelected
+                                                className={`cursor-pointer border rounded-lg overflow-hidden transition-all ${isSelected
                                                         ? 'border-blue-500 ring-2 ring-blue-500 shadow-lg'
                                                         : 'border-gray-200 hover:border-blue-500 hover:shadow-md'
-                                                }`}
+                                                    }`}
                                             >
                                                 <CollectionThumbnailGrid
                                                     collection={collection}
@@ -356,11 +370,10 @@ const MediaSelectModal = ({
                     <button
                         onClick={handleSelectClick}
                         disabled={selectedItems.length === 0}
-                        className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${
-                            selectedItems.length === 0
+                        className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${selectedItems.length === 0
                                 ? 'bg-gray-300 cursor-not-allowed'
                                 : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
+                            }`}
                     >
                         Select {selectedItems.length > 0 && `(${selectedItems.length})`}
                     </button>

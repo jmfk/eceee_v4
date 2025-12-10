@@ -324,6 +324,7 @@ const ConditionalGroupField = ({
                         order: _order,
                         group: _group,
                         conditionalOn: _conditionalOn,
+                        isOverride: _isOverride, // Exclude isOverride from being passed to DOM (Pydantic schema extra)
                         fieldName: _fieldName,
                         ...schemaProps
                     } = propSchema

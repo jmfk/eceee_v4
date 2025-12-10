@@ -4,5 +4,4 @@
  * Centralized exports for special editor components and utilities.
  */
 export { default as SpecialEditorRenderer, hasSpecialEditor, getSpecialEditor } from './SpecialEditorRenderer'
-export { default as MediaSpecialEditor } from './MediaSpecialEditor'
 export { default as TableSpecialEditor } from './TableSpecialEditor'

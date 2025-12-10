@@ -194,6 +194,7 @@ const SchemaFieldRenderer = ({
             minimum, maximum, minLength, maxLength, pattern,
             const: constValue, default: defaultValue,
             conditionalOn, // Exclude conditionalOn from being passed to DOM
+            isOverride, // Exclude isOverride from being passed to DOM (Pydantic schema extra)
             // Include only component-relevant properties
             ...componentProps
         } = fieldSchema
