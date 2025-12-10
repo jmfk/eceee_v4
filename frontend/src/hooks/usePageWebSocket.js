@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { getSessionId } from '../utils/sessionId';
+import { api } from '../api/client.js';
 
 /**
  * WebSocket hook for real-time page editor notifications
@@ -129,30 +130,24 @@ export function usePageWebSocket(pageId, options = {}) {
                 if (isAuthFailure) {
                     console.log('[WebSocket] Auth failure detected, verifying session...');
                     
-                    // Verify session with API call
+                    // Verify session with API call using centralized api client
                     try {
-                        const response = await fetch('/api/v1/webpages/pages/', {
-                            credentials: 'include',
-                            headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`
-                            }
-                        });
-                        
-                        if (response.status === 401) {
-                            // Confirmed auth failure - dispatch session expired event
-                            console.log('[WebSocket] Session expired confirmed, showing login overlay');
-                            window.dispatchEvent(new CustomEvent('session-expired', {
-                                detail: {
-                                    url: '/api/v1/webpages/pages/',
-                                    method: 'GET',
-                                    source: 'websocket'
-                                }
-                            }));
+                        await api.get('/api/v1/webpages/pages/');
+                        // If we get here, authentication succeeded (api client handles token refresh)
+                        // Reset auth failure flag to allow reconnection
+                        authFailureDetectedRef.current = false;
+                    } catch (error) {
+                        // API client interceptor handles 401 by:
+                        // 1. Attempting token refresh if refresh token exists
+                        // 2. Dispatching 'session-expired' event if refresh fails or no refresh token
+                        // The session-expired event is handled by AuthContext
+                        if (error.response?.status === 401) {
+                            // Confirmed auth failure - api client already dispatched session-expired event
+                            console.log('[WebSocket] Session expired confirmed, login overlay should be shown');
                             // Don't auto-reconnect on auth failure
                             authFailureDetectedRef.current = true;
                             return;
                         }
-                    } catch (error) {
                         console.error('[WebSocket] Session verification failed:', error);
                     }
                 }

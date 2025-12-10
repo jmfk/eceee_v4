@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Optional
 from django.template import Template, Context
 from django.template.base import Parser, Token
 from django.template.loader import get_template
+from django.template import TemplateDoesNotExist
 from django.utils.html import strip_tags, escape
 from bs4 import BeautifulSoup, NavigableString, Comment
 from django.core.cache import cache
@@ -555,9 +556,32 @@ class WidgetTemplateParser:
             if pattern in condition_lower:
                 return False
 
-        # Only allow safe Django template syntax patterns
+        # Allow safe Django template syntax patterns including:
+        # - Variable access: config.show_border, item.type
+        # - Leading not operator: not config.show_border
+        # - Comparisons: ==, !=, >, <, >=, <=
+        # - String literals: 'header', "text"
+        # - Filters: |length, |default, etc.
+        # - Numeric literals: 0, 1, 2
+        # - Boolean operators: and, or
+        # - Combined expressions: config.banner_mode == 'text' and config.image1
+        
+        # Build the pattern step by step for clarity and correctness
+        # Basic variable pattern: var or var.attr or var|filter
+        var_pattern = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*(?:\|[a-zA-Z_][a-zA-Z0-9_]*)?"
+        
+        # Value pattern: variable, string literal, or number
+        value_pattern = rf"(?:{var_pattern}|'[^']*'|\"[^\"]*\"|\d+)"
+        
+        # Comparison pattern: var == value, var != value, etc.
+        comparison_pattern = rf"(?:{var_pattern}\s*(?:==|!=|>|<|>=|<=)\s*{value_pattern})"
+        
+        # Simple condition: not? (var | comparison)
+        simple_condition = rf"(?:\s*(?:not\s+)?(?:{var_pattern}|{comparison_pattern})\s*)"
+        
+        # Full pattern: simple_condition (and|or simple_condition)*
         safe_pattern = re.compile(
-            r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*(\s+(and|or|not)\s+[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*)*$"
+            rf"^{simple_condition}(?:\s+(?:and|or){simple_condition})*$"
         )
         return bool(safe_pattern.match(condition.strip()))
 
@@ -634,10 +658,11 @@ class WidgetTemplateParser:
             if pattern in content_lower:
                 return False
 
-        # Validate attribute structure: either key="value" pairs or simple attribute names
+        # Validate attribute structure: either key="value" pairs, simple attribute names, or CSS properties
         # Allow: target="_blank", rel="noopener", disabled, data-test="value"
+        # Also allow CSS properties like: cursor: pointer;
         attribute_pattern = re.compile(
-            r'^[a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?(?:\s+[a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?)*$'
+            r'^([a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?(?:\s+[a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?)*|[a-zA-Z][\w-]*\s*:\s*[^;<>]*;?)$'
         )
 
         return bool(attribute_pattern.match(content))
@@ -719,6 +744,34 @@ class WidgetTemplateParser:
 
             return result
 
+        except TemplateDoesNotExist:
+            # Handle Mustache-only widgets gracefully
+            # Check if Mustache template exists
+            mustache_template_name = template_name.replace(".html", ".mustache")
+            try:
+                from webpages.utils.mustache_renderer import load_mustache_template
+                load_mustache_template(mustache_template_name)
+                # Mustache template exists, return minimal structure
+                logger.debug(f"Widget {template_name} is Mustache-only, returning minimal structure")
+                result = {
+                    "structure": {
+                        "type": "element",
+                        "tag": "div",
+                        "attributes": {"class": "mustache-only-widget"},
+                        "children": []
+                    },
+                    "template_variables": [],
+                    "template_tags": [],
+                    "has_inline_css": False,
+                    "is_mustache_only": True,
+                }
+                # Cache the result
+                cache.set(cache_key, result, self.cache_timeout)
+                return result
+            except (ImportError, Exception):
+                # Mustache template also doesn't exist, raise original error
+                logger.error(f"Widget template {template_name} not found (neither Django nor Mustache template exists)")
+                raise Exception("Widget template parsing failed")
         except Exception as e:
             logger.error(f"Error parsing widget template {template_name}: {e}")
             raise Exception("Widget template parsing failed")
