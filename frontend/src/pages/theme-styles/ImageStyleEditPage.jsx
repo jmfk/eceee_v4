@@ -369,17 +369,17 @@ const ImageStyleEditPage = () => {
                                 <ArrowLeft className="h-5 w-5" />
                             </button>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                <div className="text-2xl font-bold text-gray-900 flex items-center gap-2" role="heading" aria-level="1">
                                     {styleType === 'carousel' ? (
                                         <Play className="h-6 w-6 text-purple-600" />
                                     ) : (
                                         <Grid3X3 className="h-6 w-6 text-blue-600" />
                                     )}
                                     {name || styleKey}
-                                </h1>
-                                <p className="text-sm text-gray-600 mt-1">
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1">
                                     Theme: {themeData.name} · Type: {styleType === 'carousel' ? 'Carousel' : 'Gallery'}
-                                </p>
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -418,7 +418,7 @@ const ImageStyleEditPage = () => {
                     <div className="space-y-6">
                         {/* Basic Info */}
                         <div className="bg-white rounded-lg border p-6">
-                            <h3 className="font-semibold text-gray-900 mb-4">Basic Information</h3>
+                            <div className="font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Basic Information</div>
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -453,9 +453,9 @@ const ImageStyleEditPage = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                                         placeholder="my-image-style"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         Auto-generated from display name (edit to customize)
-                                    </p>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -509,9 +509,9 @@ const ImageStyleEditPage = () => {
                                         <option value="standard">Standard Images Only</option>
                                         <option value="inline">Inline Images Only</option>
                                     </select>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         Controls where this style can be used
-                                    </p>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <input
@@ -530,7 +530,7 @@ const ImageStyleEditPage = () => {
 
                         {/* Image Processing (imgproxy) */}
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                            <h3 className="font-semibold text-gray-900 mb-4">Thumbnail Image Processing (imgproxy)</h3>
+                            <div className="font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Thumbnail Image Processing (imgproxy)</div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -567,7 +567,7 @@ const ImageStyleEditPage = () => {
                                         placeholder="1600"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Prevents upscaling</p>
+                                    <div className="text-xs text-gray-500 mt-1">Prevents upscaling</div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -580,7 +580,7 @@ const ImageStyleEditPage = () => {
                                         placeholder="1200"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Prevents upscaling</p>
+                                    <div className="text-xs text-gray-500 mt-1">Prevents upscaling</div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -620,7 +620,7 @@ const ImageStyleEditPage = () => {
 
                         {/* Lightbox Settings */}
                         <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-                            <h3 className="font-semibold text-gray-900 mb-4">Lightbox Settings</h3>
+                            <div className="font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Lightbox Settings</div>
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2">
                                     <input
@@ -646,9 +646,9 @@ const ImageStyleEditPage = () => {
                                             placeholder="Custom Mustache template for lightbox UI"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono text-sm"
                                         />
-                                        <p className="text-xs text-gray-500 mt-1">
+                                        <div className="text-xs text-gray-500 mt-1">
                                             Leave empty to use default lightbox
-                                        </p>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -656,10 +656,10 @@ const ImageStyleEditPage = () => {
 
                         {/* Default Values */}
                         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                            <h3 className="font-semibold text-gray-900 mb-4">Default Values</h3>
-                            <p className="text-xs text-gray-600 mb-4">
+                            <div className="font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Default Values</div>
+                            <div className="text-xs text-gray-600 mb-4">
                                 These defaults can be overridden by individual widgets
-                            </p>
+                            </div>
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2">
                                     <input
@@ -684,9 +684,9 @@ const ImageStyleEditPage = () => {
                                         placeholder="my-gallery"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         Group images for lightbox navigation
-                                    </p>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <input
@@ -734,7 +734,7 @@ const ImageStyleEditPage = () => {
 
                         {/* Template Editor */}
                         <div className="bg-white rounded-lg border p-6">
-                            <h3 className="font-semibold text-gray-900 mb-4">Mustache Template</h3>
+                            <div className="font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Mustache Template</div>
                             <textarea
                                 value={template}
                                 onChange={(e) => setTemplate(e.target.value)}
@@ -746,7 +746,7 @@ const ImageStyleEditPage = () => {
 
                         {/* CSS Editor with Breakpoints */}
                         <div className="bg-white rounded-lg border p-6">
-                            <h3 className="font-semibold text-gray-900 mb-4">CSS Styles</h3>
+                            <div className="font-semibold text-gray-900 mb-4" role="heading" aria-level="3">CSS Styles</div>
 
                             {/* Breakpoint Tabs */}
                             <div className="flex gap-1 mb-2 border-b border-gray-200">
@@ -773,9 +773,9 @@ const ImageStyleEditPage = () => {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                             />
 
-                            <p className="text-xs text-gray-500 mt-2">
+                            <div className="text-xs text-gray-500 mt-2">
                                 💡 Styles cascade: Default applies to all sizes, then each breakpoint overrides at min-width.
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -783,7 +783,7 @@ const ImageStyleEditPage = () => {
                     <div className="lg:sticky lg:top-24 h-fit space-y-6">
                         {/* Quick Reference */}
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-3">📋 Quick Reference</h4>
+                            <div className="text-sm font-semibold text-gray-900 mb-3" role="heading" aria-level="4">📋 Quick Reference</div>
 
                             {/* Scenario Selector */}
                             <div className="mb-4">
@@ -801,15 +801,15 @@ const ImageStyleEditPage = () => {
                                         </option>
                                     ))}
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                     {currentScenario.description}
-                                </p>
+                                </div>
                             </div>
 
                             <div className="space-y-4 text-sm">
                                 {/* Available Variables */}
                                 <div>
-                                    <p className="font-medium text-gray-700 mb-2">Available Variables:</p>
+                                    <div className="font-medium text-gray-700 mb-2">Available Variables:</div>
                                     <div className="space-y-1">
                                         {currentScenario.variables.map((variable) => (
                                             <div key={variable.name} className="flex items-start gap-2">
@@ -827,7 +827,7 @@ const ImageStyleEditPage = () => {
                                 {/* Item Properties */}
                                 {currentScenario.itemProperties && currentScenario.itemProperties.length > 0 && (
                                     <div>
-                                        <p className="font-medium text-gray-700 mb-2">Item Properties:</p>
+                                        <div className="font-medium text-gray-700 mb-2">Item Properties:</div>
                                         <div className="space-y-1">
                                             {currentScenario.itemProperties.map((prop) => (
                                                 <div key={prop.name} className="flex items-start gap-2">
@@ -846,7 +846,7 @@ const ImageStyleEditPage = () => {
                                 {/* Template Example */}
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="font-medium text-gray-700">Template Example:</p>
+                                        <div className="font-medium text-gray-700">Template Example:</div>
                                         <button
                                             onClick={handleCopyTemplate}
                                             className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
@@ -872,7 +872,7 @@ const ImageStyleEditPage = () => {
                                 {/* CSS Example */}
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="font-medium text-gray-700">CSS Example:</p>
+                                        <div className="font-medium text-gray-700">CSS Example:</div>
                                         <button
                                             onClick={handleCopyCSS}
                                             className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
@@ -897,7 +897,7 @@ const ImageStyleEditPage = () => {
 
                                 {/* Mustache Syntax Reminder */}
                                 <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                                    <strong>Mustache Tip:</strong> Use &#123;&#123;#variable&#125;&#125;...&#123;&#123;/variable&#125;&#125; for loops/conditionals
+                                    <span className="font-bold">Mustache Tip:</span> Use &#123;&#123;#variable&#125;&#125;...&#123;&#123;/variable&#125;&#125; for loops/conditionals
                                 </div>
                             </div>
                         </div>
@@ -905,7 +905,7 @@ const ImageStyleEditPage = () => {
                         {/* Preview */}
                         {showPreview && (
                             <div className="bg-white rounded-lg border p-6">
-                                <h3 className="font-semibold text-gray-900 mb-4">Live Preview</h3>
+                                <div className="font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Live Preview</div>
                                 <style dangerouslySetInnerHTML={{ __html: css }} />
                                 <div className="border rounded p-4 bg-gray-50 overflow-auto">
                                     <div dangerouslySetInnerHTML={{ __html: previewHTML() }} />

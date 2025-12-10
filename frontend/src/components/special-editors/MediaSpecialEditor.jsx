@@ -903,7 +903,7 @@ const MediaSpecialEditor = ({
                 <div className="flex items-center justify-center h-full">
                     <div className="text-center">
                         <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-                        <p className="text-sm text-gray-600">Loading media editor...</p>
+                        <div className="text-sm text-gray-600">Loading media editor...</div>
                     </div>
                 </div>
             )
@@ -914,7 +914,7 @@ const MediaSpecialEditor = ({
                 <div className="flex items-center justify-center h-full">
                     <div className="text-center">
                         <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                        <p className="text-sm text-gray-600">No namespace available</p>
+                        <div className="text-sm text-gray-600">No namespace available</div>
                     </div>
                 </div>
             )
@@ -1069,7 +1069,7 @@ const MediaSpecialEditor = ({
                             {currentConfig.imageStyle && currentTheme && (
                                 <div className="p-3 border border-green-200 rounded-lg bg-green-50 space-y-3">
                                     <label className="text-sm font-medium text-gray-700">Override Defaults</label>
-                                    <p className="text-xs text-gray-600">Override the image style's default values for this widget</p>
+                                    <div className="text-xs text-gray-600">Override the image style's default values for this widget</div>
 
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
@@ -1276,8 +1276,8 @@ const MediaSpecialEditor = ({
                                 <div className="flex items-start gap-2">
                                     <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                                     <div className="text-xs text-amber-800">
-                                        <p className="font-medium mb-1">Global Collection</p>
-                                        <p>Changes to this collection affect all instances using it.</p>
+                                        <div className="font-medium mb-1">Global Collection</div>
+                                        <div>Changes to this collection affect all instances using it.</div>
                                     </div>
                                 </div>
                             </div>
@@ -1450,7 +1450,7 @@ const MediaSpecialEditor = ({
                             {currentConfig.imageStyle && currentTheme && (
                                 <div className="p-3 border border-green-200 rounded-lg bg-green-50 space-y-3">
                                     <label className="text-sm font-medium text-gray-700">Override Defaults</label>
-                                    <p className="text-xs text-gray-600">Override the image style's default values for this widget</p>
+                                    <div className="text-xs text-gray-600">Override the image style's default values for this widget</div>
 
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
@@ -1704,7 +1704,7 @@ const MediaSpecialEditor = ({
                 ) : (
                     <div className="text-center py-8 text-gray-500">
                         <Image className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No media selected</p>
+                        <div>No media selected</div>
                     </div>
                 )}
             </div>
@@ -1715,7 +1715,7 @@ const MediaSpecialEditor = ({
                     <div className="bg-white rounded-lg border border-gray-200 p-4">
                         <div className="flex items-center gap-2 mb-3">
                             <Eye className="w-5 h-5 text-gray-600" />
-                            <h5 className="font-medium text-gray-900">Preview</h5>
+                            <div className="font-medium text-gray-900" role="heading" aria-level="5">Preview</div>
                         </div>
                         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                             <ImageWidget
@@ -1733,9 +1733,9 @@ const MediaSpecialEditor = ({
                     <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-2">
                             <AlertCircle className="w-5 h-5 text-orange-600" />
-                            <p className="font-medium text-orange-900">Pending Uploads</p>
+                            <div className="font-medium text-orange-900">Pending Uploads</div>
                         </div>
-                        <p className="text-sm text-orange-700 mb-3">{pendingUploads.length} files waiting for verification</p>
+                        <div className="text-sm text-orange-700 mb-3">{pendingUploads.length} files waiting for verification</div>
                         <button
                             onClick={() => setCurrentView('verify')}
                             className="w-full px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
@@ -1762,7 +1762,7 @@ const MediaSpecialEditor = ({
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <h6 className="font-medium text-gray-900">Browse Images</h6>
+                    <div className="font-medium text-gray-900" role="heading" aria-level="6">Browse Images</div>
                 </div>
 
                 <div className="space-y-2">
@@ -1793,11 +1793,11 @@ const MediaSpecialEditor = ({
                                 <AlertCircle className="w-3 h-3" />
                                 <span className="font-medium">Adding to Global Collection</span>
                             </div>
-                            <p className="mt-1">These images will be added to the collection and visible in all instances using it.</p>
+                            <div className="mt-1">These images will be added to the collection and visible in all instances using it.</div>
                         </div>
                     )}
                     <div className="flex items-center justify-between mb-2">
-                        <h6 className="font-medium text-blue-900">Selected Images ({tempSelectedImages.length})</h6>
+                        <div className="font-medium text-blue-900" role="heading" aria-level="6">Selected Images ({tempSelectedImages.length})</div>
                         <div className="flex gap-2">
                             <button
                                 onClick={handleClearTempSelection}
@@ -1844,9 +1844,9 @@ const MediaSpecialEditor = ({
                 {/* Pagination */}
                 {totalResults > 0 && (
                     <div className="flex items-center justify-between mb-4 text-sm text-gray-500">
-                        <p>
+                        <div>
                             {((currentPage - 1) * 20) + 1}-{Math.min(currentPage * 20, totalResults)} of {totalResults}
-                        </p>
+                        </div>
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => handleSearch(searchTerms, currentPage - 1)}
@@ -1931,7 +1931,7 @@ const MediaSpecialEditor = ({
                                         </div>
                                     </div>
                                     <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-                                        <p className="text-white text-xs font-medium truncate">{image.title}</p>
+                                        <div className="text-white text-xs font-medium truncate">{image.title}</div>
                                         {image.tags && image.tags.length > 0 && (
                                             <div className="flex gap-1 mt-1 flex-wrap">
                                                 {image.tags.slice(0, 4).map(tag => (
@@ -1957,12 +1957,12 @@ const MediaSpecialEditor = ({
                 ) : searchTerms.length > 0 && !loading ? (
                     <div className="text-center py-8 text-gray-500">
                         <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No images found for "{searchTerms.map(t => t.value).join(', ')}"</p>
+                        <div>No images found for "{searchTerms.map(t => t.value).join(', ')}"</div>
                     </div>
                 ) : searchTerms.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                         <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p className="mb-4">Browse all images or search for specific ones</p>
+                        <div className="mb-4">Browse all images or search for specific ones</div>
                         <button
                             onClick={() => loadImages([])}
                             disabled={loading}
@@ -1975,7 +1975,7 @@ const MediaSpecialEditor = ({
                 ) : (
                     <div className="text-center py-8 text-gray-500">
                         <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No images found for "{searchTerms.map(t => t.value).join(', ')}"</p>
+                        <div>No images found for "{searchTerms.map(t => t.value).join(', ')}"</div>
                     </div>
                 )}
 
@@ -1994,7 +1994,7 @@ const MediaSpecialEditor = ({
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <h6 className="font-medium text-gray-900">Select Collection</h6>
+                    <div className="font-medium text-gray-900" role="heading" aria-level="6">Select Collection</div>
                 </div>
             </div>
 
@@ -2009,11 +2009,11 @@ const MediaSpecialEditor = ({
                             >
                                 <FolderOpen className="w-8 h-8 text-blue-600 flex-shrink-0" />
                                 <div className="flex-1">
-                                    <p className="font-medium text-gray-900">{collection.title}</p>
-                                    <p className="text-sm text-gray-600">{collection.description || 'No description'}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="font-medium text-gray-900">{collection.title}</div>
+                                    <div className="text-sm text-gray-600">{collection.description || 'No description'}</div>
+                                    <div className="text-xs text-gray-500 mt-1">
                                         {collection.fileCount || 0} images
-                                    </p>
+                                    </div>
                                 </div>
                                 <Plus className="w-5 h-5 text-gray-400" />
                             </div>
@@ -2022,7 +2022,7 @@ const MediaSpecialEditor = ({
                 ) : (
                     <div className="text-center py-8 text-gray-500">
                         <FolderOpen className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No collections available</p>
+                        <div>No collections available</div>
                     </div>
                 )}
             </div>
@@ -2040,7 +2040,7 @@ const MediaSpecialEditor = ({
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <h6 className="font-medium text-gray-900">Upload Images</h6>
+                    <div className="font-medium text-gray-900" role="heading" aria-level="6">Upload Images</div>
                 </div>
             </div>
 
@@ -2055,9 +2055,9 @@ const MediaSpecialEditor = ({
                     onClick={() => document.getElementById('file-upload').click()}
                 >
                     <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                    <p className="text-lg font-medium text-gray-900 mb-2">Upload Images</p>
-                    <p className="text-sm text-gray-600 mb-4">Drag and drop images here, or click to browse</p>
-                    <p className="text-xs text-gray-500">Supported formats: JPG, PNG, GIF, WebP</p>
+                    <div className="text-lg font-medium text-gray-900 mb-2">Upload Images</div>
+                    <div className="text-sm text-gray-600 mb-4">Drag and drop images here, or click to browse</div>
+                    <div className="text-xs text-gray-500">Supported formats: JPG, PNG, GIF, WebP</div>
 
                     <input
                         id="file-upload"
@@ -2083,7 +2083,7 @@ const MediaSpecialEditor = ({
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <h6 className="font-medium text-gray-900">Verify Uploads</h6>
+                    <div className="font-medium text-gray-900" role="heading" aria-level="6">Verify Uploads</div>
                     <span className="text-sm text-gray-500">({pendingUploads.length} files)</span>
                 </div>
             </div>
@@ -2126,7 +2126,7 @@ const MediaSpecialEditor = ({
                                             namespace={namespace}
                                         />
                                         {upload.metadata.tags.length === 0 && (
-                                            <p className="text-xs text-red-500 mt-1">At least one tag is required</p>
+                                            <div className="text-xs text-red-500 mt-1">At least one tag is required</div>
                                         )}
                                     </div>
                                 </div>
@@ -2177,11 +2177,11 @@ const MediaSpecialEditor = ({
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <h6 className="font-medium text-gray-900">Manage Collection Images</h6>
+                    <div className="font-medium text-gray-900" role="heading" aria-level="6">Manage Collection Images</div>
                 </div>
-                <p className="text-sm text-gray-600 mt-1">
+                <div className="text-sm text-gray-600 mt-1">
                     {collections.find(c => c.id === currentCollectionId)?.title || 'Collection'}
-                </p>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
@@ -2231,7 +2231,7 @@ const MediaSpecialEditor = ({
                                         </button>
                                     </div>
                                     <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-                                        <p className="text-white text-xs font-medium truncate">{image.title}</p>
+                                        <div className="text-white text-xs font-medium truncate">{image.title}</div>
                                     </div>
                                 </div>
                             );
@@ -2240,7 +2240,7 @@ const MediaSpecialEditor = ({
                 ) : (
                     <div className="text-center py-8 text-gray-500">
                         <FolderOpen className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No images in this collection</p>
+                        <div>No images in this collection</div>
                     </div>
                 )}
             </div>
@@ -2265,11 +2265,11 @@ const MediaSpecialEditor = ({
                 } ${isClosing ? 'animate-fade-out-down' : ''
                 }`}>
                 <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-md font-medium text-gray-900 flex items-center">
+                    <div className="text-md font-medium text-gray-900 flex items-center" role="heading" aria-level="4">
                         <Image className={`w-4 h-4 mr-2 transition-all duration-300 delay-200 ${isAnimating ? 'animate-bounce-in' : ''
                             }`} />
                         Media Manager
-                    </h4>
+                    </div>
                     {pendingUploads.length > 0 && currentView !== 'verify' && (
                         <button
                             onClick={() => setCurrentView('verify')}
@@ -2343,9 +2343,9 @@ const MediaSpecialEditor = ({
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                         <div className="flex items-center justify-between mb-4">
-                            <h5 className="font-medium text-gray-900">
+                            <div className="font-medium text-gray-900" role="heading" aria-level="5">
                                 Remove Image from Collection
-                            </h5>
+                            </div>
                             <button
                                 onClick={() => setShowDeleteConfirm(null)}
                                 className="p-1 text-gray-400 hover:text-gray-600"
@@ -2361,9 +2361,9 @@ const MediaSpecialEditor = ({
                                     className="w-full h-full object-cover"
                                 />
                             </div>
-                            <p className="text-gray-600">
-                                Are you sure you want to remove <strong>{showDeleteConfirm.title || 'this image'}</strong> from the collection?
-                            </p>
+                            <div className="text-gray-600">
+                                Are you sure you want to remove <span className="font-bold">{showDeleteConfirm.title || 'this image'}</span> from the collection?
+                            </div>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setShowDeleteConfirm(null)}
@@ -2388,9 +2388,9 @@ const MediaSpecialEditor = ({
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
-                            <h5 className="font-medium text-gray-900">
+                            <div className="font-medium text-gray-900" role="heading" aria-level="5">
                                 Collection Settings
-                            </h5>
+                            </div>
                             <button
                                 onClick={() => setEditingItem(null)}
                                 className="p-1 text-gray-400 hover:text-gray-600"
@@ -2400,11 +2400,11 @@ const MediaSpecialEditor = ({
                         </div>
                         <div className="space-y-4">
                             <div className="p-3 bg-gray-50 rounded">
-                                <p className="font-medium text-gray-900">{editingItem.data.title}</p>
-                                <p className="text-sm text-gray-600">{editingItem.data.description}</p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="font-medium text-gray-900">{editingItem.data.title}</div>
+                                <div className="text-sm text-gray-600">{editingItem.data.description}</div>
+                                <div className="text-xs text-gray-500 mt-1">
                                     {editingItem.data.fileCount || 0} images
-                                </p>
+                                </div>
                             </div>
 
                             <div>
@@ -2460,9 +2460,9 @@ const MediaSpecialEditor = ({
                                     ))}
                                 </select>
                                 {availableImageStyles.length === 0 && (
-                                    <p className="text-sm text-gray-500 mt-1">
+                                    <div className="text-sm text-gray-500 mt-1">
                                         No image styles defined in current theme. Go to Theme Manager to create image styles.
-                                    </p>
+                                    </div>
                                 )}
                             </div>
 
@@ -2518,11 +2518,11 @@ const MediaSpecialEditor = ({
                         ) : (
                         <div className="space-y-4">
                             <div className="p-3 bg-gray-50 rounded">
-                                <p className="font-medium text-gray-900">{editingItem.data.title}</p>
-                                <p className="text-sm text-gray-600">{editingItem.data.description}</p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="font-medium text-gray-900">{editingItem.data.title}</div>
+                                <div className="text-sm text-gray-600">{editingItem.data.description}</div>
+                                <div className="text-xs text-gray-500 mt-1">
                                     {editingItem.data.fileCount || 0} images
-                                </p>
+                                </div>
                             </div>
 
                             <div>
@@ -2591,9 +2591,9 @@ const MediaSpecialEditor = ({
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
                     <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
-                            <h5 className="font-medium text-gray-900">
+                            <div className="font-medium text-gray-900" role="heading" aria-level="5">
                                 Edit Media Insert
-                            </h5>
+                            </div>
                             <button
                                 onClick={() => setEditingItem(null)}
                                 className="p-1 text-gray-400 hover:text-gray-600"
@@ -2623,9 +2623,9 @@ const MediaSpecialEditor = ({
                                     readOnly
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     Title is read-only (from media library)
-                                </p>
+                                </div>
                             </div>
 
                             {/* Alt Text */}
@@ -2643,9 +2643,9 @@ const MediaSpecialEditor = ({
                                     placeholder="Describe image for screen readers"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     Describe the image for visually impaired users (required for accessibility)
-                                </p>
+                                </div>
                             </div>
 
                             {/* Caption */}
@@ -2663,9 +2663,9 @@ const MediaSpecialEditor = ({
                                     rows={2}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     Optional caption displayed below the image
-                                </p>
+                                </div>
                             </div>
 
                             {/* Annotation */}
@@ -2683,9 +2683,9 @@ const MediaSpecialEditor = ({
                                     placeholder="Enter annotation text (optional)"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     Additional annotation text shown in smaller font
-                                </p>
+                                </div>
                             </div>
 
                             {/* Lightbox Settings */}
@@ -2703,7 +2703,7 @@ const MediaSpecialEditor = ({
                                         />
                                         Open in lightbox
                                     </label>
-                                    <p className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</p>
+                                    <div className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Style</label>
@@ -2730,7 +2730,7 @@ const MediaSpecialEditor = ({
                                         placeholder="optional group key"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
-                                    <p className="mt-1 text-xs text-gray-500">Images sharing a group key can be navigated in the lightbox.</p>
+                                    <div className="mt-1 text-xs text-gray-500">Images sharing a group key can be navigated in the lightbox.</div>
                                 </div>
                             </div>
 

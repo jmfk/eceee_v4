@@ -108,11 +108,11 @@ const LoginPage = () => {
             <div className="max-w-md w-full space-y-8">
                 {/* Header */}
                 <div className="text-center">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">EASY v4</h1>
-                    <h2 className="text-xl text-gray-600 mb-6">AI-Integrated CMS</h2>
-                    <p className="text-sm text-gray-500">
+                    <div className="text-4xl font-bold text-gray-900 mb-2" role="heading" aria-level="1">EASY v4</div>
+                    <div className="text-xl text-gray-600 mb-6" role="heading" aria-level="2">AI-Integrated CMS</div>
+                    <div className="text-sm text-gray-500">
                         Sign in to access the content management system
-                    </p>
+                    </div>
                 </div>
 
                 {/* Login Form */}
@@ -122,7 +122,7 @@ const LoginPage = () => {
                         {error && (
                             <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-center space-x-3">
                                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                <p className="text-sm text-red-700">{error}</p>
+                                <div className="text-sm text-red-700">{error}</div>
                             </div>
                         )}
 
@@ -194,10 +194,10 @@ const LoginPage = () => {
                     {/* Demo Credentials - Only show in development */}
                     {import.meta.env.DEV && (
                         <div className="mt-6 p-4 bg-gray-50 rounded-md">
-                            <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h3>
+                            <div className="text-sm font-medium text-gray-700 mb-2" role="heading" aria-level="3">Demo Credentials:</div>
                             <div className="text-xs text-gray-600 space-y-1">
-                                <p><strong>Username:</strong> admin</p>
-                                <p><strong>Password:</strong> blarg123</p>
+                                <div><span className="font-bold">Username:</span> admin</div>
+                                <div><span className="font-bold">Password:</span> blarg123</div>
                             </div>
                         </div>
                     )}
@@ -205,7 +205,7 @@ const LoginPage = () => {
 
                 {/* Footer */}
                 <div className="text-center text-sm text-gray-500">
-                    <p>Powered by Django & React</p>
+                    <div>Powered by Django & React</div>
                 </div>
             </div>
         </div>

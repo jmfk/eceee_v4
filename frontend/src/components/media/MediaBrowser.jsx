@@ -794,17 +794,17 @@ const MediaBrowser = ({
                             {renderThumbnail(file, imageWidth, objectFit)}
                         </div>
                         <div className="p-3 border-t border-gray-100 flex-shrink-0">
-                            <h4
+                            <div
                                 className="text-sm font-medium text-gray-900 truncate mb-1"
                                 title={file.title}
-                            >
+                             role="heading" aria-level="4">
                                 {file.title}
-                            </h4>
-                            <p className="text-xs text-gray-500 mb-1">
+                            </div>
+                            <div className="text-xs text-gray-500 mb-1">
                                 {file.fileType || file.file_type} • {formatFileSize(file.fileSize || file.file_size)}
-                            </p>
+                            </div>
                             {(file.width && file.height) && (
-                                <p className="text-xs text-gray-400">{file.width}x{file.height}</p>
+                                <div className="text-xs text-gray-400">{file.width}x{file.height}</div>
                             )}
                             {/* Tags */}
                             {file.tags && file.tags.length > 0 && (
@@ -936,10 +936,10 @@ const MediaBrowser = ({
                             Back to Library
                         </button>
                         <div className="flex-1">
-                            <h2 className="text-xl font-semibold text-gray-900">Edit File</h2>
-                            <p className="text-sm text-gray-600 mt-1">
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Edit File</div>
+                            <div className="text-sm text-gray-600 mt-1">
                                 Editing: {file.title || file.originalFilename}
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1081,23 +1081,23 @@ const MediaBrowser = ({
                             {uploadState === 'uploading' ? (
                                 <div className="flex flex-col items-center gap-2">
                                     <Loader2 className="w-6 h-6 animate-spin text-green-600" />
-                                    <p className="text-sm text-gray-700">Uploading files...</p>
+                                    <div className="text-sm text-gray-700">Uploading files...</div>
                                 </div>
                             ) : uploadState === 'complete' ? (
                                 <div className="flex flex-col items-center gap-2">
                                     <CheckCircle className="w-6 h-6 text-green-600" />
-                                    <p className="text-sm text-green-700 font-medium">Upload complete!</p>
+                                    <div className="text-sm text-green-700 font-medium">Upload complete!</div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center gap-2">
                                     <FolderOpen className="w-8 h-8 text-gray-400" />
                                     <div>
-                                        <p className="text-sm text-gray-700 mb-1">
+                                        <div className="text-sm text-gray-700 mb-1">
                                             <span className="font-semibold">Drag files here</span> or <span className="text-blue-600 underline">click to browse</span>
-                                        </p>
-                                        <p className="text-xs text-gray-500">
+                                        </div>
+                                        <div className="text-xs text-gray-500">
                                             Supports images, documents, videos, and audio files
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1145,14 +1145,14 @@ const MediaBrowser = ({
                     <div className="flex items-center justify-center h-64">
                         <div className="text-center">
                             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-                            <p className="text-gray-600">Loading media files...</p>
+                            <div className="text-gray-600">Loading media files...</div>
                         </div>
                     </div>
                 ) : files.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
                         <div className="text-center">
                             <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-600">No files found</p>
+                            <div className="text-gray-600">No files found</div>
                         </div>
                     </div>
                 ) : (

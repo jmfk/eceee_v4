@@ -134,7 +134,7 @@ const ContentPreview = ({ html, mediaItems = [], currentTheme = null }) => {
         <div className="content-preview">
             {/* Widget Statistics */}
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Widgets to Create:</h4>
+                <div className="text-sm font-semibold text-gray-900 mb-3" role="heading" aria-level="4">Widgets to Create:</div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="flex items-center bg-white p-3 rounded border border-gray-200">
                         <span className="text-2xl mr-3">📝</span>
@@ -156,12 +156,12 @@ const ContentPreview = ({ html, mediaItems = [], currentTheme = null }) => {
             {/* Media Items with Thumbnails */}
             {(imageItems.length > 0 || fileItems.length > 0) && (
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Uploaded Media:</h4>
+                    <div className="text-sm font-semibold text-gray-900 mb-3" role="heading" aria-level="4">Uploaded Media:</div>
 
                     {/* Images */}
                     {imageItems.length > 0 && (
                         <div className="mb-3">
-                            <h5 className="text-xs font-semibold text-gray-700 mb-2">Images ({imageItems.length}):</h5>
+                            <div className="text-xs font-semibold text-gray-700 mb-2" role="heading" aria-level="5">Images ({imageItems.length}):</div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {imageItems.map((item, idx) => (
                                     <div key={idx} className="bg-white p-2 rounded border border-gray-200 flex items-start gap-3">
@@ -212,7 +212,7 @@ const ContentPreview = ({ html, mediaItems = [], currentTheme = null }) => {
                     {/* Files */}
                     {fileItems.length > 0 && (
                         <div>
-                            <h5 className="text-xs font-semibold text-gray-700 mb-2">Files ({fileItems.length}):</h5>
+                            <div className="text-xs font-semibold text-gray-700 mb-2" role="heading" aria-level="5">Files ({fileItems.length}):</div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {fileItems.map((item, idx) => (
                                     <div key={idx} className="bg-white p-2 rounded border border-gray-200 flex items-start gap-3">

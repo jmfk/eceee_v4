@@ -196,10 +196,10 @@ const ValueListsManager = () => {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Value Lists</h2>
-                    <p className="text-gray-600 mt-1">
+                    <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="2">Value Lists</div>
+                    <div className="text-gray-600 mt-1">
                         Manage centralized lists of values for form fields
-                    </p>
+                    </div>
                 </div>
                 <button
                     onClick={() => {
@@ -219,8 +219,8 @@ const ValueListsManager = () => {
                 <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-start">
                     <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 mr-3" />
                     <div>
-                        <h3 className="text-sm font-medium text-red-800">Error</h3>
-                        <p className="text-sm text-red-700 mt-1">{error}</p>
+                        <div className="text-sm font-medium text-red-800" role="heading" aria-level="3">Error</div>
+                        <div className="text-sm text-red-700 mt-1">{error}</div>
                     </div>
                 </div>
             )}
@@ -228,13 +228,13 @@ const ValueListsManager = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Value Lists Panel */}
                 <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-gray-900">Available Lists ({valueLists.length})</h3>
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">Available Lists ({valueLists.length})</div>
 
                     {valueLists.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
                             <List className="w-8 h-8 mx-auto mb-3 text-gray-400" />
-                            <p>No value lists created yet</p>
-                            <p className="text-sm mt-1">Create your first value list to get started</p>
+                            <div>No value lists created yet</div>
+                            <div className="text-sm mt-1">Create your first value list to get started</div>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -256,8 +256,8 @@ const ValueListsManager = () => {
                                             <div className="flex items-center space-x-3">
                                                 <ValueTypeIcon className="w-5 h-5 text-gray-600" />
                                                 <div>
-                                                    <h4 className="font-medium text-gray-900">{valueList.label}</h4>
-                                                    <p className="text-sm text-gray-500">{valueList.name}</p>
+                                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">{valueList.label}</div>
+                                                    <div className="text-sm text-gray-500">{valueList.name}</div>
                                                 </div>
                                             </div>
                                             <div className="flex items-center space-x-2">
@@ -294,7 +294,7 @@ const ValueListsManager = () => {
                                             </div>
                                         </div>
                                         {valueList.description && (
-                                            <p className="text-sm text-gray-600 mt-2">{valueList.description}</p>
+                                            <div className="text-sm text-gray-600 mt-2">{valueList.description}</div>
                                         )}
                                     </div>
                                 )
@@ -309,9 +309,9 @@ const ValueListsManager = () => {
                         /* Create/Edit Form */
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-medium text-gray-900">
+                                <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                                     {editingList ? 'Edit Value List' : 'Create Value List'}
-                                </h3>
+                                </div>
                                 <button
                                     onClick={cancelEdit}
                                     className="p-1 text-gray-400 hover:text-gray-600"
@@ -333,9 +333,9 @@ const ValueListsManager = () => {
                                         disabled={editingList !== null} // Can't change name when editing
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         Unique identifier (letters, numbers, underscores only)
-                                    </p>
+                                    </div>
                                 </div>
 
                                 <div>
@@ -377,9 +377,9 @@ const ValueListsManager = () => {
                                         <option value="integer">Integer</option>
                                         <option value="decimal">Decimal</option>
                                     </select>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         Type of values that will be stored in this list
-                                    </p>
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center">
@@ -422,8 +422,8 @@ const ValueListsManager = () => {
                                         className: "w-5 h-5 text-gray-600"
                                     })}
                                     <div>
-                                        <h3 className="text-lg font-medium text-gray-900">{selectedList.label}</h3>
-                                        <p className="text-sm text-gray-500">{selectedList.name}</p>
+                                        <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">{selectedList.label}</div>
+                                        <div className="text-sm text-gray-500">{selectedList.name}</div>
                                     </div>
                                 </div>
                                 <button
@@ -436,12 +436,12 @@ const ValueListsManager = () => {
                             </div>
 
                             {selectedList.description && (
-                                <p className="text-gray-600 mb-4">{selectedList.description}</p>
+                                <div className="text-gray-600 mb-4">{selectedList.description}</div>
                             )}
 
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h4 className="font-medium text-gray-900">Items ({selectedList.item_count})</h4>
+                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">Items ({selectedList.item_count})</div>
                                     <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(selectedList.value_type)}`}>
                                         {selectedList.value_type}
                                     </span>
@@ -475,7 +475,7 @@ const ValueListsManager = () => {
                                 ) : (
                                     <div className="text-center py-6 text-gray-500">
                                         <List className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-                                        <p className="text-sm">No items in this list</p>
+                                        <div className="text-sm">No items in this list</div>
                                     </div>
                                 )}
                             </div>
@@ -484,11 +484,11 @@ const ValueListsManager = () => {
                         /* Welcome Message */
                         <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
                             <List className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Value List</h3>
-                            <p className="text-gray-600">
+                            <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">Select a Value List</div>
+                            <div className="text-gray-600">
                                 Choose a value list from the left to view and manage its items,
                                 or create a new value list to get started.
-                            </p>
+                            </div>
                         </div>
                     )}
                 </div>

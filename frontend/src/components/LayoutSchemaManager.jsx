@@ -122,10 +122,10 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                 <div className="p-6">
                     <div className="space-y-6">
                         <div>
-                            <h2 className="text-lg font-semibold mb-2">Layout Schema Extensions</h2>
-                            <p className="text-gray-600 text-sm mb-4">
+                            <div className="text-lg font-semibold mb-2" role="heading" aria-level="2">Layout Schema Extensions</div>
+                            <div className="text-gray-600 text-sm mb-4">
                                 Define fields specific to certain layouts. These fields are separate from the system schema and only available for the selected layout.
-                            </p>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -176,7 +176,7 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                                 {layoutForm.layoutName && (
                                     <>
                                         <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-md font-medium">Additional Fields for {layoutForm.layoutName}</h3>
+                                            <div className="text-md font-medium" role="heading" aria-level="3">Additional Fields for {layoutForm.layoutName}</div>
                                             {layoutSchemas.find((s) => s.layoutName === layoutForm.layoutName) && (
                                                 <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">Existing Schema</span>
                                             )}
@@ -220,7 +220,7 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                             {/* Column 2: Layout Schema Preview */}
                             {layoutForm.layoutName && (
                                 <div>
-                                    <h3 className="text-md font-medium mb-4">Layout Schema Preview</h3>
+                                    <div className="text-md font-medium mb-4" role="heading" aria-level="3">Layout Schema Preview</div>
                                     <div className="bg-white border rounded-lg p-4">
                                         <SchemaFormPreview
                                             key={`layout-preview-${layoutForm.layoutName}-${Object.keys(layoutForm.schema?.properties || {}).length}`}

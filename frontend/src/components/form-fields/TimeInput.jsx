@@ -87,13 +87,13 @@ const TimeInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {step && step < 60 && (
-                <p className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500">
                     Time precision: {step} seconds
-                </p>
+                </div>
             )}
         </div>
     )

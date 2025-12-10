@@ -241,9 +241,9 @@ const LocalStateFieldWrapper = React.memo(({
     if (!FieldComponent) {
         return (
             <div className="p-3 border border-red-200 rounded bg-red-50">
-                <p className="text-sm text-red-700">
+                <div className="text-sm text-red-700">
                     Field component not provided for field: {fieldName}
-                </p>
+                </div>
             </div>
         )
     }

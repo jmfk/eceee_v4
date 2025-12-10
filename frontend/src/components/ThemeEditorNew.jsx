@@ -98,13 +98,13 @@ const ThemeEditor = () => {
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                        <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
                             <Palette className="h-6 w-6 mr-2" />
                             Theme Editor
-                        </h1>
-                        <p className="text-gray-600 mt-1">
+                        </div>
+                        <div className="text-gray-600 mt-1">
                             Create and manage page themes with color schemes and styling
-                        </p>
+                        </div>
                     </div>
                     <button
                         onClick={handleCreateNew}
@@ -164,15 +164,15 @@ const ThemeEditor = () => {
             {!isLoading && filteredThemes.length === 0 && (
                 <div className="text-center py-12">
                     <Palette className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
                         {searchTerm ? 'No matching themes' : 'No themes yet'}
-                    </h3>
-                    <p className="text-gray-600 mb-6">
+                    </div>
+                    <div className="text-gray-600 mb-6">
                         {searchTerm
                             ? 'Try adjusting your search terms'
                             : 'Create your first theme to get started'
                         }
-                    </p>
+                    </div>
                     {!searchTerm && (
                         <button
                             onClick={handleCreateNew}
@@ -200,12 +200,12 @@ const ThemeEditor = () => {
                             <ArrowLeft className="h-5 w-5" />
                         </button>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
+                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">
                                 {isCreating ? 'Create New Theme' : `Edit ${selectedTheme?.name}`}
-                            </h1>
-                            <p className="text-gray-600 mt-1">
+                            </div>
+                            <div className="text-gray-600 mt-1">
                                 {isCreating ? 'Configure your new theme settings' : 'Modify theme properties and styling'}
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -276,9 +276,9 @@ const ThemeCard = ({ theme, onEdit, onDelete }) => {
                 {/* Theme Info */}
                 <div className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-medium text-gray-900 truncate">
+                        <div className="text-lg font-medium text-gray-900 truncate" role="heading" aria-level="3">
                             {theme.name}
-                        </h3>
+                        </div>
                         <div className="flex items-center space-x-1">
                             {theme.is_default && (
                                 <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
@@ -297,9 +297,9 @@ const ThemeCard = ({ theme, onEdit, onDelete }) => {
                         </div>
                     </div>
 
-                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                    <div className="text-sm text-gray-500 mb-3 line-clamp-2">
                         {theme.description || 'No description provided'}
-                    </p>
+                    </div>
 
                     <div className="flex items-center justify-between text-xs text-gray-400">
                         <span>
@@ -360,10 +360,10 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     // This would be the full ThemeForm component from the original file
     return (
         <div className="p-6">
-            <h3 className="text-lg font-medium mb-4">
+            <div className="text-lg font-medium mb-4" role="heading" aria-level="3">
                 {theme ? 'Edit Theme' : 'Create New Theme'}
-            </h3>
-            <p className="text-gray-600 mb-4">Theme form content would go here...</p>
+            </div>
+            <div className="text-gray-600 mb-4">Theme form content would go here...</div>
             <div className="flex justify-end space-x-3">
                 <button
                     onClick={onCancel}
@@ -386,8 +386,8 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel }) => {
     // This would be the full ThemeEditPanel component from the original file
     return (
         <div className="p-6">
-            <h3 className="text-lg font-medium mb-4">Edit {theme.name}</h3>
-            <p className="text-gray-600 mb-4">Theme edit panel content would go here...</p>
+            <div className="text-lg font-medium mb-4" role="heading" aria-level="3">Edit {theme.name}</div>
+            <div className="text-gray-600 mb-4">Theme edit panel content would go here...</div>
             <div className="flex justify-end space-x-3">
                 <button
                     onClick={onCancel}

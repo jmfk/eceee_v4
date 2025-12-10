@@ -114,7 +114,7 @@ export default function ImagePropertyConfig({
 
             {/* Image-Specific Configuration */}
             <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Media Options</h4>
+                <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Media Options</div>
 
                 {/* Media Types */}
                 <div>
@@ -268,7 +268,7 @@ export default function ImagePropertyConfig({
                 {/* Image-specific settings */}
                 {mediaTypes.includes('image') && (
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                        <h5 className="text-sm font-medium text-blue-900 mb-2">Image Settings</h5>
+                        <div className="text-sm font-medium text-blue-900 mb-2" role="heading" aria-level="5">Image Settings</div>
 
                         <div className="space-y-3">
                             {/* Dimension Constraints */}

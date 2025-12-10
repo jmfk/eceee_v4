@@ -172,7 +172,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
                             </div>
                         )}
                         <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">{child.title}</h4>
+                            <div className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors" role="heading" aria-level="4">{child.title}</div>
                             <div className="flex items-center space-x-2 text-sm text-gray-500">
                                 <span className="font-medium text-blue-600">{child.objectTypeLabel}</span>
                                 <span>•</span>
@@ -218,7 +218,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
             <div className="h-full flex flex-col relative">
                 {/* Content Header */}
                 <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3">
-                    <h1 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="1">
                         <Users className="h-5 w-5 mr-2" />
                         Sub-objects & Hierarchy
                         {objectType && (
@@ -226,7 +226,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
                                 {objectType.label}
                             </span>
                         )}
-                    </h1>
+                    </div>
                 </div>
 
                 {/* Scrollable Content Area */}
@@ -240,10 +240,10 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
                                     /* New Instance - Can't have children yet */
                                     <div className="text-center py-12 bg-gray-50 rounded-lg">
                                         <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Sub-objects Yet</h3>
-                                        <p className="text-gray-600 mb-4">
+                                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No Sub-objects Yet</div>
+                                        <div className="text-gray-600 mb-4">
                                             Sub-objects can be created after saving this {objectType?.label?.toLowerCase()}.
-                                        </p>
+                                        </div>
                                         <button
                                             onClick={onSave}
                                             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
@@ -382,7 +382,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
                                                                             </span>
                                                                         </div>
                                                                     )}
-                                                                    <h3 className="font-medium text-gray-900">{group.label}</h3>
+                                                                    <div className="font-medium text-gray-900" role="heading" aria-level="3">{group.label}</div>
                                                                     <span className="text-sm text-gray-500">({group.children.length})</span>
                                                                 </div>
                                                                 {/* Group Items */}
@@ -405,9 +405,9 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
                                             ) : children.length > 0 ? (
                                                 <div className="text-center py-8 bg-gray-50 rounded-lg">
                                                     <Filter className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                                    <p className="text-gray-600">
+                                                    <div className="text-gray-600">
                                                         No sub-objects match the current filters.
-                                                    </p>
+                                                    </div>
                                                     <button
                                                         onClick={() => {
                                                             setFilterType('all')
@@ -421,13 +421,13 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
                                             ) : (
                                                 <div className="text-center py-8 bg-gray-50 rounded-lg">
                                                     <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                                    <p className="text-gray-600">
+                                                    <div className="text-gray-600">
                                                         No sub-objects created yet.
                                                         {allowedChildTypes.length > 0
                                                             ? ' Use the "Add sub-object" button above to create new sub-objects.'
                                                             : ' This object type does not allow child objects.'
                                                         }
-                                                    </p>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

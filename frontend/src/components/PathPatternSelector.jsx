@@ -76,9 +76,9 @@ const PathPatternSelector = ({ value, onChange, disabled = false, className = ''
                         </option>
                     ))}
                 </select>
-                <p className="mt-1 text-sm text-gray-500">
+                <div className="mt-1 text-sm text-gray-500">
                     Select a pattern to capture URL variables for dynamic content
-                </p>
+                </div>
             </div>
 
             {/* Selected Pattern Details */}
@@ -86,12 +86,12 @@ const PathPatternSelector = ({ value, onChange, disabled = false, className = ''
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4 space-y-3">
                     <div className="flex items-start justify-between">
                         <div className="flex-1">
-                            <h4 className="text-sm font-semibold text-blue-900">
+                            <div className="text-sm font-semibold text-blue-900" role="heading" aria-level="4">
                                 {selectedPattern.name}
-                            </h4>
-                            <p className="text-sm text-blue-700 mt-1">
+                            </div>
+                            <div className="text-sm text-blue-700 mt-1">
                                 {selectedPattern.description}
-                            </p>
+                            </div>
                         </div>
                         <button
                             type="button"
@@ -109,9 +109,9 @@ const PathPatternSelector = ({ value, onChange, disabled = false, className = ''
                                 {selectedPattern.contextualizedExample || selectedPattern.exampleUrl}
                             </code>
                             {selectedPattern.contextualizedExample && (
-                                <p className="text-xs text-blue-600 mt-1">
+                                <div className="text-xs text-blue-600 mt-1">
                                     Pattern: {selectedPattern.exampleUrl}
-                                </p>
+                                </div>
                             )}
                         </div>
 
@@ -167,9 +167,9 @@ const PathPatternSelector = ({ value, onChange, disabled = false, className = ''
                                                 </tbody>
                                             </table>
                                         </div>
-                                        <p className="mt-2 text-xs text-blue-700">
+                                        <div className="mt-2 text-xs text-blue-700">
                                             These variables will be available to widgets on this page.
-                                        </p>
+                                        </div>
                                     </div>
                                 )}
                             </>

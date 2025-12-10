@@ -149,8 +149,8 @@ const FieldTypeTest = () => {
     if (loading) {
         return (
             <div className="p-6">
-                <h2 className="text-2xl font-bold mb-4">Field Type Registry Test</h2>
-                <p>Loading field types from backend...</p>
+                <div className="text-2xl font-bold mb-4" role="heading" aria-level="2">Field Type Registry Test</div>
+                <div>Loading field types from backend...</div>
             </div>
         )
     }
@@ -158,9 +158,9 @@ const FieldTypeTest = () => {
     if (error) {
         return (
             <div className="p-6">
-                <h2 className="text-2xl font-bold mb-4">Field Type Registry Test</h2>
+                <div className="text-2xl font-bold mb-4" role="heading" aria-level="2">Field Type Registry Test</div>
                 <div className="bg-red-50 border border-red-200 rounded p-4">
-                    <p className="text-red-700">Error: {error}</p>
+                    <div className="text-red-700">Error: {error}</div>
                 </div>
             </div>
         )
@@ -168,16 +168,16 @@ const FieldTypeTest = () => {
 
     return (
         <div className="p-6 max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold mb-6">Field Type Registry Test</h2>
+            <div className="text-2xl font-bold mb-6" role="heading" aria-level="2">Field Type Registry Test</div>
 
             {/* Field Types List */}
             <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-4">Available Field Types ({fieldTypes.length})</h3>
+                <div className="text-xl font-semibold mb-4" role="heading" aria-level="3">Available Field Types ({fieldTypes.length})</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {fieldTypes.map(fieldType => (
                         <div key={fieldType.key} className="border border-gray-200 rounded p-4 bg-gray-50">
-                            <h4 className="font-medium text-gray-900">{fieldType.label}</h4>
-                            <p className="text-sm text-gray-600 mt-1">{fieldType.description}</p>
+                            <div className="font-medium text-gray-900" role="heading" aria-level="4">{fieldType.label}</div>
+                            <div className="text-sm text-gray-600 mt-1">{fieldType.description}</div>
                             <div className="mt-2 text-xs text-gray-500">
                                 <div>Component: {fieldType.component}</div>
                                 <div>Type: {fieldType.jsonSchemaType}</div>
@@ -191,7 +191,7 @@ const FieldTypeTest = () => {
             {/* Integration Demos */}
             <div className="border-t pt-8">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-semibold">Integration Demonstrations</h3>
+                    <div className="text-xl font-semibold" role="heading" aria-level="3">Integration Demonstrations</div>
                     <button
                         onClick={() => setShowWidgetEditor(true)}
                         className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
@@ -201,7 +201,7 @@ const FieldTypeTest = () => {
                     </button>
                 </div>
 
-                <h4 className="text-lg font-medium mb-4">Dynamic Form Test</h4>
+                <div className="text-lg font-medium mb-4" role="heading" aria-level="4">Dynamic Form Test</div>
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <DynamicFormRenderer
                         schema={testSchema}
@@ -214,7 +214,7 @@ const FieldTypeTest = () => {
 
                 {/* Form Data Display */}
                 <div className="mt-4 bg-gray-50 border border-gray-200 rounded p-4">
-                    <h4 className="font-medium mb-2">Current Form Data:</h4>
+                    <div className="font-medium mb-2" role="heading" aria-level="4">Current Form Data:</div>
                     <pre className="text-sm text-gray-700 overflow-auto">
                         {JSON.stringify(formData, null, 2)}
                     </pre>

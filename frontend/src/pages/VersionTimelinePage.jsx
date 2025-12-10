@@ -396,12 +396,12 @@ const VersionTimelinePage = () => {
                                 Back to Editor
                             </button>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900">
+                                <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">
                                     Version Timeline & Publishing
-                                </h1>
-                                <p className="text-sm text-gray-600 mt-1">
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1">
                                     {pageTitle} - Schedule and manage when different versions go live
-                                </p>
+                                </div>
                                 {pageData && (
                                     <div className="flex items-center text-xs text-gray-500 mt-2 space-x-2">
                                         <span className="font-medium">Page URL:</span>
@@ -457,15 +457,15 @@ const VersionTimelinePage = () => {
                 {isLoading ? (
                     <div className="text-center py-12">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading versions...</p>
+                        <div className="text-gray-600">Loading versions...</div>
                     </div>
                 ) : sortedVersions.length === 0 ? (
                     <div className="text-center py-12">
                         <div className="text-gray-400 mb-4">
                             <Calendar className="w-16 h-16 mx-auto" />
                         </div>
-                        <h3 className="text-xl font-medium text-gray-900 mb-2">No versions found</h3>
-                        <p className="text-gray-600 mb-6">Create content first to manage versions and publishing.</p>
+                        <div className="text-xl font-medium text-gray-900 mb-2" role="heading" aria-level="3">No versions found</div>
+                        <div className="text-gray-600 mb-6">Create content first to manage versions and publishing.</div>
                         <button
                             onClick={() => navigate(buildEditorUrl())}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -528,16 +528,16 @@ const VersionTimelinePage = () => {
                                                             className="flex items-center space-x-2 group cursor-pointer"
                                                             onClick={() => handleStartEditDescription(version)}
                                                         >
-                                                            <h3 className="text-xl font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                                            <div className="text-xl font-semibold text-gray-900 group-hover:text-blue-600 transition-colors" role="heading" aria-level="3">
                                                                 {version.description || `Version ${version.version_number}`}
-                                                            </h3>
+                                                            </div>
                                                             <Edit2 className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                         </div>
                                                     )}
                                                     {version.description && editingVersionId !== version.id && (
-                                                        <p className="text-sm text-gray-600 mt-1">
+                                                        <div className="text-sm text-gray-600 mt-1">
                                                             Version {version.version_number}
-                                                        </p>
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <span className={`px-3 py-1 text-sm font-medium rounded-full ${statusInfo.color}`}>
@@ -583,9 +583,9 @@ const VersionTimelinePage = () => {
                                                 </div>
                                             </div>
 
-                                            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
+                                            <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
                                                 {statusInfo.description}
-                                            </p>
+                                            </div>
                                         </div>
 
                                         {/* Actions */}
@@ -624,9 +624,9 @@ const VersionTimelinePage = () => {
                         <div className="p-6">
                             <div className="flex items-center space-x-3 mb-4">
                                 <AlertTriangle className="w-6 h-6 text-orange-600" />
-                                <h3 className="text-lg font-medium text-gray-900">
+                                <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                                     {packType === 'aggressive' ? 'Pack All Old Versions' : 'Pack Old Drafts'}
-                                </h3>
+                                </div>
                             </div>
 
                             {packPreview.error ? (
@@ -636,12 +636,12 @@ const VersionTimelinePage = () => {
                             ) : (
                                 <>
                                     <div className="mb-4">
-                                        <p className="text-sm text-gray-600 mb-3">
+                                        <div className="text-sm text-gray-600 mb-3">
                                             {packType === 'aggressive'
                                                 ? 'This will permanently delete all superseded and draft versions older than the current published version.'
                                                 : 'This will permanently delete all draft versions older than the current published version.'
                                             }
-                                        </p>
+                                        </div>
 
                                         <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
                                             <div className="flex items-center space-x-2 text-sm font-medium text-green-800">
@@ -711,14 +711,14 @@ const VersionTimelinePage = () => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
                         <div className="p-6">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">
+                            <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">
                                 Schedule {selectedVersion.description || `Version ${selectedVersion.version_number}`}
                                 {selectedVersion.description && (
                                     <span className="text-sm text-gray-600 block font-normal mt-1">
                                         Version {selectedVersion.version_number}
                                     </span>
                                 )}
-                            </h3>
+                            </div>
 
                             <div className="space-y-4">
                                 <div>

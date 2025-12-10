@@ -10,12 +10,12 @@ const NotFoundPage = () => {
       <div className="text-center space-y-6">
         {/* 404 Text */}
         <div className="space-y-2">
-          <h1 className="text-9xl font-bold text-primary-600">404</h1>
-          <h2 className="text-3xl font-bold text-gray-900">Page Not Found</h2>
-          <p className="text-lg text-gray-600 max-w-md mx-auto">
+          <div className="text-9xl font-bold text-primary-600" role="heading" aria-level="1">404</div>
+          <div className="text-3xl font-bold text-gray-900" role="heading" aria-level="2">Page Not Found</div>
+          <div className="text-lg text-gray-600 max-w-md mx-auto">
             Sorry, we couldn't find the page you're looking for. 
             It might have been moved, deleted, or you entered the wrong URL.
-          </p>
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -39,7 +39,7 @@ const NotFoundPage = () => {
 
         {/* Help Text */}
         <div className="text-sm text-gray-500">
-          <p>If you believe this is an error, please contact the development team.</p>
+          <div>If you believe this is an error, please contact the development team.</div>
         </div>
       </div>
     </div>

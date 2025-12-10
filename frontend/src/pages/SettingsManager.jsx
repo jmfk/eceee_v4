@@ -273,7 +273,7 @@ const SettingsManager = () => {
                 <div className="bg-white rounded-lg shadow p-8">
                     <div className="text-center text-gray-500">
                         <History className="w-8 h-8 mx-auto mb-2" />
-                        <p>Select a page from the Pages tab to view its version history</p>
+                        <div>Select a page from the Pages tab to view its version history</div>
                     </div>
                 </div>
             )
@@ -283,10 +283,10 @@ const SettingsManager = () => {
             <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h3 className="text-lg font-semibold">Version History</h3>
-                        <p className="text-sm text-gray-600">
+                        <div className="text-lg font-semibold" role="heading" aria-level="3">Version History</div>
+                        <div className="text-sm text-gray-600">
                             Managing versions for: <span className="font-medium">{selectedPage.title}</span>
-                        </p>
+                        </div>
                     </div>
                     <button
                         onClick={() => setShowVersionManager(true)}
@@ -298,7 +298,7 @@ const SettingsManager = () => {
 
                 <div className="text-center text-gray-500 py-8">
                     <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p>Click "Open Version Manager" to view and manage page versions</p>
+                    <div>Click "Open Version Manager" to view and manage page versions</div>
                 </div>
             </div>
         )
@@ -497,9 +497,9 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
     return (
         <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-medium text-gray-900">
+                <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                     {page ? 'Edit Page' : 'Create New Page'}
-                </h3>
+                </div>
                 <button
                     onClick={onCancel}
                     className="text-gray-400 hover:text-gray-500"

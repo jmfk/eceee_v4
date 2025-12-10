@@ -53,18 +53,18 @@ const DeletedWidgetWarning = ({
             <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
                 <div className="ml-3 flex-1">
-                    <h3 className="text-sm font-medium text-red-800">
+                    <div className="text-sm font-medium text-red-800" role="heading" aria-level="3">
                         Widget Type Not Available
-                    </h3>
+                    </div>
                     <div className="mt-2 text-sm text-red-700">
-                        <p>
+                        <div>
                             The widget type "{widget?.type || 'unknown'}" is no longer available on the server.
                             This widget cannot be edited until the widget type is restored.
-                        </p>
+                        </div>
                         {widget?.name && (
-                            <p className="mt-1">
+                            <div className="mt-1">
                                 Widget name: <span className="font-medium">{widget.name}</span>
-                            </p>
+                            </div>
                         )}
                     </div>
                     <div className="mt-4 flex space-x-3">

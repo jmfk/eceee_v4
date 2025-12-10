@@ -107,20 +107,20 @@ const SelfContainedFormDemo = () => {
         <div className="max-w-7xl mx-auto p-6 space-y-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-200">
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <div className="text-2xl font-bold text-gray-900 flex items-center gap-2" role="heading" aria-level="1">
                         <Settings className="w-6 h-6 text-blue-600" />
                         Self-Contained Widget Form Demo
-                    </h1>
-                    <p className="text-gray-600 mt-2">
+                    </div>
+                    <div className="text-gray-600 mt-2">
                         Demonstration of the new self-contained widget form with real-time updates and zero React rerenders.
-                    </p>
+                    </div>
                 </div>
 
                 <div className="p-6">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Widget Selection */}
                         <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Select Widget</h3>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Select Widget</div>
                             <div className="space-y-2">
                                 {Object.entries(mockWidgets).map(([key, widget]) => (
                                     <button
@@ -139,14 +139,14 @@ const SelfContainedFormDemo = () => {
 
                             {/* Settings */}
                             <div className="pt-4 border-t border-gray-200">
-                                <h4 className="font-medium text-gray-900 mb-2">Settings</h4>
+                                <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Settings</div>
                             </div>
                         </div>
 
                         {/* Current Widget State */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-gray-900">Current State</h3>
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Current State</div>
                                 <button
                                     onClick={() => setIsEditorOpen(true)}
                                     className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -174,7 +174,7 @@ const SelfContainedFormDemo = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <h4 className="font-medium text-gray-900">Configuration</h4>
+                                <div className="font-medium text-gray-900" role="heading" aria-level="4">Configuration</div>
                                 <pre className="bg-gray-100 rounded-lg p-3 text-sm overflow-auto max-h-40">
                                     {JSON.stringify(currentWidget.config, null, 2)}
                                 </pre>
@@ -184,7 +184,7 @@ const SelfContainedFormDemo = () => {
                         {/* Real-time Updates Log */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-gray-900">Real-time Updates</h3>
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Real-time Updates</div>
                                 <button
                                     onClick={() => setRealTimeUpdates([])}
                                     className="text-sm text-gray-500 hover:text-gray-700"
@@ -195,7 +195,7 @@ const SelfContainedFormDemo = () => {
 
                             <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
                                 {realTimeUpdates.length === 0 ? (
-                                    <p className="text-gray-500 text-sm">No updates yet. Open the editor and make changes.</p>
+                                    <div className="text-gray-500 text-sm">No updates yet. Open the editor and make changes.</div>
                                 ) : (
                                     <div className="space-y-2">
                                         {realTimeUpdates.map((update, index) => (
@@ -222,7 +222,7 @@ const SelfContainedFormDemo = () => {
                     {/* Registry State */}
                     <div className="mt-8 pt-6 border-t border-gray-200">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Widget Registry State</h3>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Widget Registry State</div>
                             <button
                                 onClick={() => setShowRegistry(!showRegistry)}
                                 className="text-sm text-blue-600 hover:text-blue-800"

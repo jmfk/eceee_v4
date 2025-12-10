@@ -377,12 +377,12 @@ div[style*="z-index"] {
   --editor-max-header-level: var(--max-header-level, 3);
 }
 
-.theme-content h1,
-.theme-content h2,
-.theme-content h3,
-.theme-content h4,
-.theme-content h5,
-.theme-content h6 {
+.theme-content .text-h1,
+.theme-content .text-h2,
+.theme-content .text-h3,
+.theme-content .text-h4,
+.theme-content .text-h5,
+.theme-content .text-h6 {
   color: var(--heading-color, var(--primary, #1f2937));
   font-weight: var(--heading-weight, 600);
   margin-top: var(--heading-margin-top, 0);
@@ -390,14 +390,14 @@ div[style*="z-index"] {
   line-height: var(--heading-line-height, 1.2);
 }
 
-.theme-content h1 { font-size: var(--h1-size, 2.25rem); }
-.theme-content h2 { font-size: var(--h2-size, 1.875rem); }
-.theme-content h3 { font-size: var(--h3-size, 1.5rem); }
-.theme-content h4 { font-size: var(--h4-size, 1.25rem); }
-.theme-content h5 { font-size: var(--h5-size, 1.125rem); }
-.theme-content h6 { font-size: var(--h6-size, 1rem); }
+.theme-content .text-h1 { font-size: var(--h1-size, 2.25rem); }
+.theme-content .text-h2 { font-size: var(--h2-size, 1.875rem); }
+.theme-content .text-h3 { font-size: var(--h3-size, 1.5rem); }
+.theme-content .text-h4 { font-size: var(--h4-size, 1.25rem); }
+.theme-content .text-h5 { font-size: var(--h5-size, 1.125rem); }
+.theme-content .text-h6 { font-size: var(--h6-size, 1rem); }
 
-.theme-content p {
+.theme-content .text-p {
   color: var(--text, #1f2937);
   margin-bottom: var(--paragraph-spacing, 1em);
   line-height: var(--paragraph-line-height, var(--line-height, 1.6));
@@ -413,27 +413,24 @@ div[style*="z-index"] {
 }
 
 /* List styling with theme-overridable defaults */
-.theme-content ul,
-.theme-content ol {
+.theme-content .text-ul,
+.theme-content .text-ol {
   color: var(--text, #1f2937);
   margin: var(--list-margin, 1em 0);
   padding-left: var(--list-indent, 1.5em);
-  list-style: var(--list-style, revert);
 }
 
-.theme-content ul {
+.theme-content .text-ul .text-li {
   list-style-type: var(--ul-list-style-type, disc);
-}
-
-.theme-content ol {
-  list-style-type: var(--ol-list-style-type, decimal);
-}
-
-.theme-content li {
   margin-bottom: var(--list-item-spacing, 0.5em);
 }
 
-.theme-content blockquote {
+.theme-content .text-ol .text-li {
+  list-style-type: var(--ol-list-style-type, decimal);
+  margin-bottom: var(--list-item-spacing, 0.5em);
+}
+
+.theme-content .text-blockquote {
   border-left: var(--blockquote-border, 4px solid var(--primary, #3b82f6));
   padding-left: var(--blockquote-padding, 1em);
   margin: var(--blockquote-margin, 1.5em 0);

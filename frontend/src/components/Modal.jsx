@@ -70,9 +70,9 @@ const Modal = ({
                 }}>
                     {/* Header */}
                     <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                             {title}
-                        </h3>
+                        </div>
                         {showCloseButton && (
                             <button
                                 onClick={onClose}

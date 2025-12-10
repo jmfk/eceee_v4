@@ -44,9 +44,9 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div className="flex items-center">
                         <AlertTriangle className="w-6 h-6 text-orange-500 mr-3" />
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                             Duplicate Files Detected
-                        </h2>
+                        </div>
                     </div>
                     <button
                         onClick={onCancel}
@@ -62,12 +62,12 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
                         <div className="flex items-start">
                             <Copy className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
                             <div>
-                                <p className="text-sm font-medium text-blue-900 mb-1">
+                                <div className="text-sm font-medium text-blue-900 mb-1">
                                     Files will be uploaded with new names
-                                </p>
-                                <p className="text-sm text-blue-700">
+                                </div>
+                                <div className="text-sm text-blue-700">
                                     The following files already exist. They will be uploaded as new files with unique names, preserving the existing files.
-                                </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -91,9 +91,9 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
                                                     {duplicate.filename}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-gray-600 ml-6">
+                                            <div className="text-sm text-gray-600 ml-6">
                                                 {duplicate.error}
-                                            </p>
+                                            </div>
                                         </div>
                                     </div>
 

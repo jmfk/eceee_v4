@@ -93,10 +93,10 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Component Styles</h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Component Styles</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         Custom component templates using Mustache syntax
-                    </p>
+                    </div>
                 </div>
                 <button
                     onClick={handleAddStyle}
@@ -111,7 +111,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
             {styleEntries.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                     <Code className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                    <p className="text-gray-600 mb-4">No component styles defined yet</p>
+                    <div className="text-gray-600 mb-4">No component styles defined yet</div>
                     <button
                         onClick={handleAddStyle}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -131,7 +131,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                             <div className="flex items-start justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                     <Code className="h-5 w-5 text-blue-600" />
-                                    <h4 className="font-semibold text-gray-900">{style.name || key}</h4>
+                                    <div className="font-semibold text-gray-900" role="heading" aria-level="4">{style.name || key}</div>
                                 </div>
                                 <button
                                     onClick={(e) => {
@@ -144,7 +144,7 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                                 </button>
                             </div>
                             {style.description && (
-                                <p className="text-sm text-gray-600 mb-2">{style.description}</p>
+                                <div className="text-sm text-gray-600 mb-2">{style.description}</div>
                             )}
                             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                                 <span>Key: {key}</span>
@@ -160,10 +160,10 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
                 <div className="flex items-start gap-3">
                     <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
                     <div>
-                        <h4 className="font-medium text-blue-900 mb-1">Component Styles Documentation</h4>
-                        <p className="text-sm text-blue-700 mb-2">
+                        <div className="font-medium text-blue-900 mb-1" role="heading" aria-level="4">Component Styles Documentation</div>
+                        <div className="text-sm text-blue-700 mb-2">
                             Learn how to create custom component templates with Mustache.
-                        </p>
+                        </div>
                         <a
                             href="/docs/component-styles-reference.html"
                             target="_blank"

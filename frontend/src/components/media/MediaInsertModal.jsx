@@ -364,22 +364,22 @@ const MediaInsertModal = ({
                     <div className="flex items-center gap-3">
                         <ImageIcon className="w-6 h-6 text-blue-600" />
                         <div>
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                             {step === 'select'
                                 ? (isChangingMedia ? 'Change Media' : 'Select Media')
                                 : (isEditMode ? 'Edit Media' : 'Configure Media Insert')
                             }
-                        </h2>
+                        </div>
                             {step === 'configure' && selectedMedia && (
-                                <p className="text-sm text-gray-600 mt-1">
+                                <div className="text-sm text-gray-600 mt-1">
                                     Selected: {selectedMedia.title || selectedMedia.original_filename}
-                                </p>
+                                </div>
                             )}
                             {errorMessage && (
-                                <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                                <div className="text-sm text-red-600 mt-1 flex items-center gap-1">
                                     <AlertCircle className="w-4 h-4" />
                                     {errorMessage}
-                                </p>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -397,14 +397,14 @@ const MediaInsertModal = ({
                     {step === 'select' ? (
                         <div className="p-6">
                             {isInsertMode && !isChangingMedia && (
-                                <p className="text-sm text-gray-600 mb-4">
+                                <div className="text-sm text-gray-600 mb-4">
                                     Select an image or collection from the media library to insert into your content.
-                                </p>
+                                </div>
                             )}
                             {isEditMode && isChangingMedia && (
-                                <p className="text-sm text-gray-600 mb-4">
+                                <div className="text-sm text-gray-600 mb-4">
                                     Select a new image or collection to replace the current media.
-                                </p>
+                                </div>
                             )}
 
                             {/* Tab Toggle - always show Browse and Pending, add Collections if allowed */}
@@ -453,7 +453,7 @@ const MediaInsertModal = ({
                                     <div className="flex items-center justify-center h-64">
                                         <div className="text-center">
                                             <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                                            <p className="text-gray-600">No collections found</p>
+                                            <div className="text-gray-600">No collections found</div>
                                         </div>
                                     </div>
                                 ) : (
@@ -469,8 +469,8 @@ const MediaInsertModal = ({
                                                     className="aspect-square"
                                                 />
                                                 <div className="p-3">
-                                                    <h4 className="font-medium text-sm text-gray-900 truncate">{collection.title}</h4>
-                                                    <p className="text-xs text-gray-600">{collection.fileCount || collection.file_count || 0} images</p>
+                                                    <div className="font-medium text-sm text-gray-900 truncate" role="heading" aria-level="4">{collection.title}</div>
+                                                    <div className="text-xs text-gray-600">{collection.fileCount || collection.file_count || 0} images</div>
                                                 </div>
                                             </div>
                                         ))}
@@ -485,8 +485,8 @@ const MediaInsertModal = ({
                                     <div className="flex items-center justify-center h-64">
                                         <div className="text-center">
                                             <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                                            <p className="text-gray-600">No pending files</p>
-                                            <p className="text-sm text-gray-500 mt-2">Upload files from the Image tab to approve them here</p>
+                                            <div className="text-gray-600">No pending files</div>
+                                            <div className="text-sm text-gray-500 mt-2">Upload files from the Image tab to approve them here</div>
                                         </div>
                                     </div>
                                 ) : (
@@ -517,7 +517,7 @@ const MediaInsertModal = ({
                             {/* Preview with Change Media button for edit mode */}
                             <div className="mb-6">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-medium text-gray-900">Preview</h3>
+                                    <div className="text-sm font-medium text-gray-900" role="heading" aria-level="3">Preview</div>
                                     {isEditMode && (
                                         <button
                                             onClick={handleChangeMedia}
@@ -538,8 +538,8 @@ const MediaInsertModal = ({
                                                     className="h-32"
                                                 />
                                                 <div className="p-4">
-                                                    <p className="font-medium text-gray-900">{selectedMedia.title || selectedMedia.original_filename}</p>
-                                                    <p className="text-sm text-gray-600">Collection ({selectedMedia.files?.length || 0} files)</p>
+                                                    <div className="font-medium text-gray-900">{selectedMedia.title || selectedMedia.original_filename}</div>
+                                                    <div className="text-sm text-gray-600">Collection ({selectedMedia.files?.length || 0} files)</div>
                                                 </div>
                                             </div>
                                         ) : (
@@ -556,8 +556,8 @@ const MediaInsertModal = ({
                                                     </div>
                                                 )}
                                                 <div>
-                                                    <p className="font-medium text-gray-900">{selectedMedia.title || selectedMedia.original_filename}</p>
-                                                    <p className="text-sm text-gray-600">Single Image</p>
+                                                    <div className="font-medium text-gray-900">{selectedMedia.title || selectedMedia.original_filename}</div>
+                                                    <div className="text-sm text-gray-600">Single Image</div>
                                                 </div>
                                             </div>
                                         )
@@ -599,9 +599,9 @@ const MediaInsertModal = ({
                                                 </option>
                                             ))}
                                         </select>
-                                        <p className="mt-1 text-xs text-gray-500">
+                                        <div className="mt-1 text-xs text-gray-500">
                                             Choose a custom image style from the theme (includes gallery and carousel styles)
-                                        </p>
+                                        </div>
                                     </div>
                                 )}
 
@@ -617,9 +617,9 @@ const MediaInsertModal = ({
                                         placeholder="Describe image for screen readers"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
-                                    <p className="mt-1 text-xs text-gray-500">
+                                    <div className="mt-1 text-xs text-gray-500">
                                         Describe the image for visually impaired users (required for accessibility)
-                                    </p>
+                                    </div>
                                 </div>
 
                                 {/* Caption */}
@@ -634,9 +634,9 @@ const MediaInsertModal = ({
                                         placeholder="Enter image caption (optional)"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
-                                    <p className="mt-1 text-xs text-gray-500">
+                                    <div className="mt-1 text-xs text-gray-500">
                                         Optional caption displayed below the image
-                                    </p>
+                                    </div>
                                 </div>
 
                                 {/* Lightbox */}
@@ -651,7 +651,7 @@ const MediaInsertModal = ({
                                             />
                                             Open in lightbox
                                         </label>
-                                        <p className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</p>
+                                        <div className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Style</label>
@@ -672,7 +672,7 @@ const MediaInsertModal = ({
                                             placeholder="optional group key"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         />
-                                        <p className="mt-1 text-xs text-gray-500">Images sharing a group key can be navigated in the lightbox.</p>
+                                        <div className="mt-1 text-xs text-gray-500">Images sharing a group key can be navigated in the lightbox.</div>
                                     </div>
                                 </div>
                             </div>

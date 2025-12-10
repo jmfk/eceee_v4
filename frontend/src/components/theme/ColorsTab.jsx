@@ -87,7 +87,7 @@ const ColorsTab = ({ colors, onChange, onDirty }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Named Colors</h3>
+        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Named Colors</div>
         <CopyButton
           data={colors}
           level="section"
@@ -125,7 +125,7 @@ const ColorsTab = ({ colors, onChange, onDirty }) => {
 
       {/* Add Color Form */}
       <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 space-y-4">
-        <h4 className="font-semibold text-gray-900">Add Color</h4>
+        <div className="font-semibold text-gray-900" role="heading" aria-level="4">Add Color</div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -229,7 +229,7 @@ const ColorsTab = ({ colors, onChange, onDirty }) => {
       ) : (
         <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
           <Palette className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-500">No colors defined yet.</p>
+          <div className="text-gray-500">No colors defined yet.</div>
         </div>
       )}
     </div>

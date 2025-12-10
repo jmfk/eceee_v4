@@ -298,9 +298,9 @@ const SimplifiedApprovalForm = ({
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                         Approve Uploaded Files
-                    </h3>
+                    </div>
                 </div>
                 <div className="text-sm text-gray-600">
                     {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''} pending
@@ -309,9 +309,9 @@ const SimplifiedApprovalForm = ({
 
             {/* Instructions */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-800">
+                <div className="text-sm text-blue-800">
                     Please provide a title and at least one tag for each file before approving.
-                </p>
+                </div>
             </div>
 
             {/* Bulk Tag All Section */}
@@ -321,13 +321,13 @@ const SimplifiedApprovalForm = ({
                         <Tags className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1 space-y-2">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold text-purple-900">
+                                <div className="text-sm font-semibold text-purple-900" role="heading" aria-level="4">
                                     Tag All Files
-                                </h4>
+                                </div>
                             </div>
-                            <p className="text-xs text-purple-700">
+                            <div className="text-xs text-purple-700">
                                 Add tags to all {pendingFiles.length} files at once
-                            </p>
+                            </div>
                             <div className="flex items-end gap-2">
                                 <div className="flex-1">
                                     <MediaTagWidget
@@ -365,12 +365,12 @@ const SimplifiedApprovalForm = ({
                             <div className="flex items-start gap-3">
                                 {renderThumbnail(file)}
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-gray-900 truncate">
+                                    <div className="font-medium text-gray-900 truncate">
                                         {file.originalFilename}
-                                    </p>
-                                    <p className="text-sm text-gray-500">
+                                    </div>
+                                    <div className="text-sm text-gray-500">
                                         {file.fileType} • {(file.fileSize / 1024).toFixed(1)} KB
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -391,10 +391,10 @@ const SimplifiedApprovalForm = ({
                                     disabled={processing}
                                 />
                                 {errors.title && (
-                                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                                    <div className="text-sm text-red-600 mt-1 flex items-center gap-1">
                                         <AlertCircle className="w-4 h-4" />
                                         {errors.title}
-                                    </p>
+                                    </div>
                                 )}
                             </div>
 
@@ -411,9 +411,9 @@ const SimplifiedApprovalForm = ({
                                     rows={2}
                                     disabled={processing}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                     Additional annotation text displayed in the user interface
-                                </p>
+                                </div>
                             </div>
 
                             {/* Tags Input */}
@@ -428,10 +428,10 @@ const SimplifiedApprovalForm = ({
                                     disabled={processing}
                                 />
                                 {errors.tags && (
-                                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                                    <div className="text-sm text-red-600 mt-1 flex items-center gap-1">
                                         <AlertCircle className="w-4 h-4" />
                                         {errors.tags}
-                                    </p>
+                                    </div>
                                 )}
                             </div>
                         </div>

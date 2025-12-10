@@ -159,10 +159,10 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Image Styles</h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Image Styles</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         Unified gallery and carousel styles with Mustache templates
-                    </p>
+                    </div>
                 </div>
                 <button
                     onClick={handleAddStyle}
@@ -177,7 +177,7 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
             {styleEntries.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                     <Grid3X3 className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                    <p className="text-gray-600 mb-4">No image styles defined yet</p>
+                    <div className="text-gray-600 mb-4">No image styles defined yet</div>
                     <button
                         onClick={handleAddStyle}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -201,7 +201,7 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
                                     ) : (
                                         <Grid3X3 className="h-5 w-5 text-blue-600" />
                                     )}
-                                    <h4 className="font-semibold text-gray-900">{style.name || key}</h4>
+                                    <div className="font-semibold text-gray-900" role="heading" aria-level="4">{style.name || key}</div>
                                 </div>
                                 <button
                                     onClick={(e) => {
@@ -214,7 +214,7 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
                                 </button>
                             </div>
                             {style.description && (
-                                <p className="text-sm text-gray-600 mb-2">{style.description}</p>
+                                <div className="text-sm text-gray-600 mb-2">{style.description}</div>
                             )}
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <span className={`px-2 py-1 rounded ${
@@ -248,10 +248,10 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
                 <div className="flex items-start gap-3">
                     <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
                     <div>
-                        <h4 className="font-medium text-blue-900 mb-1">Image Styles Documentation</h4>
-                        <p className="text-sm text-blue-700 mb-2">
+                        <div className="font-medium text-blue-900 mb-1" role="heading" aria-level="4">Image Styles Documentation</div>
+                        <div className="text-sm text-blue-700 mb-2">
                             Learn how to create custom gallery and carousel templates with Mustache.
-                        </p>
+                        </div>
                         <a
                             href="/docs/image-styles-reference.html"
                             target="_blank"

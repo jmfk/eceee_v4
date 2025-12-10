@@ -157,14 +157,14 @@ const AdvancedFieldDemo = () => {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center justify-center space-x-2">
+                <div className="text-2xl font-bold text-gray-900 mb-4 flex items-center justify-center space-x-2" role="heading" aria-level="2">
                     <Sparkles className="w-6 h-6 text-yellow-500" />
                     <span>Advanced Field Types Demo</span>
-                </h2>
-                <p className="text-gray-600 max-w-2xl mx-auto">
+                </div>
+                <div className="text-gray-600 max-w-2xl mx-auto">
                     Explore the advanced field types: color picker, slider, tag input, and date range.
                     These components provide rich UI interactions for complex form requirements.
-                </p>
+                </div>
             </div>
 
             {/* Example Selector */}
@@ -198,8 +198,8 @@ const AdvancedFieldDemo = () => {
                     <div className="flex items-center space-x-3">
                         <currentExample.icon className="w-5 h-5 text-blue-600" />
                         <div>
-                            <h3 className="text-lg font-medium text-gray-900">{currentExample.title}</h3>
-                            <p className="text-sm text-gray-600">{currentExample.description}</p>
+                            <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">{currentExample.title}</div>
+                            <div className="text-sm text-gray-600">{currentExample.description}</div>
                         </div>
                     </div>
                 </div>
@@ -207,7 +207,7 @@ const AdvancedFieldDemo = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
                     {/* Form */}
                     <div>
-                        <h4 className="text-md font-medium text-gray-900 mb-4">Interactive Form</h4>
+                        <div className="text-md font-medium text-gray-900 mb-4" role="heading" aria-level="4">Interactive Form</div>
                         <DynamicFormRenderer
                             schema={currentExample.schema}
                             data={formData}
@@ -219,7 +219,7 @@ const AdvancedFieldDemo = () => {
 
                     {/* Data Preview */}
                     <div>
-                        <h4 className="text-md font-medium text-gray-900 mb-4">Form Data</h4>
+                        <div className="text-md font-medium text-gray-900 mb-4" role="heading" aria-level="4">Form Data</div>
                         <div className="bg-gray-50 border border-gray-200 rounded p-4">
                             <pre className="text-sm text-gray-700 overflow-auto max-h-96">
                                 {JSON.stringify(formData, null, 2)}
@@ -228,7 +228,7 @@ const AdvancedFieldDemo = () => {
 
                         {/* Field Type Info */}
                         <div className="mt-4 space-y-2">
-                            <h5 className="text-sm font-medium text-gray-900">Field Types Used:</h5>
+                            <div className="text-sm font-medium text-gray-900" role="heading" aria-level="5">Field Types Used:</div>
                             <div className="flex flex-wrap gap-2">
                                 {Object.values(currentExample.schema.properties).map((field, index) => (
                                     <span
@@ -248,31 +248,31 @@ const AdvancedFieldDemo = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <Palette className="w-8 h-8 text-purple-600 mb-2" />
-                    <h4 className="font-medium text-purple-900">Color Picker</h4>
-                    <p className="text-sm text-purple-700 mt-1">
+                    <div className="font-medium text-purple-900" role="heading" aria-level="4">Color Picker</div>
+                    <div className="text-sm text-purple-700 mt-1">
                         Advanced color selection with presets, eyedropper, and format support
-                    </p>
+                    </div>
                 </div>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <Sliders className="w-8 h-8 text-green-600 mb-2" />
-                    <h4 className="font-medium text-green-900">Range Slider</h4>
-                    <p className="text-sm text-green-700 mt-1">
+                    <div className="font-medium text-green-900" role="heading" aria-level="4">Range Slider</div>
+                    <div className="text-sm text-green-700 mt-1">
                         Interactive range selection with visual feedback and step controls
-                    </p>
+                    </div>
                 </div>
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <Tag className="w-8 h-8 text-yellow-600 mb-2" />
-                    <h4 className="font-medium text-yellow-900">Tag Input</h4>
-                    <p className="text-sm text-yellow-700 mt-1">
+                    <div className="font-medium text-yellow-900" role="heading" aria-level="4">Tag Input</div>
+                    <div className="text-sm text-yellow-700 mt-1">
                         Tag creation and selection with autocomplete and color coding
-                    </p>
+                    </div>
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <CalendarRange className="w-8 h-8 text-blue-600 mb-2" />
-                    <h4 className="font-medium text-blue-900">Date Range</h4>
-                    <p className="text-sm text-blue-700 mt-1">
+                    <div className="font-medium text-blue-900" role="heading" aria-level="4">Date Range</div>
+                    <div className="text-sm text-blue-700 mt-1">
                         Date range selection with presets and validation
-                    </p>
+                    </div>
                 </div>
             </div>
         </div>

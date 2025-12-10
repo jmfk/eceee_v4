@@ -180,7 +180,7 @@ const ReorderableInput = ({
                     {items.length === 0 ? (
                         <div className="p-6 text-center text-gray-500">
                             <List className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                            <p className="text-sm">{emptyText}</p>
+                            <div className="text-sm">{emptyText}</div>
                         </div>
                     ) : (
                         items.map((item, index) => (
@@ -297,7 +297,7 @@ const ReorderableInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Validation Message */}

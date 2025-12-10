@@ -207,7 +207,7 @@ const MetadataConfirmationStep = ({
                 {/* Custom Tags List */}
                 {customTags.length > 0 && (
                     <div className="mb-4">
-                        <p className="text-xs text-gray-500 mb-2">Custom Tags Added:</p>
+                        <div className="text-xs text-gray-500 mb-2">Custom Tags Added:</div>
                         <div className="flex flex-wrap gap-2">
                             {customTags.map((tagName) => (
                                 <span
@@ -231,7 +231,7 @@ const MetadataConfirmationStep = ({
 
                 {/* Add Custom Tag */}
                 <div>
-                    <p className="text-xs text-gray-500 mb-2">Add Custom Tag:</p>
+                    <div className="text-xs text-gray-500 mb-2">Add Custom Tag:</div>
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -256,8 +256,8 @@ const MetadataConfirmationStep = ({
             {/* AI Reasoning */}
             {metadata?.reasoning && (
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                    <p className="text-xs font-medium text-blue-900 mb-1">AI Analysis:</p>
-                    <p className="text-sm text-blue-700">{metadata.reasoning}</p>
+                    <div className="text-xs font-medium text-blue-900 mb-1">AI Analysis:</div>
+                    <div className="text-sm text-blue-700">{metadata.reasoning}</div>
                 </div>
             )}
         </div>

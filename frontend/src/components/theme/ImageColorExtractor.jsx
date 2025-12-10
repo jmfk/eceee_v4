@@ -191,9 +191,9 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
             <ImageIcon className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-            <p className="text-sm text-gray-600 mb-3">
+            <div className="text-sm text-gray-600 mb-3">
               Upload an image to extract colors
-            </p>
+            </div>
             <label className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer transition-colors">
               <Upload className="w-4 h-4 mr-2" />
               Choose Image
@@ -259,9 +259,9 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
                     </button>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500">
                   Maximum number to extract (limit: {sliderMax})
-                </p>
+                </div>
               </div>
 
               {/* Clustering Distance */}
@@ -291,9 +291,9 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
                     </button>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500">
                   Groups colors within {clusteringDistance} units
-                </p>
+                </div>
               </div>
             </div>
 
@@ -306,7 +306,7 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
                 </div>
               ) : colorStats ? (
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold text-gray-900 mb-2">Statistics</p>
+                  <div className="text-xs font-semibold text-gray-900 mb-2">Statistics</div>
                   <div className="space-y-1 text-xs text-gray-700">
                     <div className="flex justify-between">
                       <span>Found:</span>
@@ -340,7 +340,7 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
           <div className="grid grid-cols-4 gap-3">
             {/* Red Column */}
             <div>
-              <h5 className="text-xs font-semibold text-red-600 mb-2">Red ({categorizedColors.red.length})</h5>
+              <div className="text-xs font-semibold text-red-600 mb-2" role="heading" aria-level="5">Red ({categorizedColors.red.length})</div>
               <div className="space-y-1.5">
                 {categorizedColors.red.map((color) => {
                   const isSelected = selectedColors.has(color.originalIndex);
@@ -361,11 +361,11 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
                           style={{ backgroundColor: color.hex }}
                         />
                         <div className="w-full text-center">
-                          <p className="text-[9px] leading-tight text-gray-900">
+                          <div className="text-[9px] leading-tight text-gray-900">
                             R:{color.r} G:{color.g} B:{color.b}
-                          </p>
+                          </div>
                           {color.frequency && (
-                            <p className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</p>
+                            <div className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</div>
                           )}
                         </div>
                         {isSelected && (
@@ -382,7 +382,7 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
 
             {/* Green Column */}
             <div>
-              <h5 className="text-xs font-semibold text-green-600 mb-2">Green ({categorizedColors.green.length})</h5>
+              <div className="text-xs font-semibold text-green-600 mb-2" role="heading" aria-level="5">Green ({categorizedColors.green.length})</div>
               <div className="space-y-1.5">
                 {categorizedColors.green.map((color) => {
                   const isSelected = selectedColors.has(color.originalIndex);
@@ -403,11 +403,11 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
                           style={{ backgroundColor: color.hex }}
                         />
                         <div className="w-full text-center">
-                          <p className="text-[9px] leading-tight text-gray-900">
+                          <div className="text-[9px] leading-tight text-gray-900">
                             R:{color.r} G:{color.g} B:{color.b}
-                          </p>
+                          </div>
                           {color.frequency && (
-                            <p className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</p>
+                            <div className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</div>
                           )}
                         </div>
                         {isSelected && (
@@ -424,7 +424,7 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
 
             {/* Blue Column */}
             <div>
-              <h5 className="text-xs font-semibold text-blue-600 mb-2">Blue ({categorizedColors.blue.length})</h5>
+              <div className="text-xs font-semibold text-blue-600 mb-2" role="heading" aria-level="5">Blue ({categorizedColors.blue.length})</div>
               <div className="space-y-1.5">
                 {categorizedColors.blue.map((color) => {
                   const isSelected = selectedColors.has(color.originalIndex);
@@ -445,11 +445,11 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
                           style={{ backgroundColor: color.hex }}
                         />
                         <div className="w-full text-center">
-                          <p className="text-[9px] leading-tight text-gray-900">
+                          <div className="text-[9px] leading-tight text-gray-900">
                             R:{color.r} G:{color.g} B:{color.b}
-                          </p>
+                          </div>
                           {color.frequency && (
-                            <p className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</p>
+                            <div className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</div>
                           )}
                         </div>
                         {isSelected && (
@@ -466,7 +466,7 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
 
             {/* Black/White Column */}
             <div>
-              <h5 className="text-xs font-semibold text-gray-600 mb-2">B/W ({categorizedColors.bw.length})</h5>
+              <div className="text-xs font-semibold text-gray-600 mb-2" role="heading" aria-level="5">B/W ({categorizedColors.bw.length})</div>
               <div className="space-y-1.5">
                 {categorizedColors.bw.map((color) => {
                   const isSelected = selectedColors.has(color.originalIndex);
@@ -487,11 +487,11 @@ const ImageColorExtractor = ({ onColorsExtracted, mode = 'add' }) => {
                           style={{ backgroundColor: color.hex }}
                         />
                         <div className="w-full text-center">
-                          <p className="text-[9px] leading-tight text-gray-900">
+                          <div className="text-[9px] leading-tight text-gray-900">
                             R:{color.r} G:{color.g} B:{color.b}
-                          </p>
+                          </div>
                           {color.frequency && (
-                            <p className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</p>
+                            <div className="text-[10px] leading-tight text-gray-500 font-medium mt-0.5">{color.frequency}%</div>
                           )}
                         </div>
                         {isSelected && (

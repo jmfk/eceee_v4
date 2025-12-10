@@ -1108,7 +1108,7 @@ class LayoutRenderer {
     modal.innerHTML = `
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">Edit ${this.templateRenderer.escapeHtml(widgetInstance.name)}</h3>
+          <div class="text-lg font-semibold text-gray-900">Edit ${this.templateRenderer.escapeHtml(widgetInstance.name)}</div>
           <button class="widget-edit-close text-gray-400 hover:text-gray-600 transition-colors"><span class="text-xl">×</span></button>
         </div>
         <form class="widget-edit-form space-y-4"></form>
@@ -1412,8 +1412,8 @@ class LayoutRenderer {
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h3 class="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
-            <p class="text-sm text-gray-600">${slotConfig?.title || slotName}</p>
+            <div class="text-lg font-semibold text-gray-900">Add Widget to Slot</div>
+            <div class="text-sm text-gray-600">${slotConfig?.title || slotName}</div>
           </div>
           <button class="widget-modal-close text-gray-400 hover:text-gray-600 transition-colors">
             <span class="text-xl">×</span>
@@ -1423,7 +1423,7 @@ class LayoutRenderer {
         <div class="flex items-center justify-center py-12">
           <div class="text-center">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p class="mt-2 text-sm text-gray-600">Loading widgets...</p>
+            <div class="mt-2 text-sm text-gray-600">Loading widgets...</div>
           </div>
         </div>
       </div>
@@ -1452,8 +1452,8 @@ class LayoutRenderer {
         <div class="p-6">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
-              <p class="text-sm text-gray-600">${slotConfig?.title || slotName}</p>
+              <div class="text-lg font-semibold text-gray-900">Add Widget to Slot</div>
+              <div class="text-sm text-gray-600">${slotConfig?.title || slotName}</div>
             </div>
             <button class="widget-modal-close text-gray-400 hover:text-gray-600 transition-colors">
               <span class="text-xl">×</span>
@@ -1488,8 +1488,8 @@ class LayoutRenderer {
         <div class="p-6">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
-              <p class="text-sm text-gray-600">${slotConfig?.title || slotName}</p>
+              <div class="text-lg font-semibold text-gray-900">Add Widget to Slot</div>
+              <div class="text-sm text-gray-600">${slotConfig?.title || slotName}</div>
             </div>
             <button class="widget-modal-close text-gray-400 hover:text-gray-600 transition-colors">
               <span class="text-xl">×</span>
@@ -1499,8 +1499,8 @@ class LayoutRenderer {
           <div class="flex items-center justify-center py-12">
             <div class="text-center">
               <div class="text-red-500 text-4xl mb-2">⚠️</div>
-              <p class="text-sm text-gray-600">Error loading widgets</p>
-              <p class="text-xs text-gray-500 mt-1">${error.message}</p>
+              <div class="text-sm text-gray-600">Error loading widgets</div>
+              <div class="text-xs text-gray-500 mt-1">${error.message}</div>
               <button class="mt-3 px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors widget-retry">
                 Retry
               </button>
@@ -2102,8 +2102,8 @@ class LayoutRenderer {
             ${this.templateRenderer.escapeHtml(widget.icon)}
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-semibold text-gray-900 mb-1">${this.templateRenderer.escapeHtml(widget.name)}</h4>
-            <p class="text-xs text-gray-600 leading-relaxed">${this.templateRenderer.escapeHtml(widget.description)}</p>
+            <div class="text-sm font-semibold text-gray-900 mb-1">${this.templateRenderer.escapeHtml(widget.name)}</div>
+            <div class="text-xs text-gray-600 leading-relaxed">${this.templateRenderer.escapeHtml(widget.description)}</div>
             <div class="mt-2">
               <span class="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
                 ${this.templateRenderer.escapeHtml(widget.category)}
@@ -5294,7 +5294,7 @@ class LayoutRenderer {
 
       element.innerHTML = `
         <div class="text-sm font-medium text-gray-700">${widgetType}</div>
-        ${configText ? `<div class="text-xs text-gray-500 mt-1"><pre>${configText}</pre></div>` : ''}
+        ${configText ? `<div class="text-xs text-gray-500 mt-1"><pre>${configText}</divre></div>` : ''}
       `;
 
       return element;

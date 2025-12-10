@@ -336,8 +336,8 @@ const UserManagementPage = () => {
             <div className="max-w-4xl mx-auto py-8 px-4">
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                     <Shield className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
-                    <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
-                    <p className="text-gray-600">You need superuser privileges to access this page.</p>
+                    <div className="text-xl font-semibold text-gray-900 mb-2" role="heading" aria-level="2">Access Denied</div>
+                    <div className="text-gray-600">You need superuser privileges to access this page.</div>
                 </div>
             </div>
         );
@@ -348,11 +348,11 @@ const UserManagementPage = () => {
             <div className="mb-8">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 flex items-center space-x-3">
+                        <div className="text-3xl font-bold text-gray-900 flex items-center space-x-3" role="heading" aria-level="1">
                             <Users className="w-8 h-8" />
                             <span>User Management</span>
-                        </h1>
-                        <p className="text-gray-600 mt-2">Manage user accounts and password resets</p>
+                        </div>
+                        <div className="text-gray-600 mt-2">Manage user accounts and password resets</div>
                     </div>
                     <button
                         onClick={() => setShowCreateModal(true)}
@@ -480,7 +480,7 @@ const UserManagementPage = () => {
                     {users.length === 0 && (
                         <div className="text-center py-12">
                             <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                            <p className="text-gray-500">No users found</p>
+                            <div className="text-gray-500">No users found</div>
                         </div>
                     )}
                 </div>
@@ -491,10 +491,10 @@ const UserManagementPage = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="3">
                                 <Key className="w-5 h-5 mr-2 text-blue-600" />
                                 Password Reset Link Generated
-                            </h3>
+                            </div>
                             <button
                                 onClick={closeModal}
                                 className="text-gray-400 hover:text-gray-600"
@@ -545,8 +545,8 @@ const UserManagementPage = () => {
                                 <div className="flex items-start space-x-2">
                                     <Calendar className="w-5 h-5 text-yellow-600 mt-0.5" />
                                     <div className="text-sm text-yellow-800">
-                                        <p className="font-medium">This link expires in {resetLinkModal.expiresIn}</p>
-                                        <p className="mt-1">Share this link securely with the user. They can use it to reset their password.</p>
+                                        <div className="font-medium">This link expires in {resetLinkModal.expiresIn}</div>
+                                        <div className="mt-1">Share this link securely with the user. They can use it to reset their password.</div>
                                     </div>
                                 </div>
                             </div>
@@ -569,10 +569,10 @@ const UserManagementPage = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="3">
                                 <UserPlus className="w-5 h-5 mr-2 text-blue-600" />
                                 Create New User
-                            </h3>
+                            </div>
                             <button
                                 onClick={closeCreateModal}
                                 className="text-gray-400 hover:text-gray-600"
@@ -685,9 +685,9 @@ const UserManagementPage = () => {
                                     </div>
                                 )}
                                 {!createErrors.password && (
-                                    <p className="mt-1 text-xs text-gray-500">
+                                    <div className="mt-1 text-xs text-gray-500">
                                         Password must be at least 8 characters long
-                                    </p>
+                                    </div>
                                 )}
                             </div>
 
@@ -774,10 +774,10 @@ const UserManagementPage = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="3">
                                 <Edit className="w-5 h-5 mr-2 text-blue-600" />
                                 Edit User: {editFormData.username}
-                            </h3>
+                            </div>
                             <button
                                 onClick={closeEditModal}
                                 className="text-gray-400 hover:text-gray-600"
@@ -902,10 +902,10 @@ const UserManagementPage = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="3">
                                 <AlertCircle className="w-5 h-5 mr-2 text-red-600" />
                                 Confirm Delete User
-                            </h3>
+                            </div>
                             <button
                                 onClick={closeDeleteModal}
                                 className="text-gray-400 hover:text-gray-600"
@@ -916,15 +916,15 @@ const UserManagementPage = () => {
                         </div>
 
                         <div className="mb-6">
-                            <p className="text-gray-700 mb-4">
+                            <div className="text-gray-700 mb-4">
                                 Are you sure you want to delete the user <span className="font-semibold">{deleteConfirmModal.username}</span>?
-                            </p>
+                            </div>
                             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                                 <div className="flex items-start space-x-2">
                                     <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                                     <div className="text-sm text-red-800">
-                                        <p className="font-medium">This action cannot be undone.</p>
-                                        <p className="mt-1">All data associated with this user will be permanently deleted.</p>
+                                        <div className="font-medium">This action cannot be undone.</div>
+                                        <div className="mt-1">All data associated with this user will be permanently deleted.</div>
                                     </div>
                                 </div>
                             </div>

@@ -27,7 +27,7 @@ export default function PropertyPreview({
     return (
         <div className="border-t border-gray-200 mt-4 pt-4">
             <div className="flex items-center justify-between mb-3">
-                <h5 className="text-sm font-medium text-gray-900">Field Preview</h5>
+                <div className="text-sm font-medium text-gray-900" role="heading" aria-level="5">Field Preview</div>
                 <button
                     type="button"
                     onClick={onToggle}

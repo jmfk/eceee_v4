@@ -105,8 +105,8 @@ const ThemeSelector = ({
             <div className="h-full flex items-center justify-center bg-red-50">
                 <div className="text-center text-red-600">
                     <Palette className="w-8 h-8 mx-auto mb-2" />
-                    <p>Error loading themes</p>
-                    <p className="text-sm">{extractErrorMessage(error, 'Failed to load themes')}</p>
+                    <div>Error loading themes</div>
+                    <div className="text-sm">{extractErrorMessage(error, 'Failed to load themes')}</div>
                 </div>
             </div>
         )
@@ -118,10 +118,10 @@ const ThemeSelector = ({
             <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Page Theme</h2>
-                        <p className="text-gray-600 mt-1">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Page Theme</div>
+                        <div className="text-gray-600 mt-1">
                             Choose a theme to style content elements in this page
-                        </p>
+                        </div>
                     </div>
                     <div className="flex items-center space-x-2">
                         {selectedTheme && (
@@ -173,8 +173,8 @@ const ThemeSelector = ({
                             {themes.length === 0 ? (
                                 <div className="text-center py-12 text-gray-500">
                                     <Palette className="w-12 h-12 mx-auto mb-4" />
-                                    <p className="text-lg font-medium">No themes available</p>
-                                    <p className="text-sm mt-1">Create themes in the Theme Editor to style your content</p>
+                                    <div className="text-lg font-medium">No themes available</div>
+                                    <div className="text-sm mt-1">Create themes in the Theme Editor to style your content</div>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -209,7 +209,7 @@ const ThemeSelector = ({
                                                         <div className="flex items-start justify-between mb-3">
                                                             <div className="flex-1">
                                                                 <div className="flex items-center space-x-2">
-                                                                    <h4 className="font-medium text-gray-900">{theme.name}</h4>
+                                                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">{theme.name}</div>
                                                                     {theme.isDefault && !isEffective && (
                                                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
                                                                             Default
@@ -225,7 +225,7 @@ const ThemeSelector = ({
                                                                     )}
                                                                 </div>
                                                                 {theme.description && (
-                                                                    <p className="text-sm text-gray-600 mt-1">{theme.description}</p>
+                                                                    <div className="text-sm text-gray-600 mt-1">{theme.description}</div>
                                                                 )}
                                                             </div>
                                                             <div className="flex items-center space-x-1">
@@ -317,7 +317,7 @@ const ThemeSelector = ({
                                                         {/* Theme Preview */}
                                                         {showPreview && previewThemeId === theme.id && previewTheme && (
                                                             <div className="mt-3 p-3 bg-gray-50 rounded border">
-                                                                <h5 className="text-xs font-medium text-gray-700 mb-2">Preview</h5>
+                                                                <div className="text-xs font-medium text-gray-700 mb-2" role="heading" aria-level="5">Preview</div>
                                                                 <ThemePreview theme={previewTheme} />
                                                             </div>
                                                         )}
@@ -346,19 +346,19 @@ const ThemeSelector = ({
                         {/* Current Theme Details */}
                         {selectedTheme && (
                             <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <h3 className="font-medium text-blue-900 mb-2">Applied Theme: {selectedTheme.name}</h3>
+                                <div className="font-medium text-blue-900 mb-2" role="heading" aria-level="3">Applied Theme: {selectedTheme.name}</div>
                                 <div className="text-sm text-blue-800">
-                                    <p>This theme will style all content elements including:</p>
-                                    <ul className="mt-2 space-y-1 text-xs">
+                                    <div>This theme will style all content elements including:</div>
+                                    <div className="mt-2 space-y-1 text-xs" role="list">
                                         <li>• Text content in ContentWidget editors and previews</li>
                                         <li>• Headers, paragraphs, lists, and other HTML elements</li>
                                         <li>• Widget content areas (not admin interfaces)</li>
-                                    </ul>
+                                    </div>
                                     {Object.keys(selectedTheme.cssVariables || {}).length > 0 && (
-                                        <p className="mt-2">
+                                        <div className="mt-2">
                                             <span className="font-medium">{Object.keys(selectedTheme.cssVariables).length} CSS variables</span>
                                             {selectedTheme.customCss && <span> and custom CSS</span>} defined.
-                                        </p>
+                                        </div>
                                     )}
                                 </div>
                             </div>

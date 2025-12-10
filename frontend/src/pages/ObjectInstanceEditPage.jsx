@@ -387,8 +387,8 @@ const ObjectInstanceEditPage = () => {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-2">Object Type Not Found</h2>
-                    <p className="text-gray-600 mb-4">The specified object type could not be found.</p>
+                    <div className="text-xl font-semibold text-gray-900 mb-2" role="heading" aria-level="2">Object Type Not Found</div>
+                    <div className="text-gray-600 mb-4">The specified object type could not be found.</div>
                     <button
                         onClick={handleBack}
                         className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
@@ -419,7 +419,7 @@ const ObjectInstanceEditPage = () => {
                             <div className="h-6 w-px bg-gray-300"></div>
 
                             <div>
-                                <h1 className="text-lg font-semibold text-gray-900 truncate flex items-center">
+                                <div className="text-lg font-semibold text-gray-900 truncate flex items-center" role="heading" aria-level="1">
                                     {objectType?.iconImage ? (
                                         <img
                                             src={objectType.iconImage}
@@ -430,13 +430,13 @@ const ObjectInstanceEditPage = () => {
                                         <Layout className="h-5 w-5 mr-2" />
                                     )}
                                     {isNewInstance ? `New ${objectType?.label}` : instance?.title || 'Untitled'}
-                                </h1>
-                                <p className="text-sm text-gray-500">
+                                </div>
+                                <div className="text-sm text-gray-500">
                                     {isNewInstance
                                         ? `Create a new ${objectType?.label?.toLowerCase()}`
                                         : `Edit ${objectType?.label?.toLowerCase()}`
                                     }
-                                </p>
+                                </div>
                             </div>
                         </div>
 
@@ -479,9 +479,9 @@ const ObjectInstanceEditPage = () => {
                                 </svg>
                             </div>
                             <div className="ml-3 flex-1">
-                                <p className="text-sm text-yellow-700">
-                                    <strong className="font-medium">Editor initialization warning:</strong> Some features may not work correctly. You can continue editing, but saving may be affected.
-                                </p>
+                                <div className="text-sm text-yellow-700">
+                                    <span className="font-bold">Editor initialization warning:</span> Some features may not work correctly. You can continue editing, but saving may be affected.
+                                </div>
                                 <button
                                     onClick={() => {
                                         setUdcInitError(null)
@@ -548,13 +548,13 @@ const ObjectEssentialFieldsModal = ({ objectType, onSave, onCancel, isLoading = 
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                 <div className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">
+                    <div className="text-xl font-semibold mb-4" role="heading" aria-level="2">
                         Create New {objectType?.label || 'Object'}
-                    </h2>
-                    <p className="text-sm text-gray-600 mb-4">
+                    </div>
+                    <div className="text-sm text-gray-600 mb-4">
                         Enter a title for your new {objectType?.label?.toLowerCase() || 'object'}.
                         A unique URL slug will be automatically generated.
-                    </p>
+                    </div>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">

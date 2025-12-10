@@ -169,13 +169,13 @@ const WidgetManager = () => {
                 {filteredWidgetTypes.length === 0 ? (
                     <div className="text-center py-12">
                         <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No widget types found</h3>
-                        <p className="text-gray-500">
+                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No widget types found</div>
+                        <div className="text-gray-500">
                             {searchTerm || filterCategory !== 'all'
                                 ? 'Try adjusting your search or filter criteria.'
                                 : 'No widget types are currently registered in the system.'
                             }
-                        </p>
+                        </div>
                     </div>
                 ) : (
                     filteredWidgetTypes.map((widget) => {
@@ -197,9 +197,9 @@ const WidgetManager = () => {
                                         {/* Widget Info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center space-x-2 mb-1">
-                                                <h3 className="text-lg font-medium text-gray-900 truncate">
+                                                <div className="text-lg font-medium text-gray-900 truncate" role="heading" aria-level="3">
                                                     {widget.name}
-                                                </h3>
+                                                </div>
                                                 <div className="flex items-center space-x-1">
                                                     {getStatusIcon(widget.isActive)}
                                                     <span className={`text-xs font-medium ${widget.isActive ? 'text-green-600' : 'text-red-600'
@@ -209,9 +209,9 @@ const WidgetManager = () => {
                                                 </div>
                                             </div>
 
-                                            <p className="text-gray-600 text-sm mb-2">
+                                            <div className="text-gray-600 text-sm mb-2">
                                                 {widget.description || 'No description provided'}
-                                            </p>
+                                            </div>
 
                                             <div className="flex flex-wrap gap-2 text-xs">
                                                 <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">

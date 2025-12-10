@@ -60,7 +60,7 @@ const PresetSelector = ({
         <div className={`preset-selector ${className}`}>
             {/* Header */}
             <div className="preset-header">
-                <h3 className="text-lg font-semibold text-gray-900">Insert Preset Template</h3>
+                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Insert Preset Template</div>
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -155,9 +155,9 @@ const PresetSelector = ({
                     ))
                 ) : (
                     <div className="preset-empty">
-                        <p className="text-gray-500 text-sm">
+                        <div className="text-gray-500 text-sm">
                             {searchTerm ? 'No presets match your search' : 'No presets available'}
-                        </p>
+                        </div>
                     </div>
                 )}
             </div>
@@ -233,13 +233,13 @@ const PresetCard = ({ preset, onInsert, onPreview }) => {
     return (
         <div className="preset-card">
             <div className="preset-card-header">
-                <h4 className="preset-card-title">{preset.name}</h4>
+                <div className="preset-card-title" role="heading" aria-level="4">{preset.name}</div>
                 <span className={`preset-card-badge ${getCategoryColor(preset.category)}`}>
                     {preset.category}
                 </span>
             </div>
 
-            <p className="preset-card-description">{preset.description}</p>
+            <div className="preset-card-description">{preset.description}</div>
 
             <div className="preset-card-actions">
                 <button
@@ -346,8 +346,8 @@ const PresetPreview = ({ preset, onClose, onInsert }) => {
             <div className="preset-preview-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="preset-preview-header">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{preset.name}</h3>
-                        <p className="text-sm text-gray-500">{preset.description}</p>
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">{preset.name}</div>
+                        <div className="text-sm text-gray-500">{preset.description}</div>
                     </div>
                     <button
                         onClick={onClose}

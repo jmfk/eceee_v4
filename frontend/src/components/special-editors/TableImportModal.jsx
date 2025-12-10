@@ -417,7 +417,7 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b">
-                    <h2 className="text-xl font-semibold">Import Table</h2>
+                    <div className="text-xl font-semibold" role="heading" aria-level="2">Import Table</div>
                     <button
                         onClick={handleClose}
                         className="p-1 hover:bg-gray-100 rounded"
@@ -457,12 +457,12 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
                     {activeTab === 'paste' && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-sm text-gray-600">
+                                <div className="text-sm text-gray-600">
                                     {showCodeView
                                         ? 'Paste or edit table data. Supports: HTML, CSV, TSV (Google Sheets/Excel), JSON.'
                                         : 'Paste from webpage, spreadsheet, or data file. Auto-detects: HTML, CSV, TSV, JSON.'
                                     }
-                                </p>
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={handleClearPaste}
@@ -508,7 +508,7 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
                                 <div className="flex items-center gap-2 text-sm">
                                     <CheckCircle size={16} className="text-green-600" />
                                     <span className="text-gray-700">
-                                        Detected format: <strong>{detectedFormat.toUpperCase()}</strong>
+                                        Detected format: <span className="font-bold">{detectedFormat.toUpperCase()}</span>
                                     </span>
                                 </div>
                             )}
@@ -518,9 +518,9 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
                     {/* Upload Tab */}
                     {activeTab === 'upload' && (
                         <div className="space-y-4">
-                            <p className="text-sm text-gray-600">
+                            <div className="text-sm text-gray-600">
                                 Upload a CSV or Excel file (.csv, .xlsx, .xls). Maximum file size: 5MB.
-                            </p>
+                            </div>
 
                             {/* Drop zone */}
                             <div
@@ -530,12 +530,12 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 <Upload size={48} className="mx-auto text-gray-400 mb-4" />
-                                <p className="text-gray-700 mb-2">
+                                <div className="text-gray-700 mb-2">
                                     Drop your file here or click to browse
-                                </p>
-                                <p className="text-sm text-gray-500">
+                                </div>
+                                <div className="text-sm text-gray-500">
                                     Supported formats: CSV, Excel (.xlsx, .xls)
-                                </p>
+                                </div>
                             </div>
 
                             <input
@@ -559,7 +559,7 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
                             {loading && (
                                 <div className="text-center text-gray-600">
                                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                    <p className="mt-2 text-sm">Processing file...</p>
+                                    <div className="mt-2 text-sm">Processing file...</div>
                                 </div>
                             )}
                         </div>
@@ -576,11 +576,11 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
                     {/* Preview */}
                     {preview && (
                         <div className="mt-6">
-                            <h3 className="text-sm font-medium text-gray-700 mb-2">Preview:</h3>
+                            <div className="text-sm font-medium text-gray-700 mb-2" role="heading" aria-level="3">Preview:</div>
                             {renderPreview()}
-                            <p className="text-xs text-gray-500 mt-2">
+                            <div className="text-xs text-gray-500 mt-2">
                                 {preview.rows.length} rows × {preview.column_widths?.length || 0} columns
-                            </p>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -607,10 +607,10 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
             {showMergeDialog && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
-                        <h3 className="text-lg font-semibold mb-4">Table Already Has Data</h3>
-                        <p className="text-sm text-gray-600 mb-6">
+                        <div className="text-lg font-semibold mb-4" role="heading" aria-level="3">Table Already Has Data</div>
+                        <div className="text-sm text-gray-600 mb-6">
                             This table already contains data. Would you like to replace it or append the new rows?
-                        </p>
+                        </div>
                         <div className="space-y-4">
                             <div className="flex flex-col gap-2">
                                 <button

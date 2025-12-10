@@ -283,12 +283,12 @@ const ComboboxInput = ({
                             {isSearching || isLoading ? (
                                 <div className="p-4 text-center">
                                     <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-gray-400" />
-                                    <p className="text-sm text-gray-500">{loadingText}</p>
+                                    <div className="text-sm text-gray-500">{loadingText}</div>
                                 </div>
                             ) : displayOptions.length === 0 ? (
                                 <div className="p-4 text-center text-gray-500">
                                     <Search className="w-5 h-5 mx-auto mb-2 text-gray-300" />
-                                    <p className="text-sm">{noOptionsText}</p>
+                                    <div className="text-sm">{noOptionsText}</div>
                                 </div>
                             ) : (
                                 <div className="py-1">
@@ -333,7 +333,7 @@ const ComboboxInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
         </div>
     )

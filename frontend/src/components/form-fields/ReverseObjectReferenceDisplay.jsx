@@ -75,7 +75,7 @@ const ReverseObjectReferenceDisplay = ({
                     </label>
                 )}
                 {description && (
-                    <p className="text-sm text-gray-500">{description}</p>
+                    <div className="text-sm text-gray-500">{description}</div>
                 )}
                 <div className="text-sm text-gray-500 italic p-4 bg-gray-50 rounded-md">
                     No {reverse_relationship_type} references
@@ -96,7 +96,7 @@ const ReverseObjectReferenceDisplay = ({
 
             {/* Description */}
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Reverse Reference List */}

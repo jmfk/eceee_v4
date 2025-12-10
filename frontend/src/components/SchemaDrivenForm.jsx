@@ -433,7 +433,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             return (
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-lg font-semibold text-gray-900">Page Data</h2>
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">Page Data</div>
                         <button
                             onClick={validateAllProperties}
                             className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
@@ -496,9 +496,9 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                 <div key={groupKey} className={`bg-white rounded-lg shadow p-6 border-2 ${getGroupBorderColor()}`}>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3">
-                            <h3 className="text-lg font-semibold text-gray-900">
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                                 {group.title || `${groupKey.charAt(0).toUpperCase() + groupKey.slice(1)} Fields`}
-                            </h3>
+                            </div>
                             {groupValidation && (
                                 <span className={`text-sm font-medium ${getGroupStatusColor()}`}>
                                     {groupIsValid ? '✓ Valid' : '✗ Invalid'}
@@ -512,30 +512,30 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                     {/* Group-level error summary */}
                     {false && groupHasErrors !== 0 && groupHasErrors && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                            <h4 className="text-sm font-medium text-red-800 mb-1">Group Validation Errors:</h4>
-                            <ul className="text-sm text-red-700 space-y-1">
+                            <div className="text-sm font-medium text-red-800 mb-1" role="heading" aria-level="4">Group Validation Errors:</div>
+                            <div className="text-sm text-red-700 space-y-1" role="list">
                                 {(() => {
                                     // Handle client-side format (results object with individual property validations)
                                     if (groupValidation.results) {
                                         return Object.entries(groupValidation.results)
                                             .filter(([prop, result]) => result.errors && result.errors.length > 0)
                                             .map(([prop, result]) => (
-                                                <li key={prop}>
-                                                    <strong>{prop}:</strong> {result.errors.join(', ')}
-                                                </li>
+                                                <div key={prop}>
+                                                    <span className="font-bold">{prop}:</span> {result.errors.join(', ')}
+                                                </div>
                                             ))
                                     }
                                     // Handle server-side format (direct errors object)
                                     if (groupValidation.errors) {
                                         return Object.entries(groupValidation.errors).map(([prop, errors]) => (
-                                            <li key={prop}>
-                                                <strong>{prop === '_root' ? 'General' : prop}:</strong> {errors.map(e => e.message || e).join(', ')}
-                                            </li>
+                                            <div key={prop}>
+                                                <span className="font-bold">{prop === '_root' ? 'General' : prop}:</span> {errors.map(e => e.message || e).join(', ')}
+                                            </div>
                                         ))
                                     }
                                     return []
                                 })()}
-                            </ul>
+                            </div>
                         </div>
                     )}
 
@@ -552,7 +552,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             <div className="max-w-2xl mx-auto space-y-6">
                 {/* Header with validation button */}
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">Page Data</h2>
+                    <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Page Data</div>
                 </div>
 
                 {/* Form Fields - either grouped or ungrouped */}

@@ -51,9 +51,9 @@ const DeleteConfirmationModal = ({
                                     <AlertTriangle className="h-6 w-6 text-red-600" />
                                 </div>
                                 <div className="ml-4">
-                                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                                    <div className="text-lg leading-6 font-medium text-gray-900" role="heading" aria-level="3">
                                         {title || 'Confirm Deletion'}
-                                    </h3>
+                                    </div>
                                 </div>
                             </div>
                             <button
@@ -66,26 +66,26 @@ const DeleteConfirmationModal = ({
 
                         {/* Content */}
                         <div className="mt-3">
-                            <p className="text-sm text-gray-500">
+                            <div className="text-sm text-gray-500">
                                 {message || `Are you sure you want to delete "${itemName}"?`}
-                            </p>
+                            </div>
 
                             {warningText && (
                                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                                     <div className="flex">
                                         <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5" />
                                         <div className="ml-3">
-                                            <p className="text-sm text-yellow-800">
+                                            <div className="text-sm text-yellow-800">
                                                 {warningText}
-                                            </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            <p className="mt-4 text-sm font-medium text-gray-900">
+                            <div className="mt-4 text-sm font-medium text-gray-900">
                                 This action cannot be undone.
-                            </p>
+                            </div>
                         </div>
                     </div>
 

@@ -289,7 +289,7 @@ const ParentObjectSelector = ({
             )}
 
             {/* Help text */}
-            <p className="text-gray-500 text-sm mt-2">
+            <div className="text-gray-500 text-sm mt-2">
                 {validParentTypes.length > 0 ? (
                     <>
                         Can be a child of: {validParentTypes.map(type => type.label).join(', ')}
@@ -299,7 +299,7 @@ const ParentObjectSelector = ({
                         No parent types configured for {currentObjectType?.label}
                     </>
                 )}
-            </p>
+            </div>
         </div>
     )
 }

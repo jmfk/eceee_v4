@@ -122,7 +122,7 @@ const PasswordInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Strength Indicator */}
@@ -146,7 +146,7 @@ const PasswordInput = ({
             {/* Requirements */}
             {showRequirements && value && (
                 <div className="mt-2 space-y-1">
-                    <p className="text-xs text-gray-600 mb-1">Requirements:</p>
+                    <div className="text-xs text-gray-600 mb-1">Requirements:</div>
                     <div className="space-y-1">
                         <div className="flex items-center space-x-2">
                             {passwordStrength.checks?.length ? (

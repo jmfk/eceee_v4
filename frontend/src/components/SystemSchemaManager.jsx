@@ -144,24 +144,24 @@ export default function SystemSchemaManager() {
                     <div className="space-y-6">
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <h2 className="text-lg font-semibold">System Schema</h2>
+                                <div className="text-lg font-semibold" role="heading" aria-level="2">System Schema</div>
                                 {systemSchema && (
                                     <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">Existing • ID: {systemSchema.id}</span>
                                 )}
                             </div>
-                            <p className="text-gray-600 text-sm mb-4">
+                            <div className="text-gray-600 text-sm mb-4">
                                 Define the base fields that will be available on all pages. These fields are mandatory and cannot be removed by layout schemas.
                                 {!systemSchema && (
                                     <span className="block mt-2 text-blue-600 font-medium">
                                         The default fields (Meta Title, Page Description, Featured Image) are included as a starting template.
                                     </span>
                                 )}
-                            </p>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div>
-                                <h3 className="text-md font-medium mb-4">Schema Definition</h3>
+                                <div className="text-md font-medium mb-4" role="heading" aria-level="3">Schema Definition</div>
                                 <VisualSchemaEditor key={`system-${systemForm.id || 'new'}`} schema={systemForm.schema} onChange={handleSystemSchemaChange} />
                                 {validationErrors.schema && <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>}
 
@@ -205,7 +205,7 @@ export default function SystemSchemaManager() {
                             </div>
 
                             <div>
-                                <h3 className="text-md font-medium mb-4">Schema Editor Preview</h3>
+                                <div className="text-md font-medium mb-4" role="heading" aria-level="3">Schema Editor Preview</div>
                                 <div className="bg-white border rounded-lg p-4">
                                     <SchemaFormPreview schema={systemForm.schema} title="Current Schema Fields" />
                                 </div>

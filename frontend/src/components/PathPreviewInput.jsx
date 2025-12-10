@@ -82,9 +82,9 @@ const PathPreviewInput = ({
                         ) : null}
                     </div>
                 </div>
-                <p className="mt-1 text-sm text-gray-500">
+                <div className="mt-1 text-sm text-gray-500">
                     Simulate different URL paths to preview extracted variables
-                </p>
+                </div>
             </div>
 
             {/* Validation Results */}
@@ -97,15 +97,15 @@ const PathPreviewInput = ({
                         <>
                             <div className="flex items-center mb-2">
                                 <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                                <h4 className="text-sm font-semibold text-green-900">
+                                <div className="text-sm font-semibold text-green-900" role="heading" aria-level="4">
                                     Path Valid
-                                </h4>
+                                </div>
                             </div>
                             {validationResult.variables && Object.keys(validationResult.variables).length > 0 && (
                                 <div className="mt-3">
-                                    <p className="text-xs font-medium text-green-900 mb-2">
+                                    <div className="text-xs font-medium text-green-900 mb-2">
                                         Extracted Variables:
-                                    </p>
+                                    </div>
                                     <div className="bg-white border border-green-200 rounded overflow-hidden">
                                         <table className="min-w-full divide-y divide-green-200">
                                             <thead className="bg-green-100">
@@ -132,9 +132,9 @@ const PathPreviewInput = ({
                                             </tbody>
                                         </table>
                                     </div>
-                                    <p className="mt-2 text-xs text-green-700">
+                                    <div className="mt-2 text-xs text-green-700">
                                         These variables are available to widgets as <code className="px-1 py-0.5 bg-green-100 rounded">context.pathVariables</code>
-                                    </p>
+                                    </div>
                                 </div>
                             )}
                         </>
@@ -143,12 +143,12 @@ const PathPreviewInput = ({
                             <div className="flex items-center">
                                 <XCircle className="h-5 w-5 text-red-600 mr-2" />
                                 <div>
-                                    <h4 className="text-sm font-semibold text-red-900">
+                                    <div className="text-sm font-semibold text-red-900" role="heading" aria-level="4">
                                         Invalid Path
-                                    </h4>
-                                    <p className="text-sm text-red-700 mt-1">
+                                    </div>
+                                    <div className="text-sm text-red-700 mt-1">
                                         {validationResult.error || 'Path does not match the selected pattern'}
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         </>
@@ -161,9 +161,9 @@ const PathPreviewInput = ({
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                     <div className="flex items-start">
                         <AlertCircle className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-blue-700">
+                        <div className="text-sm text-blue-700">
                             Enter a path to validate it against the selected pattern
-                        </p>
+                        </div>
                     </div>
                 </div>
             )}

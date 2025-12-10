@@ -191,13 +191,13 @@ const InlineImageUpload = ({
                     </button>
 
                     {/* Helper text */}
-                    <p className="text-xs text-gray-500 mt-2">
+                    <div className="text-xs text-gray-500 mt-2">
                         {acceptedTypes.map(type => type.split('/')[1]).join(', ').toUpperCase()} up to {Math.round(maxSizeBytes / (1024 * 1024))}MB
-                    </p>
+                    </div>
 
                     {/* Error message */}
                     {uploadError && (
-                        <p className="text-red-600 text-sm mt-1">{uploadError}</p>
+                        <div className="text-red-600 text-sm mt-1">{uploadError}</div>
                     )}
                 </div>
             </div>

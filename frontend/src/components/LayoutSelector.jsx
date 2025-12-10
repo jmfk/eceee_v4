@@ -146,21 +146,21 @@ const LayoutSelector = ({
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <div className="text-sm font-medium text-gray-900 truncate">
                         {option.label}
-                    </p>
+                    </div>
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                         Code
                     </span>
                 </div>
                 {showDescription && option.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                    <div className="text-xs text-gray-500 mt-1 line-clamp-2">
                         {option.description}
-                    </p>
+                    </div>
                 )}
-                <p className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-gray-400 mt-1">
                     {option.layout.slotConfiguration?.slots?.length || 0} slots
-                </p>
+                </div>
             </div>
         </div>
     )
@@ -195,7 +195,7 @@ const LayoutSelector = ({
 
             {/* Description */}
             {description && (
-                <p className="text-sm text-gray-600 mb-2">{description}</p>
+                <div className="text-sm text-gray-600 mb-2">{description}</div>
             )}
 
             {/* Selector Button */}
@@ -214,12 +214,12 @@ const LayoutSelector = ({
                                     <Code className="w-4 h-4 text-blue-600" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-gray-900 truncate">
+                                    <div className="text-sm text-gray-900 truncate">
                                         {selectedLayout.label}
-                                    </p>
-                                    <p className="text-xs text-gray-500 truncate">
+                                    </div>
+                                    <div className="text-xs text-gray-500 truncate">
                                         Code Layout
-                                    </p>
+                                    </div>
                                 </div>
                             </>
                         ) : (
@@ -268,7 +268,7 @@ const LayoutSelector = ({
                         {isLoading && (
                             <div className="px-3 py-8 text-center">
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-                                <p className="text-sm text-gray-500 mt-2">Loading layouts...</p>
+                                <div className="text-sm text-gray-500 mt-2">Loading layouts...</div>
                             </div>
                         )}
 
@@ -292,9 +292,9 @@ const LayoutSelector = ({
                                 {/* No results */}
                                 {filteredOptions.length === 0 && (
                                     <div className="px-3 py-8 text-center">
-                                        <p className="text-sm text-gray-500">
+                                        <div className="text-sm text-gray-500">
                                             {searchTerm ? 'No layouts found matching your search' : 'No layouts available'}
-                                        </p>
+                                        </div>
                                     </div>
                                 )}
                             </>

@@ -480,7 +480,7 @@ const WidgetEditorPanel = forwardRef(({
                         } ${showSpecialEditor && isClosingSpecialEditor ? 'animate-fade-out-down' : ''
                         }`}>
                         <div className="flex items-center space-x-3 min-w-0 flex-1">
-                            <h3 className="text-md font-medium text-gray-900 truncate">{title}</h3>
+                            <div className="text-md font-medium text-gray-900 truncate" role="heading" aria-level="3">{title}</div>
                             {hasChanges && (
                                 <span className="flex items-center text-xs text-blue-600 flex-shrink-0">
                                     <Save className="w-3 h-3 mr-1" />
@@ -526,7 +526,7 @@ const WidgetEditorPanel = forwardRef(({
                                     className="mb-4"
                                 />
                                 <div className="text-center text-gray-500 py-8">
-                                    <p>Widget editing is disabled because the widget type is not available.</p>
+                                    <div>Widget editing is disabled because the widget type is not available.</div>
                                 </div>
                             </div>
                         ) : isLoadingSchema ? (
@@ -537,8 +537,8 @@ const WidgetEditorPanel = forwardRef(({
                         ) : schemaError ? (
                             <div className="text-center py-8 p-4">
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                                    <p className="text-red-800 font-medium">Failed to load widget configuration</p>
-                                    <p className="text-red-600 text-sm mt-1">{schemaError}</p>
+                                    <div className="text-red-800 font-medium">Failed to load widget configuration</div>
+                                    <div className="text-red-600 text-sm mt-1">{schemaError}</div>
                                 </div>
                             </div>
                         ) : widgetData ? (
@@ -562,7 +562,7 @@ const WidgetEditorPanel = forwardRef(({
                             </>
                         ) : (
                             <div className="text-center text-gray-500 py-8 p-4">
-                                <p>No widget selected for editing.</p>
+                                <div>No widget selected for editing.</div>
                             </div>
                         )}
                     </div>

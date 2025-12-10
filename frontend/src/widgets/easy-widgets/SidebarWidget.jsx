@@ -47,9 +47,9 @@ const SidebarWidget = ({ config = {}, mode = 'preview' }) => {
         return (
             <div key={index} className="sidebar-section mb-6 last:mb-0">
                 {widget.title && !isCollapsed && (
-                    <h3 className="sidebar-section-title font-semibold text-gray-900 mb-3 pb-2 border-b-2 border-gray-300">
+                    <div className="sidebar-section-title font-semibold text-gray-900 mb-3 pb-2 border-b-2 border-gray-300">
                         {widget.title}
-                    </h3>
+                    </div>
                 )}
 
                 {widget.content && !isCollapsed && (
@@ -74,7 +74,7 @@ const SidebarWidget = ({ config = {}, mode = 'preview' }) => {
                                         <span className="font-medium text-gray-900">{item.title}</span>
                                     )}
                                     {item.description && (
-                                        <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                                        <div className="text-sm text-gray-600 mt-1">{item.description}</div>
                                     )}
                                 </li>
                             ))}

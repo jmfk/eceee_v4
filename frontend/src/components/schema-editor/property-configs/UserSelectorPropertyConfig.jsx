@@ -93,7 +93,7 @@ export default function UserSelectorPropertyConfig({
 
       {/* User Selector Specific Configuration */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">User Selector Configuration</h4>
+        <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">User Selector Configuration</div>
 
         {/* Multiple Users */}
         <div className="flex items-start space-x-3 mb-4">
@@ -110,9 +110,9 @@ export default function UserSelectorPropertyConfig({
             <label htmlFor={`multiple-${property.key}`} className="text-sm font-medium text-gray-700">
               Allow Multiple Users
             </label>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
               Enable to allow selecting multiple users
-            </p>
+            </div>
           </div>
         </div>
 
@@ -130,9 +130,9 @@ export default function UserSelectorPropertyConfig({
               placeholder="No limit"
               min="1"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
               Maximum number of users allowed (leave empty for no limit)
-            </p>
+            </div>
           </div>
         )}
 
@@ -151,9 +151,9 @@ export default function UserSelectorPropertyConfig({
             <label htmlFor={`searchable-${property.key}`} className="text-sm text-gray-700">
               Enable Search
             </label>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
               Allow searching/filtering users by name
-            </p>
+            </div>
           </div>
         </div>
 
@@ -169,9 +169,9 @@ export default function UserSelectorPropertyConfig({
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="e.g., editors, authors, admins"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-gray-500 mt-1">
             Leave empty to show all users, or specify a group name to filter
-          </p>
+          </div>
         </div>
       </div>
 

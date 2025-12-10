@@ -124,13 +124,13 @@ const ProfilePage = () => {
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
-                <p className="text-gray-600 mt-2">Manage your account settings</p>
+                <div className="text-3xl font-bold text-gray-900" role="heading" aria-level="1">Profile</div>
+                <div className="text-gray-600 mt-2">Manage your account settings</div>
             </div>
 
             {/* User Information */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Account Information</h2>
+                <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">Account Information</div>
                 
                 <div className="space-y-4">
                     <div className="flex items-center space-x-3">
@@ -179,12 +179,12 @@ const ProfilePage = () => {
 
             {/* Change Password */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Change Password</h2>
+                <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">Change Password</div>
 
                 {success && (
                     <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4 flex items-center space-x-3">
                         <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <p className="text-sm text-green-700">Your password has been changed successfully.</p>
+                        <div className="text-sm text-green-700">Your password has been changed successfully.</div>
                     </div>
                 )}
 
@@ -242,9 +242,9 @@ const ProfilePage = () => {
                             </div>
                         )}
                         {!errors.newPassword && passwordData.newPassword && (
-                            <p className="mt-1 text-xs text-gray-500">
+                            <div className="mt-1 text-xs text-gray-500">
                                 Password must be at least 8 characters long
-                            </p>
+                            </div>
                         )}
                     </div>
 

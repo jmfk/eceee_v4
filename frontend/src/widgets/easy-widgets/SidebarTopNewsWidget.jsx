@@ -19,10 +19,10 @@ const SidebarTopNewsWidget = ({
             <div className="sidebar-top-news-widget-editor p-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
                 <div className="text-center">
                     <Sidebar className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Sidebar Top News Widget</h3>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <div className="text-lg font-semibold text-gray-700 mb-2">Sidebar Top News Widget</div>
+                    <div className="text-sm text-gray-500 mb-4">
                         Compact list of top news for sidebars
-                    </p>
+                    </div>
                     <div className="text-xs text-gray-400 space-y-1">
                         {config.widget_title && <p>Title: {config.widget_title}</p>}
                         {config.object_types && config.object_types.length > 0 && (

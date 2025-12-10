@@ -138,7 +138,7 @@ const TreeBasedLayoutRenderer = forwardRef(({
         return (
             <div className="tree-renderer-loading p-8 text-center">
                 <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading inheritance tree...</p>
+                <div className="text-gray-600">Loading inheritance tree...</div>
             </div>
         )
     }
@@ -148,8 +148,8 @@ const TreeBasedLayoutRenderer = forwardRef(({
         return (
             <div className="tree-renderer-error bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                 <Layout className="h-12 w-12 mx-auto mb-4 text-red-400" />
-                <h3 className="text-lg font-medium text-red-800 mb-2">Tree Generation Failed</h3>
-                <p className="text-red-600">Could not build inheritance tree for this page</p>
+                <div className="text-lg font-medium text-red-800 mb-2" role="heading" aria-level="3">Tree Generation Failed</div>
+                <div className="text-red-600">Could not build inheritance tree for this page</div>
             </div>
         )
     }
@@ -163,12 +163,12 @@ const TreeBasedLayoutRenderer = forwardRef(({
         return (
             <div className="layout-error bg-red-50 border border-red-200 rounded-lg p-8 max-w-2xl mx-auto mt-8">
                 <Layout className="h-12 w-12 mx-auto mb-4 text-red-400" />
-                <h3 className="text-lg font-medium text-red-800 mb-2">Layout Not Found</h3>
-                <p className="text-red-600 mb-6">Layout "{layoutName}" is not available</p>
+                <div className="text-lg font-medium text-red-800 mb-2" role="heading" aria-level="3">Layout Not Found</div>
+                <div className="text-red-600 mb-6">Layout "{layoutName}" is not available</div>
 
                 <div className="mt-4 text-sm text-gray-600">
-                    <p className="font-medium mb-1">Available layouts:</p>
-                    <p className="text-gray-500">{availableLayouts.join(', ')}</p>
+                    <div className="font-medium mb-1">Available layouts:</div>
+                    <div className="text-gray-500">{availableLayouts.join(', ')}</div>
                 </div>
             </div>
         )

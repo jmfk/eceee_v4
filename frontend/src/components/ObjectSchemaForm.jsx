@@ -70,7 +70,7 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
         return (
             <div className="text-center py-8 text-gray-500">
                 <FileText className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-                <p>No schema fields defined</p>
+                <div>No schema fields defined</div>
             </div>
         )
     }
@@ -87,7 +87,7 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
     if (error) {
         return (
             <div className="p-4 border border-red-200 rounded bg-red-50">
-                <p className="text-red-700">Failed to load form: {error}</p>
+                <div className="text-red-700">Failed to load form: {error}</div>
             </div>
         )
     }
@@ -103,9 +103,9 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
         if (!FieldComponent) {
             return (
                 <div key={field.name} className="p-3 border border-yellow-200 rounded bg-yellow-50">
-                    <p className="text-sm text-yellow-700">
+                    <div className="text-sm text-yellow-700">
                         Loading component: {componentName || 'Unknown'}
-                    </p>
+                    </div>
                 </div>
             )
         }

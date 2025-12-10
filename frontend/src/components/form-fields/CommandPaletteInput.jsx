@@ -279,9 +279,9 @@ const CommandPaletteInput = ({
                         {filteredActions.length === 0 ? (
                             <div className="p-4 text-center text-gray-500">
                                 <Search className="w-6 h-6 mx-auto mb-2 text-gray-300" />
-                                <p className="text-sm">No commands found</p>
+                                <div className="text-sm">No commands found</div>
                                 {searchTerm && (
-                                    <p className="text-xs mt-1">Try a different search term</p>
+                                    <div className="text-xs mt-1">Try a different search term</div>
                                 )}
                             </div>
                         ) : (
@@ -358,7 +358,7 @@ const CommandPaletteInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Current Selection Display */}

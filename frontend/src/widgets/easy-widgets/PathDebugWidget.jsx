@@ -24,7 +24,7 @@ const PathDebugWidget = ({ config = {}, mode = 'display', onConfigChange, contex
             <div className="border-2 border-purple-300 bg-purple-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-4">
                     <Bug className="w-5 h-5 text-purple-600" />
-                    <h3 className="font-semibold text-purple-900">Path Debug Widget - Configuration</h3>
+                    <div className="font-semibold text-purple-900">Path Debug Widget - Configuration</div>
                 </div>
 
                 <div className="space-y-4">
@@ -55,10 +55,10 @@ const PathDebugWidget = ({ config = {}, mode = 'display', onConfigChange, contex
                     </div>
 
                     <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-                        <p className="text-xs text-yellow-800">
+                        <div className="text-xs text-yellow-800">
                             <strong>Note:</strong> This widget is for development/debugging.
                             It displays path variables captured from the page's path pattern.
-                        </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -73,7 +73,7 @@ const PathDebugWidget = ({ config = {}, mode = 'display', onConfigChange, contex
         <div className="border-2 border-purple-500 bg-purple-50 rounded-lg p-6">
             <div className="flex items-center gap-2 mb-3">
                 <Bug className="w-5 h-5 text-purple-600" />
-                <h3 className="text-lg font-bold text-purple-900">{title}</h3>
+                <div className="text-lg font-bold text-purple-900">{title}</div>
             </div>
 
             {/* Path Pattern Status */}

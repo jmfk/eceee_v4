@@ -454,14 +454,14 @@ const LinkField = ({
 
             {/* Description */}
             {description && !hasError && (
-                <p className="text-xs text-gray-500">{description}</p>
+                <div className="text-xs text-gray-500">{description}</div>
             )}
 
             {/* Validation errors */}
             {hasError && validation.errors && (
-                <p className="text-xs text-red-500">
+                <div className="text-xs text-red-500">
                     {validation.errors.join(', ')}
-                </p>
+                </div>
             )}
 
             {/* LinkPicker Modal */}

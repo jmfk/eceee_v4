@@ -52,7 +52,7 @@ const CloneThemeDialog = ({ isOpen, onClose, onConfirm, themeName, existingNames
         <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-semibold text-gray-900">Clone Theme</h2>
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">Clone Theme</div>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -64,9 +64,9 @@ const CloneThemeDialog = ({ isOpen, onClose, onConfirm, themeName, existingNames
                 <form onSubmit={handleSubmit}>
                     <div className="px-6 py-4">
                         <div className="mb-4">
-                            <p className="text-sm text-gray-600 mb-4">
+                            <div className="text-sm text-gray-600 mb-4">
                                 Create a copy of <span className="font-semibold">{themeName}</span>
-                            </p>
+                            </div>
 
                             <label htmlFor="themeName" className="block text-sm font-medium text-gray-700 mb-2">
                                 New Theme Name
@@ -83,7 +83,7 @@ const CloneThemeDialog = ({ isOpen, onClose, onConfirm, themeName, existingNames
                                 autoFocus
                             />
                             {error && (
-                                <p className="mt-2 text-sm text-red-600">{error}</p>
+                                <div className="mt-2 text-sm text-red-600">{error}</div>
                             )}
                         </div>
                     </div>

@@ -231,7 +231,7 @@ export default function ValidatedInput({
                     )}
                     {renderInput()}
                     {description && (
-                        <p className="text-xs text-gray-500 mt-1">{description}</p>
+                        <div className="text-xs text-gray-500 mt-1">{description}</div>
                     )}
                 </div>
                 <div className="flex-shrink-0 w-64">
@@ -252,7 +252,7 @@ export default function ValidatedInput({
             )}
             {renderInput()}
             {description && (
-                <p className="text-xs text-gray-500">{description}</p>
+                <div className="text-xs text-gray-500">{description}</div>
             )}
             {renderValidation()}
         </div>

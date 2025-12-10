@@ -208,9 +208,9 @@ const TaskCard = ({ task, onCancel, onRetry, onView }) => {
                 <div className="flex items-start justify-between">
                     <div>
                         <CardTitle className="text-lg">{task.title}</CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <div className="text-sm text-muted-foreground mt-1">
                             {task.description || `${task.taskType} task`}
-                        </p>
+                        </div>
                     </div>
                     <TaskStatusBadge status={task.status} />
                 </div>
@@ -454,7 +454,7 @@ const NewTaskForm = ({ onSubmit, onCancel }) => {
 
             {/* Dynamic Configuration Fields */}
             <div className="space-y-4">
-                <h3 className="text-lg font-medium">Configuration</h3>
+                <div className="text-lg font-medium" role="heading" aria-level="3">Configuration</div>
                 {currentConfig.fields.map(field => (
                     <div key={field.key} className="space-y-2">
                         <label className="text-sm font-medium">{field.label}</label>
@@ -616,10 +616,10 @@ const AIAgentTaskManager = () => {
         <div className="w-full max-w-6xl mx-auto p-6">
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold">AI Agent Tasks</h1>
-                    <p className="text-muted-foreground">
+                    <div className="text-3xl font-bold" role="heading" aria-level="1">AI Agent Tasks</div>
+                    <div className="text-muted-foreground">
                         Manage and monitor your AI agent tasks
-                    </p>
+                    </div>
                 </div>
 
                 {!showNewTaskForm && (
@@ -664,9 +664,9 @@ const AIAgentTaskManager = () => {
                             {tasks.length === 0 ? (
                                 <Card>
                                     <CardContent className="text-center py-12">
-                                        <p className="text-muted-foreground">
+                                        <div className="text-muted-foreground">
                                             No tasks found. Create your first AI agent task to get started.
-                                        </p>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             ) : (
@@ -776,7 +776,7 @@ const AIAgentTaskManager = () => {
                         <CardContent>
                             <div className="space-y-4">
                                 <div>
-                                    <h3 className="font-medium mb-2">Task Configuration</h3>
+                                    <div className="font-medium mb-2" role="heading" aria-level="3">Task Configuration</div>
                                     <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
                                         {JSON.stringify(selectedTask.taskConfig, null, 2)}
                                     </pre>
@@ -784,7 +784,7 @@ const AIAgentTaskManager = () => {
 
                                 {selectedTask.resultData && Object.keys(selectedTask.resultData).length > 0 && (
                                     <div>
-                                        <h3 className="font-medium mb-2">Results</h3>
+                                        <div className="font-medium mb-2" role="heading" aria-level="3">Results</div>
                                         <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
                                             {JSON.stringify(selectedTask.resultData, null, 2)}
                                         </pre>

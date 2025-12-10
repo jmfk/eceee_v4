@@ -68,15 +68,15 @@ export default function ValidationSummary({
                 <div className="flex items-center gap-3">
                     {getStatusIcon(overallStatus)}
                     <div>
-                        <h3 className="font-medium">
+                        <div className="font-medium" role="heading" aria-level="3">
                             {getStatusMessage()}
-                        </h3>
+                        </div>
                         {(errorCount > 0 || warningCount > 0) && (
-                            <p className="text-sm opacity-75 mt-1">
+                            <div className="text-sm opacity-75 mt-1">
                                 {errorCount > 0 && `${errorCount} error${errorCount !== 1 ? 's' : ''}`}
                                 {errorCount > 0 && warningCount > 0 && ', '}
                                 {warningCount > 0 && `${warningCount} warning${warningCount !== 1 ? 's' : ''}`}
-                            </p>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -92,10 +92,10 @@ export default function ValidationSummary({
                 <div className="mt-4 space-y-2">
                     {properties.errors.length > 0 && (
                         <div>
-                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                            <div className="text-sm font-medium mb-2 flex items-center gap-2" role="heading" aria-level="4">
                                 <AlertCircle className="w-4 h-4" />
                                 Properties with Errors
-                            </h4>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {properties.errors.map(prop => (
                                     <button
@@ -112,10 +112,10 @@ export default function ValidationSummary({
 
                     {properties.warnings.length > 0 && (
                         <div>
-                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                            <div className="text-sm font-medium mb-2 flex items-center gap-2" role="heading" aria-level="4">
                                 <AlertTriangle className="w-4 h-4" />
                                 Properties with Warnings
-                            </h4>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {properties.warnings.map(prop => (
                                     <button
@@ -132,10 +132,10 @@ export default function ValidationSummary({
 
                     {properties.valid.length > 0 && (
                         <div>
-                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                            <div className="text-sm font-medium mb-2 flex items-center gap-2" role="heading" aria-level="4">
                                 <CheckCircle className="w-4 h-4" />
                                 Valid Properties ({properties.valid.length})
-                            </h4>
+                            </div>
                             <div className="text-sm opacity-75">
                                 {properties.valid.join(', ')}
                             </div>

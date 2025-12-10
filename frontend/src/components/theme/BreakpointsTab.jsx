@@ -156,10 +156,10 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Responsive Breakpoints</h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Responsive Breakpoints</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         Configure responsive breakpoint values for this theme. Leave empty to use defaults.
-                    </p>
+                    </div>
                 </div>
                 <button
                     onClick={handleReset}
@@ -204,12 +204,12 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-1">
-                                        <h4 className="font-medium text-gray-900">{label}</h4>
+                                        <div className="font-medium text-gray-900" role="heading" aria-level="4">{label}</div>
                                         {isCustom && !hasError && (
                                             <span className="text-xs text-blue-600 font-medium">Custom</span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-gray-600 mb-3">{description}</p>
+                                    <div className="text-xs text-gray-600 mb-3">{description}</div>
                                     
                                     <div className="flex items-center gap-2">
                                         <div className="relative flex-1">
@@ -241,9 +241,9 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                                     )}
 
                                     {!hasError && !isCustom && (
-                                        <p className="text-xs text-gray-500 mt-2">
+                                        <div className="text-xs text-gray-500 mt-2">
                                             Using default: {defaultValue}px
-                                        </p>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -254,7 +254,7 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
 
             {/* Visual Breakpoint Scale */}
             <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Breakpoint Scale</h4>
+                <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Breakpoint Scale</div>
                 <div className="relative">
                     <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
                         <span>0px</span>
@@ -290,13 +290,13 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                 <div className="flex gap-3">
                     <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-blue-900">
-                        <p className="font-medium mb-1">How Breakpoints Work</p>
-                        <ul className="list-disc list-inside space-y-1 text-blue-800">
+                        <div className="font-medium mb-1">How Breakpoints Work</div>
+                        <div className="list-disc list-inside space-y-1 text-blue-800" role="list">
                             <li>Breakpoints define max-width values for responsive media queries</li>
                             <li>Larger screens inherit styles from smaller breakpoints</li>
                             <li>Values must be in ascending order (sm &lt; md &lt; lg &lt; xl)</li>
                             <li>Leave fields empty to use theme defaults ({breakpointConfig.map(b => `${b.key}: ${b.default}px`).join(', ')})</li>
-                        </ul>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -295,14 +295,14 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
             )}
 
             {/* Help Text */}
-            <p className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500">
                 {disabled
                     ? "Tags help organize and categorize your page content"
                     : isValidating
                         ? "Validating tag..."
                         : "Type to search existing tags or create new ones. Press Enter or click + to add."
                 }
-            </p>
+            </div>
 
             {/* Tag Conflict Modal */}
             <TagConflictModal

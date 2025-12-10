@@ -86,13 +86,13 @@ const LayoutEditor = ({
             <div className="border-b border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                        <div className="text-xl font-semibold text-gray-900 flex items-center" role="heading" aria-level="2">
                             <Grid3X3 className="h-6 w-6 mr-2 text-blue-600" />
                             Layout Templates
-                        </h2>
-                        <p className="mt-1 text-sm text-gray-600">
+                        </div>
+                        <div className="mt-1 text-sm text-gray-600">
                             View and manage code-based layout templates
-                        </p>
+                        </div>
                     </div>
                 </div>
 
@@ -114,9 +114,9 @@ const LayoutEditor = ({
             {/* Layouts Grid */}
             <div className="p-6">
                 <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         Code-based Layouts
-                    </h3>
+                    </div>
                     <span className="text-sm text-gray-500">
                         Code-based layout templates
                     </span>
@@ -125,10 +125,10 @@ const LayoutEditor = ({
                 {filteredLayouts.length === 0 ? (
                     <div className="text-center py-8">
                         <Grid3X3 className="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 className="mt-2 text-sm font-medium text-gray-900">No layouts found</h3>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <div className="mt-2 text-sm font-medium text-gray-900" role="heading" aria-level="3">No layouts found</div>
+                        <div className="mt-1 text-sm text-gray-500">
                             {searchTerm ? 'Try adjusting your search terms.' : 'No layouts have been defined.'}
-                        </p>
+                        </div>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -172,12 +172,12 @@ const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
             {/* Header */}
             <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-gray-900 truncate">
+                    <div className="text-sm font-medium text-gray-900 truncate" role="heading" aria-level="4">
                         {layout.displayName || layout.name}
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1">
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
                         📝 Code Layout
-                    </p>
+                    </div>
                 </div>
                 {onPreview && (
                     <button
@@ -195,9 +195,9 @@ const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
 
             {/* Description */}
             {layout.description && (
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                <div className="text-sm text-gray-600 mb-3 line-clamp-2">
                     {layout.description}
-                </p>
+                </div>
             )}
 
             {/* Metadata */}
@@ -246,12 +246,12 @@ const LayoutPreviewModal = ({ layout, onClose }) => {
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                             {layout.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
                             📝 Code Layout Preview
-                        </p>
+                        </div>
                     </div>
                     <button
                         onClick={onClose}
@@ -265,7 +265,7 @@ const LayoutPreviewModal = ({ layout, onClose }) => {
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
                     {/* Basic Info */}
                     <div className="mb-6">
-                        <h4 className="text-sm font-medium text-gray-900 mb-2">Layout Information</h4>
+                        <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">Layout Information</div>
                         <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Name:</span>
@@ -296,9 +296,9 @@ const LayoutPreviewModal = ({ layout, onClose }) => {
                     {/* Slots Configuration */}
                     {layout.slotConfiguration?.slots && layout.slotConfiguration.slots.length > 0 && (
                         <div>
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">
+                            <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">
                                 Widget Slots ({layout.slotConfiguration.slots.length})
-                            </h4>
+                            </div>
                             <div className="space-y-3">
                                 {layout.slotConfiguration.slots.map((slot, index) => (
                                     <div key={index} className="bg-gray-50 rounded-lg p-3">
@@ -311,9 +311,9 @@ const LayoutPreviewModal = ({ layout, onClose }) => {
                                             </span>
                                         </div>
                                         {slot.description && (
-                                            <p className="text-xs text-gray-600 mb-2">
+                                            <div className="text-xs text-gray-600 mb-2">
                                                 {slot.description}
-                                            </p>
+                                            </div>
                                         )}
                                         <div className="flex items-center justify-between text-xs text-gray-500">
                                             <span>

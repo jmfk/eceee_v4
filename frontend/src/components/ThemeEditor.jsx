@@ -579,10 +579,10 @@ const ThemeEditor = ({ onSave }) => {
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Theme Management</h1>
-                            <p className="text-sm text-gray-600 mt-1">
+                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Theme Management</div>
+                            <div className="text-sm text-gray-600 mt-1">
                                 Create and manage themes with fonts, colors, typography, component styles, and table templates
-                            </p>
+                            </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
@@ -619,7 +619,7 @@ const ThemeEditor = ({ onSave }) => {
                 {isLoading ? (
                     <div className="text-center py-8">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <p className="mt-2 text-gray-600">Loading themes...</p>
+                        <div className="mt-2 text-gray-600">Loading themes...</div>
                     </div>
                 ) : filteredThemes.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -650,14 +650,14 @@ const ThemeEditor = ({ onSave }) => {
                                 <div className="p-4 flex-1 flex flex-col">
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex-1">
-                                            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                                            <div className="font-semibold text-gray-900 flex items-center gap-2" role="heading" aria-level="3">
                                                 {theme.name}
                                                 {theme.isDefault && (
                                                     <Star className="w-4 h-4 text-yellow-500 fill-current" title="Default Theme" />
                                                 )}
-                                            </h3>
+                                            </div>
                                             {theme.description && (
-                                                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{theme.description}</p>
+                                                <div className="text-sm text-gray-600 mt-1 line-clamp-2">{theme.description}</div>
                                             )}
                                         </div>
                                     </div>
@@ -753,9 +753,9 @@ const ThemeEditor = ({ onSave }) => {
                     </div>
                 ) : (
                     <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                        <p className="text-gray-600">
+                        <div className="text-gray-600">
                             {searchTerm ? 'No themes found matching your search' : 'No themes created yet'}
-                        </p>
+                        </div>
                     </div>
                 )}
             </div>
@@ -804,10 +804,10 @@ const ThemeEditor = ({ onSave }) => {
                                     Back
                                 </button>
                                 <div>
-                                    <h1 className="text-xl font-bold text-gray-900">
+                                    <div className="text-xl font-bold text-gray-900" role="heading" aria-level="1">
                                         {isCreating ? 'Create Theme' : `Edit: ${selectedThemeData?.name || 'Theme'}`}
                                         {isThemeDirty && <span className="ml-2 text-sm text-orange-600">• Unsaved changes</span>}
-                                    </h1>
+                                    </div>
                                 </div>
                             </div>
 
@@ -863,7 +863,7 @@ const ThemeEditor = ({ onSave }) => {
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     {activeTab === 'basic' && (
                         <div className="space-y-6">
-                            <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Basic Information</div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>

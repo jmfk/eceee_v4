@@ -90,7 +90,7 @@ export default function BooleanPropertyConfig({
 
       {/* Boolean-Specific Configuration */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Boolean Field Options</h4>
+        <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Boolean Field Options</div>
 
         {/* Default Value */}
         <div>
@@ -164,7 +164,7 @@ export default function BooleanPropertyConfig({
 
         {/* Custom Labels */}
         <div className="mt-4">
-          <h5 className="text-sm font-medium text-gray-900 mb-2">Custom Labels (Optional)</h5>
+          <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="5">Custom Labels (Optional)</div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>

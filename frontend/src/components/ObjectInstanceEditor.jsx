@@ -236,7 +236,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {/* Left Column - Widget Slots */}
                                 <div className="space-y-4">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                    <div className="text-lg font-medium text-gray-900 mb-4 flex items-center" role="heading" aria-level="3">
                                         <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                                         Widget Slots
                                         {objectType?.slotConfiguration?.slots && (
@@ -244,7 +244,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                                 {objectType.slotConfiguration.slots.length} slots configured
                                             </span>
                                         )}
-                                    </h3>
+                                    </div>
 
                                     {/* Show available slots */}
                                     {objectType?.slotConfiguration?.slots && (
@@ -271,10 +271,10 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
 
                                 {/* Right Column - Object Data */}
                                 <div className="space-y-4">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                    <div className="text-lg font-medium text-gray-900 mb-4 flex items-center" role="heading" aria-level="3">
                                         <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                                         Object Data
-                                    </h3>
+                                    </div>
 
                                     {/* Object Type Selection */}
                                     {!instanceId && (
@@ -296,7 +296,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                                 ))}
                                             </select>
                                             {errors.objectTypeId && (
-                                                <p className="text-red-600 text-sm mt-1">{errors.objectTypeId}</p>
+                                                <div className="text-red-600 text-sm mt-1">{errors.objectTypeId}</div>
                                             )}
                                         </div>
                                     )}
@@ -315,16 +315,16 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                             placeholder="Enter object title..."
                                         />
                                         {errors.title && (
-                                            <p className="text-red-600 text-sm mt-1">{errors.title}</p>
+                                            <div className="text-red-600 text-sm mt-1">{errors.title}</div>
                                         )}
                                     </div>
 
                                     {/* Dynamic Schema Fields */}
                                     {objectType?.schema?.properties && (
                                         <div className="border-t pt-4 space-y-4">
-                                            <h4 className="font-medium text-gray-900">
+                                            <div className="font-medium text-gray-900" role="heading" aria-level="4">
                                                 {objectType.label} Fields
-                                            </h4>
+                                            </div>
                                             <ObjectSchemaForm
                                                 schema={getSchemaFromObjectType(objectType)}
                                                 data={formData.data}
@@ -340,16 +340,16 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                         {activeTab === 'subobjects' && (
                             <div className="space-y-4">
                                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-2">Sub-objects</h3>
-                                    <p className="text-gray-700">
+                                    <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">Sub-objects</div>
+                                    <div className="text-gray-700">
                                         Manage child objects and hierarchical relationships.
                                         Sub-objects inherit context from their parent and can be organized in tree structures.
-                                    </p>
+                                    </div>
                                 </div>
 
                                 {instanceId ? (
                                     <div>
-                                        <h4 className="font-medium text-gray-900 mb-2">Child Objects:</h4>
+                                        <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Child Objects:</div>
                                         <div className="text-gray-500 text-sm">
                                             Child object management will be implemented in a future phase.
                                         </div>
@@ -383,9 +383,9 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                                 </option>
                                             ))}
                                     </select>
-                                    <p className="text-gray-500 text-xs mt-1">
+                                    <div className="text-gray-500 text-xs mt-1">
                                         Select a parent object to create hierarchical relationships
-                                    </p>
+                                    </div>
                                 </div>
 
                             </div>
@@ -441,7 +441,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                         {activeTab === 'versions' && instanceId && (
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-medium text-gray-900">Version History</h3>
+                                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">Version History</div>
                                     <button
                                         type="button"
                                         onClick={() => setShowVersions(true)}
@@ -453,20 +453,20 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                 </div>
 
                                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                                    <h4 className="text-sm font-medium text-blue-900 mb-2">Version Control</h4>
-                                    <p className="text-blue-800 text-sm">
+                                    <div className="text-sm font-medium text-blue-900 mb-2" role="heading" aria-level="4">Version Control</div>
+                                    <div className="text-blue-800 text-sm">
                                         This object has version control enabled. All changes are automatically tracked
                                         and you can view the complete version history, compare changes between versions,
                                         and restore previous versions if needed.
-                                    </p>
+                                    </div>
                                 </div>
 
                                 <div className="bg-gray-50 rounded-md p-4">
-                                    <h4 className="text-sm font-medium text-gray-900 mb-2">Current Version Info</h4>
+                                    <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">Current Version Info</div>
                                     <div className="text-sm text-gray-700 space-y-1">
-                                        <p><strong>Version:</strong> {formData.version || 'New'}</p>
-                                        <p><strong>Last Modified:</strong> {instanceResponse?.data?.updatedAt ? new Date(instanceResponse.data.updatedAt).toLocaleString() : 'Not saved yet'}</p>
-                                        <p><strong>Created By:</strong> {instanceResponse?.data?.createdBy?.username || instanceResponse?.data?.createdBy || 'Current user'}</p>
+                                        <div><span className="font-bold">Version:</span> {formData.version || 'New'}</div>
+                                        <div><span className="font-bold">Last Modified:</span> {instanceResponse?.data?.updatedAt ? new Date(instanceResponse.data.updatedAt).toLocaleString() : 'Not saved yet'}</div>
+                                        <div><span className="font-bold">Created By:</span> {instanceResponse?.data?.createdBy?.username || instanceResponse?.data?.createdBy || 'Current user'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -682,8 +682,8 @@ const SchemaFieldInput = ({ field, value, onChange, error }) => {
                 {field.required && <span className="text-red-500 ml-1">*</span>}
             </label>
             {renderInput()}
-            {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
-            {field.help && <p className="text-gray-500 text-xs mt-1">{field.help}</p>}
+            {error && <div className="text-red-600 text-sm mt-1">{error}</div>}
+            {field.help && <div className="text-gray-500 text-xs mt-1">{field.help}</div>}
         </div>
     )
 }

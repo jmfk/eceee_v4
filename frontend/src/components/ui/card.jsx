@@ -16,9 +16,9 @@ export const CardHeader = ({ children, className = '', ...props }) => (
 );
 
 export const CardTitle = ({ children, className = '', ...props }) => (
-    <h3 className={`text-2xl font-semibold leading-none tracking-tight ${className}`} {...props}>
+    <div className={`text-2xl font-semibold leading-none tracking-tight ${className}`} {...props} role="heading" aria-level="3">
         {children}
-    </h3>
+    </div>
 );
 
 export const CardContent = ({ children, className = '', ...props }) => (

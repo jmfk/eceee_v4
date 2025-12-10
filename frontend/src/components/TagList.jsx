@@ -69,10 +69,10 @@ const TagList = ({
         return (
             <div className="text-center py-12">
                 <Hash className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No tags found</h3>
-                <p className="text-gray-600">
+                <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No tags found</div>
+                <div className="text-gray-600">
                     Create your first tag to start organizing your content.
-                </p>
+                </div>
             </div>
         )
     }
@@ -202,15 +202,15 @@ const TagList = ({
                         <div className="p-6">
                             <div className="flex items-center mb-4">
                                 <AlertCircle className="w-6 h-6 text-red-600 mr-3" />
-                                <h3 className="text-lg font-semibold text-gray-900">
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                                     Delete Tag
-                                </h3>
+                                </div>
                             </div>
-                            <p className="text-gray-600 mb-6">
+                            <div className="text-gray-600 mb-6">
                                 Are you sure you want to delete the tag "
                                 <span className="font-medium">{showDeleteConfirm.name}</span>"?
                                 This action cannot be undone.
-                            </p>
+                            </div>
                             <div className="flex justify-end space-x-3">
                                 <button
                                     onClick={() => setShowDeleteConfirm(null)}
@@ -237,14 +237,14 @@ const TagList = ({
                         <div className="p-6">
                             <div className="flex items-center mb-4">
                                 <AlertCircle className="w-6 h-6 text-red-600 mr-3" />
-                                <h3 className="text-lg font-semibold text-gray-900">
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                                     Delete Multiple Tags
-                                </h3>
+                                </div>
                             </div>
-                            <p className="text-gray-600 mb-6">
+                            <div className="text-gray-600 mb-6">
                                 Are you sure you want to delete {selectedTags.size} selected tag
                                 {selectedTags.size !== 1 ? 's' : ''}? This action cannot be undone.
-                            </p>
+                            </div>
                             <div className="flex justify-end space-x-3">
                                 <button
                                     onClick={() => setShowBulkDeleteConfirm(false)}

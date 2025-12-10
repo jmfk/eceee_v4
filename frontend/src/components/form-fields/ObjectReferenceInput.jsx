@@ -145,7 +145,7 @@ const ObjectReferenceInput = ({
 
             {/* Description */}
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Selected Items (Chips) */}
@@ -271,20 +271,20 @@ const ObjectReferenceInput = ({
                             {isSearching && (
                                 <div className="p-4 text-center text-gray-500">
                                     <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-                                    <p className="text-sm">Searching...</p>
+                                    <div className="text-sm">Searching...</div>
                                 </div>
                             )}
 
                             {!isSearching && searchResults.length === 0 && searchTerm && (
                                 <div className="p-4 text-center text-gray-500">
-                                    <p className="text-sm">No objects found</p>
-                                    <p className="text-xs mt-1">Try a different search term</p>
+                                    <div className="text-sm">No objects found</div>
+                                    <div className="text-xs mt-1">Try a different search term</div>
                                 </div>
                             )}
 
                             {!isSearching && searchResults.length === 0 && !searchTerm && (
                                 <div className="p-4 text-center text-gray-500">
-                                    <p className="text-sm">Start typing to search</p>
+                                    <div className="text-sm">Start typing to search</div>
                                 </div>
                             )}
 
@@ -377,15 +377,15 @@ const ObjectReferenceInput = ({
 
             {/* Info / Status Messages */}
             {isFull && (
-                <p className="text-xs text-amber-600">
+                <div className="text-xs text-amber-600">
                     Maximum of {max_items} {multiple ? 'items' : 'item'} reached
-                </p>
+                </div>
             )}
 
             {allowed_object_types.length > 0 && (
-                <p className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500">
                     Allowed types: {allowed_object_types.join(', ')}
-                </p>
+                </div>
             )}
 
             {/* Validation Error */}

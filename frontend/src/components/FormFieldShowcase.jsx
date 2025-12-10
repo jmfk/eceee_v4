@@ -96,13 +96,13 @@ const FormFieldShowcase = () => {
     const renderOverview = () => (
         <div className="space-y-8">
             <div className="text-center">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                <div className="text-3xl font-bold text-gray-900 mb-4" role="heading" aria-level="2">
                     Custom React-Based Form Field Widgets System
-                </h2>
-                <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+                </div>
+                <div className="text-lg text-gray-600 max-w-3xl mx-auto">
                     A comprehensive, extensible form field system that provides advanced UI components
                     with integrated validation, accessibility features, and seamless backend integration.
-                </p>
+                </div>
             </div>
 
             {/* Stats */}
@@ -126,10 +126,10 @@ const FormFieldShowcase = () => {
 
             {/* Features */}
             <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <div className="text-xl font-semibold text-gray-900 mb-4 flex items-center" role="heading" aria-level="3">
                     <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
                     Key Features
-                </h3>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {systemStats.features.map((feature, index) => (
                         <div key={index} className="flex items-center space-x-2">
@@ -142,7 +142,7 @@ const FormFieldShowcase = () => {
 
             {/* Architecture Diagram */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">System Architecture</h3>
+                <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="3">System Architecture</div>
                 <div className="flex items-center justify-center space-x-8">
                     <div className="text-center">
                         <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
@@ -182,9 +182,9 @@ const FormFieldShowcase = () => {
                             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                                 <Users className="w-5 h-5 text-white" />
                             </div>
-                            <h1 className="text-xl font-semibold text-gray-900">
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="1">
                                 Form Field Widgets Showcase
-                            </h1>
+                            </div>
                         </div>
                         <div className="text-sm text-gray-500">
                             EASY v4 • Phase 3 Complete
@@ -230,28 +230,28 @@ const FormFieldShowcase = () => {
                 {activeDemo === 'value-lists' && <ValueListsDemo />}
                 {activeDemo === 'dynamic-forms' && (
                     <div className="space-y-6">
-                        <h2 className="text-2xl font-bold text-gray-900">Dynamic Form Examples</h2>
-                        <p className="text-gray-600">
+                        <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="2">Dynamic Form Examples</div>
+                        <div className="text-gray-600">
                             Examples of dynamic form rendering using the new field system.
-                        </p>
+                        </div>
                         {/* Add dynamic form examples here */}
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
-                            <p className="text-gray-500">Dynamic form examples coming soon...</p>
+                            <div className="text-gray-500">Dynamic form examples coming soon...</div>
                         </div>
                     </div>
                 )}
                 {activeDemo === 'integration' && (
                     <div className="space-y-6">
-                        <h2 className="text-2xl font-bold text-gray-900">System Integration</h2>
-                        <p className="text-gray-600">
+                        <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="2">System Integration</div>
+                        <div className="text-gray-600">
                             Integration examples with existing form systems.
-                        </p>
+                        </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div className="bg-white border border-gray-200 rounded-lg p-6">
-                                <h3 className="text-lg font-medium mb-3">Widget Editor Integration</h3>
-                                <p className="text-gray-600 text-sm mb-4">
+                                <div className="text-lg font-medium mb-3" role="heading" aria-level="3">Widget Editor Integration</div>
+                                <div className="text-gray-600 text-sm mb-4">
                                     Enhanced widget configuration forms with advanced field types.
-                                </p>
+                                </div>
                                 <div className="bg-gray-50 p-4 rounded border">
                                     <code className="text-sm">
                                         &lt;EnhancedWidgetForm<br />
@@ -262,10 +262,10 @@ const FormFieldShowcase = () => {
                                 </div>
                             </div>
                             <div className="bg-white border border-gray-200 rounded-lg p-6">
-                                <h3 className="text-lg font-medium mb-3">Schema-Driven Forms</h3>
-                                <p className="text-gray-600 text-sm mb-4">
+                                <div className="text-lg font-medium mb-3" role="heading" aria-level="3">Schema-Driven Forms</div>
+                                <div className="text-gray-600 text-sm mb-4">
                                     Enhanced schema-driven forms with field type mapping.
-                                </p>
+                                </div>
                                 <div className="bg-gray-50 p-4 rounded border">
                                     <code className="text-sm">
                                         &lt;EnhancedSchemaDrivenForm<br />

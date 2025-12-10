@@ -257,10 +257,10 @@ const NavbarWidgetEditor = ({
         <div className="h-full flex flex-col overflow-hidden min-w-0">
             {/* Header */}
             <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-white">
-                <h2 className="text-lg font-semibold">Navbar Configuration</h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <div className="text-lg font-semibold">Navbar Configuration</div>
+                <div className="text-sm text-gray-600 mt-1">
                     Configure menu items and import subpages
-                </p>
+                </div>
             </div>
 
             {/* Scrollable Content */}
@@ -270,15 +270,15 @@ const NavbarWidgetEditor = ({
                     <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 min-w-0">
                         <div className="flex items-center justify-between mb-3">
                             <div className="min-w-0 flex-1 mr-2">
-                                <h3 className="text-base font-semibold flex items-center gap-2">
+                                <div className="text-base font-semibold flex items-center gap-2">
                                     <FileText size={18} />
                                     Import Subpages
-                                </h3>
-                                <p className="text-xs text-gray-600 mt-1">
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">
                                     {currentPageId
                                         ? `Select subpages of the current page to add as menu items (includes unpublished pages)`
                                         : 'Select a page to view its subpages'}
-                                </p>
+                                </div>
                             </div>
                             <button
                                 type="button"
@@ -292,7 +292,7 @@ const NavbarWidgetEditor = ({
 
                         {!currentPageId ? (
                             <div className="text-sm text-gray-600 bg-yellow-50 border border-yellow-200 rounded p-3">
-                                <p>No page context available. This widget should be used within a page editor.</p>
+                                <div>No page context available. This widget should be used within a page editor.</div>
                             </div>
                         ) : isLoadingChildren ? (
                             <div className="flex items-center justify-center py-8">
@@ -301,7 +301,7 @@ const NavbarWidgetEditor = ({
                             </div>
                         ) : childrenPages.length === 0 ? (
                             <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
-                                <p>This page has no subpages. Create child pages to import them here.</p>
+                                <div>This page has no subpages. Create child pages to import them here.</div>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -392,7 +392,7 @@ const NavbarWidgetEditor = ({
                 {/* Primary Menu Items */}
                 <div className="min-w-0">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-semibold">Primary Menu Items</h3>
+                        <div className="text-base font-semibold">Primary Menu Items</div>
                         <button
                             type="button"
                             onClick={addMenuItem}
@@ -467,16 +467,16 @@ const NavbarWidgetEditor = ({
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-500 italic py-4 text-center bg-gray-50 border border-gray-200 rounded">
+                        <div className="text-sm text-gray-500 italic py-4 text-center bg-gray-50 border border-gray-200 rounded">
                             No menu items yet. Add items manually or import subpages above.
-                        </p>
+                        </div>
                     )}
                 </div>
 
                 {/* Secondary Menu Items */}
                 <div className="min-w-0">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-semibold">Secondary Menu Items</h3>
+                        <div className="text-base font-semibold">Secondary Menu Items</div>
                         <button
                             type="button"
                             onClick={addSecondaryMenuItem}
@@ -579,13 +579,13 @@ const NavbarWidgetEditor = ({
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-500 italic py-4 text-center bg-gray-50 border border-gray-200 rounded">
+                        <div className="text-sm text-gray-500 italic py-4 text-center bg-gray-50 border border-gray-200 rounded">
                             No secondary menu items yet.
-                        </p>
+                        </div>
                     )}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     )
 }
 

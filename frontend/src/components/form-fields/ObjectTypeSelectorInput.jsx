@@ -190,7 +190,7 @@ const ObjectTypeSelectorInput = ({
 
             {/* Description */}
             {description && (
-                <p className="text-sm text-gray-500 mb-2">{description}</p>
+                <div className="text-sm text-gray-500 mb-2">{description}</div>
             )}
 
             {/* Main dropdown trigger */}
@@ -332,25 +332,25 @@ const ObjectTypeSelectorInput = ({
 
             {/* Validation Messages */}
             {hasError && validation.errors?.map((error, index) => (
-                <p key={index} className="text-sm text-red-600 flex items-center space-x-1">
+                <div key={index} className="text-sm text-red-600 flex items-center space-x-1">
                     <AlertCircle className="w-4 h-4" />
                     <span>{error}</span>
-                </p>
+                </div>
             ))}
 
             {hasWarning && validation.warnings?.map((warning, index) => (
-                <p key={index} className="text-sm text-yellow-600 flex items-center space-x-1">
+                <div key={index} className="text-sm text-yellow-600 flex items-center space-x-1">
                     <AlertCircle className="w-4 h-4" />
                     <span>{warning}</span>
-                </p>
+                </div>
             ))}
 
             {/* Validating state */}
             {isValidating && (
-                <p className="text-sm text-blue-600 flex items-center space-x-1">
+                <div className="text-sm text-blue-600 flex items-center space-x-1">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Validating...</span>
-                </p>
+                </div>
             )}
         </div>
     )

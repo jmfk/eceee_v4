@@ -104,13 +104,13 @@ export default function ReverseObjectReferencePropertyConfig({
 
       {/* Reverse Reference Specific Configuration */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Reverse Reference Configuration</h4>
+        <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Reverse Reference Configuration</div>
         
         <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-          <p className="text-sm text-blue-800">
-            <strong>Read-only field:</strong> This field displays objects from other object types that reference this object.
+          <div className="text-sm text-blue-800">
+            <span className="font-bold">Read-only field:</span> This field displays objects from other object types that reference this object.
             It automatically fetches and displays the reverse relationships.
-          </p>
+          </div>
         </div>
 
         {/* Reverse Relationship Type */}
@@ -127,9 +127,9 @@ export default function ReverseObjectReferencePropertyConfig({
             }`}
             placeholder="e.g., columns_authored, articles"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-gray-500 mt-1">
             The field name on the other object that references this object
-          </p>
+          </div>
           {errors.reverseRelationshipType && (
             <div className="text-red-500 text-xs mt-1">{errors.reverseRelationshipType}</div>
           )}
@@ -176,9 +176,9 @@ export default function ReverseObjectReferencePropertyConfig({
             </div>
           )}
           
-          <p className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-gray-500 mt-1">
             Select which object types to fetch reverse references from
-          </p>
+          </div>
           {selectedTypes.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {selectedTypes.map(typeName => {
@@ -201,7 +201,7 @@ export default function ReverseObjectReferencePropertyConfig({
 
         {/* Display Options */}
         <div className="space-y-3">
-          <h5 className="text-sm font-medium text-gray-900">Display Options</h5>
+          <div className="text-sm font-medium text-gray-900" role="heading" aria-level="5">Display Options</div>
           
           <div className="flex items-start space-x-3">
             <div className="flex items-center h-5">
@@ -217,9 +217,9 @@ export default function ReverseObjectReferencePropertyConfig({
               <label htmlFor={`showCount-${property.key}`} className="text-sm text-gray-700">
                 Show count badge
               </label>
-              <p className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-gray-500 mt-1">
                 Display the number of reverse references
-              </p>
+              </div>
             </div>
           </div>
 
@@ -237,9 +237,9 @@ export default function ReverseObjectReferencePropertyConfig({
               <label htmlFor={`linkToObjects-${property.key}`} className="text-sm text-gray-700">
                 Link to referenced objects
               </label>
-              <p className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-gray-500 mt-1">
                 Make items clickable to navigate to the referenced objects
-              </p>
+              </div>
             </div>
           </div>
         </div>

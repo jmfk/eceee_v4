@@ -1025,9 +1025,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                             Import Content from Web
-                        </h2>
+                        </div>
                         <button
                             onClick={handleClose}
                             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -1074,9 +1074,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     onKeyPress={(e) => e.key === 'Enter' && handleNext()}
                                 />
-                                <p className="mt-2 text-sm text-gray-500">
+                                <div className="mt-2 text-sm text-gray-500">
                                     The page will be displayed live so you can click on the content you want.
-                                </p>
+                                </div>
                             </div>
                         )}
 
@@ -1086,9 +1086,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                 {/* Left side: Iframe */}
                                 <div className="flex-1 flex flex-col min-w-0">
                                     <div className="flex items-center justify-between mb-3 px-4">
-                                        <p className="text-sm text-gray-700">
+                                        <div className="text-sm text-gray-700">
                                             Click on the content block you want to import.
-                                        </p>
+                                        </div>
 
                                         <label className="flex items-center text-sm text-gray-600">
                                             <input
@@ -1129,8 +1129,8 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                             <div className="absolute inset-0 bg-gray-900/40 flex flex-col items-center justify-center z-10 pointer-events-auto">
                                                 <div className="bg-white rounded-lg shadow-xl p-6 flex flex-col items-center">
                                                     <Loader className="h-8 w-8 text-blue-600 animate-spin mb-3" />
-                                                    <p className="text-sm font-medium text-gray-900">Analyzing page...</p>
-                                                    <p className="text-xs text-gray-600 mt-1">Please wait while we load the content</p>
+                                                    <div className="text-sm font-medium text-gray-900">Analyzing page...</div>
+                                                    <div className="text-xs text-gray-600 mt-1">Please wait while we load the content</div>
                                                 </div>
                                             </div>
                                         )}
@@ -1186,9 +1186,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         {/* Step 5: Media Upload */}
                         {currentStep === STEPS.MEDIA_UPLOAD && (
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                                <div className="text-lg font-semibold text-gray-900 mb-3" role="heading" aria-level="3">
                                     Uploading Media Files
-                                </h3>
+                                </div>
 
                                 {!aiAvailable && mediaUploadStatus.length > 0 && (
                                     <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
@@ -1200,7 +1200,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                 {mediaUploadStatus.length === 0 ? (
                                     <div className="text-center py-8">
                                         <Loader className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
-                                        <p className="text-gray-600">Analyzing content and preparing uploads...</p>
+                                        <div className="text-gray-600">Analyzing content and preparing uploads...</div>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -1289,9 +1289,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         {/* Step 4: Content Preview */}
                         {currentStep === STEPS.CONTENT_PREVIEW && selectedElement && (
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                                <div className="text-lg font-semibold text-gray-900 mb-3" role="heading" aria-level="3">
                                     Preview Content
-                                </h3>
+                                </div>
                                 <ContentPreview
                                     html={selectedElement.html}
                                     mediaItems={mediaUploadStatus}
@@ -1303,9 +1303,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         {/* Step 4: Import Options */}
                         {currentStep === STEPS.IMPORT_OPTIONS && (
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                <div className="text-lg font-semibold text-gray-900 mb-4" role="heading" aria-level="3">
                                     Import Options
-                                </h3>
+                                </div>
 
                                 <div className="space-y-3 mb-6">
                                     <label className="flex items-center">
@@ -1340,12 +1340,12 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                 </div>
 
                                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <h4 className="font-medium text-blue-900 mb-2">Media files will be:</h4>
-                                    <ul className="text-sm text-blue-800 space-y-1">
+                                    <div className="font-medium text-blue-900 mb-2" role="heading" aria-level="4">Media files will be:</div>
+                                    <div className="text-sm text-blue-800 space-y-1" role="list">
                                         <li>• Downloaded automatically</li>
                                         <li>• Tagged with "imported"</li>
                                         <li>• AI-generated metadata added (if configured)</li>
-                                    </ul>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1354,9 +1354,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                         {currentStep === STEPS.PROCESSING && (
                             <div className="text-center py-8">
                                 <Loader className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
-                                <p className="text-lg font-medium text-gray-900 mb-2">
+                                <div className="text-lg font-medium text-gray-900 mb-2">
                                     {progress.step}
-                                </p>
+                                </div>
 
                                 {/* Progress bar */}
                                 <div className="w-full max-w-md mx-auto bg-gray-200 rounded-full h-2 mb-3">
@@ -1366,9 +1366,9 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
                                     />
                                 </div>
 
-                                <p className="text-sm text-gray-600">
+                                <div className="text-sm text-gray-600">
                                     Creating {mediaUploadStatus.filter(m => m.status === 'success' || m.status === 'reused').length} widgets from uploaded media...
-                                </p>
+                                </div>
                             </div>
                         )}
                     </div>

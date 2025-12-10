@@ -86,10 +86,10 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
         <div className="h-full flex flex-col relative">
             {/* Content Header */}
             <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3">
-                <h1 className="text-lg font-semibold text-gray-900 flex items-center">
+                <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="1">
                     <SettingsIcon className="h-5 w-5 mr-2" />
                     Object Settings
-                </h1>
+                </div>
             </div>
 
             {/* Scrollable Content Area */}
@@ -114,7 +114,7 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
                             {/* Object Info (read-only) */}
                             {!isNewInstance && instance && (
                                 <div className="border-t pt-6">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Object Information</h3>
+                                    <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Object Information</div>
                                     <div className="bg-gray-50 rounded-md p-4 space-y-2">
                                         <div className="grid grid-cols-2 gap-4 text-sm">
                                             <div>

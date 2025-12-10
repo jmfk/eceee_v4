@@ -342,7 +342,7 @@ const MediaSearchWidget = ({
             )}
 
             {/* Help Text */}
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
                 {disabled
                     ? "Search terms help filter your media files"
                     : isLoading
@@ -351,7 +351,7 @@ const MediaSearchWidget = ({
                             ? "Searching for tags..."
                             : "Type to search files by text. Click tags to add filters (blue pills). Multiple tags work as AND filters."
                 }
-            </p>
+            </div>
         </div>
     )
 }

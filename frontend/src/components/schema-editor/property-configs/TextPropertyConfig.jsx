@@ -94,7 +94,7 @@ export default function TextPropertyConfig({
 
       {/* Text-Specific Configuration */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Text Field Options</h4>
+        <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Text Field Options</div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>

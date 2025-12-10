@@ -351,7 +351,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
             )}
 
             {/* Help Text */}
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
                 {disabled
                     ? "Tags help organize and categorize your media files"
                     : isLoading
@@ -360,7 +360,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
                             ? "Searching for tags..."
                             : "Type to search existing tags or create new ones. Press Enter or click + to add."
                 }
-            </p>
+            </div>
         </div>
     )
 }

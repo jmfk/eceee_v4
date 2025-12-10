@@ -182,7 +182,7 @@ const ComponentStyleEditPage = () => {
     const renderPreview = () => {
         try {
             const context = prepareComponentContext(
-                '<p>Sample content for preview</p>',
+                '<div>Sample content for preview</div>',
                 'Sample Heading',
                 variables
             );
@@ -264,12 +264,12 @@ const ComponentStyleEditPage = () => {
                                 Back to Component Styles
                             </button>
                             <div>
-                                <h1 className="text-xl font-bold text-gray-900">
+                                <div className="text-xl font-bold text-gray-900" role="heading" aria-level="1">
                                     Edit: {name || styleKey}
-                                </h1>
-                                <p className="text-sm text-gray-500">
+                                </div>
+                                <div className="text-sm text-gray-500">
                                     Theme: {themeData?.name}
-                                </p>
+                                </div>
                             </div>
                         </div>
 
@@ -346,9 +346,9 @@ const ComponentStyleEditPage = () => {
                                         required
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         Auto-generated from display name (edit to customize)
-                                    </p>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -370,7 +370,7 @@ const ComponentStyleEditPage = () => {
                                     Mustache Template
                                 </label>
                                 <div className="mb-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                                    <strong>⚠️ Important:</strong> Use triple braces <code className="bg-white px-1 rounded">{'{{{content}}}'}</code> for HTML content!
+                                    <span className="font-bold">⚠️ Important:</span> Use triple braces <code className="bg-white px-1 rounded">{'{{{content}}}'}</code> for HTML content!
                                 </div>
                                 <CodeEditorPanel
                                     data={template}
@@ -408,9 +408,9 @@ const ComponentStyleEditPage = () => {
                                     mode="css"
                                 />
 
-                                <p className="text-xs text-gray-500 mt-2">
+                                <div className="text-xs text-gray-500 mt-2">
                                     💡 Styles cascade: Default applies to all sizes, then each breakpoint overrides at min-width.
-                                </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -419,7 +419,7 @@ const ComponentStyleEditPage = () => {
                     <div className="lg:sticky lg:top-24 h-fit space-y-6">
                         {/* Quick Reference */}
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-3">📋 Quick Reference</h4>
+                            <div className="text-sm font-semibold text-gray-900 mb-3" role="heading" aria-level="4">📋 Quick Reference</div>
 
                             {/* Scenario Selector */}
                             <div className="mb-4">
@@ -437,15 +437,15 @@ const ComponentStyleEditPage = () => {
                                         </option>
                                     ))}
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                     {currentScenario.description}
-                                </p>
+                                </div>
                             </div>
 
                             <div className="space-y-4 text-sm">
                                 {/* Available Variables */}
                                 <div>
-                                    <p className="font-medium text-gray-700 mb-2">Available Variables:</p>
+                                    <div className="font-medium text-gray-700 mb-2">Available Variables:</div>
                                     <div className="space-y-1">
                                         {currentScenario.variables.map((variable) => (
                                             <div key={variable.name} className="flex items-start gap-2">
@@ -463,7 +463,7 @@ const ComponentStyleEditPage = () => {
                                 {/* Item Properties */}
                                 {currentScenario.itemProperties && currentScenario.itemProperties.length > 0 && (
                                     <div>
-                                        <p className="font-medium text-gray-700 mb-2">Item Properties:</p>
+                                        <div className="font-medium text-gray-700 mb-2">Item Properties:</div>
                                         <div className="space-y-1">
                                             {currentScenario.itemProperties.map((prop) => (
                                                 <div key={prop.name} className="flex items-start gap-2">
@@ -482,7 +482,7 @@ const ComponentStyleEditPage = () => {
                                 {/* Template Example */}
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="font-medium text-gray-700">HTML Template Example:</p>
+                                        <div className="font-medium text-gray-700">HTML Template Example:</div>
                                         <button
                                             onClick={handleCopyTemplate}
                                             className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
@@ -509,7 +509,7 @@ const ComponentStyleEditPage = () => {
                                 {/* CSS Example */}
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="font-medium text-gray-700">CSS Example:</p>
+                                        <div className="font-medium text-gray-700">CSS Example:</div>
                                         <button
                                             onClick={handleCopyCSS}
                                             className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
@@ -535,7 +535,7 @@ const ComponentStyleEditPage = () => {
 
                                 {/* Mustache Syntax Reminder */}
                                 <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                                    <strong>⚠️ Important:</strong> Use triple braces <code className="bg-white px-1 rounded">{'{{{content}}}'}</code> for HTML content to avoid escaping!
+                                    <span className="font-bold">⚠️ Important:</span> Use triple braces <code className="bg-white px-1 rounded">{'{{{content}}}'}</code> for HTML content to avoid escaping!
                                 </div>
                             </div>
                         </div>
@@ -543,9 +543,9 @@ const ComponentStyleEditPage = () => {
                         {/* Preview Panel */}
                         {showPreview && (
                             <div className="bg-white border border-gray-200 rounded-lg p-6">
-                                <h3 className="text-sm font-semibold text-gray-900 mb-4">
+                                <div className="text-sm font-semibold text-gray-900 mb-4" role="heading" aria-level="3">
                                     Live Preview
-                                </h3>
+                                </div>
                                 <style dangerouslySetInnerHTML={{ __html: css }} />
                                 <div className="border border-gray-300 rounded p-4 bg-gray-50 overflow-auto">
                                     <div dangerouslySetInnerHTML={{ __html: renderPreview() }} />

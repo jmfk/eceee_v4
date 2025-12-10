@@ -338,17 +338,17 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                     </div>
                 )}
                 <div className="p-3">
-                    <p className="text-sm font-medium text-gray-900 truncate" title={file.title}>
+                    <div className="text-sm font-medium text-gray-900 truncate" title={file.title}>
                         {file.title}
-                    </p>
+                    </div>
                     {file.annotation && (
-                        <p className="text-xs text-gray-600 mt-1 truncate" title={file.annotation}>
+                        <div className="text-xs text-gray-600 mt-1 truncate" title={file.annotation}>
                             {file.annotation}
-                        </p>
+                        </div>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 mt-1">
                         {formatFileSize(file.fileSize)}
-                    </p>
+                    </div>
                 </div>
                 <button
                     onClick={() => handleRemoveFile(file.id)}
@@ -374,8 +374,8 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                             <X className="w-5 h-5 text-gray-500" />
                         </button>
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-900">Edit Collection</h2>
-                            <p className="text-sm text-gray-600 mt-0.5">{collection.title}</p>
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Edit Collection</div>
+                            <div className="text-sm text-gray-600 mt-0.5">{collection.title}</div>
                         </div>
                     </div>
                 </div>
@@ -390,7 +390,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                             onClick={() => setMetadataExpanded(!metadataExpanded)}
                             className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                         >
-                            <h3 className="text-lg font-semibold text-gray-900">Collection Details</h3>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Collection Details</div>
                             {metadataExpanded ? (
                                 <ChevronUp className="w-5 h-5 text-gray-400" />
                             ) : (
@@ -472,8 +472,8 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                     <div className="bg-white rounded-lg border border-gray-200">
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Files in Collection</h3>
-                                <p className="text-sm text-gray-600 mt-0.5">{existingFiles.length} files</p>
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Files in Collection</div>
+                                <div className="text-sm text-gray-600 mt-0.5">{existingFiles.length} files</div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
@@ -502,15 +502,15 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                         <span className="font-medium text-sm">Error loading files</span>
                                     </div>
-                                    <p className="text-red-700 text-sm mt-1">{existingError}</p>
+                                    <div className="text-red-700 text-sm mt-1">{existingError}</div>
                                 </div>
                             ) : existingFiles.length === 0 ? (
                                 <div className="text-center py-12">
                                     <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <h4 className="text-sm font-medium text-gray-900 mb-1">No files in collection</h4>
-                                    <p className="text-sm text-gray-600">
+                                    <div className="text-sm font-medium text-gray-900 mb-1" role="heading" aria-level="4">No files in collection</div>
+                                    <div className="text-sm text-gray-600">
                                         Add files from available files on the right.
-                                    </p>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-2'}>
@@ -759,13 +759,13 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
 
                 {/* File Info */}
                 <div className="p-2">
-                    <h4 className="text-xs font-medium text-gray-900 truncate mb-1">
+                    <div className="text-xs font-medium text-gray-900 truncate mb-1" role="heading" aria-level="4">
                         {file.title || file.originalFilename}
-                    </h4>
+                    </div>
                     {file.annotation && (
-                        <p className="text-xs text-gray-600 mb-1 truncate" title={file.annotation}>
+                        <div className="text-xs text-gray-600 mb-1 truncate" title={file.annotation}>
                             {file.annotation}
-                        </p>
+                        </div>
                     )}
                     <div className="flex items-center justify-between text-xs text-gray-500">
                         <span className="truncate">{file.title || file.originalFilename}</span>
@@ -807,13 +807,13 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                     />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-medium text-gray-900 truncate">
+                    <div className="text-xs font-medium text-gray-900 truncate" role="heading" aria-level="4">
                         {file.title || file.originalFilename}
-                    </h4>
+                    </div>
                     {file.annotation && (
-                        <p className="text-xs text-gray-600 mt-0.5 truncate" title={file.annotation}>
+                        <div className="text-xs text-gray-600 mt-0.5 truncate" title={file.annotation}>
                             {file.annotation}
-                        </p>
+                        </div>
                     )}
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                         <span className="truncate">{file.title || file.originalFilename}</span>
@@ -872,13 +872,13 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
 
                 {/* File Info */}
                 <div className="p-2">
-                    <h4 className="text-xs font-medium text-gray-900 truncate mb-1">
+                    <div className="text-xs font-medium text-gray-900 truncate mb-1" role="heading" aria-level="4">
                         {file.title || file.originalFilename}
-                    </h4>
+                    </div>
                     {file.annotation && (
-                        <p className="text-xs text-gray-600 mb-1 truncate" title={file.annotation}>
+                        <div className="text-xs text-gray-600 mb-1 truncate" title={file.annotation}>
                             {file.annotation}
-                        </p>
+                        </div>
                     )}
                     <div className="flex items-center justify-between text-xs text-gray-500">
                         <span className="truncate">{file.title || file.originalFilename}</span>
@@ -920,13 +920,13 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                     />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-medium text-gray-900 truncate">
+                    <div className="text-xs font-medium text-gray-900 truncate" role="heading" aria-level="4">
                         {file.title || file.originalFilename}
-                    </h4>
+                    </div>
                     {file.annotation && (
-                        <p className="text-xs text-gray-600 mt-0.5 truncate" title={file.annotation}>
+                        <div className="text-xs text-gray-600 mt-0.5 truncate" title={file.annotation}>
                             {file.annotation}
-                        </p>
+                        </div>
                     )}
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                         <span className="truncate">{file.title || file.originalFilename}</span>
@@ -960,10 +960,10 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                         </button>
                         <Folder className="w-6 h-6 text-blue-600" />
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-900">{collection.title}</h2>
-                            <p className="text-gray-600 mt-1">
+                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="2">{collection.title}</div>
+                            <div className="text-gray-600 mt-1">
                                 {existingFiles.length} files in collection • {availableFiles.length} available to add
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -994,10 +994,10 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
             {/* Available Files Section - Full Width */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
                 <div className="mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">Available Files</h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Available Files</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         {availableFiles.length} files available to add • Click + to add
-                    </p>
+                    </div>
                 </div>
 
                 {/* Search and Filters */}
@@ -1050,15 +1050,15 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                         {/* Left Column - Existing Files in Collection */}
                         <div className="bg-white rounded-lg border border-gray-200 flex flex-col overflow-hidden">
                             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-                                <h3 className="text-lg font-semibold text-gray-900">Files in Collection</h3>
-                                <p className="text-sm text-gray-600 mt-1">{existingFiles.length} files</p>
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Files in Collection</div>
+                                <div className="text-sm text-gray-600 mt-1">{existingFiles.length} files</div>
                             </div>
                             <div className="p-4 flex-1 overflow-auto">
                                 {existingLoading && (
                                     <div className="flex items-center justify-center h-32">
                                         <div className="text-center">
                                             <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
-                                            <p className="text-sm text-gray-600">Loading existing files...</p>
+                                            <div className="text-sm text-gray-600">Loading existing files...</div>
                                         </div>
                                     </div>
                                 )}
@@ -1069,7 +1069,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                                             <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                             <span className="font-medium text-sm">Error loading existing files</span>
                                         </div>
-                                        <p className="text-red-700 text-sm">{existingError}</p>
+                                        <div className="text-red-700 text-sm">{existingError}</div>
                                     </div>
                                 )}
 
@@ -1078,8 +1078,8 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                                         {existingFiles.length === 0 ? (
                                             <div className="text-center py-8">
                                                 <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                                <h4 className="text-sm font-medium text-gray-900 mb-1">No files in collection</h4>
-                                                <p className="text-sm text-gray-600">Add files from the right panel to get started.</p>
+                                                <div className="text-sm font-medium text-gray-900 mb-1" role="heading" aria-level="4">No files in collection</div>
+                                                <div className="text-sm text-gray-600">Add files from the right panel to get started.</div>
                                             </div>
                                         ) : (
                                             <div className={
@@ -1100,15 +1100,15 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                         {/* Right Column - Available Files Grid */}
                         <div className="bg-white rounded-lg border border-gray-200 flex flex-col overflow-hidden">
                             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-                                <h3 className="text-lg font-semibold text-gray-900">Available Files</h3>
-                                <p className="text-sm text-gray-600 mt-1">Click + to add files or × to remove</p>
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Available Files</div>
+                                <div className="text-sm text-gray-600 mt-1">Click + to add files or × to remove</div>
                             </div>
                             <div className="p-4 flex-1 overflow-auto">
                                 {availableLoading && (
                                     <div className="flex items-center justify-center h-32">
                                         <div className="text-center">
                                             <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
-                                            <p className="text-sm text-gray-600">Loading available files...</p>
+                                            <div className="text-sm text-gray-600">Loading available files...</div>
                                         </div>
                                     </div>
                                 )}
@@ -1119,7 +1119,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                                             <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                             <span className="font-medium text-sm">Error loading available files</span>
                                         </div>
-                                        <p className="text-red-700 text-sm">{availableError}</p>
+                                        <div className="text-red-700 text-sm">{availableError}</div>
                                     </div>
                                 )}
 
@@ -1128,18 +1128,18 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                                         {availableFiles.length === 0 ? (
                                             <div className="text-center py-8">
                                                 <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                                <h4 className="text-sm font-medium text-gray-900 mb-1">
+                                                <div className="text-sm font-medium text-gray-900 mb-1" role="heading" aria-level="4">
                                                     {searchTerms.length > 0 || selectedFileType
                                                         ? 'No files match your filters'
                                                         : 'No files available to add'
                                                     }
-                                                </h4>
-                                                <p className="text-sm text-gray-600">
+                                                </div>
+                                                <div className="text-sm text-gray-600">
                                                     {searchTerms.length > 0 || selectedFileType
                                                         ? 'Try adjusting your search criteria or clearing the filters.'
                                                         : 'All files are already in this collection.'
                                                     }
-                                                </p>
+                                                </div>
                                                 {(searchTerms.length > 0 || selectedFileType) && (
                                                     <button
                                                         onClick={() => {
@@ -1243,8 +1243,8 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
                         </button>
                         <Edit3 className="w-6 h-6 text-blue-600" />
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-900">Edit Collection</h2>
-                            <p className="text-gray-600 mt-1">Update collection details</p>
+                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="2">Edit Collection</div>
+                            <div className="text-gray-600 mt-1">Update collection details</div>
                         </div>
                     </div>
                 </div>
@@ -1643,12 +1643,12 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                             <Plus className="w-5 h-5 text-blue-600" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                            <div className="text-lg font-semibold text-gray-900 mb-1" role="heading" aria-level="3">
                                 New Collection
-                            </h3>
-                            <p className="text-sm text-gray-600">
+                            </div>
+                            <div className="text-sm text-gray-600">
                                 Enter a title and optionally add tags
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -1681,9 +1681,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                 availableTags={availableTags}
                             />
                             {formData.tagIds.length === 0 && (
-                                <p className="text-xs text-amber-600 mt-1">
+                                <div className="text-xs text-amber-600 mt-1">
                                     At least one tag is required to enable file uploads
-                                </p>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -1746,7 +1746,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                 <div className="h-32 bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center rounded-t-lg">
                     <div className="text-center">
                         <Folder className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">No images</p>
+                        <div className="text-sm text-gray-500">No images</div>
                     </div>
                 </div>
             );
@@ -1809,9 +1809,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                 <Folder className="w-5 h-5 text-blue-600" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                                <div className="text-lg font-semibold text-gray-900 truncate" role="heading" aria-level="3">
                                     {collection.title}
-                                </h3>
+                                </div>
                                 <div className="flex items-center gap-3 text-sm text-gray-500">
                                     <span className="flex items-center gap-1">
                                         <FileText className="w-3.5 h-3.5" />
@@ -1830,9 +1830,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
 
                         {/* Description */}
                         {collection.description && (
-                            <p className="text-sm text-gray-600 line-clamp-2 ml-13">
+                            <div className="text-sm text-gray-600 line-clamp-2 ml-13">
                                 {collection.description}
-                            </p>
+                            </div>
                         )}
 
                         {/* Tags */}
@@ -1911,9 +1911,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                 <div className="p-4">
                     <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-gray-900 truncate mb-1">
+                            <div className="text-lg font-semibold text-gray-900 truncate mb-1" role="heading" aria-level="3">
                                 {collection.title}
-                            </h3>
+                            </div>
                             <div className="flex items-center gap-3 text-sm text-gray-500">
                                 <span className="flex items-center gap-1">
                                     <FileText className="w-3.5 h-3.5" />
@@ -1961,9 +1961,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
 
                     {/* Description */}
                     {collection.description && (
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        <div className="text-sm text-gray-600 mb-3 line-clamp-2">
                             {collection.description}
-                        </p>
+                        </div>
                     )}
 
                     {/* Tags */}
@@ -2001,7 +2001,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                     <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">Please select a namespace to manage collections</p>
+                    <div className="text-gray-600">Please select a namespace to manage collections</div>
                 </div>
             </div>
         );
@@ -2030,8 +2030,8 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
             <div className="bg-white border-b border-gray-200 px-6 py-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900">Media Collections</h2>
-                        <p className="text-gray-600 mt-1">Organize your media files into collections</p>
+                        <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="2">Media Collections</div>
+                        <div className="text-gray-600 mt-1">Organize your media files into collections</div>
                     </div>
 
                     {!showInlineForm && (
@@ -2112,7 +2112,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                         <div className="flex items-center justify-center h-64">
                             <div className="text-center">
                                 <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-                                <p className="text-gray-600">Loading collections...</p>
+                                <div className="text-gray-600">Loading collections...</div>
                             </div>
                         </div>
                     )}
@@ -2124,7 +2124,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                                 <span className="font-medium">Error loading collections</span>
                             </div>
-                            <p className="text-red-700 mb-4">{error}</p>
+                            <div className="text-red-700 mb-4">{error}</div>
                             <button
                                 onClick={loadCollections}
                                 className="px-4 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200 transition-colors font-medium"
@@ -2141,10 +2141,10 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                 <div className="text-center py-16">
                                     <div className="bg-white rounded-lg p-8 max-w-md mx-auto">
                                         <Folder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No collections found</h3>
-                                        <p className="text-gray-600 mb-6">
+                                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No collections found</div>
+                                        <div className="text-gray-600 mb-6">
                                             {searchQuery ? 'No collections match your search criteria.' : 'Get started by creating your first collection.'}
-                                        </p>
+                                        </div>
                                         {!searchQuery && (
                                             <button
                                                 onClick={handleCreate}
@@ -2185,9 +2185,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                         {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-semibold text-gray-900">
+                                <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="3">
                                     Edit Collection
-                                </h3>
+                                </div>
                                 <button
                                     onClick={() => {
                                         setShowEditModal(false);
@@ -2286,18 +2286,18 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                     <AlertCircle className="w-6 h-6 text-red-600" />
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Delete Collection</h3>
-                                    <p className="text-sm text-gray-600">This action cannot be undone</p>
+                                    <div className="text-lg font-semibold text-gray-900 mb-1" role="heading" aria-level="3">Delete Collection</div>
+                                    <div className="text-sm text-gray-600">This action cannot be undone</div>
                                 </div>
                             </div>
 
                             <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                                <p className="text-gray-700 leading-relaxed">
+                                <div className="text-gray-700 leading-relaxed">
                                     Are you sure you want to delete the collection <span className="font-medium">"{selectedCollection.title}"</span>?
-                                </p>
-                                <p className="text-sm text-gray-600 mt-2">
+                                </div>
+                                <div className="text-sm text-gray-600 mt-2">
                                     This will remove the collection but not the files in it.
-                                </p>
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-end gap-3">

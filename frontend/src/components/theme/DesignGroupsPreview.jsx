@@ -106,48 +106,48 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
                 {...(widgetType && { 'data-widget-type': widgetType })}
                 {...(slot && { 'data-slot-name': slot })}
             >
-                <h1>Heading 1 - The Quick Brown Fox</h1>
-                <h2>Heading 2 - Jumps Over the Lazy Dog</h2>
-                <h3>Heading 3 - Typography Preview</h3>
-                <h4>Heading 4 - Font Styling Examples</h4>
-                <h5>Heading 5 - Smaller Heading</h5>
-                <h6>Heading 6 - Smallest Heading</h6>
+                <div className="text-4xl font-semibold mb-6" role="heading" aria-level="1">Heading 1 - The Quick Brown Fox</div>
+                <div className="text-3xl font-medium mb-6" role="heading" aria-level="2">Heading 2 - Jumps Over the Lazy Dog</div>
+                <div className="text-2xl font-bold mb-6" role="heading" aria-level="3">Heading 3 - Typography Preview</div>
+                <div className="text-xl font-semibold mb-4" role="heading" aria-level="4">Heading 4 - Font Styling Examples</div>
+                <div className="text-lg font-semibold mb-4" role="heading" aria-level="5">Heading 5 - Smaller Heading</div>
+                <div className="text-base font-semibold mb-4" role="heading" aria-level="6">Heading 6 - Smallest Heading</div>
 
-                <p>
-                    This is a paragraph with some <strong>bold text</strong> and <em>italic text</em>.
+                <div className="text-base font-light mb-6">
+                    This is a paragraph with some <span className="font-bold">bold text</span> and <span className="italic">italic text</span>.
                     Here's a <a href="#" onClick={(e) => e.preventDefault()}>link to somewhere</a> in the text.
-                </p>
+                </div>
 
-                <p>
+                <div className="text-base font-light mb-6">
                     Paragraphs can contain multiple sentences. This helps demonstrate line height,
                     letter spacing, and other typography properties that affect readability and
                     visual hierarchy in your content.
-                </p>
+                </div>
 
-                <ul>
-                    <li>Unordered list item one</li>
-                    <li>Unordered list item two with more content</li>
-                    <li>Unordered list item three</li>
-                </ul>
+                <div className="mb-6 pl-6" role="list">
+                    <div className="mb-2 list-item list-disc">Unordered list item one</div>
+                    <div className="mb-2 list-item list-disc">Unordered list item two with more content</div>
+                    <div className="mb-2 list-item list-disc">Unordered list item three</div>
+                </div>
 
-                <ol>
-                    <li>Ordered list item one</li>
-                    <li>Ordered list item two with more content</li>
-                    <li>Ordered list item three</li>
-                </ol>
+                <div className="mb-6 pl-6" role="list">
+                    <div className="mb-2 list-item list-decimal">Ordered list item one</div>
+                    <div className="mb-2 list-item list-decimal">Ordered list item two with more content</div>
+                    <div className="mb-2 list-item list-decimal">Ordered list item three</div>
+                </div>
 
-                <blockquote>
+                <div className="border-l-4 border-blue-500 pl-4 my-6 italic">
                     This is a blockquote element. It's typically used for quotes or callouts
                     that need to stand out from the regular content.
-                </blockquote>
+                </div>
 
-                <p>
-                    Here's some <code>inline code</code> within a paragraph, and below is a code block:
-                </p>
+                <div className="text-base font-light mb-6">
+                    Here's some <span className="font-mono text-sm bg-gray-100 px-1 py-0.5 rounded">inline code</span> within a paragraph, and below is a code block:
+                </div>
 
-                <pre><code>{`function example() {
+                <div className="bg-gray-100 p-4 rounded overflow-x-auto font-mono text-sm">{`function example() {
   return "Hello, World!";
-}`}</code></pre>
+}`}</div>
             </div>
         </div>
     );

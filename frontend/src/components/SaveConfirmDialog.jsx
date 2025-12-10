@@ -37,9 +37,9 @@ const SaveConfirmDialog = ({
                     <AlertTriangle className="w-8 h-8 text-amber-500" />
                 </div>
                 <div className="flex-1">
-                    <p className="text-gray-700 mb-6">
+                    <div className="text-gray-700 mb-6">
                         {message}
-                    </p>
+                    </div>
 
                     <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
                         <button

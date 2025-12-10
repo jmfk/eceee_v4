@@ -120,7 +120,7 @@ const MediaPropertyConfig = ({
 
             {/* Media Field Options */}
             <div className="pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Media Field Options</h4>
+                <div className="text-sm font-medium text-gray-700 mb-3" role="heading" aria-level="4">Media Field Options</div>
 
                 {/* Media Types */}
                 <div className="mb-4">
@@ -362,7 +362,7 @@ const MediaPropertyConfig = ({
 
             {/* Group and Order */}
             <div className="pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Organization</h4>
+                <div className="text-sm font-medium text-gray-700 mb-3" role="heading" aria-level="4">Organization</div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">

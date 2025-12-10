@@ -88,7 +88,7 @@ export default function DateRangePropertyConfig({
 
             {/* Date Range Specific Configuration */}
             <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Date Range Configuration</h4>
+                <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Date Range Configuration</div>
 
                 {/* Date Constraints */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -102,9 +102,9 @@ export default function DateRangePropertyConfig({
                             onChange={(e) => handleChange('minDate', e.target.value || null)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             Users cannot select dates before this
-                        </p>
+                        </div>
                     </div>
 
                     <div>
@@ -117,15 +117,15 @@ export default function DateRangePropertyConfig({
                             onChange={(e) => handleChange('maxDate', e.target.value || null)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             Users cannot select dates after this
-                        </p>
+                        </div>
                     </div>
                 </div>
 
                 {/* Options */}
                 <div className="space-y-3">
-                    <h5 className="text-sm font-medium text-gray-900">Options</h5>
+                    <div className="text-sm font-medium text-gray-900" role="heading" aria-level="5">Options</div>
 
                     <div className="flex items-start space-x-3">
                         <div className="flex items-center h-5">
@@ -141,9 +141,9 @@ export default function DateRangePropertyConfig({
                             <label htmlFor={`allowSameDate-${property.key}`} className="text-sm text-gray-700">
                                 Allow same start and end date
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Permit selecting the same date for both start and end
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -161,9 +161,9 @@ export default function DateRangePropertyConfig({
                             <label htmlFor={`showPresets-${property.key}`} className="text-sm text-gray-700">
                                 Show preset ranges
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Display quick selection options (Today, Last 7 days, Last 30 days, etc.)
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -181,9 +181,9 @@ export default function DateRangePropertyConfig({
                             <label htmlFor={`clearable-${property.key}`} className="text-sm text-gray-700">
                                 Allow clearing selection
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Show a clear button to remove the selected date range
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -94,7 +94,7 @@ const BooleanInput = ({
                 </div>
 
                 {description && (
-                    <p className="text-sm text-gray-500">{description}</p>
+                    <div className="text-sm text-gray-500">{description}</div>
                 )}
 
                 {hasError && validation?.errors?.length > 0 && (
@@ -149,7 +149,7 @@ const BooleanInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500 ml-7">{description}</p>
+                <div className="text-sm text-gray-500 ml-7">{description}</div>
             )}
 
             {hasError && validation?.errors?.length > 0 && (

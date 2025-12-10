@@ -166,8 +166,8 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
-                            <p className="text-sm text-gray-600">{slot?.label || slot?.name}</p>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Add Widget to Slot</div>
+                            <div className="text-sm text-gray-600">{slot?.label || slot?.name}</div>
                         </div>
                         <button
                             onClick={onClose}
@@ -214,15 +214,15 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                             <div className="col-span-full flex items-center justify-center py-12">
                                 <div className="text-center">
                                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                    <p className="mt-2 text-sm text-gray-600">Loading widgets...</p>
+                                    <div className="mt-2 text-sm text-gray-600">Loading widgets...</div>
                                 </div>
                             </div>
                         ) : filteredWidgets.length === 0 ? (
                             <div className="col-span-full text-center py-12 text-gray-500">
                                 <div className="text-4xl mb-2">🔍</div>
-                                <p className="text-sm">No widgets found</p>
+                                <div className="text-sm">No widgets found</div>
                                 {searchTerm && (
-                                    <p className="text-xs mt-1">Try adjusting your search terms</p>
+                                    <div className="text-xs mt-1">Try adjusting your search terms</div>
                                 )}
                             </div>
                         ) : (
@@ -246,8 +246,8 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-semibold text-gray-900 mb-1">{widget.name}</h4>
-                                            <p className="text-xs text-gray-600 leading-relaxed">{widget.description}</p>
+                                            <div className="text-sm font-semibold text-gray-900 mb-1" role="heading" aria-level="4">{widget.name}</div>
+                                            <div className="text-xs text-gray-600 leading-relaxed">{widget.description}</div>
                                             <div className="mt-2">
                                                 <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
                                                     {widget.category}

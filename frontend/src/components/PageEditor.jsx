@@ -1779,7 +1779,7 @@ const PageEditor = () => {
             <div className="fixed inset-0 bg-gray-50 flex items-center justify-center" style={{ zIndex: 10000 }}>
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading page editor...</p>
+                    <div className="text-gray-600">Loading page editor...</div>
                 </div>
             </div>
         )
@@ -1806,9 +1806,9 @@ const PageEditor = () => {
                             <div className="h-6 w-px bg-gray-300"></div>
 
                             <div>
-                                <h1 className="text-lg font-semibold text-gray-900 truncate">
+                                <div className="text-lg font-semibold text-gray-900 truncate" role="heading" aria-level="1">
                                     {isNewPage ? 'New Page' : (webpageData?.title || 'Untitled Page')}
-                                </h1>
+                                </div>
                                 {/* Show hostnames for root pages, otherwise show path */}
                                 {!isNewPage && !webpageData?.parent && webpageData?.hostnames && webpageData.hostnames.length > 0 ? (
                                     <div className="flex items-center text-sm text-gray-500">
@@ -1816,9 +1816,9 @@ const PageEditor = () => {
                                         <span>{webpageData.hostnames.join(', ')}</span>
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-gray-500">
+                                    <div className="text-sm text-gray-500">
                                         /{isNewPage ? 'new-page-slug' : (webpageData?.slug || 'page-slug')}
-                                    </p>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -1922,7 +1922,7 @@ const PageEditor = () => {
                                     <div className="h-full flex items-center justify-center bg-gray-50">
                                         <div className="text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                            <p className="text-gray-600">Loading version data...</p>
+                                            <div className="text-gray-600">Loading version data...</div>
                                         </div>
                                     </div>
                                 ) : (
@@ -1937,9 +1937,9 @@ const PageEditor = () => {
                                                         </svg>
                                                     </div>
                                                     <div className="ml-3">
-                                                        <p className="text-sm text-amber-700">
-                                                            <strong>No layout specified for this version.</strong> Using default layout "{activeLayoutName || 'main_layout'}" for preview.
-                                                        </p>
+                                                        <div className="text-sm text-amber-700">
+                                                            <span className="font-bold">No layout specified for this version.</span> Using default layout "{activeLayoutName || 'main_layout'}" for preview.
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1949,7 +1949,7 @@ const PageEditor = () => {
                                             <div className="flex-1 flex items-center justify-center bg-gray-50">
                                                 <div className="text-center">
                                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                                    <p className="text-gray-600">Loading layout data...</p>
+                                                    <div className="text-gray-600">Loading layout data...</div>
                                                 </div>
                                             </div>
                                         ) : (
@@ -2067,7 +2067,7 @@ const PageEditor = () => {
                                     <div className="h-full flex items-center justify-center bg-gray-50">
                                         <div className="text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                            <p className="text-gray-600">Loading version data...</p>
+                                            <div className="text-gray-600">Loading version data...</div>
                                         </div>
                                     </div>
                                 ) : (
@@ -2244,8 +2244,8 @@ const EssentialFieldsModal = ({ onSave, onCancel, isLoading = false }) => {
                 <form onSubmit={handleSubmit}>
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-xl font-semibold text-gray-900">Create New Page</h2>
-                        <p className="text-sm text-gray-500 mt-1">Fill in the essential fields to get started</p>
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Create New Page</div>
+                        <div className="text-sm text-gray-500 mt-1">Fill in the essential fields to get started</div>
                     </div>
 
                     {/* Body */}
@@ -2328,9 +2328,9 @@ const EssentialFieldsModal = ({ onSave, onCancel, isLoading = false }) => {
                                     </option>
                                 ))}
                             </select>
-                            <p className="mt-1 text-xs text-gray-500">
+                            <div className="mt-1 text-xs text-gray-500">
                                 Leave blank to use the default layout
-                            </p>
+                            </div>
                         </div>
                     </div>
 

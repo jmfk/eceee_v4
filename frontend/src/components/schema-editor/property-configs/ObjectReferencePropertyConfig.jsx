@@ -105,7 +105,7 @@ export default function ObjectReferencePropertyConfig({
 
             {/* Object Reference Specific Configuration */}
             <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Reference Configuration</h4>
+                <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Reference Configuration</div>
 
                 {/* Multiple References */}
                 <div className="flex items-start space-x-3 mb-4">
@@ -123,9 +123,9 @@ export default function ObjectReferencePropertyConfig({
                         <label htmlFor={`multiple-${property.key}`} className="text-sm font-medium text-gray-700">
                             Allow Multiple References
                         </label>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             Enable to allow selecting multiple objects
-                        </p>
+                        </div>
                     </div>
                 </div>
 
@@ -144,9 +144,9 @@ export default function ObjectReferencePropertyConfig({
                             placeholder="No limit"
                             min="1"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             Maximum number of references allowed (leave empty for no limit)
-                        </p>
+                        </div>
                     </div>
                 )}
 
@@ -164,9 +164,9 @@ export default function ObjectReferencePropertyConfig({
                             } ${disabled ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                         placeholder="e.g., authors, tags, categories"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 mt-1">
                         Name of the relationship field (used for database relationships)
-                    </p>
+                    </div>
                     {errors.relationshipType && (
                         <div className="text-red-500 text-xs mt-1">{errors.relationshipType}</div>
                     )}
@@ -214,9 +214,9 @@ export default function ObjectReferencePropertyConfig({
                         </div>
                     )}
 
-                    <p className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 mt-1">
                         Select which object types can be referenced by this field
-                    </p>
+                    </div>
                     {selectedTypes.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                             {selectedTypes.map(typeName => {

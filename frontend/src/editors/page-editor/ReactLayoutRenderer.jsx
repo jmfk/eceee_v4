@@ -17,6 +17,13 @@ import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../../utils/clipb
 import { Clipboard, Scissors, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useClipboard } from '../../contexts/ClipboardContext';
 
+// Helper function to filter valid widgets
+const filterValidWidgets = (widgets) => {
+    return Array.isArray(widgets)
+        ? widgets.filter(w => w != null && typeof w === 'object' && w.id != null)
+        : []
+}
+
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'main_layout',  // Default to main_layout (available layout)
     widgets = {},
@@ -320,7 +327,8 @@ const ReactLayoutRenderer = forwardRef(({
                 const pastedWidgetId = pastedWidget.id;
 
                 // Add the pasted widget FIRST to ensure correct insert position
-                const slotWidgetsPaste = [...(updatedWidgets[slotName] || [])];
+                // Filter valid widgets first to remove any undefined entries
+                const slotWidgetsPaste = filterValidWidgets(updatedWidgets[slotName] || []);
                 slotWidgetsPaste.splice(insertPosition, 0, pastedWidget);
                 updatedWidgets[slotName] = slotWidgetsPaste;
 
@@ -351,9 +359,10 @@ const ReactLayoutRenderer = forwardRef(({
 
                                         // Filter out the widget to delete, but keep the pasted widget if it's in the same slot
                                         // Use String() to ensure type matching and also check both string and number formats
-                                        updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(
+                                        // Filter valid widgets first
+                                        const validWidgets = filterValidWidgets(updatedWidgets[parsed.slotName] || []);
+                                        updatedWidgets[parsed.slotName] = validWidgets.filter(
                                             w => {
-                                                if (!w) return false;
                                                 const widgetIdStr = String(w.id);
                                                 const parsedIdStr = String(parsed.widgetId);
                                                 const pastedIdStr = String(pastedWidgetId);
@@ -390,7 +399,9 @@ const ReactLayoutRenderer = forwardRef(({
                                             if (removed > 0) {
                                                 widgetsDeleted = true;
                                                 // Update the container widget in the state
-                                                updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].map(w =>
+                                                // Filter valid widgets first
+                                                const validWidgets = filterValidWidgets(updatedWidgets[parsed.slotName] || []);
+                                                updatedWidgets[parsed.slotName] = validWidgets.map(w =>
                                                     String(w.id) === String(parsed.containerId) ? containerWidget : w
                                                 );
 
@@ -433,7 +444,9 @@ const ReactLayoutRenderer = forwardRef(({
 
                                             if (removed > 0) {
                                                 widgetsDeleted = true;
-                                                updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                                                // Filter valid widgets first
+                                                const validWidgets = filterValidWidgets(updatedWidgets[slotName] || []);
+                                                updatedWidgets[slotName] = validWidgets.map(w =>
                                                     String(w.id) === String(containerId) ? containerWidget : w
                                                 );
 
@@ -455,11 +468,10 @@ const ReactLayoutRenderer = forwardRef(({
 
                                         // Filter out widgets to delete, but keep the pasted widget
                                         // Use String() to ensure type matching
-                                        updatedWidgets[slotName] = updatedWidgets[slotName].filter(
+                                        // Filter valid widgets first
+                                        const validWidgets = filterValidWidgets(updatedWidgets[slotName] || []);
+                                        updatedWidgets[slotName] = validWidgets.filter(
                                             widget => {
-                                                if (!widget) {
-                                                    return false;
-                                                }
                                                 const widgetIdStr = String(widget.id);
                                                 const pastedIdStr = String(pastedWidgetId);
                                                 const widgetIdsStr = widgetIds.map(String);
@@ -550,7 +562,9 @@ const ReactLayoutRenderer = forwardRef(({
                 const newConfig = args[0];
                 const updatedWidgetsConfig = { ...widgets };
                 if (updatedWidgetsConfig[slotName]) {
-                    updatedWidgetsConfig[slotName] = updatedWidgetsConfig[slotName].map(w =>
+                    // Filter valid widgets first, then update
+                    const validWidgets = filterValidWidgets(updatedWidgetsConfig[slotName]);
+                    updatedWidgetsConfig[slotName] = validWidgets.map(w =>
                         w.id === widget.id ? { ...w, config: newConfig } : w
                     );
                 }
@@ -864,8 +878,10 @@ const ReactLayoutRenderer = forwardRef(({
                 if (!parsed.isNested) {
                     // Top-level widget
                     if (updatedWidgets[parsed.slotName]) {
-                        const originalLength = updatedWidgets[parsed.slotName].length;
-                        updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(
+                        // Filter valid widgets first
+                        const validWidgets = filterValidWidgets(updatedWidgets[parsed.slotName] || []);
+                        const originalLength = validWidgets.length;
+                        updatedWidgets[parsed.slotName] = validWidgets.filter(
                             widget => widget.id !== parsed.widgetId
                         );
 
@@ -896,7 +912,9 @@ const ReactLayoutRenderer = forwardRef(({
                             if (removed > 0) {
                                 hasChanges = true;
                                 // Update the container widget
-                                updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].map(w =>
+                                // Filter valid widgets first
+                                const validWidgets = filterValidWidgets(updatedWidgets[parsed.slotName] || []);
+                                updatedWidgets[parsed.slotName] = validWidgets.map(w =>
                                     String(w.id) === String(parsed.containerId) ? containerWidget : w
                                 );
 
@@ -936,7 +954,9 @@ const ReactLayoutRenderer = forwardRef(({
 
                             if (removed > 0) {
                                 hasChanges = true;
-                                updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                                // Filter valid widgets first
+                                const validWidgets = filterValidWidgets(updatedWidgets[slotName] || []);
+                                updatedWidgets[slotName] = validWidgets.map(w =>
                                     String(w.id) === String(containerId) ? containerWidget : w
                                 );
 
@@ -953,8 +973,10 @@ const ReactLayoutRenderer = forwardRef(({
                     // Top-level widget
                     const slotName = key;
                     if (updatedWidgets[slotName]) {
-                        const originalLength = updatedWidgets[slotName].length;
-                        updatedWidgets[slotName] = updatedWidgets[slotName].filter(
+                        // Filter valid widgets first
+                        const validWidgets = filterValidWidgets(updatedWidgets[slotName] || []);
+                        const originalLength = validWidgets.length;
+                        updatedWidgets[slotName] = validWidgets.filter(
                             widget => !widgetIds.includes(widget.id)
                         );
 
@@ -1194,12 +1216,12 @@ const ReactLayoutRenderer = forwardRef(({
         return (
             <div className="layout-error bg-red-50 border border-red-200 rounded-lg p-8 max-w-2xl mx-auto mt-8">
                 <Layout className="h-12 w-12 mx-auto mb-4 text-red-400" />
-                <h3 className="text-lg font-medium text-red-800 mb-2">Layout Not Found</h3>
-                <p className="text-red-600 mb-6">Layout "{layoutName}" is not available</p>
+                <div className="text-lg font-medium text-red-800 mb-2" role="heading" aria-level="3">Layout Not Found</div>
+                <div className="text-red-600 mb-6">Layout "{layoutName}" is not available</div>
 
                 <div className="mt-4 text-sm text-gray-600">
-                    <p className="font-medium mb-1">Available layouts:</p>
-                    <p className="text-gray-500">{availableLayouts.join(', ')}</p>
+                    <div className="font-medium mb-1">Available layouts:</div>
+                    <div className="text-gray-500">{availableLayouts.join(', ')}</div>
                 </div>
             </div>
         );

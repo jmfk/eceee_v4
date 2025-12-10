@@ -159,13 +159,13 @@ const MediaSelectModal = ({
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                             {customTitle || 'Select Media'}
-                        </h2>
+                        </div>
                         {selectedItems.length > 0 && (
-                            <p className="text-sm text-gray-600 mt-1">
+                            <div className="text-sm text-gray-600 mt-1">
                                 {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
-                            </p>
+                            </div>
                         )}
                     </div>
                     <button
@@ -207,15 +207,15 @@ const MediaSelectModal = ({
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                             <Check className="w-4 h-4 text-blue-600" />
-                                            <h3 className="font-medium text-gray-900">Currently Selected</h3>
+                                            <div className="font-medium text-gray-900" role="heading" aria-level="3">Currently Selected</div>
                                         </div>
-                                        <p className="text-sm text-gray-700 truncate">
+                                        <div className="text-sm text-gray-700 truncate">
                                             {currentSelection.title || currentSelection.original_filename || 'Untitled'}
-                                        </p>
+                                        </div>
                                         {currentSelection.files && (
-                                            <p className="text-xs text-gray-600 mt-1">
+                                            <div className="text-xs text-gray-600 mt-1">
                                                 Collection ({currentSelection.files.length} images)
-                                            </p>
+                                            </div>
                                         )}
                                     </div>
                                     <button
@@ -277,7 +277,7 @@ const MediaSelectModal = ({
                                 <div className="flex items-center justify-center h-64">
                                     <div className="text-center">
                                         <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                                        <p className="text-gray-600">No collections found</p>
+                                        <div className="text-gray-600">No collections found</div>
                                     </div>
                                 </div>
                             ) : (
@@ -299,8 +299,8 @@ const MediaSelectModal = ({
                                                     className="aspect-square"
                                                 />
                                                 <div className="p-3">
-                                                    <h4 className="font-medium text-sm text-gray-900 truncate">{collection.title}</h4>
-                                                    <p className="text-xs text-gray-600">{collection.fileCount || collection.file_count || 0} images</p>
+                                                    <div className="font-medium text-sm text-gray-900 truncate" role="heading" aria-level="4">{collection.title}</div>
+                                                    <div className="text-xs text-gray-600">{collection.fileCount || collection.file_count || 0} images</div>
                                                 </div>
                                             </div>
                                         );
@@ -316,8 +316,8 @@ const MediaSelectModal = ({
                                 <div className="flex items-center justify-center h-64">
                                     <div className="text-center">
                                         <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                                        <p className="text-gray-600">No pending files</p>
-                                        <p className="text-sm text-gray-500 mt-2">Upload files from the Image tab to approve them here</p>
+                                        <div className="text-gray-600">No pending files</div>
+                                        <div className="text-sm text-gray-500 mt-2">Upload files from the Image tab to approve them here</div>
                                     </div>
                                 </div>
                             ) : (

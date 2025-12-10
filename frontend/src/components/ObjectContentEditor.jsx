@@ -178,7 +178,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
         return (
             <div className="text-center py-8 text-gray-500">
                 <Layout className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-                <p>No widget slots configured</p>
+                <div>No widget slots configured</div>
             </div>
         )
     }
@@ -584,7 +584,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                     <div className="flex-1">
                         <div className="flex items-center">
                             <Layout className="h-4 w-4 mr-2 text-gray-400" />
-                            <h4 className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-gray-900" role="heading" aria-level="4">
                                 {slot.label}
                                 <span className="ml-2 text-xs text-gray-500">
                                     ({slotWidgets.length} widgets)
@@ -594,13 +594,13 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                                         Required
                                     </span>
                                 )}
-                            </h4>
+                            </div>
                         </div>
                         {(slot.description || slot.maxWidgets) && (
-                            <p className="text-xs text-gray-500 mt-1 ml-6">
+                            <div className="text-xs text-gray-500 mt-1 ml-6">
                                 {slot.description}
                                 {slot.maxWidgets && (slot.description ? ` • Max: ${slot.maxWidgets}` : `Max: ${slot.maxWidgets}`)}
-                            </p>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -648,8 +648,8 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
             {objectType.slotConfiguration.slots.length === 0 && (
                 <div className="text-center py-12 text-gray-500">
                     <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">No Slots Configured</h4>
-                    <p>This object type doesn't have any widget slots configured.</p>
+                    <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="4">No Slots Configured</div>
+                    <div>This object type doesn't have any widget slots configured.</div>
                 </div>
             )}
 

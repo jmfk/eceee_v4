@@ -60,7 +60,7 @@ const RadioInput = ({
             )}
 
             {description && (
-                <p className="text-sm text-gray-500 mb-2">{description}</p>
+                <div className="text-sm text-gray-500 mb-2">{description}</div>
             )}
 
             <div className={`space-${layout === 'horizontal' ? 'x' : 'y'}-2 ${layout === 'horizontal' ? 'flex flex-wrap' : ''}`}>

@@ -145,10 +145,10 @@ const BulkPublishingOperations = () => {
         <div className="space-y-6">
             {/* Header */}
             <div className="border-b border-gray-200 pb-4">
-                <h1 className="text-2xl font-bold text-gray-900">Bulk Publishing Operations</h1>
-                <p className="mt-2 text-gray-600">
+                <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Bulk Publishing Operations</div>
+                <div className="mt-2 text-gray-600">
                     Select multiple pages to publish immediately or schedule for future publication.
-                </p>
+                </div>
             </div>
 
             {/* Status Messages */}

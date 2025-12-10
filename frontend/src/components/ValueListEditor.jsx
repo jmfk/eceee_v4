@@ -396,7 +396,7 @@ const ValueListEditor = () => {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading value lists...</p>
+                    <div className="text-gray-600">Loading value lists...</div>
                 </div>
             </div>
         )
@@ -408,8 +408,8 @@ const ValueListEditor = () => {
             <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Value Lists</h1>
-                        <p className="text-gray-600 mt-1">Manage centralized dropdown options for form fields</p>
+                        <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Value Lists</div>
+                        <div className="text-gray-600 mt-1">Manage centralized dropdown options for form fields</div>
                     </div>
                     <button
                         onClick={handleCreateNew}
@@ -438,15 +438,15 @@ const ValueListEditor = () => {
                 {filteredValueLists.length === 0 ? (
                     <div className="text-center py-12">
                         <ListIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
                             {searchTerm ? 'No value lists found' : 'No value lists yet'}
-                        </h3>
-                        <p className="text-gray-600 mb-4">
+                        </div>
+                        <div className="text-gray-600 mb-4">
                             {searchTerm
                                 ? 'Try adjusting your search terms'
                                 : 'Create your first value list to manage dropdown options centrally'
                             }
-                        </p>
+                        </div>
                         {!searchTerm && (
                             <button
                                 onClick={handleCreateNew}
@@ -471,8 +471,8 @@ const ValueListEditor = () => {
                                         <div className="flex items-center space-x-3">
                                             <ValueTypeIcon className="w-6 h-6 text-gray-600" />
                                             <div>
-                                                <h3 className="font-semibold text-gray-900">{valueList.name}</h3>
-                                                <p className="text-sm text-gray-500">{valueList.slug}</p>
+                                                <div className="font-semibold text-gray-900" role="heading" aria-level="3">{valueList.name}</div>
+                                                <div className="text-sm text-gray-500">{valueList.slug}</div>
                                             </div>
                                         </div>
                                         <div className="flex items-center space-x-2">
@@ -488,9 +488,9 @@ const ValueListEditor = () => {
                                     </div>
 
                                     {valueList.description && (
-                                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                                        <div className="text-gray-600 text-sm mb-4 line-clamp-2">
                                             {valueList.description}
-                                        </p>
+                                        </div>
                                     )}
 
                                     <div className="flex items-center justify-between text-sm">
@@ -546,15 +546,15 @@ const ValueListEditor = () => {
                     </button>
                     <div className="h-6 w-px bg-gray-300"></div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">
                             {isCreating ? 'Create Value List' : `Edit ${selectedValueList?.name}`}
-                        </h1>
-                        <p className="text-gray-600 mt-1">
+                        </div>
+                        <div className="text-gray-600 mt-1">
                             {isCreating
                                 ? 'Create a new centralized list of values for form fields'
                                 : 'Manage value list settings and items'
                             }
-                        </p>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -582,7 +582,7 @@ const ValueListEditor = () => {
                 {/* Value List Settings */}
                 <div className="space-y-6">
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h2 className="text-lg font-medium text-gray-900 mb-4">Value List Settings</h2>
+                        <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="2">Value List Settings</div>
 
                         <div className="space-y-4">
                             <div>
@@ -597,9 +597,9 @@ const ValueListEditor = () => {
                                     disabled={!isCreating} // Can't change name when editing
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                     Display name and unique identifier (letters, numbers, spaces allowed)
-                                </p>
+                                </div>
                             </div>
 
                             <div>
@@ -642,14 +642,14 @@ const ValueListEditor = () => {
                                     <option value="integer">Integer</option>
                                     <option value="decimal">Decimal</option>
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                     {(!isCreating && items.length > 0)
                                         ? 'Cannot change type when items exist (delete all items first)'
                                         : (!isCreating && selectedValueList?.is_system)
                                             ? 'Cannot change type of system-managed value lists'
                                             : 'Type of values that will be stored in this list'
                                     }
-                                </p>
+                                </div>
                             </div>
 
                             <div className="flex items-center">
@@ -673,13 +673,13 @@ const ValueListEditor = () => {
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h2 className="text-lg font-medium text-gray-900">
+                                <div className="text-lg font-medium text-gray-900" role="heading" aria-level="2">
                                     Items ({items.length})
-                                </h2>
+                                </div>
                                 {items.length > 0 && (
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         {items.length > 1 ? 'Drag to reorder • ' : ''}Click labels or values to edit • Enter to save • Esc to cancel
-                                    </p>
+                                    </div>
                                 )}
                             </div>
                             <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(formData.value_type)}`}>
@@ -747,13 +747,13 @@ const ValueListEditor = () => {
                                                 }`}
                                         />
                                         {valueValidationError && (
-                                            <p className="text-xs text-red-600 mt-1">{valueValidationError}</p>
+                                            <div className="text-xs text-red-600 mt-1">{valueValidationError}</div>
                                         )}
-                                        <p className="text-xs text-gray-500 mt-1">
+                                        <div className="text-xs text-gray-500 mt-1">
                                             {formData.value_type === 'string' && 'Enter a custom text value or leave empty to use slug'}
                                             {formData.value_type === 'integer' && 'Enter a whole number or leave empty to use slug'}
                                             {formData.value_type === 'decimal' && 'Enter a decimal number or leave empty to use slug'}
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
                                 <button
@@ -771,8 +771,8 @@ const ValueListEditor = () => {
                         {items.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
                                 <ListIcon className="w-8 h-8 mx-auto mb-3 text-gray-400" />
-                                <p className="text-sm">No items added yet</p>
-                                <p className="text-xs mt-1">Add items using the form above</p>
+                                <div className="text-sm">No items added yet</div>
+                                <div className="text-xs mt-1">Add items using the form above</div>
                             </div>
                         ) : (
                             <div className="space-y-2">

@@ -323,7 +323,7 @@ export default function SchemaEditor({
       {/* Header with view toggle and status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-medium">Schema Editor</h3>
+          <div className="text-lg font-medium" role="heading" aria-level="3">Schema Editor</div>
 
           {/* Status Indicator */}
           <div className="flex items-center space-x-2">
@@ -396,15 +396,15 @@ export default function SchemaEditor({
               <div className="flex items-start">
                 <AlertCircle className="w-5 h-5 text-red-400 mr-3 mt-0.5" />
                 <div>
-                  <h3 className="text-red-800 font-medium">Schema Validation Errors</h3>
+                  <div className="text-red-800 font-medium" role="heading" aria-level="3">Schema Validation Errors</div>
                   <div className="text-red-700 mt-1 text-sm">
                     Please fix the following errors before the schema can be saved:
                   </div>
-                  <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
+                  <div className="mt-2 text-sm text-red-700 list-disc list-inside" role="list">
                     {Object.values(validationErrors).map((error, index) => (
-                      <li key={index}>{error}</li>
+                      <div key={index}>{error}</div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               </div>
             </div>

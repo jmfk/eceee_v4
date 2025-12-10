@@ -53,9 +53,9 @@ const PromptDialog = ({
                 </div>
                 <div className="flex-1">
                     {message && (
-                        <p className="text-gray-700 mb-4">
+                        <div className="text-gray-700 mb-4">
                             {message}
-                        </p>
+                        </div>
                     )}
 
                     <form onSubmit={handleSubmit}>

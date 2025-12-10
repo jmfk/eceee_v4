@@ -14,8 +14,8 @@ const LayoutSchemaPage = () => {
             <ErrorBoundary>
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="mb-4">
-                        <h1 className="text-2xl font-semibold">Layout Schemas</h1>
-                        <p className="text-gray-600 mt-1">Select a layout to create or edit its schema extensions.</p>
+                        <div className="text-2xl font-semibold" role="heading" aria-level="1">Layout Schemas</div>
+                        <div className="text-gray-600 mt-1">Select a layout to create or edit its schema extensions.</div>
                     </div>
                     <LayoutSchemaManager />
                 </div>

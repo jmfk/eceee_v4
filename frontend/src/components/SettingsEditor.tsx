@@ -147,7 +147,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
             <div className="max-w-2xl mx-auto space-y-6">
                 {/* Page Settings Section */}
                 <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-6">Page Settings</h2>
+                    <div className="text-lg font-semibold text-gray-900 mb-6" role="heading" aria-level="2">Page Settings</div>
 
                     <div className="space-y-6">
                         <div>
@@ -161,9 +161,9 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="Page Title"
                             />
-                            <p className="text-sm text-gray-500 mt-1">
+                            <div className="text-sm text-gray-500 mt-1">
                                 The main title of your page
-                            </p>
+                            </div>
                         </div>
 
                         <div>
@@ -177,9 +177,9 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="Shorter version for navigation menus"
                             />
-                            <p className="text-sm text-gray-500 mt-1">
+                            <div className="text-sm text-gray-500 mt-1">
                                 Brief title for navigation, breadcrumbs, or cards. Leave blank to use full title.
-                            </p>
+                            </div>
                         </div>
 
                         <div>
@@ -212,12 +212,12 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                     const errorName = errorNames[errorCode] || 'Error';
                                     return (
                                         <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                            <p className="text-sm text-blue-800">
-                                                <strong>Error Page Detected:</strong> This slug ({slug}) will create a custom error page for HTTP {errorCode} ({errorName}) responses on this site.
-                                            </p>
-                                            <p className="text-xs text-blue-600 mt-1">
+                                            <div className="text-sm text-blue-800">
+                                                <span className="font-bold">Error Page Detected:</span> This slug ({slug}) will create a custom error page for HTTP {errorCode} ({errorName}) responses on this site.
+                                            </div>
+                                            <div className="text-xs text-blue-600 mt-1">
                                                 Consider using an error layout (error_404, error_500, etc.) for the best user experience.
-                                            </p>
+                                            </div>
                                         </div>
                                     );
                                 }
@@ -264,9 +264,9 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                 if (isErrorCode && !currentLayout.startsWith('error_')) {
                                     return (
                                         <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                                            <p className="text-xs text-yellow-800">
-                                                <strong>Tip:</strong> Consider using the <code className="px-1 bg-yellow-100 rounded">{suggestedLayout}</code> layout for this error page.
-                                            </p>
+                                            <div className="text-xs text-yellow-800">
+                                                <span className="font-bold">Tip:</span> Consider using the <code className="px-1 bg-yellow-100 rounded">{suggestedLayout}</code> layout for this error page.
+                                            </div>
                                         </div>
                                     );
                                 }
@@ -287,7 +287,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
 
                 {/* SEO & Metadata Section */}
                 <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-6">SEO & Metadata</h2>
+                    <div className="text-lg font-semibold text-gray-900 mb-6" role="heading" aria-level="2">SEO & Metadata</div>
 
                     <div className="space-y-6">
                         <div>
@@ -316,9 +316,9 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="example.com, www.example.com"
                             />
-                            <p className="text-sm text-gray-500 mt-1">
+                            <div className="text-sm text-gray-500 mt-1">
                                 Enter hostnames separated by commas
-                            </p>
+                            </div>
                         </div>
 
                         {/* Site Icon - Only for root pages */}
@@ -336,8 +336,8 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                                 className="w-16 h-16 object-cover rounded-lg border border-gray-200"
                                             />
                                             <div className="flex-1">
-                                                <p className="text-sm font-medium text-gray-900">Current Icon</p>
-                                                <p className="text-xs text-gray-500">Will be resized to multiple sizes automatically</p>
+                                                <div className="text-sm font-medium text-gray-900">Current Icon</div>
+                                                <div className="text-xs text-gray-500">Will be resized to multiple sizes automatically</div>
                                             </div>
                                             <button
                                                 type="button"
@@ -365,9 +365,9 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                             hover:file:bg-blue-100
                                             cursor-pointer"
                                     />
-                                    <p className="text-sm text-gray-500">
+                                    <div className="text-sm text-gray-500">
                                         Upload a square image (PNG, JPG, SVG, or WebP). Will be automatically resized to favicon sizes (16x16, 32x32, etc.) and app icons (180x180, 192x192, etc.)
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         )}

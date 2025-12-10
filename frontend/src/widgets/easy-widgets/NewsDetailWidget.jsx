@@ -19,10 +19,10 @@ const NewsDetailWidget = ({
             <div className="news-detail-widget-editor p-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
                 <div className="text-center">
                     <FileText className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">News Detail Widget</h3>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <div className="text-lg font-semibold text-gray-700 mb-2">News Detail Widget</div>
+                    <div className="text-sm text-gray-500 mb-4">
                         Displays a single news article based on URL slug
-                    </p>
+                    </div>
                     <div className="text-xs text-gray-400 space-y-1">
                         {config.object_types && config.object_types.length > 0 && (
                             <p>Object Types: {config.object_types.join(', ')}</p>

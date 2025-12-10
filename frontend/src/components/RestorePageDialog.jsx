@@ -92,7 +92,7 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
             <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">Restore Page</h2>
+                    <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Restore Page</div>
                     <button
                         onClick={onCancel}
                         className="text-gray-400 hover:text-gray-600"
@@ -105,22 +105,22 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
                 <div className="flex-1 overflow-y-auto p-6">
                     {/* Page Info */}
                     <div className="mb-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
                             {page.title || page.slug || `Page ${page.id}`}
-                        </h3>
+                        </div>
                         <div className="text-sm text-gray-600 space-y-1">
-                            <p>
+                            <div>
                                 <span className="font-medium">Slug:</span>{' '}
                                 <span className="font-mono">{page.slug || 'None'}</span>
-                            </p>
-                            <p>
+                            </div>
+                            <div>
                                 <span className="font-medium">Original Location:</span>{' '}
                                 {page.parentPath}
-                            </p>
-                            <p>
+                            </div>
+                            <div>
                                 <span className="font-medium">Deleted:</span>{' '}
                                 {new Date(page.deletedAt).toLocaleString()} by {page.deletedByUsername}
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -130,17 +130,17 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
                             <div className="flex items-start gap-3">
                                 <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    <h4 className="text-sm font-medium text-yellow-900 mb-2">
+                                    <div className="text-sm font-medium text-yellow-900 mb-2" role="heading" aria-level="4">
                                         Restoration Warnings
-                                    </h4>
-                                    <ul className="text-sm text-yellow-800 space-y-1">
+                                    </div>
+                                    <div className="text-sm text-yellow-800 space-y-1" role="list">
                                         {page.restorationWarnings.map((warning, idx) => (
-                                            <li key={idx} className="flex items-start gap-2">
+                                            <div key={idx} className="flex items-start gap-2">
                                                 <span className="text-yellow-600">•</span>
                                                 <span>{warning}</span>
-                                            </li>
+                                            </div>
                                         ))}
-                                    </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -151,9 +151,9 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
                         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                             <div className="flex items-start gap-3">
                                 <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-sm text-blue-800">
+                                <div className="text-sm text-blue-800">
                                     This page will be restored to its original location.
-                                </p>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -161,9 +161,9 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
                     {/* Children Section */}
                     {page.childrenCount > 0 && (
                         <div className="mb-6">
-                            <h4 className="text-base font-medium text-gray-900 mb-3">
+                            <div className="text-base font-medium text-gray-900 mb-3" role="heading" aria-level="4">
                                 Subpages ({page.childrenCount})
-                            </h4>
+                            </div>
 
                             {childrenLoading ? (
                                 <div className="flex items-center justify-center py-8">
@@ -203,12 +203,12 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
                                                     className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                                 />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                                    <div className="text-sm font-medium text-gray-900 truncate">
                                                         {child.title || child.slug || `Page ${child.id}`}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500 font-mono">
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 font-mono">
                                                         {child.slug}
-                                                    </p>
+                                                    </div>
                                                 </div>
                                             </label>
                                         ))}
@@ -217,45 +217,45 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
                                     {/* Selected count */}
                                     {selectedChildren.size > 0 && (
                                         <div className="bg-blue-50 px-4 py-2 border-t border-blue-200">
-                                            <p className="text-sm text-blue-800">
+                                            <div className="text-sm text-blue-800">
                                                 {selectedChildren.size} subpage{selectedChildren.size !== 1 ? 's' : ''} selected for restoration
-                                            </p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <p className="text-sm text-gray-600 italic">
+                                <div className="text-sm text-gray-600 italic">
                                     No deleted subpages found.
-                                </p>
+                                </div>
                             )}
                         </div>
                     )}
 
                     {/* Restoration Summary */}
                     <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-900 mb-2">
+                        <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">
                             What will be restored?
-                        </h4>
-                        <ul className="text-sm text-gray-700 space-y-1">
-                            <li className="flex items-start gap-2">
+                        </div>
+                        <div className="text-sm text-gray-700 space-y-1" role="list">
+                            <div className="flex items-start gap-2">
                                 <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                                <span>The page: <strong>{page.title || page.slug}</strong></span>
-                            </li>
+                                <span>The page: <span className="font-bold">{page.title || page.slug}</span></span>
+                            </div>
                             {selectedChildren.size > 0 && (
-                                <li className="flex items-start gap-2">
+                                <div className="flex items-start gap-2">
                                     <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                                     <span>
                                         {selectedChildren.size} selected subpage{selectedChildren.size !== 1 ? 's' : ''}
                                     </span>
-                                </li>
+                                </div>
                             )}
                             {selectedChildren.size === 0 && page.childrenCount > 0 && (
-                                <li className="flex items-start gap-2">
+                                <div className="flex items-start gap-2">
                                     <Info className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
                                     <span className="text-gray-600">Subpages will remain deleted</span>
-                                </li>
+                                </div>
                             )}
-                        </ul>
+                        </div>
                     </div>
                 </div>
 

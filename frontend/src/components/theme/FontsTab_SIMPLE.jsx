@@ -44,7 +44,7 @@ const FontsTab = ({ fonts, onChange }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Google Fonts</h3>
+                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Google Fonts</div>
             </div>
 
             {/* Current Fonts List */}
@@ -56,7 +56,7 @@ const FontsTab = ({ fonts, onChange }) => {
                             className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between"
                         >
                             <div>
-                                <h4 className="font-semibold text-gray-900">{font.family}</h4>
+                                <div className="font-semibold text-gray-900" role="heading" aria-level="4">{font.family}</div>
                                 <div className="text-sm text-gray-500">Variants: {font.variants.join(', ')}</div>
                             </div>
                             <button
@@ -73,7 +73,7 @@ const FontsTab = ({ fonts, onChange }) => {
 
             {/* Add Font Form */}
             <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 space-y-4">
-                <h4 className="font-semibold text-gray-900">Add Font</h4>
+                <div className="font-semibold text-gray-900" role="heading" aria-level="4">Add Font</div>
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">

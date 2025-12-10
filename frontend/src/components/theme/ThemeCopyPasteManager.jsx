@@ -315,9 +315,9 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">
                                 Paste Theme Settings
-                            </h2>
+                            </div>
                             <button
                                 onClick={() => {
                                     setShowPasteModal(false);

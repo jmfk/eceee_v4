@@ -94,13 +94,13 @@ const SimpleFormDemo = () => {
         <div className="max-w-4xl mx-auto p-6 space-y-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-200">
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <div className="text-2xl font-bold text-gray-900 flex items-center gap-2" role="heading" aria-level="1">
                         <Settings className="w-6 h-6 text-blue-600" />
                         Simple Self-Contained Form Demo
-                    </h1>
-                    <p className="text-gray-600 mt-2">
+                    </div>
+                    <div className="text-gray-600 mt-2">
                         A simplified demonstration showing the self-contained widget form with zero React rerenders.
-                    </p>
+                    </div>
                 </div>
 
                 <div className="p-6">
@@ -108,7 +108,7 @@ const SimpleFormDemo = () => {
                         {/* Form Container */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-gray-900">Widget Form</h3>
+                                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Widget Form</div>
                                 <button
                                     onClick={() => setIsFormVisible(!isFormVisible)}
                                     className={`px-4 py-2 rounded-lg transition-colors ${isFormVisible
@@ -122,9 +122,9 @@ const SimpleFormDemo = () => {
 
                             {isFormVisible && (
                                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <h4 className="font-medium text-gray-900 mb-4">
+                                    <div className="font-medium text-gray-900 mb-4" role="heading" aria-level="4">
                                         {mockWidget.name} Configuration
-                                    </h4>
+                                    </div>
                                     <div
                                         ref={containerRef}
                                         className="self-contained-form-demo-container"
@@ -135,14 +135,14 @@ const SimpleFormDemo = () => {
 
                             {!isFormVisible && (
                                 <div className="text-center py-8 text-gray-500">
-                                    <p>Click "Show Form" to see the self-contained widget form in action.</p>
+                                    <div>Click "Show Form" to see the self-contained widget form in action.</div>
                                 </div>
                             )}
                         </div>
 
                         {/* Real-time Updates Monitor */}
                         <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Real-time Updates</h3>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Real-time Updates</div>
 
                             <div className="bg-gray-50 rounded-lg p-4">
                                 <div className="space-y-2">
@@ -174,7 +174,7 @@ const SimpleFormDemo = () => {
 
                             {lastUpdate && (
                                 <div className="space-y-2">
-                                    <h4 className="font-medium text-gray-900">Current Configuration</h4>
+                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">Current Configuration</div>
                                     <pre className="bg-gray-100 rounded-lg p-3 text-xs overflow-auto max-h-40">
                                         {JSON.stringify(lastUpdate.config, null, 2)}
                                     </pre>
@@ -182,40 +182,40 @@ const SimpleFormDemo = () => {
                             )}
 
                             <div className="space-y-2">
-                                <h4 className="font-medium text-gray-900">Performance Notes</h4>
-                                <ul className="text-sm text-gray-600 space-y-1">
+                                <div className="font-medium text-gray-900" role="heading" aria-level="4">Performance Notes</div>
+                                <div className="text-sm text-gray-600 space-y-1" role="list">
                                     <li>• No React rerenders on field changes</li>
                                     <li>• Direct DOM manipulation for updates</li>
                                     <li>• Real-time server sync with debouncing</li>
                                     <li>• Event-driven architecture</li>
                                     <li>• Zero virtual DOM overhead</li>
-                                </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Instructions</h3>
+                        <div className="text-lg font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Instructions</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
                             <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Testing the Form</h4>
-                                <ol className="space-y-1 list-decimal list-inside">
+                                <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Testing the Form</div>
+                                <div className="space-y-1 list-decimal list-inside" role="list">
                                     <li>Click "Show Form" to display the widget form</li>
                                     <li>Edit any field (text, font size, color, etc.)</li>
                                     <li>Watch the real-time updates counter increase</li>
                                     <li>Notice no page rerenders or flickering</li>
                                     <li>See save status messages</li>
-                                </ol>
+                                </div>
                             </div>
                             <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Key Benefits</h4>
-                                <ul className="space-y-1 list-disc list-inside">
+                                <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Key Benefits</div>
+                                <div className="space-y-1 list-disc list-inside" role="list">
                                     <li>73% faster initial rendering</li>
                                     <li>94% faster field updates</li>
                                     <li>87% faster validation</li>
                                     <li>65% less memory usage</li>
                                     <li>No form rerendering issues</li>
-                                </ul>
+                                </div>
                             </div>
                         </div>
                     </div>

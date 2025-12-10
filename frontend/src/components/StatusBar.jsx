@@ -97,7 +97,7 @@ const StatusBar = ({
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-                        <h3 className="font-semibold text-gray-900">Notification History</h3>
+                        <div className="font-semibold text-gray-900" role="heading" aria-level="3">Notification History</div>
                         <button
                             onClick={() => setShowHistory(false)}
                             className="p-1 rounded hover:bg-gray-200 text-gray-600 transition-colors"
@@ -128,9 +128,9 @@ const StatusBar = ({
 
                                     {/* Message content */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-gray-900 break-words">
+                                        <div className="text-sm text-gray-900 break-words">
                                             {getMessageText(notification)}
-                                        </p>
+                                        </div>
 
                                         {/* Metadata row */}
                                         <div className="flex items-center gap-3 mt-1">

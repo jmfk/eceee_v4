@@ -362,12 +362,12 @@ const MediaMetadataForm = ({
     return (
         <div className="p-8">
             <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <div className="text-xl font-semibold text-gray-900 mb-2" role="heading" aria-level="3">
                     Review and Edit Metadata
-                </h3>
-                <p className="text-gray-600">
+                </div>
+                <div className="text-gray-600">
                     Complete the metadata for your uploaded files. Title is required for all files.
-                </p>
+                </div>
             </div>
 
             <div className="space-y-6">
@@ -383,9 +383,9 @@ const MediaMetadataForm = ({
                             {/* File Header */}
                             <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="text-lg font-medium text-gray-900 truncate">
+                                    <div className="text-lg font-medium text-gray-900 truncate" role="heading" aria-level="4">
                                         {file.original_filename}
-                                    </h4>
+                                    </div>
                                     <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                                         <span className="capitalize">{file.file_type}</span>
                                         <span>{formatFileSize(file.file_size)}</span>
@@ -651,9 +651,9 @@ const MediaMetadataForm = ({
                                                 Use suggestion: {slugValidation[file.id].suggestion}
                                             </button>
                                         )}
-                                        <p className="text-xs text-gray-500 mt-1">
+                                        <div className="text-xs text-gray-500 mt-1">
                                             URL-friendly identifier (lowercase, alphanumeric, hyphens only)
-                                        </p>
+                                        </div>
                                     </div>
 
                                     {/* Access Level */}
@@ -691,14 +691,14 @@ const MediaMetadataForm = ({
                             {/* Extracted Text */}
                             {suggestions?.extracted_text && (
                                 <div className="mt-4 p-4 bg-green-50 border-l-4 border-green-400 rounded">
-                                    <h5 className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2">
+                                    <div className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2" role="heading" aria-level="5">
                                         <FileText className="w-4 h-4" />
                                         Extracted Text:
-                                    </h5>
-                                    <p className="text-sm text-green-700 leading-relaxed">
+                                    </div>
+                                    <div className="text-sm text-green-700 leading-relaxed">
                                         {suggestions.extracted_text.substring(0, 300)}
                                         {suggestions.extracted_text.length > 300 && '...'}
-                                    </p>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -738,21 +738,21 @@ const MediaMetadataForm = ({
             {/* Validation Summary */}
             {Object.keys(validationErrors).length > 0 && (
                 <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <h4 className="text-lg font-medium text-red-800 mb-3 flex items-center gap-2">
+                    <div className="text-lg font-medium text-red-800 mb-3 flex items-center gap-2" role="heading" aria-level="4">
                         <AlertCircle className="w-5 h-5" />
                         Validation Errors:
-                    </h4>
+                    </div>
                     <div className="space-y-2">
                         {Object.entries(validationErrors).map(([fileId, errors]) => {
                             const file = uploadResults.find(f => f.id === fileId);
                             return (
                                 <div key={fileId} className="text-sm text-red-700">
                                     <span className="font-medium">{file?.original_filename}:</span>
-                                    <ul className="ml-4 list-disc">
+                                    <div className="ml-4 list-disc" role="list">
                                         {Object.values(errors).map((error, index) => (
-                                            <li key={index}>{error}</li>
+                                            <div key={index}>{error}</div>
                                         ))}
-                                    </ul>
+                                    </div>
                                 </div>
                             );
                         })}

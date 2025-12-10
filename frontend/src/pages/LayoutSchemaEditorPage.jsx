@@ -25,8 +25,8 @@ const LayoutSchemaEditorPage = () => {
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="mb-6 flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl font-semibold">Edit Layout Schema</h1>
-                            <p className="text-gray-600 mt-1">Editing schema extensions for layout: <span className="font-medium text-gray-900">{layoutName}</span></p>
+                            <div className="text-2xl font-semibold" role="heading" aria-level="1">Edit Layout Schema</div>
+                            <div className="text-gray-600 mt-1">Editing schema extensions for layout: <span className="font-medium text-gray-900">{layoutName}</span></div>
                         </div>
                         <Link to="/schemas/layout" className="text-blue-600 hover:underline text-sm">Back to Layouts</Link>
                     </div>

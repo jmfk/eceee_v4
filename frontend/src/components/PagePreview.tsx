@@ -77,8 +77,8 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         return (
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center text-gray-500">
-                    <p className="text-lg">No page data available</p>
-                    <p className="text-sm">Save your page to see the preview</p>
+                    <div className="text-lg">No page data available</div>
+                    <div className="text-sm">Save your page to see the preview</div>
                 </div>
             </div>
         );
@@ -88,8 +88,8 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         return (
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center text-gray-500">
-                    <p className="text-lg">Version not saved</p>
-                    <p className="text-sm">Save the page to preview</p>
+                    <div className="text-lg">Version not saved</div>
+                    <div className="text-sm">Save the page to preview</div>
                 </div>
             </div>
         );
@@ -124,26 +124,26 @@ const PagePreview: React.FC<PagePreviewProps> = ({
                                 </svg>
                             </div>
                             <div className="flex-1">
-                                <h3 className="text-lg font-medium text-amber-900">Preview Configuration Required</h3>
-                                <p className="mt-2 text-sm text-amber-800">
+                                <div className="text-lg font-medium text-amber-900" role="heading" aria-level="3">Preview Configuration Required</div>
+                                <div className="mt-2 text-sm text-amber-800">
                                     This page cannot be previewed because the root page does not have any hostnames configured.
-                                </p>
+                                </div>
                                 <div className="mt-3 text-sm text-amber-800">
-                                    <p className="font-medium">Root Page: {rootPage?.title || rootPage?.slug || 'Unknown'}</p>
-                                    {rootPage?.id && <p className="text-xs text-amber-700 mt-1">ID: {rootPage.id}</p>}
+                                    <div className="font-medium">Root Page: {rootPage?.title || rootPage?.slug || 'Unknown'}</div>
+                                    {rootPage?.id && <div className="text-xs text-amber-700 mt-1">ID: {rootPage.id}</div>}
                                 </div>
                                 <div className="mt-4 bg-amber-50 border border-amber-200 rounded p-3">
-                                    <p className="text-sm font-medium text-amber-900 mb-2">How to fix:</p>
-                                    <ol className="text-sm text-amber-800 space-y-1 list-decimal list-inside">
+                                    <div className="text-sm font-medium text-amber-900 mb-2">How to fix:</div>
+                                    <div className="text-sm text-amber-800 space-y-1 list-decimal list-inside" role="list">
                                         <li>Go to the Django Admin panel</li>
                                         <li>Navigate to Web Pages → Web Pages</li>
-                                        <li>Edit the root page: <strong>{rootPage?.title || rootPage?.slug}</strong></li>
+                                        <li>Edit the root page: <span className="font-bold">{rootPage?.title || rootPage?.slug}</span></li>
                                         <li>Add at least one hostname in the "Hostnames" field</li>
                                         <li>Save and refresh this preview</li>
-                                    </ol>
-                                    <p className="text-xs text-amber-700 mt-2">
+                                    </div>
+                                    <div className="text-xs text-amber-700 mt-2">
                                         Examples: <code className="bg-amber-100 px-1 rounded">localhost:8000</code>, <code className="bg-amber-100 px-1 rounded">example.com</code>
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -182,7 +182,7 @@ const PagePreview: React.FC<PagePreviewProps> = ({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                         <Monitor className="w-5 h-5 text-gray-500" />
-                        <h3 className="text-sm font-medium text-gray-900">Preview</h3>
+                        <div className="text-sm font-medium text-gray-900" role="heading" aria-level="3">Preview</div>
                     </div>
 
                     <div className="flex items-center space-x-3">
@@ -252,7 +252,7 @@ const PagePreview: React.FC<PagePreviewProps> = ({
                     <div className="h-full flex items-center justify-center">
                         <div className="text-center text-gray-500">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                            <p className="text-sm">Loading preview...</p>
+                            <div className="text-sm">Loading preview...</div>
                         </div>
                     </div>
                 ) : (

@@ -93,15 +93,15 @@ const SessionExpiredOverlay = () => {
                     </div>
                 </div>
 
-                <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+                <div className="text-2xl font-bold text-gray-900 text-center mb-2" role="heading" aria-level="2">
                     Session Expired
-                </h2>
-                <p className="text-gray-600 text-center mb-6">
+                </div>
+                <div className="text-gray-600 text-center mb-6">
                     Your session has expired. Please log in to continue working.
-                </p>
-                <p className="text-sm text-gray-500 text-center mb-6">
+                </div>
+                <div className="text-sm text-gray-500 text-center mb-6">
                     Don't worry — your work is safe and will be preserved.
-                </p>
+                </div>
 
                 {/* Login Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">

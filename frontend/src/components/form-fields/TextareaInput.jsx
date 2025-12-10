@@ -93,13 +93,13 @@ const TextareaInput = ({
             <ValidatedInput {...inputProps} />
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {!showCharacterCount && maxLength && (
-                <p className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500">
                     Maximum {maxLength} characters
-                </p>
+                </div>
             )}
         </div>
     )

@@ -149,13 +149,13 @@ export default function ReorderableListInput({
             )}
 
             {description && (
-                <p className="text-xs text-gray-500 mb-2">{description}</p>
+                <div className="text-xs text-gray-500 mb-2">{description}</div>
             )}
 
             <div className="space-y-2">
                 {value.length === 0 ? (
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <p className="text-gray-500 text-sm">{emptyText}</p>
+                        <div className="text-gray-500 text-sm">{emptyText}</div>
                     </div>
                 ) : (
                     value.map((item, index) => itemRenderer(item, index, handleUpdate))

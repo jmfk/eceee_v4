@@ -327,14 +327,14 @@ const AllSlotsEditor = ({
             {/* Header with controls */}
             <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-900">All Slots</h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">All Slots</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         Manage widgets in all slots, including those not in the current layout
-                    </p>
+                    </div>
                     {slotsData && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             {slotsData.total || 0} total slots available
-                        </p>
+                        </div>
                     )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -358,10 +358,10 @@ const AllSlotsEditor = ({
                 {/* Unified list of all slots */}
                 {categorizedSlots.allWithCurrentFlag && categorizedSlots.allWithCurrentFlag.length > 0 && (
                     <div className="mb-6">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                        <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2" role="heading" aria-level="3">
                             <Layout className="h-4 w-4" />
                             All Slots ({categorizedSlots.allWithCurrentFlag.length})
-                        </h3>
+                        </div>
                         <div className="space-y-2">
                             {categorizedSlots.allWithCurrentFlag.map(slot => (
                                 <SlotAccordionItem
@@ -388,16 +388,16 @@ const AllSlotsEditor = ({
                 {!hasAnySlots && (
                     <div className="text-center py-12 text-gray-500">
                         <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p>No slots available</p>
+                        <div>No slots available</div>
                         {slotsData && slotsData.slots && slotsData.slots.length === 0 && (
-                            <p className="text-sm text-gray-400 mt-2">
+                            <div className="text-sm text-gray-400 mt-2">
                                 No layouts are registered or no slots are defined in layouts.
-                            </p>
+                            </div>
                         )}
                         {!slotsData && (
-                            <p className="text-sm text-gray-400 mt-2">
+                            <div className="text-sm text-gray-400 mt-2">
                                 Loading slots data...
-                            </p>
+                            </div>
                         )}
                     </div>
                 )}
@@ -481,7 +481,7 @@ const SlotAccordionItem = ({
                             )}
                         </div>
                         {slotDescription && (
-                            <p className="text-sm text-gray-600 mt-0.5 truncate">{slotDescription}</p>
+                            <div className="text-sm text-gray-600 mt-0.5 truncate">{slotDescription}</div>
                         )}
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">

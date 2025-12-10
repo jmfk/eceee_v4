@@ -116,7 +116,7 @@ const FontsTab = ({ fonts, onChange }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Google Fonts</h3>
+                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Google Fonts</div>
                 <div className="flex gap-2">
                     {/* View Mode Toggle */}
                     <div className="inline-flex rounded-md shadow-sm" role="group">
@@ -191,9 +191,9 @@ const FontsTab = ({ fonts, onChange }) => {
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3">
-                                                <h4 className="text-base font-semibold text-gray-900">
+                                                <div className="text-base font-semibold text-gray-900" role="heading" aria-level="4">
                                                     {font.family}
-                                                </h4>
+                                                </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveFont(index)}
@@ -233,7 +233,7 @@ const FontsTab = ({ fonts, onChange }) => {
                     {/* Add Font Panel */}
                     {showAddFont && (
                         <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 space-y-4">
-                            <h4 className="font-semibold text-gray-900">Add Google Font</h4>
+                            <div className="font-semibold text-gray-900" role="heading" aria-level="4">Add Google Font</div>
 
                             {/* Search */}
                             <div className="relative">
@@ -343,7 +343,7 @@ const FontsTab = ({ fonts, onChange }) => {
                     {/* Manual Add Font Panel */}
                     {showManualAdd && (
                         <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 space-y-4">
-                            <h4 className="font-semibold text-gray-900">Add Font Manually</h4>
+                            <div className="font-semibold text-gray-900" role="heading" aria-level="4">Add Font Manually</div>
 
                             {/* Google Font vs Custom Font Toggle */}
                             <div className="flex gap-4">
@@ -393,9 +393,9 @@ const FontsTab = ({ fonts, onChange }) => {
                                     placeholder="e.g., 400, 500, 600, 700"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                     Enter font weights like 400, 500, 600, 700, etc.
-                                </p>
+                                </div>
                             </div>
 
                             {/* Custom Font Face CSS (only for custom fonts) */}
@@ -411,9 +411,9 @@ const FontsTab = ({ fonts, onChange }) => {
                                         rows={4}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                         Optional CSS for loading custom fonts from your own files.
-                                    </p>
+                                    </div>
                                 </div>
                             )}
 

@@ -91,9 +91,9 @@ const TagForm = ({ tag = null, onSave, onCancel, isLoading = false }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                    <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                         {tag ? 'Edit Tag' : 'Create New Tag'}
-                    </h2>
+                    </div>
                     <button
                         onClick={handleCancel}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -121,10 +121,10 @@ const TagForm = ({ tag = null, onSave, onCancel, isLoading = false }) => {
                             maxLength={50}
                         />
                         {errors.name && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                            <div className="mt-1 text-sm text-red-600 flex items-center">
                                 <AlertCircle className="w-4 h-4 mr-1" />
                                 {errors.name}
-                            </p>
+                            </div>
                         )}
                     </div>
 

@@ -30,12 +30,12 @@ const OverrideSettingsModal = ({ isOpen, onClose, config, onConfigChange, select
                     <div className="flex items-center gap-3">
                         <Settings className="w-5 h-5 text-green-600" />
                         <div>
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">
                                 Override Defaults
-                            </h2>
-                            <p className="text-sm text-gray-600 mt-0.5">
+                            </div>
+                            <div className="text-sm text-gray-600 mt-0.5">
                                 Override the image style's default values
-                            </p>
+                            </div>
                         </div>
                     </div>
                     <button
@@ -220,10 +220,10 @@ const OverrideSettingsModal = ({ isOpen, onClose, config, onConfigChange, select
 
                     {/* Help Text */}
                     <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-xs text-blue-800">
-                            <strong>First checkbox:</strong> Enable override for this setting<br />
-                            <strong>Second checkbox/input:</strong> Set the override value
-                        </p>
+                        <div className="text-xs text-blue-800">
+                            <span className="font-bold">First checkbox:</span> Enable override for this setting<br />
+                            <span className="font-bold">Second checkbox/input:</span> Set the override value
+                        </div>
                     </div>
                 </div>
 

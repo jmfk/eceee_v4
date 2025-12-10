@@ -74,7 +74,7 @@ const ImageUpload = ({ imageUrl, onUpload, onRemove, isUploading = false }) => {
                 /* No image - show upload prompt */
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-gray-400 transition-colors">
                     <Upload className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-                    <p className="text-sm text-gray-600 mb-4">No preview image</p>
+                    <div className="text-sm text-gray-600 mb-4">No preview image</div>
                     <label className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer transition-colors">
                         <Upload className="w-4 h-4 mr-2" />
                         Upload Image
@@ -92,9 +92,9 @@ const ImageUpload = ({ imageUrl, onUpload, onRemove, isUploading = false }) => {
                             disabled={isUploading}
                         />
                     </label>
-                    <p className="mt-3 text-xs text-gray-500">
+                    <div className="mt-3 text-xs text-gray-500">
                         Recommended: 1200x600px
-                    </p>
+                    </div>
                 </div>
             )}
         </div>

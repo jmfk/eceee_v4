@@ -125,7 +125,7 @@ const StyleAIHelper = ({
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-purple-600" />
-                    <h4 className="font-semibold text-purple-900">AI Style Helper</h4>
+                    <div className="font-semibold text-purple-900" role="heading" aria-level="4">AI Style Helper</div>
                 </div>
                 <div className="flex items-center gap-2">
                     {undoStack.length > 0 && (
@@ -218,8 +218,8 @@ const StyleAIHelper = ({
             {/* Helper Text */}
             {contextLog.length === 0 && (
                 <div className="text-xs text-gray-600">
-                    <strong>Examples:</strong>
-                    <ul className="list-disc list-inside mt-1 space-y-1">
+                    <span className="font-bold">Examples:</span>
+                    <div className="list-disc list-inside mt-1 space-y-1" role="list">
                         {styleType === 'gallery' && (
                             <>
                                 <li>"Create a masonry gallery with 3 columns"</li>
@@ -241,7 +241,7 @@ const StyleAIHelper = ({
                                 <li>"Add shadow on hover to component"</li>
                             </>
                         )}
-                    </ul>
+                    </div>
                 </div>
             )}
         </div>

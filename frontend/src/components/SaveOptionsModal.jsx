@@ -49,9 +49,9 @@ const SaveOptionsModal = ({
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">
                         Save Options
-                    </h2>
+                    </div>
                     <button
                         onClick={handleClose}
                         disabled={isLoading}
@@ -67,7 +67,7 @@ const SaveOptionsModal = ({
                     {currentVersion && !isNewPage && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                             <div className="text-sm text-blue-800">
-                                <strong>Current Version:</strong> v{currentVersion.versionNumber}
+                                <span className="font-bold">Current Version:</span> v{currentVersion.versionNumber}
                                 {currentVersion.description && (
                                     <div className="text-blue-600 mt-1">
                                         "{currentVersion.description}"
@@ -97,10 +97,10 @@ const SaveOptionsModal = ({
                                             Update Current Version
                                         </span>
                                     </div>
-                                    <p className="text-sm text-gray-600 mt-1">
+                                    <div className="text-sm text-gray-600 mt-1">
                                         Modify the existing version v{currentVersion?.versionNumber || '?'}.
                                         Changes will overwrite current content.
-                                    </p>
+                                    </div>
                                 </div>
                             </label>
                         )}
@@ -123,10 +123,10 @@ const SaveOptionsModal = ({
                                         Save as New Version
                                     </span>
                                 </div>
-                                <p className="text-sm text-gray-600 mt-1">
+                                <div className="text-sm text-gray-600 mt-1">
                                     Create a new version preserving the current one.
                                     Good for major changes or experiments.
-                                </p>
+                                </div>
                             </div>
                         </label>
                     </div>
@@ -145,9 +145,9 @@ const SaveOptionsModal = ({
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 disabled={isLoading}
                             />
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Help others understand what's new in this version
-                            </p>
+                            </div>
                         </div>
                     )}
                 </div>

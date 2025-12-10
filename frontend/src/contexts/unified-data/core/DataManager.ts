@@ -468,7 +468,8 @@ export class DataManager {
         }
 
         const topSlot = path[0];
-        const slotWidgets = widgets[topSlot] || [];
+        // Filter valid widgets to ensure no undefined entries
+        const slotWidgets = (widgets[topSlot] || []).filter((w: any) => w != null && typeof w === 'object' && w.id != null);
         
         // If path only has 2 elements [slot, widgetId], it's a top-level widget
         if (path.length === 2) {
@@ -678,7 +679,8 @@ export class DataManager {
                             const versionId = target.versionId as string;
                             const version = state.versions[versionId];
                             const slotName = payload.slot || 'main';
-                            const slotWidgets = version.widgets[slotName] || [];
+                            // Filter valid widgets to ensure no undefined entries
+                            const slotWidgets = (version.widgets[slotName] || []).filter((w: any) => w != null && typeof w === 'object' && w.id != null);
                             
                             // Insert at the specified position (order), or append to end
                             const insertPosition = payload.order !== undefined && payload.order !== null 
@@ -777,7 +779,8 @@ export class DataManager {
                             if (payload.parentWidgetId) {
                                 // Find and update nested widget within parent widget's config
                                 const parentSlot = payload.parentSlotName || slotName;
-                                const parentWidgets = version.widgets[parentSlot] || [];
+                                // Filter valid widgets to ensure no undefined entries
+                                const parentWidgets = (version.widgets[parentSlot] || []).filter((w: any) => w != null && typeof w === 'object' && w.id != null);
                                 const parentIndex = parentWidgets.findIndex(w => w.id === payload.parentWidgetId);
                                 
                                 if (parentIndex === -1) {
@@ -836,7 +839,8 @@ export class DataManager {
                             }
                             
                             // Not nested - handle as top-level widget
-                            const slotWidgets = version.widgets[slotName] || [];
+                            // Filter valid widgets to ensure no undefined entries
+                            const slotWidgets = (version.widgets[slotName] || []).filter((w: any) => w != null && typeof w === 'object' && w.id != null);
                             const widgetIndex = slotWidgets.findIndex(w => w.id === widgetId);
                             if (widgetIndex === -1) {
                                 throw new Error(`Widget ${widgetId} not found in slot ${slotName} of version ${target.versionId}`);
@@ -953,8 +957,10 @@ export class DataManager {
                             const widgetsBySlot = { ...version.widgets };
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
-                                const filtered = arr.filter(w => w.id !== widgetId)
-                                    .map((w, idx) => ({ ...w, order: idx }));
+                                // Filter out invalid widgets first, then filter by widgetId
+                                const validWidgets = arr.filter((w: any) => w != null && typeof w === 'object' && w.id != null);
+                                const filtered = validWidgets.filter((w: any) => w.id !== widgetId)
+                                    .map((w: any, idx: number) => ({ ...w, order: idx }));
                                 widgetsBySlot[slotName] = filtered;
                             });
                             return {
@@ -972,7 +978,9 @@ export class DataManager {
                             const widgetsBySlot = { ...(objValue.widgets || {}) } as any;
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
-                                const filtered = arr.filter((w: any) => w.id !== widgetId)
+                                // Filter out invalid widgets first, then filter by widgetId
+                                const validWidgets = arr.filter((w: any) => w != null && typeof w === 'object' && w.id != null);
+                                const filtered = validWidgets.filter((w: any) => w.id !== widgetId)
                                     .map((w: any, idx: number) => ({ ...w, order: idx }));
                                 widgetsBySlot[slotName] = filtered;
                             });

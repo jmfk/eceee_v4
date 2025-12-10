@@ -76,7 +76,7 @@ const ColorsTab = ({ colors, onChange }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Named Colors</h3>
+                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Named Colors</div>
                 <div className="flex gap-2">
                     {/* View Mode Toggle */}
                     <div className="inline-flex rounded-md shadow-sm" role="group">
@@ -159,7 +159,7 @@ const ColorsTab = ({ colors, onChange }) => {
                     {/* Add Color Panel */}
                     {showAddColor && (
                         <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 space-y-4">
-                            <h4 className="font-semibold text-gray-900">Add New Color</h4>
+                            <div className="font-semibold text-gray-900" role="heading" aria-level="4">Add New Color</div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -238,16 +238,16 @@ const ColorsTab = ({ colors, onChange }) => {
                     ) : (
                         <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                             <Palette className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                            <p className="text-gray-500">
+                            <div className="text-gray-500">
                                 No colors defined yet. Click "Add Color" to create your color palette.
-                            </p>
+                            </div>
                         </div>
                     )}
 
                     {/* Color Preview */}
                     {colorEntries.length > 0 && (
                         <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">Color Preview</h4>
+                            <div className="text-sm font-medium text-gray-700 mb-3" role="heading" aria-level="4">Color Preview</div>
                             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                                 {colorEntries.map(([name, value]) => (
                                     <div key={name} className="text-center">

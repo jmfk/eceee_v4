@@ -143,7 +143,7 @@ const TransferInput = ({
             {/* Header */}
             <div className="p-3 border-b border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-900">{title}</h4>
+                    <div className="font-medium text-gray-900" role="heading" aria-level="4">{title}</div>
                     <span className="text-xs text-gray-500">
                         {selectedItems.length > 0 && `${selectedItems.length}/`}{items.length}
                     </span>
@@ -308,7 +308,7 @@ const TransferInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Summary */}

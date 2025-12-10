@@ -103,7 +103,7 @@ const FieldPlaceholder = ({ componentName, label, value, ...props }) => {
             )}
             {renderPlaceholder()}
             {props.description && (
-                <p className="text-sm text-gray-500">{props.description}</p>
+                <div className="text-sm text-gray-500">{props.description}</div>
             )}
         </div>
     )
@@ -316,7 +316,7 @@ const SchemaFieldRenderer = ({
                     placeholder={fieldSchema.placeholder}
                 />
                 {fieldSchema.description && (
-                    <p className="text-sm text-gray-500">{fieldSchema.description}</p>
+                    <div className="text-sm text-gray-500">{fieldSchema.description}</div>
                 )}
             </div>
         )

@@ -353,9 +353,9 @@ const MediaEditForm = ({
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 mb-6">
             {showHeader && (
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                         {mode === 'approve' ? 'Approve File' : 'Edit File'}
-                    </h3>
+                    </div>
                     <button
                         onClick={onCancel}
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -392,8 +392,8 @@ const MediaEditForm = ({
                         )}
                     </div>
                     <div className="mt-3 text-sm text-gray-600 text-center">
-                        <p className="font-medium">{file.originalFilename}</p>
-                        <p className="text-gray-500">{formatFileSize(file.fileSize)}</p>
+                        <div className="font-medium">{file.originalFilename}</div>
+                        <div className="text-gray-500">{formatFileSize(file.fileSize)}</div>
                     </div>
                     
                     {/* Replace File Button - Only show in edit mode */}
@@ -480,9 +480,9 @@ const MediaEditForm = ({
                                 {validationErrors.slug}
                             </div>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             URL-friendly identifier (lowercase, alphanumeric, hyphens only)
-                        </p>
+                        </div>
                     </div>
 
                     {/* Annotation */}
@@ -498,9 +498,9 @@ const MediaEditForm = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Optional annotation text"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             Additional annotation text displayed in the user interface
-                        </p>
+                        </div>
                     </div>
 
                     {/* Tags */}
@@ -537,7 +537,7 @@ const MediaEditForm = ({
                     {/* References Display */}
                     {mode === 'edit' && (
                         <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-2">References</h4>
+                            <div className="text-sm font-medium text-gray-700 mb-2" role="heading" aria-level="4">References</div>
                             <MediaReferencesDisplay fileId={file.id} />
                         </div>
                     )}
@@ -557,14 +557,14 @@ const MediaEditForm = ({
                     {/* Extracted Text */}
                     {file.aiSuggestions?.extractedText && (
                         <div className="p-4 bg-green-50 border-l-4 border-green-400 rounded">
-                            <h5 className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2">
+                            <div className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2" role="heading" aria-level="5">
                                 <FileText className="w-4 h-4" />
                                 Extracted Text:
-                            </h5>
-                            <p className="text-sm text-green-700 leading-relaxed">
+                            </div>
+                            <div className="text-sm text-green-700 leading-relaxed">
                                 {file.aiSuggestions.extractedText.substring(0, 300)}
                                 {file.aiSuggestions.extractedText.length > 300 && '...'}
-                            </p>
+                            </div>
                         </div>
                     )}
 

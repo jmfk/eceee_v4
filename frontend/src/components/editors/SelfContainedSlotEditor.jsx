@@ -145,11 +145,20 @@ const SelfContainedSlotEditor = ({
         notifySlotChange(newWidgets);
     }, [widgets, notifySlotChange]);
 
+    // Helper function to filter valid widgets
+    const filterValidWidgets = (widgets) => {
+        return Array.isArray(widgets)
+            ? widgets.filter(w => w != null && typeof w === 'object' && w.id != null)
+            : []
+    }
+
     /**
      * Handle widget config changes (for active/inactive toggle, etc.)
      */
     const handleConfigChange = useCallback((widgetId, updatedConfig) => {
-        const newWidgets = widgets.map(w => 
+        // Filter valid widgets first, then update
+        const validWidgets = filterValidWidgets(widgets);
+        const newWidgets = validWidgets.map(w => 
             w.id === widgetId ? { ...w, config: updatedConfig } : w
         );
         setWidgets(newWidgets);
@@ -292,13 +301,13 @@ const SelfContainedSlotEditor = ({
                                 <div className="text-purple-600 font-semibold text-lg mb-2">
                                     Click to paste here
                                 </div>
-                                <p className="text-sm text-purple-700">
+                                <div className="text-sm text-purple-700">
                                     Paste widget(s) into this empty slot
-                                </p>
+                                </div>
                             </>
                         ) : (
                             <>
-                                <p className="mb-2">{defaultEmptyMessage}</p>
+                                <div className="mb-2">{defaultEmptyMessage}</div>
                                 {showAddButton && canAddWidget() && (
                                     <button
                                         className="add-first-widget text-gray-600 hover:text-gray-800 text-sm px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
@@ -311,10 +320,11 @@ const SelfContainedSlotEditor = ({
                         )}
                     </div>
                 ) : (
-                    widgets.map((widget, index) => {
+                    filterValidWidgets(widgets).map((widget, index) => {
                         // Build full path for this nested widget: append widget ID to slot path
                         const fullWidgetPath = [...slotPath, widget.id];
-                        const isLast = index === widgets.length - 1;
+                        const validWidgets = filterValidWidgets(widgets);
+                        const isLast = index === validWidgets.length - 1;
 
                         return (
                             <div key={widget.id} className={isLast ? '' : 'mb-8'}>
@@ -328,7 +338,7 @@ const SelfContainedSlotEditor = ({
                                     onMoveDown={() => handleMoveWidget(index, index + 1)}
                                     onConfigChange={(newConfig) => handleConfigChange(widget.id, newConfig)}
                                     canMoveUp={index > 0}
-                                    canMoveDown={index < widgets.length - 1}
+                                    canMoveDown={index < validWidgets.length - 1}
                                     mode={mode}
                                     showControls={mode === 'editor'}
                                     widgetId={widget.id}

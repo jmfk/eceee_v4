@@ -178,7 +178,7 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    <p className="text-gray-600">Loading versions...</p>
+                    <div className="text-gray-600">Loading versions...</div>
                 </div>
             </div>
         )
@@ -192,10 +192,10 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                     <div className="bg-white rounded-lg shadow p-6">
                         <div className="flex items-start justify-between">
                             <div className="flex-1">
-                                <h2 className="text-lg font-semibold text-gray-900 mb-2">Version Timeline & Publishing</h2>
-                                <p className="text-gray-600">
+                                <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="2">Version Timeline & Publishing</div>
+                                <div className="text-gray-600">
                                     Manage page versions, scheduling, and publishing workflow
-                                </p>
+                                </div>
                             </div>
                             <button
                                 onClick={() => setShowConfirmPublishAll(true)}
@@ -210,7 +210,7 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                         {/* Cached Publication Status */}
                         {webpageData && (
                             <div className="mt-4 pt-4 border-t border-gray-200">
-                                <h3 className="text-sm font-semibold text-gray-700 mb-3">Current Publication Status (Cached)</h3>
+                                <div className="text-sm font-semibold text-gray-700 mb-3" role="heading" aria-level="3">Current Publication Status (Cached)</div>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <span className="text-gray-600">Status:</span>
@@ -286,12 +286,12 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                     {/* Version List */}
                     <div className="bg-white rounded-lg shadow">
                         <div className="p-6">
-                            <h3 className="text-md font-semibold text-gray-900 mb-4">Page Versions</h3>
+                            <div className="text-md font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Page Versions</div>
 
                             {versions.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
                                     <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                                    <p>No versions found for this page</p>
+                                    <div>No versions found for this page</div>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -317,19 +317,19 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                                             </span>
                                                         </div>
 
-                                                        <p className="text-sm text-gray-600 mb-2">
+                                                        <div className="text-sm text-gray-600 mb-2">
                                                             {typeof version.changeSummary === 'string'
                                                                 ? version.changeSummary
                                                                 : version.changeSummary?.summaryText || 'No description'}
-                                                        </p>
+                                                        </div>
 
                                                         <div className="space-y-1 text-xs text-gray-500">
-                                                            <p>Created: {new Date(version.createdAt).toLocaleString()}</p>
+                                                            <div>Created: {new Date(version.createdAt).toLocaleString()}</div>
                                                             {version.effectiveDate && (
-                                                                <p>Effective: {new Date(version.effectiveDate).toLocaleString()}</p>
+                                                                <div>Effective: {new Date(version.effectiveDate).toLocaleString()}</div>
                                                             )}
                                                             {version.expiryDate && (
-                                                                <p>Expires: {new Date(version.expiryDate).toLocaleString()}</p>
+                                                                <div>Expires: {new Date(version.expiryDate).toLocaleString()}</div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -453,10 +453,10 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div className="px-6 py-4 border-b border-gray-200">
-                            <h2 className="text-xl font-semibold text-gray-900">Schedule Version</h2>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Schedule Version</div>
+                            <div className="text-sm text-gray-500 mt-1">
                                 Version {selectedVersion?.versionNumber}
-                            </p>
+                            </div>
                         </div>
 
                         <div className="px-6 py-4 space-y-4">
@@ -471,9 +471,9 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     required
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     When this version should become live
-                                </p>
+                                </div>
                             </div>
 
                             <div>
@@ -486,9 +486,9 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                                     onChange={(e) => setExpiryDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     When this version should stop being live
-                                </p>
+                                </div>
                             </div>
                         </div>
 
@@ -518,22 +518,22 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div className="px-6 py-4 border-b border-gray-200">
-                            <h2 className="text-xl font-semibold text-gray-900">Publish Page + All Subpages</h2>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Publish Page + All Subpages</div>
+                            <div className="text-sm text-gray-500 mt-1">
                                 {webpageData?.title || 'Current Page'}
-                            </p>
+                            </div>
                         </div>
 
                         <div className="px-6 py-4">
                             <div className="flex items-start space-x-3">
                                 <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                                 <div>
-                                    <p className="text-sm text-gray-700">
-                                        This will publish the latest version of this page and <strong>all of its subpages</strong> immediately.
-                                    </p>
-                                    <p className="text-sm text-gray-500 mt-2">
+                                    <div className="text-sm text-gray-700">
+                                        This will publish the latest version of this page and <span className="font-bold">all of its subpages</span> immediately.
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-2">
                                         Are you sure you want to continue?
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

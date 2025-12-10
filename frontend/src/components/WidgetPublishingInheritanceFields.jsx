@@ -72,7 +72,7 @@ const WidgetPublishingInheritanceFields = ({
         <div className="border-t border-gray-200 bg-gray-50">
             {/* Header */}
             <div className="w-full flex items-center justify-between p-4">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <div className="text-sm font-semibold text-gray-700 flex items-center gap-2" role="heading" aria-level="3">
                     <Layers className="w-4 h-4" />
                     Publishing & Inheritance
                     {!localValues.isPublished && (
@@ -90,7 +90,7 @@ const WidgetPublishingInheritanceFields = ({
                             {localValues.inheritanceLevel}L
                         </span>
                     )}
-                </h3>
+                </div>
             </div>
 
             {/* Content */}
@@ -142,11 +142,11 @@ const WidgetPublishingInheritanceFields = ({
                             <option value={4}>4 Levels</option>
                             <option value={5}>5 Levels</option>
                         </select>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-gray-500">
                             {localValues.inheritanceLevel === -1 && 'Widget visible on all descendant pages'}
                             {localValues.inheritanceLevel === 0 && 'Widget only visible on this page'}
                             {localValues.inheritanceLevel > 0 && `Widget visible ${localValues.inheritanceLevel} level${localValues.inheritanceLevel > 1 ? 's' : ''} deep`}
-                        </p>
+                        </div>
                     </div>
 
                     {/* Inheritance Behavior Dropdown */}
@@ -163,9 +163,9 @@ const WidgetPublishingInheritanceFields = ({
                             <option value="insert_before_parent">Insert Before Parent Widgets</option>
                             <option value="override_parent">Override Parent Widgets</option>
                         </select>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             How this widget interacts with inherited parent widgets
-                        </p>
+                        </div>
                     </div>
 
                     {/* Effective Date */}
@@ -180,9 +180,9 @@ const WidgetPublishingInheritanceFields = ({
                             onChange={(e) => handleFieldChange('publishEffectiveDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         />
-                        <p className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-gray-500">
                             Widget becomes visible on this date/time
-                        </p>
+                        </div>
                     </div>
 
                     {/* Expire Date */}
@@ -197,17 +197,17 @@ const WidgetPublishingInheritanceFields = ({
                             onChange={(e) => handleFieldChange('publishExpireDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         />
-                        <p className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-gray-500">
                             Widget stops being visible on this date/time
-                        </p>
+                        </div>
                     </div>
 
                     {/* Info box about inheritance + publishing */}
                     {!localValues.isPublished && (
                         <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                            <p className="text-xs text-yellow-800">
-                                <strong>Note:</strong> Unpublished widgets are not inherited by child pages, regardless of inheritance settings.
-                            </p>
+                            <div className="text-xs text-yellow-800">
+                                <span className="font-bold">Note:</span> Unpublished widgets are not inherited by child pages, regardless of inheritance settings.
+                            </div>
                         </div>
                     )}
             </div>

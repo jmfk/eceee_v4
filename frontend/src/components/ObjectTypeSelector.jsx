@@ -19,12 +19,12 @@ const ObjectTypeSelector = ({
         return (
             <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                 <Layout className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">
+                <div className="text-gray-600 text-sm">
                     No child object types configured
-                </p>
-                <p className="text-gray-500 text-xs mt-1">
+                </div>
+                <div className="text-gray-500 text-xs mt-1">
                     Configure allowed child types in the object type settings
-                </p>
+                </div>
             </div>
         )
     }
@@ -72,12 +72,12 @@ const ObjectTypeSelector = ({
                                             </div>
                                         )}
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                                            <div className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors" role="heading" aria-level="4">
                                                 {childType.label}
-                                            </h4>
-                                            <p className="text-sm text-gray-500 truncate">
+                                            </div>
+                                            <div className="text-sm text-gray-500 truncate">
                                                 {childType.description || `Create a new ${childType.label.toLowerCase()}`}
-                                            </p>
+                                            </div>
                                         </div>
                                         <Plus className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                                     </div>

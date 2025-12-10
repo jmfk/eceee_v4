@@ -45,7 +45,7 @@ const PageChildrenDisplayField = ({
                     </label>
                 )}
                 {description && (
-                    <p className="text-sm text-gray-500">{description}</p>
+                    <div className="text-sm text-gray-500">{description}</div>
                 )}
                 <div className="text-sm text-gray-500 italic bg-gray-50 border border-gray-200 rounded-md p-4">
                     Not available in preview mode. Save the page first to see child pages.
@@ -65,7 +65,7 @@ const PageChildrenDisplayField = ({
 
             {/* Description */}
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Children List */}
@@ -120,9 +120,9 @@ const PageChildrenDisplayField = ({
 
             {/* Info footer */}
             {children && children.length > 0 && (
-                <p className="text-xs text-gray-500 mt-2">
+                <div className="text-xs text-gray-500 mt-2">
                     {children.length} child {children.length === 1 ? 'page' : 'pages'} will be displayed in the navigation.
-                </p>
+                </div>
             )}
         </div>
     )

@@ -106,9 +106,9 @@ const DynamicFormRenderer = React.memo(({
         if (!FieldComponent) {
             return (
                 <div key={fieldName} className="p-3 border border-yellow-200 rounded bg-yellow-50">
-                    <p className="text-sm text-yellow-700">
+                    <div className="text-sm text-yellow-700">
                         Loading component for field type: {fieldType}
-                    </p>
+                    </div>
                 </div>
             )
         }
@@ -169,7 +169,7 @@ const DynamicFormRenderer = React.memo(({
     if (error) {
         return (
             <div className="p-4 border border-red-200 rounded bg-red-50">
-                <p className="text-red-700">Failed to load form: {error}</p>
+                <div className="text-red-700">Failed to load form: {error}</div>
             </div>
         )
     }
@@ -177,7 +177,7 @@ const DynamicFormRenderer = React.memo(({
     if (!schema?.properties) {
         return (
             <div className="p-4 border border-gray-200 rounded bg-gray-50">
-                <p className="text-gray-600">No form schema provided</p>
+                <div className="text-gray-600">No form schema provided</div>
             </div>
         )
     }

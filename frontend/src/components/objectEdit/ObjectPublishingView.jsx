@@ -212,7 +212,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    <p className="text-gray-600">Loading versions...</p>
+                    <div className="text-gray-600">Loading versions...</div>
                 </div>
             </div>
         )
@@ -223,10 +223,10 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center max-w-md mx-auto p-6">
                     <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Save Object First</h3>
-                    <p className="text-gray-600">
+                    <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">Save Object First</div>
+                    <div className="text-gray-600">
                         You need to save this object before you can manage publishing and versions.
-                    </p>
+                    </div>
                 </div>
             </div>
         )
@@ -238,21 +238,21 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                 <div className="max-w-4xl mx-auto space-y-6">
                     {/* Header */}
                     <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-2">Version Timeline & Publishing</h2>
-                        <p className="text-gray-600">
+                        <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="2">Version Timeline & Publishing</div>
+                        <div className="text-gray-600">
                             Manage object versions, scheduling, and publishing workflow
-                        </p>
+                        </div>
                     </div>
 
                     {/* Version List */}
                     <div className="bg-white rounded-lg shadow">
                         <div className="p-6">
-                            <h3 className="text-md font-semibold text-gray-900 mb-4">Object Versions</h3>
+                            <div className="text-md font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Object Versions</div>
 
                             {versions.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
                                     <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                                    <p>No versions found for this object</p>
+                                    <div>No versions found for this object</div>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -289,17 +289,17 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                                             </button>
                                                         </div>
 
-                                                        <p className="text-sm text-gray-600 mb-2">
+                                                        <div className="text-sm text-gray-600 mb-2">
                                                             {version.changeDescription || 'No description'}
-                                                        </p>
+                                                        </div>
 
                                                         <div className="space-y-1 text-xs text-gray-500">
-                                                            <p>Created: {new Date(version.createdAt).toLocaleString()}</p>
+                                                            <div>Created: {new Date(version.createdAt).toLocaleString()}</div>
                                                             {version.effectiveDate && (
-                                                                <p>Effective: {new Date(version.effectiveDate).toLocaleString()}</p>
+                                                                <div>Effective: {new Date(version.effectiveDate).toLocaleString()}</div>
                                                             )}
                                                             {version.expiryDate && (
-                                                                <p>Expires: {new Date(version.expiryDate).toLocaleString()}</p>
+                                                                <div>Expires: {new Date(version.expiryDate).toLocaleString()}</div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -384,10 +384,10 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div className="px-6 py-4 border-b border-gray-200">
-                            <h2 className="text-xl font-semibold text-gray-900">Schedule Version</h2>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Schedule Version</div>
+                            <div className="text-sm text-gray-500 mt-1">
                                 Version {selectedVersion?.versionNumber}
-                            </p>
+                            </div>
                         </div>
 
                         <div className="px-6 py-4 space-y-4">
@@ -402,9 +402,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     required
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     When this version should become live
-                                </p>
+                                </div>
                             </div>
 
                             <div>
@@ -417,9 +417,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                     onChange={(e) => setExpiryDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <div className="mt-1 text-xs text-gray-500">
                                     When this version should stop being live
-                                </p>
+                                </div>
                             </div>
 
                             <div className="flex items-start">
@@ -437,7 +437,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                         <Star className="w-4 h-4 mr-1 text-yellow-500" />
                                         Mark as Featured
                                     </label>
-                                    <p className="text-gray-500">Featured items appear first in listings</p>
+                                    <div className="text-gray-500">Featured items appear first in listings</div>
                                 </div>
                             </div>
                         </div>

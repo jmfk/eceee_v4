@@ -1129,7 +1129,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Design Groups</h3>
+        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Design Groups</div>
         <div className="flex gap-2">
           <CopyButton
             data={designGroups}
@@ -2073,7 +2073,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
             })
           ) : (
             <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-              <p className="text-gray-500">No typography groups yet. Click "Add Group" to get started.</p>
+              <div className="text-gray-500">No typography groups yet. Click "Add Group" to get started.</div>
             </div>
           )}
         </div>
@@ -2081,7 +2081,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         {/* Preview - takes 1 column */}
         <div className="lg:sticky lg:top-6 lg:self-start">
           <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">Live Preview</h4>
+            <div className="text-sm font-semibold text-gray-900 mb-3" role="heading" aria-level="4">Live Preview</div>
             <DesignGroupsPreview designGroups={designGroups} colors={colors} breakpoints={breakpoints} />
           </div>
         </div>
@@ -2093,18 +2093,18 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                 Import CSS {
                   importModal.type === 'global' ? 'to Create New Group' :
                     importModal.type === 'group' ? 'to Update Group' :
                       `for ${importModal.elementKey}`
                 }
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
+              </div>
+              <div className="text-sm text-gray-600 mt-1">
                 {importModal.type === 'global' && 'Paste CSS rules with selectors (e.g., h1 { font-size: 2.5rem; })'}
                 {importModal.type === 'group' && 'Paste CSS rules with selectors to update all elements in this group'}
                 {importModal.type === 'element' && 'Paste CSS properties without selector (e.g., font-size: 2.5rem; color: blue;)'}
-              </p>
+              </div>
             </div>
 
             {/* Modal Body */}
@@ -2149,7 +2149,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
               {/* Preview Info */}
               {importCSSText.trim() && (
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                  <p className="text-sm text-blue-800">
+                  <div className="text-sm text-blue-800">
                     {(() => {
                       try {
                         if (importModal.type === 'element') {
@@ -2170,7 +2170,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                         return `⚠ Parse error: ${error.message}`;
                       }
                     })()}
-                  </p>
+                  </div>
                 </div>
               )}
             </div>

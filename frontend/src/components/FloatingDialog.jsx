@@ -227,9 +227,9 @@ const FloatingDialog = ({
                 >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                         {typeof title === 'string' ? (
-                            <h2 className="text-lg font-semibold text-gray-900 truncate">
+                            <div className="text-lg font-semibold text-gray-900 truncate" role="heading" aria-level="2">
                                 {title}
-                            </h2>
+                            </div>
                         ) : title}
                         {headerContent}
                     </div>

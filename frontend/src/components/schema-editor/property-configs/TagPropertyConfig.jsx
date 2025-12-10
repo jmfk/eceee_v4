@@ -88,7 +88,7 @@ export default function TagPropertyConfig({
 
             {/* Tag Specific Configuration */}
             <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Tag Field Configuration</h4>
+                <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Tag Field Configuration</div>
 
                 {/* Placeholder */}
                 <div className="mb-4">
@@ -117,14 +117,14 @@ export default function TagPropertyConfig({
                         placeholder="No limit"
                         min="1"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 mt-1">
                         Leave empty for unlimited tags
-                    </p>
+                    </div>
                 </div>
 
                 {/* Options */}
                 <div className="space-y-3">
-                    <h5 className="text-sm font-medium text-gray-900">Options</h5>
+                    <div className="text-sm font-medium text-gray-900" role="heading" aria-level="5">Options</div>
 
                     <div className="flex items-start space-x-3">
                         <div className="flex items-center h-5">
@@ -140,9 +140,9 @@ export default function TagPropertyConfig({
                             <label htmlFor={`allowCreate-${property.key}`} className="text-sm text-gray-700">
                                 Allow creating new tags
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Users can create new tags by typing and pressing enter
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -160,9 +160,9 @@ export default function TagPropertyConfig({
                             <label htmlFor={`tagColors-${property.key}`} className="text-sm text-gray-700">
                                 Enable tag color coding
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Display tags with different colors
-                            </p>
+                            </div>
                         </div>
                     </div>
 
@@ -180,9 +180,9 @@ export default function TagPropertyConfig({
                             <label htmlFor={`uniqueItems-${property.key}`} className="text-sm text-gray-700">
                                 Prevent duplicate tags
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Ensure each tag appears only once
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>

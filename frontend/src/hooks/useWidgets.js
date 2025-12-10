@@ -11,8 +11,20 @@ import {
  * Provides shared functionality for both ContentEditor and ObjectContentEditor
  */
 
+// Helper function to filter valid widgets
+const filterValidWidgets = (widgets) => {
+    return Array.isArray(widgets)
+        ? widgets.filter(w => w != null && typeof w === 'object' && w.id != null)
+        : []
+}
+
 export const useWidgets = (initialWidgets = {}) => {
-    const [widgets, setWidgets] = useState(initialWidgets)
+    // Filter initial widgets to ensure no undefined entries
+    const filteredInitial = {}
+    Object.keys(initialWidgets).forEach(slotName => {
+        filteredInitial[slotName] = filterValidWidgets(initialWidgets[slotName] || [])
+    })
+    const [widgets, setWidgets] = useState(filteredInitial)
 
     // Fetch available widget types from API
     const {
@@ -71,10 +83,14 @@ export const useWidgets = (initialWidgets = {}) => {
             slotName: slotName
         }
 
-        setWidgets(prev => ({
-            ...prev,
-            [slotName]: [...(prev[slotName] || []), newWidget]
-        }))
+        setWidgets(prev => {
+            // Filter existing widgets to remove any undefined entries, then add new widget
+            const existingWidgets = filterValidWidgets(prev[slotName] || [])
+            return {
+                ...prev,
+                [slotName]: [...existingWidgets, newWidget]
+            }
+        })
 
         return newWidget
     }, [generateWidgetId, widgetTypes])
@@ -82,7 +98,8 @@ export const useWidgets = (initialWidgets = {}) => {
     // Update widget configuration
     const updateWidget = useCallback((slotName, widgetIndex, updates) => {
         setWidgets(prev => {
-            const slotWidgets = [...(prev[slotName] || [])]
+            // Filter valid widgets first to remove any undefined entries
+            const slotWidgets = filterValidWidgets(prev[slotName] || [])
             if (slotWidgets[widgetIndex]) {
                 slotWidgets[widgetIndex] = {
                     ...slotWidgets[widgetIndex],
@@ -99,8 +116,11 @@ export const useWidgets = (initialWidgets = {}) => {
     // Delete widget from slot
     const deleteWidget = useCallback((slotName, widgetIndex) => {
         setWidgets(prev => {
-            const slotWidgets = [...(prev[slotName] || [])]
-            slotWidgets.splice(widgetIndex, 1)
+            // Filter valid widgets first, then remove by index
+            const slotWidgets = filterValidWidgets(prev[slotName] || [])
+            if (widgetIndex >= 0 && widgetIndex < slotWidgets.length) {
+                slotWidgets.splice(widgetIndex, 1)
+            }
             return {
                 ...prev,
                 [slotName]: slotWidgets
@@ -113,12 +133,19 @@ export const useWidgets = (initialWidgets = {}) => {
         setWidgets(prev => {
             const newWidgets = { ...prev }
 
-            // Remove widget from source
-            const sourceWidgets = [...(newWidgets[fromSlot] || [])]
+            // Filter valid widgets first
+            const sourceWidgets = filterValidWidgets(newWidgets[fromSlot] || [])
+            if (fromIndex < 0 || fromIndex >= sourceWidgets.length) {
+                return prev // Invalid index
+            }
+            
             const [movedWidget] = sourceWidgets.splice(fromIndex, 1)
+            if (!movedWidget) {
+                return prev // No widget to move
+            }
 
             // Add widget to destination
-            const destWidgets = fromSlot === toSlot ? sourceWidgets : [...(newWidgets[toSlot] || [])]
+            const destWidgets = fromSlot === toSlot ? sourceWidgets : filterValidWidgets(newWidgets[toSlot] || [])
             destWidgets.splice(toIndex, 0, { ...movedWidget, slotName: toSlot })
 
             // Update state
@@ -142,9 +169,10 @@ export const useWidgets = (initialWidgets = {}) => {
     // Get widget by ID across all slots
     const getWidgetById = useCallback((widgetId) => {
         for (const slotName in widgets) {
-            const widget = widgets[slotName].find(w => w.id === widgetId)
+            const validWidgets = filterValidWidgets(widgets[slotName] || [])
+            const widget = validWidgets.find(w => w.id === widgetId)
             if (widget) {
-                return { widget, slotName, index: widgets[slotName].indexOf(widget) }
+                return { widget, slotName, index: validWidgets.indexOf(widget) }
             }
         }
         return null

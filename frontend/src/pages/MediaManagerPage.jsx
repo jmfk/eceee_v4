@@ -66,7 +66,7 @@ const MediaManagerPage = () => {
         <div className="flex items-center justify-center min-h-96">
           <div className="text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-600">Loading media manager...</p>
+            <div className="text-gray-600">Loading media manager...</div>
           </div>
         </div>
       </div>
@@ -79,8 +79,8 @@ const MediaManagerPage = () => {
       <div className="flex-shrink-0 max-w-7xl mx-auto w-full p-6">
         <div className="flex justify-between items-start mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Media Manager</h1>
-            <p className="text-gray-600">Upload, organize, and manage your media files</p>
+            <div className="text-3xl font-bold text-gray-900 mb-2" role="heading" aria-level="1">Media Manager</div>
+            <div className="text-gray-600">Upload, organize, and manage your media files</div>
           </div>
 
           <div className="flex items-center gap-3 mt-1">
@@ -110,8 +110,8 @@ const MediaManagerPage = () => {
           <div className="flex justify-center items-center h-full">
             <div className="text-center">
               <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">Select a Namespace</h3>
-              <p className="text-gray-500">Please select a namespace to view and manage media files.</p>
+              <div className="text-xl font-semibold text-gray-600 mb-2" role="heading" aria-level="3">Select a Namespace</div>
+              <div className="text-gray-500">Please select a namespace to view and manage media files.</div>
             </div>
           </div>
         ) : (

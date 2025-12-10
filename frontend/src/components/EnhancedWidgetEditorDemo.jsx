@@ -135,7 +135,7 @@ const EnhancedWidgetEditorDemo = ({
                 <div className="flex items-center justify-between p-4 border-b border-gray-200">
                     <div className="flex items-center space-x-3">
                         <Settings className="w-5 h-5 text-blue-600" />
-                        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">{title}</div>
                         {hasChanges && (
                             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
                                 Unsaved changes
@@ -155,10 +155,10 @@ const EnhancedWidgetEditorDemo = ({
                     {/* Form Panel */}
                     <div className="w-1/2 p-6 overflow-y-auto border-r border-gray-200">
                         <div className="mb-4">
-                            <h3 className="text-md font-medium text-gray-900 mb-2">Widget Configuration</h3>
-                            <p className="text-sm text-gray-600">
+                            <div className="text-md font-medium text-gray-900 mb-2" role="heading" aria-level="3">Widget Configuration</div>
+                            <div className="text-sm text-gray-600">
                                 This demo shows how the enhanced field system can be integrated into the widget editor.
-                            </p>
+                            </div>
                         </div>
 
                         <EnhancedWidgetForm
@@ -173,7 +173,7 @@ const EnhancedWidgetEditorDemo = ({
 
                     {/* Preview Panel */}
                     <div className="w-1/2 p-6 bg-gray-50">
-                        <h3 className="text-md font-medium text-gray-900 mb-4">Live Preview</h3>
+                        <div className="text-md font-medium text-gray-900 mb-4" role="heading" aria-level="3">Live Preview</div>
                         <div className="bg-white rounded-lg p-4 shadow-sm">
                             <div
                                 style={{
@@ -201,7 +201,7 @@ const EnhancedWidgetEditorDemo = ({
 
                         {/* Config Display */}
                         <div className="mt-6">
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">Current Configuration</h4>
+                            <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">Current Configuration</div>
                             <pre className="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-40">
                                 {JSON.stringify(config, null, 2)}
                             </pre>

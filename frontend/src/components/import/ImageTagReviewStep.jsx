@@ -184,13 +184,13 @@ const ImageTagReviewStep = ({
     return (
         <div className="space-y-6">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-blue-900 mb-2">
+                <div className="font-semibold text-blue-900 mb-2" role="heading" aria-level="3">
                     Review Image Tags
-                </h3>
-                <p className="text-sm text-blue-700">
+                </div>
+                <div className="text-sm text-blue-700">
                     Review and approve AI-generated tags for each image. Page tags (blue, locked) are always included.
                     Click tags to toggle between approved (green) and ignored (red).
-                </p>
+                </div>
             </div>
 
             {/* Global Tag Overview */}
@@ -198,9 +198,9 @@ const ImageTagReviewStep = ({
                 <div className="border border-gray-300 rounded-lg bg-gray-50 p-4 mb-6">
                     <div className="flex items-center gap-2 mb-3">
                         <Hash className="w-5 h-5 text-gray-600" />
-                        <h3 className="font-semibold text-gray-900">
+                        <div className="font-semibold text-gray-900" role="heading" aria-level="3">
                             All Tags Across Images
-                        </h3>
+                        </div>
                         <span className="text-sm text-gray-500">
                             (Remove tags from all images)
                         </span>
@@ -209,9 +209,9 @@ const ImageTagReviewStep = ({
                     {/* AI-Suggested Tags */}
                     {globalTagStats.aiTagCounts.size > 0 && (
                         <div className="mb-4">
-                            <p className="text-xs text-gray-600 mb-2 font-medium">
+                            <div className="text-xs text-gray-600 mb-2 font-medium">
                                 AI-Suggested Tags ({globalTagStats.aiTagCounts.size})
-                            </p>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {Array.from(globalTagStats.aiTagCounts.entries())
                                     .sort((a, b) => b[1] - a[1]) // Sort by count descending
@@ -240,9 +240,9 @@ const ImageTagReviewStep = ({
                     {/* Custom Tags */}
                     {globalTagStats.customTagCounts.size > 0 && (
                         <div>
-                            <p className="text-xs text-gray-600 mb-2 font-medium">
+                            <div className="text-xs text-gray-600 mb-2 font-medium">
                                 Custom Tags ({globalTagStats.customTagCounts.size})
-                            </p>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {Array.from(globalTagStats.customTagCounts.entries())
                                     .sort((a, b) => b[1] - a[1]) // Sort by count descending
@@ -296,32 +296,32 @@ const ImageTagReviewStep = ({
                                             <ImageIcon className="w-8 h-8 text-gray-400" />
                                         </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1 text-center">
+                                    <div className="text-xs text-gray-500 mt-1 text-center">
                                         Image {idx + 1}
-                                    </p>
+                                    </div>
                                 </div>
 
                                 {/* Tag Management */}
                                 <div className="flex-1 space-y-3">
                                     {/* Image Title/Alt */}
                                     <div>
-                                        <p className="font-medium text-gray-900 text-sm">
+                                        <div className="font-medium text-gray-900 text-sm">
                                             {image.title || image.alt || image.filename || `Image ${idx + 1}`}
-                                        </p>
+                                        </div>
                                         {image.description && (
-                                            <p className="text-xs text-gray-600 mt-1">
+                                            <div className="text-xs text-gray-600 mt-1">
                                                 {image.description}
-                                            </p>
+                                            </div>
                                         )}
                                     </div>
 
                                     {/* Page Tags (Mandatory) */}
                                     {pageTags && pageTags.length > 0 && (
                                         <div>
-                                            <p className="text-xs text-gray-600 mb-1.5 flex items-center gap-1">
+                                            <div className="text-xs text-gray-600 mb-1.5 flex items-center gap-1">
                                                 <Lock className="w-3 h-3" />
                                                 Page Tags (Required)
-                                            </p>
+                                            </div>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {pageTags.map((tag, tidx) => (
                                                     <span
@@ -339,9 +339,9 @@ const ImageTagReviewStep = ({
                                     {/* AI-Suggested Tags (Toggleable) */}
                                     {aiTags.length > 0 && (
                                         <div>
-                                            <p className="text-xs text-gray-600 mb-1.5">
+                                            <div className="text-xs text-gray-600 mb-1.5">
                                                 AI-Suggested Tags (click to toggle)
-                                            </p>
+                                            </div>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {aiTags.map((tag, tidx) => {
                                                     const isApproved = review.approvedTags.has(tag);
@@ -370,9 +370,9 @@ const ImageTagReviewStep = ({
                                     {/* Custom Tags */}
                                     {review.customTags.length > 0 && (
                                         <div>
-                                            <p className="text-xs text-gray-600 mb-1.5">
+                                            <div className="text-xs text-gray-600 mb-1.5">
                                                 Custom Tags
-                                            </p>
+                                            </div>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {review.customTags.map((tag, tidx) => (
                                                     <span
@@ -394,9 +394,9 @@ const ImageTagReviewStep = ({
 
                                     {/* Add Custom Tag Input */}
                                     <div>
-                                        <p className="text-xs text-gray-600 mb-1.5">
+                                        <div className="text-xs text-gray-600 mb-1.5">
                                             Add Custom Tag
-                                        </p>
+                                        </div>
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"

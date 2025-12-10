@@ -383,7 +383,7 @@ const RuleBuilderInput = ({
             {(!group.rules || group.rules.length === 0) && (
                 <div className="p-4 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded">
                     <Filter className="w-6 h-6 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm">No conditions defined</p>
+                    <div className="text-sm">No conditions defined</div>
                     <button
                         type="button"
                         onClick={() => addItem(path, 'rule')}
@@ -477,7 +477,7 @@ const RuleBuilderInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Validation Message */}

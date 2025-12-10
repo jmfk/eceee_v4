@@ -161,7 +161,7 @@ export default function DiffStepperModal({
         return (
             <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black bg-opacity-50">
                 <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                    <p className="text-center text-gray-600">No conflicts to resolve</p>
+                    <div className="text-center text-gray-600">No conflicts to resolve</div>
                     <button
                         onClick={onCancel}
                         className="mt-4 w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
@@ -181,12 +181,12 @@ export default function DiffStepperModal({
                     <div className="flex items-center gap-3">
                         <AlertTriangle className="w-6 h-6 text-orange-500" />
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-900">
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                                 Resolve Conflicts
-                            </h2>
-                            <p className="text-sm text-gray-600 mt-1">
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
                                 Conflict {currentIndex + 1} of {totalConflicts}
-                            </p>
+                            </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -253,9 +253,9 @@ export default function DiffStepperModal({
                     <div className="max-w-4xl mx-auto">
                         {/* Field name */}
                         <div className="mb-6">
-                            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+                            <div className="text-2xl font-semibold text-gray-900 mb-2" role="heading" aria-level="3">
                                 {currentConflict.fieldLabel}
-                            </h3>
+                            </div>
                             {currentResolution !== null && (
                                 <div className="flex items-center gap-2 text-green-600">
                                     <Check className="w-5 h-5" />
@@ -353,7 +353,7 @@ export default function DiffStepperModal({
                         {currentConflict.originalDisplay !== currentConflict.localDisplay && 
                          currentConflict.originalDisplay !== currentConflict.serverDisplay && (
                             <div className="mt-6 pt-6 border-t border-gray-200">
-                                <p className="text-sm text-gray-500 mb-2">Original value:</p>
+                                <div className="text-sm text-gray-500 mb-2">Original value:</div>
                                 <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded border border-gray-200">
                                     {currentConflict.originalDisplay}
                                 </div>

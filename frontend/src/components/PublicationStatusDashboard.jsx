@@ -104,8 +104,8 @@ const PublicationStatusDashboard = () => {
             <div className="bg-white rounded-lg shadow p-6">
                 <div className="text-center py-12">
                     <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Dashboard</h3>
-                    <p className="text-gray-600 mb-4">{error}</p>
+                    <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">Error Loading Dashboard</div>
+                    <div className="text-gray-600 mb-4">{error}</div>
                     <button
                         onClick={fetchPublicationStatus}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -123,8 +123,8 @@ const PublicationStatusDashboard = () => {
             <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900">Publication Status Dashboard</h2>
-                        <p className="text-gray-600 mt-1">Overview of content publication across your site</p>
+                        <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="2">Publication Status Dashboard</div>
+                        <div className="text-gray-600 mt-1">Overview of content publication across your site</div>
                     </div>
                     <button
                         onClick={fetchPublicationStatus}
@@ -143,10 +143,10 @@ const PublicationStatusDashboard = () => {
                             <div key={status} className="bg-gray-50 rounded-lg p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-600 capitalize">
+                                        <div className="text-sm font-medium text-gray-600 capitalize">
                                             {status.replace('_', ' ')}
-                                        </p>
-                                        <p className="text-2xl font-bold text-gray-900">{count}</p>
+                                        </div>
+                                        <div className="text-2xl font-bold text-gray-900">{count}</div>
                                     </div>
                                     <div className={`p-2 rounded-full ${getStatusColor(status)}`}>
                                         <Icon className="w-5 h-5" />
@@ -171,22 +171,22 @@ const PublicationStatusDashboard = () => {
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="flex items-center mb-4">
                         <Clock className="w-5 h-5 text-blue-600 mr-2" />
-                        <h3 className="text-lg font-semibold text-gray-900">Upcoming Scheduled Publications</h3>
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Upcoming Scheduled Publications</div>
                     </div>
                     <div className="space-y-3">
                         {statusData.upcomingScheduled.map((page) => (
                             <div key={page.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                                 <div>
-                                    <h4 className="font-medium text-gray-900">{page.title}</h4>
-                                    <p className="text-sm text-gray-600">/{page.slug}</p>
+                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">{page.title}</div>
+                                    <div className="text-sm text-gray-600">/{page.slug}</div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-sm font-medium text-blue-900">
+                                    <div className="text-sm font-medium text-blue-900">
                                         {formatDate(page.effectiveDate)}
-                                    </p>
-                                    <p className="text-xs text-blue-600">
+                                    </div>
+                                    <div className="text-xs text-blue-600">
                                         {formatRelativeDate(page.effectiveDate)}
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -199,19 +199,19 @@ const PublicationStatusDashboard = () => {
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="flex items-center mb-4">
                         <Archive className="w-5 h-5 text-red-600 mr-2" />
-                        <h3 className="text-lg font-semibold text-gray-900">Recently Expired Pages</h3>
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Recently Expired Pages</div>
                     </div>
                     <div className="space-y-3">
                         {statusData.recentlyExpired.map((page) => (
                             <div key={page.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                                 <div>
-                                    <h4 className="font-medium text-gray-900">{page.title}</h4>
-                                    <p className="text-sm text-gray-600">/{page.slug}</p>
+                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">{page.title}</div>
+                                    <div className="text-sm text-gray-600">/{page.slug}</div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-sm font-medium text-red-900">
+                                    <div className="text-sm font-medium text-red-900">
                                         Expired: {formatDate(page.expiryDate)}
-                                    </p>
+                                    </div>
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                         Needs Review
                                     </span>
@@ -224,22 +224,22 @@ const PublicationStatusDashboard = () => {
 
             {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div className="text-lg font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Quick Actions</div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
                         <CheckCircle className="w-8 h-8 text-green-600 mb-2" />
-                        <h4 className="font-medium text-gray-900">Bulk Publish</h4>
-                        <p className="text-sm text-gray-600">Publish multiple pages at once</p>
+                        <div className="font-medium text-gray-900" role="heading" aria-level="4">Bulk Publish</div>
+                        <div className="text-sm text-gray-600">Publish multiple pages at once</div>
                     </button>
                     <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
                         <Timer className="w-8 h-8 text-blue-600 mb-2" />
-                        <h4 className="font-medium text-gray-900">Schedule Content</h4>
-                        <p className="text-sm text-gray-600">Schedule pages for future publication</p>
+                        <div className="font-medium text-gray-900" role="heading" aria-level="4">Schedule Content</div>
+                        <div className="text-sm text-gray-600">Schedule pages for future publication</div>
                     </button>
                     <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
                         <Calendar className="w-8 h-8 text-purple-600 mb-2" />
-                        <h4 className="font-medium text-gray-900">Publication Calendar</h4>
-                        <p className="text-sm text-gray-600">View timeline of all publications</p>
+                        <div className="font-medium text-gray-900" role="heading" aria-level="4">Publication Calendar</div>
+                        <div className="text-sm text-gray-600">View timeline of all publications</div>
                     </button>
                 </div>
             </div>

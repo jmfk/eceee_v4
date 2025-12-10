@@ -125,7 +125,7 @@ const CheckboxInput = ({
                 </div>
 
                 {description && (
-                    <p className="text-sm text-gray-500 ml-7">{description}</p>
+                    <div className="text-sm text-gray-500 ml-7">{description}</div>
                 )}
 
                 {hasError && validation?.errors?.length > 0 && (
@@ -147,7 +147,7 @@ const CheckboxInput = ({
             )}
 
             {description && (
-                <p className="text-sm text-gray-500 mb-2">{description}</p>
+                <div className="text-sm text-gray-500 mb-2">{description}</div>
             )}
 
             <div className={`space-${layout === 'horizontal' ? 'x' : 'y'}-2 ${layout === 'horizontal' ? 'flex flex-wrap' : ''}`}>

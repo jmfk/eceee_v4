@@ -266,9 +266,9 @@ const FileUploadSection = ({
                     disabled={uploading}
                     multiple={multiple}
                 />
-                <p className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600">
                     {dragOver ? `Drop ${fileTypeLabel.toLowerCase()}s here` : `Drag & drop or click to select ${fileTypeLabel.toLowerCase()}s`}
-                </p>
+                </div>
             </div>
         )
     }
@@ -282,7 +282,7 @@ const FileUploadSection = ({
         <div className="mt-4 space-y-3">
             {/* Upload Files Header */}
             <div className="flex items-center justify-between">
-                <h5 className="text-sm font-medium text-gray-700">Files to Upload ({uploadFiles.length}):</h5>
+                <div className="text-sm font-medium text-gray-700" role="heading" aria-level="5">Files to Upload ({uploadFiles.length}):</div>
                 <div className="flex items-center gap-2">
                     {maxFiles && uploadFiles.length > availableSlots && (
                         <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
@@ -321,7 +321,7 @@ const FileUploadSection = ({
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                                <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                                <div className="text-sm font-medium text-gray-900 truncate">{file.name}</div>
                                 {willBeAdded ? (
                                     <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">
                                         Will be added
@@ -332,7 +332,7 @@ const FileUploadSection = ({
                                     </span>
                                 )}
                             </div>
-                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                            <div className="text-xs text-gray-500">{formatFileSize(file.size)}</div>
                         </div>
                         <button
                             onClick={() => removeUploadFile(index)}
@@ -349,11 +349,11 @@ const FileUploadSection = ({
             {/* Limit Warning */}
             {maxFiles && uploadFiles.length > availableSlots && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-sm text-blue-800">
-                        <strong>Note:</strong> All {uploadFiles.length} files will be uploaded to your media library,
+                    <div className="text-sm text-blue-800">
+                        <span className="font-bold">Note:</span> All {uploadFiles.length} files will be uploaded to your media library,
                         but only the first {availableSlots} will be added to this field due to the maximum limit of {maxFiles}.
                         The remaining {uploadFiles.length - availableSlots} files will be available in your media library for use elsewhere.
-                    </p>
+                    </div>
                 </div>
             )}
 
@@ -389,9 +389,9 @@ const FileUploadSection = ({
                         </button>
                     </div>
                 )}
-                <p className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-gray-500 mt-1">
                     Add tags to help organize and find these files later
-                </p>
+                </div>
             </div>
 
             {/* Default Collection Display */}
@@ -430,10 +430,10 @@ const FileUploadSection = ({
             {/* Upload Errors Display */}
             {uploadErrors.length > 0 && (
                 <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-                    <h5 className="text-sm font-medium text-red-800 mb-3 flex items-center">
+                    <div className="text-sm font-medium text-red-800 mb-3 flex items-center" role="heading" aria-level="5">
                         <AlertCircle className="w-4 h-4 mr-2" />
                         Upload Validation Errors
-                    </h5>
+                    </div>
                     <div className="space-y-2">
                         {uploadErrors.map((fileError, index) => (
                             <div key={index} className="text-sm">
@@ -449,10 +449,10 @@ const FileUploadSection = ({
 
                     {showForceUpload && (
                         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                            <p className="text-sm text-yellow-800 mb-3">
-                                <strong>Security Warning:</strong> These files were blocked due to security validation.
+                            <div className="text-sm text-yellow-800 mb-3">
+                                <span className="font-bold">Security Warning:</span> These files were blocked due to security validation.
                                 You can force upload to bypass these checks, but only do this if you trust the source.
-                            </p>
+                            </div>
                             <div className="flex gap-2">
                                 <button
                                     onClick={handleForceUpload}

@@ -42,7 +42,7 @@ const EnhancedWidgetForm = ({
     if (!schema?.properties) {
         return (
             <div className="p-4 text-center text-gray-500">
-                <p>No schema properties found</p>
+                <div>No schema properties found</div>
             </div>
         )
     }
@@ -50,7 +50,7 @@ const EnhancedWidgetForm = ({
     if (!fieldTypesLoaded) {
         return (
             <div className="p-4 text-center text-gray-500">
-                <p>Loading field types...</p>
+                <div>Loading field types...</div>
             </div>
         )
     }
@@ -117,7 +117,7 @@ const EnhancedWidgetForm = ({
                                 {isRequired && <span className="text-red-500 ml-1">*</span>}
                             </label>
                             {fieldSchema.description && (
-                                <p className="text-xs text-gray-500">{fieldSchema.description}</p>
+                                <div className="text-xs text-gray-500">{fieldSchema.description}</div>
                             )}
 
                             {/* Custom rendering for special fields */}

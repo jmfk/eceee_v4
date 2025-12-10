@@ -92,9 +92,9 @@ export default function NumberPropertyConfig({
 
       {/* Number-Specific Configuration */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">
+        <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">
           {isInteger ? 'Integer' : 'Number'} Field Options
-        </h4>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -197,7 +197,7 @@ export default function NumberPropertyConfig({
 
         {/* Display Options */}
         <div className="mt-4">
-          <h5 className="text-sm font-medium text-gray-900 mb-2">Display Options</h5>
+          <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="5">Display Options</div>
 
           <div className="space-y-2">
             <div className="flex items-center space-x-2">

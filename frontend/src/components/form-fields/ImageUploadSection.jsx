@@ -421,9 +421,9 @@ const ImageUploadSection = ({
                 onDragLeave={handleDragLeave}
                 onClick={handleFileInputClick}
             >
-                <p className={`text-sm ${dragOver ? 'text-blue-700' : 'text-gray-600'}`}>
+                <div className={`text-sm ${dragOver ? 'text-blue-700' : 'text-gray-600'}`}>
                     {dragOver ? 'Drop images here' : 'Drag and drop images here, or click to select files'}
-                </p>
+                </div>
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -440,9 +440,9 @@ const ImageUploadSection = ({
         <div className="space-y-4">
             {/* Upload Queue Header */}
             <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-gray-900">
+                <div className="text-sm font-medium text-gray-900" role="heading" aria-level="4">
                     Upload Queue ({uploadFiles.length} image{uploadFiles.length !== 1 ? 's' : ''})
-                </h4>
+                </div>
                 <button
                     onClick={removeAllUploadFiles}
                     className="text-sm text-red-600 hover:text-red-800"
@@ -485,13 +485,13 @@ const ImageUploadSection = ({
                     <div className="flex items-start">
                         <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
                         <div className="flex-1">
-                            <h4 className="text-sm font-medium text-red-800 mb-2">
+                            <div className="text-sm font-medium text-red-800 mb-2" role="heading" aria-level="4">
                                 Upload validation failed
-                            </h4>
+                            </div>
                             <div className="space-y-1">
                                 {uploadErrors.map((error, index) => (
                                     <div key={index} className="text-sm text-red-700">
-                                        <strong>{error.filename}:</strong> {error.error}
+                                        <span className="font-bold">{error.filename}:</span> {error.error}
                                     </div>
                                 ))}
                             </div>

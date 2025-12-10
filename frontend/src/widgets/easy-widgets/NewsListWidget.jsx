@@ -82,10 +82,10 @@ const NewsListWidget = ({
             <div className="news-list-widget-editor p-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
                 <div className="text-center">
                     <Newspaper className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">News List Widget</h3>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <div className="text-lg font-semibold text-gray-700 mb-2">News List Widget</div>
+                    <div className="text-sm text-gray-500 mb-4">
                         Displays a list of news articles from selected ObjectTypes
-                    </p>
+                    </div>
                     <div className="text-xs text-gray-400 space-y-1">
                         {config.objectTypes && config.objectTypes.length > 0 && (
                             <p>Object Types: {config.objectTypes.join(', ')}</p>
@@ -182,11 +182,11 @@ const NewsListWidget = ({
                                     )}
                                 </div>
 
-                                <h3 className="news-title">
+                                <div className="news-title">
                                     <a href={`/${item.object_type?.name}/${item.slug}/`}>
                                         {item.title}
                                     </a>
-                                </h3>
+                                </div>
 
                                 {config.showExcerpts && (
                                     <div className="news-excerpt">

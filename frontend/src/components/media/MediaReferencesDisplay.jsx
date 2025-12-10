@@ -100,10 +100,10 @@ const MediaReferencesDisplay = ({ fileId }) => {
             {/* Reference List */}
             {referenceList && Object.entries(referenceList).map(([contentType, ids]) => (
                 <div key={contentType} className="space-y-2">
-                    <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2" role="heading" aria-level="3">
                         <Link className="w-4 h-4" />
                         {getContentTypeLabel(contentType)}
-                    </h3>
+                    </div>
                     <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
                         {ids.map((id) => (
                             <div key={id} className="p-3 flex items-center justify-between">

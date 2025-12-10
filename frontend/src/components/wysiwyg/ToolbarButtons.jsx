@@ -143,7 +143,7 @@ const FormatDropdown = ({ currentFormat, maxHeaderLevel, allowedFormats, onComma
 
     // Build all possible format options
     const allFormatOptions = [
-        { value: '<p>', label: 'Paragraph' },
+        { value: '<div>', label: 'Paragraph' },
         ...Array.from({ length: 6 }, (_, i) => ({
             value: `<h${i + 1}>`,
             label: `Heading ${i + 1}`
@@ -154,7 +154,7 @@ const FormatDropdown = ({ currentFormat, maxHeaderLevel, allowedFormats, onComma
     const formatOptions = allowedFormats
         ? allFormatOptions.filter(opt => allowedFormats.includes(opt.value))
         : [
-            { value: '<p>', label: 'Paragraph' },
+            { value: '<div>', label: 'Paragraph' },
             ...Array.from({ length: maxHeaderLevel || 3 }, (_, i) => ({
                 value: `<h${i + 1}>`,
                 label: `Heading ${i + 1}`

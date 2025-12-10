@@ -239,10 +239,10 @@ const NamespaceManager = () => {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Namespace Management</h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Namespace Management</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         Organize content into separate namespaces to prevent slug conflicts
-                    </p>
+                    </div>
                 </div>
                 <button
                     onClick={handleOpenCreateModal}
@@ -306,13 +306,13 @@ const NamespaceManager = () => {
                 {isLoading ? (
                     <div className="p-8 text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                        <p className="mt-2 text-gray-600">Loading namespaces...</p>
+                        <div className="mt-2 text-gray-600">Loading namespaces...</div>
                     </div>
                 ) : namespaces.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">
                         <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No namespaces found</h3>
-                        <p>Create your first namespace to get started</p>
+                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No namespaces found</div>
+                        <div>Create your first namespace to get started</div>
                     </div>
                 ) : (
                     <div className="overflow-hidden">
@@ -489,9 +489,9 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
         <div className="fixed inset-0 bg-gray-600/10 overflow-y-auto h-full w-full z-50">
             <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         {namespace ? 'Edit Namespace' : 'Create Namespace'}
-                    </h3>
+                    </div>
                     <button
                         onClick={onCancel}
                         className="text-gray-400 hover:text-gray-500"
@@ -594,9 +594,9 @@ const ContentSummaryModal = ({ data, onClose }) => {
         <div className="fixed inset-0 bg-gray-600/10 overflow-y-auto h-full w-full z-50">
             <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         Content Summary: {namespace.name}
-                    </h3>
+                    </div>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-500"

@@ -64,7 +64,7 @@ export default function SegmentedControl({
             </div>
 
             {description && (
-                <p className="text-xs text-gray-500">{description}</p>
+                <div className="text-xs text-gray-500">{description}</div>
             )}
         </div>
     )

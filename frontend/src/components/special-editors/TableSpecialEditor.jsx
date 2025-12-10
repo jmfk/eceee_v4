@@ -631,7 +631,7 @@ const TableSpecialEditor = ({
 
                         {showBorderPicker && (
                             <div ref={borderPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-10 w-72">
-                                <h4 className="font-medium mb-2">Border Configuration</h4>
+                                <div className="font-medium mb-2" role="heading" aria-level="4">Border Configuration</div>
 
                                 {/* Selection info */}
                                 {selectedCells.length > 0 && (
@@ -642,10 +642,10 @@ const TableSpecialEditor = ({
 
                                 {/* Border side selector with tri-state checkboxes */}
                                 <div className="mb-3">
-                                    <p className="text-sm text-gray-600 mb-1">
+                                    <div className="text-sm text-gray-600 mb-1">
                                         Sides:
                                         <span className="text-xs ml-2">(Grey=Mixed, Empty=Remove, Filled=Add)</span>
-                                    </p>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         {['top', 'bottom', 'left', 'right'].map(side => (
                                             <label
@@ -679,7 +679,7 @@ const TableSpecialEditor = ({
 
                                 {/* Border width */}
                                 <div className="mb-3">
-                                    <p className="text-sm text-gray-600 mb-1">Width:</p>
+                                    <div className="text-sm text-gray-600 mb-1">Width:</div>
                                     <select
                                         value={borderWidth}
                                         onChange={(e) => setBorderWidth(e.target.value)}
@@ -693,7 +693,7 @@ const TableSpecialEditor = ({
 
                                 {/* Border style */}
                                 <div className="mb-3">
-                                    <p className="text-sm text-gray-600 mb-1">Style:</p>
+                                    <div className="text-sm text-gray-600 mb-1">Style:</div>
                                     <select
                                         value={borderStyle}
                                         onChange={(e) => setBorderStyle(e.target.value)}
@@ -706,7 +706,7 @@ const TableSpecialEditor = ({
 
                                 {/* Border color */}
                                 <div className="mb-3">
-                                    <p className="text-sm text-gray-600 mb-1">Color:</p>
+                                    <div className="text-sm text-gray-600 mb-1">Color:</div>
                                     <input
                                         type="color"
                                         value={borderColor}
@@ -734,7 +734,7 @@ const TableSpecialEditor = ({
 
                             {showColorPicker && (
                                 <div ref={colorPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-10 w-64">
-                                    <h4 className="font-medium mb-3 text-sm">Cell Colors</h4>
+                                    <div className="font-medium mb-3 text-sm" role="heading" aria-level="4">Cell Colors</div>
 
                                     {/* Background Color */}
                                     <div className="mb-3">

@@ -60,9 +60,9 @@ const TagConflictModal = ({
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div className="flex items-center">
                         <AlertTriangle className="w-6 h-6 text-amber-500 mr-3" />
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                             Tag Conflict
-                        </h3>
+                        </div>
                     </div>
                     <button
                         onClick={handleCancel}
@@ -75,9 +75,9 @@ const TagConflictModal = ({
                 {/* Content */}
                 <div className="p-6">
                     <div className="mb-4">
-                        <p className="text-gray-700 mb-4">
+                        <div className="text-gray-700 mb-4">
                             {getConflictMessage()}
-                        </p>
+                        </div>
                         
                         {existingTag && (
                             <div className="bg-gray-50 rounded-lg p-3 mb-4">
@@ -91,9 +91,9 @@ const TagConflictModal = ({
                             </div>
                         )}
 
-                        <p className="text-gray-600 text-sm">
+                        <div className="text-gray-600 text-sm">
                             Please choose a different name for your tag:
-                        </p>
+                        </div>
                     </div>
 
                     <form onSubmit={handleSubmit}>
@@ -111,9 +111,9 @@ const TagConflictModal = ({
                                 disabled={isValidating}
                                 autoFocus
                             />
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-1">
                                 Tag names should be unique and contain only letters, numbers, spaces, and hyphens.
-                            </p>
+                            </div>
                         </div>
 
                         {/* Actions */}

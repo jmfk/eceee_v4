@@ -329,9 +329,9 @@ const EnhancedSchemaDrivenForm = ({
             <div className="space-y-8">
                 {Object.entries(schema.groups).map(([groupKey, group]) => (
                     <div key={groupKey} className="space-y-4">
-                        <h3 className="text-lg font-medium text-gray-900">{group.title || groupKey}</h3>
+                        <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">{group.title || groupKey}</div>
                         {group.description && (
-                            <p className="text-sm text-gray-600">{group.description}</p>
+                            <div className="text-sm text-gray-600">{group.description}</div>
                         )}
                         <div className="space-y-4">
                             {Object.keys(group.properties || {}).map(key =>

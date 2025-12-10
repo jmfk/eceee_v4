@@ -310,9 +310,9 @@ const AutoCollectionInput = ({
 
             {/* Help Text */}
             {helpText && (
-                <p className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500">
                     {helpText}
-                </p>
+                </div>
             )}
         </div>
     )

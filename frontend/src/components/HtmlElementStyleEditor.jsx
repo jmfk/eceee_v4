@@ -109,10 +109,10 @@ const HtmlElementStyleEditor = ({ htmlElements = {}, onChange, showPreview = fal
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900">HTML Element Styles</h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">HTML Element Styles</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         Define custom styles for HTML elements like headings, paragraphs, links, and lists
-                    </p>
+                    </div>
                 </div>
                 <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-500">
@@ -172,12 +172,12 @@ const HtmlElementStyleEditor = ({ htmlElements = {}, onChange, showPreview = fal
                                     <Type className="w-4 h-4 text-purple-600" />
                                 </div>
                                 <div>
-                                    <h4 className="font-medium text-gray-900">
+                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">
                                         <code className="bg-gray-100 px-2 py-1 rounded text-sm">{element}</code>
-                                    </h4>
-                                    <p className="text-sm text-gray-500">
+                                    </div>
+                                    <div className="text-sm text-gray-500">
                                         {Object.keys(styles).length} {Object.keys(styles).length === 1 ? 'property' : 'properties'} defined
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                             <button
@@ -210,10 +210,10 @@ const HtmlElementStyleEditor = ({ htmlElements = {}, onChange, showPreview = fal
                 {Object.keys(htmlElements).length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                         <Type className="w-8 h-8 mx-auto mb-3 text-gray-400" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No HTML Elements Styled</h3>
-                        <p className="text-gray-500">
+                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No HTML Elements Styled</div>
+                        <div className="text-gray-500">
                             Add HTML elements above to define custom styles for your theme
-                        </p>
+                        </div>
                     </div>
                 )}
             </div>
@@ -221,7 +221,7 @@ const HtmlElementStyleEditor = ({ htmlElements = {}, onChange, showPreview = fal
             {/* Preview */}
             {showPreview && Object.keys(htmlElements).length > 0 && (
                 <div className="border-t pt-6">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">HTML Elements Preview</h4>
+                    <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="4">HTML Elements Preview</div>
                     <HtmlElementsPreview htmlElements={htmlElements} />
                 </div>
             )}
@@ -388,33 +388,33 @@ const HtmlElementsPreview = ({ htmlElements }) => {
 
     return (
         <div className="theme-preview border rounded-lg p-6 bg-white">
-            <h1>Sample Heading 1</h1>
-            <h2>Sample Heading 2</h2>
-            <h3>Sample Heading 3</h3>
-            <p>This is a sample paragraph with some <a href="#">linked text</a> to demonstrate how the theme styles different HTML elements. This paragraph contains <strong>bold text</strong>, <em>italic text</em>, and <small>small text</small>.</p>
+            <div className="text-4xl font-semibold mb-6" role="heading" aria-level="1">Sample Heading 1</div>
+            <div className="text-3xl font-medium mb-6" role="heading" aria-level="2">Sample Heading 2</div>
+            <div className="text-2xl font-bold mb-6" role="heading" aria-level="3">Sample Heading 3</div>
+            <div className="text-base font-light mb-6">This is a sample paragraph with some <a href="#">linked text</a> to demonstrate how the theme styles different HTML elements. This paragraph contains <span className="font-bold">bold text</span>, <span className="italic">italic text</span>, and <span className="text-sm">small text</span>.</div>
 
-            <ul>
-                <li>First list item</li>
-                <li>Second list item with more content</li>
-                <li>Third list item</li>
-            </ul>
+            <div className="mb-6 pl-6" role="list">
+                <div className="mb-2 list-item list-disc">First list item</div>
+                <div className="mb-2 list-item list-disc">Second list item with more content</div>
+                <div className="mb-2 list-item list-disc">Third list item</div>
+            </div>
 
-            <ol>
-                <li>First numbered item</li>
-                <li>Second numbered item</li>
-                <li>Third numbered item</li>
-            </ol>
+            <div className="mb-6 pl-6" role="list">
+                <div className="mb-2 list-item list-decimal">First numbered item</div>
+                <div className="mb-2 list-item list-decimal">Second numbered item</div>
+                <div className="mb-2 list-item list-decimal">Third numbered item</div>
+            </div>
 
-            <blockquote>
+            <div className="border-l-4 border-blue-500 pl-4 my-6 italic">
                 This is a sample blockquote to demonstrate quote styling in the theme.
-            </blockquote>
+            </div>
 
-            <p>Here's some <code>inline code</code> and a code block:</p>
-            <pre><code>{`function example() {
+            <div className="text-base font-light mb-6">Here's some <span className="font-mono text-sm bg-gray-100 px-1 py-0.5 rounded">inline code</span> and a code block:</div>
+            <div className="bg-gray-100 p-4 rounded overflow-x-auto font-mono text-sm">{`function example() {
     return "Hello, World!";
-}`}</code></pre>
+}`}</div>
 
-            <hr />
+            <div className="border-t border-gray-300 my-6" />
 
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tr>

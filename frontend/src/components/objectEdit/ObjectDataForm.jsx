@@ -383,10 +383,10 @@ const ObjectDataForm = forwardRef(({
                         ))}
                     </select>
                     {errors.objectTypeId && (
-                        <p className="text-red-600 text-sm mt-1 flex items-center">
+                        <div className="text-red-600 text-sm mt-1 flex items-center">
                             <AlertCircle className="h-4 w-4 mr-1" />
                             {errors.objectTypeId}
-                        </p>
+                        </div>
                     )}
                 </div>
             )}
@@ -405,22 +405,22 @@ const ObjectDataForm = forwardRef(({
                     placeholder="Enter object title..."
                 />
                 {errors.title && (
-                    <p className="text-red-600 text-sm mt-1 flex items-center">
+                    <div className="text-red-600 text-sm mt-1 flex items-center">
                         <AlertCircle className="h-4 w-4 mr-1" />
                         {errors.title}
-                    </p>
+                    </div>
                 )}
-                <p className="text-gray-500 text-sm mt-1">
+                <div className="text-gray-500 text-sm mt-1">
                     This is the object's display title (stored on the object, not in schema data)
-                </p>
+                </div>
             </div>
 
             {/* Dynamic Schema Fields */}
             {objectType && (
                 <div className="border-t pt-4">
-                    <h4 className="font-medium text-gray-900 mb-4">
+                    <div className="font-medium text-gray-900 mb-4" role="heading" aria-level="4">
                         {objectType.label} Fields
-                    </h4>
+                    </div>
                     <ObjectSchemaForm
                         schema={getSchemaFromObjectType(objectType)}
                         data={formData.data || {}}

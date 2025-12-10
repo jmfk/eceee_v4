@@ -24,8 +24,8 @@ export default function ErrorTodoSidebar({ items = [], onToggle, onNavigate, cla
                 <div className="flex items-start space-x-2 mb-3">
                     <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
                     <div>
-                        <h3 className="text-sm font-semibold text-gray-900">Resolve before saving</h3>
-                        <p className="text-xs text-gray-600">Fix the issues below, then check them off to enable saving again.</p>
+                        <div className="text-sm font-semibold text-gray-900" role="heading" aria-level="3">Resolve before saving</div>
+                        <div className="text-xs text-gray-600">Fix the issues below, then check them off to enable saving again.</div>
                     </div>
                 </div>
 
@@ -34,9 +34,9 @@ export default function ErrorTodoSidebar({ items = [], onToggle, onNavigate, cla
                     <span className="font-medium">{unresolvedCount}</span> unresolved item{unresolvedCount === 1 ? '' : 's'}
                 </div>
 
-                <ul className="space-y-3">
+                <div className="space-y-3" role="list">
                     {items.map((item) => (
-                        <li key={item.id} className={`rounded-md border ${item.checked ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} p-3`}>
+                        <div key={item.id} className={`rounded-md border ${item.checked ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} p-3`}>
                             <div className="flex items-start">
                                 <input
                                     id={`todo-${item.id}`}
@@ -56,14 +56,14 @@ export default function ErrorTodoSidebar({ items = [], onToggle, onNavigate, cla
                                         ) : null}
                                     </div>
                                     {item.detail && (
-                                        <p id={`todo-detail-${item.id}`} className="mt-1 text-xs text-gray-700 break-words">
+                                        <div id={`todo-detail-${item.id}`} className="mt-1 text-xs text-gray-700 break-words">
                                             {item.detail}
-                                        </p>
+                                        </div>
                                     )}
                                     {item.hint && (
-                                        <p className="mt-1 text-xs text-gray-600">
+                                        <div className="mt-1 text-xs text-gray-600">
                                             <span className="font-medium">How to fix:</span> {item.hint}
-                                        </p>
+                                        </div>
                                     )}
                                     <div className="mt-2 flex items-center space-x-2">
                                         {item.target && (
@@ -88,9 +88,9 @@ export default function ErrorTodoSidebar({ items = [], onToggle, onNavigate, cla
                                     </div>
                                 </div>
                             </div>
-                        </li>
+                        </div>
                     ))}
-                </ul>
+                </div>
             </div>
         </aside>
     )

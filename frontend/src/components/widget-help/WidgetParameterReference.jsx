@@ -77,12 +77,12 @@ const WidgetParameterReference = ({ parameters }) => {
         <div className="space-y-6">
             {/* Info Banner */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900">
-                    <strong>Template Parameters</strong> are available in the widget's Mustache template.
+                <div className="text-sm text-blue-900">
+                    <span className="font-bold">Template Parameters</span> are available in the widget's Mustache template.
                     Frontend uses <code className="bg-blue-100 px-1 rounded">camelCase</code> but templates use{' '}
                     <code className="bg-blue-100 px-1 rounded">snake_case</code>.
                     The API automatically converts between the two.
-                </p>
+                </div>
             </div>
 
             {/* Search */}
@@ -163,8 +163,8 @@ function ParameterGroup({ title, description, parameters, isExpanded, onToggle, 
                         <ChevronRight className="w-5 h-5 text-gray-600" />
                     )}
                     <div className="text-left">
-                        <h3 className="font-semibold text-gray-900">{title}</h3>
-                        <p className="text-sm text-gray-600 mt-0.5">{description}</p>
+                        <div className="font-semibold text-gray-900" role="heading" aria-level="3">{title}</div>
+                        <div className="text-sm text-gray-600 mt-0.5">{description}</div>
                     </div>
                 </div>
                 <span className="text-sm font-medium text-gray-600 px-2 py-1 bg-white rounded">
@@ -236,9 +236,9 @@ function ParameterRow({ param, isLast }) {
                     </div>
 
                     {/* Description */}
-                    <p className="text-sm text-gray-700 mb-2">
+                    <div className="text-sm text-gray-700 mb-2">
                         {param.description}
-                    </p>
+                    </div>
 
                     {/* Type and Default */}
                     <div className="flex flex-wrap items-center gap-4 text-sm">

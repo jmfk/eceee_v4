@@ -93,7 +93,7 @@ const UploadQueue = ({ className = '' }) => {
             <div className="p-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold text-gray-900">Upload Queue</h3>
+                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Upload Queue</div>
                         <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
                             {stats.total} files
                         </span>
@@ -173,7 +173,7 @@ const UploadQueue = ({ className = '' }) => {
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <p className="font-medium text-gray-900 truncate">{item.file.name}</p>
+                                        <div className="font-medium text-gray-900 truncate">{item.file.name}</div>
                                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
                                             {item.status}
                                         </span>

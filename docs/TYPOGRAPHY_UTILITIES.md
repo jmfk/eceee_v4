@@ -2,27 +2,43 @@
 
 This document describes the custom typography system available in the eceee_v4 project.
 
-## Default Content Typography
+## Styled Div/Span Approach
 
-**Content typography is automatically applied to unclassed HTML tags.** You don't need to add classes for standard content:
+**The eceee_v4 project uses styled divs and spans with Tailwind utility classes instead of semantic HTML tags.** This provides maximum styling flexibility and consistency.
 
-```html
-<h1>This heading automatically gets content h1 styling</h1>
-<h2>This heading automatically gets content h2 styling</h2>
-<h3>This heading automatically gets content h3 styling</h3>
-<p>This paragraph automatically gets content paragraph styling</p>
-<ul>
-  <li>List items inherit from parent styling</li>
-</ul>
+### Standard Typography Classes
+
+Use these Tailwind utility classes for consistent typography:
+
+```jsx
+<div className="text-4xl font-semibold mb-6">Heading 1</div>
+<div className="text-3xl font-medium mb-6">Heading 2</div>
+<div className="text-2xl font-bold mb-6">Heading 3</div>
+<div className="text-xl font-semibold mb-4">Heading 4</div>
+<div className="text-lg font-semibold mb-4">Heading 5</div>
+<div className="text-base font-semibold mb-4">Heading 6</div>
+
+<div className="text-base font-light mb-6">
+  Paragraph text with <span className="font-bold">bold text</span> and <span className="italic">italic text</span>.
+</div>
+
+<div className="mb-6 pl-6" role="list">
+  <div className="mb-2 list-item list-disc">List item one</div>
+  <div className="mb-2 list-item list-disc">List item two</div>
+</div>
 ```
 
-### Default Styles Applied
+### Default Styling Reference
 
-- **h1**: 41px/44px, semibold weight, 22px bottom margin
-- **h2**: 36px/43px, medium weight, 22px bottom margin
-- **h3**: 22px/26px, bold weight, 22px bottom margin
-- **p**: 16px/22px, light weight, 22px bottom margin
-- **ul, ol**: 22px bottom margin
+- **Heading 1**: `text-4xl font-semibold mb-6` (36px, semibold, 24px margin)
+- **Heading 2**: `text-3xl font-medium mb-6` (30px, medium, 24px margin)
+- **Heading 3**: `text-2xl font-bold mb-6` (24px, bold, 24px margin)
+- **Heading 4**: `text-xl font-semibold mb-4` (20px, semibold, 16px margin)
+- **Heading 5**: `text-lg font-semibold mb-4` (18px, semibold, 16px margin)
+- **Heading 6**: `text-base font-semibold mb-4` (16px, semibold, 16px margin)
+- **Paragraph**: `text-base font-light mb-6` (16px, light, 24px margin)
+- **Lists**: `mb-6 pl-6` with `list-disc` or `list-decimal`
+- **List items**: `mb-2 list-item`
 
 ## Contextual Typography Utilities
 
@@ -31,161 +47,146 @@ For special sections (hero and sidebar), use these utility classes:
 ### Hero Typography
 
 **Hero H1**: Use for large hero headings
-```html
-<h1 class="text-hero-h1 font-light">Hero Heading</h1>
+```jsx
+<div className="text-hero-h1 font-light">Hero Heading</div>
 ```
 - Font size: 54px
 - Line height: 65px
 - Recommended weight: `font-light`
-- Note: Margin is inherited from default h1 styling (22px)
 
 ### Sidebar Typography
 
 **Sidebar H4**: Use for sidebar headings
-```html
-<h4 class="text-sidebar-h4 font-bold">Sidebar Heading</h4>
+```jsx
+<div className="text-sidebar-h4 font-bold">Sidebar Heading</div>
 ```
 - Font size: 18px
 - Line height: 22px
 - Recommended weight: `font-bold`
-- Margin: Inherits 22px from default
 
 **Sidebar Paragraph**: Use for sidebar text
-```html
-<p class="text-sidebar-p font-light">Sidebar paragraph text.</p>
+```jsx
+<div className="text-sidebar-p font-light">Sidebar paragraph text.</div>
 ```
 - Font size: 14px
 - Line height: 17px
 - Recommended weight: `font-light`
-- Margin: Inherits 22px from default
 
 **Sidebar List Items**: Use for sidebar lists
-```html
-<ul>
-  <li class="text-sidebar-li">List item text</li>
-</ul>
+```jsx
+<div className="mb-6 pl-6" role="list">
+  <div className="text-sidebar-li">List item text</div>
+</div>
 ```
 - Font size: 14px
 - Line height: 17px
 - Recommended weight: `font-normal` (regular)
-- Margin: List container inherits 22px from default
 
 ## Usage Notes
 
-1. **Default Content Styling**: Standard HTML tags (h1, h2, h3, p, ul, ol) automatically receive content typography styling. No classes needed for regular content.
+1. **Styled Divs/Spans**: Use divs for block-level elements (headings, paragraphs, lists) and spans for inline elements (bold, italic, code).
 
-2. **Override When Needed**: Use utility classes for special sections:
-   - Hero sections: Use `text-hero-h1` with `font-light`
-   - Sidebar sections: Use `text-sidebar-*` utilities with appropriate weights
+2. **Accessibility**: Add appropriate ARIA attributes when semantic meaning is needed:
+   - Headings: Add `role="heading"` and `aria-level="1-6"`
+   - Lists: Add `role="list"` to container
 
 3. **Font Weights**: Available font weight utilities:
    - `font-light` (300) - for hero h1 and content paragraphs
    - `font-normal` (400) - for sidebar list items
-   - `font-medium` (500) - for content h2
-   - `font-semibold` (600) - for content h1 (default)
-   - `font-bold` (700) - for content h3 and sidebar h4
+   - `font-medium` (500) - for heading 2
+   - `font-semibold` (600) - for heading 1 (default)
+   - `font-bold` (700) - for heading 3 and sidebar h4
 
-4. **Spacing**: All typography elements have 22px bottom margin by default. Override with Tailwind spacing utilities if needed (e.g., `mb-0`, `mb-4`)
+4. **Spacing**: Use Tailwind margin utilities (`mb-0`, `mb-2`, `mb-4`, `mb-6`) for consistent spacing
 
-5. **Optional mb-text Utility**: A `mb-text` utility (22px) is available if you need to manually apply the standard spacing
+5. **Interactive Elements**: Keep `<a>`, `<button>`, `<input>`, `<form>` as-is - only replace text/content elements
 
 ## Complete Examples
 
 ### Hero Section
-```html
-<section class="hero">
-  <h1 class="text-hero-h1 font-light">
+```jsx
+<section className="hero">
+  <div className="text-hero-h1 font-light">
     Welcome to ECEEE
-  </h1>
+  </div>
 </section>
 ```
 
-### Content Section (Default - No Classes Needed!)
-```html
-<article class="content">
-  <!-- All elements below use default typography automatically -->
-  <h1>Main Article Title</h1>
+### Content Section with Styled Divs
+```jsx
+<article className="content">
+  <div className="text-4xl font-semibold mb-6" role="heading" aria-level="1">
+    Main Article Title
+  </div>
   
-  <h2>Section Heading</h2>
+  <div className="text-3xl font-medium mb-6" role="heading" aria-level="2">
+    Section Heading
+  </div>
   
-  <p>
-    This is a paragraph of body text with the standard content styling.
-    No classes needed!
-  </p>
+  <div className="text-base font-light mb-6">
+    This is a paragraph of body text with styled divs.
+    Use <span className="font-bold">bold</span> and <span className="italic">italic</span> spans for inline emphasis.
+  </div>
   
-  <h3>Subsection Heading</h3>
+  <div className="text-2xl font-bold mb-6" role="heading" aria-level="3">
+    Subsection Heading
+  </div>
   
-  <p>Another paragraph of body text.</p>
+  <div className="text-base font-light mb-6">Another paragraph of body text.</div>
   
-  <ul>
-    <li>List item one</li>
-    <li>List item two</li>
-  </ul>
+  <div className="mb-6 pl-6" role="list">
+    <div className="mb-2 list-item list-disc">List item one</div>
+    <div className="mb-2 list-item list-disc">List item two</div>
+  </div>
 </article>
 ```
 
 ### Sidebar Section
-```html
-<aside class="sidebar">
-  <h4 class="text-sidebar-h4 font-bold">
+```jsx
+<aside className="sidebar">
+  <div className="text-sidebar-h4 font-bold">
     Quick Links
-  </h4>
+  </div>
   
-  <p class="text-sidebar-p font-light">
+  <div className="text-sidebar-p font-light">
     Find important resources below:
-  </p>
+  </div>
   
-  <ul>
-    <li class="text-sidebar-li">Resource One</li>
-    <li class="text-sidebar-li">Resource Two</li>
-    <li class="text-sidebar-li">Resource Three</li>
-  </ul>
+  <div className="pl-6" role="list">
+    <div className="text-sidebar-li">Resource One</div>
+    <div className="text-sidebar-li">Resource Two</div>
+    <div className="text-sidebar-li">Resource Three</div>
+  </div>
 </aside>
+```
+
+### Special Elements
+
+**Blockquote**
+```jsx
+<div className="border-l-4 border-blue-500 pl-4 my-6 italic">
+  This is a blockquote styled with Tailwind utilities.
+</div>
+```
+
+**Code Elements**
+```jsx
+<div className="text-base font-light mb-6">
+  Here's some <span className="font-mono text-sm bg-gray-100 px-1 py-0.5 rounded">inline code</span> in text.
+</div>
+
+<div className="bg-gray-100 p-4 rounded overflow-x-auto font-mono text-sm">
+  {`function example() {
+  return "Code block";
+}`}
+</div>
 ```
 
 ## Configuration
 
-The typography system is defined in `backend/tailwind.config.js`:
+The typography system uses Tailwind utility classes. Custom typography utilities can be added in `frontend/tailwind.config.js`:
 
-### Base Styles (Auto-applied to HTML tags)
-```javascript
-plugins: [
-  function ({ addBase }) {
-    addBase({
-      // Content typography - applied to unclassed HTML tags
-      'h1': {
-        'font-size': '41px',
-        'line-height': '44px',
-        'font-weight': '600', // semibold
-        'margin-bottom': '22px',
-      },
-      'h2': {
-        'font-size': '36px',
-        'line-height': '43px',
-        'font-weight': '500', // medium
-        'margin-bottom': '22px',
-      },
-      'h3': {
-        'font-size': '22px',
-        'line-height': '26px',
-        'font-weight': '700', // bold
-        'margin-bottom': '22px',
-      },
-      'p': {
-        'font-size': '16px',
-        'line-height': '22px',
-        'font-weight': '300', // light
-        'margin-bottom': '22px',
-      },
-      'ul, ol': {
-        'margin-bottom': '22px',
-      },
-    })
-  }
-]
-```
-
-### Utility Classes (For Hero & Sidebar)
+### Custom Font Sizes
 ```javascript
 fontSize: {
   // Hero typography
@@ -196,8 +197,21 @@ fontSize: {
   'sidebar-p': ['14px', '17px'],
   'sidebar-li': ['14px', '17px'],
 },
-spacing: {
-  'text': '22px', // Optional manual spacing utility
-},
+```
+
+### Theme-Based Styling
+
+For content areas that need theme-based styling, use the `.theme-content` wrapper with class selectors:
+
+```css
+.theme-content .text-h1 {
+  color: var(--heading-color);
+  font-size: var(--h1-size, 2.25rem);
+}
+
+.theme-content .text-p {
+  color: var(--text);
+  margin-bottom: var(--paragraph-spacing, 1em);
+}
 ```
 

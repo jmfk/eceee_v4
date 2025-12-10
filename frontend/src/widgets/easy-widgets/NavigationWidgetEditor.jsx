@@ -95,10 +95,10 @@ const NavigationWidgetEditor = ({
         <div className="h-full flex flex-col overflow-hidden min-w-0">
             {/* Header */}
             <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-white">
-                <h2 className="text-lg font-semibold">Navigation Configuration</h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <div className="text-lg font-semibold">Navigation Configuration</div>
+                <div className="text-sm text-gray-600 mt-1">
                     Configure navigation menu items
-                </p>
+                </div>
             </div>
 
             {/* Scrollable Content */}
@@ -106,7 +106,7 @@ const NavigationWidgetEditor = ({
                 {/* Menu Items */}
                 <div className="min-w-0">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-semibold">Menu Items</h3>
+                        <div className="text-base font-semibold">Menu Items</div>
                         <button
                             type="button"
                             onClick={addMenuItem}
@@ -124,10 +124,10 @@ const NavigationWidgetEditor = ({
                                     key={index}
                                     draggable
                                     className={`border rounded bg-white min-w-0 cursor-move transition-all ${draggedItemIndex === index
-                                            ? 'opacity-50 border-blue-400'
-                                            : dropTargetIndex === index
-                                                ? 'border-blue-500 border-2'
-                                                : 'border-gray-200'
+                                        ? 'opacity-50 border-blue-400'
+                                        : dropTargetIndex === index
+                                            ? 'border-blue-500 border-2'
+                                            : 'border-gray-200'
                                         }`}
                                     onDragStart={(e) => {
                                         e.dataTransfer.effectAllowed = 'move'
@@ -180,9 +180,9 @@ const NavigationWidgetEditor = ({
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-500 italic py-4 text-center bg-gray-50 border border-gray-200 rounded">
+                        <div className="text-sm text-gray-500 italic py-4 text-center bg-gray-50 border border-gray-200 rounded">
                             No menu items yet. Add items using the button above.
-                        </p>
+                        </div>
                     )}
                 </div>
             </div>

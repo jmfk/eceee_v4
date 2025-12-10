@@ -123,10 +123,10 @@ export default function DynamicWidgetConfigForm({
                                 }`}
                         />
                         {hasValidationError && (
-                            <p className="text-xs text-red-600 mt-1">This field is required</p>
+                            <div className="text-xs text-red-600 mt-1">This field is required</div>
                         )}
                         {!hasValidationError && description && (
-                            <p className="text-xs text-gray-500 mt-1">{description}</p>
+                            <div className="text-xs text-gray-500 mt-1">{description}</div>
                         )}
                     </div>
                 )
@@ -147,7 +147,7 @@ export default function DynamicWidgetConfigForm({
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
                         />
                         {description && (
-                            <p className="text-xs text-gray-500 mt-1">{description}</p>
+                            <div className="text-xs text-gray-500 mt-1">{description}</div>
                         )}
                     </div>
                 )
@@ -168,7 +168,7 @@ export default function DynamicWidgetConfigForm({
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         {description && (
-                            <p className="text-xs text-gray-500 mt-1">{description}</p>
+                            <div className="text-xs text-gray-500 mt-1">{description}</div>
                         )}
                     </div>
                 )
@@ -190,13 +190,13 @@ export default function DynamicWidgetConfigForm({
                                 {commonProps.label}
                             </label>
                             {description && (
-                                <p className="text-xs text-gray-500 mt-1">{description}</p>
+                                <div className="text-xs text-gray-500 mt-1">{description}</div>
                             )}
                             {ui.warning && (
-                                <p className="text-xs text-amber-600 mt-1 flex items-center">
+                                <div className="text-xs text-amber-600 mt-1 flex items-center">
                                     <AlertCircle className="w-3 h-3 mr-1" />
                                     Warning: Use with caution
-                                </p>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -229,7 +229,7 @@ export default function DynamicWidgetConfigForm({
                             })}
                         </select>
                         {description && (
-                            <p className="text-xs text-gray-500 mt-1">{description}</p>
+                            <div className="text-xs text-gray-500 mt-1">{description}</div>
                         )}
                     </div>
                 )
@@ -283,7 +283,7 @@ export default function DynamicWidgetConfigForm({
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         {description && (
-                            <p className="text-xs text-gray-500 mt-1">{description}</p>
+                            <div className="text-xs text-gray-500 mt-1">{description}</div>
                         )}
                     </div>
                 )
@@ -310,9 +310,9 @@ export default function DynamicWidgetConfigForm({
                             disabled={disabled}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             {description || `Component type: ${component}`}
-                        </p>
+                        </div>
                     </div>
                 )
         }
@@ -347,7 +347,7 @@ export default function DynamicWidgetConfigForm({
     if (!schema || !schema.fields) {
         return (
             <div className="bg-gray-50 border border-gray-200 rounded-md p-4 text-center">
-                <p className="text-gray-600">No configuration available for this widget type</p>
+                <div className="text-gray-600">No configuration available for this widget type</div>
             </div>
         )
     }
@@ -422,7 +422,7 @@ export default function DynamicWidgetConfigForm({
                     {/* Grouped fields */}
                     {Object.entries(groupedFields).map(([groupName, fields]) => (
                         <div key={groupName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-4">{groupName}</h4>
+                            <div className="text-sm font-semibold text-gray-900 mb-4" role="heading" aria-level="4">{groupName}</div>
                             <div className="space-y-4">
                                 {fields.map(([fieldName, fieldMeta]) => renderField(fieldName, fieldMeta))}
                             </div>
@@ -441,7 +441,7 @@ export default function DynamicWidgetConfigForm({
                         placeholder='{"key": "value"}'
                     />
                     {jsonError && (
-                        <p className="text-xs text-red-600 mt-1">{jsonError}</p>
+                        <div className="text-xs text-red-600 mt-1">{jsonError}</div>
                     )}
                 </div>
             )}

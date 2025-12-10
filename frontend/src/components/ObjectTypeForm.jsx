@@ -925,9 +925,9 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-800">
+                                <div className="text-sm font-medium text-red-800" role="heading" aria-level="3">
                                     Basic Info Validation Error
-                                </h3>
+                                </div>
                                 <div className="mt-1 text-sm text-red-700">
                                     {basicInfoError}
                                 </div>
@@ -958,10 +958,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 placeholder="e.g., blog_post, news_article, event"
                                 disabled={!!objectType} // Don't allow editing name for existing types
                             />
-                            {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
-                            <p className="text-gray-500 text-xs mt-1">
+                            {errors.name && <div className="text-red-600 text-sm mt-1">{errors.name}</div>}
+                            <div className="text-gray-500 text-xs mt-1">
                                 Automatically formatted as slug (lowercase, underscores only)
-                            </p>
+                            </div>
                         </div>
 
                         <div>
@@ -976,7 +976,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                     }`}
                                 placeholder="e.g., News Article, Blog Post"
                             />
-                            {errors.label && <p className="text-red-600 text-sm mt-1">{errors.label}</p>}
+                            {errors.label && <div className="text-red-600 text-sm mt-1">{errors.label}</div>}
                         </div>
                     </div>
 
@@ -993,7 +993,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                     }`}
                                 placeholder="e.g., News Articles, Blog Posts"
                             />
-                            {errors.pluralLabel && <p className="text-red-600 text-sm mt-1">{errors.pluralLabel}</p>}
+                            {errors.pluralLabel && <div className="text-red-600 text-sm mt-1">{errors.pluralLabel}</div>}
                         </div>
 
                         <div>
@@ -1046,9 +1046,9 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 </option>
                             ))}
                         </select>
-                        <p className="text-gray-500 text-xs mt-1">
+                        <div className="text-gray-500 text-xs mt-1">
                             Namespace for organizing content and media for this object type. Leave empty to use the default namespace.
-                        </p>
+                        </div>
                     </div>
 
                     {/* Icon Image Upload */}
@@ -1065,13 +1065,13 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                             />
                         ) : (
                             <div className="bg-gray-50 border border-gray-200 rounded-md p-4 text-center">
-                                <p className="text-gray-500 text-sm">
+                                <div className="text-gray-500 text-sm">
                                     Save the object type first to upload an icon image
-                                </p>
+                                </div>
                             </div>
                         )}
                         {errors.iconImage && (
-                            <p className="text-red-600 text-sm mt-1">{errors.iconImage}</p>
+                            <div className="text-red-600 text-sm mt-1">{errors.iconImage}</div>
                         )}
                     </div>
                 </div>
@@ -1080,10 +1080,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             {/* Schema Fields Tab */}
             {activeTab === 'schema' && (
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Schema Fields</h3>
-                    <p className="text-gray-600 mb-6">
+                    <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Schema Fields</div>
+                    <div className="text-gray-600 mb-6">
                         Define the data fields that instances of this object type will have.
-                    </p>
+                    </div>
 
                     {/* Schema Fix Warning Banner */}
                     {needsSchemaFix && schemaFixInfo && (
@@ -1093,17 +1093,17 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                     <AlertTriangle className="h-6 w-6 text-amber-600" />
                                 </div>
                                 <div className="ml-3 flex-1">
-                                    <h3 className="text-sm font-medium text-amber-800">
+                                    <div className="text-sm font-medium text-amber-800" role="heading" aria-level="3">
                                         Schema Issue Detected
-                                    </h3>
+                                    </div>
                                     <div className="mt-2 text-sm text-amber-700">
-                                        <p className="mb-2">
+                                        <div className="mb-2">
                                             This schema uses React component names instead of field type keys.
                                             This may cause validation errors.
-                                        </p>
-                                        <p className="mb-3 font-medium">
+                                        </div>
+                                        <div className="mb-3 font-medium">
                                             {getFixDescription(schemaFixInfo.affectedProperties)}
-                                        </p>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={handleFixSchema}
@@ -1127,9 +1127,9 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-800">
+                                <div className="text-sm font-medium text-red-800" role="heading" aria-level="3">
                                     Schema Validation Error
-                                </h3>
+                                </div>
                                 <div className="mt-1 text-sm text-red-700">
                                     {schemaError}
                                 </div>
@@ -1159,10 +1159,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             {/* Widget Slots Tab */}
             {activeTab === 'slots' && (
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Widget Slots</h3>
-                    <p className="text-gray-600 mb-6">
+                    <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Widget Slots</div>
+                    <div className="text-gray-600 mb-6">
                         Define widget slots where content editors can add widgets to object instances.
-                    </p>
+                    </div>
 
                     {/* Widget Slots Warnings Display */}
                     {slotsWarnings.length > 0 && (
@@ -1174,19 +1174,19 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                     </svg>
                                 </div>
                                 <div className="ml-3 flex-1">
-                                    <h3 className="text-base font-semibold text-yellow-800 mb-2">
+                                    <div className="text-base font-semibold text-yellow-800 mb-2" role="heading" aria-level="3">
                                         ⚠️ Widget Controls Filtered ({slotsWarnings.length} issue{slotsWarnings.length !== 1 ? 's' : ''})
-                                    </h3>
-                                    <p className="text-sm text-yellow-700 mb-3">
+                                    </div>
+                                    <div className="text-sm text-yellow-700 mb-3">
                                         Some widget controls were removed during save because they reference widget types that don't exist:
-                                    </p>
-                                    <ul className="list-disc list-inside space-y-1 text-sm text-yellow-800">
+                                    </div>
+                                    <div className="list-disc list-inside space-y-1 text-sm text-yellow-800" role="list">
                                         {slotsWarnings.map((warning, idx) => (
-                                            <li key={idx} className="ml-2">
+                                            <div key={idx} className="ml-2">
                                                 <span className="font-medium">{warning.slot}:</span> {warning.message}
-                                            </li>
+                                            </div>
                                         ))}
-                                    </ul>
+                                    </div>
                                     <div className="mt-3">
                                         <button
                                             type="button"
@@ -1210,9 +1210,9 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-800">
+                                <div className="text-sm font-medium text-red-800" role="heading" aria-level="3">
                                     Widget Slots Validation Error
-                                </h3>
+                                </div>
                                 <div className="mt-1 text-sm text-red-700">
                                     {slotsError}
                                 </div>
@@ -1242,10 +1242,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 <div className="space-y-8">
                     {/* Hierarchy Level Configuration */}
                     <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Hierarchy Level</h3>
-                        <p className="text-gray-600 mb-6">
+                        <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Hierarchy Level</div>
+                        <div className="text-gray-600 mb-6">
                             Configure where this object type can appear in the content hierarchy.
-                        </p>
+                        </div>
 
                         <div className="space-y-3">
                             <label className="flex items-center">
@@ -1259,7 +1259,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 />
                                 <div className="ml-3">
                                     <span className="text-sm font-medium text-gray-900">Top-level only</span>
-                                    <p className="text-sm text-gray-500">Can only exist at the root level, cannot be a child of other objects</p>
+                                    <div className="text-sm text-gray-500">Can only exist at the root level, cannot be a child of other objects</div>
                                 </div>
                             </label>
 
@@ -1274,7 +1274,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 />
                                 <div className="ml-3">
                                     <span className="text-sm font-medium text-gray-900">Sub-object only</span>
-                                    <p className="text-sm text-gray-500">Must be a child of another object, cannot exist at root level</p>
+                                    <div className="text-sm text-gray-500">Must be a child of another object, cannot exist at root level</div>
                                 </div>
                             </label>
 
@@ -1289,7 +1289,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 />
                                 <div className="ml-3">
                                     <span className="text-sm font-medium text-gray-900">Both levels</span>
-                                    <p className="text-sm text-gray-500">Can exist at root level or as a child of other objects</p>
+                                    <div className="text-sm text-gray-500">Can exist at root level or as a child of other objects</div>
                                 </div>
                             </label>
                         </div>
@@ -1297,10 +1297,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
                     {/* Child Type Selection */}
                     <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Allowed Child Types</h3>
-                        <p className="text-gray-600 mb-6">
+                        <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Allowed Child Types</div>
+                        <div className="text-gray-600 mb-6">
                             Select which object types can be children of this type in hierarchical structures.
-                        </p>
+                        </div>
                         <ChildTypeSelector
                             selectedTypes={formData.allowedChildTypes}
                             availableTypes={existingTypes.filter(type =>
@@ -1484,7 +1484,7 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
             {slots.map((slot, index) => (
                 <div key={index} className="border border-gray-200 rounded-md p-4">
                     <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-medium text-gray-900">Slot {index + 1}</h4>
+                        <div className="font-medium text-gray-900" role="heading" aria-level="4">Slot {index + 1}</div>
                         <button
                             type="button"
                             onClick={() => removeSlot(index)}
@@ -1508,10 +1508,10 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                                 placeholder="e.g., main_content, sidebar"
                             />
                             {errors[`slot_${index}_name`] && (
-                                <p className="text-red-600 text-sm mt-1">{errors[`slot_${index}_name`]}</p>
+                                <div className="text-red-600 text-sm mt-1">{errors[`slot_${index}_name`]}</div>
                             )}
                             {(!slot.name || !slot.name.trim()) && (
-                                <p className="text-red-600 text-sm mt-1">Slot Name is required</p>
+                                <div className="text-red-600 text-sm mt-1">Slot Name is required</div>
                             )}
                         </div>
 
@@ -1528,10 +1528,10 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                                 placeholder="e.g., Main Content, Sidebar"
                             />
                             {errors[`slot_${index}_label`] && (
-                                <p className="text-red-600 text-sm mt-1">{errors[`slot_${index}_label`]}</p>
+                                <div className="text-red-600 text-sm mt-1">{errors[`slot_${index}_label`]}</div>
                             )}
                             {(!slot.label || !slot.label.trim()) && (
-                                <p className="text-red-600 text-sm mt-1">Display Label is required</p>
+                                <div className="text-red-600 text-sm mt-1">Display Label is required</div>
                             )}
                         </div>
                     </div>
@@ -1566,10 +1566,10 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
 
                     {/* Widget Control Definitions */}
                     <div className="border-t border-gray-200 pt-4">
-                        <h5 className="text-sm font-medium text-gray-900 mb-3">Widget Control Definitions</h5>
-                        <p className="text-xs text-gray-500 mb-4">
+                        <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="5">Widget Control Definitions</div>
+                        <div className="text-xs text-gray-500 mb-4">
                             Configure individual widget types that can be used in this slot, including their settings and behavior.
-                        </p>
+                        </div>
 
                         {loadingWidgets ? (
                             <div className="text-sm text-gray-500">Loading available widgets...</div>
@@ -1615,15 +1615,15 @@ const ChildTypeSelector = ({ selectedTypes, availableTypes, onChange, hierarchyL
         <div className="space-y-2">
             {availableTypes.length === 0 ? (
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                    <p className="text-gray-500 text-sm">
+                    <div className="text-gray-500 text-sm">
                         No object types available as children. Only object types configured as "Sub-object only" or "Both levels" can be children of other types.
-                    </p>
+                    </div>
                 </div>
             ) : (
                 <>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <div className="text-sm text-gray-600 mb-4">
                         {availableTypes.length} object type{availableTypes.length !== 1 ? 's' : ''} available as potential children:
-                    </p>
+                    </div>
                     {availableTypes.map((type) => (
                         <div key={type.name} className="flex items-center p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
                             <input
@@ -1646,7 +1646,7 @@ const ChildTypeSelector = ({ selectedTypes, availableTypes, onChange, hierarchyL
                                     </span>
                                 </div>
                                 {type.description && (
-                                    <p className="text-sm text-gray-600 mt-1">{type.description}</p>
+                                    <div className="text-sm text-gray-600 mt-1">{type.description}</div>
                                 )}
                             </div>
                         </div>
@@ -1770,9 +1770,9 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                                 {/* Widget Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center space-x-2 mb-1">
-                                        <h3 className="text-lg font-medium text-gray-900 truncate">
+                                        <div className="text-lg font-medium text-gray-900 truncate" role="heading" aria-level="3">
                                             {control?.label || selectedWidget?.name || 'Unknown Widget'}
-                                        </h3>
+                                        </div>
                                         <div className="flex items-center space-x-1">
                                             <CheckCircle className="w-4 h-4 text-green-500" />
                                             <span className="text-xs font-medium text-green-600">
@@ -1781,9 +1781,9 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                                         </div>
                                     </div>
 
-                                    <p className="text-gray-600 text-sm mb-2">
+                                    <div className="text-gray-600 text-sm mb-2">
                                         {description}
-                                    </p>
+                                    </div>
 
                                     <div className="flex flex-wrap gap-2 text-xs">
                                         <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
@@ -1892,7 +1892,7 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
             {/* Add Widget Control - Select + Button */}
             <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center justify-between mb-3">
-                    <h6 className="text-sm font-medium text-gray-900">Add Widget Control</h6>
+                    <div className="text-sm font-medium text-gray-900" role="heading" aria-level="6">Add Widget Control</div>
                     {/* Add All Button */}
                     {availableWidgets.length > 0 && (
                         <button
@@ -1953,16 +1953,16 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                 </div>
                 {selectedWidgetType && (
                     <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                        <strong>{availableWidgets.find(w => w.type === selectedWidgetType)?.name}</strong>: {availableWidgets.find(w => w.type === selectedWidgetType)?.description}
+                        <span className="font-bold">{availableWidgets.find(w => w.type === selectedWidgetType)?.name}</span>: {availableWidgets.find(w => w.type === selectedWidgetType)?.description}
                     </div>
                 )}
             </div>
 
             {widgetControls.length > 0 && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <h6 className="text-sm font-medium text-blue-900 mb-1">
+                    <div className="text-sm font-medium text-blue-900 mb-1" role="heading" aria-level="6">
                         Widget Controls Summary
-                    </h6>
+                    </div>
                     <div className="text-sm text-blue-800">
                         {widgetControls.length} widget control(s) configured
                         {widgetControls.filter(c => c.preCreate).length > 0 && (

@@ -137,9 +137,9 @@ const PreviewSizeManager: React.FC<PreviewSizeManagerProps> = ({
             <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                    <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                         Manage Preview Sizes
-                    </h2>
+                    </div>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -153,9 +153,9 @@ const PreviewSizeManager: React.FC<PreviewSizeManagerProps> = ({
                     {/* Add/Edit Form */}
                     {isAdding && (
                         <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <h3 className="text-sm font-medium text-gray-900 mb-3">
+                            <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="3">
                                 {editingId ? 'Edit Preview Size' : 'Add New Preview Size'}
-                            </h3>
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -260,12 +260,12 @@ const PreviewSizeManager: React.FC<PreviewSizeManagerProps> = ({
                     {isLoading ? (
                         <div className="text-center py-8 text-gray-500">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                            <p className="text-sm">Loading preview sizes...</p>
+                            <div className="text-sm">Loading preview sizes...</div>
                         </div>
                     ) : previewSizes.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                            <p className="text-sm">No preview sizes configured yet.</p>
-                            <p className="text-xs mt-1">Add your first preview size above.</p>
+                            <div className="text-sm">No preview sizes configured yet.</div>
+                            <div className="text-xs mt-1">Add your first preview size above.</div>
                         </div>
                     ) : (
                         <div className="space-y-2">

@@ -34,7 +34,7 @@ const HeroWidget = ({
     const [backgroundUrl, setBackgroundUrl] = useState('')
     const [backgroundUrl2x, setBackgroundUrl2x] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
-    
+
     // State for image edit modal
     const [showImageModal, setShowImageModal] = useState(false)
     const [editingField, setEditingField] = useState(null)
@@ -132,10 +132,10 @@ const HeroWidget = ({
         minHeight: '310px',
         maxHeight: '310px',
         flexShrink: 0,
-        ...(image && backgroundUrl && backgroundUrl2x ? { 
-            backgroundImage: `image-set(url('${backgroundUrl}') 1x, url('${backgroundUrl2x}') 2x)` 
-        } : image && backgroundUrl ? { 
-            backgroundImage: `url('${backgroundUrl}')` 
+        ...(image && backgroundUrl && backgroundUrl2x ? {
+            backgroundImage: `image-set(url('${backgroundUrl}') 1x, url('${backgroundUrl2x}') 2x)`
+        } : image && backgroundUrl ? {
+            backgroundImage: `url('${backgroundUrl}')`
         } : {})
     }
 

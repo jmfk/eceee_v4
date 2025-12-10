@@ -105,7 +105,7 @@ const TagRemovalWidget = ({
     if (error) {
         return (
             <div className={`p-4 bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-lg ${className}`}>
-                <p className="text-sm text-red-700">{error}</p>
+                <div className="text-sm text-red-700">{error}</div>
             </div>
         );
     }
@@ -113,12 +113,12 @@ const TagRemovalWidget = ({
     if (allTags.length === 0) {
         return (
             <div className={`p-4 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-lg ${className}`}>
-                <p className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600">
                     {selectedFiles.length === 0
                         ? 'No files selected'
                         : 'Selected files have no tags to remove'
                     }
-                </p>
+                </div>
             </div>
         );
     }
@@ -127,20 +127,20 @@ const TagRemovalWidget = ({
         <div className={`space-y-4 ${className}`}>
             {/* Instructions */}
             <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-indigo-800 font-medium">
+                <div className="text-sm text-indigo-800 font-medium">
                     Click on tags below to remove them from all selected files
-                </p>
-                <p className="text-xs text-indigo-600 mt-1">
+                </div>
+                <div className="text-xs text-indigo-600 mt-1">
                     {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected • {allTags.length} unique tag{allTags.length !== 1 ? 's' : ''} found
-                </p>
+                </div>
             </div>
 
             {/* Tags that will remain (kept tags) */}
             {getRemainingTags().length > 0 && (
                 <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-green-800">
+                    <div className="text-sm font-semibold text-green-800" role="heading" aria-level="4">
                         Tags to Keep ({getRemainingTags().length})
-                    </h4>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         {getRemainingTags().map((tag) => (
                             <button
@@ -161,9 +161,9 @@ const TagRemovalWidget = ({
             {/* Tags that will be removed */}
             {getTagsToRemoveList().length > 0 && (
                 <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-red-800">
+                    <div className="text-sm font-semibold text-red-800" role="heading" aria-level="4">
                         Tags to Remove ({getTagsToRemoveList().length})
-                    </h4>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         {getTagsToRemoveList().map((tag) => (
                             <button

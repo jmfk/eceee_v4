@@ -156,15 +156,15 @@ const ObjectTypeEditorPage = () => {
                             <ArrowLeft className="h-5 w-5" />
                         </button>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
+                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">
                                 {isCreating ? 'Create Object Type' : `Edit ${objectType?.label || 'Object Type'}`}
-                            </h1>
-                            <p className="text-gray-600 mt-1">
+                            </div>
+                            <div className="text-gray-600 mt-1">
                                 {isCreating
                                     ? 'Define a new object type with schema and configuration'
                                     : 'Modify object type settings and schema'
                                 }
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>

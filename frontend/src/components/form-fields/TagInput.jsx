@@ -229,7 +229,7 @@ const TagInput = ({
             )}
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Tag Count */}

@@ -68,14 +68,14 @@ const ValueListsDemo = () => {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center justify-center space-x-2">
+                <div className="text-2xl font-bold text-gray-900 mb-4 flex items-center justify-center space-x-2" role="heading" aria-level="2">
                     <List className="w-6 h-6 text-green-500" />
                     <span>Value Lists Feature</span>
-                </h2>
-                <p className="text-gray-600 max-w-3xl mx-auto">
+                </div>
+                <div className="text-gray-600 max-w-3xl mx-auto">
                     Centralized management of dropdown options. Create named value lists that can be
                     reused across multiple form fields, ensuring consistency and easy maintenance.
-                </p>
+                </div>
             </div>
 
             {/* View Selector */}
@@ -110,16 +110,16 @@ const ValueListsDemo = () => {
                 <div className="space-y-6">
                     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                         <div className="bg-green-50 px-6 py-4 border-b border-gray-200">
-                            <h3 className="text-lg font-medium text-gray-900">Field Integration Example</h3>
-                            <p className="text-sm text-gray-600 mt-1">
+                            <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">Field Integration Example</div>
+                            <div className="text-sm text-gray-600 mt-1">
                                 This form demonstrates how selection fields can use value lists for their options.
-                            </p>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
                             {/* Form */}
                             <div>
-                                <h4 className="text-md font-medium text-gray-900 mb-4">Sample Form</h4>
+                                <div className="text-md font-medium text-gray-900 mb-4" role="heading" aria-level="4">Sample Form</div>
                                 <DynamicFormRenderer
                                     schema={sampleSchema}
                                     data={formData}
@@ -131,7 +131,7 @@ const ValueListsDemo = () => {
 
                             {/* Data Preview */}
                             <div>
-                                <h4 className="text-md font-medium text-gray-900 mb-4">Form Data</h4>
+                                <div className="text-md font-medium text-gray-900 mb-4" role="heading" aria-level="4">Form Data</div>
                                 <div className="bg-gray-50 border border-gray-200 rounded p-4">
                                     <pre className="text-sm text-gray-700 overflow-auto">
                                         {JSON.stringify(formData, null, 2)}
@@ -140,7 +140,7 @@ const ValueListsDemo = () => {
 
                                 {/* Value List Info */}
                                 <div className="mt-4 space-y-2">
-                                    <h5 className="text-sm font-medium text-gray-900">Value List Integration:</h5>
+                                    <div className="text-sm font-medium text-gray-900" role="heading" aria-level="5">Value List Integration:</div>
                                     <div className="space-y-1 text-xs">
                                         <div className="flex items-center space-x-2">
                                             <span className="px-2 py-1 bg-green-100 text-green-800 rounded">
@@ -168,25 +168,25 @@ const ValueListsDemo = () => {
 
                     {/* Benefits */}
                     <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Value Lists Benefits</h3>
+                        <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Value Lists Benefits</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Centralized Management</h4>
-                                <ul className="space-y-1 text-gray-600">
+                                <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Centralized Management</div>
+                                <div className="space-y-1 text-gray-600" role="list">
                                     <li>• Single source of truth for dropdown options</li>
                                     <li>• Easy updates across all forms using the list</li>
                                     <li>• Consistent labeling and values</li>
                                     <li>• Version control and audit trail</li>
-                                </ul>
+                                </div>
                             </div>
                             <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Developer Experience</h4>
-                                <ul className="space-y-1 text-gray-600">
+                                <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Developer Experience</div>
+                                <div className="space-y-1 text-gray-600" role="list">
                                     <li>• No hardcoded options in form schemas</li>
                                     <li>• Reusable across multiple forms</li>
                                     <li>• Type-safe value handling</li>
                                     <li>• Admin interface for non-technical users</li>
-                                </ul>
+                                </div>
                             </div>
                         </div>
                     </div>

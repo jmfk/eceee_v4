@@ -117,7 +117,7 @@ export default function FilePropertyConfig({
 
             {/* File-Specific Configuration */}
             <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">File Options</h4>
+                <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">File Options</div>
 
                 {/* File Type Categories */}
                 <div>
@@ -228,7 +228,7 @@ export default function FilePropertyConfig({
 
                 {/* File Size Constraints */}
                 <div className="mt-4">
-                    <h5 className="text-sm font-medium text-gray-700 mb-3">File Size Constraints</h5>
+                    <div className="text-sm font-medium text-gray-700 mb-3" role="heading" aria-level="5">File Size Constraints</div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>

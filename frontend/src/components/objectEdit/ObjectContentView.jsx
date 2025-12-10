@@ -142,14 +142,14 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
             {/* Content Header - Styled like PageEditor */}
             <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="1">
                         Object Content & Data
                         {objectType && (
                             <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
                                 {objectType.label}
                             </span>
                         )}
-                    </h1>
+                    </div>
 
                     {/* Save Status */}
                     <div className="flex items-center space-x-3">
@@ -199,10 +199,10 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                         /* Single Column - Object Data Only */
                         <div className="space-y-6">
                             <div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                <div className="text-lg font-medium text-gray-900 mb-4 flex items-center" role="heading" aria-level="3">
                                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                                     Object Data
-                                </h3>
+                                </div>
                             </div>
                             <ObjectDataForm
                                 ref={formRef}

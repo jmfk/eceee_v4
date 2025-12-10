@@ -184,8 +184,8 @@ const PublicationTimeline = () => {
             <div className="bg-white rounded-lg shadow p-6">
                 <div className="text-center py-12">
                     <Calendar className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Timeline</h3>
-                    <p className="text-gray-600 mb-4">{error}</p>
+                    <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">Error Loading Timeline</div>
+                    <div className="text-gray-600 mb-4">{error}</div>
                     <button
                         onClick={fetchTimelineData}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -203,8 +203,8 @@ const PublicationTimeline = () => {
             <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Publication Timeline</h2>
-                        <p className="text-gray-600 mt-1">Visual timeline of content publication periods</p>
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Publication Timeline</div>
+                        <div className="text-gray-600 mt-1">Visual timeline of content publication periods</div>
                     </div>
                     <button
                         onClick={fetchTimelineData}
@@ -225,9 +225,9 @@ const PublicationTimeline = () => {
                         >
                             <ChevronLeft className="w-5 h-5" />
                         </button>
-                        <h3 className="text-lg font-medium text-gray-900 min-w-0 flex-1">
+                        <div className="text-lg font-medium text-gray-900 min-w-0 flex-1" role="heading" aria-level="3">
                             {formatDateRange()}
-                        </h3>
+                        </div>
                         <button
                             onClick={() => navigateTime(1)}
                             className="p-2 text-gray-600 hover:text-gray-900 transition-colors"

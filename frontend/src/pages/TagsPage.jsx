@@ -11,11 +11,11 @@ const TagsPage = () => {
             <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-2">
                     <Hash className="w-8 h-8 text-primary-600" />
-                    <h1 className="text-3xl font-bold text-gray-900">Tags</h1>
+                    <div className="text-3xl font-bold text-gray-900" role="heading" aria-level="1">Tags</div>
                 </div>
-                <p className="text-gray-600">
+                <div className="text-gray-600">
                     Manage content tags for organizing and categorizing pages, objects, and other content throughout the system.
-                </p>
+                </div>
             </div>
 
             <div className="bg-white rounded-lg shadow">

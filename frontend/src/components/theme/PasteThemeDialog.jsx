@@ -84,7 +84,7 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
         <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-semibold text-gray-900">Paste Theme Data</h2>
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">Paste Theme Data</div>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -96,14 +96,14 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
                 <div className="px-6 py-4">
                     {isLoading ? (
                         <div className="text-center py-8">
-                            <p className="text-gray-600">Reading clipboard...</p>
+                            <div className="text-gray-600">Reading clipboard...</div>
                         </div>
                     ) : showManualInput ? (
                         <div>
                             <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-                                <p className="text-sm text-blue-800">
+                                <div className="text-sm text-blue-800">
                                     Clipboard access requires permission. Please paste the theme data manually below.
-                                </p>
+                                </div>
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -122,10 +122,10 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
                                     <div className="flex items-start">
                                         <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
                                         <div>
-                                            <h3 className="text-sm font-medium text-red-800 mb-1">
+                                            <div className="text-sm font-medium text-red-800 mb-1" role="heading" aria-level="3">
                                                 Invalid Data
-                                            </h3>
-                                            <p className="text-sm text-red-700">{error}</p>
+                                            </div>
+                                            <div className="text-sm text-red-700">{error}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -142,10 +142,10 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
                             <div className="flex items-start">
                                 <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
                                 <div>
-                                    <h3 className="text-sm font-medium text-red-800 mb-1">
+                                    <div className="text-sm font-medium text-red-800 mb-1" role="heading" aria-level="3">
                                         Error Reading Clipboard
-                                    </h3>
-                                    <p className="text-sm text-red-700">{error}</p>
+                                    </div>
+                                    <div className="text-sm text-red-700">{error}</div>
                                 </div>
                             </div>
                         </div>
@@ -156,12 +156,12 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
                                 <div className="flex items-start">
                                     <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
                                     <div>
-                                        <h3 className="text-sm font-medium text-yellow-800 mb-1">
+                                        <div className="text-sm font-medium text-yellow-800 mb-1" role="heading" aria-level="3">
                                             Warning: This will overwrite the entire theme
-                                        </h3>
-                                        <p className="text-sm text-yellow-700">
+                                        </div>
+                                        <div className="text-sm text-yellow-700">
                                             All current settings in "{targetTheme?.name}" will be replaced with the pasted data, including the theme image if one is included.
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -169,26 +169,26 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
                             {/* Current vs New */}
                             <div className="grid grid-cols-2 gap-4 mb-6">
                                 <div>
-                                    <h3 className="text-sm font-medium text-gray-900 mb-2">Current Theme</h3>
+                                    <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="3">Current Theme</div>
                                     <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
-                                        <p className="font-semibold text-gray-900">{targetTheme?.name}</p>
+                                        <div className="font-semibold text-gray-900">{targetTheme?.name}</div>
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-medium text-gray-900 mb-2">Source Theme</h3>
+                                    <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="3">Source Theme</div>
                                     <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
-                                        <p className="font-semibold text-blue-900">
+                                        <div className="font-semibold text-blue-900">
                                             {clipboardData.data.name || 'Unnamed Theme'}
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Preview of what will be pasted */}
                             <div>
-                                <h3 className="text-sm font-medium text-gray-900 mb-3">
+                                <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="3">
                                     Data to be pasted:
-                                </h3>
+                                </div>
                                 <div className="bg-gray-50 rounded-md p-4 border border-gray-200 space-y-2">
                                     {clipboardData.data.fonts?.googleFonts && (
                                         <div className="flex justify-between text-sm">
@@ -249,7 +249,7 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
                         </div>
                     ) : (
                         <div className="text-center py-8">
-                            <p className="text-gray-600">No valid theme data found in clipboard</p>
+                            <div className="text-gray-600">No valid theme data found in clipboard</div>
                         </div>
                     )}
                 </div>

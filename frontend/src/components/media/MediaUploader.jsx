@@ -282,14 +282,14 @@ const MediaUploader = ({
         return (
             <div className="p-8">
                 <div className="text-center">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-6">Uploading Files...</h3>
+                    <div className="text-xl font-semibold text-gray-900 mb-6" role="heading" aria-level="3">Uploading Files...</div>
                     <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
                         <div
                             className="bg-blue-600 h-3 rounded-full transition-all duration-300"
                             style={{ width: `${uploadProgress.overall || 0}%` }}
                         />
                     </div>
-                    <p className="text-gray-600 mb-8">{uploadProgress.overall || 0}% complete</p>
+                    <div className="text-gray-600 mb-8">{uploadProgress.overall || 0}% complete</div>
 
                     <div className="space-y-3">
                         {selectedFiles.map((file, index) => (
@@ -320,7 +320,7 @@ const MediaUploader = ({
     return (
         <div className="p-8">
             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Upload Media Files</h3>
+                <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="3">Upload Media Files</div>
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -346,10 +346,10 @@ const MediaUploader = ({
             >
                 <div className="pointer-events-none">
                     <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-lg text-gray-700 mb-2">Drag and drop files here, or click to browse</p>
-                    <p className="text-sm text-gray-500">
+                    <div className="text-lg text-gray-700 mb-2">Drag and drop files here, or click to browse</div>
+                    <div className="text-sm text-gray-500">
                         Supported: Images, Documents, Videos, Audio (max {maxFiles} files, 100MB each)
-                    </p>
+                    </div>
                 </div>
 
                 <input
@@ -364,12 +364,12 @@ const MediaUploader = ({
 
             {selectedFiles.length > 0 && (
                 <div className="mt-6">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">Selected Files ({selectedFiles.length})</h4>
+                    <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="4">Selected Files ({selectedFiles.length})</div>
                     <div className="space-y-3 mb-6">
                         {selectedFiles.map((file, index) => (
                             <div key={index} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-gray-900 truncate">{file.name}</p>
+                                    <div className="font-medium text-gray-900 truncate">{file.name}</div>
                                     <div className="flex items-center gap-4 text-sm text-gray-500">
                                         <span>{file.type}</span>
                                         <span>{formatFileSize(file.size)}</span>
@@ -409,7 +409,7 @@ const MediaUploader = ({
 
             {errors.length > 0 && (
                 <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <h4 className="text-lg font-medium text-red-800 mb-3">Validation Errors:</h4>
+                    <div className="text-lg font-medium text-red-800 mb-3" role="heading" aria-level="4">Validation Errors:</div>
                     <div className="space-y-2">
                         {errors.map((error, index) => (
                             <div key={index} className="text-sm text-red-700">
@@ -422,10 +422,10 @@ const MediaUploader = ({
 
             {!namespace && (
                 <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-yellow-800 flex items-center gap-2">
+                    <div className="text-yellow-800 flex items-center gap-2">
                         <span className="text-xl">⚠️</span>
                         Please select a namespace before uploading files.
-                    </p>
+                    </div>
                 </div>
             )}
 

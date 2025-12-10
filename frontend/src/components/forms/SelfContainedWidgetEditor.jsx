@@ -401,7 +401,7 @@ const SelfContainedWidgetEditor = forwardRef(({
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
                         <div className="flex items-center space-x-3">
-                            <h3 className="text-md font-medium text-gray-900">{title}</h3>
+                            <div className="text-md font-medium text-gray-900" role="heading" aria-level="3">{title}</div>
                             {hasUnsavedChanges && (
                                 <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
                                     Unsaved changes
@@ -440,8 +440,8 @@ const SelfContainedWidgetEditor = forwardRef(({
                         ) : error ? (
                             <div className="p-4">
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                                    <p className="text-red-800 font-medium">Failed to load widget form</p>
-                                    <p className="text-red-600 text-sm mt-1">{error}</p>
+                                    <div className="text-red-800 font-medium">Failed to load widget form</div>
+                                    <div className="text-red-600 text-sm mt-1">{error}</div>
                                     <button
                                         onClick={() => {
                                             setError(null)

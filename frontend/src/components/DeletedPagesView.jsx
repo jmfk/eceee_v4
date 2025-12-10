@@ -250,10 +250,10 @@ export default function DeletedPagesView({ isStaff = false }) {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                     <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900">Access Denied</h3>
-                    <p className="text-gray-600 mt-2">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">Access Denied</div>
+                    <div className="text-gray-600 mt-2">
                         You need staff/admin permissions to view deleted pages.
-                    </p>
+                    </div>
                 </div>
             </div>
         )
@@ -265,7 +265,7 @@ export default function DeletedPagesView({ isStaff = false }) {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                     <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
-                    <p className="text-gray-600">Loading deleted pages...</p>
+                    <div className="text-gray-600">Loading deleted pages...</div>
                 </div>
             </div>
         )
@@ -277,8 +277,8 @@ export default function DeletedPagesView({ isStaff = false }) {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                     <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900">Error Loading Pages</h3>
-                    <p className="text-gray-600 mt-2">{error?.message || 'Unknown error'}</p>
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">Error Loading Pages</div>
+                    <div className="text-gray-600 mt-2">{error?.message || 'Unknown error'}</div>
                     <button
                         onClick={() => refetch()}
                         className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -295,9 +295,9 @@ export default function DeletedPagesView({ isStaff = false }) {
             {/* Header - Compact and responsive */}
             <div className="flex-shrink-0 bg-white px-2 sm:px-4 py-2 sm:py-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs sm:text-sm text-gray-600">
+                    <div className="text-xs sm:text-sm text-gray-600">
                         {deletedPages.length} deleted page{deletedPages.length !== 1 ? 's' : ''}
-                    </p>
+                    </div>
                     <div className="flex items-center gap-1 sm:gap-2">
                         {deletedPages.length > 0 && (
                             <button
@@ -364,12 +364,12 @@ export default function DeletedPagesView({ isStaff = false }) {
                     <div className="flex items-center justify-center h-64">
                         <div className="text-center">
                             <Trash2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900">No Deleted Pages</h3>
-                            <p className="text-gray-600 mt-2">
+                            <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">No Deleted Pages</div>
+                            <div className="text-gray-600 mt-2">
                                 {searchTerm
                                     ? 'No deleted pages match your search.'
                                     : 'There are no deleted pages to restore.'}
-                            </p>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -445,9 +445,9 @@ function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore, onPermane
                     <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
                         {/* Row 1: Title and slug */}
                         <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2">
-                            <h3 className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                            <div className="text-xs sm:text-sm font-medium text-gray-900 truncate" role="heading" aria-level="3">
                                 {page.title || page.slug || `Page ${page.id}`}
-                            </h3>
+                            </div>
                             <span className="font-mono text-xs text-gray-500 truncate">/{page.slug}</span>
                         </div>
 

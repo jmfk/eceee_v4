@@ -830,7 +830,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     <div className="space-y-6">
       {/* Header with view toggle */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Schema Editor</h3>
+        <div className="text-lg font-medium" role="heading" aria-level="3">Schema Editor</div>
         <div className="flex items-center space-x-2">
           <button
             type="button"

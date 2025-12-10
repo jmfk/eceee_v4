@@ -28,16 +28,16 @@ const TopNewsPlugWidget = ({
             <div className="top-news-plug-widget-editor p-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
                 <div className="text-center">
                     <Layout className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Top News Plug Widget</h3>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <div className="text-lg font-semibold text-gray-700 mb-2">Top News Plug Widget</div>
+                    <div className="text-sm text-gray-500 mb-4">
                         Display top/featured news in configurable grid layouts
-                    </p>
+                    </div>
                     <div className="text-xs text-gray-400 space-y-1">
                         {config.object_types && config.object_types.length > 0 && (
-                            <p>Object Types: {config.object_types.join(', ')}</p>
+                            <div>Object Types: {config.object_types.join(', ')}</div>
                         )}
                         {config.layout && (
-                            <p>Layout: {layoutNames[config.layout] || config.layout}</p>
+                            <div>Layout: {layoutNames[config.layout] || config.layout}</div>
                         )}
                         {config.show_excerpts && <p>Excerpts: Enabled</p>}
                     </div>

@@ -43,7 +43,7 @@ const PasteConfirmationModal = ({
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                         <div className="flex items-center space-x-3">
                             <ClipboardPaste className="h-6 w-6 text-blue-600" />
-                            <h3 className="text-lg font-semibold text-gray-900">Paste {widgetText}</h3>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Paste {widgetText}</div>
                         </div>
                         <button
                             onClick={onClose}
@@ -56,9 +56,9 @@ const PasteConfirmationModal = ({
 
                     {/* Body */}
                     <div className="px-6 py-4">
-                        <p className="text-gray-700 mb-4">
+                        <div className="text-gray-700 mb-4">
                             How would you like to paste {widgetText}?
-                        </p>
+                        </div>
                         <div className="space-y-3">
                             <div className="p-3 border border-gray-200 rounded hover:bg-gray-50">
                                 <button

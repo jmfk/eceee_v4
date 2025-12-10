@@ -5,6 +5,17 @@
  */
 
 /**
+ * Filter out invalid widgets (null, undefined, or missing id)
+ * @param {Array} widgets - Array of widgets to filter
+ * @returns {Array} Filtered array of valid widgets
+ */
+const filterValidWidgets = (widgets) => {
+    return Array.isArray(widgets)
+        ? widgets.filter(w => w != null && typeof w === 'object' && w.id != null)
+        : []
+}
+
+/**
  * Merge inherited widgets with local widgets for a specific slot
  * 
  * REPLACEMENT BEHAVIOR: Local widgets REPLACE inherited widgets (not merge alongside)
@@ -17,9 +28,9 @@
  * @returns {Array} Widget array with inheritance metadata
  */
 export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], slotRules = {}) {
-    // Ensure we have valid arrays
-    const safeLocalWidgets = Array.isArray(localWidgets) ? localWidgets : [];
-    const safeInheritedWidgets = Array.isArray(inheritedWidgets) ? inheritedWidgets : [];
+    // Ensure we have valid arrays and filter out invalid widgets
+    const safeLocalWidgets = filterValidWidgets(Array.isArray(localWidgets) ? localWidgets : []);
+    const safeInheritedWidgets = filterValidWidgets(Array.isArray(inheritedWidgets) ? inheritedWidgets : []);
 
     // Filter out hidden widgets (isVisible !== false)
     const visibleLocalWidgets = safeLocalWidgets.filter(w => w.isVisible !== false);
@@ -98,9 +109,9 @@ export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], sl
  * @returns {Array} Widget array appropriate for the mode
  */
 export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets = [], slotRules = {}) {
-    // Ensure we have valid arrays
-    const safeLocalWidgets = Array.isArray(localWidgets) ? localWidgets : [];
-    const safeInheritedWidgets = Array.isArray(inheritedWidgets) ? inheritedWidgets : [];
+    // Ensure we have valid arrays and filter out invalid widgets
+    const safeLocalWidgets = filterValidWidgets(Array.isArray(localWidgets) ? localWidgets : []);
+    const safeInheritedWidgets = filterValidWidgets(Array.isArray(inheritedWidgets) ? inheritedWidgets : []);
 
     // Filter out hidden widgets (isVisible !== false)
     const visibleLocalWidgets = safeLocalWidgets.filter(w => w.isVisible !== false);
@@ -134,9 +145,9 @@ export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets 
  * @returns {boolean} True if should default to preview mode
  */
 export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inheritedWidgets = [], slotRules = {}) {
-    // Ensure we have valid arrays
-    const safeLocalWidgets = Array.isArray(localWidgets) ? localWidgets : [];
-    const safeInheritedWidgets = Array.isArray(inheritedWidgets) ? inheritedWidgets : [];
+    // Ensure we have valid arrays and filter out invalid widgets
+    const safeLocalWidgets = filterValidWidgets(Array.isArray(localWidgets) ? localWidgets : []);
+    const safeInheritedWidgets = filterValidWidgets(Array.isArray(inheritedWidgets) ? inheritedWidgets : []);
 
     // If inheritance not allowed, always edit mode
     if (!slotRules.inheritanceAllowed) {
@@ -274,8 +285,8 @@ export function transformInheritanceData(inheritanceData) {
     let hasInheritedContent = false
 
     Object.entries(inheritanceData.slots).forEach(([slotName, slotData]) => {
-        // Extract inherited widgets
-        inheritedWidgets[slotName] = slotData.inheritedWidgets || []
+        // Extract inherited widgets and filter out invalid ones
+        inheritedWidgets[slotName] = filterValidWidgets(slotData.inheritedWidgets || [])
 
         // Extract slot rules with new allowMerge field (preferred) and fallback to old naming
         const allowMerge = slotData.allowMerge ??

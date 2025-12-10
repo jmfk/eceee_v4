@@ -46,10 +46,10 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
                 {/* Header Controls */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                        <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                        <div className="text-lg font-medium text-gray-900 flex items-center" role="heading" aria-level="3">
                             <History className="h-5 w-5 mr-2" />
                             Version History
-                        </h3>
+                        </div>
                         {versions.length > 0 && (
                             <span className="text-sm text-gray-600">
                                 {versions.length} version{versions.length !== 1 ? 's' : ''}
@@ -76,14 +76,14 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
 
                 {compareMode && (
                     <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <p className="text-sm text-blue-800">
+                        <div className="text-sm text-blue-800">
                             Select up to 2 versions to compare.
                             {selectedVersions.length > 0 && (
                                 <span className="ml-2 font-medium">
                                     {selectedVersions.length} selected
                                 </span>
                             )}
-                        </p>
+                        </div>
                     </div>
                 )}
 
@@ -97,7 +97,7 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
                 {/* Error State */}
                 {error && (
                     <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                        <p className="text-red-800">Error loading versions: {error.message}</p>
+                        <div className="text-red-800">Error loading versions: {error.message}</div>
                     </div>
                 )}
 
@@ -107,7 +107,7 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
                         {versions.length === 0 ? (
                             <div className="text-center py-8">
                                 <History className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                                <p className="text-gray-600">No version history available</p>
+                                <div className="text-gray-600">No version history available</div>
                             </div>
                         ) : compareMode && selectedVersions.length === 2 ? (
                             <VersionComparison
@@ -177,9 +177,9 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
                         </div>
 
                         {version.changeDescription && (
-                            <p className="text-sm text-gray-700 mt-2">
+                            <div className="text-sm text-gray-700 mt-2">
                                 {version.changeDescription}
-                            </p>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -195,7 +195,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
             {/* Expanded Details */}
             {expanded && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Data Snapshot</h4>
+                    <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">Data Snapshot</div>
                     <div className="bg-gray-50 rounded-md p-3 max-h-60 overflow-y-auto">
                         <pre className="text-xs text-gray-700 whitespace-pre-wrap">
                             {JSON.stringify(version.data, null, 2)}
@@ -204,7 +204,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
 
                     {version.widgets && Object.keys(version.widgets).length > 0 && (
                         <div className="mt-3">
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">Widget Configuration</h4>
+                            <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">Widget Configuration</div>
                             <div className="bg-gray-50 rounded-md p-3 max-h-40 overflow-y-auto">
                                 <pre className="text-xs text-gray-700 whitespace-pre-wrap">
                                     {JSON.stringify(version.widgets, null, 2)}
@@ -249,9 +249,9 @@ const VersionComparison = ({ version1, version2 }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">
+                <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                     Compare Versions {version1?.versionNumber} & {version2?.versionNumber}
-                </h3>
+                </div>
 
                 <div className="flex bg-gray-100 rounded-md p-1">
                     <button
@@ -278,36 +278,36 @@ const VersionComparison = ({ version1, version2 }) => {
             {/* Version Info */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 rounded-md p-3">
-                    <h4 className="font-medium text-gray-900">Version {version1?.versionNumber}</h4>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="font-medium text-gray-900" role="heading" aria-level="4">Version {version1?.versionNumber}</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         {version1?.createdBy?.username || version1?.createdBy || 'Unknown'} • {new Date(version1?.createdAt).toLocaleString()}
-                    </p>
+                    </div>
                     {version1?.changeDescription && (
-                        <p className="text-sm text-gray-700 mt-2">{version1.changeDescription}</p>
+                        <div className="text-sm text-gray-700 mt-2">{version1.changeDescription}</div>
                     )}
                 </div>
 
                 <div className="bg-gray-50 rounded-md p-3">
-                    <h4 className="font-medium text-gray-900">Version {version2?.versionNumber}</h4>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="font-medium text-gray-900" role="heading" aria-level="4">Version {version2?.versionNumber}</div>
+                    <div className="text-sm text-gray-600 mt-1">
                         {version2?.createdBy?.username || version2?.createdBy || 'Unknown'} • {new Date(version2?.createdAt).toLocaleString()}
-                    </p>
+                    </div>
                     {version2?.changeDescription && (
-                        <p className="text-sm text-gray-700 mt-2">{version2.changeDescription}</p>
+                        <div className="text-sm text-gray-700 mt-2">{version2.changeDescription}</div>
                     )}
                 </div>
             </div>
 
             {/* Differences */}
             <div>
-                <h4 className="font-medium text-gray-900 mb-3">
+                <div className="font-medium text-gray-900 mb-3" role="heading" aria-level="4">
                     {compareField === 'data' ? 'Data' : 'Widget'} Changes
-                </h4>
+                </div>
 
                 {(compareField === 'data' ? dataDifferences : widgetDifferences).length === 0 ? (
-                    <p className="text-gray-600 text-sm italic">
+                    <div className="text-gray-600 text-sm italic">
                         No {compareField} changes between these versions
-                    </p>
+                    </div>
                 ) : (
                     <div className="space-y-2">
                         {(compareField === 'data' ? dataDifferences : widgetDifferences).map((diff, index) => (

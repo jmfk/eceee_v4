@@ -92,12 +92,19 @@ const WidgetSlot = ({
     // Check if slot has inherited content
     const hasInheritance = hasInheritedContent(slotInheritedWidgets);
 
+    // Helper function to filter valid widgets
+    const filterValidWidgets = (widgets) => {
+        return Array.isArray(widgets)
+            ? widgets.filter(w => w != null && typeof w === 'object' && w.id != null)
+            : []
+    }
+
     // Get effective widgets based on current mode
     const effectiveWidgets = useMemo(() => {
         try {
             const result = getSlotWidgetsForMode(currentMode, localWidgets, slotInheritedWidgets, slotRules);
-            // Ensure we always return an array, never undefined or null
-            return Array.isArray(result) ? result : [];
+            // Ensure we always return an array, never undefined or null, and filter invalid widgets
+            return filterValidWidgets(Array.isArray(result) ? result : []);
         } catch (error) {
             // Silently return empty array on error to prevent crashes
             return [];
@@ -111,18 +118,21 @@ const WidgetSlot = ({
                 return [];
             }
 
-            // Ensure we have valid arrays
+            // Ensure we have valid arrays and filter invalid widgets
             if (!Array.isArray(slotInheritedWidgets)) {
                 return [];
             }
 
+            const validInheritedWidgets = filterValidWidgets(slotInheritedWidgets);
+
             if (!Array.isArray(localWidgets)) {
-                return slotInheritedWidgets;
+                return validInheritedWidgets;
             }
 
             // TYPE-BASED REPLACEMENT: If inheritableTypes defined and any local widget matches, skip inherited
             if (slotRules.inheritableTypes?.length > 0) {
-                const localTypes = localWidgets.map(w => w?.type).filter(Boolean);
+                const validLocalWidgets = filterValidWidgets(localWidgets);
+                const localTypes = validLocalWidgets.map(w => w?.type).filter(Boolean);
                 const hasMatchingType = slotRules.inheritableTypes.some(type =>
                     localTypes.includes(type)
                 );
@@ -133,7 +143,7 @@ const WidgetSlot = ({
                 }
             }
 
-            return slotInheritedWidgets;
+            return validInheritedWidgets;
         } catch (error) {
             // Silently return empty array on error
             return [];
@@ -149,7 +159,9 @@ const WidgetSlot = ({
         const override = [];
 
         if (Array.isArray(localWidgets)) {
-            localWidgets.forEach(widget => {
+            // Filter valid widgets first
+            const validLocalWidgets = filterValidWidgets(localWidgets);
+            validLocalWidgets.forEach(widget => {
                 // Check for inheritance_behavior (snake_case from API or camelCase from frontend)
                 const behavior = widget.inheritanceBehavior || widget.inheritance_behavior || 'insert_after_parent';
 
@@ -393,9 +405,9 @@ const WidgetSlot = ({
                             <div className="flex-1">
                                 <div className="flex items-center">
                                     <Layout className="h-4 w-4 mr-2 text-gray-400" />
-                                    <h4 className="text-sm font-medium text-gray-900">
+                                    <div className="text-sm font-medium text-gray-900">
                                         {label}
-                                    </h4>
+                                    </div>
                                     {/* Slot type indicator */}
                                     {finalSlotType === 'inherited' && (
                                         <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
@@ -448,7 +460,7 @@ const WidgetSlot = ({
                     isSlotPreviewMode ? (
                         // Preview mode: Show merged widgets using effectiveWidgets
                         Array.isArray(effectiveWidgets) && effectiveWidgets.length > 0 ? (
-                            effectiveWidgets.map((widget, index) => renderWidget(widget, index))
+                            effectiveWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))
                         ) : null
                     ) : (
                         // Edit mode: Show widgets in correct inheritance order
@@ -457,21 +469,21 @@ const WidgetSlot = ({
                                 {/* Override widgets replace everything */}
                                 {overrideLocalWidgets.length > 0 ? (
                                     <div className="override-widgets-section">
-                                        {overrideLocalWidgets.map((widget, index) => renderWidget(widget, index))}
+                                        {overrideLocalWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))}
                                     </div>
                                 ) : (
                                     <>
                                         {/* Before Local Widgets - appear BEFORE inherited */}
                                         {beforeLocalWidgets.length > 0 && (
                                             <div className="before-local-widgets-section">
-                                                {beforeLocalWidgets.map((widget, index) => renderWidget(widget, index))}
+                                                {beforeLocalWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))}
                                             </div>
                                         )}
 
                                         {/* Inherited Widgets Section */}
                                         {Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && (
                                             <div className="inherited-widgets-section">
-                                                {displayInheritedWidgets.map((widget, index) =>
+                                                {displayInheritedWidgets.filter(w => w != null && w.id != null).map((widget, index) =>
                                                     renderWidget({ ...widget, isInherited: true }, index)
                                                 )}
                                             </div>
@@ -480,7 +492,7 @@ const WidgetSlot = ({
                                         {/* After Local Widgets - appear AFTER inherited (default) */}
                                         {afterLocalWidgets.length > 0 && (
                                             <div className="after-local-widgets-section">
-                                                {afterLocalWidgets.map((widget, index) => renderWidget(widget, index))}
+                                                {afterLocalWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))}
                                             </div>
                                         )}
 
@@ -502,7 +514,7 @@ const WidgetSlot = ({
 
                                         {/* Empty slot handling - only when NO inherited AND NO local widgets */}
                                         {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && displayLocalWidgets.length === 0 && (
-                                            <div 
+                                            <div
                                                 className={`empty-slot text-center py-12 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
                                                 onClick={(e) => {
                                                     if (pasteModeActive && onPasteAtPosition) {
@@ -522,8 +534,8 @@ const WidgetSlot = ({
                                                 ) : (
                                                     <>
                                                         <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                                        <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
-                                                        <p className="text-sm">{description}</p>
+                                                        <div className="text-lg font-medium text-gray-900 mb-2">{label}</div>
+                                                        <div className="text-sm">{description}</div>
 
                                                         <div className="mt-4">
                                                             <button
@@ -552,13 +564,13 @@ const WidgetSlot = ({
     } catch (error) {
         return (
             <div className="widget-slot-error p-6 bg-red-50 border-2 border-red-300">
-                <h4 className="text-lg font-semibold text-red-800 mb-2">Slot Rendering Error</h4>
-                <p className="text-sm text-red-600 mb-2">
+                <div className="text-lg font-semibold text-red-800 mb-2">Slot Rendering Error</div>
+                <div className="text-sm text-red-600 mb-2">
                     Failed to render slot: <strong>{label || name}</strong>
-                </p>
-                <p className="text-xs text-red-500 font-mono">
+                </div>
+                <div className="text-xs text-red-500 font-mono">
                     {error.message}
-                </p>
+                </div>
                 <button
                     onClick={() => window.location.reload()}
                     className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"

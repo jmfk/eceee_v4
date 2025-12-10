@@ -126,12 +126,12 @@ const PageWidgetSelectionModal = ({
                 {/* Modal Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                             Add Widget to {slotLabel || slotName}
-                        </h2>
-                        <p className="text-sm text-gray-600 mt-1">
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
                             Choose a widget type to add to your page
-                        </p>
+                        </div>
                     </div>
                     <button
                         onClick={handleClose}
@@ -202,8 +202,8 @@ const PageWidgetSelectionModal = ({
                     ) : filteredWidgets.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">
                             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                            <p className="text-lg font-medium">No widgets found</p>
-                            <p className="text-sm mt-1">Try adjusting your search or filter criteria</p>
+                            <div className="text-lg font-medium">No widgets found</div>
+                            <div className="text-sm mt-1">Try adjusting your search or filter criteria</div>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -218,13 +218,13 @@ const PageWidgetSelectionModal = ({
                                             <Grid className="h-8 w-8 text-gray-400 group-hover:text-blue-500 transition-colors" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
+                                            <div className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors" role="heading" aria-level="3">
                                                 {widget.name}
-                                            </h3>
+                                            </div>
                                             {widget.description && (
-                                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                                <div className="text-xs text-gray-500 mt-1 line-clamp-2">
                                                     {widget.description}
-                                                </p>
+                                                </div>
                                             )}
                                             <div className="flex items-center mt-2 space-x-2">
                                                 {widget.category && (

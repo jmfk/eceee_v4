@@ -369,9 +369,9 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center space-x-2">
                         <Download className="w-5 h-5 text-blue-600" />
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                             {importMode === 'root' ? 'Import Page Tree as Root' : 'Import Page Tree as Subpage'}
-                        </h2>
+                        </div>
                     </div>
                     <button
                         onClick={handleClose}
@@ -409,17 +409,17 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                     <div className="text-sm text-blue-800">
                                         {importMode === 'root' ? (
                                             <div>
-                                                <strong>Import as root page</strong>
-                                                <p className="mt-1 text-blue-700">
+                                                <span className="font-bold">Import as root page</span>
+                                                <div className="mt-1 text-blue-700">
                                                     Pages will be created as a new root page tree. You must specify a hostname.
-                                                </p>
+                                                </div>
                                             </div>
                                         ) : (
                                             <div>
-                                                <strong>Import as subpage</strong>
-                                                <p className="mt-1 text-blue-700">
+                                                <span className="font-bold">Import as subpage</span>
+                                                <div className="mt-1 text-blue-700">
                                                     Pages will be created under: <span className="font-semibold">"{parentPage.title || parentPage.slug}"</span>
-                                                </p>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -489,9 +489,9 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
                                 {requestDelay < 1.0 && (
-                                    <p className="mt-1 text-xs text-yellow-700">
+                                    <div className="mt-1 text-xs text-yellow-700">
                                         ⚠️ Low delay may result in 503 errors. Recommended: 2+ seconds.
-                                    </p>
+                                    </div>
                                 )}
                             </div>
                         </>
@@ -501,7 +501,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                     {error && (
                         <div className="flex items-start space-x-2 p-3 bg-red-50 border border-red-200 rounded-md">
                             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-red-800">{error}</p>
+                            <div className="text-sm text-red-800">{error}</div>
                         </div>
                     )}
 
@@ -537,11 +537,11 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                             <div className="flex items-center space-x-2">
                                 <Loader2 className="w-4 h-4 text-yellow-600 animate-spin flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-yellow-900">Processing:</p>
-                                    <p className="text-sm font-semibold text-yellow-800" title={currentUrl}>
+                                    <div className="text-xs font-medium text-yellow-900">Processing:</div>
+                                    <div className="text-sm font-semibold text-yellow-800" title={currentUrl}>
                                         {getShortUrl(currentUrl)}
-                                    </p>
-                                    <p className="text-xs text-yellow-600 truncate">{currentUrl}</p>
+                                    </div>
+                                    <div className="text-xs text-yellow-600 truncate">{currentUrl}</div>
                                 </div>
                             </div>
                         </div>
@@ -555,9 +555,9 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                 {/* Queue */}
                                 {queue.length > 0 && (
                                     <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
-                                        <p className="text-sm font-medium text-blue-900 mb-2">
+                                        <div className="text-sm font-medium text-blue-900 mb-2">
                                             📋 Queue ({queue.length})
-                                        </p>
+                                        </div>
                                         <div className="max-h-48 overflow-y-auto space-y-1">
                                             {queue.slice(0, 20).map((url, idx) => (
                                                 <div key={idx} className="flex items-center justify-between gap-2 text-xs bg-white p-2 rounded">
@@ -577,9 +577,9 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                                 </div>
                                             ))}
                                             {queue.length > 20 && (
-                                                <p className="text-xs text-blue-600 text-center py-1">
+                                                <div className="text-xs text-blue-600 text-center py-1">
                                                     ... and {queue.length - 20} more
-                                                </p>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -588,16 +588,16 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                                 {/* Failed */}
                                 {failed.length > 0 && (
                                     <div className="bg-red-50 rounded-md p-3 border border-red-200">
-                                        <p className="text-sm font-medium text-red-900 mb-2">
+                                        <div className="text-sm font-medium text-red-900 mb-2">
                                             ✗ Failed ({failed.length})
-                                        </p>
+                                        </div>
                                         <div className="max-h-48 overflow-y-auto space-y-2">
                                             {failed.map((item, idx) => (
                                                 <div key={idx} className="bg-white p-2 rounded text-xs">
-                                                    <p className="text-red-700 font-medium" title={item.url}>
+                                                    <div className="text-red-700 font-medium" title={item.url}>
                                                         {getShortUrl(item.url)}
-                                                    </p>
-                                                    <p className="text-red-600 mt-1 text-xs">{item.error}</p>
+                                                    </div>
+                                                    <div className="text-red-600 mt-1 text-xs">{item.error}</div>
                                                 </div>
                                             ))}
                                         </div>
@@ -608,25 +608,25 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
                             {/* Right column: Completed */}
                             {completed.length > 0 && (
                                 <div className="bg-green-50 rounded-md p-3 border border-green-200">
-                                    <p className="text-sm font-medium text-green-900 mb-2">
+                                    <div className="text-sm font-medium text-green-900 mb-2">
                                         ✓ Completed ({completed.length})
-                                    </p>
+                                    </div>
                                     <div className="max-h-[400px] overflow-y-auto space-y-1">
                                         {completed.map((item, idx) => (
                                             <div key={idx} className="bg-white p-2 rounded text-xs">
-                                                <p className="font-medium text-green-900">{item.title}</p>
-                                                <p className="text-green-700">{item.fullPath}</p>
+                                                <div className="font-medium text-green-900">{item.title}</div>
+                                                <div className="text-green-700">{item.fullPath}</div>
                                                 {item.skipped && (
-                                                    <p className="text-orange-600 text-xs mt-1">
+                                                    <div className="text-orange-600 text-xs mt-1">
                                                         ⚠️ {item.reason}
-                                                    </p>
+                                                    </div>
                                                 )}
                                                 {item.warnings && item.warnings.length > 0 && (
                                                     <div className="mt-1 space-y-1">
                                                         {item.warnings.map((warning, wIdx) => (
-                                                            <p key={wIdx} className="text-amber-600 text-xs">
+                                                            <div key={wIdx} className="text-amber-600 text-xs">
                                                                 ⚠️ {warning.message}
-                                                            </p>
+                                                            </div>
                                                         ))}
                                                     </div>
                                                 )}

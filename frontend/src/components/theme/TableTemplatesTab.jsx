@@ -113,7 +113,7 @@ const TableTemplatesTab = ({ tableTemplates, onChange, onDirty }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Table Templates</h3>
+                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Table Templates</div>
                 <CopyButton
                     data={tableTemplates}
                     level="section"
@@ -131,7 +131,7 @@ const TableTemplatesTab = ({ tableTemplates, onChange, onDirty }) => {
 
             {/* Add Template Form */}
             <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Add Table Template</h4>
+                <div className="text-sm font-semibold text-gray-900 mb-3" role="heading" aria-level="4">Add Table Template</div>
                 <div className="flex gap-2">
                     <input
                         type="text"
@@ -160,7 +160,7 @@ const TableTemplatesTab = ({ tableTemplates, onChange, onDirty }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {/* Templates sidebar */}
                     <div className="space-y-2">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Your Templates</h4>
+                        <div className="text-sm font-semibold text-gray-700 mb-2" role="heading" aria-level="4">Your Templates</div>
                         {templateEntries.map(([key, template]) => (
                             <div
                                 key={key}
@@ -224,9 +224,9 @@ const TableTemplatesTab = ({ tableTemplates, onChange, onDirty }) => {
             ) : (
                 <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                     <TableIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                    <p className="text-gray-500">
+                    <div className="text-gray-500">
                         No table templates defined. Add a template to get started.
-                    </p>
+                    </div>
                 </div>
             )}
         </div>
@@ -300,7 +300,7 @@ const TableTemplateEditor = ({ templateKey, template, editMode, onEditModeChange
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {/* Header */}
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                <h4 className="font-semibold text-gray-900">{templateKey}</h4>
+                <div className="font-semibold text-gray-900" role="heading" aria-level="4">{templateKey}</div>
 
                 <div className="flex gap-2">
                     <button
@@ -351,9 +351,9 @@ const TableTemplateEditor = ({ templateKey, template, editMode, onEditModeChange
                                     placeholder="unique-key-name"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-1">
                                     Lowercase letters, numbers, and hyphens only
-                                </p>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">

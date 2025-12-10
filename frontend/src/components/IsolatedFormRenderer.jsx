@@ -404,7 +404,7 @@ const IsolatedFormRenderer = React.memo(({
     if (!schemaProperties) {
         return (
             <div className="text-center text-gray-500 py-8 p-4">
-                <p>No configuration options available for this widget.</p>
+                <div>No configuration options available for this widget.</div>
             </div>
         )
     }

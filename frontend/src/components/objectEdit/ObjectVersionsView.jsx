@@ -46,17 +46,17 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
                 <div className="flex-1 min-w-0">
                     <div className="space-y-6">
                         <div className="bg-white p-6">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                            <div className="text-xl font-semibold text-gray-900 mb-6 flex items-center" role="heading" aria-level="2">
                                 <History className="h-5 w-5 mr-2" />
                                 Version History
-                            </h2>
+                            </div>
 
                             <div className="text-center py-12 bg-gray-50 rounded-lg">
                                 <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Version History Yet</h3>
-                                <p className="text-gray-600 mb-4">
+                                <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No Version History Yet</div>
+                                <div className="text-gray-600 mb-4">
                                     Version history will be available after saving this {objectType?.label?.toLowerCase()}.
-                                </p>
+                                </div>
                                 <button
                                     onClick={onSave}
                                     className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
@@ -76,24 +76,24 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
             <div className="flex-1 min-w-0">
                 <div className="space-y-6">
                     <div className="bg-white p-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                        <div className="text-xl font-semibold text-gray-900 mb-6 flex items-center" role="heading" aria-level="2">
                             <History className="h-5 w-5 mr-2" />
                             Version History
-                        </h2>
+                        </div>
 
                         <div className="space-y-6">
                             {/* Version Control Info */}
                             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                                <h3 className="text-sm font-medium text-blue-900 mb-2">About Version Control</h3>
-                                <p className="text-blue-800 text-sm">
+                                <div className="text-sm font-medium text-blue-900 mb-2" role="heading" aria-level="3">About Version Control</div>
+                                <div className="text-blue-800 text-sm">
                                     All changes to this object are automatically tracked. You can view the complete
                                     version history, compare changes between versions, and restore previous versions if needed.
-                                </p>
+                                </div>
                             </div>
 
                             {/* Current Version Info */}
                             <div className="bg-gray-50 rounded-md p-4">
-                                <h3 className="text-sm font-medium text-gray-900 mb-2">Current Version</h3>
+                                <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="3">Current Version</div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                     <div>
                                         <span className="font-medium text-gray-700">Version:</span>
@@ -114,9 +114,9 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
 
                             {/* Version List */}
                             <div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                                <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">
                                     Version History ({versions.length} versions)
-                                </h3>
+                                </div>
 
                                 {versionsLoading ? (
                                     <div className="flex justify-center py-8">
@@ -172,9 +172,9 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
                                                 </div>
 
                                                 <div className="mt-2">
-                                                    <p className="text-sm text-gray-700">
+                                                    <div className="text-sm text-gray-700">
                                                         {getChangesSummary(version)}
-                                                    </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -182,9 +182,9 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
                                 ) : (
                                     <div className="text-center py-8 bg-gray-50 rounded-lg">
                                         <History className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                        <p className="text-gray-600">
+                                        <div className="text-gray-600">
                                             No version history available yet.
-                                        </p>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -201,7 +201,7 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
                             <div className="space-y-6">
                                 {/* Version Metadata */}
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <h3 className="font-medium text-gray-900 mb-3">Version Information</h3>
+                                    <div className="font-medium text-gray-900 mb-3" role="heading" aria-level="3">Version Information</div>
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                         <div>
                                             <span className="font-medium text-gray-700">Version:</span>
@@ -226,7 +226,7 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
 
                                 {/* Version Data Preview */}
                                 <div>
-                                    <h3 className="font-medium text-gray-900 mb-3">Data Snapshot</h3>
+                                    <div className="font-medium text-gray-900 mb-3" role="heading" aria-level="3">Data Snapshot</div>
                                     <div className="bg-gray-50 rounded-lg p-4">
                                         <pre className="text-sm text-gray-700 overflow-auto max-h-64">
                                             {JSON.stringify(selectedVersion.data, null, 2)}
@@ -237,7 +237,7 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
                                 {/* Version Widgets Preview */}
                                 {selectedVersion.widgets && Object.keys(selectedVersion.widgets).length > 0 && (
                                     <div>
-                                        <h3 className="font-medium text-gray-900 mb-3">Widget Configuration</h3>
+                                        <div className="font-medium text-gray-900 mb-3" role="heading" aria-level="3">Widget Configuration</div>
                                         <div className="bg-gray-50 rounded-lg p-4">
                                             <pre className="text-sm text-gray-700 overflow-auto max-h-64">
                                                 {JSON.stringify(selectedVersion.widgets, null, 2)}

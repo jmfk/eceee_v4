@@ -46,11 +46,11 @@ const WidgetExamples = ({ examples, widgetType, onApplyExample }) => {
                 <div className="flex items-start gap-3">
                     <FileCode className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-blue-900">
-                        <p className="font-medium mb-1">Configuration Examples</p>
-                        <p>
+                        <div className="font-medium mb-1">Configuration Examples</div>
+                        <div>
                             These examples show common widget configurations. All examples use camelCase
                             for field names as expected by the frontend API.
-                        </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -146,11 +146,11 @@ function ExampleCard({ title, description, config, exampleType, isCopied, onCopy
         <div className={`border rounded-lg ${colorScheme.border}`}>
             {/* Header */}
             <div className={`p-4 ${colorScheme.bg} rounded-t-lg border-b ${colorScheme.border}`}>
-                <h3 className={`font-semibold ${colorScheme.text}`}>{title}</h3>
+                <div className={`font-semibold ${colorScheme.text}`} role="heading" aria-level="3">{title}</div>
                 {description && (
-                    <p className={`text-sm mt-1 ${colorScheme.text} opacity-90`}>
+                    <div className={`text-sm mt-1 ${colorScheme.text} opacity-90`}>
                         {description}
-                    </p>
+                    </div>
                 )}
             </div>
 

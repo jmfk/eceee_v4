@@ -192,15 +192,15 @@ const ObjectTypeManager = () => {
                 {!isLoading && filteredTypes.length === 0 && (
                     <div className="text-center py-12">
                         <Database className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
                             {searchTerm ? 'No matching object types' : 'No object types yet'}
-                        </h3>
-                        <p className="text-gray-600 mb-6">
+                        </div>
+                        <div className="text-gray-600 mb-6">
                             {searchTerm
                                 ? 'Try adjusting your search terms'
                                 : 'Create your first object type to get started'
                             }
-                        </p>
+                        </div>
                         {!searchTerm && (
                             <button
                                 onClick={handleCreateNew}
@@ -243,22 +243,22 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                 <div className="p-6">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                    <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">
                         Delete Object Type
-                    </h2>
+                    </div>
 
-                    <p className="text-gray-600 mb-4">
-                        Are you sure you want to delete <strong>"{objectType.label}"</strong>?
-                    </p>
+                    <div className="text-gray-600 mb-4">
+                        Are you sure you want to delete <span className="font-bold">"{objectType.label}"</span>?
+                    </div>
 
                     {hasInstances && (
                         <div className="bg-orange-50 border-2 border-orange-400 rounded-md p-4 mb-4">
                             <div className="flex items-start">
                                 <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 mr-2 flex-shrink-0" />
                                 <div className="flex-1">
-                                    <p className="text-sm font-medium text-orange-800 mb-2">
+                                    <div className="text-sm font-medium text-orange-800 mb-2">
                                         Warning: This object type has {objectType.instanceCount} existing instance{objectType.instanceCount === 1 ? '' : 's'}
-                                    </p>
+                                    </div>
                                     <label className="flex items-start cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -267,7 +267,7 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
                                             className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mt-0.5 mr-2"
                                         />
                                         <span className="text-sm text-orange-800">
-                                            <strong>Delete all {objectType.instanceCount} instance{objectType.instanceCount === 1 ? '' : 's'}</strong> along with the object type. This action cannot be undone.
+                                            <span className="font-bold">Delete all {objectType.instanceCount} instance{objectType.instanceCount === 1 ? '' : 's'}</span> along with the object type. This action cannot be undone.
                                         </span>
                                     </label>
                                 </div>
@@ -275,9 +275,9 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
                         </div>
                     )}
 
-                    <p className="text-sm text-gray-500 mb-6">
+                    <div className="text-sm text-gray-500 mb-6">
                         This action cannot be undone.
-                    </p>
+                    </div>
 
                     <div className="flex space-x-3">
                         <button
@@ -332,8 +332,8 @@ const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
                             </div>
                         )}
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900">{objectType.label}</h3>
-                            <p className="text-sm text-gray-500">{objectType.name}</p>
+                            <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">{objectType.label}</div>
+                            <div className="text-sm text-gray-500">{objectType.name}</div>
                         </div>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
@@ -342,9 +342,9 @@ const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
                 </div>
 
                 {objectType.description && (
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    <div className="text-gray-600 text-sm mb-4 line-clamp-2">
                         {objectType.description}
-                    </p>
+                    </div>
                 )}
 
                 <div className="flex items-center justify-between text-sm mb-4">

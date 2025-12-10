@@ -236,7 +236,7 @@ const VersionManager = ({ pageId, onClose }) => {
 
             <div className="space-y-2 text-sm text-gray-600">
                 {version.description && (
-                    <p className="text-gray-800">{version.description}</p>
+                    <div className="text-gray-800">{version.description}</div>
                 )}
                 <div className="flex items-center space-x-4">
                     <span className="flex items-center">
@@ -309,7 +309,7 @@ const VersionManager = ({ pageId, onClose }) => {
     const ComparisonView = () => (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Version Comparison</h3>
+                <div className="text-lg font-semibold" role="heading" aria-level="3">Version Comparison</div>
                 <button
                     onClick={() => {
                         setActiveTab('list')
@@ -329,26 +329,26 @@ const VersionManager = ({ pageId, onClose }) => {
                 <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-6">
                         <div className="border rounded-lg p-4">
-                            <h4 className="font-semibold mb-2">Version {compareVersions.version1.versionNumber}</h4>
-                            <p className="text-sm text-gray-600">{compareVersions.version1.description}</p>
-                            <p className="text-xs text-gray-500 mt-2">{compareVersions.version1.formattedDate}</p>
+                            <div className="font-semibold mb-2" role="heading" aria-level="4">Version {compareVersions.version1.versionNumber}</div>
+                            <div className="text-sm text-gray-600">{compareVersions.version1.description}</div>
+                            <div className="text-xs text-gray-500 mt-2">{compareVersions.version1.formattedDate}</div>
                         </div>
                         <div className="border rounded-lg p-4">
-                            <h4 className="font-semibold mb-2">Version {compareVersions.version2.versionNumber}</h4>
-                            <p className="text-sm text-gray-600">{compareVersions.version2.description}</p>
-                            <p className="text-xs text-gray-500 mt-2">{compareVersions.version2.formattedDate}</p>
+                            <div className="font-semibold mb-2" role="heading" aria-level="4">Version {compareVersions.version2.versionNumber}</div>
+                            <div className="text-sm text-gray-600">{compareVersions.version2.description}</div>
+                            <div className="text-xs text-gray-500 mt-2">{compareVersions.version2.formattedDate}</div>
                         </div>
                     </div>
 
                     <div className="border rounded-lg p-4">
-                        <h4 className="font-semibold mb-4">Changes</h4>
+                        <div className="font-semibold mb-4" role="heading" aria-level="4">Changes</div>
                         {comparisonData.changes.fieldsChanged.length > 0 && (
                             <div className="mb-4">
-                                <h5 className="font-medium text-sm mb-2">Field Changes:</h5>
+                                <div className="font-medium text-sm mb-2" role="heading" aria-level="5">Field Changes:</div>
                                 <div className="space-y-2">
                                     {comparisonData.changes.fieldsChanged.map((change, index) => (
                                         <div key={index} className="text-sm bg-yellow-50 p-2 rounded">
-                                            <strong>{change.field}:</strong> {String(change.oldValue)} → {String(change.newValue)}
+                                            <span className="font-bold">{change.field}:</span> {String(change.oldValue)} → {String(change.newValue)}
                                         </div>
                                     ))}
                                 </div>
@@ -357,27 +357,27 @@ const VersionManager = ({ pageId, onClose }) => {
 
                         {comparisonData.changes.widgetsAdded.length > 0 && (
                             <div className="mb-4">
-                                <h5 className="font-medium text-sm mb-2">Widgets Added:</h5>
+                                <div className="font-medium text-sm mb-2" role="heading" aria-level="5">Widgets Added:</div>
                                 <div className="text-sm text-green-600">{comparisonData.changes.widgetsAdded.length} widgets added</div>
                             </div>
                         )}
 
                         {comparisonData.changes.widgetsRemoved.length > 0 && (
                             <div className="mb-4">
-                                <h5 className="font-medium text-sm mb-2">Widgets Removed:</h5>
+                                <div className="font-medium text-sm mb-2" role="heading" aria-level="5">Widgets Removed:</div>
                                 <div className="text-sm text-red-600">{comparisonData.changes.widgetsRemoved.length} widgets removed</div>
                             </div>
                         )}
 
                         {comparisonData.changes.widgetsModified.length > 0 && (
                             <div className="mb-4">
-                                <h5 className="font-medium text-sm mb-2">Widgets Modified:</h5>
+                                <div className="font-medium text-sm mb-2" role="heading" aria-level="5">Widgets Modified:</div>
                                 <div className="text-sm text-blue-600">{comparisonData.changes.widgetsModified.length} widgets modified</div>
                             </div>
                         )}
 
                         {Object.values(comparisonData.changes).every(arr => arr.length === 0) && (
-                            <p className="text-gray-500 text-sm">No changes detected between these versions.</p>
+                            <div className="text-gray-500 text-sm">No changes detected between these versions.</div>
                         )}
                     </div>
                 </div>
@@ -392,7 +392,7 @@ const VersionManager = ({ pageId, onClose }) => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                             <History className="h-6 w-6 text-blue-600" />
-                            <h2 className="text-xl font-semibold">Version Manager</h2>
+                            <div className="text-xl font-semibold" role="heading" aria-level="2">Version Manager</div>
                         </div>
                         <button
                             onClick={onClose}
@@ -444,7 +444,7 @@ const VersionManager = ({ pageId, onClose }) => {
                                         {formattedVersions.length === 0 && (
                                             <div className="text-center py-8 text-gray-500">
                                                 <History className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                                                <p>No versions found for this page.</p>
+                                                <div>No versions found for this page.</div>
                                             </div>
                                         )}
                                     </div>

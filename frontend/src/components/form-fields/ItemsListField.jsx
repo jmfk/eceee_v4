@@ -347,7 +347,7 @@ const ItemsListField = ({
                     {itemsRef.current.length === 0 ? (
                         <div className="p-8 text-center">
                             <List className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                            <p className="text-sm text-gray-500 mb-4">{emptyText}</p>
+                            <div className="text-sm text-gray-500 mb-4">{emptyText}</div>
                             {allowAdd && !disabled && (
                                 <button
                                     type="button"
@@ -390,7 +390,7 @@ const ItemsListField = ({
 
             {/* Description */}
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Validation Message */}

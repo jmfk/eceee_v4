@@ -77,9 +77,9 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
                         {getIcon()}
-                        <h3 className={`font-semibold text-sm ${getTextColor()}`}>
+                        <div className={`font-semibold text-sm ${getTextColor()}`} role="heading" aria-level="3">
                             {type === 'success' ? 'Success' : type === 'warning' ? 'Warning' : type === 'info' ? 'Information' : 'Error'}
-                        </h3>
+                        </div>
                     </div>
                     <button
                         onClick={handleClose}
@@ -92,17 +92,17 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
 
                 {/* Content */}
                 <div>
-                    <p className={`text-sm ${getTextColor()}`}>
+                    <div className={`text-sm ${getTextColor()}`}>
                         {typeof message === 'string'
                             ? message
                             : message.message || message.response?.data?.detail || 'An error occurred'
                         }
-                    </p>
+                    </div>
 
                     {/* Show additional error details if available */}
                     {message.response?.data?.detail && (
                         <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-700">
-                            <strong>Details:</strong> {message.response.data.detail}
+                            <span className="font-bold">Details:</span> {message.response.data.detail}
                         </div>
                     )}
 

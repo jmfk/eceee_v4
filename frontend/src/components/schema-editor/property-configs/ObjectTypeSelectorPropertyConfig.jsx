@@ -102,7 +102,7 @@ export default function ObjectTypeSelectorPropertyConfig({
 
       {/* Object Type Selector Specific Configuration */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Object Type Selector Configuration</h4>
+        <div className="text-sm font-medium text-gray-900 mb-3" role="heading" aria-level="4">Object Type Selector Configuration</div>
 
         {/* Multiple Selection */}
         <div className="flex items-start space-x-3 mb-4">
@@ -119,9 +119,9 @@ export default function ObjectTypeSelectorPropertyConfig({
             <label htmlFor={`multiple-${property.key}`} className="text-sm font-medium text-gray-700">
               Allow Multiple Selection
             </label>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
               Enable to allow selecting multiple object types
-            </p>
+            </div>
           </div>
         </div>
 
@@ -166,9 +166,9 @@ export default function ObjectTypeSelectorPropertyConfig({
             </div>
           )}
           
-          <p className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-gray-500 mt-1">
             Leave empty to allow all object types, or select specific types to restrict the selection
-          </p>
+          </div>
           {selectedTypes.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {selectedTypes.map(typeName => {

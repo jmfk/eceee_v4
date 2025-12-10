@@ -166,8 +166,8 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Gallery Styles</h3>
-                    <p className="text-sm text-gray-500 mt-1">Define custom gallery templates using Mustache syntax</p>
+                    <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Gallery Styles</div>
+                    <div className="text-sm text-gray-500 mt-1">Define custom gallery templates using Mustache syntax</div>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -212,7 +212,7 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
                 <div className="grid grid-cols-2 gap-6">
                     {/* List panel */}
                     <div className="space-y-2">
-                        <h4 className="text-sm font-semibold text-gray-700">Gallery Styles</h4>
+                        <div className="text-sm font-semibold text-gray-700" role="heading" aria-level="4">Gallery Styles</div>
                         {styleEntries.map(([key, style]) => (
                             <div
                                 key={key}
@@ -265,9 +265,9 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
             ) : (
                 <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                     <Grid3X3 className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                    <p className="text-gray-500">
+                    <div className="text-gray-500">
                         No gallery styles defined. Add a style to get started.
-                    </p>
+                    </div>
                 </div>
             )}
 

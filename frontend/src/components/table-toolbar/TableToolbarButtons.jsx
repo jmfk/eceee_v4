@@ -304,7 +304,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
 
                 {showBorderPicker && (
                     <div ref={borderPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-50 w-72">
-                        <h4 className="font-medium mb-2">Border Configuration</h4>
+                        <div className="font-medium mb-2" role="heading" aria-level="4">Border Configuration</div>
 
                         {state.selectedCellsCount > 0 && (
                             <div className="mb-2 text-xs bg-gray-50 text-gray-600 px-2 py-1">
@@ -313,7 +313,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                         )}
 
                         <div className="mb-3">
-                            <p className="text-sm text-gray-600 mb-1">Sides:</p>
+                            <div className="text-sm text-gray-600 mb-1">Sides:</div>
                             <div className="grid grid-cols-2 gap-2">
                                 {['top', 'bottom', 'left', 'right'].map(side => (
                                     <label
@@ -341,7 +341,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                         </div>
 
                         <div className="mb-3">
-                            <p className="text-sm text-gray-600 mb-1">Width:</p>
+                            <div className="text-sm text-gray-600 mb-1">Width:</div>
                             <select value={borderWidth} onChange={(e) => setBorderWidth(e.target.value)} className="w-full p-2 border text-sm">
                                 <option value="1px">1px</option>
                                 <option value="2px">2px</option>
@@ -350,7 +350,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                         </div>
 
                         <div className="mb-3">
-                            <p className="text-sm text-gray-600 mb-1">Style:</p>
+                            <div className="text-sm text-gray-600 mb-1">Style:</div>
                             <select value={borderStyle} onChange={(e) => setBorderStyle(e.target.value)} className="w-full p-2 border text-sm">
                                 <option value="solid">Solid</option>
                                 <option value="double">Double</option>
@@ -358,7 +358,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                         </div>
 
                         <div className="mb-3">
-                            <p className="text-sm text-gray-600 mb-1">Color:</p>
+                            <div className="text-sm text-gray-600 mb-1">Color:</div>
                             <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 border cursor-pointer" />
                         </div>
                     </div>
@@ -381,7 +381,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
 
                     {showColorPicker && (
                         <div ref={colorPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-50 w-64">
-                            <h4 className="font-medium mb-3 text-sm">Cell Colors</h4>
+                            <div className="font-medium mb-3 text-sm" role="heading" aria-level="4">Cell Colors</div>
 
                             <div className="mb-3">
                                 <label className="block text-xs text-gray-600 mb-1">Background</label>

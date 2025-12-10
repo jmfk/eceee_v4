@@ -463,22 +463,22 @@ export function mergeGroupElements(defaultElements = {}, specificElements = {}) 
  */
 export function getSupportedHTMLElements() {
     return [
-        { tag: 'h1', label: 'Heading 1', preview: 'Large Heading' },
-        { tag: 'h2', label: 'Heading 2', preview: 'Medium Heading' },
-        { tag: 'h3', label: 'Heading 3', preview: 'Small Heading' },
-        { tag: 'h4', label: 'Heading 4', preview: 'Smaller Heading' },
-        { tag: 'h5', label: 'Heading 5', preview: 'Tiny Heading' },
-        { tag: 'h6', label: 'Heading 6', preview: 'Smallest Heading' },
-        { tag: 'p', label: 'Paragraph', preview: 'This is a paragraph of text.' },
+        { tag: 'text-h1', label: 'Heading 1', preview: 'Large Heading', className: 'text-4xl font-semibold mb-6' },
+        { tag: 'text-h2', label: 'Heading 2', preview: 'Medium Heading', className: 'text-3xl font-medium mb-6' },
+        { tag: 'text-h3', label: 'Heading 3', preview: 'Small Heading', className: 'text-2xl font-bold mb-6' },
+        { tag: 'text-h4', label: 'Heading 4', preview: 'Smaller Heading', className: 'text-xl font-semibold mb-4' },
+        { tag: 'text-h5', label: 'Heading 5', preview: 'Tiny Heading', className: 'text-lg font-semibold mb-4' },
+        { tag: 'text-h6', label: 'Heading 6', preview: 'Smallest Heading', className: 'text-base font-semibold mb-4' },
+        { tag: 'text-p', label: 'Paragraph', preview: 'This is a paragraph of text.', className: 'text-base font-light mb-6' },
         { tag: 'a', label: 'Link', preview: 'This is a link' },
-        { tag: 'ul', label: 'Unordered List', preview: 'Bulleted list' },
-        { tag: 'ol', label: 'Ordered List', preview: 'Numbered list' },
-        { tag: 'li', label: 'List Item', preview: 'List item text' },
-        { tag: 'blockquote', label: 'Blockquote', preview: 'This is a quote' },
-        { tag: 'code', label: 'Inline Code', preview: 'const code = true;' },
-        { tag: 'pre', label: 'Code Block', preview: 'Code block' },
-        { tag: 'strong', label: 'Bold', preview: 'Bold text' },
-        { tag: 'em', label: 'Italic', preview: 'Italic text' },
+        { tag: 'text-ul', label: 'Unordered List', preview: 'Bulleted list', className: 'mb-6 pl-6' },
+        { tag: 'text-ol', label: 'Ordered List', preview: 'Numbered list', className: 'mb-6 pl-6' },
+        { tag: 'text-li', label: 'List Item', preview: 'List item text', className: 'mb-2' },
+        { tag: 'text-blockquote', label: 'Blockquote', preview: 'This is a quote', className: 'border-l-4 border-blue-500 pl-4 my-6 italic' },
+        { tag: 'text-code', label: 'Inline Code', preview: 'const code = true;', className: 'font-mono text-sm bg-gray-100 px-1 py-0.5 rounded' },
+        { tag: 'text-pre', label: 'Code Block', preview: 'Code block', className: 'bg-gray-100 p-4 rounded overflow-x-auto font-mono text-sm' },
+        { tag: 'text-strong', label: 'Bold', preview: 'Bold text', className: 'font-bold' },
+        { tag: 'text-em', label: 'Italic', preview: 'Italic text', className: 'italic' },
     ];
 }
 

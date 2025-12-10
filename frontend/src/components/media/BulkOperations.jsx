@@ -434,12 +434,12 @@ const BulkOperations = ({
                     <div className={`bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-lg shadow-md ${compact ? 'p-4' : 'p-5'}`}>
                         <div className="flex items-center gap-3 mb-4">
                             <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
-                            <h4 className={`font-semibold text-red-800 ${compact ? 'text-base' : 'text-lg'}`}>Confirm Deletion</h4>
+                            <div className={`font-semibold text-red-800 ${compact ? 'text-base' : 'text-lg'}`} role="heading" aria-level="4">Confirm Deletion</div>
                         </div>
-                        <p className={`text-red-700 mb-4 leading-relaxed ${compact ? 'text-sm' : ''}`}>
+                        <div className={`text-red-700 mb-4 leading-relaxed ${compact ? 'text-sm' : ''}`}>
                             This action will permanently delete {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
                             and cannot be undone. All references to these files will be broken.
-                        </p>
+                        </div>
                         <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gradient-to-r hover:from-red-100 hover:to-pink-100 transition-all duration-200 hover:shadow-sm">
                             <input
                                 type="checkbox"
@@ -474,9 +474,9 @@ const BulkOperations = ({
             {showSelectionHeader && selectedFiles.length > 0 && (
                 <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border-b border-blue-200">
                     <div className="flex justify-between items-center px-4 py-3">
-                        <p className="text-sm text-blue-800 font-semibold">
+                        <div className="text-sm text-blue-800 font-semibold">
                             {selectedFiles.length} file(s) selected
-                        </p>
+                        </div>
                         <div className="flex items-center gap-2">
                             <select
                                 value={operation}
@@ -514,7 +514,7 @@ const BulkOperations = ({
                         {/* Operation Selection - only show if no initial operation and not showing selection header */}
                         {!operation && !initialOperation && !showSelectionHeader && (
                             <div className="p-6 space-y-4 bg-gradient-to-br from-white to-gray-50">
-                                <h4 className="font-bold text-gray-900 text-xl mb-4 text-center">Select Operation</h4>
+                                <div className="font-bold text-gray-900 text-xl mb-4 text-center" role="heading" aria-level="4">Select Operation</div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {operations.map(op => (
                                         <button
@@ -577,7 +577,7 @@ const BulkOperations = ({
                 ) : (
                     /* Progress Display */
                     <div className="space-y-4">
-                        <h4 className="font-medium text-gray-900">Operation Progress</h4>
+                        <div className="font-medium text-gray-900" role="heading" aria-level="4">Operation Progress</div>
 
                         <div className="space-y-3">
                             {/* Progress Bar */}
@@ -612,7 +612,7 @@ const BulkOperations = ({
                             {/* Error Details */}
                             {progress.errors.length > 0 && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                    <h5 className="font-medium text-red-800 mb-2">Errors:</h5>
+                                    <div className="font-medium text-red-800 mb-2" role="heading" aria-level="5">Errors:</div>
                                     <div className="space-y-1 max-h-32 overflow-y-auto">
                                         {progress.errors.map((error, index) => (
                                             <div key={index} className="text-sm text-red-700">

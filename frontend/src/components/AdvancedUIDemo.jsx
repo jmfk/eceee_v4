@@ -125,14 +125,14 @@ const AdvancedUIDemo = () => {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center justify-center space-x-2">
+                <div className="text-2xl font-bold text-gray-900 mb-4 flex items-center justify-center space-x-2" role="heading" aria-level="2">
                     <Sparkles className="w-6 h-6 text-indigo-500" />
                     <span>Advanced UI Patterns</span>
-                </h2>
-                <p className="text-gray-600 max-w-3xl mx-auto">
+                </div>
+                <div className="text-gray-600 max-w-3xl mx-auto">
                     Enterprise-grade UI patterns: rule builders, drag-and-drop lists, rating systems,
                     segmented controls, and enhanced numeric inputs with sophisticated interactions.
-                </p>
+                </div>
             </div>
 
             {/* Example Selector */}
@@ -166,8 +166,8 @@ const AdvancedUIDemo = () => {
                     <div className="flex items-center space-x-3">
                         <currentExample.icon className="w-5 h-5 text-indigo-600" />
                         <div>
-                            <h3 className="text-lg font-medium text-gray-900">{currentExample.title}</h3>
-                            <p className="text-sm text-gray-600">{currentExample.description}</p>
+                            <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">{currentExample.title}</div>
+                            <div className="text-sm text-gray-600">{currentExample.description}</div>
                         </div>
                     </div>
                 </div>
@@ -175,7 +175,7 @@ const AdvancedUIDemo = () => {
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 p-6">
                     {/* Form */}
                     <div>
-                        <h4 className="text-md font-medium text-gray-900 mb-4">Interactive Form</h4>
+                        <div className="text-md font-medium text-gray-900 mb-4" role="heading" aria-level="4">Interactive Form</div>
                         <DynamicFormRenderer
                             schema={currentExample.schema}
                             data={formData}
@@ -187,7 +187,7 @@ const AdvancedUIDemo = () => {
 
                     {/* Data Preview */}
                     <div>
-                        <h4 className="text-md font-medium text-gray-900 mb-4">Form Data</h4>
+                        <div className="text-md font-medium text-gray-900 mb-4" role="heading" aria-level="4">Form Data</div>
                         <div className="bg-gray-50 border border-gray-200 rounded p-4">
                             <pre className="text-sm text-gray-700 overflow-auto max-h-96">
                                 {JSON.stringify(formData, null, 2)}
@@ -196,7 +196,7 @@ const AdvancedUIDemo = () => {
 
                         {/* Field Type Info */}
                         <div className="mt-4 space-y-2">
-                            <h5 className="text-sm font-medium text-gray-900">Advanced UI Patterns:</h5>
+                            <div className="text-sm font-medium text-gray-900" role="heading" aria-level="5">Advanced UI Patterns:</div>
                             <div className="space-y-1">
                                 {Object.values(currentExample.schema.properties).map((field, index) => (
                                     <div key={index} className="flex items-center space-x-2 text-xs">
@@ -216,78 +216,78 @@ const AdvancedUIDemo = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <Filter className="w-8 h-8 text-blue-600 mb-2" />
-                    <h4 className="font-medium text-blue-900">Rule Builder</h4>
-                    <p className="text-sm text-blue-700 mt-1">
+                    <div className="font-medium text-blue-900" role="heading" aria-level="4">Rule Builder</div>
+                    <div className="text-sm text-blue-700 mt-1">
                         Visual query builder with nested AND/OR logic
-                    </p>
+                    </div>
                 </div>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <GripVertical className="w-8 h-8 text-green-600 mb-2" />
-                    <h4 className="font-medium text-green-900">Reorderable List</h4>
-                    <p className="text-sm text-green-700 mt-1">
+                    <div className="font-medium text-green-900" role="heading" aria-level="4">Reorderable List</div>
+                    <div className="text-sm text-green-700 mt-1">
                         Drag-and-drop sortable lists with add/remove
-                    </p>
+                    </div>
                 </div>
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <Star className="w-8 h-8 text-yellow-600 mb-2" />
-                    <h4 className="font-medium text-yellow-900">Rating System</h4>
-                    <p className="text-sm text-yellow-700 mt-1">
+                    <div className="font-medium text-yellow-900" role="heading" aria-level="4">Rating System</div>
+                    <div className="text-sm text-yellow-700 mt-1">
                         Customizable ratings with stars, hearts, or custom icons
-                    </p>
+                    </div>
                 </div>
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <ToggleRight className="w-8 h-8 text-purple-600 mb-2" />
-                    <h4 className="font-medium text-purple-900">Segmented Control</h4>
-                    <p className="text-sm text-purple-700 mt-1">
+                    <div className="font-medium text-purple-900" role="heading" aria-level="4">Segmented Control</div>
+                    <div className="text-sm text-purple-700 mt-1">
                         iOS-style toggle groups with multiple variants
-                    </p>
+                    </div>
                 </div>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <Calculator className="w-8 h-8 text-red-600 mb-2" />
-                    <h4 className="font-medium text-red-900">Numeric Stepper</h4>
-                    <p className="text-sm text-red-700 mt-1">
+                    <div className="font-medium text-red-900" role="heading" aria-level="4">Numeric Stepper</div>
+                    <div className="text-sm text-red-700 mt-1">
                         Enhanced number input with precision controls
-                    </p>
+                    </div>
                 </div>
             </div>
 
             {/* Feature Highlights */}
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Advanced Features</h3>
+                <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Advanced Features</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                     <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Interaction Patterns</h4>
-                        <ul className="space-y-1 text-gray-600">
+                        <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Interaction Patterns</div>
+                        <div className="space-y-1 text-gray-600" role="list">
                             <li>• Drag-and-drop reordering</li>
                             <li>• Visual rule construction</li>
                             <li>• Multi-thumb range sliders</li>
                             <li>• Interactive rating systems</li>
-                        </ul>
+                        </div>
                     </div>
                     <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Advanced Controls</h4>
-                        <ul className="space-y-1 text-gray-600">
+                        <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Advanced Controls</div>
+                        <div className="space-y-1 text-gray-600" role="list">
                             <li>• Fuzzy search algorithms</li>
                             <li>• Async data loading</li>
                             <li>• Keyboard navigation</li>
                             <li>• Touch-friendly interfaces</li>
-                        </ul>
+                        </div>
                     </div>
                     <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Enterprise Features</h4>
-                        <ul className="space-y-1 text-gray-600">
+                        <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Enterprise Features</div>
+                        <div className="space-y-1 text-gray-600" role="list">
                             <li>• Complex validation rules</li>
                             <li>• Accessibility compliance</li>
                             <li>• Performance optimization</li>
                             <li>• Extensible architecture</li>
-                        </ul>
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Implementation Stats */}
             <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Implementation Statistics</h3>
+                <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Implementation Statistics</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                     <div>
                         <div className="text-2xl font-bold text-indigo-600">31</div>

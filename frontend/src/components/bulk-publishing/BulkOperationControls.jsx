@@ -25,12 +25,12 @@ const BulkOperationControls = ({
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Bulk Operations</h2>
+            <div className="text-lg font-semibold text-gray-900 mb-4" role="heading" aria-level="2">Bulk Operations</div>
 
             {/* Operation Type Selection */}
             <div className="space-y-4">
                 <div>
-                    <h3 className="font-medium text-gray-900 mb-3">Operation Type</h3>
+                    <div className="font-medium text-gray-900 mb-3" role="heading" aria-level="3">Operation Type</div>
                     <div className="space-y-2">
                         <label className="flex items-center">
                             <input
@@ -60,7 +60,7 @@ const BulkOperationControls = ({
                 {/* Schedule Settings */}
                 {operation === 'schedule' && (
                     <div className="space-y-4">
-                        <h3 className="font-medium text-gray-900">Schedule Settings</h3>
+                        <div className="font-medium text-gray-900" role="heading" aria-level="3">Schedule Settings</div>
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">

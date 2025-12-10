@@ -60,7 +60,7 @@ const PageSectionsDisplayField = ({
                     </label>
                 )}
                 {description && (
-                    <p className="text-sm text-gray-500">{description}</p>
+                    <div className="text-sm text-gray-500">{description}</div>
                 )}
                 <div className="text-sm text-gray-500 italic bg-gray-50 border border-gray-200 rounded-md p-4">
                     Not available in preview mode. Save the page first to see sections.
@@ -80,7 +80,7 @@ const PageSectionsDisplayField = ({
 
             {/* Description */}
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Sections List */}
@@ -125,9 +125,9 @@ const PageSectionsDisplayField = ({
 
             {/* Info footer */}
             {sectionsWithAnchors && sectionsWithAnchors.length > 0 && (
-                <p className="text-xs text-gray-500 mt-2">
+                <div className="text-xs text-gray-500 mt-2">
                     {sectionsWithAnchors.length} section{sectionsWithAnchors.length === 1 ? '' : 's'} from "{selectedSlot}" slot will be displayed in the navigation.
-                </p>
+                </div>
             )}
         </div>
     )

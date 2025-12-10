@@ -1089,9 +1089,9 @@ const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {
         <div className="fixed inset-0 bg-orange-50/10 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         Edit Hostnames for "{page.title}"
-                    </h3>
+                    </div>
                     <button
                         onClick={onCancel}
                         className="text-gray-400 hover:text-gray-500"
@@ -1114,15 +1114,15 @@ const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             required
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             Enter hostnames separated by commas. Root pages need at least one hostname.
-                        </p>
+                        </div>
                     </div>
 
                     <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <p className="text-sm text-blue-800">
+                        <div className="text-sm text-blue-800">
                             Root pages are accessed directly via these hostnames. Each hostname should point to your server.
-                        </p>
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-end space-x-3 pt-4">

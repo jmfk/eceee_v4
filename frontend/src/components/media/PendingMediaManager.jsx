@@ -810,10 +810,10 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
         <div className="p-6">
             {/* Header */}
             <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Pending Media Files</h2>
-                <p className="text-gray-600">
+                <div className="text-2xl font-bold text-gray-900 mb-2" role="heading" aria-level="2">Pending Media Files</div>
+                <div className="text-gray-600">
                     Review and manage files awaiting approval. Files expire after 24 hours if not processed.
-                </p>
+                </div>
             </div>
 
             {/* Content */}
@@ -830,13 +830,13 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
             ) : (!Array.isArray(pendingFiles) || pendingFiles.length === 0) ? (
                 <div className="text-center py-12">
                     <Upload className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No pending files</h3>
-                    <p className="text-gray-500">
+                    <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No pending files</div>
+                    <div className="text-gray-500">
                         {searchQuery || filters.fileType ?
                             'No files match your current filters.' :
                             'All uploaded files have been processed or no files are awaiting approval.'
                         }
-                    </p>
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -851,9 +851,9 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                         onChange={toggleSelectAll}
                                         className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                     />
-                                    <h3 className="text-lg font-semibold text-blue-900">
+                                    <div className="text-lg font-semibold text-blue-900" role="heading" aria-level="3">
                                         Bulk Actions
-                                    </h3>
+                                    </div>
                                     {selectedFiles.size > 0 && (
                                         <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-600 text-white rounded-full">
                                             {selectedFiles.size} selected
@@ -906,9 +906,9 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                             )}
 
                             {selectedFiles.size === 0 && (
-                                <p className="text-sm text-blue-800">
+                                <div className="text-sm text-blue-800">
                                     Select files using the checkboxes below to apply tags and approve multiple files at once.
-                                </p>
+                                </div>
                             )}
                         </div>
                     )}
@@ -993,12 +993,12 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                     {/* Header Row */}
                                                                     <div className="flex items-center justify-between mb-2">
                                                                         <div className="flex items-center gap-2">
-                                                                            <h3 className="text-sm font-large text-gray-900 truncate">
+                                                                            <div className="text-sm font-large text-gray-900 truncate" role="heading" aria-level="3">
                                                                                 {formData?.title && formData?.title || file.originalFilename}
                                                                                 {formData?.slug && (
                                                                                     <small className="ml-2 rounded text-xs">[{formData.slug}]</small>
                                                                                 )}
-                                                                            </h3>
+                                                                            </div>
                                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full font-medium">
                                                                                 <Check className="w-3 h-3" />
                                                                                 Approved
@@ -1077,9 +1077,9 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                     </div>
                                                                     <div className="flex-1">
                                                                         <div className="flex items-center gap-2 mb-2">
-                                                                            <h3 className="text-sm font-medium text-gray-900">
+                                                                            <div className="text-sm font-medium text-gray-900" role="heading" aria-level="3">
                                                                                 {file.originalFilename}
-                                                                            </h3>
+                                                                            </div>
                                                                             <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full font-medium">
                                                                                 <X className="w-3 h-3" />
                                                                                 Rejected
@@ -1126,9 +1126,9 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                 {Object.keys(markedFiles).length > 0 && (
                                     <div className="mx-4">
                                         <div className="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-                                            <h3 className="text-lg font-semibold text-blue-900 mb-4">
+                                            <div className="text-lg font-semibold text-blue-900 mb-4" role="heading" aria-level="3">
                                                 Submit Marked Files ({Object.keys(markedFiles).length})
-                                            </h3>
+                                            </div>
 
                                             <div className="space-y-4">
                                                 {/* Collection Selection */}
@@ -1217,13 +1217,13 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                     />
                                                                 </div>
                                                                 <div className="flex-1">
-                                                                    <h4 className="text-base font-semibold text-gray-900">
+                                                                    <div className="text-base font-semibold text-gray-900" role="heading" aria-level="4">
                                                                         {file.originalFilename}
-                                                                    </h4>
+                                                                    </div>
                                                                     {selectedFiles.has(file.id) && (
-                                                                        <p className="text-sm text-blue-600 mt-1">
+                                                                        <div className="text-sm text-blue-600 mt-1">
                                                                             Selected for bulk actions
-                                                                        </p>
+                                                                        </div>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -1336,17 +1336,17 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                                 placeholder="Optional annotation text"
                                                                                 rows={2}
                                                                             />
-                                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                            <div className="text-xs text-gray-500 mt-1">
                                                                                 Additional annotation text displayed in the user interface
-                                                                            </p>
+                                                                            </div>
                                                                         </div>
 
                                                                         {/* Tags Section */}
                                                                         <div>
                                                                             <div className="flex items-center justify-between mb-3">
-                                                                                <h4 className="text-sm font-medium text-gray-700">
+                                                                                <div className="text-sm font-medium text-gray-700" role="heading" aria-level="4">
                                                                                     Tags <span className="text-red-500">*</span>
-                                                                                </h4>
+                                                                                </div>
                                                                                 {(!formData.tags || formData.tags.length === 0) && (
                                                                                     <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded">
                                                                                         <AlertCircle className="w-3 h-3" />

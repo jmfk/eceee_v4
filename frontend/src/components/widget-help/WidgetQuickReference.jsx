@@ -55,12 +55,12 @@ const WidgetQuickReference = ({ widgetType, onClose, isOpen }) => {
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                             {widgetData?.name || 'Widget'} Quick Reference
-                        </h2>
-                        <p className="text-sm text-gray-600 mt-1">
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
                             {widgetData?.type}
-                        </p>
+                        </div>
                     </div>
                     <button
                         onClick={onClose}
@@ -133,14 +133,14 @@ function OverviewTab({ widgetData }) {
         <div className="space-y-6">
             {/* Description */}
             <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-                <p className="text-gray-700 leading-relaxed">{widgetData.description}</p>
+                <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="3">Description</div>
+                <div className="text-gray-700 leading-relaxed">{widgetData.description}</div>
             </div>
 
             {/* Category */}
             {widgetData.category && (
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Category</h3>
+                    <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="3">Category</div>
                     <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                         {widgetData.category}
                     </span>
@@ -150,7 +150,7 @@ function OverviewTab({ widgetData }) {
             {/* Special Features */}
             {widgetData.specialFeatures && (
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Special Features</h3>
+                    <div className="text-lg font-semibold text-gray-900 mb-3" role="heading" aria-level="3">Special Features</div>
                     <div className="grid grid-cols-2 gap-4">
                         {widgetData.specialFeatures.hasSpecialEditor && (
                             <FeatureBadge
@@ -185,7 +185,7 @@ function OverviewTab({ widgetData }) {
                     {/* Slot Information */}
                     {widgetData.specialFeatures.isContainer && widgetData.specialFeatures.slots && (
                         <div className="mt-4">
-                            <h4 className="font-medium text-gray-900 mb-2">Available Slots</h4>
+                            <div className="font-medium text-gray-900 mb-2" role="heading" aria-level="4">Available Slots</div>
                             <div className="space-y-2">
                                 {Object.entries(widgetData.specialFeatures.slots).map(([slotName, slotDef]) => (
                                     <div key={slotName} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -197,7 +197,7 @@ function OverviewTab({ widgetData }) {
                                                 Max: {slotDef.max_widgets || '∞'}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-gray-600 mt-1">{slotDef.description}</p>
+                                        <div className="text-sm text-gray-600 mt-1">{slotDef.description}</div>
                                     </div>
                                 ))}
                             </div>
@@ -208,7 +208,7 @@ function OverviewTab({ widgetData }) {
 
             {/* Template Information */}
             <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Template</h3>
+                <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="3">Template</div>
                 <code className="text-sm bg-gray-100 px-3 py-1 rounded border border-gray-300">
                     {widgetData.templateName}
                 </code>
@@ -262,11 +262,11 @@ function CSSVariablesTab({ cssVariables, cssScope }) {
                 <div className="flex items-start gap-3">
                     <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-blue-900">
-                        <p className="font-medium mb-1">CSS Scope: {cssScope}</p>
-                        <p>
+                        <div className="font-medium mb-1">CSS Scope: {cssScope}</div>
+                        <div>
                             These CSS variables can be overridden in theme styles to customize the widget appearance.
                             Click any variable to copy the CSS var() function.
-                        </p>
+                        </div>
                     </div>
                 </div>
             </div>

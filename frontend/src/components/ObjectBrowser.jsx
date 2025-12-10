@@ -216,10 +216,10 @@ const ObjectBrowser = () => {
                         <div className="mb-6">
                             <div className="flex justify-between items-center mb-4">
                                 <div>
-                                    <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                                    <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
                                         <FolderOpen className="h-6 w-6 mr-3" />
                                         Objects Publisher
-                                    </h1>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -248,12 +248,12 @@ const ObjectBrowser = () => {
                                                     <Image className="h-8 w-8 text-gray-400" />
                                                 </div>
                                             )}
-                                            <h3 className="text-lg font-medium text-gray-900 mb-1">
+                                            <div className="text-lg font-medium text-gray-900 mb-1" role="heading" aria-level="3">
                                                 {objectType.label}
-                                            </h3>
-                                            <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                                            </div>
+                                            <div className="text-sm text-gray-500 mb-3 line-clamp-2">
                                                 {objectType.description || `Manage ${objectType.pluralLabel?.toLowerCase()}`}
-                                            </p>
+                                            </div>
                                             <div className="text-xs text-gray-400">
                                                 {objectType.instanceCount || 0} items
                                             </div>
@@ -266,10 +266,10 @@ const ObjectBrowser = () => {
                         {!typesLoading && objectTypes.length === 0 && (
                             <div className="text-center py-12">
                                 <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Object Types Available</h3>
-                                <p className="text-gray-500">
+                                <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No Object Types Available</div>
+                                <div className="text-gray-500">
                                     Create object types in the admin interface to start managing content.
-                                </p>
+                                </div>
                             </div>
                         )}
 
@@ -302,7 +302,7 @@ const ObjectBrowser = () => {
                                             >
                                                 <ArrowLeft className="h-4 w-4" />
                                             </button>
-                                            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                                            <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
                                                 {selectedObjectType.iconImage ? (
                                                     <img
                                                         src={selectedObjectType.iconImage}
@@ -315,11 +315,11 @@ const ObjectBrowser = () => {
                                                     </div>
                                                 )}
                                                 {selectedObjectType.pluralLabel}
-                                            </h1>
+                                            </div>
                                         </div>
-                                        <p className="text-gray-600 ml-9">
+                                        <div className="text-gray-600 ml-9">
                                             {selectedObjectType.description || `Browse and manage ${selectedObjectType.pluralLabel?.toLowerCase()}`}
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
                                 <button
@@ -376,15 +376,15 @@ const ObjectBrowser = () => {
                                 ) : (
                                     <div className="text-center py-12">
                                         <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
                                             No {selectedObjectType.pluralLabel} Found
-                                        </h3>
-                                        <p className="text-gray-500 mb-4">
+                                        </div>
+                                        <div className="text-gray-500 mb-4">
                                             {searchTerm || statusFilter
                                                 ? 'Try adjusting your search or filters.'
                                                 : `Create your first ${selectedObjectType.label?.toLowerCase()} to get started.`
                                             }
-                                        </p>
+                                        </div>
                                         {!searchTerm && !statusFilter && (
                                             <button
                                                 onClick={handleCreateNew}
@@ -418,8 +418,8 @@ const ObjectBrowser = () => {
                         <div className="mb-6">
                             <div className="flex justify-between items-center mb-4">
                                 <div>
-                                    <h1 className="text-2xl font-bold text-gray-900">Objects</h1>
-                                    <p className="text-gray-600 mt-1">Select an object type to view and manage objects</p>
+                                    <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Objects</div>
+                                    <div className="text-gray-600 mt-1">Select an object type to view and manage objects</div>
                                 </div>
                             </div>
                         </div>
@@ -448,12 +448,12 @@ const ObjectBrowser = () => {
                                                     <Image className="h-8 w-8 text-gray-400" />
                                                 </div>
                                             )}
-                                            <h3 className="text-lg font-medium text-gray-900 mb-1">
+                                            <div className="text-lg font-medium text-gray-900 mb-1" role="heading" aria-level="3">
                                                 {objectType.label}
-                                            </h3>
-                                            <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                                            </div>
+                                            <div className="text-sm text-gray-500 mb-3 line-clamp-2">
                                                 {objectType.description || `Manage ${objectType.pluralLabel?.toLowerCase()}`}
-                                            </p>
+                                            </div>
                                             <div className="text-xs text-gray-400">
                                                 Click to view objects
                                             </div>
@@ -480,7 +480,7 @@ const ObjectBrowser = () => {
                                         <ArrowLeft className="h-5 w-5" />
                                     </button>
                                     <div>
-                                        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                                        <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
                                             {selectedObjectType?.iconImage ? (
                                                 <img
                                                     src={selectedObjectType.iconImage}
@@ -491,10 +491,10 @@ const ObjectBrowser = () => {
                                                 <FolderOpen className="h-8 w-8 mr-3 text-gray-400" />
                                             )}
                                             {selectedObjectType?.pluralLabel}
-                                        </h1>
-                                        <p className="text-gray-600 mt-1">
+                                        </div>
+                                        <div className="text-gray-600 mt-1">
                                             {selectedObjectType?.description || `Manage ${selectedObjectType?.pluralLabel?.toLowerCase()}`}
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
                                 <button
@@ -527,12 +527,12 @@ const ObjectBrowser = () => {
                                 ) : (
                                     <div className="text-center py-12">
                                         <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
                                             No {selectedObjectType?.pluralLabel?.toLowerCase()} found
-                                        </h3>
-                                        <p className="text-gray-600 mb-6">
+                                        </div>
+                                        <div className="text-gray-600 mb-6">
                                             Get started by creating your first {selectedObjectType?.label?.toLowerCase()}.
-                                        </p>
+                                        </div>
                                         {selectedObjectType && (
                                             <button
                                                 onClick={handleCreateNew}
@@ -592,9 +592,9 @@ const ObjectListItem = ({ instance, onEdit, onDelete }) => {
             <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center">
-                        <h3 className="text-lg font-medium text-gray-900 truncate">
+                        <div className="text-lg font-medium text-gray-900 truncate" role="heading" aria-level="3">
                             {instance.title}
-                        </h3>
+                        </div>
                         <span className={`ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(instance.status)}`}>
                             {instance.status}
                         </span>

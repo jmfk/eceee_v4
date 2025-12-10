@@ -132,7 +132,7 @@ const ObjectWidgetFactory = ({
             console.error('Error loading widget preview:', error)
             setPreviewContent({
                 html: `<div class="text-red-600 p-4 border border-red-200 rounded bg-red-50">
-                    <strong>Preview Error:</strong> Could not load widget preview
+                    <span className="font-bold">Preview Error:</span> Could not load widget preview
                     <br><small>${error.message || 'Unknown error'}</small>
                 </div>`,
                 css: '',
@@ -170,16 +170,16 @@ const ObjectWidgetFactory = ({
                             <Layout className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium text-red-900">
+                            <div className="text-sm font-medium text-red-900" role="heading" aria-level="4">
                                 Unsupported Widget
-                            </h4>
-                            <p className="text-xs text-red-600">
+                            </div>
+                            <div className="text-xs text-red-600">
                                 Widget type "{widget.type}" is not supported in this object type
-                            </p>
+                            </div>
                             {allowedWidgetTypes.length > 0 && (
-                                <p className="text-xs text-gray-600 mt-1">
+                                <div className="text-xs text-gray-600 mt-1">
                                     Allowed types: {allowedWidgetTypes.join(', ')}
-                                </p>
+                                </div>
                             )}
                             {onDelete && (
                                 <div className="mt-3">
@@ -281,12 +281,12 @@ const ObjectWidgetFactory = ({
                         >
                             <div className="flex items-center justify-between p-4 border-b border-gray-200">
                                 <div>
-                                    <h3 className="text-lg font-medium text-gray-900">
+                                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                                         Preview: {getWidgetDisplayName(widget.type)}
-                                    </h3>
-                                    <p className="text-sm text-gray-500">
+                                    </div>
+                                    <div className="text-sm text-gray-500">
                                         {objectType?.name} • {slotConfig?.label || actualSlotName}
-                                    </p>
+                                    </div>
                                 </div>
                                 <button
                                     onClick={handleClosePreview}
@@ -299,7 +299,7 @@ const ObjectWidgetFactory = ({
                                 {isLoadingPreview ? (
                                     <div className="text-center py-12">
                                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                        <p className="mt-2 text-sm text-gray-600">Rendering preview...</p>
+                                        <div className="mt-2 text-sm text-gray-600">Rendering preview...</div>
                                     </div>
                                 ) : previewContent ? (
                                     <div
@@ -309,7 +309,7 @@ const ObjectWidgetFactory = ({
                                     />
                                 ) : (
                                     <div className="text-center py-12 text-gray-500">
-                                        <p>No preview available</p>
+                                        <div>No preview available</div>
                                     </div>
                                 )}
                             </div>

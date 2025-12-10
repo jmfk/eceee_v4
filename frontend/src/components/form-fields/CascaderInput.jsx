@@ -327,7 +327,7 @@ const CascaderInput = ({
                             {filteredOptions.length === 0 ? (
                                 <div className="p-4 text-center text-gray-500">
                                     <Folder className="w-6 h-6 mx-auto mb-2 text-gray-300" />
-                                    <p className="text-sm">No options available</p>
+                                    <div className="text-sm">No options available</div>
                                 </div>
                             ) : (
                                 <div className="py-1">
@@ -340,7 +340,7 @@ const CascaderInput = ({
             </div>
 
             {description && (
-                <p className="text-sm text-gray-500">{description}</p>
+                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Selection Summary */}

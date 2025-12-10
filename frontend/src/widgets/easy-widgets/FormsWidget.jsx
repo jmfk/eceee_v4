@@ -254,9 +254,9 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
             <div className="forms-widget-editor p-4">
                 <div className="forms-widget bg-white border border-gray-200 rounded-lg p-6 max-w-2xl mx-auto">
                     <div className="form-header mb-6">
-                        <h2 className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</h2>
+                        <div className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</div>
                         {description && (
-                            <p className="form-description text-gray-600 text-center mt-2">{description}</p>
+                            <div className="form-description text-gray-600 text-center mt-2">{description}</div>
                         )}
                     </div>
 
@@ -287,13 +287,13 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                                     ) : null}
 
                                     {field.help_text && (
-                                        <p className="form-help text-sm text-gray-500 mb-2">{field.help_text}</p>
+                                        <div className="form-help text-sm text-gray-500 mb-2">{field.help_text}</div>
                                     )}
 
                                     {renderField(field)}
 
                                     {errors[field.name] && (
-                                        <p className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</p>
+                                        <div className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</div>
                                     )}
                                 </div>
                             ))}
@@ -354,9 +354,9 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
     return (
         <div className="forms-widget bg-white border border-gray-200 rounded-lg p-6 max-w-2xl mx-auto">
             <div className="form-header mb-6">
-                <h2 className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</h2>
+                <div className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</div>
                 {description && (
-                    <p className="form-description text-gray-600 text-center mt-2">{description}</p>
+                    <div className="form-description text-gray-600 text-center mt-2">{description}</div>
                 )}
             </div>
 
@@ -387,13 +387,13 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                             ) : null}
 
                             {field.help_text && (
-                                <p className="form-help text-sm text-gray-500 mb-2">{field.help_text}</p>
+                                <div className="form-help text-sm text-gray-500 mb-2">{field.help_text}</div>
                             )}
 
                             {renderField(field)}
 
                             {errors[field.name] && (
-                                <p className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</p>
+                                <div className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</div>
                             )}
                         </div>
                     ))}

@@ -345,9 +345,9 @@ export default function SettingsTabs() {
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0">
-                                                                    <p className="font-medium truncate">{item.label}</p>
+                                                                    <div className="font-medium truncate">{item.label}</div>
                                                                     {item.description && (
-                                                                        <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                                                                        <div className="text-xs text-gray-500 truncate">{item.description}</div>
                                                                     )}
                                                                 </div>
                                                                 {/* Badges for specific item types */}

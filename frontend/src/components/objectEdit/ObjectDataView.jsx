@@ -130,7 +130,7 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
             <div className="flex-1 min-w-0">
                 <div className="space-y-6">
                     <div className="bg-white p-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-6">Object Data & Schema</h2>
+                        <div className="text-xl font-semibold text-gray-900 mb-6" role="heading" aria-level="2">Object Data & Schema</div>
 
                         <div className="space-y-6">
                             {/* Object Type Selection (only for new instances) */}
@@ -153,10 +153,10 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
                                         ))}
                                     </select>
                                     {errors.objectTypeId && (
-                                        <p className="text-red-600 text-sm mt-1 flex items-center">
+                                        <div className="text-red-600 text-sm mt-1 flex items-center">
                                             <AlertCircle className="h-4 w-4 mr-1" />
                                             {errors.objectTypeId}
-                                        </p>
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -175,19 +175,19 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
                                     placeholder="Enter object title..."
                                 />
                                 {errors.title && (
-                                    <p className="text-red-600 text-sm mt-1 flex items-center">
+                                    <div className="text-red-600 text-sm mt-1 flex items-center">
                                         <AlertCircle className="h-4 w-4 mr-1" />
                                         {errors.title}
-                                    </p>
+                                    </div>
                                 )}
                             </div>
 
                             {/* Dynamic Schema Fields */}
                             {objectType && (
                                 <div className="border-t pt-6">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+                                    <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">
                                         {objectType.label} Fields
-                                    </h3>
+                                    </div>
                                     <ObjectSchemaForm
                                         schema={getSchemaFromObjectType(objectType)}
                                         data={formData.data}

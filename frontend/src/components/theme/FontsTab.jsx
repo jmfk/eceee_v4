@@ -123,7 +123,7 @@ const FontsTab = ({ fonts, onChange, onDirty }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Google Fonts</h3>
+                <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Google Fonts</div>
                 <div className="flex gap-2">
                     <CopyButton
                         data={fonts}
@@ -183,7 +183,7 @@ const FontsTab = ({ fonts, onChange, onDirty }) => {
                                     </button>
 
                                     <div className="flex-1">
-                                        <h4 className="text-base font-semibold text-gray-900">{font.family}</h4>
+                                        <div className="text-base font-semibold text-gray-900" role="heading" aria-level="4">{font.family}</div>
                                         <div className="mt-1 text-sm text-gray-500">
                                             Variants: {font.variants.join(', ')}
                                         </div>
@@ -240,9 +240,9 @@ const FontsTab = ({ fonts, onChange, onDirty }) => {
                                                     );
                                                 })}
                                             </div>
-                                            <p className="mt-2 text-xs text-gray-500">
+                                            <div className="mt-2 text-xs text-gray-500">
                                                 Click to add/remove variants. At least one variant is required.
-                                            </p>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -255,7 +255,7 @@ const FontsTab = ({ fonts, onChange, onDirty }) => {
             {/* Add from List Panel */}
             {showAddFont && (
                 <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 space-y-4">
-                    <h4 className="font-semibold text-gray-900">Add Google Font</h4>
+                    <div className="font-semibold text-gray-900" role="heading" aria-level="4">Add Google Font</div>
 
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -354,7 +354,7 @@ const FontsTab = ({ fonts, onChange, onDirty }) => {
             {/* Manual Add Panel */}
             {showManualAdd && (
                 <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 space-y-4">
-                    <h4 className="font-semibold text-gray-900">Add Font Manually</h4>
+                    <div className="font-semibold text-gray-900" role="heading" aria-level="4">Add Font Manually</div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">

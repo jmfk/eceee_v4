@@ -839,8 +839,8 @@ const TreePageManager = () => {
         return (
             <div className="p-6 text-center">
                 <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to load pages</h3>
-                <p className="text-gray-600 mb-4">{error.message}</p>
+                <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="3">Failed to load pages</div>
+                <div className="text-gray-600 mb-4">{error.message}</div>
                 <button
                     onClick={handleRefresh}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -856,8 +856,8 @@ const TreePageManager = () => {
         return (
             <div className="p-6 text-center">
                 <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Search failed</h3>
-                <p className="text-gray-600 mb-4">{searchError.message}</p>
+                <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="3">Search failed</div>
+                <div className="text-gray-600 mb-4">{searchError.message}</div>
                 <button
                     onClick={handleClearSearch}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1181,9 +1181,9 @@ const TreePageManager = () => {
                                         <FolderPlus className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                                     </div>
                                 </Tooltip>
-                                <p>
+                                <div>
                                     {searchTerm ? 'No pages found matching your search' : 'No pages found'}
-                                </p>
+                                </div>
                                 {searchTerm ? (
                                     <div className="mt-4">
                                         <button
@@ -1363,12 +1363,12 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
         <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         {positioningParams ?
                             `Add Child Page to "${positioningParams.parentPage.title}"` :
                             'Create New Page'
                         }
-                    </h3>
+                    </div>
                     <button
                         onClick={onCancel}
                         className="text-gray-400 hover:text-gray-500"
@@ -1427,9 +1427,9 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
 
                     {positioningParams && (
                         <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                            <p className="text-sm text-blue-800">
+                            <div className="text-sm text-blue-800">
                                 This page will be created as a child page under "{positioningParams.parentPage.title}".
-                            </p>
+                            </div>
                         </div>
                     )}
 
@@ -1508,9 +1508,9 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         Create Root Page
-                    </h3>
+                    </div>
                     <button
                         onClick={onCancel}
                         className="text-gray-400 hover:text-gray-500"
@@ -1533,9 +1533,9 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                             required
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             URL slug will be automatically generated from the title
-                        </p>
+                        </div>
                     </div>
 
                     <div>
@@ -1551,9 +1551,9 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                             required
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                             Enter hostnames separated by commas. Root pages need at least one hostname.
-                        </p>
+                        </div>
                     </div>
 
                     <div>
@@ -1574,10 +1574,10 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
                     </div>
 
                     <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
-                        <p className="text-sm text-purple-800">
+                        <div className="text-sm text-purple-800">
                             Root pages are top-level pages that can be accessed directly via hostnames.
                             They serve as entry points to your site.
-                        </p>
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-end space-x-3 pt-4">

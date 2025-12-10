@@ -12,11 +12,11 @@ const TagInputDemo = () => {
     return (
         <div className="max-w-2xl mx-auto p-6 space-y-8">
             <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h2 className="text-lg font-semibold mb-4">TagInput Demo</h2>
+                <div className="text-lg font-semibold mb-4" role="heading" aria-level="2">TagInput Demo</div>
 
                 <div className="space-y-6">
                     <div>
-                        <h3 className="text-md font-medium mb-3">Image Property Tags</h3>
+                        <div className="text-md font-medium mb-3" role="heading" aria-level="3">Image Property Tags</div>
                         <TagInput
                             label="Auto-Tags for Uploads"
                             value={imageTagValue}
@@ -25,12 +25,12 @@ const TagInputDemo = () => {
                             helpText="Tags that will be automatically added to uploaded images. New tags will be created if they don't exist."
                         />
                         <div className="mt-2 text-sm text-gray-600">
-                            <strong>Current value:</strong> {imageTagValue || '(empty)'}
+                            <span className="font-bold">Current value:</span> {imageTagValue || '(empty)'}
                         </div>
                     </div>
 
                     <div>
-                        <h3 className="text-md font-medium mb-3">File Property Tags</h3>
+                        <div className="text-md font-medium mb-3" role="heading" aria-level="3">File Property Tags</div>
                         <TagInput
                             label="Auto-Tags for Uploads"
                             value={fileTagValue}
@@ -39,12 +39,12 @@ const TagInputDemo = () => {
                             helpText="Tags that will be automatically added to uploaded files. New tags will be created if they don't exist."
                         />
                         <div className="mt-2 text-sm text-gray-600">
-                            <strong>Current value:</strong> {fileTagValue || '(empty)'}
+                            <span className="font-bold">Current value:</span> {fileTagValue || '(empty)'}
                         </div>
                     </div>
 
                     <div className="border-t pt-4">
-                        <h3 className="text-md font-medium mb-3">Test Actions</h3>
+                        <div className="text-md font-medium mb-3" role="heading" aria-level="3">Test Actions</div>
                         <div className="flex space-x-4">
                             <button
                                 onClick={() => setImageTagValue('test-tag, another-tag, new-category')}
