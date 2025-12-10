@@ -266,6 +266,13 @@ export async function getResponsiveImgproxyUrls(sourceUrlOrImage, config = {}) {
  */
 export async function getImgproxyUrlFromImage(imageObj, options = {}) {
     if (!imageObj) return '';
+    
+    // Handle accidental array wrapping (defensive fix)
+    if (Array.isArray(imageObj)) {
+        console.warn('getImgproxyUrlFromImage: Received array, extracting first item');
+        imageObj = imageObj[0];
+        if (!imageObj) return '';
+    }
 
     // Try camelCase first (from API via djangorestframework-camel-case)
     let sourceUrl = imageObj.imgproxyBaseUrl || imageObj.fileUrl;

@@ -99,8 +99,9 @@ const ExpandableImageField = ({
                 onChange(selectedArray)
             }
         } else {
-            // For single selection
-            onChange(selected)
+            // For single selection, extract first item if array
+            const singleItem = Array.isArray(selected) ? selected[0] : selected
+            onChange(singleItem)
         }
         setIsModalOpen(false)
     }, [multiple, maxItems, onChange, addNotification])
