@@ -466,10 +466,6 @@ const SectionWidget = ({
                                     <div
                                         className="section-banner expand-banner hidden section-collapsed:flex items-center justify-center p-4 mt-4 border-t border-gray-300 cursor-pointer select-none transition-opacity hover:opacity-80 font-medium"
                                         onClick={toggleSection}
-                                        style={{
-                                            backgroundColor: config.bannerBgColor || '#f3f4f6',
-                                            color: config.bannerTextColor || '#374151'
-                                        }}
                                     >
                                         <span>{config.expandText || 'Expand to read more'}</span>
                                     </div>
@@ -478,10 +474,6 @@ const SectionWidget = ({
                                     <div
                                         className="section-banner contract-banner flex section-collapsed:hidden items-center justify-center p-4 mt-4 border-t border-gray-300 cursor-pointer select-none transition-opacity hover:opacity-80 font-medium"
                                         onClick={toggleSection}
-                                        style={{
-                                            backgroundColor: config.bannerBgColor || '#f3f4f6',
-                                            color: config.bannerTextColor || '#374151'
-                                        }}
                                     >
                                         <span>{config.contractText || 'Show less'}</span>
                                     </div>
@@ -554,8 +546,6 @@ SectionWidget.defaultConfig = {
     accordionMode: false,
     expandText: 'Expand to read more',
     contractText: 'Show less',
-    bannerBgColor: '#f3f4f6',
-    bannerTextColor: '#374151',
     componentStyle: 'default',
     slots: { content: [] }
 };

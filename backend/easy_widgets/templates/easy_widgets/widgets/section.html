@@ -34,14 +34,10 @@ Section Widget Template
             </div>
             
             {# Expand/Contract banners #}
-            <div class="section-banner expand-banner" 
-                 onclick="toggleSection(this)"
-                 style="background-color: {{ config.banner_bg_color|default:'#f3f4f6' }}; color: {{ config.banner_text_color|default:'#374151' }};">
+            <div class="section-banner expand-banner" onclick="toggleSection(this)">
                 <span>{{ config.expand_text|default:'Expand to read more' }}</span>
             </div>
-            <div class="section-banner contract-banner" 
-                 onclick="toggleSection(this)"
-                 style="background-color: {{ config.banner_bg_color|default:'#f3f4f6' }}; color: {{ config.banner_text_color|default:'#374151' }};">
+            <div class="section-banner contract-banner" onclick="toggleSection(this)">
                 <span>{{ config.contract_text|default:'Show less' }}</span>
             </div>
         </div>
