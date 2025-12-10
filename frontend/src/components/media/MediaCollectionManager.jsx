@@ -55,11 +55,13 @@ import MediaSearchWidget from './MediaSearchWidget';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
 // Compact Tag Input Component for inline forms
-const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availableTags = [] }) => {
+const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availableTags = [], onTagCreated }) => {
     const [inputValue, setInputValue] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isCreatingTag, setIsCreatingTag] = useState(false);
     const inputRef = useRef(null);
     const dropdownRef = useRef(null);
+    const { addNotification } = useGlobalNotifications();
 
     // Get selected tag objects from IDs
     const selectedTags = selectedTagIds.map(id =>
@@ -71,6 +73,11 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
         !selectedTagIds.includes(tag.id) &&
         tag.name.toLowerCase().includes(inputValue.toLowerCase())
     ).slice(0, 5); // Limit to 5 suggestions
+
+    // Check if we should show "Create new tag" option
+    const hasCreateOption = inputValue.trim() && 
+        !suggestions.some(tag => tag.name.toLowerCase() === inputValue.trim().toLowerCase()) &&
+        !availableTags.some(tag => tag.name.toLowerCase() === inputValue.trim().toLowerCase());
 
     const addTag = (tag) => {
         if (!selectedTagIds.includes(tag.id)) {
@@ -84,6 +91,52 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
         onTagsChange(selectedTagIds.filter(id => id !== tagId));
     };
 
+    const handleCreateTag = async (tagName) => {
+        if (!tagName || !tagName.trim()) return;
+
+        const normalizedTagName = tagName.trim();
+
+        // Check for duplicates (case-insensitive)
+        const isDuplicate = availableTags.some(tag =>
+            tag.name.toLowerCase() === normalizedTagName.toLowerCase()
+        );
+        if (isDuplicate) {
+            addNotification('Tag already exists', 'error');
+            return;
+        }
+
+        setIsCreatingTag(true);
+        try {
+            const slug = normalizedTagName.toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+
+            const newTag = await mediaTagsApi.create({
+                name: normalizedTagName,
+                slug: slug,
+                namespace: namespace,
+                description: `User-created tag: ${normalizedTagName}`
+            })();
+
+            // Notify parent to update available tags list
+            if (onTagCreated) {
+                onTagCreated(newTag);
+            }
+
+            // Add the newly created tag to selection
+            addTag(newTag);
+            addNotification(`Tag "${normalizedTagName}" created successfully`, 'success');
+        } catch (error) {
+            console.error('Failed to create tag:', error);
+            addNotification(
+                error.message || `Failed to create tag "${normalizedTagName}"`,
+                'error'
+            );
+        } finally {
+            setIsCreatingTag(false);
+        }
+    };
+
     const handleInputChange = (e) => {
         const value = e.target.value;
         setInputValue(value);
@@ -94,14 +147,13 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
         if (e.key === 'Escape') {
             setShowSuggestions(false);
             setInputValue('');
-        } else if (e.key === 'Enter' && inputValue.trim()) {
+        } else if (e.key === 'Enter' && inputValue.trim() && !isCreatingTag) {
             e.preventDefault();
             if (suggestions.length > 0) {
                 addTag(suggestions[0]); // Add first suggestion on Enter
-            } else {
+            } else if (hasCreateOption) {
                 // Create new tag if no suggestions exist
-                const newTag = { id: `new-${Date.now()}`, name: inputValue.trim() };
-                addTag(newTag);
+                handleCreateTag(inputValue.trim());
             }
         }
     };
@@ -163,28 +215,73 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
                 {showSuggestions && inputValue.trim() && (
                     <div
                         ref={dropdownRef}
-                        className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-32 overflow-y-auto"
+                        className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
                     >
-                        {suggestions.length > 0 ? (
-                            suggestions.map((tag) => (
-                                <button
-                                    key={tag.id}
-                                    type="button"
-                                    onClick={() => addTag(tag)}
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
-                                >
-                                    <Tag className="w-3 h-3 mr-2 text-gray-400" />
-                                    <span>{tag.name}</span>
-                                    {tag.usageCount > 0 && (
-                                        <span className="ml-auto text-xs text-gray-500">
-                                            {tag.usageCount}
-                                        </span>
-                                    )}
-                                </button>
-                            ))
-                        ) : (
+                        {suggestions.length > 0 && (
+                            <>
+                                {suggestions.map((tag) => (
+                                    <button
+                                        key={tag.id}
+                                        type="button"
+                                        onClick={() => addTag(tag)}
+                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                                    >
+                                        <Tag className="w-3 h-3 mr-2 text-gray-400" />
+                                        <span>{tag.name}</span>
+                                        {tag.usageCount > 0 && (
+                                            <span className="ml-auto text-xs text-gray-500">
+                                                {tag.usageCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                                {hasCreateOption && (
+                                    <div className="border-t border-gray-200">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCreateTag(inputValue.trim())}
+                                            disabled={isCreatingTag}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isCreatingTag ? (
+                                                <>
+                                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                                    <span>Creating tag...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Plus className="w-3 h-3 mr-2" />
+                                                    <span>Create new tag: <strong>"{inputValue.trim()}"</strong></span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        {suggestions.length === 0 && hasCreateOption && (
+                            <button
+                                type="button"
+                                onClick={() => handleCreateTag(inputValue.trim())}
+                                disabled={isCreatingTag}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isCreatingTag ? (
+                                    <>
+                                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                        <span>Creating tag...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="w-3 h-3 mr-2" />
+                                        <span>Create new tag: <strong>"{inputValue.trim()}"</strong></span>
+                                    </>
+                                )}
+                            </button>
+                        )}
+                        {suggestions.length === 0 && !hasCreateOption && (
                             <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                                No existing tags found. Press Enter to create "{inputValue}"
+                                No existing tags found
                             </div>
                         )}
                     </div>
@@ -1423,6 +1520,18 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         }
     }, [namespace]);
 
+    // Handle tag creation - add new tag to available tags list
+    const handleTagCreated = useCallback((newTag) => {
+        setAvailableTags(prev => {
+            // Check if tag already exists to avoid duplicates
+            const exists = prev.some(tag => tag.id === newTag.id);
+            if (exists) {
+                return prev;
+            }
+            return [...prev, newTag];
+        });
+    }, []);
+
     // Load data on mount and when dependencies change
     useEffect(() => {
         if (namespace) {
@@ -1542,14 +1651,14 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                 collectionData = {
                     ...formData,
                     namespace: namespace,
-                    tag_ids: formData.tagIds
+                    tagIds: formData.tagIds
                 };
             } else {
                 // For creating, only send essential fields (let backend generate slug)
                 collectionData = {
                     title: formData.title,
                     namespace: namespace,
-                    tag_ids: formData.tagIds
+                    tagIds: formData.tagIds
                 };
             }
 
@@ -1679,6 +1788,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                 selectedTagIds={formData.tagIds}
                                 onTagsChange={(tagIds) => setFormData(prev => ({ ...prev, tagIds }))}
                                 availableTags={availableTags}
+                                onTagCreated={handleTagCreated}
                             />
                             {formData.tagIds.length === 0 && (
                                 <div className="text-xs text-amber-600 mt-1">

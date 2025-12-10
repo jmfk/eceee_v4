@@ -236,6 +236,15 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
 
         return sample_images
 
+    def validate_tag_ids(self, value):
+        """Validate that at least one tag is provided for collection creation."""
+        if not value or len(value) == 0:
+            raise serializers.ValidationError(
+                "At least one tag is required to create a collection. "
+                "Collections must have tags to accept uploads."
+            )
+        return value
+
     def create(self, validated_data):
         """Create collection with tags."""
         from content.models import Namespace

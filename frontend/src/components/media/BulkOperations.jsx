@@ -33,6 +33,7 @@ import { mediaApi, mediaTagsApi, mediaCollectionsApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import MediaTagWidget from './MediaTagWidget';
 import TagRemovalWidget from './TagRemovalWidget';
+import { extractErrorMessage } from '../../utils/errorHandling';
 
 const BulkOperations = ({
     selectedFiles = [],
@@ -52,6 +53,7 @@ const BulkOperations = ({
     const [progress, setProgress] = useState({ completed: 0, total: 0, errors: [] });
     const [showProgress, setShowProgress] = useState(false);
     const [newCollectionName, setNewCollectionName] = useState('');
+    const [newCollectionTagIds, setNewCollectionTagIds] = useState([]);
     const [selectedTags, setSelectedTags] = useState([]);
     const [existingTagsFromFiles, setExistingTagsFromFiles] = useState([]);
     const [tagsToRemove, setTagsToRemove] = useState([]);
@@ -183,31 +185,43 @@ const BulkOperations = ({
             setSelectedTags([]);
             setTagsToRemove([]);
         }
+        
+        // Reset collection creation fields
+        setNewCollectionName('');
+        setNewCollectionTagIds([]);
     };
 
 
 
-    // Create new collection
-    const createNewCollection = async () => {
-        if (!newCollectionName.trim()) return;
-
-        try {
-            const newCollection = await mediaCollectionsApi.create({
-                title: newCollectionName.trim(),
-                namespace: namespace
-            })();
-
-            setAvailableCollections(prev => [...prev, newCollection]);
-            setOperationData(prev => ({
-                ...prev,
-                collectionId: newCollection.id
-            }));
-            setNewCollectionName('');
-            addNotification(`Collection "${newCollection.title}" created`, 'success');
-        } catch (error) {
-            console.error('Failed to create collection:', error);
-            addNotification('Failed to create collection', 'error');
+    // Create new collection (called during execute if needed)
+    const createNewCollection = async (name, tagIds) => {
+        if (!name || !name.trim()) {
+            throw new Error('Collection name is required');
         }
+
+        if (!tagIds || tagIds.length === 0) {
+            throw new Error('At least one tag is required to create a collection');
+        }
+
+        // Ensure tagIds are strings (UUIDs should be strings)
+        const normalizedTagIds = tagIds.map(id => String(id));
+
+        const newCollection = await mediaCollectionsApi.create({
+            title: name.trim(),
+            namespace: namespace,
+            tagIds: normalizedTagIds
+        })();
+
+        // Add to available collections list
+        setAvailableCollections(prev => {
+            const exists = prev.some(c => c.id === newCollection.id);
+            if (exists) {
+                return prev;
+            }
+            return [...prev, newCollection];
+        });
+
+        return newCollection;
     };
 
     // Execute bulk operation
@@ -219,11 +233,29 @@ const BulkOperations = ({
         setProgress({ completed: 0, total: selectedFiles.length, errors: [] });
 
         try {
+            let collectionId = operationData.collectionId;
+
+            // If adding to collection and a new collection name is provided, create it first
+            if (operation === 'add_to_collection' && newCollectionName.trim() && !collectionId) {
+                try {
+                    const newCollection = await createNewCollection(newCollectionName.trim(), newCollectionTagIds);
+                    collectionId = newCollection.id;
+                    addNotification(`Collection "${newCollection.title}" created`, 'success');
+                } catch (error) {
+                    console.error('Failed to create collection:', error);
+                    addNotification(extractErrorMessage(error) || 'Failed to create collection', 'error');
+                    setProcessing(false);
+                    setShowProgress(false);
+                    return;
+                }
+            }
+
             const fileIds = selectedFiles.map(file => file.id);
             const requestData = {
                 file_ids: fileIds,
                 operation: operation,
-                ...operationData
+                ...operationData,
+                collectionId: collectionId || operationData.collectionId
             };
 
             // Ensure collectionId is null instead of empty string for UUID validation
@@ -285,6 +317,9 @@ const BulkOperations = ({
             case 'set_access_level':
                 return operationData.accessLevel;
             case 'add_to_collection':
+                // Valid if either: existing collection selected OR new collection name + tags provided
+                return operationData.collectionId || 
+                       (newCollectionName.trim() && newCollectionTagIds && newCollectionTagIds.length > 0);
             case 'remove_from_collection':
                 return operationData.collectionId;
             case 'delete':
@@ -402,27 +437,46 @@ const BulkOperations = ({
                         </div>
 
                         {operation === 'add_to_collection' && (
-                            <div>
-                                <label className={`block text-sm font-semibold mb-3 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
-                                    Create New Collection
-                                </label>
-                                <div className="flex gap-3">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className={`block text-sm font-semibold mb-2 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
+                                        Collection Name (for new collection)
+                                    </label>
                                     <input
                                         type="text"
                                         value={newCollectionName}
                                         onChange={(e) => setNewCollectionName(e.target.value)}
-                                        placeholder="Enter collection name"
-                                        className="flex-1 px-4 py-3 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-md hover:shadow-lg transition-all duration-200"
-                                        onKeyPress={(e) => e.key === 'Enter' && createNewCollection()}
+                                        placeholder="Enter collection name (leave empty to use existing collection)"
+                                        className="w-full px-4 py-3 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-md hover:shadow-lg transition-all duration-200"
                                     />
-                                    <button
-                                        type="button"
-                                        onClick={createNewCollection}
-                                        disabled={!newCollectionName.trim()}
-                                        className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-all duration-200 shadow-md hover:shadow-lg font-medium"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                    </button>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        If you enter a name and tags below, a new collection will be created when you execute the operation.
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className={`block text-sm font-semibold mb-2 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
+                                        Tags {newCollectionName.trim() && <span className="text-xs text-gray-500 font-normal">(Required for new collection)</span>}
+                                    </label>
+                                    {availableTags && Array.isArray(availableTags) ? (
+                                        <MediaTagWidget
+                                            tags={newCollectionTagIds
+                                                .map(id => availableTags.find(tag => tag.id === id))
+                                                .filter(Boolean)
+                                            }
+                                            onChange={(tagObjects) => {
+                                                const tagIds = tagObjects.map(tag => tag.id);
+                                                setNewCollectionTagIds(tagIds);
+                                            }}
+                                            namespace={namespace}
+                                        />
+                                    ) : (
+                                        <div className="text-sm text-gray-500">Loading tags...</div>
+                                    )}
+                                    {newCollectionName.trim() && (!newCollectionTagIds || newCollectionTagIds.length === 0) && (
+                                        <div className="text-xs text-amber-600 mt-1">
+                                            At least one tag is required to create a new collection
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

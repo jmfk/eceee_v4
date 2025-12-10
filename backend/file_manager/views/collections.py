@@ -302,7 +302,8 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """Create a new collection with tag validation."""
         # Validate that at least one tag is provided
-        tag_ids = request.data.get('tag_ids', [])
+        # Check both snake_case and camelCase to handle case conversion
+        tag_ids = request.data.get('tag_ids') or request.data.get('tagIds', [])
         if not tag_ids or len(tag_ids) == 0:
             return Response(
                 {
