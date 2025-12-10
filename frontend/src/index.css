@@ -45,7 +45,9 @@
   }
   
   /* CRITICAL: Restore semantic HTML inside .cms-content */
-  /* This prevents Tailwind from destroying content styles */
+  /* This class wraps WYSIWYG-generated content that contains real semantic HTML tags */
+  /* (e.g., from ContentWidget editor, BannerWidget editor, etc.) */
+  /* Theme CSS now applies directly without .cms-content scoping */
   .cms-content {
     /* Headings: restore browser defaults so theme CSS can override */
     h1, h2, h3, h4, h5, h6 {
