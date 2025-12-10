@@ -175,8 +175,22 @@ class FooterWidget(BaseWidget):
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering and background image processing"""
         from file_manager.imgproxy import imgproxy_service
+        from webpages.utils.color_utils import resolve_color_value
 
         template_config = super().prepare_template_context(config, context)
+
+        # Get theme colors for CSS variable conversion
+        theme = context.get("theme") if context else None
+        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
+
+        # Resolve color values
+        background_color = config.get("background_color")
+        text_color = config.get("text_color")
+        
+        if background_color:
+            template_config["background_color"] = resolve_color_value(background_color, theme_colors)
+        if text_color:
+            template_config["text_color"] = resolve_color_value(text_color, theme_colors)
 
         # Process background image if provided
         background_image = config.get("background_image")

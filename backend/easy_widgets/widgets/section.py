@@ -357,7 +357,20 @@ class SectionWidget(BaseWidget):
 
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering and anchor generation"""
+        from webpages.utils.color_utils import resolve_color_value
+
         template_config = super().prepare_template_context(config, context)
+
+        # Get theme colors for CSS variable conversion
+        theme = context.get("theme") if context else None
+        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
+
+        # Resolve color values for banner
+        banner_bg_color = config.get("banner_bg_color", "#f3f4f6")
+        banner_text_color = config.get("banner_text_color", "#374151")
+        
+        template_config["banner_bg_color"] = resolve_color_value(banner_bg_color, theme_colors)
+        template_config["banner_text_color"] = resolve_color_value(banner_text_color, theme_colors)
 
         # Ensure snake_case fields for template
         template_config["show_border"] = config.get("show_border", False)

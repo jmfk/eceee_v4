@@ -260,6 +260,8 @@ class NavbarWidget(BaseWidget):
 
     def prepare_template_context(self, config, context=None):
         """Prepare navbar menu items and background styling for Mustache template"""
+        from webpages.utils.color_utils import resolve_color_value
+
         template_config = super().prepare_template_context(config, context)
         context_obj = DictToObj(context)
 
@@ -297,8 +299,7 @@ class NavbarWidget(BaseWidget):
             background_color = "#3b82f6"
 
         # Convert color name to CSS variable if it's in theme colors
-        if background_color and background_color in theme_colors:
-            background_color = f"var(--{background_color})"
+        background_color = resolve_color_value(background_color, theme_colors)
 
         if background_color:
             style_parts.append(f"background-color: {background_color};")
@@ -373,6 +374,8 @@ class NavbarWidget(BaseWidget):
 
             # Add secondary item extra fields
             if is_secondary:
+                from webpages.utils.color_utils import resolve_color_value
+
                 bg_color = item.get("background_color")
                 txt_color = item.get("text_color")
                 bg_image = item.get("background_image")
@@ -382,10 +385,8 @@ class NavbarWidget(BaseWidget):
                     bg_image = bg_image.get("imgproxy_base_url") or bg_image.get("url")
 
                 # Convert color names to CSS variables
-                if bg_color and bg_color in theme_colors:
-                    bg_color = f"var(--{bg_color})"
-                if txt_color and txt_color in theme_colors:
-                    txt_color = f"var(--{txt_color})"
+                bg_color = resolve_color_value(bg_color, theme_colors)
+                txt_color = resolve_color_value(txt_color, theme_colors)
 
                 processed["backgroundColor"] = bg_color
                 processed["textColor"] = txt_color

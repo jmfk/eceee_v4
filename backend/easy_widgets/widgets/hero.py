@@ -322,8 +322,13 @@ class HeroWidget(BaseWidget):
         Prepare template context with snake_case field conversions and layout properties.
         """
         from file_manager.imgproxy import imgproxy_service
+        from webpages.utils.color_utils import resolve_color_value
 
         template_config = config.copy() if config else {}
+
+        # Get theme colors for CSS variable conversion
+        theme = context.get("theme") if context else None
+        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
 
         # Build CSS variables for colors
         style_parts = []
@@ -331,6 +336,11 @@ class HeroWidget(BaseWidget):
         text_color = config.get("text_color", "#ffffff")
         decor_color = config.get("decor_color", "#cccccc")
         background_color = config.get("background_color", "#000000")
+
+        # Convert color names to CSS variables if they're in theme colors
+        text_color = resolve_color_value(text_color, theme_colors)
+        decor_color = resolve_color_value(decor_color, theme_colors)
+        background_color = resolve_color_value(background_color, theme_colors)
 
         style_parts.append(f"--hero-text-color: {text_color};")
         style_parts.append(f"--hero-decor-color: {decor_color};")

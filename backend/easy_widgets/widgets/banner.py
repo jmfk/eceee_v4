@@ -378,13 +378,23 @@ class BannerWidget(BaseWidget):
         """
         Prepare template context with snake_case field conversions and layout properties.
         """
+        from webpages.utils.color_utils import resolve_color_value
+
         template_config = config.copy() if config else {}
+
+        # Get theme colors for CSS variable conversion
+        theme = context.get("theme") if context else None
+        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
 
         # Build inline styles for colors (direct application)
         style_parts = []
 
         text_color = config.get("text_color", "#000000")
         background_color = config.get("background_color", "#ffffff")
+
+        # Convert color names to CSS variables if they're in theme colors
+        text_color = resolve_color_value(text_color, theme_colors)
+        background_color = resolve_color_value(background_color, theme_colors)
 
         style_parts.append(f"background-color: {background_color};")
         style_parts.append(f"color: {text_color};")
@@ -398,13 +408,15 @@ class BannerWidget(BaseWidget):
         template_config["text_content"] = config.get("text_content", "")
         template_config["image_size"] = config.get("image_size", "square")
         template_config["component_style"] = config.get("component_style", "default")
-        template_config["show_border"] = config.get("show_border", True)
-        
+        template_config["show_border"] = config.get("show_border", False)
+
         # Handle background_image (now a dict MediaFile object)
         background_image = config.get("background_image")
         if background_image and isinstance(background_image, dict):
             # Extract URL from MediaFile object
-            bg_url = background_image.get("imgproxy_base_url") or background_image.get("file_url")
+            bg_url = background_image.get("imgproxy_base_url") or background_image.get(
+                "file_url"
+            )
             template_config["background_image_url"] = bg_url
         else:
             template_config["background_image_url"] = None
