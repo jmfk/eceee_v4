@@ -43,10 +43,10 @@ const ImageDisplaySection = ({
                                             alt={image.title || image.originalFilename || 'Image'}
                                             className="w-full h-full object-cover"
                                         />
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                    )}
+                                </div>
+                            );
+                        })}
                         {displayImages.length > 3 && (
                             <div className="w-10 h-10 rounded-lg border-2 border-white bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
                                 +{displayImages.length - 3}
@@ -85,7 +85,7 @@ const ImageDisplaySection = ({
                                 const isEditingTags = editingTagsForImage === image.id
                                 const gridStyle = getGridStyle(image)
                                 const objectFitClass = getObjectFitClass(image)
-                                
+
                                 return (
                                     <div key={image.id || index} className="relative group" style={gridStyle}>
                                         <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
@@ -103,13 +103,12 @@ const ImageDisplaySection = ({
                                             {namespace && (
                                                 <button
                                                     onClick={() => setEditingTagsForImage(isEditingTags ? null : image.id)}
-                                                    className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-opacity ${
-                                                        isEditingTags
+                                                    className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-opacity ${isEditingTags
                                                             ? 'bg-blue-500 text-white'
                                                             : (image.tags && image.tags.length > 0)
                                                                 ? 'bg-blue-100 text-blue-600'
                                                                 : 'bg-white text-gray-600'
-                                                    } opacity-0 group-hover:opacity-100`}
+                                                        } opacity-0 group-hover:opacity-100`}
                                                     title={`${(image.tags || []).length} tag${(image.tags || []).length !== 1 ? 's' : ''}`}
                                                 >
                                                     <Tag className="w-3 h-3" />
@@ -167,13 +166,15 @@ const ImageDisplaySection = ({
 
     // Single image or single image in multiple mode
     const image = displayImages[0]
-    const isCollection = image?.type === "collection" || (image?.id && (image?.fileCount !== undefined || image?.sampleImages !== undefined || image?.slug !== undefined) && !image?.url && !image?.fileUrl)
-    
+    // Only treat as collection if explicitly marked as type "collection"
+    // The previous check was too broad and could incorrectly identify images as collections
+    const isCollection = image?.type === "collection"
+
     // State for collection data and files
     const [collectionData, setCollectionData] = useState(null)
     const [collectionFiles, setCollectionFiles] = useState([])
     const [loadingCollection, setLoadingCollection] = useState(false)
-    
+
     // Fetch collection data and files when it's a collection
     useEffect(() => {
         if (isCollection && image?.id) {
@@ -188,7 +189,17 @@ const ImageDisplaySection = ({
                     const files = filesResult.results || filesResult || []
                     setCollectionFiles(files.slice(0, 9)) // Get first 9 images
                 } catch (error) {
-                    console.error('Failed to load collection:', error)
+                    // Handle 404 errors silently (collection doesn't exist or was deleted)
+                    // Other errors are logged for debugging
+                    const isNotFound = error?.response?.status === 404 ||
+                        error?.originalError?.response?.status === 404 ||
+                        error?.message?.includes('No MediaCollection matches')
+
+                    if (!isNotFound) {
+                        console.error('Failed to load collection:', error)
+                    }
+
+                    // If collection doesn't exist, treat as regular image
                     setCollectionData(null)
                     setCollectionFiles([])
                 } finally {
@@ -201,7 +212,7 @@ const ImageDisplaySection = ({
             setCollectionFiles([])
         }
     }, [isCollection, image?.id])
-    
+
     // For collections, we'll show a collection preview with thumbnails (1-9 images in 3x3 grid)
     if (isCollection) {
         // Determine grid layout based on number of files (1-9 images)
@@ -212,7 +223,7 @@ const ImageDisplaySection = ({
             return 3 // 5-9 images use 3 columns
         }
         const gridCols = getGridCols(fileCount)
-        
+
         return (
             <div className="bg-white rounded-lg">
                 <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 p-4">
@@ -222,7 +233,7 @@ const ImageDisplaySection = ({
                                 <FolderOpen className="w-6 h-6 text-gray-400 animate-pulse" />
                             </div>
                         ) : collectionFiles.length > 0 ? (
-                            <div 
+                            <div
                                 className="w-full h-full grid gap-0.5"
                                 style={{
                                     gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
@@ -285,7 +296,7 @@ const ImageDisplaySection = ({
             </div>
         )
     }
-    
+
     // Regular image display
     const thumbnailUrl = getThumbnailUrl
         ? getThumbnailUrl(image, 150)
@@ -324,15 +335,15 @@ const ImageDisplaySection = ({
                     {multiple ? 'Add More' : 'Change'}
                 </button>
 
-                        {/* Remove button */}
-                        <button
-                            onClick={(event) => onRemoveImage(image.id, event)}
+                {/* Remove button */}
+                <button
+                    onClick={(event) => onRemoveImage(image.id, event)}
                     className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-                            title="Remove image"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
+                    title="Remove image"
+                >
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
         </div>
     )
 }

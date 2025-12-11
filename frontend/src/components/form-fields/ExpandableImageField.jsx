@@ -79,12 +79,24 @@ const ExpandableImageField = ({
 
     // Get image URL - use backend-provided thumbnail for optimal performance
     const getThumbnailUrl = useCallback((image, size = 150) => {
+        if (!image) return null
+
         // Use backend-provided thumbnail if available (pre-generated 150x150)
         if (image.thumbnail_url || image.thumbnailUrl) {
             return image.thumbnail_url || image.thumbnailUrl
         }
-        // Fallback to full URL
-        return getImageUrl(image)
+
+        // Fallback to full image URL using getImageUrl utility
+        // This will check imgproxy_base_url, fileUrl, url, etc.
+        // Note: This returns the full image URL, not an optimized thumbnail,
+        // but it will at least display the image
+        const fullUrl = getImageUrl(image)
+        if (fullUrl) {
+            return fullUrl
+        }
+
+        // Last resort: try any URL property that might exist
+        return image.url || image.fileUrl || image.file_url || null
     }, [])
 
     // Handle media selection from modal
