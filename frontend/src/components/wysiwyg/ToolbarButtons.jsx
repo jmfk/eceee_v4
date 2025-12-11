@@ -143,7 +143,7 @@ const FormatDropdown = ({ currentFormat, maxHeaderLevel, allowedFormats, onComma
 
     // Build all possible format options
     const allFormatOptions = [
-        { value: '<div>', label: 'Paragraph' },
+        { value: '<p>', label: 'Paragraph' },
         ...Array.from({ length: 6 }, (_, i) => ({
             value: `<h${i + 1}>`,
             label: `Heading ${i + 1}`
@@ -151,15 +151,23 @@ const FormatDropdown = ({ currentFormat, maxHeaderLevel, allowedFormats, onComma
     ];
 
     // Filter based on allowedFormats or maxHeaderLevel
-    const formatOptions = allowedFormats
-        ? allFormatOptions.filter(opt => allowedFormats.includes(opt.value))
-        : [
-            { value: '<div>', label: 'Paragraph' },
+    let formatOptions;
+    if (allowedFormats) {
+        // Filter allFormatOptions to only include allowed formats
+        formatOptions = allFormatOptions.filter(opt => allowedFormats.includes(opt.value));
+        // Ensure paragraph is always included if it's in allowedFormats
+        if (allowedFormats.includes('<p>') && !formatOptions.find(opt => opt.value === '<p>')) {
+            formatOptions.unshift({ value: '<p>', label: 'Paragraph' });
+        }
+    } else {
+        formatOptions = [
+            { value: '<p>', label: 'Paragraph' },
             ...Array.from({ length: maxHeaderLevel || 3 }, (_, i) => ({
                 value: `<h${i + 1}>`,
                 label: `Heading ${i + 1}`
             }))
         ];
+    }
 
     const handleFormatClick = (value, label) => {
         onCommand('formatBlock', value);

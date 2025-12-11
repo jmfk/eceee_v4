@@ -780,15 +780,23 @@ class ContentWidgetEditorRenderer {
         ];
 
         // Filter based on allowedFormats or maxHeaderLevel
-        const formatOptions = this.allowedFormats
-            ? allFormatOptions.filter(opt => this.allowedFormats.includes(opt.value))
-            : [
+        let formatOptions;
+        if (this.allowedFormats) {
+            // Filter allFormatOptions to only include allowed formats
+            formatOptions = allFormatOptions.filter(opt => this.allowedFormats.includes(opt.value));
+            // Ensure paragraph is always included if it's in allowedFormats
+            if (this.allowedFormats.includes('<p>') && !formatOptions.find(opt => opt.value === '<p>')) {
+                formatOptions.unshift({ value: '<p>', label: 'Paragraph' });
+            }
+        } else {
+            formatOptions = [
                 { value: '<p>', label: 'Paragraph' },
                 ...Array.from({ length: this.maxHeaderLevel }, (_, i) => ({
                     value: `<h${i + 1}>`,
                     label: `Heading ${i + 1}`
                 }))
             ];
+        }
 
         // Create menu items
         formatOptions.forEach(option => {
@@ -1760,9 +1768,9 @@ class ContentWidgetEditorRenderer {
             if (target.tagName === 'A') {
                 // Prevent default navigation
                 e.preventDefault()
-                
+
                 const href = target.getAttribute('href') || ''
-                
+
                 // Check if this is a JSON link object
                 let linkInfo = null
                 if (href.startsWith('{')) {
@@ -1776,10 +1784,10 @@ class ContentWidgetEditorRenderer {
                 } else {
                     linkInfo = { type: 'url', display: href }
                 }
-                
+
                 // Show link info tooltip/popup near the link
                 this.showLinkInfoPopup(target, linkInfo)
-                
+
                 return
             }
             target = target.parentNode
@@ -1791,7 +1799,7 @@ class ContentWidgetEditorRenderer {
      */
     getLinkDisplayInfo(linkObj) {
         const type = linkObj.type || 'unknown'
-        
+
         switch (type) {
             case 'internal':
                 return {
@@ -1819,16 +1827,16 @@ class ContentWidgetEditorRenderer {
     showLinkInfoPopup(linkElement, linkInfo) {
         // Remove any existing popup
         this.hideLinkInfoPopup()
-        
+
         // Create popup
         const popup = document.createElement('div')
         popup.className = 'link-info-popup fixed bg-gray-800 text-white text-sm px-3 py-2 rounded shadow-lg max-w-xs z-50'
         popup.style.pointerEvents = 'auto'
-        
+
         // Type badge
         const typeBadge = document.createElement('span')
         typeBadge.className = 'inline-block px-1.5 py-0.5 text-xs rounded mr-2'
-        
+
         switch (linkInfo.type) {
             case 'internal':
                 typeBadge.className += ' bg-blue-600'
@@ -1854,35 +1862,35 @@ class ContentWidgetEditorRenderer {
                 typeBadge.className += ' bg-gray-500'
                 typeBadge.textContent = 'Link'
         }
-        
+
         popup.appendChild(typeBadge)
-        
+
         // Link display
         const displayText = document.createElement('span')
         displayText.textContent = linkInfo.display
         displayText.className = 'break-all'
         popup.appendChild(displayText)
-        
+
         // Hint text
         const hint = document.createElement('div')
         hint.className = 'text-xs text-gray-400 mt-1'
         hint.textContent = 'Double-click to edit link'
         popup.appendChild(hint)
-        
+
         // Position popup above the link
         const rect = linkElement.getBoundingClientRect()
         popup.style.left = `${rect.left}px`
         popup.style.top = `${rect.top - 8}px`
         popup.style.transform = 'translateY(-100%)'
-        
+
         document.body.appendChild(popup)
         this.linkInfoPopup = popup
-        
+
         // Auto-hide after 3 seconds
         this.linkInfoPopupTimeout = setTimeout(() => {
             this.hideLinkInfoPopup()
         }, 3000)
-        
+
         // Hide on any click outside
         const hideOnClick = (e) => {
             if (!popup.contains(e.target)) {
