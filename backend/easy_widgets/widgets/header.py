@@ -32,45 +32,6 @@ class HeaderConfig(BaseModel):
         },
     )
 
-    mobile_width: Optional[int] = Field(
-        640,
-        description="Mobile breakpoint width in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 2,
-            "min": 320,
-            "max": 1024,
-            "group": "mobile",
-        },
-    )
-
-    mobile_height: Optional[int] = Field(
-        80,
-        description="Mobile header height in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 3,
-            "min": 40,
-            "max": 300,
-            "group": "mobile",
-        },
-    )
-
-    mobile_alignment: Optional[str] = Field(
-        "center",
-        description="Mobile image alignment/focal point",
-        json_schema_extra={
-            "component": "SelectInput",
-            "order": 4,
-            "options": [
-                {"value": "left", "label": "Left"},
-                {"value": "center", "label": "Center"},
-                {"value": "right", "label": "Right"},
-            ],
-            "group": "mobile",
-        },
-    )
-
     # Tablet settings (grouped)
     tablet_image: Optional[dict] = Field(
         None,
@@ -85,45 +46,6 @@ class HeaderConfig(BaseModel):
         },
     )
 
-    tablet_width: Optional[int] = Field(
-        1024,
-        description="Tablet breakpoint width in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 6,
-            "min": 640,
-            "max": 1920,
-            "group": "tablet",
-        },
-    )
-
-    tablet_height: Optional[int] = Field(
-        112,
-        description="Tablet header height in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 7,
-            "min": 40,
-            "max": 300,
-            "group": "tablet",
-        },
-    )
-
-    tablet_alignment: Optional[str] = Field(
-        "center",
-        description="Tablet image alignment/focal point",
-        json_schema_extra={
-            "component": "SelectInput",
-            "order": 8,
-            "options": [
-                {"value": "left", "label": "Left"},
-                {"value": "center", "label": "Center"},
-                {"value": "right", "label": "Right"},
-            ],
-            "group": "tablet",
-        },
-    )
-
     # Desktop settings (grouped)
     image: Optional[dict] = Field(
         None,
@@ -132,45 +54,6 @@ class HeaderConfig(BaseModel):
             "component": "ImageInput",
             "order": 9,
             "mediaTypes": ["image"],
-            "group": "desktop",
-        },
-    )
-
-    width: Optional[int] = Field(
-        1280,
-        description="Desktop breakpoint width in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 10,
-            "min": 1024,
-            "max": 3840,
-            "group": "desktop",
-        },
-    )
-
-    height: Optional[int] = Field(
-        112,
-        description="Desktop header height in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 11,
-            "min": 40,
-            "max": 300,
-            "group": "desktop",
-        },
-    )
-
-    alignment: Optional[str] = Field(
-        "center",
-        description="Desktop image alignment/focal point",
-        json_schema_extra={
-            "component": "SelectInput",
-            "order": 12,
-            "options": [
-                {"value": "left", "label": "Left"},
-                {"value": "center", "label": "Center"},
-                {"value": "right", "label": "Right"},
-            ],
             "group": "desktop",
         },
     )
@@ -192,6 +75,21 @@ class HeaderWidget(BaseWidget):
         "Simple header widget with responsive image that scales to fill header height"
     )
     template_name = "easy_widgets/widgets/header.html"
+
+    layout_parts = {
+        "header-widget": {
+            "label": "Header container",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "border",
+                "borderRadius",
+            ],
+        },
+    }
 
     widget_css = """
     """
@@ -258,18 +156,18 @@ class HeaderWidget(BaseWidget):
         # Build complete inline style string
         style_parts = []
 
-        # Get configuration values with defaults
-        mobile_width = config.get("mobile_width", 640)
-        mobile_height = config.get("mobile_height", 80)
-        mobile_alignment = config.get("mobile_alignment", "center")
+        # Use hardcoded default values (moved to CSS)
+        mobile_width = 640
+        mobile_height = 80
+        mobile_alignment = "center"
 
-        tablet_width = config.get("tablet_width", 1024)
-        tablet_height = config.get("tablet_height", 112)
-        tablet_alignment = config.get("tablet_alignment", "center")
+        tablet_width = 1024
+        tablet_height = 112
+        tablet_alignment = "center"
 
-        desktop_width = config.get("width", 1280)
-        desktop_height = config.get("height", 112)
-        desktop_alignment = config.get("alignment", "center")
+        desktop_width = 1280
+        desktop_height = 112
+        desktop_alignment = "center"
 
         # Get images
         image = config.get("image")
@@ -294,7 +192,9 @@ class HeaderWidget(BaseWidget):
                 resize_type="fill",
             )
             if desktop_url and desktop_url_2x:
-                style_parts.append(f"--desktop-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);")
+                style_parts.append(
+                    f"--desktop-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);"
+                )
             elif desktop_url:
                 style_parts.append(f"--desktop-bg-image: url('{desktop_url}');")
 
@@ -316,11 +216,15 @@ class HeaderWidget(BaseWidget):
                 resize_type="fill",
             )
         if tablet_url and tablet_url_2x:
-            style_parts.append(f"--tablet-bg-image: image-set(url('{tablet_url}') 1x, url('{tablet_url_2x}') 2x);")
+            style_parts.append(
+                f"--tablet-bg-image: image-set(url('{tablet_url}') 1x, url('{tablet_url_2x}') 2x);"
+            )
         elif tablet_url:
             style_parts.append(f"--tablet-bg-image: url('{tablet_url}');")
         elif desktop_url and desktop_url_2x:
-            style_parts.append(f"--tablet-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);")
+            style_parts.append(
+                f"--tablet-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);"
+            )
         elif desktop_url:
             style_parts.append(f"--tablet-bg-image: url('{desktop_url}');")
 
@@ -342,33 +246,25 @@ class HeaderWidget(BaseWidget):
                 resize_type="fill",
             )
         if mobile_url and mobile_url_2x:
-            style_parts.append(f"--mobile-bg-image: image-set(url('{mobile_url}') 1x, url('{mobile_url_2x}') 2x);")
+            style_parts.append(
+                f"--mobile-bg-image: image-set(url('{mobile_url}') 1x, url('{mobile_url_2x}') 2x);"
+            )
         elif mobile_url:
             style_parts.append(f"--mobile-bg-image: url('{mobile_url}');")
         elif tablet_url and tablet_url_2x:
-            style_parts.append(f"--mobile-bg-image: image-set(url('{tablet_url}') 1x, url('{tablet_url_2x}') 2x);")
+            style_parts.append(
+                f"--mobile-bg-image: image-set(url('{tablet_url}') 1x, url('{tablet_url_2x}') 2x);"
+            )
         elif tablet_url:
             style_parts.append(f"--mobile-bg-image: url('{tablet_url}');")
         elif desktop_url and desktop_url_2x:
-            style_parts.append(f"--mobile-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);")
+            style_parts.append(
+                f"--mobile-bg-image: image-set(url('{desktop_url}') 1x, url('{desktop_url_2x}') 2x);"
+            )
         elif desktop_url:
             style_parts.append(f"--mobile-bg-image: url('{desktop_url}');")
 
-        # Add fixed heights as CSS variables
-        style_parts.append(f"--mobile-height: {mobile_height}px;")
-        style_parts.append(f"--tablet-height: {tablet_height}px;")
-        style_parts.append(f"--desktop-height: {desktop_height}px;")
-
-        # Add alignment as CSS variables (with two-value syntax)
-        style_parts.append(f"--mobile-alignment: {mobile_alignment} center;")
-        style_parts.append(f"--tablet-alignment: {tablet_alignment} center;")
-        style_parts.append(f"--desktop-alignment: {desktop_alignment} center;")
-
-        # Join all style parts
+        # Join all style parts (heights and alignments moved to CSS)
         template_config["header_style"] = " ".join(style_parts)
-
-        # Pass breakpoint widths to template for media queries
-        template_config["mobile_width"] = mobile_width
-        template_config["tablet_width"] = tablet_width
 
         return template_config
