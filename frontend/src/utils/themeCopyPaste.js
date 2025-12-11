@@ -322,6 +322,14 @@ function mergeSectionData(existing, incoming, sectionName, resolutions) {
 
         return { ...existing, googleFonts: mergedFonts };
     } else if (sectionName === 'designGroups') {
+        // If existing is empty or missing, use incoming data
+        const hasExistingGroups = existing.groups && existing.groups.length > 0;
+        
+        if (!hasExistingGroups) {
+            return incoming;
+        }
+
+        // If existing has data, check conflict resolution
         const conflictKey = 'designGroups';
         const resolution = resolutions[`${sectionName}.${conflictKey}`];
 
