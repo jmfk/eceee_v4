@@ -104,10 +104,10 @@ const ImageDisplaySection = ({
                                                 <button
                                                     onClick={() => setEditingTagsForImage(isEditingTags ? null : image.id)}
                                                     className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-opacity ${isEditingTags
-                                                            ? 'bg-blue-500 text-white'
-                                                            : (image.tags && image.tags.length > 0)
-                                                                ? 'bg-blue-100 text-blue-600'
-                                                                : 'bg-white text-gray-600'
+                                                        ? 'bg-blue-500 text-white'
+                                                        : (image.tags && image.tags.length > 0)
+                                                            ? 'bg-blue-100 text-blue-600'
+                                                            : 'bg-white text-gray-600'
                                                         } opacity-0 group-hover:opacity-100`}
                                                     title={`${(image.tags || []).length} tag${(image.tags || []).length !== 1 ? 's' : ''}`}
                                                 >

@@ -206,8 +206,8 @@ class HeroWidget(BaseWidget):
     .hero-widget h1 {
         font-family: "Source Sans 3", sans-serif;
         font-weight: 300;
-        font-size: 54px;
-        line-height: 44px;
+        font-size: 50px;
+        line-height: 54px;
         margin-top: 16px;
         margin-bottom: 16px;
         color: var(--hero-text-color, #ffffff);

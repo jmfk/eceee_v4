@@ -190,3 +190,4 @@ ImageWidget.schema = {
 - ✅ MediaPicker still available for legacy code (tests, docs)
 
 
+
