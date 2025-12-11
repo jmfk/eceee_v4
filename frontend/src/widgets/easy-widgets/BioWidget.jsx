@@ -37,7 +37,7 @@ const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimen
                 slotDimensions,
                 pageId,
                 detachedToolbar: true,
-                allowedFormats: ['<p>', '<h2>', '<h3>']
+                allowedFormats: ['<p>', '<h3>', '<h4>']
             })
             rendererRef.current.render()
             lastExternalContentRef.current = content
@@ -134,7 +134,7 @@ const BioWidget = memo(({
     }
     const componentId = `widget-${widgetId}`
     const contextType = useEditorContext()
-    
+
     // State for image edit modal
     const [showImageModal, setShowImageModal] = useState(false)
     const [editingField, setEditingField] = useState(null)
