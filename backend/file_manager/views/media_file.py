@@ -8,6 +8,7 @@ from django.db import models
 from django.http import Http404
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -20,6 +21,20 @@ from ..storage import storage, S3MediaStorage
 from .pagination import MediaFilePagination
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_replaced_media_file(media_file: MediaFile, max_hops: int = 10) -> MediaFile:
+    """Follow replaced_by chain to the final MediaFile (with cycle protection)."""
+    current = media_file
+    seen = set()
+    for _ in range(max_hops):
+        if not current.replaced_by_id:
+            return current
+        if current.id in seen:
+            return current
+        seen.add(current.id)
+        current = current.replaced_by
+    return current
 
 
 class MediaFileViewSet(viewsets.ModelViewSet):
@@ -286,7 +301,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def download(self, request, pk=None):
         """Download file with access tracking."""
-        media_file = self.get_object()
+        media_file = _resolve_replaced_media_file(self.get_object())
 
         # Update access tracking
         media_file.download_count += 1
@@ -294,7 +309,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         media_file.save(update_fields=["download_count", "last_accessed"])
 
         # Get signed URL for secure access
-        signed_url = storage.get_signed_url(media_file.file_path)
+        signed_url = storage.generate_signed_url(media_file.file_path)
 
         if signed_url:
             # Redirect to signed URL
@@ -311,10 +326,9 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         """Replace the file in storage while preserving all metadata."""
         from ..security import SecurityAuditLogger
         from django.db import transaction
+        import hashlib
 
         media_file = self.get_object()
-        old_file_path = media_file.file_path
-        old_file_hash = media_file.file_hash
 
         # Check if file is provided
         if "file" not in request.FILES:
@@ -355,81 +369,41 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            # Upload new file using S3MediaStorage
-            s3_storage = S3MediaStorage()
-            upload_result = s3_storage.upload_file(
-                uploaded_file, folder_path=f"{media_file.namespace.slug}/media"
-            )
-            new_file_hash = upload_result["file_hash"]
-            new_file_path = upload_result["file_path"]
+            # Compute hash up-front (avoids uploading something we can't store)
+            uploaded_file.seek(0)
+            file_bytes = uploaded_file.read()
+            uploaded_file.seek(0)
+            new_file_hash = hashlib.sha256(file_bytes).hexdigest()
 
-            # Scenario 1: Same hash as current file (no-op replacement)
-            if new_file_hash == old_file_hash:
-                logger.info(f"Replacement file has same hash as current file {media_file.id}, no changes needed")
-                # Delete the newly uploaded file since it's identical to what we already have
-                try:
-                    s3_storage.delete_file(new_file_path)
-                except Exception as e:
-                    logger.warning(f"Failed to delete duplicate upload {new_file_path}: {e}")
-                
-                # Return current file unchanged
+            # Scenario 1: Same content as current - no-op (optionally overwrite anyway)
+            if new_file_hash == media_file.file_hash:
+                logger.info(
+                    f"Replacement file has same hash as current file {media_file.id}, no changes needed"
+                )
                 serializer = self.get_serializer(media_file)
                 return Response(serializer.data, status=status.HTTP_200_OK)
 
-            # Check for hash conflicts with other files
-            existing_file_with_hash = (
-                MediaFile.objects.with_deleted()
-                .filter(file_hash=new_file_hash)
+            # Scenario 2: Hash matches a different active file -> link replacement (keep uniqueness)
+            existing_active = (
+                MediaFile.objects.filter(file_hash=new_file_hash)
                 .exclude(id=media_file.id)
                 .first()
             )
 
+            if existing_active:
+                with transaction.atomic():
+                    media_file.replaced_by = existing_active
+                    media_file.last_modified_by = request.user
+                    media_file.save(update_fields=["replaced_by", "last_modified_by", "updated_at"])
+
+                serializer = self.get_serializer(media_file)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            # Scenario 3: Unique hash -> overwrite object in-place at current key
+            s3_storage = S3MediaStorage()
+            upload_result = s3_storage.overwrite_file(media_file.file_path, uploaded_file)
+
             with transaction.atomic():
-                if existing_file_with_hash:
-                    if existing_file_with_hash.is_deleted:
-                        # Scenario 3: Hash matches soft-deleted file
-                        logger.info(
-                            f"New file hash matches soft-deleted file {existing_file_with_hash.id}, "
-                            f"hard deleting it before replacement"
-                        )
-                        # Hard delete the soft-deleted record to free up the hash
-                        existing_file_with_hash.delete(force=True)
-                    else:
-                        # Scenario 2: Hash matches different active file
-                        logger.info(
-                            f"New file hash matches existing active file {existing_file_with_hash.id}, "
-                            f"reusing existing S3 object"
-                        )
-                        # Delete the newly uploaded duplicate from S3
-                        try:
-                            s3_storage.delete_file(new_file_path)
-                        except Exception as e:
-                            logger.warning(f"Failed to delete duplicate upload {new_file_path}: {e}")
-                        
-                        # Point to the existing file's S3 object instead
-                        upload_result["file_path"] = existing_file_with_hash.file_path
-                        # Keep the new hash for the update below
-
-                # Delete old file from storage (if not referenced elsewhere)
-                if old_file_path and old_file_path != upload_result["file_path"]:
-                    # Check if other files reference the same S3 object
-                    other_files_with_same_path = (
-                        MediaFile.objects.with_deleted()
-                        .filter(file_hash=old_file_hash)
-                        .exclude(id=media_file.id)
-                        .exists()
-                    )
-                    
-                    if not other_files_with_same_path:
-                        try:
-                            default_storage.delete(old_file_path)
-                            logger.info(f"Deleted old file: {old_file_path}")
-                        except Exception as e:
-                            logger.warning(f"Failed to delete old file {old_file_path}: {e}")
-
-                # Scenario 4: Unique hash - proceed with normal replacement
-                # Update MediaFile fields with new file information
-                media_file.file_path = upload_result["file_path"]
                 media_file.file_size = upload_result["file_size"]
                 media_file.content_type = upload_result["content_type"]
                 media_file.file_hash = upload_result["file_hash"]
@@ -437,6 +411,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 media_file.height = upload_result.get("height")
                 media_file.original_filename = uploaded_file.name
                 media_file.last_modified_by = request.user
+                media_file.replaced_by = None
                 media_file.save()
 
             # Log the file replacement
@@ -447,7 +422,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                     "size": uploaded_file.size,
                     "id": str(media_file.id),
                     "action": "replace",
-                    "old_file": old_file_path,
+                    "file_path": media_file.file_path,
                 },
                 success=True,
             )

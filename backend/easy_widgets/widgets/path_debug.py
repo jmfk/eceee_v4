@@ -43,6 +43,21 @@ class PathDebugWidget(BaseWidget):
     template_name = "easy_widgets/widgets/path_debug.html"
     configuration_model = PathDebugConfig
 
+    layout_parts = {
+        "path-debug-widget": {
+            "label": "Path Debug widget container",
+            "selector": ".path-debug-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     # Widget is for development/debugging
     is_development_only = True
 

@@ -183,6 +183,20 @@ class ImageWidget(BaseWidget):
     description = "Image widget that contains image, image gallery, or video"
     template_name = "easy_widgets/widgets/image.html"
 
+    layout_parts = {
+        "image-widget": {
+            "label": "Image widget container",
+            "selector": ".image-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+            ],
+        },
+    }
+
     widget_css = """
     .image-widget {
         display: block;

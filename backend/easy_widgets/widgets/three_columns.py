@@ -49,6 +49,7 @@ class ThreeColumnsWidget(BaseWidget):
     layout_parts = {
         "three-columns-widget": {
             "label": "Three Columns container",
+            "selector": ".three-columns-widget",
             "properties": [
                 "width",
                 "height",
@@ -65,6 +66,7 @@ class ThreeColumnsWidget(BaseWidget):
         },
         "three-col-widget-wrapper": {
             "label": "Three Columns Wrappercontainer",
+            "selector": ".three-col-widget-wrapper",
             "properties": [
                 "padding",
                 "margin",

@@ -64,6 +64,21 @@ class SidebarWidget(BaseWidget):
     description = "Sidebar widget with background image/color and text color options"
     template_name = "easy_widgets/widgets/sidebar.html"
 
+    layout_parts = {
+        "sidebar-widget": {
+            "label": "Sidebar widget container",
+            "selector": ".sidebar-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     widget_css = """
     .sidebar-widget {
         background-color: var(--sidebar-bg-color, #f9fafb);
@@ -195,32 +210,32 @@ class SidebarWidget(BaseWidget):
     def render_with_style(self, config, theme):
         """
         Render sidebar with custom component style from theme.
-        
+
         Args:
             config: Widget configuration
             theme: PageTheme instance
-            
+
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import render_mustache, prepare_component_context
+        from webpages.utils.mustache_renderer import (
+            render_mustache,
+            prepare_component_context,
+        )
         from django.template.loader import render_to_string
-        
+
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
             return None
-        
+
         styles = theme.component_styles or {}
         style = styles.get(style_name)
         if not style:
             return None
-        
+
         # Render the sidebar HTML using the default template first
-        sidebar_html = render_to_string(
-            self.template_name,
-            {"config": config}
-        )
-        
+        sidebar_html = render_to_string(self.template_name, {"config": config})
+
         # Prepare context with rendered sidebar as content
         context = prepare_component_context(
             content=sidebar_html,
@@ -228,7 +243,7 @@ class SidebarWidget(BaseWidget):
             style_vars=style.get("variables", {}),
             config=config,  # Pass raw config for granular control
         )
-        
+
         # Render with style template
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")

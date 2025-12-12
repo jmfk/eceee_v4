@@ -1,32 +1,5 @@
 {% load static %}
 
-<style>
-.widget-type-header {
-    background-image: var(--mobile-bg-image);
-    background-size: cover;
-    background-position: center center;
-    background-repeat: no-repeat;
-    height: 80px;
-    width: 100%;
-}
-
-@media (min-width: 640px) {
-    .widget-type-header {
-        background-image: var(--tablet-bg-image);
-        background-position: center center;
-        height: 112px;
-    }
-}
-
-@media (min-width: 1024px) {
-    .widget-type-header {
-        background-image: var(--desktop-bg-image);
-        background-position: center center;
-        height: 112px;
-    }
-}
-</style>
-
 <header class="widget-type-header block w-full" style="{{ header_style }}">
 </header>
 

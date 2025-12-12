@@ -89,6 +89,21 @@ class SidebarTopNewsWidget(BaseWidget):
     description = "Compact list of top/featured news for sidebars"
     template_name = "easy_widgets/widgets/sidebar_top_news.html"
 
+    layout_parts = {
+        "sidebar-top-news-widget": {
+            "label": "Sidebar Top News widget container",
+            "selector": ".sidebar-top-news-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     widget_css = """
     .sidebar-top-news-widget {
         font-family: var(--body-font, inherit);

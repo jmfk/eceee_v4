@@ -133,6 +133,7 @@ class ContentWidget(BaseWidget):
     layout_parts = {
         "content-widget": {
             "label": "Content widget container",
+            "selector": ".content-widget",
             "properties": [
                 "width",
                 "height",

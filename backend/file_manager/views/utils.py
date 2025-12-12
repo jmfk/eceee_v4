@@ -297,13 +297,25 @@ class MediaFileBySlugView(APIView):
             namespace = Namespace.objects.get(slug=namespace_slug)
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
+            # Resolve replacements
+            current = media_file
+            seen = set()
+            for _ in range(10):
+                if not current.replaced_by_id:
+                    break
+                if current.id in seen:
+                    break
+                seen.add(current.id)
+                current = current.replaced_by
+            media_file = current
+
             # Update access tracking
             media_file.download_count += 1
             media_file.last_accessed = timezone.now()
             media_file.save(update_fields=["download_count", "last_accessed"])
 
             # Get signed URL for secure access
-            signed_url = storage.get_signed_url(media_file.file_path)
+            signed_url = storage.generate_signed_url(media_file.file_path)
 
             if signed_url:
                 return redirect(signed_url)
@@ -326,13 +338,25 @@ class MediaFileByUUIDView(APIView):
         try:
             media_file = MediaFile.objects.get(id=file_uuid)
 
+            # Resolve replacements
+            current = media_file
+            seen = set()
+            for _ in range(10):
+                if not current.replaced_by_id:
+                    break
+                if current.id in seen:
+                    break
+                seen.add(current.id)
+                current = current.replaced_by
+            media_file = current
+
             # Update access tracking
             media_file.download_count += 1
             media_file.last_accessed = timezone.now()
             media_file.save(update_fields=["download_count", "last_accessed"])
 
             # Get signed URL for secure access
-            signed_url = storage.get_signed_url(media_file.file_path)
+            signed_url = storage.generate_signed_url(media_file.file_path)
 
             if signed_url:
                 return redirect(signed_url)
@@ -358,13 +382,25 @@ class MediaFileDownloadView(APIView):
             namespace = Namespace.objects.get(slug=namespace_slug)
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
+            # Resolve replacements
+            current = media_file
+            seen = set()
+            for _ in range(10):
+                if not current.replaced_by_id:
+                    break
+                if current.id in seen:
+                    break
+                seen.add(current.id)
+                current = current.replaced_by
+            media_file = current
+
             # Update access tracking
             media_file.download_count += 1
             media_file.last_accessed = timezone.now()
             media_file.save(update_fields=["download_count", "last_accessed"])
 
             # Get signed URL for secure access
-            signed_url = storage.get_signed_url(media_file.file_path)
+            signed_url = storage.generate_signed_url(media_file.file_path)
 
             if signed_url:
                 response = redirect(signed_url)

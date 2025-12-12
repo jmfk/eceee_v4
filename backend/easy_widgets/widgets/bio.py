@@ -133,6 +133,21 @@ class BioWidget(BaseWidget):
     description = "Biography widget with image and text"
     template_name = "easy_widgets/widgets/bio.html"
 
+    layout_parts = {
+        "bio-widget": {
+            "label": "Bio widget container",
+            "selector": ".bio-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     widget_css = """
     .bio-widget {
         display: block;
@@ -228,7 +243,9 @@ class BioWidget(BaseWidget):
         # Get snake_case fields for template
         template_config["bio_text"] = config.get("bio_text", "")
         template_config["text_layout"] = config.get("text_layout", "column")
-        template_config["use_content_margins"] = config.get("use_content_margins", False)
+        template_config["use_content_margins"] = config.get(
+            "use_content_margins", False
+        )
 
         # Handle image (now a dict MediaFile object)
         image = config.get("image")

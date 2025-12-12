@@ -66,6 +66,7 @@ class FooterWidget(BaseWidget):
     layout_parts = {
         "footer-widget": {
             "label": "Footer widget container",
+            "selector": ".footer-widget",
             "properties": [
                 "width",
                 "height",

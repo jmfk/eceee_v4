@@ -101,6 +101,7 @@ class HeadlineWidget(BaseWidget):
     layout_parts = {
         "headline-widget": {
             "label": "Headline container",
+            "selector": ".headline-widget",
             "properties": [
                 "width",
                 "height",

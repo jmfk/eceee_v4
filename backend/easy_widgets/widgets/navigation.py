@@ -76,6 +76,7 @@ class NavigationWidget(BaseWidget):
     layout_parts = {
         "nav-container": {
             "label": "Navigation container",
+            "selector": ".nav-container",
             "properties": [
                 "width",
                 "height",
@@ -86,8 +87,9 @@ class NavigationWidget(BaseWidget):
                 "fontFamily",
                 "fontSize",
                 "lineHeight",
+                "gap",
             ],
-        },
+        }
     }
 
     widget_css = """

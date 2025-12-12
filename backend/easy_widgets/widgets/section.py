@@ -142,6 +142,7 @@ class SectionWidget(BaseWidget):
     layout_parts = {
         "section-widget": {
             "label": "Section container (with collapse)",
+            "selector": ".section-widget",
             "properties": [
                 "width",
                 "height",
@@ -161,6 +162,7 @@ class SectionWidget(BaseWidget):
         },
         "section-content-only-widget": {
             "label": "Section container (without collapse)",
+            "selector": ".section-content-only-widget",
             "properties": [
                 "width",
                 "height",

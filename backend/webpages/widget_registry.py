@@ -275,19 +275,22 @@ class BaseWidget(ABC):
                     # Legacy format: "container": "Main widget container"
                     normalized_parts[part_name] = {
                         "label": part_config,
-                        "properties": None  # None = all properties available
+                        "properties": None,  # None = all properties available
+                        "selector": None  # None = use default .{part} selector
                     }
                 elif isinstance(part_config, dict):
-                    # New format: already has "label" and optional "properties"
+                    # New format: already has "label" and optional "properties" and "selector"
                     normalized_parts[part_name] = {
                         "label": part_config.get("label", part_name.capitalize()),
-                        "properties": part_config.get("properties")  # None or list of property names
+                        "properties": part_config.get("properties"),  # None or list of property names
+                        "selector": part_config.get("selector")  # None or CSS selector string
                     }
                 else:
                     # Fallback: treat as label string
                     normalized_parts[part_name] = {
                         "label": str(part_config),
-                        "properties": None
+                        "properties": None,
+                        "selector": None
                     }
             
             result["layout_parts"] = normalized_parts

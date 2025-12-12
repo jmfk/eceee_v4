@@ -203,6 +203,21 @@ class FormsWidget(BaseWidget):
     description = "Forms widget with schema support for building custom forms"
     template_name = "easy_widgets/widgets/forms.html"
 
+    layout_parts = {
+        "forms-widget": {
+            "label": "Forms widget container",
+            "selector": ".forms-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     widget_css = """
     .forms-widget {
         background-color: var(--form-bg-color, #ffffff);

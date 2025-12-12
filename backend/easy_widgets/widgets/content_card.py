@@ -116,6 +116,7 @@ class ContentCardWidget(BaseWidget):
     layout_parts = {
         "content-card-widget": {
             "label": "Content Card Widget",
+            "selector": ".content-card-widget",
             "properties": [
                 "width",
                 "height",
@@ -127,6 +128,7 @@ class ContentCardWidget(BaseWidget):
         },
         "content-card-header": {
             "label": "Card Header",
+            "selector": ".content-card-header",
             "properties": [
                 "width",
                 "height",
@@ -141,6 +143,7 @@ class ContentCardWidget(BaseWidget):
         },
         "content-card-text": {
             "label": "Text Content",
+            "selector": ".content-card-text",
             "properties": [
                 "width",
                 "height",
@@ -154,6 +157,7 @@ class ContentCardWidget(BaseWidget):
         },
         "content-card-image": {
             "label": "Individual Image",
+            "selector": ".content-card-image",
             "properties": [
                 "width",
                 "height",

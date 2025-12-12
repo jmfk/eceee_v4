@@ -148,6 +148,21 @@ class NavbarWidget(BaseWidget):
     template_name = "easy_widgets/widgets/navbar.html"
     mustache_template_name = "easy_widgets/widgets/navbar.mustache"
 
+    layout_parts = {
+        "navbar-widget": {
+            "label": "Navbar widget container",
+            "selector": ".navbar-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     widget_css = """
         /* Navbar Widget - Override only conflicting theme styles */
         .navbar-menu-list {

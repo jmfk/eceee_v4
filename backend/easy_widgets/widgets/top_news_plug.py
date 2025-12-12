@@ -115,6 +115,21 @@ class TopNewsPlugWidget(BaseWidget):
     description = "Display top/featured news in configurable grid layouts"
     template_name = "easy_widgets/widgets/top_news_plug.html"
 
+    layout_parts = {
+        "top-news-plug-widget": {
+            "label": "Top News Plug widget container",
+            "selector": ".top-news-plug-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     widget_css = """
     .top-news-plug-widget {
         font-family: var(--body-font, inherit);

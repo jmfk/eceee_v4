@@ -47,6 +47,7 @@ class TwoColumnsWidget(BaseWidget):
     layout_parts = {
         "two-columns-widget": {
             "label": "Two Columns container",
+            "selector": ".two-columns-widget",
             "properties": [
                 "width",
                 "height",

@@ -1471,6 +1471,17 @@ class PageTheme(models.Model):
                 # Get theme breakpoints for media queries
                 breakpoints = self.get_breakpoints()
 
+                # Get widget type metadata to look up selectors for layout parts
+                part_selector_map = {}  # part_id -> custom selector
+                if widget_types:
+                    from webpages.widget_registry import widget_type_registry
+                    for wt_type in widget_types:
+                        wt_class = widget_type_registry.get_widget_type_by_type(wt_type)
+                        if wt_class and hasattr(wt_class, 'layout_parts'):
+                            for part_id, part_config in wt_class.layout_parts.items():
+                                if isinstance(part_config, dict) and part_config.get("selector"):
+                                    part_selector_map[part_id] = part_config["selector"]
+
                 for part, part_breakpoints in layout_properties.items():
                     # Handle each breakpoint in mobile-first order
                     for bp_key in ["sm", "md", "lg", "xl"]:
@@ -1510,32 +1521,48 @@ class PageTheme(models.Model):
                         if not bp_props or len(bp_props) == 0:
                             continue
 
-                        # Build selectors using layout part classes
-                        # base_selectors contain widget-type classes like:
-                        # .widget-type-easy-widgets-contentcardwidget
-                        #
-                        # For widget root elements (parts ending in '-widget' or named 'container'),
-                        # the widget-type class and part class are on the SAME element,
-                        # so we use a same-element selector (no space).
-                        # For child elements, we use descendant selectors (with space).
-                        is_root_element = (
-                            part.endswith("-widget") or part == "container"
-                        )
-
-                        part_selectors = []
-                        for base in base_selectors:
-                            if base:
-                                if is_root_element:
-                                    # Root element: both classes on same div
-                                    # .slot-main .widget-type-{type}.{part}
-                                    part_selectors.append(f"{base}.{part}".strip())
+                        # Build selectors using layout part classes or custom selectors
+                        # Check if this part has a custom selector defined in widget metadata
+                        custom_selector = part_selector_map.get(part)
+                        
+                        if custom_selector:
+                            # Use custom selector (e.g., ".nav-container a")
+                            # Prefix with base selectors for scoping
+                            part_selectors = []
+                            for base in base_selectors:
+                                if base:
+                                    # Append custom selector as descendant
+                                    part_selectors.append(f"{base} {custom_selector}".strip())
                                 else:
-                                    # Child element: descendant selector
-                                    # .slot-main .widget-type-{type} .{part}
-                                    part_selectors.append(f"{base} .{part}".strip())
-                            else:
-                                # Fallback for global layout parts
-                                part_selectors.append(f".{part}")
+                                    # Global - use custom selector as-is
+                                    part_selectors.append(custom_selector)
+                        else:
+                            # Default behavior: use part id as class name
+                            # base_selectors contain widget-type classes like:
+                            # .widget-type-easy-widgets-contentcardwidget
+                            #
+                            # For widget root elements (parts ending in '-widget' or named 'container'),
+                            # the widget-type class and part class are on the SAME element,
+                            # so we use a same-element selector (no space).
+                            # For child elements, we use descendant selectors (with space).
+                            is_root_element = (
+                                part.endswith("-widget") or part == "container"
+                            )
+
+                            part_selectors = []
+                            for base in base_selectors:
+                                if base:
+                                    if is_root_element:
+                                        # Root element: both classes on same div
+                                        # .slot-main .widget-type-{type}.{part}
+                                        part_selectors.append(f"{base}.{part}".strip())
+                                    else:
+                                        # Child element: descendant selector
+                                        # .slot-main .widget-type-{type} .{part}
+                                        part_selectors.append(f"{base} .{part}".strip())
+                                else:
+                                    # Fallback for global layout parts
+                                    part_selectors.append(f".{part}")
 
                         selector = ",\n".join(part_selectors)
 

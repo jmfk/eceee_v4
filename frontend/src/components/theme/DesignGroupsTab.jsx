@@ -452,11 +452,30 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   };
 
   // Convert layout properties to CSS
-  const layoutPropertiesToCSS = (layoutProperties) => {
+  const layoutPropertiesToCSS = (layoutProperties, groupIndex) => {
     if (!layoutProperties || Object.keys(layoutProperties).length === 0) return '';
 
     const cssParts = [];
     const effectiveBreakpoints = getBreakpoints({ breakpoints });
+
+    // Get selected widget types for this group to look up selectors
+    const group = groups[groupIndex];
+    const selectedWidgetTypes = group?.widgetTypes || (group?.widgetType ? [group.widgetType] : []);
+    
+    // Build part selector map from widget metadata
+    const partSelectorMap = {};  // part_id -> custom selector
+    if (selectedWidgetTypes.length > 0) {
+      selectedWidgetTypes.forEach(wtType => {
+        const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+        if (widgetMeta?.layoutParts) {
+          Object.entries(widgetMeta.layoutParts).forEach(([partId, partConfig]) => {
+            if (partConfig?.selector) {
+              partSelectorMap[partId] = partConfig.selector;
+            }
+          });
+        }
+      });
+    }
 
     // Helper to convert property value (handle color references)
     const formatPropertyValue = (prop, value) => {
@@ -474,9 +493,12 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     };
 
     for (const [part, bpStyles] of Object.entries(layoutProperties)) {
+      // Use custom selector if available, otherwise fallback to .{part}
+      const selector = partSelectorMap[part] || `.${part}`;
+      
       // Default (no media query)
       if (bpStyles.default && Object.keys(bpStyles.default).length > 0) {
-        let cssRule = `.${part} {\n`;
+        let cssRule = `${selector} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.default)) {
           cssRule += formatPropertyValue(prop, value);
         }
@@ -486,7 +508,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
       // Legacy desktop support (migrate to default)
       else if (bpStyles.desktop && Object.keys(bpStyles.desktop).length > 0) {
-        let cssRule = `.${part} {\n`;
+        let cssRule = `${selector} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.desktop)) {
           cssRule += formatPropertyValue(prop, value);
         }
@@ -497,7 +519,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       // Generate media queries for each breakpoint (mobile-first)
       ['sm', 'md', 'lg', 'xl'].forEach(bp => {
         if (bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0 && effectiveBreakpoints[bp]) {
-          let cssRule = `@media (min-width: ${effectiveBreakpoints[bp]}px) {\n  .${part} {\n`;
+          let cssRule = `@media (min-width: ${effectiveBreakpoints[bp]}px) {\n  ${selector} {\n`;
           for (const [prop, value] of Object.entries(bpStyles[bp])) {
             cssRule += '  ' + formatPropertyValue(prop, value);
           }
@@ -508,7 +530,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
       // Legacy tablet support (migrate to md)
       if (bpStyles.tablet && Object.keys(bpStyles.tablet).length > 0 && !bpStyles.md) {
-        let cssRule = `@media (min-width: ${effectiveBreakpoints.md}px) {\n  .${part} {\n`;
+        let cssRule = `@media (min-width: ${effectiveBreakpoints.md}px) {\n  ${selector} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.tablet)) {
           cssRule += '  ' + formatPropertyValue(prop, value);
         }
@@ -518,7 +540,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
       // Legacy mobile support (migrate to sm)
       if (bpStyles.mobile && Object.keys(bpStyles.mobile).length > 0 && !bpStyles.sm) {
-        let cssRule = `@media (min-width: ${effectiveBreakpoints.sm}px) {\n  .${part} {\n`;
+        let cssRule = `@media (min-width: ${effectiveBreakpoints.sm}px) {\n  ${selector} {\n`;
         for (const [prop, value] of Object.entries(bpStyles.mobile)) {
           cssRule += '  ' + formatPropertyValue(prop, value);
         }
@@ -531,28 +553,66 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   };
 
   // Convert CSS to layout properties
-  const cssToLayoutProperties = (cssText) => {
+  const cssToLayoutProperties = (cssText, groupIndex) => {
     const layoutProperties = {};
+
+    // Get selected widget types for this group to build selector-to-partId map
+    const group = groups[groupIndex];
+    const selectedWidgetTypes = group?.widgetTypes || (group?.widgetType ? [group.widgetType] : []);
+    
+    // Build reverse map: selector -> part_id
+    const selectorToPartMap = {};  // selector -> part_id
+    const partIdSet = new Set();  // All known part IDs
+    if (selectedWidgetTypes.length > 0) {
+      selectedWidgetTypes.forEach(wtType => {
+        const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+        if (widgetMeta?.layoutParts) {
+          Object.entries(widgetMeta.layoutParts).forEach(([partId, partConfig]) => {
+            partIdSet.add(partId);
+            if (partConfig?.selector) {
+              // Store custom selector mapping
+              selectorToPartMap[partConfig.selector] = partId;
+            }
+          });
+        }
+      });
+    }
 
     try {
       // Parse default (non-media query) rules
-      const defaultRules = cssText.match(/\.(\w+)\s*\{([^}]+)\}/g);
+      // Match both class selectors (.part) and custom selectors
+      const defaultRules = cssText.match(/([.#][\w-]+(?:\s+[.#\w\s>+~:[\]()="'-]+)?)\s*\{([^}]+)\}/g);
       if (defaultRules) {
         defaultRules.forEach(rule => {
-          const match = rule.match(/\.(\w+)\s*\{([^}]+)\}/);
+          const match = rule.match(/([.#][\w-]+(?:\s+[.#\w\s>+~:[\]()="'-]+)?)\s*\{([^}]+)\}/);
           if (match) {
-            const part = match[1];
+            const selector = match[1].trim();
             const properties = match[2];
 
-            if (!layoutProperties[part]) layoutProperties[part] = {};
-            if (!layoutProperties[part].default) layoutProperties[part].default = {};
+            // Try to map selector to part ID
+            let part = null;
+            if (selectorToPartMap[selector]) {
+              // Custom selector matches
+              part = selectorToPartMap[selector];
+            } else if (selector.startsWith('.') && !selector.includes(' ')) {
+              // Simple class selector - extract part ID
+              const className = selector.substring(1);
+              if (partIdSet.has(className)) {
+                part = className;
+              }
+            }
 
-            const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
-            for (const propMatch of propMatches) {
-              const cssProp = propMatch[1];
-              const value = propMatch[2].trim();
-              const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-              layoutProperties[part].default[camelProp] = value;
+            if (part) {
+              if (!layoutProperties[part]) layoutProperties[part] = {};
+              if (!layoutProperties[part].default) layoutProperties[part].default = {};
+
+              const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+              for (const propMatch of propMatches) {
+                const cssProp = propMatch[1];
+                const value = propMatch[2].trim();
+                const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+                layoutProperties[part].default[camelProp] = value;
+              }
             }
           }
         });
@@ -569,21 +629,36 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
         for (const match of matches) {
           const content = match[1];
-          const rules = content.matchAll(/\.(\w+)\s*\{([^}]+)\}/g);
+          const rules = content.matchAll(/([.#][\w-]+(?:\s+[.#\w\s>+~:[\]()="'-]+)?)\s*\{([^}]+)\}/g);
 
           for (const rule of rules) {
-            const part = rule[1];
+            const selector = rule[1].trim();
             const properties = rule[2];
 
-            if (!layoutProperties[part]) layoutProperties[part] = {};
-            if (!layoutProperties[part][bp]) layoutProperties[part][bp] = {};
+            // Try to map selector to part ID
+            let part = null;
+            if (selectorToPartMap[selector]) {
+              // Custom selector matches
+              part = selectorToPartMap[selector];
+            } else if (selector.startsWith('.') && !selector.includes(' ')) {
+              // Simple class selector - extract part ID
+              const className = selector.substring(1);
+              if (partIdSet.has(className)) {
+                part = className;
+              }
+            }
 
-            const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
-            for (const propMatch of propMatches) {
-              const cssProp = propMatch[1];
-              const value = propMatch[2].trim();
-              const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-              layoutProperties[part][bp][camelProp] = value;
+            if (part) {
+              if (!layoutProperties[part]) layoutProperties[part] = {};
+              if (!layoutProperties[part][bp]) layoutProperties[part][bp] = {};
+
+              const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+              for (const propMatch of propMatches) {
+                const cssProp = propMatch[1];
+                const value = propMatch[2].trim();
+                const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+                layoutProperties[part][bp][camelProp] = value;
+              }
             }
           }
         }
@@ -603,7 +678,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
     try {
       const cssText = textarea.value;
-      const layoutProperties = cssToLayoutProperties(cssText);
+      const layoutProperties = cssToLayoutProperties(cssText, groupIndex);
 
       const updatedGroups = [...groups];
       updatedGroups[groupIndex] = {

@@ -154,6 +154,20 @@ class TableWidget(BaseWidget):
     special_editor = "TableSpecialEditor"
     hide_config_form_fields = True  # Use special editor exclusively
 
+    layout_parts = {
+        "table-widget": {
+            "label": "Table widget container",
+            "selector": ".table-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+            ],
+        },
+    }
+
     widget_css = """
     .table-widget {
         overflow-x: auto;
@@ -333,7 +347,9 @@ class TableWidget(BaseWidget):
         template_config = super().prepare_template_context(config, context)
 
         # Ensure snake_case fields for template
-        template_config["use_content_margins"] = config.get("use_content_margins", False)
+        template_config["use_content_margins"] = config.get(
+            "use_content_margins", False
+        )
 
         return template_config
 

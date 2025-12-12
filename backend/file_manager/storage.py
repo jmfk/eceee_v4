@@ -135,6 +135,58 @@ class S3MediaStorage(Storage):
 
         return result
 
+    def overwrite_file(self, file_path: str, file: UploadedFile) -> Dict[str, Any]:
+        """
+        Overwrite an existing S3 object at a known key/path.
+
+        This is used for true in-place replacements where we must preserve the
+        MediaFile record and its file_path (so existing references keep working).
+
+        Args:
+            file_path: Existing S3 key/path to overwrite
+            file: Uploaded file object
+
+        Returns:
+            Dictionary containing:
+                - file_path: The same S3 key/path where file is stored
+                - file_size: Size of the file in bytes
+                - content_type: MIME type of the file
+                - file_hash: SHA-256 hash of the file content
+                - width: Image width (for images only)
+                - height: Image height (for images only)
+        """
+        # Read file content for hashing and metadata extraction
+        file_content = file.read()
+        file.seek(0)  # Reset file pointer
+
+        file_hash = hashlib.sha256(file_content).hexdigest()
+        content_type = getattr(file, "content_type", "application/octet-stream")
+
+        result: Dict[str, Any] = {
+            "file_path": file_path,
+            "file_size": file.size,
+            "content_type": content_type,
+            "file_hash": file_hash,
+        }
+
+        if content_type.startswith("image/"):
+            try:
+                metadata = self.extract_metadata(file_content, content_type)
+                if "width" in metadata:
+                    result["width"] = metadata["width"]
+                if "height" in metadata:
+                    result["height"] = metadata["height"]
+            except Exception as e:
+                logger.warning(f"Failed to extract image metadata: {e}")
+
+        try:
+            self._save(file_path, file)
+        except Exception as e:
+            logger.error(f"Failed to overwrite file {file.name} to S3 path {file_path}: {e}")
+            raise
+
+        return result
+
     def upload_thumbnail(self, thumbnail_bytes: bytes, original_file_path: str) -> str:
         """
         Upload generated thumbnail to S3.

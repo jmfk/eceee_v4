@@ -20,22 +20,27 @@ class LandingPageLayout(BaseLayout):
     layout_parts = {
         "slot-landing-page": {
             "label": "Landing page slot container",
+            "selector": ".slot-landing-page",
             "properties": ["gap", "display", "flexDirection"],
         },
         "slot-header": {
             "label": "Header slot container",
+            "selector": ".slot-header",
             "properties": ["gap", "display", "flexDirection"],
         },
         "slot-navbar": {
             "label": "Navbar slot container",
+            "selector": ".slot-navbar",
             "properties": ["gap", "display", "flexDirection"],
         },
         "slot-hero": {
             "label": "Hero slot container",
+            "selector": ".slot-hero",
             "properties": ["gap", "display", "flexDirection"],
         },
         "slot-footer": {
             "label": "Footer slot container",
+            "selector": ".slot-footer",
             "properties": ["gap", "display", "flexDirection"],
         },
     }

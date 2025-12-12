@@ -113,6 +113,7 @@ class HeroWidget(BaseWidget):
     layout_parts = {
         "hero-widget": {
             "label": "Main hero container",
+            "selector": ".hero-widget",
             "properties": [
                 "width",
                 "height",
@@ -125,6 +126,7 @@ class HeroWidget(BaseWidget):
         },
         "hero-content": {
             "label": "Text content overlay",
+            "selector": ".hero-content",
             "properties": [
                 "padding",
                 "margin",
@@ -136,6 +138,7 @@ class HeroWidget(BaseWidget):
         },
         "hero-header": {
             "label": "Hero header (h1)",
+            "selector": ".hero-header",
             "properties": [
                 "fontFamily",
                 "fontSize",
@@ -147,6 +150,7 @@ class HeroWidget(BaseWidget):
         },
         "hero-before-text": {
             "label": "Before text (h5)",
+            "selector": ".hero-before-text",
             "properties": [
                 "fontFamily",
                 "fontSize",
@@ -158,6 +162,7 @@ class HeroWidget(BaseWidget):
         },
         "hero-after-text": {
             "label": "After text (h6)",
+            "selector": ".hero-after-text",
             "properties": [
                 "fontFamily",
                 "fontSize",

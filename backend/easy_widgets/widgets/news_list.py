@@ -114,6 +114,21 @@ class NewsListWidget(BaseWidget):
     description = "Display a list of news articles from selected ObjectTypes"
     template_name = "easy_widgets/widgets/news_list.html"
 
+    layout_parts = {
+        "news-list-widget": {
+            "label": "News List widget container",
+            "selector": ".news-list-widget",
+            "properties": [
+                "width",
+                "height",
+                "padding",
+                "margin",
+                "backgroundColor",
+                "color",
+            ],
+        },
+    }
+
     widget_css = """
     """
 

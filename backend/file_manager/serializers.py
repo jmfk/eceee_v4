@@ -309,6 +309,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     uuid_url = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
     annotation = serializers.SerializerMethodField()
+    replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
 
     class Meta:
         model = MediaFile
@@ -332,6 +333,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "uuid_url",
             "download_url",
             "annotation",
+            "replaced_by",
             "created_at",
             "created_by",
             "created_by_name",
@@ -414,6 +416,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     imgproxy_base_url = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
     annotation = serializers.CharField(required=False, allow_blank=True)
+    replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
 
     class Meta:
         model = MediaFile
@@ -449,6 +452,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "imgproxy_base_url",
             "thumbnail_url",
             "annotation",
+            "replaced_by",
             "created_at",
             "updated_at",
             "created_by",

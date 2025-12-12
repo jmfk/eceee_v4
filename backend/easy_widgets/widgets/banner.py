@@ -157,6 +157,7 @@ class BannerWidget(BaseWidget):
     layout_parts = {
         "banner-widget": {
             "label": "Main widget container",
+            "selector": ".banner-widget",
             "properties": [
                 "width",
                 "height",
@@ -164,6 +165,7 @@ class BannerWidget(BaseWidget):
         },
         "banner-image": {
             "label": "Individual Image",
+            "selector": ".banner-image",
             "properties": [
                 "width",
                 "height",
