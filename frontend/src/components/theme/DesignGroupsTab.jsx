@@ -23,6 +23,8 @@ import CopyButton from './CopyButton';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import { useWidgets } from '../../hooks/useWidgets';
 import ConfirmDialog from '../ConfirmDialog';
+import { useQuery } from '@tanstack/react-query';
+import layoutsApi from '../../api/layouts';
 
 // Autocomplete Component for Widget Types
 const WidgetTypeAutocomplete = ({ availableWidgets, onSelect, disabled }) => {
@@ -155,6 +157,148 @@ const WidgetTypeAutocomplete = ({ availableWidgets, onSelect, disabled }) => {
         >
           <div className="px-3 py-2 text-xs text-gray-500">
             No widgets found matching "{searchTerm}"
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Autocomplete Component for Slots
+const SlotAutocomplete = ({ availableSlots, onSelect, disabled }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Filter slots based on search term
+  const filteredSlots = searchTerm
+    ? availableSlots.filter(slot =>
+      slot.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (slot.layouts && slot.layouts.some(l => l.toLowerCase().includes(searchTerm.toLowerCase())))
+    )
+    : availableSlots;
+
+  // Handle selection
+  const handleSelect = (slot) => {
+    onSelect(slot.name);
+    setSearchTerm('');
+    setIsOpen(false);
+    setHighlightedIndex(0);
+    inputRef.current?.blur();
+  };
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e) => {
+    if (!isOpen && filteredSlots.length > 0 && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+      setIsOpen(true);
+      e.preventDefault();
+      return;
+    }
+
+    if (!isOpen) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex((prev) =>
+          prev < filteredSlots.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredSlots[highlightedIndex]) {
+          handleSelect(filteredSlots[highlightedIndex]);
+        }
+        break;
+      case 'Escape':
+        setIsOpen(false);
+        setSearchTerm('');
+        inputRef.current?.blur();
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target) &&
+        !inputRef.current?.contains(e.target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Reset highlighted index when filtered list changes
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [searchTerm]);
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder="+ Add slot..."
+          disabled={disabled}
+          className="w-full pl-8 pr-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        />
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+      </div>
+
+      {isOpen && filteredSlots.length > 0 && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto"
+        >
+          {filteredSlots.map((slot, index) => (
+            <button
+              key={slot.name}
+              type="button"
+              onClick={() => handleSelect(slot)}
+              className={`w-full px-3 py-2 text-left text-xs hover:bg-blue-50 transition-colors ${index === highlightedIndex ? 'bg-blue-50' : ''
+                }`}
+              onMouseEnter={() => setHighlightedIndex(index)}
+            >
+              <div className="font-medium text-gray-900">{slot.name}</div>
+              {slot.layouts && slot.layouts.length > 0 && (
+                <div className="text-gray-500 text-xs">
+                  {slot.layouts.length} layout{slot.layouts.length !== 1 ? 's' : ''}
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isOpen && searchTerm && filteredSlots.length === 0 && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg"
+        >
+          <div className="px-3 py-2 text-xs text-gray-500">
+            No slots found matching "{searchTerm}"
           </div>
         </div>
       )}
@@ -362,6 +506,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const layoutDebounceTimerRef = useRef({});
   const [elementInputValues, setElementInputValues] = useState({}); // Local state for element property inputs
   const elementDebounceTimerRef = useRef({});
+  const [selectorPopup, setSelectorPopup] = useState(null); // { type: 'tag' | 'breakpoint', selectors: [], position: {x, y} }
   const { addNotification } = useGlobalNotifications();
 
   // Confirmation dialog state for widget type removal
@@ -369,6 +514,24 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
+
+  // Fetch all available slots from layouts
+  const { data: slotsData, isLoading: isLoadingSlots } = useQuery({
+    queryKey: ['allSlots'],
+    queryFn: async () => {
+      try {
+        const response = await layoutsApi.codeLayouts.allSlots(true);
+        return response || { slots: [], total: 0 };
+      } catch (error) {
+        console.error('Error fetching all slots:', error);
+        return { slots: [], total: 0 };
+      }
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  const availableSlots = slotsData?.slots || [];
+
 
   // Cleanup layout debounce timers on unmount
   useEffect(() => {
@@ -593,6 +756,41 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
+  const handleAddSlot = (groupIndex, slotName) => {
+    const group = groups[groupIndex];
+    const currentSlots = group.slots || (group.slot ? [group.slot] : []);
+
+    // Don't add if already exists
+    if (currentSlots.includes(slotName)) {
+      return;
+    }
+
+    const newSlots = [...currentSlots, slotName];
+    const updatedGroups = [...groups];
+    updatedGroups[groupIndex] = {
+      ...updatedGroups[groupIndex],
+      slots: newSlots,
+      slot: newSlots.length === 1 ? newSlots[0] : null,
+    };
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+    if (onDirty) onDirty();
+  };
+
+  const handleRemoveSlot = (groupIndex, slotName) => {
+    const group = groups[groupIndex];
+    const currentSlots = group.slots || (group.slot ? [group.slot] : []);
+    const newSlots = currentSlots.filter(s => s !== slotName);
+
+    const updatedGroups = [...groups];
+    updatedGroups[groupIndex] = {
+      ...updatedGroups[groupIndex],
+      slots: newSlots,
+      slot: newSlots.length === 1 ? newSlots[0] : null,
+    };
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+    if (onDirty) onDirty();
+  };
+
   const handleUpdateTargetingMode = (index, mode) => {
     const updatedGroups = [...groups];
     updatedGroups[index] = {
@@ -630,7 +828,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     const key = `${groupIndex}-${part}-${breakpoint}-${property}`;
 
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DesignGroupsTab.jsx:638',message:'handleUpdateLayoutProperty ENTRY',data:{groupIndex,part,breakpoint,property,value,immediate,key},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:638', message: 'handleUpdateLayoutProperty ENTRY', data: { groupIndex, part, breakpoint, property, value, immediate, key }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'E' }) }).catch(() => { });
     // #endregion
 
     // Update local input state immediately
@@ -652,7 +850,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       const breakpointProps = partProps[breakpoint] || {};
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DesignGroupsTab.jsx:660',message:'performUpdate BEFORE cleanup',data:{value,isEmpty:value===''||value===null,breakpointPropsBefore:{...breakpointProps},breakpointPropsKeys:Object.keys(breakpointProps)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:660', message: 'performUpdate BEFORE cleanup', data: { value, isEmpty: value === '' || value === null, breakpointPropsBefore: { ...breakpointProps }, breakpointPropsKeys: Object.keys(breakpointProps) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'E' }) }).catch(() => { });
       // #endregion
 
       // Update or remove property
@@ -678,7 +876,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       }
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DesignGroupsTab.jsx:683',message:'performUpdate AFTER cleanup',data:{breakpointPropsAfter:{...breakpointProps},breakpointPropsKeysAfter:Object.keys(breakpointProps),partPropsKeys:Object.keys(partProps),layoutPropsKeys:Object.keys(layoutProperties),willDeletePart:Object.keys(partProps).length===0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:683', message: 'performUpdate AFTER cleanup', data: { breakpointPropsAfter: { ...breakpointProps }, breakpointPropsKeysAfter: Object.keys(breakpointProps), partPropsKeys: Object.keys(partProps), layoutPropsKeys: Object.keys(layoutProperties), willDeletePart: Object.keys(partProps).length === 0 }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'E' }) }).catch(() => { });
       // #endregion
 
       updatedGroups[groupIndex] = {
@@ -1902,11 +2100,22 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                             <div>
                               <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
 
+                              {/* Autocomplete to add widget types */}
+                              <WidgetTypeAutocomplete
+                                availableWidgets={(() => {
+                                  const selectedTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
+                                  return widgetTypes.filter(wt => !selectedTypes.includes(wt.type));
+                                })()}
+                                onSelect={(widgetType) => handleAddWidgetType(groupIndex, widgetType)}
+                                disabled={isLoadingTypes}
+                              />
+                              <div className="text-xs text-gray-500 mt-1">Search and select widget types to apply this design group. Empty = all widgets</div>
+
                               {/* Selected widget types as pills */}
                               {(() => {
                                 const selectedTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
                                 return selectedTypes.length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5 mb-2">
+                                  <div className="flex flex-wrap gap-1.5 mt-2">
                                     {selectedTypes.map(wtType => {
                                       const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
                                       return (
@@ -1929,30 +2138,47 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                   </div>
                                 );
                               })()}
-
-                              {/* Autocomplete to add widget types */}
-                              <WidgetTypeAutocomplete
-                                availableWidgets={(() => {
-                                  const selectedTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
-                                  return widgetTypes.filter(wt => !selectedTypes.includes(wt.type));
-                                })()}
-                                onSelect={(widgetType) => handleAddWidgetType(groupIndex, widgetType)}
-                                disabled={isLoadingTypes}
-                              />
-                              <div className="text-xs text-gray-500 mt-1">Search and select widget types to apply this design group. Empty = all widgets</div>
                             </div>
 
-                            {/* Slots (comma-separated) */}
+                            {/* Slots (pills and autocomplete) */}
                             <div>
                               <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
-                              <input
-                                type="text"
-                                value={(group.slots || (group.slot ? [group.slot] : [])).join(', ')}
-                                onChange={(e) => handleUpdateSlots(groupIndex, e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="main, sidebar, footer (comma-separated)"
+
+                              {/* Autocomplete to add slots */}
+                              <SlotAutocomplete
+                                availableSlots={(() => {
+                                  const selectedSlots = group.slots || (group.slot ? [group.slot] : []);
+                                  return availableSlots.filter(slot => !selectedSlots.includes(slot.name));
+                                })()}
+                                onSelect={(slotName) => handleAddSlot(groupIndex, slotName)}
+                                disabled={isLoadingSlots}
                               />
-                              <div className="text-xs text-gray-500 mt-1">Comma-separated. Empty = all slots</div>
+                              <div className="text-xs text-gray-500 mt-1">Search and select slots to apply this design group. Empty = all slots</div>
+
+                              {/* Selected slots as pills */}
+                              {(() => {
+                                const selectedSlots = group.slots || (group.slot ? [group.slot] : []);
+                                return selectedSlots.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {selectedSlots.map(slotName => (
+                                      <div
+                                        key={slotName}
+                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded border border-green-200"
+                                      >
+                                        <span>{slotName}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveSlot(groupIndex, slotName)}
+                                          className="hover:bg-green-200 rounded-sm p-0.5 transition-colors"
+                                          title="Remove slot"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         ) : (
@@ -2003,315 +2229,438 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                     </button>
 
                     {expandedLayoutProps[groupIndex] && (
-                        <div className="px-4 pb-4">
-                          {/* Calculated CSS Selectors Display */}
-                          {group.calculatedSelectors && group.calculatedSelectors.base_selectors && group.calculatedSelectors.base_selectors.length > 0 && (
-                            <div className="mb-3 flex items-center gap-2 pb-3 border-b border-gray-200">
-                              <span className="text-xs text-gray-500 font-medium">Active CSS Selectors:</span>
-                              <div className="flex flex-wrap gap-1">
-                                {group.calculatedSelectors.base_selectors.map((selector, idx) => (
-                                  <span key={idx} className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
-                                    {selector || '(global)'}
-                                  </span>
-                                ))}
-                              </div>
+                      <div className="px-4 pb-4">
+                        {/* Calculated CSS Selectors Display */}
+                        {group.calculatedSelectors && group.calculatedSelectors.base_selectors && group.calculatedSelectors.base_selectors.length > 0 && (
+                          <div className="mb-3 flex items-center gap-2 pb-3 border-b border-gray-200">
+                            <span className="text-xs text-gray-500 font-medium">Active CSS Selectors:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {group.calculatedSelectors.base_selectors.map((selector, idx) => (
+                                <span key={idx} className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
+                                  {selector || '(global)'}
+                                </span>
+                              ))}
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          {(() => {
-                            const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
-                            const layoutParts = new Set();
-                            const groupSlots = group.slots || (group.slot ? [group.slot] : []);
+                        {(() => {
+                          const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
+                          const layoutParts = new Set();
+                          const groupSlots = group.slots || (group.slot ? [group.slot] : []);
 
-                            // If widget types are selected, collect layout parts from widgets
-                            if (selectedWidgetTypes.length > 0) {
-                              selectedWidgetTypes.forEach(wtType => {
-                                const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
-                                if (widgetMeta?.layoutParts) {
-                                  Object.keys(widgetMeta.layoutParts).forEach(part => layoutParts.add(part));
-                                }
-                              });
-                            } else if (groupSlots.length > 0) {
-                              // If no widget types but slots exist, use slots as parts
-                              groupSlots.forEach(slot => layoutParts.add(slot));
-                            }
-
-                            if (layoutParts.size === 0) {
-                              return (
-                                <div className="text-sm text-gray-600">
-                                  {(group.widgetTypes?.length > 0 || group.widgetType)
-                                    ? "Selected widgets don't have customizable layout parts."
-                                    : "Select widget types in the Targeting section to configure layout properties."}
-                                </div>
-                              );
-                            }
-
-                            // Separate parts into used vs unused
-                            const usedParts = Array.from(layoutParts).filter(part => {
-                              const partKey = `${groupIndex}-${part}`;
-                              // Part is visible if explicitly added to UI OR has actual data
-                              return partKey in expandedLayoutParts || 
-                                     (part in (group.layoutProperties || {}) && 
-                                      Object.keys(group.layoutProperties[part]).length > 0);
+                          // If widget types are selected, collect layout parts from widgets
+                          if (selectedWidgetTypes.length > 0) {
+                            selectedWidgetTypes.forEach(wtType => {
+                              const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                              if (widgetMeta?.layoutParts) {
+                                Object.keys(widgetMeta.layoutParts).forEach(part => layoutParts.add(part));
+                              }
                             });
+                          } else if (groupSlots.length > 0) {
+                            // If no widget types but slots exist, use slots as parts
+                            groupSlots.forEach(slot => layoutParts.add(slot));
+                          }
 
-                            const unusedParts = Array.from(layoutParts).filter(part => {
-                              const partKey = `${groupIndex}-${part}`;
-                              // Part is pill if not added to UI and has no data
-                              return !(partKey in expandedLayoutParts) && 
-                                     !(part in (group.layoutProperties || {}) && 
-                                       Object.keys(group.layoutProperties[part]).length > 0);
-                            });
-
+                          if (layoutParts.size === 0) {
                             return (
-                              <div className="space-y-3">
-                                {/* Pills for unused parts */}
-                                {unusedParts.length > 0 && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {unusedParts.map(part => (
-                                      <button
-                                        key={part}
-                                        type="button"
-                                        onClick={() => handleAddLayoutPart(groupIndex, part)}
-                                        className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                                        title={`Add ${getPartLabel(part, selectedWidgetTypes)}`}
-                                      >
-                                        + {getPartLabel(part, selectedWidgetTypes)}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                              <div className="text-sm text-gray-600">
+                                {(group.widgetTypes?.length > 0 || group.widgetType)
+                                  ? "Selected widgets don't have customizable layout parts."
+                                  : "Select widget types in the Targeting section to configure layout properties."}
+                              </div>
+                            );
+                          }
 
-                                {/* Collapsible sections for used parts */}
-                                {usedParts.map(part => {
-                                  const partProps = group.layoutProperties?.[part] || {};
-                                  const partKey = `${groupIndex}-${part}`;
-                                  const isPartExpanded = expandedLayoutParts[partKey] === true; // Only expanded if explicitly set
+                          // Separate parts into used vs unused
+                          const usedParts = Array.from(layoutParts).filter(part => {
+                            const partKey = `${groupIndex}-${part}`;
+                            // Part is visible if explicitly added to UI OR has actual data
+                            return partKey in expandedLayoutParts ||
+                              (part in (group.layoutProperties || {}) &&
+                                Object.keys(group.layoutProperties[part]).length > 0);
+                          });
 
-                                  // Check if this part is a slot (not from widget metadata)
-                                  const isSlot = selectedWidgetTypes.length === 0 && groupSlots.includes(part);
+                          const unusedParts = Array.from(layoutParts).filter(part => {
+                            const partKey = `${groupIndex}-${part}`;
+                            // Part is pill if not added to UI and has no data
+                            return !(partKey in expandedLayoutParts) &&
+                              !(part in (group.layoutProperties || {}) &&
+                                Object.keys(group.layoutProperties[part]).length > 0);
+                          });
 
-                                  // Get allowed properties for this part from widget metadata
-                                  let allowedProperties = null; // null = all properties allowed
-                                  if (!isSlot) {
-                                    // Only check widget metadata if this is not a slot
-                                    selectedWidgetTypes.forEach(wtType => {
-                                      const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
-                                      if (widgetMeta?.layoutParts?.[part]?.properties) {
-                                        // If any widget defines properties for this part, use them
-                                        const partConfig = widgetMeta.layoutParts[part];
-                                        if (partConfig.properties) {
-                                          allowedProperties = partConfig.properties;
-                                        }
+                          return (
+                            <div className="space-y-3">
+                              {/* Pills for unused parts */}
+                              {unusedParts.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {unusedParts.map(part => (
+                                    <button
+                                      key={part}
+                                      type="button"
+                                      onClick={() => handleAddLayoutPart(groupIndex, part)}
+                                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                      title={`Add ${getPartLabel(part, selectedWidgetTypes)}`}
+                                    >
+                                      + {getPartLabel(part, selectedWidgetTypes)}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Collapsible sections for used parts */}
+                              {usedParts.map(part => {
+                                const partProps = group.layoutProperties?.[part] || {};
+                                const partKey = `${groupIndex}-${part}`;
+                                const isPartExpanded = expandedLayoutParts[partKey] === true; // Only expanded if explicitly set
+
+                                // Check if this part is a slot (not from widget metadata)
+                                const isSlot = selectedWidgetTypes.length === 0 && groupSlots.includes(part);
+
+                                // Get allowed properties for this part from widget metadata
+                                let allowedProperties = null; // null = all properties allowed
+                                if (!isSlot) {
+                                  // Only check widget metadata if this is not a slot
+                                  selectedWidgetTypes.forEach(wtType => {
+                                    const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                                    if (widgetMeta?.layoutParts?.[part]?.properties) {
+                                      // If any widget defines properties for this part, use them
+                                      const partConfig = widgetMeta.layoutParts[part];
+                                      if (partConfig.properties) {
+                                        allowedProperties = partConfig.properties;
                                       }
-                                    });
-                                  }
+                                    }
+                                  });
+                                }
 
-                                  // Filter LAYOUT_PROPERTIES based on allowed properties
-                                  // Slots get all properties (no restrictions)
-                                  const availableProperties = allowedProperties
-                                    ? Object.fromEntries(
-                                      Object.entries(LAYOUT_PROPERTIES).filter(([prop]) =>
-                                        allowedProperties.includes(prop)
-                                      )
+                                // Filter LAYOUT_PROPERTIES based on allowed properties
+                                // Slots get all properties (no restrictions)
+                                const availableProperties = allowedProperties
+                                  ? Object.fromEntries(
+                                    Object.entries(LAYOUT_PROPERTIES).filter(([prop]) =>
+                                      allowedProperties.includes(prop)
                                     )
-                                    : LAYOUT_PROPERTIES;
+                                  )
+                                  : LAYOUT_PROPERTIES;
 
-                                  // Get the label for this part from widget metadata or format slot name
-                                  let partLabel = part;
-                                  if (isSlot) {
-                                    // Format slot name: capitalize first letter and replace underscores/hyphens with spaces
-                                    partLabel = part
-                                      .replace(/[-_]/g, ' ')
-                                      .split(' ')
-                                      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                                      .join(' ');
-                                  } else {
-                                    selectedWidgetTypes.forEach(wtType => {
-                                      const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
-                                      if (widgetMeta?.layoutParts?.[part]?.label) {
-                                        partLabel = widgetMeta.layoutParts[part].label;
-                                      }
-                                    });
-                                  }
+                                // Get the label for this part from widget metadata or format slot name
+                                let partLabel = part;
+                                if (isSlot) {
+                                  // Format slot name: capitalize first letter and replace underscores/hyphens with spaces
+                                  partLabel = part
+                                    .replace(/[-_]/g, ' ')
+                                    .split(' ')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                                    .join(' ');
+                                } else {
+                                  selectedWidgetTypes.forEach(wtType => {
+                                    const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                                    if (widgetMeta?.layoutParts?.[part]?.label) {
+                                      partLabel = widgetMeta.layoutParts[part].label;
+                                    }
+                                  });
+                                }
 
-                                  return (
-                                    <div key={part} className="bg-white rounded border border-gray-200">
-                                      {/* Part Header - Collapsible */}
-                                      <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-t transition-colors">
-                                        <button
-                                          type="button"
-                                          onClick={() => setExpandedLayoutParts({
-                                            ...expandedLayoutParts,
-                                            [partKey]: !isPartExpanded
-                                          })}
-                                          className="flex items-center gap-2 flex-1 text-left"
-                                        >
-                                          {isPartExpanded ? (
-                                            <ChevronDown size={14} className="text-gray-600" />
-                                          ) : (
-                                            <ChevronRight size={14} className="text-gray-600" />
-                                          )}
-                                          <span className="text-xs font-semibold text-gray-700">
-                                            {partLabel}
+                                return (
+                                  <div key={part} className="bg-white rounded border border-gray-200">
+                                    {/* Part Header - Collapsible */}
+                                    <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-t transition-colors">
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedLayoutParts({
+                                          ...expandedLayoutParts,
+                                          [partKey]: !isPartExpanded
+                                        })}
+                                        className="flex items-center gap-2 flex-1 text-left"
+                                      >
+                                        {isPartExpanded ? (
+                                          <ChevronDown size={14} className="text-gray-600" />
+                                        ) : (
+                                          <ChevronRight size={14} className="text-gray-600" />
+                                        )}
+                                        <span className="text-xs font-semibold text-gray-700">
+                                          {partLabel}
+                                        </span>
+                                        {allowedProperties && (
+                                          <span className="text-xs text-gray-500">
+                                            {allowedProperties.length} {allowedProperties.length === 1 ? 'property' : 'properties'}
                                           </span>
-                                          {allowedProperties && (
-                                            <span className="text-xs text-gray-500">
-                                              {allowedProperties.length} {allowedProperties.length === 1 ? 'property' : 'properties'}
-                                            </span>
-                                          )}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemoveLayoutPart(groupIndex, part);
-                                          }}
-                                          className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                          title="Remove this layout part"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
-                                      </div>
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveLayoutPart(groupIndex, part);
+                                        }}
+                                        className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                        title="Remove this layout part"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
 
-                                      {isPartExpanded && (
-                                        <div className="p-3 pt-0">
-                                          {/* Part-specific selectors */}
-                                          {group.calculatedSelectors?.layout_part_selectors?.[part] && (
-                                            <div className="mb-2 flex items-center gap-2">
-                                              <span className="text-xs text-gray-500">→</span>
-                                              <div className="flex flex-wrap gap-1">
-                                                {group.calculatedSelectors.layout_part_selectors[part].map((selector, idx) => (
-                                                  <span key={idx} className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-mono rounded">
-                                                    {selector}
-                                                  </span>
-                                                ))}
-                                              </div>
+                                    {isPartExpanded && (
+                                      <div className="p-3 pt-0">
+                                        {/* Part-specific selectors */}
+                                        {group.calculatedSelectors?.layout_part_selectors?.[part] && (
+                                          <div className="mb-2 flex items-center gap-2">
+                                            <span className="text-xs text-gray-500">→</span>
+                                            <div className="flex flex-wrap gap-1">
+                                              {group.calculatedSelectors.layout_part_selectors[part].map((selector, idx) => (
+                                                <span key={idx} className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-mono rounded">
+                                                  {selector}
+                                                </span>
+                                              ))}
                                             </div>
-                                          )}
+                                          </div>
+                                        )}
 
-                                          {/* Separate breakpoints into used vs unused */}
-                                          {(() => {
-                                            const usedBreakpoints = BREAKPOINTS.filter(bp => {
-                                              const breakpointKey = `${groupIndex}-${part}-${bp}`;
-                                              // Breakpoint is visible if explicitly added to UI OR has actual data
-                                              return breakpointKey in expandedLayoutBreakpoints ||
-                                                     (bp in partProps && Object.keys(partProps[bp]).length > 0);
-                                            });
+                                        {/* Separate breakpoints into used vs unused */}
+                                        {(() => {
+                                          const usedBreakpoints = BREAKPOINTS.filter(bp => {
+                                            const breakpointKey = `${groupIndex}-${part}-${bp}`;
+                                            // Breakpoint is visible if explicitly added to UI OR has actual data
+                                            return breakpointKey in expandedLayoutBreakpoints ||
+                                              (bp in partProps && Object.keys(partProps[bp]).length > 0);
+                                          });
 
-                                            const unusedBreakpoints = BREAKPOINTS.filter(bp => {
-                                              const breakpointKey = `${groupIndex}-${part}-${bp}`;
-                                              // Breakpoint is pill if not added to UI and has no data
-                                              return !(breakpointKey in expandedLayoutBreakpoints) &&
-                                                     !(bp in partProps && Object.keys(partProps[bp]).length > 0);
-                                            });
+                                          const unusedBreakpoints = BREAKPOINTS.filter(bp => {
+                                            const breakpointKey = `${groupIndex}-${part}-${bp}`;
+                                            // Breakpoint is pill if not added to UI and has no data
+                                            return !(breakpointKey in expandedLayoutBreakpoints) &&
+                                              !(bp in partProps && Object.keys(partProps[bp]).length > 0);
+                                          });
 
-                                            return (
-                                              <>
-                                                {/* Pills for unused breakpoints */}
-                                                {unusedBreakpoints.length > 0 && (
-                                                  <div className="flex flex-wrap gap-2 mb-2">
-                                                    {unusedBreakpoints.map(bp => (
+                                          return (
+                                            <>
+                                              {/* Pills for unused breakpoints */}
+                                              {unusedBreakpoints.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                  {unusedBreakpoints.map(bp => (
+                                                    <button
+                                                      key={bp}
+                                                      type="button"
+                                                      onClick={() => handleAddBreakpoint(groupIndex, part, bp)}
+                                                      className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                                                      title={`Add ${getBreakpointLabel(bp)}`}
+                                                    >
+                                                      + {getBreakpointLabel(bp)}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              )}
+
+                                              {/* Collapsible sections for used breakpoints */}
+                                              {usedBreakpoints.map(breakpoint => {
+                                                const modeKey = `${groupIndex}-${part}-${breakpoint}`;
+                                                const currentMode = layoutEditMode[modeKey] || 'form';
+                                                const breakpointProps = partProps[breakpoint] || {};
+
+                                                // Convert breakpoint properties to CSS
+                                                const breakpointToCSS = () => {
+                                                  if (!breakpointProps || Object.keys(breakpointProps).length === 0) return '';
+                                                  let css = '';
+                                                  for (const [prop, value] of Object.entries(breakpointProps)) {
+                                                    const cssProp = cssPropertyToKebab(prop);
+                                                    css += `${cssProp}: ${value};\n`;
+                                                  }
+                                                  return css;
+                                                };
+
+                                                const breakpointKey = `${groupIndex}-${part}-${breakpoint}`;
+                                                const isBreakpointExpanded = expandedLayoutBreakpoints[breakpointKey] === true; // Only expanded if explicitly set
+
+                                                // #region agent log
+                                                fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:2220', message: 'Breakpoint render', data: { groupIndex, part, breakpoint, breakpointKey, isBreakpointExpanded, expandedValue: expandedLayoutBreakpoints[breakpointKey], breakpointPropsKeys: Object.keys(breakpointProps) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'D' }) }).catch(() => { });
+                                                // #endregion
+
+                                                return (
+                                                  <div key={breakpoint} className="mb-3 last:mb-0 border border-gray-200 rounded-lg bg-white shadow-sm">
+                                                    {/* Breakpoint Header - Collapsible */}
+                                                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-t-lg border-b border-gray-200">
                                                       <button
-                                                        key={bp}
                                                         type="button"
-                                                        onClick={() => handleAddBreakpoint(groupIndex, part, bp)}
-                                                        className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
-                                                        title={`Add ${getBreakpointLabel(bp)}`}
+                                                        onClick={() => setExpandedLayoutBreakpoints({
+                                                          ...expandedLayoutBreakpoints,
+                                                          [breakpointKey]: !isBreakpointExpanded
+                                                        })}
+                                                        className="flex items-center gap-2 flex-1 text-left"
                                                       >
-                                                        + {getBreakpointLabel(bp)}
+                                                        {isBreakpointExpanded ? (
+                                                          <ChevronDown className="w-4 h-4 text-gray-600" />
+                                                        ) : (
+                                                          <ChevronRight className="w-4 h-4 text-gray-600" />
+                                                        )}
+                                                        <div className="flex-1">
+                                                          <div className="font-mono text-sm font-semibold text-gray-900">
+                                                            {getBreakpointLabel(breakpoint)}
+                                                          </div>
+                                                          <div className="text-xs text-gray-500 font-mono">
+                                                            {breakpoint}
+                                                          </div>
+                                                          {/* Breakpoint Selectors Display */}
+                                                          {(() => {
+                                                            const partSelectors = group.calculatedSelectors?.layout_part_selectors?.[part];
+
+                                                            if (!partSelectors || partSelectors.length === 0) {
+                                                              return null;
+                                                            }
+
+                                                            return (
+                                                              <div className="mt-1">
+                                                                {partSelectors.length === 1 ? (
+                                                                  <div className="inline-block px-1.5 py-0.5 bg-purple-50 text-purple-600 text-xs font-mono rounded">
+                                                                    {partSelectors[0]}
+                                                                  </div>
+                                                                ) : (
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                      e.stopPropagation();
+                                                                      setSelectorPopup({
+                                                                        type: 'breakpoint',
+                                                                        selectors: partSelectors,
+                                                                        position: { x: e.clientX, y: e.clientY }
+                                                                      });
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 text-xs font-mono rounded hover:bg-purple-100 transition-colors"
+                                                                  >
+                                                                    {partSelectors.length} selectors
+                                                                    <ChevronDown className="w-3 h-3" />
+                                                                  </button>
+                                                                )}
+                                                              </div>
+                                                            );
+                                                          })()}
+                                                        </div>
                                                       </button>
-                                                    ))}
-                                                  </div>
-                                                )}
-
-                                                {/* Collapsible sections for used breakpoints */}
-                                                {usedBreakpoints.map(breakpoint => {
-                                                  const modeKey = `${groupIndex}-${part}-${breakpoint}`;
-                                                  const currentMode = layoutEditMode[modeKey] || 'form';
-                                                  const breakpointProps = partProps[breakpoint] || {};
-
-                                                  // Convert breakpoint properties to CSS
-                                                  const breakpointToCSS = () => {
-                                                    if (!breakpointProps || Object.keys(breakpointProps).length === 0) return '';
-                                                    let css = '';
-                                                    for (const [prop, value] of Object.entries(breakpointProps)) {
-                                                      const cssProp = cssPropertyToKebab(prop);
-                                                      css += `${cssProp}: ${value};\n`;
-                                                    }
-                                                    return css;
-                                                  };
-
-                                                  const breakpointKey = `${groupIndex}-${part}-${breakpoint}`;
-                                                  const isBreakpointExpanded = expandedLayoutBreakpoints[breakpointKey] === true; // Only expanded if explicitly set
-
-                                                  // #region agent log
-                                                  fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DesignGroupsTab.jsx:2220',message:'Breakpoint render',data:{groupIndex,part,breakpoint,breakpointKey,isBreakpointExpanded,expandedValue:expandedLayoutBreakpoints[breakpointKey],breakpointPropsKeys:Object.keys(breakpointProps)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-                                                  // #endregion
-
-                                                  return (
-                                                    <div key={breakpoint} className="mb-3 last:mb-0 border border-gray-200 rounded-lg bg-white shadow-sm">
-                                                      {/* Breakpoint Header - Collapsible */}
-                                                      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-t-lg border-b border-gray-200">
+                                                      <div className="flex gap-1">
+                                                        {/* Copy/Paste Buttons */}
                                                         <button
                                                           type="button"
-                                                          onClick={() => setExpandedLayoutBreakpoints({
-                                                            ...expandedLayoutBreakpoints,
-                                                            [breakpointKey]: !isBreakpointExpanded
-                                                          })}
-                                                          className="flex items-center gap-2 flex-1 text-left"
+                                                          onClick={() => {
+                                                            setClipboard({
+                                                              type: 'layoutBreakpoint',
+                                                              part,
+                                                              breakpoint,
+                                                              data: breakpointProps
+                                                            });
+                                                            setCopiedIndicator(`layout-${modeKey}`);
+                                                            setTimeout(() => setCopiedIndicator(null), 2000);
+                                                          }}
+                                                          className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                                                          title={`Copy ${part} ${breakpoint} properties`}
                                                         >
-                                                          {isBreakpointExpanded ? (
-                                                            <ChevronDown className="w-4 h-4 text-gray-600" />
+                                                          {copiedIndicator === `layout-${modeKey}` ? (
+                                                            <Check className="w-4 h-4 text-green-600" />
                                                           ) : (
-                                                            <ChevronRight className="w-4 h-4 text-gray-600" />
+                                                            <Copy className="w-4 h-4" />
                                                           )}
-                                                          <div className="flex-1">
-                                                            <div className="font-mono text-sm font-semibold text-gray-900">
-                                                              {getBreakpointLabel(breakpoint)}
-                                                            </div>
-                                                            <div className="text-xs text-gray-500 font-mono">
-                                                              {breakpoint}
-                                                            </div>
-                                                          </div>
                                                         </button>
-                                                        <div className="flex gap-1">
-                                                          {/* Copy/Paste Buttons */}
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                              setClipboard({
-                                                                type: 'layoutBreakpoint',
-                                                                part,
-                                                                breakpoint,
-                                                                data: breakpointProps
-                                                              });
-                                                              setCopiedIndicator(`layout-${modeKey}`);
-                                                              setTimeout(() => setCopiedIndicator(null), 2000);
-                                                            }}
-                                                            className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                                                            title={`Copy ${part} ${breakpoint} properties`}
-                                                          >
-                                                            {copiedIndicator === `layout-${modeKey}` ? (
-                                                              <Check className="w-4 h-4 text-green-600" />
-                                                            ) : (
-                                                              <Copy className="w-4 h-4" />
-                                                            )}
-                                                          </button>
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                              if (!clipboard || clipboard.type !== 'layoutBreakpoint') return;
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => {
+                                                            if (!clipboard || clipboard.type !== 'layoutBreakpoint') return;
+
+                                                            const updatedGroups = [...groups];
+                                                            const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
+                                                            const partProps = layoutProperties[part] || {};
+
+                                                            // Merge clipboard data with existing properties
+                                                            partProps[breakpoint] = { ...partProps[breakpoint], ...clipboard.data };
+
+                                                            if (Object.keys(partProps).length > 0) {
+                                                              layoutProperties[part] = partProps;
+                                                            }
+
+                                                            updatedGroups[groupIndex] = {
+                                                              ...updatedGroups[groupIndex],
+                                                              layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
+                                                            };
+
+                                                            onChange({ ...(designGroups || {}), groups: updatedGroups });
+                                                            if (onDirty) onDirty();
+                                                          }}
+                                                          disabled={!clipboard || clipboard.type !== 'layoutBreakpoint'}
+                                                          className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                                          title={`Paste ${clipboard?.part || ''} ${clipboard?.breakpoint || ''} properties`}
+                                                        >
+                                                          <Clipboard className="w-4 h-4" />
+                                                        </button>
+
+                                                        {/* Form/CSS Toggle */}
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setLayoutEditMode({ ...layoutEditMode, [modeKey]: 'form' })}
+                                                          className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentMode === 'form'
+                                                            ? 'bg-blue-100 text-blue-700'
+                                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                            }`}
+                                                        >
+                                                          <FileText className="w-3 h-3 mr-1" />
+                                                          Form
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setLayoutEditMode({ ...layoutEditMode, [modeKey]: 'css' })}
+                                                          className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentMode === 'css'
+                                                            ? 'bg-blue-100 text-blue-700'
+                                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                            }`}
+                                                        >
+                                                          <Code className="w-3 h-3 mr-1" />
+                                                          CSS
+                                                        </button>
+
+                                                        {/* Delete Breakpoint Button */}
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => handleRemoveBreakpoint(groupIndex, part, breakpoint)}
+                                                          className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                                          title="Remove this breakpoint"
+                                                        >
+                                                          <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                      </div>
+                                                    </div>
+
+                                                    {isBreakpointExpanded && (currentMode === 'css' ? (
+                                                      <div className="p-2">
+                                                        <textarea
+                                                          ref={(el) => {
+                                                            if (el) cssTextareaRefs.current[`layout-${modeKey}`] = el;
+                                                          }}
+                                                          defaultValue={breakpointToCSS()}
+                                                          onChange={() => {
+                                                            if (onDirty) onDirty();
+                                                          }}
+                                                          onBlur={(e) => {
+                                                            try {
+                                                              const cssText = e.target.value;
+                                                              const properties = {};
+                                                              const propMatches = cssText.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+                                                              for (const match of propMatches) {
+                                                                const cssProp = match[1];
+                                                                const value = match[2].trim();
+                                                                const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+                                                                properties[camelProp] = value;
+                                                              }
 
                                                               const updatedGroups = [...groups];
                                                               const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
                                                               const partProps = layoutProperties[part] || {};
 
-                                                              // Merge clipboard data with existing properties
-                                                              partProps[breakpoint] = { ...partProps[breakpoint], ...clipboard.data };
+                                                              if (Object.keys(properties).length > 0) {
+                                                                partProps[breakpoint] = properties;
+                                                              } else {
+                                                                delete partProps[breakpoint];
+                                                              }
 
                                                               if (Object.keys(partProps).length > 0) {
                                                                 layoutProperties[part] = partProps;
+                                                              } else {
+                                                                delete layoutProperties[part];
                                                               }
 
                                                               updatedGroups[groupIndex] = {
@@ -2320,234 +2669,145 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                               };
 
                                                               onChange({ ...(designGroups || {}), groups: updatedGroups });
-                                                              if (onDirty) onDirty();
-                                                            }}
-                                                            disabled={!clipboard || clipboard.type !== 'layoutBreakpoint'}
-                                                            className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                                            title={`Paste ${clipboard?.part || ''} ${clipboard?.breakpoint || ''} properties`}
-                                                          >
-                                                            <Clipboard className="w-4 h-4" />
-                                                          </button>
-
-                                                          {/* Form/CSS Toggle */}
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => setLayoutEditMode({ ...layoutEditMode, [modeKey]: 'form' })}
-                                                            className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentMode === 'form'
-                                                              ? 'bg-blue-100 text-blue-700'
-                                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                              }`}
-                                                          >
-                                                            <FileText className="w-3 h-3 mr-1" />
-                                                            Form
-                                                          </button>
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => setLayoutEditMode({ ...layoutEditMode, [modeKey]: 'css' })}
-                                                            className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentMode === 'css'
-                                                              ? 'bg-blue-100 text-blue-700'
-                                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                              }`}
-                                                          >
-                                                            <Code className="w-3 h-3 mr-1" />
-                                                            CSS
-                                                          </button>
-
-                                                          {/* Delete Breakpoint Button */}
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveBreakpoint(groupIndex, part, breakpoint)}
-                                                            className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                                            title="Remove this breakpoint"
-                                                          >
-                                                            <Trash2 className="w-4 h-4" />
-                                                          </button>
-                                                        </div>
+                                                            } catch (error) {
+                                                              addNotification({
+                                                                type: 'error',
+                                                                message: `Failed to parse CSS: ${error.message}`
+                                                              });
+                                                            }
+                                                          }}
+                                                          className="w-full px-2 py-1.5 text-xs font-mono border border-gray-300 rounded bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                          rows={5}
+                                                          placeholder="width: 100%;&#10;padding: 1rem;&#10;gap: 0.5rem;"
+                                                        />
                                                       </div>
+                                                    ) : (
+                                                      <>
+                                                        {/* Property forms for used properties */}
+                                                        {(() => {
+                                                          const usedProperties = Object.keys(breakpointProps);
+                                                          const unusedProperties = Object.entries(availableProperties)
+                                                            .filter(([prop]) => !usedProperties.includes(prop));
 
-                                                      {isBreakpointExpanded && (currentMode === 'css' ? (
-                                                        <div className="p-2">
-                                                          <textarea
-                                                            ref={(el) => {
-                                                              if (el) cssTextareaRefs.current[`layout-${modeKey}`] = el;
-                                                            }}
-                                                            defaultValue={breakpointToCSS()}
-                                                            onChange={() => {
-                                                              if (onDirty) onDirty();
-                                                            }}
-                                                            onBlur={(e) => {
-                                                              try {
-                                                                const cssText = e.target.value;
-                                                                const properties = {};
-                                                                const propMatches = cssText.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
-                                                                for (const match of propMatches) {
-                                                                  const cssProp = match[1];
-                                                                  const value = match[2].trim();
-                                                                  const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-                                                                  properties[camelProp] = value;
-                                                                }
+                                                          // #region agent log
+                                                          fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:2389', message: 'Property filtering', data: { groupIndex, part, breakpoint, breakpointProps: { ...breakpointProps }, usedProperties, unusedPropertiesCount: unusedProperties.length, isBreakpointExpanded }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'A,C' }) }).catch(() => { });
+                                                          // #endregion
 
-                                                                const updatedGroups = [...groups];
-                                                                const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
-                                                                const partProps = layoutProperties[part] || {};
+                                                          return (
+                                                            <>
+                                                              {/* Existing Properties */}
+                                                              {usedProperties.length > 0 && (
+                                                                <div className="p-4 space-y-3">
+                                                                  {Object.entries(availableProperties)
+                                                                    .filter(([prop]) => usedProperties.includes(prop))
+                                                                    .map(([prop, config]) => {
+                                                                      const key = `${groupIndex}-${part}-${breakpoint}-${prop}`;
+                                                                      const storedValue = breakpointProps[prop] || '';
+                                                                      const value = layoutInputValues[key] !== undefined ? layoutInputValues[key] : storedValue;
 
-                                                                if (Object.keys(properties).length > 0) {
-                                                                  partProps[breakpoint] = properties;
-                                                                } else {
-                                                                  delete partProps[breakpoint];
-                                                                }
-
-                                                                if (Object.keys(partProps).length > 0) {
-                                                                  layoutProperties[part] = partProps;
-                                                                } else {
-                                                                  delete layoutProperties[part];
-                                                                }
-
-                                                                updatedGroups[groupIndex] = {
-                                                                  ...updatedGroups[groupIndex],
-                                                                  layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
-                                                                };
-
-                                                                onChange({ ...(designGroups || {}), groups: updatedGroups });
-                                                              } catch (error) {
-                                                                addNotification({
-                                                                  type: 'error',
-                                                                  message: `Failed to parse CSS: ${error.message}`
-                                                                });
-                                                              }
-                                                            }}
-                                                            className="w-full px-2 py-1.5 text-xs font-mono border border-gray-300 rounded bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                            rows={5}
-                                                            placeholder="width: 100%;&#10;padding: 1rem;&#10;gap: 0.5rem;"
-                                                          />
-                                                        </div>
-                                                      ) : (
-                                                        <>
-                                                          {/* Property forms for used properties */}
-                                                          {(() => {
-                                                            const usedProperties = Object.keys(breakpointProps);
-                                                            const unusedProperties = Object.entries(availableProperties)
-                                                              .filter(([prop]) => !usedProperties.includes(prop));
-
-                                                            // #region agent log
-                                                            fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DesignGroupsTab.jsx:2389',message:'Property filtering',data:{groupIndex,part,breakpoint,breakpointProps:{...breakpointProps},usedProperties,unusedPropertiesCount:unusedProperties.length,isBreakpointExpanded},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})}).catch(()=>{});
-                                                            // #endregion
-
-                                                            return (
-                                                              <>
-                                                                {/* Existing Properties */}
-                                                                {usedProperties.length > 0 && (
-                                                                  <div className="p-4 space-y-3">
-                                                                    {Object.entries(availableProperties)
-                                                                      .filter(([prop]) => usedProperties.includes(prop))
-                                                                      .map(([prop, config]) => {
-                                                                        const key = `${groupIndex}-${part}-${breakpoint}-${prop}`;
-                                                                        const storedValue = breakpointProps[prop] || '';
-                                                                        const value = layoutInputValues[key] !== undefined ? layoutInputValues[key] : storedValue;
-
-                                                                        return (
-                                                                          <div key={prop} className="flex gap-2 items-start">
-                                                                            <div className="flex-1">
-                                                                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                                                {config.label}
-                                                                              </label>
-                                                                              {config.type === 'color' ? (
-                                                                                <ColorSelector
-                                                                                  value={value}
-                                                                                  onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
-                                                                                  colors={colors}
-                                                                                  className="w-full"
-                                                                                />
-                                                                              ) : config.type === 'font' ? (
-                                                                                <FontSelector
-                                                                                  fontFamily={value}
-                                                                                  fontWeight={breakpointProps.fontWeight}
-                                                                                  onFontFamilyChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
-                                                                                  onFontWeightChange={(newWeight) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, 'fontWeight', newWeight || null, true)}
-                                                                                  fonts={fonts}
-                                                                                  className="w-full"
-                                                                                />
-                                                                              ) : config.type === 'numeric' ? (
-                                                                                <NumericInput
-                                                                                  value={value}
-                                                                                  onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null)}
-                                                                                  onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
-                                                                                  property={prop}
-                                                                                  className="w-full"
-                                                                                />
-                                                                              ) : config.type === 'select' ? (
-                                                                                <select
-                                                                                  value={value}
-                                                                                  onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null, true)}
-                                                                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                                >
-                                                                                  <option value="">None</option>
-                                                                                  {config.options?.map(opt => (
-                                                                                    <option key={opt} value={opt}>{opt}</option>
-                                                                                  ))}
-                                                                                </select>
-                                                                              ) : (
-                                                                                <input
-                                                                                  type="text"
-                                                                                  value={value}
-                                                                                  onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null)}
-                                                                                  onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
-                                                                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                                  placeholder={config.placeholder}
-                                                                                />
-                                                                              )}
-                                                                            </div>
-                                                                            <button
-                                                                              type="button"
-                                                                              onClick={() => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, null, true)}
-                                                                              className="mt-6 p-1 text-red-600 hover:text-red-700"
-                                                                              title="Remove property"
-                                                                            >
-                                                                              <Trash2 className="w-4 h-4" />
-                                                                            </button>
+                                                                      return (
+                                                                        <div key={prop} className="flex gap-2 items-start">
+                                                                          <div className="flex-1">
+                                                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                                              {config.label}
+                                                                            </label>
+                                                                            {config.type === 'color' ? (
+                                                                              <ColorSelector
+                                                                                value={value}
+                                                                                onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
+                                                                                colors={colors}
+                                                                                className="w-full"
+                                                                              />
+                                                                            ) : config.type === 'font' ? (
+                                                                              <FontSelector
+                                                                                fontFamily={value}
+                                                                                fontWeight={breakpointProps.fontWeight}
+                                                                                onFontFamilyChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
+                                                                                onFontWeightChange={(newWeight) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, 'fontWeight', newWeight || null, true)}
+                                                                                fonts={fonts}
+                                                                                className="w-full"
+                                                                              />
+                                                                            ) : config.type === 'numeric' ? (
+                                                                              <NumericInput
+                                                                                value={value}
+                                                                                onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null)}
+                                                                                onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
+                                                                                property={prop}
+                                                                                className="w-full"
+                                                                              />
+                                                                            ) : config.type === 'select' ? (
+                                                                              <select
+                                                                                value={value}
+                                                                                onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null, true)}
+                                                                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                              >
+                                                                                <option value="">None</option>
+                                                                                {config.options?.map(opt => (
+                                                                                  <option key={opt} value={opt}>{opt}</option>
+                                                                                ))}
+                                                                              </select>
+                                                                            ) : (
+                                                                              <input
+                                                                                type="text"
+                                                                                value={value}
+                                                                                onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null)}
+                                                                                onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
+                                                                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                                placeholder={config.placeholder}
+                                                                              />
+                                                                            )}
                                                                           </div>
-                                                                        );
-                                                                      })}
-                                                                  </div>
-                                                                )}
+                                                                          <button
+                                                                            type="button"
+                                                                            onClick={() => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, null, true)}
+                                                                            className="mt-6 p-1 text-red-600 hover:text-red-700"
+                                                                            title="Remove property"
+                                                                          >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                          </button>
+                                                                        </div>
+                                                                      );
+                                                                    })}
+                                                                </div>
+                                                              )}
 
-                                                                {/* Add Property Pills */}
-                                                                {unusedProperties.length > 0 && (
-                                                                  <div className="flex flex-wrap gap-2 px-4 pb-4">
-                                                                    {unusedProperties.map(([prop, config]) => (
-                                                                      <button
-                                                                        key={prop}
-                                                                        type="button"
-                                                                        onClick={() => handleAddProperty(groupIndex, part, breakpoint, prop)}
-                                                                        className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                                                                        title={`Add ${config.label}`}
-                                                                      >
-                                                                        + {config.label}
-                                                                      </button>
-                                                                    ))}
-                                                                  </div>
-                                                                )}
-                                                              </>
-                                                            );
-                                                          })()}
-                                                        </>
-                                                      ))}
-                                                    </div>
-                                                  );
-                                                })}
-                                              </>
-                                            );
-                                          })()}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
+                                                              {/* Add Property Pills */}
+                                                              {unusedProperties.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2 px-4 pb-4">
+                                                                  {unusedProperties.map(([prop, config]) => (
+                                                                    <button
+                                                                      key={prop}
+                                                                      type="button"
+                                                                      onClick={() => handleAddProperty(groupIndex, part, breakpoint, prop)}
+                                                                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                                                      title={`Add ${config.label}`}
+                                                                    >
+                                                                      + {config.label}
+                                                                    </button>
+                                                                  ))}
+                                                                </div>
+                                                              )}
+                                                            </>
+                                                          );
+                                                        })()}
+                                                      </>
+                                                    ))}
+                                                  </div>
+                                                );
+                                              })}
+                                            </>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Content Section */}
@@ -2644,6 +2904,32 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                       <div className="font-mono text-sm font-semibold text-gray-900">{tagGroup.label}</div>
                                       {tagGroup.hasGroup && (
                                         <div className="text-xs text-gray-500 font-mono">{tagGroup.variants.join(', ')}</div>
+                                      )}
+                                      {/* Tag Selectors Display */}
+                                      {group.calculatedSelectors?.base_selectors && group.calculatedSelectors.base_selectors.length > 0 && (
+                                        <div className="mt-1">
+                                          {group.calculatedSelectors.base_selectors.length === 1 ? (
+                                            <div className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs font-mono rounded">
+                                              {group.calculatedSelectors.base_selectors[0] || '(global)'}
+                                            </div>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectorPopup({
+                                                  type: 'tag',
+                                                  selectors: group.calculatedSelectors.base_selectors,
+                                                  position: { x: e.clientX, y: e.clientY }
+                                                });
+                                              }}
+                                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs font-mono rounded hover:bg-blue-100 transition-colors"
+                                            >
+                                              {group.calculatedSelectors.base_selectors.length} selectors
+                                              <ChevronDown className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
                                       )}
                                     </div>
 
@@ -2952,6 +3238,46 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         cancelText="Cancel"
         confirmButtonStyle="danger"
       />
+
+      {/* Selector Popup */}
+      {selectorPopup && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[10020]"
+            onClick={() => setSelectorPopup(null)}
+          />
+          {/* Popup */}
+          <div
+            className="fixed z-[10021] bg-white border border-gray-300 rounded-lg shadow-lg p-3 max-w-md"
+            style={{
+              left: `${Math.min(selectorPopup.position.x, window.innerWidth - 320)}px`,
+              top: `${Math.min(selectorPopup.position.y, window.innerHeight - 200)}px`,
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-700">CSS Selectors</h3>
+              <button
+                type="button"
+                onClick={() => setSelectorPopup(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {selectorPopup.selectors.map((selector, idx) => (
+                <div
+                  key={idx}
+                  className={`px-2 py-1 ${selectorPopup.type === 'tag' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'} text-xs font-mono rounded`}
+                >
+                  {selector || '(global)'}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
