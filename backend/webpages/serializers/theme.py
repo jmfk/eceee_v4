@@ -96,6 +96,15 @@ class PageThemeSerializer(serializers.ModelSerializer):
         # Always include computed breakpoints (with defaults if not set)
         data["breakpoints"] = instance.get_breakpoints()
 
+        # Add calculated selectors for each design group
+        if data.get("design_groups") and isinstance(data["design_groups"], dict):
+            groups = data["design_groups"].get("groups", [])
+            for group in groups:
+                # Calculate selectors for this group
+                calculated = instance.calculate_selectors_for_group(group)
+                # Add the calculated selectors to the group data
+                group["calculatedSelectors"] = calculated
+
         return data
 
     class Meta:

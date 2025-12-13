@@ -134,6 +134,146 @@ class PageTheme(models.Model):
 
         return DEFAULT_BREAKPOINTS
 
+    def calculate_selectors_for_group(self, group, scope="", frontend_scoped=False):
+        """
+        Calculate the actual CSS selectors that would be generated for a design group.
+        This mirrors the logic in _generate_design_groups_css() to show developers
+        what selectors are being generated.
+
+        Args:
+            group: Design group dictionary
+            scope: CSS scope selector
+            frontend_scoped: If True, prepend .cms-content to all selectors
+
+        Returns:
+            dict: Dictionary with structure:
+                {
+                    "base_selectors": [...],  # Base selectors for the group
+                    "layout_part_selectors": {  # Selectors for each layout part
+                        "container": [...],
+                        "header": [...],
+                        ...
+                    },
+                    "element_selectors": {  # Selectors for each HTML element
+                        "h1": [...],
+                        "p": [...],
+                        ...
+                    }
+                }
+        """
+        import re
+
+        # Helper to normalize names for CSS class names
+        def normalize_for_css(name):
+            return re.sub(r"[^a-z0-9-]", "-", name.lower())
+
+        # Check targeting mode
+        targeting_mode = group.get("targetingMode", "widget-slot")
+        
+        # Calculate base selectors
+        base_selectors = []
+
+        if targeting_mode == "css-classes":
+            # Use custom CSS selectors from targetCssClasses
+            target_css_classes = group.get("targetCssClasses", "")
+            if target_css_classes:
+                # Parse comma or newline-separated selectors
+                custom_selectors = [
+                    s.strip() 
+                    for s in re.split(r'[,\n]', target_css_classes) 
+                    if s.strip()
+                ]
+                base_selectors = custom_selectors
+            else:
+                # No custom selectors specified - would apply globally
+                base_selectors = [scope if scope else ""]
+        else:
+            # widget-slot mode: Build selectors from widgetTypes/slots
+            widget_types = group.get("widgetTypes", []) or group.get("widget_types", [])
+            if not widget_types:
+                single_wt = group.get("widgetType") or group.get("widget_type")
+                if single_wt:
+                    widget_types = [single_wt]
+
+            slots = group.get("slots", [])
+            if not slots and group.get("slot"):
+                slots = [group["slot"]]
+
+            if not widget_types and not slots:
+                # Global - no targeting
+                base_selectors.append(scope if scope else "")
+            elif not widget_types and slots:
+                # Slot targeting only
+                if scope:
+                    base_selectors = [
+                        f"{scope}.slot-{normalize_for_css(slot)}" for slot in slots
+                    ]
+                else:
+                    base_selectors = [
+                        f".slot-{normalize_for_css(slot)}" for slot in slots
+                    ]
+            elif widget_types and not slots:
+                # Widget type targeting only
+                if scope:
+                    base_selectors = [
+                        f"{scope}.widget-type-{normalize_for_css(wt)}"
+                        for wt in widget_types
+                    ]
+                else:
+                    base_selectors = [
+                        f".widget-type-{normalize_for_css(wt)}" for wt in widget_types
+                    ]
+            else:
+                # Both widget type and slot targeting
+                for wt in widget_types:
+                    for slot in slots:
+                        wt_normalized = normalize_for_css(wt)
+                        slot_normalized = normalize_for_css(slot)
+                        if scope:
+                            base_selectors.append(
+                                f"{scope}.slot-{slot_normalized} > .widget-type-{wt_normalized}"
+                            )
+                        else:
+                            base_selectors.append(
+                                f".slot-{slot_normalized} > .widget-type-{wt_normalized}"
+                            )
+
+        # Apply frontend scoping if requested
+        if frontend_scoped:
+            base_selectors = [
+                f".cms-content {sel}".strip() if sel else ".cms-content"
+                for sel in base_selectors
+            ]
+
+        # Calculate layout part selectors
+        layout_part_selectors = {}
+        layout_properties = group.get("layoutProperties", {})
+        if layout_properties:
+            for part in layout_properties.keys():
+                # Part selectors combine base with part class
+                part_selectors = [
+                    f"{base} .{part}".strip() if base else f".{part}"
+                    for base in base_selectors
+                ]
+                layout_part_selectors[part] = part_selectors
+
+        # Calculate element selectors
+        element_selectors = {}
+        elements = group.get("elements", {})
+        for element in elements.keys():
+            # Element selectors combine base with element tag
+            elem_selectors = [
+                f"{base} {element}".strip() if base else element
+                for base in base_selectors
+            ]
+            element_selectors[element] = elem_selectors
+
+        return {
+            "base_selectors": base_selectors,
+            "layout_part_selectors": layout_part_selectors,
+            "element_selectors": element_selectors,
+        }
+
     def to_dict(self):
         """Convert theme to dictionary representation"""
         return {
