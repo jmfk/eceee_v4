@@ -15,6 +15,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp, Globe, Package, X, Search } from 'lucide-react';
 import { createDesignGroup, generateClassName, getBreakpoints } from '../../utils/themeUtils';
 import { parseCSSRules, cssToGroupElements, cssToElementProperties, groupElementsToCSS } from '../../utils/cssParser';
+import { calculateSelectorsForGroup } from '../../utils/selectorCalculation';
 import DesignGroupsPreview from './DesignGroupsPreview';
 import ColorSelector from './form-fields/ColorSelector';
 import FontSelector from './form-fields/FontSelector';
@@ -489,6 +490,11 @@ const CSS_PROPERTIES = {
 
 const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, onDirty }) => {
   const groups = designGroups?.groups || [];
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:346', message: 'Component render - groups data', data: { groupCount: groups.length, group1HasCalcSelectors: groups[1] ? !!groups[1].calculatedSelectors : false, group1CalcSelectors: groups[1]?.calculatedSelectors || null }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'component-render' }) }).catch(() => { });
+  // #endregion
+
   const [expandedContent, setExpandedContent] = useState({});
   const [expandedTags, setExpandedTags] = useState({});
   const [expandedTargeting, setExpandedTargeting] = useState({});
@@ -599,10 +605,10 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   // Get breakpoint label for display
   const getBreakpointLabel = (bp) => {
     const labels = {
-      sm: 'Base / SM & Up',
-      md: `MD & Up (≥${themeBreakpoints.md}px)`,
-      lg: `LG & Up (≥${themeBreakpoints.lg}px)`,
-      xl: `XL & Up (≥${themeBreakpoints.xl}px)`,
+      sm: 'sm',
+      md: `md (≥${themeBreakpoints.md}px)`,
+      lg: `lg (≥${themeBreakpoints.lg}px)`,
+      xl: `xl (≥${themeBreakpoints.xl}px)`,
     };
     return labels[bp] || bp;
   };
@@ -690,6 +696,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       // Keep old field for backward compatibility
       widgetType: selectedTypes.length === 1 ? selectedTypes[0] : null,
     };
+    // Recalculate selectors immediately
+    updatedGroups[index].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[index]);
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
@@ -772,6 +780,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       slots: newSlots,
       slot: newSlots.length === 1 ? newSlots[0] : null,
     };
+    // Recalculate selectors immediately
+    updatedGroups[groupIndex].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[groupIndex]);
     onChange({ ...(designGroups || {}), groups: updatedGroups });
     if (onDirty) onDirty();
   };
@@ -787,6 +797,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       slots: newSlots,
       slot: newSlots.length === 1 ? newSlots[0] : null,
     };
+    // Recalculate selectors immediately
+    updatedGroups[groupIndex].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[groupIndex]);
     onChange({ ...(designGroups || {}), groups: updatedGroups });
     if (onDirty) onDirty();
   };
@@ -797,6 +809,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       ...updatedGroups[index],
       targetingMode: mode,
     };
+    // Recalculate selectors immediately
+    updatedGroups[index].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[index]);
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
@@ -806,6 +820,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       ...updatedGroups[index],
       targetCssClasses: cssClasses,
     };
+    // Recalculate selectors immediately
+    updatedGroups[index].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[index]);
     onChange({ ...(designGroups || {}), groups: updatedGroups });
   };
 
@@ -884,6 +900,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined,
       };
 
+      // Recalculate selectors to include layout part selectors
+      updatedGroups[groupIndex].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[groupIndex]);
+
       onChange({ ...(designGroups || {}), groups: updatedGroups });
       if (onDirty) onDirty();
 
@@ -932,6 +951,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         layoutProperties
       };
 
+      // Recalculate selectors when layout parts are added
+      updatedGroups[groupIndex].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[groupIndex]);
+
       onChange({ ...(designGroups || {}), groups: updatedGroups });
       if (onDirty) onDirty();
     }
@@ -957,6 +979,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       ...updatedGroups[groupIndex],
       layoutProperties: Object.keys(layoutProperties).length > 0 ? layoutProperties : undefined
     };
+
+    // Recalculate selectors when layout parts are removed
+    updatedGroups[groupIndex].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[groupIndex]);
 
     onChange({ ...(designGroups || {}), groups: updatedGroups });
     if (onDirty) onDirty();
@@ -2386,6 +2411,15 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                             {allowedProperties.length} {allowedProperties.length === 1 ? 'property' : 'properties'}
                                           </span>
                                         )}
+                                        {group.calculatedSelectors?.layout_part_selectors?.[part] && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {group.calculatedSelectors.layout_part_selectors[part].map((selector, idx) => (
+                                              <span key={idx} className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-mono rounded">
+                                                {selector}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
                                       </button>
                                       <button
                                         type="button"
@@ -2496,12 +2530,13 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                           <div className="font-mono text-sm font-semibold text-gray-900">
                                                             {getBreakpointLabel(breakpoint)}
                                                           </div>
-                                                          <div className="text-xs text-gray-500 font-mono">
-                                                            {breakpoint}
-                                                          </div>
                                                           {/* Breakpoint Selectors Display */}
                                                           {(() => {
                                                             const partSelectors = group.calculatedSelectors?.layout_part_selectors?.[part];
+
+                                                            // #region agent log
+                                                            fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:2503', message: 'Selector rendering check', data: { groupIndex, part, breakpoint, hasCalculatedSelectors: !!group.calculatedSelectors, hasLayoutPartSelectors: !!group.calculatedSelectors?.layout_part_selectors, layoutPartSelectorKeys: group.calculatedSelectors?.layout_part_selectors ? Object.keys(group.calculatedSelectors.layout_part_selectors) : [], partSelectors: partSelectors || null, baseSelectors: group.calculatedSelectors?.base_selectors || null }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'selector-debug' }) }).catch(() => { });
+                                                            // #endregion
 
                                                             if (!partSelectors || partSelectors.length === 0) {
                                                               return null;
