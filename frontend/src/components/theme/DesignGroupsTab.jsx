@@ -21,6 +21,8 @@ import ColorSelector from './form-fields/ColorSelector';
 import FontSelector from './form-fields/FontSelector';
 import NumericInput from './form-fields/NumericInput';
 import CopyButton from './CopyButton';
+import SelectorDisplay from './design-groups/SelectorDisplay';
+import SelectorPopup from './design-groups/modals/SelectorPopup';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import { useWidgets } from '../../hooks/useWidgets';
 import ConfirmDialog from '../ConfirmDialog';
@@ -553,53 +555,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     };
   }, []);
 
-  // Initialize expanded state only once on component mount
-  // Auto-expand parts and breakpoints that have content
-  useEffect(() => {
-    // Only initialize if state is empty (first load)
-    if (Object.keys(expandedLayoutParts).length === 0 && Object.keys(expandedLayoutBreakpoints).length === 0) {
-      const initialExpandedLayoutProps = {};
-      const initialExpandedParts = {};
-      const initialExpandedBreakpoints = {};
-
-      groups.forEach((group, groupIndex) => {
-        const layoutProps = group.layoutProperties || {};
-
-        // Check if this group has any layout properties at all
-        const hasAnyLayoutProps = Object.keys(layoutProps).length > 0;
-        if (hasAnyLayoutProps) {
-          // Auto-expand the Layout Properties section for this group
-          initialExpandedLayoutProps[groupIndex] = true;
-        }
-
-        // Auto-expand parts that have content
-        Object.entries(layoutProps).forEach(([part, partProps]) => {
-          const hasContent = Object.values(partProps).some(bp => Object.keys(bp).length > 0);
-          if (hasContent) {
-            initialExpandedParts[`${groupIndex}-${part}`] = true;
-
-            // Auto-expand breakpoints within those parts that have properties
-            Object.entries(partProps).forEach(([breakpoint, bpProps]) => {
-              if (Object.keys(bpProps).length > 0) {
-                initialExpandedBreakpoints[`${groupIndex}-${part}-${breakpoint}`] = true;
-              }
-            });
-          }
-        });
-      });
-
-      if (Object.keys(initialExpandedLayoutProps).length > 0) {
-        setExpandedLayoutProps(initialExpandedLayoutProps);
-      }
-      if (Object.keys(initialExpandedParts).length > 0) {
-        setExpandedLayoutParts(initialExpandedParts);
-      }
-      if (Object.keys(initialExpandedBreakpoints).length > 0) {
-        setExpandedLayoutBreakpoints(initialExpandedBreakpoints);
-      }
-    }
-  }, []); // Empty deps = run only once on mount
-
   // Get theme breakpoints with defaults
   const themeBreakpoints = getBreakpoints({ breakpoints });
   const BREAKPOINTS = getBreakpointKeys(); // ['sm', 'md', 'lg', 'xl']
@@ -651,7 +606,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       groups: [...groups, newGroup],
     };
     onChange(updatedDesignGroups);
-    setExpandedContent({ ...expandedContent, [groups.length]: true });
   };
 
   const handleRemoveGroup = (index) => {
@@ -1377,7 +1331,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         };
 
         onChange({ ...(designGroups || {}), groups: [...groups, newGroup] });
-        setExpandedContent({ ...expandedContent, [groups.length]: true });
 
         let message = `Created new group with ${Object.keys(elements).length} elements`;
         if (warnings.length > 0) {
@@ -1940,9 +1893,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       groups: [...groups, newGroup],
     };
     onChange(updatedTypography);
-
-    // Auto-expand the new group
-    setExpandedContent({ ...expandedContent, [groups.length]: true });
   };
 
   const getTagGroupsInGroup = (group) => {
@@ -2236,28 +2186,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                     </div>
                   </div>
 
-                  {/* Generated Selectors Overview - Summary at group level */}
-                  {group.calculatedSelectors && (
-                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-                      <div className="flex items-start gap-2">
-                        <span className="text-xs font-medium text-gray-500 mt-0.5">Selectors:</span>
-                        <div className="flex flex-wrap gap-1">
-                          {group.calculatedSelectors.base_selectors && group.calculatedSelectors.base_selectors.length > 0 ? (
-                            group.calculatedSelectors.base_selectors.map((selector, idx) => (
-                              <span key={idx} className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
-                                {selector || '(global)'}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
-                              (global)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Targeting Section */}
                   <div className="border-t border-gray-200">
                     <button
@@ -2437,20 +2365,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                     {expandedLayoutProps[groupIndex] && (
                       <div className="px-4 pb-4">
-                        {/* Calculated CSS Selectors Display */}
-                        {group.calculatedSelectors && group.calculatedSelectors.base_selectors && group.calculatedSelectors.base_selectors.length > 0 && (
-                          <div className="mb-3 flex items-center gap-2 pb-3 border-b border-gray-200">
-                            <span className="text-xs text-gray-500 font-medium">Active CSS Selectors:</span>
-                            <div className="flex flex-wrap gap-1">
-                              {group.calculatedSelectors.base_selectors.map((selector, idx) => (
-                                <span key={idx} className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
-                                  {selector || '(global)'}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                         {(() => {
                           const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
                           const layoutParts = new Set();
@@ -2594,13 +2508,15 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                           </span>
                                         )}
                                         {group.calculatedSelectors?.layout_part_selectors?.[part] && (
-                                          <div className="flex flex-wrap gap-1">
-                                            {group.calculatedSelectors.layout_part_selectors[part].map((selector, idx) => (
-                                              <span key={idx} className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-mono rounded">
-                                                {selector}
-                                              </span>
-                                            ))}
-                                          </div>
+                                          <SelectorDisplay
+                                            selectors={group.calculatedSelectors.layout_part_selectors[part]}
+                                            type="breakpoint"
+                                            onOpenPopup={(selectors, position) => setSelectorPopup({
+                                              type: 'breakpoint',
+                                              selectors,
+                                              position
+                                            })}
+                                          />
                                         )}
                                       </button>
                                       <button
@@ -2618,20 +2534,6 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                                     {isPartExpanded && (
                                       <div className="p-3 pt-0">
-                                        {/* Part-specific selectors */}
-                                        {group.calculatedSelectors?.layout_part_selectors?.[part] && (
-                                          <div className="mb-2 flex items-center gap-2">
-                                            <span className="text-xs text-gray-500">→</span>
-                                            <div className="flex flex-wrap gap-1">
-                                              {group.calculatedSelectors.layout_part_selectors[part].map((selector, idx) => (
-                                                <span key={idx} className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-mono rounded">
-                                                  {selector}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-
                                         {/* Separate breakpoints into used vs unused */}
                                         {(() => {
                                           const usedBreakpoints = BREAKPOINTS.filter(bp => {
@@ -2726,27 +2628,17 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                                                             return (
                                                               <div className="mt-1">
-                                                                {partSelectors.length === 1 ? (
-                                                                  <div className="inline-block px-1.5 py-0.5 bg-purple-50 text-purple-600 text-xs font-mono rounded">
-                                                                    {partSelectors[0]}
-                                                                  </div>
-                                                                ) : (
-                                                                  <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                      e.stopPropagation();
-                                                                      setSelectorPopup({
-                                                                        type: 'breakpoint',
-                                                                        selectors: partSelectors,
-                                                                        position: { x: e.clientX, y: e.clientY }
-                                                                      });
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 text-xs font-mono rounded hover:bg-purple-100 transition-colors"
-                                                                  >
-                                                                    {partSelectors.length} selectors
-                                                                    <ChevronDown className="w-3 h-3" />
-                                                                  </button>
-                                                                )}
+                                                                <SelectorDisplay
+                                                                  selectors={partSelectors}
+                                                                  type="breakpoint"
+                                                                  onOpenPopup={(selectors, position) => {
+                                                                    setSelectorPopup({
+                                                                      type: 'breakpoint',
+                                                                      selectors,
+                                                                      position
+                                                                    });
+                                                                  }}
+                                                                />
                                                               </div>
                                                             );
                                                           })()}
@@ -3091,7 +2983,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                             {/* Tag Groups */}
                             {tagGroupsInGroup.map((tagGroup) => {
-                              const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? !tagGroup.hasGroup;
+                              const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? false;
                               const baseStyles = group.elements[tagGroup.base] || {};
 
                               return (
@@ -3548,42 +3440,12 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
       {/* Selector Popup */}
       {selectorPopup && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-[10020]"
-            onClick={() => setSelectorPopup(null)}
-          />
-          {/* Popup */}
-          <div
-            className="fixed z-[10021] bg-white border border-gray-300 rounded-lg shadow-lg p-3 max-w-md"
-            style={{
-              left: `${Math.min(selectorPopup.position.x, window.innerWidth - 320)}px`,
-              top: `${Math.min(selectorPopup.position.y, window.innerHeight - 200)}px`,
-            }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-700">CSS Selectors</h3>
-              <button
-                type="button"
-                onClick={() => setSelectorPopup(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {selectorPopup.selectors.map((selector, idx) => (
-                <div
-                  key={idx}
-                  className={`px-2 py-1 ${selectorPopup.type === 'tag' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'} text-xs font-mono rounded`}
-                >
-                  {selector || '(global)'}
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
+        <SelectorPopup
+          selectors={selectorPopup.selectors}
+          position={selectorPopup.position}
+          type={selectorPopup.type}
+          onClose={() => setSelectorPopup(null)}
+        />
       )}
     </div>
   );
