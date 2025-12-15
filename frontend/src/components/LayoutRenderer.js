@@ -2371,7 +2371,8 @@ class LayoutRenderer {
 
     const title = document.createElement('span');
     title.className = 'text-sm font-medium text-gray-700';
-    title.textContent = name;
+    const anchorText = widgetInstance.config?.anchor ? ` → #${widgetInstance.config.anchor}` : '';
+    title.textContent = name + anchorText;
 
     // Add active/inactive toggle
     const activeToggle = this.createActiveToggle(id, widgetInstance);

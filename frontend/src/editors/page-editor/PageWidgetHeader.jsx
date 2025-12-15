@@ -162,6 +162,9 @@ const PageWidgetHeader = ({
                 <div className="flex items-center space-x-2">
                     <span className={`text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'} ${isCut ? 'line-through' : ''}`}>
                         {widgetType}
+                        {widget?.config?.anchor && (
+                            <span className="text-gray-500"> → #{widget.config.anchor}</span>
+                        )}
                     </span>
 
                     {/* Active/Inactive toggle button */}
