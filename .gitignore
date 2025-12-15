@@ -47,6 +47,10 @@ node_modules/
 /.pnp
 .pnp.js
 
+# Theme sync
+themes/.sync_state.json
+themes/**/*.conflict
+
 # Testing
 /coverage
 .nyc_output

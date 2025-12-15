@@ -47,6 +47,14 @@ class Namespace(models.Model):
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT, related_name="created_namespaces"
     )
+    
+    # Multi-tenancy support
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        related_name="namespaces",
+        help_text="Tenant this namespace belongs to",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -112,6 +120,14 @@ class Category(models.Model):
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Multi-tenancy support
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        related_name="categories",
+        help_text="Tenant this category belongs to",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -145,6 +161,14 @@ class Tag(models.Model):
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Multi-tenancy support
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        related_name="tags",
+        help_text="Tenant this tag belongs to",
+    )
 
     class Meta:
         ordering = ["name"]

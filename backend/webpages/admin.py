@@ -74,17 +74,35 @@ class HasHostnamesFilter(admin.SimpleListFilter):
 
 @admin.register(PageTheme)
 class PageThemeAdmin(admin.ModelAdmin):
+    """Admin interface for PageTheme with tenant filtering."""
     list_display = [
         "name",
+        "tenant",
         "description",
         "is_active",
         "is_default",
         "created_at",
         "created_by",
     ]
-    list_filter = ["is_active", "is_default", "created_at"]
+    list_filter = ["tenant", "is_active", "is_default", "created_at"]
     search_fields = ["name", "description"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def get_queryset(self, request):
+        """Filter themes by tenant from request."""
+        queryset = super().get_queryset(request)
+        tenant = getattr(request, "tenant", None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
+        return queryset
+
+    def save_model(self, request, obj, form, change):
+        """Set tenant from request on creation."""
+        if not change:
+            tenant = getattr(request, "tenant", None)
+            if tenant:
+                obj.tenant = tenant
+        super().save_model(request, obj, form, change)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
@@ -112,10 +130,18 @@ class PageThemeAdmin(admin.ModelAdmin):
                 form.base_fields[field_name].widget = json_widget
         return form
 
+    def get_queryset(self, request):
+        """Filter themes by tenant from request."""
+        qs = super().get_queryset(request)
+        tenant = getattr(request, 'tenant', None)
+        if tenant:
+            return qs.filter(tenant=tenant)
+        return qs
+    
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("name", "description", "image", "is_active", "is_default")},
+            {"fields": ("name", "tenant", "description", "image", "is_active", "is_default")},
         ),
         (
             "New Theme Structure (5 Parts)",
@@ -166,6 +192,11 @@ class PageThemeAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not change:
             obj.created_by = request.user
+            # Auto-set tenant from request if not already set
+            if not obj.tenant:
+                tenant = getattr(request, 'tenant', None)
+                if tenant:
+                    obj.tenant = tenant
         super().save_model(request, obj, form, change)
 
 

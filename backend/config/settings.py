@@ -50,6 +50,16 @@ else:
     # Enable caching in production (24 hours)
     THEME_CSS_CACHE_TIMEOUT = 3600 * 24  # 24 hours
 
+# Theme sync configuration
+THEME_SYNC_ENABLED = config("THEME_SYNC_ENABLED", default=False, cast=bool)
+
+# Multi-tenancy configuration
+TENANT_HEADER = config("TENANT_HEADER", default="X-Tenant-ID")
+DEFAULT_TENANT_ID = config(
+    "DEFAULT_TENANT_ID", default=None, cast=lambda x: x if x else None
+)  # UUID string or identifier
+REQUIRE_TENANT = config("REQUIRE_TENANT", default=not DEBUG, cast=bool)
+
 # Security check for production secret key
 if not DEBUG and SECRET_KEY == "dev-secret-key-change-in-production-12345":
     raise ValueError(
@@ -151,6 +161,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     # API and serialization
     "rest_framework",
+    "rest_framework.authtoken",  # Token authentication for API
     "rest_framework_simplejwt",
     "django_filters",
     "drf_spectacular",
@@ -178,6 +189,7 @@ LOCAL_APPS = [
     # 'apps.core',
     # 'apps.users',
     # 'apps.api',
+    "core",  # Core multi-tenancy support
     "htmx",
     "webpages",  # Core CMS system (required)
     "content",
@@ -202,6 +214,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.TenantContextMiddleware",  # Set tenant context for RLS (after auth, before other DB queries)
     "utils.middleware.dev_auth.DevAutoLoginMiddleware",  # Auto-login for development (only active when DEBUG=True)
     "allauth.account.middleware.AccountMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -332,6 +345,7 @@ CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF tokens
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -420,7 +434,6 @@ AUTHENTICATION_BACKENDS = [
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"  # Require email verification
-ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3  # Confirmation links expire after 3 days
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True  # Auto-login after email confirmation
 

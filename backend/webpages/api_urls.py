@@ -22,6 +22,7 @@ from .views import (
     link_display_info,
     page_lookup,
 )
+from .views.theme_sync_views import ThemeSyncViewSet
 from .views.theme_css_views import ThemeCSSView
 from .views.path_pattern_views import PathPatternViewSet
 from .views.widget_type_views import pydantic_model_schema
@@ -66,6 +67,7 @@ router.register(
     r"layouts", CodeLayoutViewSet, basename="layout"
 )  # Unified endpoint for all layout operations
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
+router.register(r"themes/sync", ThemeSyncViewSet, basename="theme-sync")
 # Widget-types will be handled with custom patterns to allow dots in widget type names
 # router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
 router.register(r"page-data-schemas", PageDataSchemaViewSet, basename="pagedataschema")

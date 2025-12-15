@@ -508,9 +508,25 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             return ObjectInstanceListSerializer
         return ObjectInstanceSerializer
 
+    def get_queryset(self):
+        """Filter queryset by tenant"""
+        queryset = super().get_queryset()
+        
+        # Filter by tenant from middleware
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
+        
+        return queryset
+
     def perform_create(self, serializer):
-        """Set the created_by field when creating"""
-        serializer.save(created_by=self.request.user)
+        """Set the created_by and tenant fields when creating"""
+        # Get tenant from request (set by middleware)
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        serializer.save(created_by=self.request.user, tenant=tenant)
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):

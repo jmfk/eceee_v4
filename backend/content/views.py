@@ -40,6 +40,11 @@ class NamespaceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
 
+        # Filter by tenant from middleware
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
+
         # Filter by active status
         is_active = self.request.query_params.get("is_active")
         if is_active is not None:
@@ -53,7 +58,12 @@ class NamespaceViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        # Get tenant from request (set by middleware)
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        serializer.save(created_by=self.request.user, tenant=tenant)
 
     def perform_update(self, serializer):
         # If setting this namespace as default, unset others
@@ -119,6 +129,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
 
+        # Filter by tenant from middleware
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
+
         # Filter by active status
         is_active = self.request.query_params.get("is_active")
         if is_active is not None:
@@ -142,6 +157,11 @@ class TagViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter tags with enhanced options"""
         queryset = Tag.objects.select_related("namespace")
+
+        # Filter by tenant from middleware
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
 
         # Filter by namespace (use default if not specified)
         namespace_id = self.request.query_params.get("namespace")

@@ -137,6 +137,14 @@ class WebPage(models.Model):
         help_text="Site icon/favicon for this root page. Will be resized to multiple sizes using imgproxy. Only available for root pages (pages without parent).",
     )
 
+    # Multi-tenancy support
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        related_name="webpages",
+        help_text="Tenant this page belongs to",
+    )
+
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -182,6 +190,7 @@ class WebPage(models.Model):
                 fields=["is_currently_published"], name="webpages_is_published_idx"
             ),
             models.Index(fields=["cached_root_id"], name="webpages_cached_root_idx"),
+            models.Index(fields=["tenant_id"], name="webpages_tenant_idx"),
             GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),
             GinIndex(fields=["cached_root_hostnames"], name="webpages_root_hosts_gin"),
         ]

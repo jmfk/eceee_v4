@@ -58,6 +58,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - FM_PASSWORD=${FM_PASSWORD}
       - POSTMARK_API_KEY=${POSTMARK_API_KEY}
+      - THEME_SYNC_ENABLED=True
     volumes:
       - ./backend:/app
       - backend_static:/app/staticfiles
@@ -201,6 +202,27 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # Theme Sync Service
+  theme-sync:
+    build:
+      context: ./theme-sync
+      dockerfile: Dockerfile
+    container_name: eceee_v4_theme_sync
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - TENANT_ID=default  # Tenant identifier (required) - change to your tenant identifier
+      - SYNC_INTERVAL=5
+      - DEBOUNCE_DELAY=0.5
+      - THEMES_DIR=/themes
+      - API_TOKEN=8222521226c191dbba22b26b03b6ac417bdab4fe      # JWT token from above
+    volumes:
+      - ./themes:/themes
+      - ./theme-sync:/app
+    command: python sync_service.py
 
 volumes:
   postgres_data:

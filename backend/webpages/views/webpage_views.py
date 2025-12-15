@@ -63,6 +63,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
         """Filter queryset based on action and permissions"""
         queryset = super().get_queryset()
 
+        # Filter by tenant from middleware
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
+
         # Exclude deleted pages by default (unless specifically accessing deleted endpoint)
         # Check if is_deleted field exists (migration might not be run yet)
         if self.action not in ["list_deleted", "bulk_restore"]:
@@ -121,8 +126,16 @@ class WebPageViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
+        # Get tenant from request (set by middleware)
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        
         serializer.save(
-            created_by=self.request.user, last_modified_by=self.request.user
+            created_by=self.request.user,
+            last_modified_by=self.request.user,
+            tenant=tenant,
         )
 
         # Normalize sort orders for the parent group

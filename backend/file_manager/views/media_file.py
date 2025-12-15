@@ -121,6 +121,11 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         # Get base queryset (respecting soft deletes)
         queryset = MediaFile.objects.all()
+        
+        # Filter by tenant from middleware
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
 
         # Handle soft deletes
         show_deleted = (
@@ -227,9 +232,17 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set user and perform security logging on create."""
         from ..security import SecurityAuditLogger
+        
+        # Get tenant from request (set by middleware)
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
 
         media_file = serializer.save(
-            created_by=self.request.user, last_modified_by=self.request.user
+            created_by=self.request.user,
+            last_modified_by=self.request.user,
+            tenant=tenant,
         )
 
         SecurityAuditLogger.log_file_upload(

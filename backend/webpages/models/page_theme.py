@@ -15,7 +15,9 @@ class PageTheme(models.Model):
     Supports HTML element-specific styling and can be applied to pages, layouts, and object types.
     """
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(
+        max_length=255
+    )  # Unique per tenant (enforced by unique_together)
     description = models.TextField(blank=True)
 
     # New structure - 5 theme parts
@@ -106,9 +108,38 @@ class PageTheme(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        related_name="themes",
+        help_text="Tenant this theme belongs to",
+    )
+
+    # Theme sync fields
+    sync_version = models.IntegerField(
+        default=1,
+        help_text="Version counter for sync conflict detection. Increments on each change.",
+        db_index=True,
+    )
+    last_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time this theme was synced via file sync service",
+    )
+    sync_source = models.CharField(
+        max_length=50,
+        choices=[("web", "Web"), ("sync", "File Sync")],
+        default="web",
+        help_text="Source of the last change (web UI or file sync)",
+    )
 
     class Meta:
         ordering = ["created_at"]  # Oldest first
+        indexes = [
+            models.Index(fields=["sync_version"], name="pagetheme_sync_version_idx"),
+            models.Index(fields=["tenant_id"], name="pagetheme_tenant_idx"),
+        ]
+        unique_together = [["tenant", "name"]]  # Name unique per tenant
 
     def __str__(self):
         return self.name
@@ -169,7 +200,7 @@ class PageTheme(models.Model):
 
         # Check targeting mode
         targeting_mode = group.get("targetingMode", "widget-slot")
-        
+
         # Calculate base selectors
         base_selectors = []
 
@@ -179,8 +210,8 @@ class PageTheme(models.Model):
             if target_css_classes:
                 # Parse comma or newline-separated selectors
                 custom_selectors = [
-                    s.strip() 
-                    for s in re.split(r'[,\n]', target_css_classes) 
+                    s.strip()
+                    for s in re.split(r"[,\n]", target_css_classes)
                     if s.strip()
                 ]
                 base_selectors = custom_selectors
@@ -303,12 +334,29 @@ class PageTheme(models.Model):
         }
 
     def save(self, *args, **kwargs):
-        """Override save to ensure only one default theme exists and invalidate CSS cache"""
+        """Override save to ensure only one default theme exists, increment sync version, and invalidate CSS cache"""
         if self.is_default:
             # Clear any existing default themes
             PageTheme.objects.filter(is_default=True).exclude(id=self.id).update(
                 is_default=False
             )
+
+        # Increment sync version on each save (unless explicitly skipped)
+        skip_version = kwargs.pop("skip_version_increment", False)
+        if not skip_version:
+            if self.pk:
+                # Existing theme - get current version and increment
+                current = (
+                    PageTheme.objects.filter(pk=self.pk)
+                    .values_list("sync_version", flat=True)
+                    .first()
+                )
+                if current is not None:
+                    self.sync_version = current + 1
+            else:
+                # New theme - start at version 1
+                self.sync_version = 1
+
         super().save(*args, **kwargs)
 
         # Invalidate CSS cache for this theme
@@ -1615,11 +1663,14 @@ class PageTheme(models.Model):
                 part_selector_map = {}  # part_id -> custom selector
                 if widget_types:
                     from webpages.widget_registry import widget_type_registry
+
                     for wt_type in widget_types:
                         wt_class = widget_type_registry.get_widget_type_by_type(wt_type)
-                        if wt_class and hasattr(wt_class, 'layout_parts'):
+                        if wt_class and hasattr(wt_class, "layout_parts"):
                             for part_id, part_config in wt_class.layout_parts.items():
-                                if isinstance(part_config, dict) and part_config.get("selector"):
+                                if isinstance(part_config, dict) and part_config.get(
+                                    "selector"
+                                ):
                                     part_selector_map[part_id] = part_config["selector"]
 
                 # Collect all images and special color variables from all breakpoints and parts
@@ -1633,21 +1684,29 @@ class PageTheme(models.Model):
                                 images = bp_props["images"]
                                 if isinstance(images, dict):
                                     for image_key, image_data in images.items():
-                                        if isinstance(image_data, dict) and image_data.get("fileUrl"):
+                                        if isinstance(
+                                            image_data, dict
+                                        ) and image_data.get("fileUrl"):
                                             # Generate CSS variable name: --{part}-{imageKey}-{breakpoint}
                                             var_name = f"--{part}-{image_key}-{bp_key}"
                                             image_url = image_data["fileUrl"]
-                                            css_variables.append(f"  {var_name}: url('{image_url}');")
-                            
+                                            css_variables.append(
+                                                f"  {var_name}: url('{image_url}');"
+                                            )
+
                             # Handle special color variables for navbar and footer
                             # These need to be CSS variables for responsive color changes
-                            if part in ['navbar-widget', 'footer-widget']:
-                                if 'backgroundColor' in bp_props:
+                            if part in ["navbar-widget", "footer-widget"]:
+                                if "backgroundColor" in bp_props:
                                     var_name = f"--{part.replace('-widget', '')}-bg-color-{bp_key}"
-                                    css_variables.append(f"  {var_name}: {bp_props['backgroundColor']};")
-                                if 'color' in bp_props:
+                                    css_variables.append(
+                                        f"  {var_name}: {bp_props['backgroundColor']};"
+                                    )
+                                if "color" in bp_props:
                                     var_name = f"--{part.replace('-widget', '')}-text-color-{bp_key}"
-                                    css_variables.append(f"  {var_name}: {bp_props['color']};")
+                                    css_variables.append(
+                                        f"  {var_name}: {bp_props['color']};"
+                                    )
 
                 # Generate CSS variable declarations at design group scope
                 if css_variables:
@@ -1701,7 +1760,7 @@ class PageTheme(models.Model):
                         # Build selectors using layout part classes or custom selectors
                         # Check if this part has a custom selector defined in widget metadata
                         custom_selector = part_selector_map.get(part)
-                        
+
                         if custom_selector:
                             # Use custom selector (e.g., ".nav-container a")
                             # Prefix with base selectors for scoping
@@ -1709,7 +1768,9 @@ class PageTheme(models.Model):
                             for base in base_selectors:
                                 if base:
                                     # Append custom selector as descendant
-                                    part_selectors.append(f"{base} {custom_selector}".strip())
+                                    part_selectors.append(
+                                        f"{base} {custom_selector}".strip()
+                                    )
                                 else:
                                     # Global - use custom selector as-is
                                     part_selectors.append(custom_selector)
@@ -1749,10 +1810,10 @@ class PageTheme(models.Model):
                             # Skip 'images' field - it's handled separately as CSS variables
                             if prop_name == "images":
                                 continue
-                            
+
                             # Skip backgroundColor and color for navbar/footer - handled as CSS variables
-                            if part in ['navbar-widget', 'footer-widget']:
-                                if prop_name in ['backgroundColor', 'color']:
+                            if part in ["navbar-widget", "footer-widget"]:
+                                if prop_name in ["backgroundColor", "color"]:
                                     continue
 
                             css_prop = (

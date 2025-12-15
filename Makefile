@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch
+.PHONY: help install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -14,6 +14,7 @@ help: ## Show this help message
 	@echo "  backend           Start Django backend server"
 	@echo "  frontend          Start React frontend dev server"
 	@echo "  playwright-service Start Playwright website rendering service"
+	@echo "  theme-sync        Start theme file sync service"
 	@echo "  shell             Open bash shell in backend container"
 	@echo "  tailwind-build    Build Tailwind CSS for backend templates"
 	@echo "  tailwind-watch    Watch and rebuild Tailwind CSS on changes"
@@ -26,6 +27,22 @@ help: ## Show this help message
 	@echo "User Management:"
 	@echo "  createsuperuser   Create Django superuser"
 	@echo "  changepassword    Change admin password"
+	@echo ""
+	@echo "Tenant Management:"
+	@echo "  create-tenant NAME=\"Name\" IDENTIFIER=id  Create a new tenant"
+	@echo "  list-tenants                              List all tenants"
+	@echo "  show-tenant ID=uuid|IDENTIFIER=id         Show tenant details"
+	@echo "  activate-tenant ID=uuid|IDENTIFIER=id     Activate a tenant"
+	@echo "  deactivate-tenant ID=uuid|IDENTIFIER=id   Deactivate a tenant"
+	@echo "  tenant-themes ID=uuid|IDENTIFIER=id       List themes for a tenant"
+	@echo "  delete-tenant ID=uuid|IDENTIFIER=id       Delete a tenant (with confirmation)"
+	@echo ""
+	@echo "API Authentication:"
+	@echo "  create-api-token USER=username [SERVER=url]  Create DRF token for user (long-lived)"
+	@echo "  get-jwt-token USER=username [SERVER=url]    Get JWT token for user (expires in 60min)"
+	@echo "  list-api-tokens [SERVER=url]                List all API tokens"
+	@echo "  test-api-auth TOKEN=token [SERVER=url]      Test API token authentication"
+	@echo "  Note: SERVER defaults to http://localhost:8000"
 	@echo ""
 	@echo "Sample Data:"
 	@echo "  sample-content    Create sample content (10 items)"
@@ -90,6 +107,10 @@ frontend:
 playwright-service:
 	cd playwright-service && docker-compose up -d
 
+# Run theme sync service
+theme-sync:
+	docker-compose -f docker-compose.dev.yml up theme-sync
+
 # Run Django migrations
 migrations:
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py makemigrations
@@ -107,6 +128,182 @@ createsuperuser:
 
 changepassword:
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py changepassword admin
+
+# API Token Management
+SERVER ?= http://localhost:8000
+
+create-api-token: ## Create DRF token for user (use: make create-api-token USER=username [SERVER=url])
+	@if [ -z "$(USER)" ]; then \
+		echo "Error: USER is required"; \
+		echo "Usage: make create-api-token USER=username [SERVER=http://localhost:8000]"; \
+		echo "Example: make create-api-token USER=admin SERVER=https://api.example.com"; \
+		exit 1; \
+	fi
+	@if echo "$(SERVER)" | grep -q "^http://localhost\|^http://127.0.0.1"; then \
+		echo "Creating DRF token for user: $(USER) on local server"; \
+		echo ""; \
+		TOKEN=$$(docker-compose -f docker-compose.dev.yml exec -T backend python manage.py drf_create_token $(USER) 2>/dev/null | grep -o '[a-f0-9]\{40\}' | head -1 || \
+			docker-compose -f docker-compose.dev.yml exec backend python manage.py drf_create_token $(USER) 2>/dev/null | grep -o '[a-f0-9]\{40\}' | head -1); \
+		if [ -n "$$TOKEN" ]; then \
+			echo ""; \
+			echo "✓ Token created successfully!"; \
+			echo ""; \
+			echo "Token: $$TOKEN"; \
+			echo ""; \
+			echo "To use this token, add it to docker-compose.dev.yml:"; \
+			echo "  theme-sync:"; \
+			echo "    environment:"; \
+			echo "      - API_TOKEN=$$TOKEN"; \
+			echo ""; \
+			echo "Or test it with:"; \
+			echo "  make test-api-auth TOKEN=$$TOKEN"; \
+			echo ""; \
+		else \
+			echo "Error: Failed to create or extract token"; \
+			exit 1; \
+		fi \
+	else \
+		echo "Error: DRF tokens can only be created on local server via Docker"; \
+		echo "For production, use: make get-jwt-token USER=$(USER) SERVER=$(SERVER)"; \
+		exit 1; \
+	fi
+
+get-jwt-token: ## Get JWT token for user (use: make get-jwt-token USER=username [SERVER=url])
+	@if [ -z "$(USER)" ]; then \
+		echo "Error: USER is required"; \
+		echo "Usage: make get-jwt-token USER=username [SERVER=http://localhost:8000]"; \
+		echo "Example: make get-jwt-token USER=admin SERVER=https://api.example.com"; \
+		echo ""; \
+		echo "You will be prompted for the password."; \
+		echo "Or set PASSWORD env var: make get-jwt-token USER=username PASSWORD=pass SERVER=url"; \
+		exit 1; \
+	fi
+	@if [ -z "$(PASSWORD)" ]; then \
+		echo "Getting JWT token for user: $(USER) from $(SERVER)"; \
+		echo "Enter password:"; \
+		read -s PASSWORD; \
+	fi
+	@echo "Requesting JWT token from $(SERVER)..."
+	@curl -s -X POST $(SERVER)/api/auth/token/ \
+		-H "Content-Type: application/json" \
+		-d "{\"username\": \"$(USER)\", \"password\": \"$(PASSWORD)\"}" | \
+		python3 -m json.tool || \
+		(echo "Error: Failed to get token. Check username/password and ensure server is accessible." && exit 1)
+
+list-api-tokens: ## List all API tokens (use: make list-api-tokens [SERVER=url])
+	@if echo "$(SERVER)" | grep -q "^http://localhost\|^http://127.0.0.1"; then \
+		echo "Listing all API tokens from local server..."; \
+		docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; print('\nAPI Tokens:'); print('=' * 80); [print(f'{user.username:20} | {Token.objects.get_or_create(user=user)[0].key:40} | EXISTS') for user in User.objects.all().order_by('username')]; print('=' * 80); print(f'\nTotal users: {User.objects.count()}')" || \
+		docker-compose -f docker-compose.dev.yml exec backend python manage.py shell -c "from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; print('\nAPI Tokens:'); print('=' * 80); [print(f'{user.username:20} | {Token.objects.get_or_create(user=user)[0].key:40} | EXISTS') for user in User.objects.all().order_by('username')]; print('=' * 80); print(f'\nTotal users: {User.objects.count()}')"; \
+	else \
+		echo "Error: Token listing only available on local server via Docker"; \
+		echo "For production, tokens must be managed through Django admin or API"; \
+		exit 1; \
+	fi
+
+create-tenant: ## Create a new tenant (use: make create-tenant NAME="Tenant Name" IDENTIFIER=tenant_id)
+	@if [ -z "$(NAME)" ] || [ -z "$(IDENTIFIER)" ]; then \
+		echo "Error: NAME and IDENTIFIER are required"; \
+		echo "Usage: make create-tenant NAME=\"Tenant Name\" IDENTIFIER=tenant_id"; \
+		exit 1; \
+	fi
+	@echo "Creating tenant: $(NAME) with identifier: $(IDENTIFIER)"
+	@docker-compose -f docker-compose.dev.yml exec backend python manage.py create_tenant --name "$(NAME)" --identifier "$(IDENTIFIER)" || \
+		(echo "Error: Failed to create tenant." && exit 1)
+
+list-tenants: ## List all tenants
+	@echo "Listing all tenants..."
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; tenants = Tenant.objects.all().order_by('name'); print('\nTenants:'); print('=' * 100); print('UUID                                 | Name                            | Identifier          | Status'); print('-' * 100); [print(f'{str(t.id):36} | {t.name:30} | {t.identifier:20} | {\"Active\" if t.is_active else \"Inactive\"}') for t in tenants]; print('=' * 100); print(f'\nTotal tenants: {Tenant.objects.count()}')" || (echo "Error: Failed to list tenants." && exit 1)
+
+show-tenant: ## Show tenant details (use: make show-tenant ID=uuid or IDENTIFIER=identifier)
+	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
+		echo "Error: ID or IDENTIFIER is required"; \
+		echo "Usage: make show-tenant ID=uuid or make show-tenant IDENTIFIER=default"; \
+		exit 1; \
+	fi
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import json; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nTenant Details:'); print('=' * 80); print(f'ID:          {tenant.id}'); print(f'Name:        {tenant.name}'); print(f'Identifier:  {tenant.identifier}'); print(f'Active:      {tenant.is_active}'); print(f'Created:     {tenant.created_at}'); print(f'Updated:     {tenant.updated_at}'); print(f'Created by:  {tenant.created_by.username if tenant.created_by else \"N/A\"}'); print(f'\nSettings:'); print(json.dumps(tenant.settings, indent=2) if tenant.settings else '  (empty)'); print(f'\nThemes: {tenant.themes.count()}'); [print(f'  - {theme.name} (v{theme.sync_version})') for theme in tenant.themes.all()[:10]]; print(f'  ... and {tenant.themes.count() - 10} more' if tenant.themes.count() > 10 else ''); print('=' * 80)" || (echo "Error: Failed to show tenant." && exit 1)
+
+activate-tenant: ## Activate a tenant (use: make activate-tenant ID=uuid or IDENTIFIER=identifier)
+	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
+		echo "Error: ID or IDENTIFIER is required"; \
+		echo "Usage: make activate-tenant ID=uuid or make activate-tenant IDENTIFIER=default"; \
+		exit 1; \
+	fi
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = True; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) activated')" || (echo "Error: Failed to activate tenant." && exit 1)
+
+deactivate-tenant: ## Deactivate a tenant (use: make deactivate-tenant ID=uuid or IDENTIFIER=identifier)
+	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
+		echo "Error: ID or IDENTIFIER is required"; \
+		echo "Usage: make deactivate-tenant ID=uuid or make deactivate-tenant IDENTIFIER=default"; \
+		exit 1; \
+	fi
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = False; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) deactivated')" || (echo "Error: Failed to deactivate tenant." && exit 1)
+
+tenant-themes: ## List themes for a tenant (use: make tenant-themes ID=uuid or IDENTIFIER=identifier)
+	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
+		echo "Error: ID or IDENTIFIER is required"; \
+		echo "Usage: make tenant-themes ID=uuid or make tenant-themes IDENTIFIER=default"; \
+		exit 1; \
+	fi
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nThemes for tenant: {tenant.name} (identifier: {tenant.identifier})'); print('=' * 80); themes = tenant.themes.all().order_by('name'); [print(f'{t.id:5} | {t.name:30} | v{t.sync_version:5} | {\"Active\" if t.is_active else \"Inactive\"}{\" (Default)\" if t.is_default else \"\"}') for t in themes] if themes.exists() else print('  (no themes)'); print('=' * 80); print(f'\nTotal themes: {themes.count()}')" || (echo "Error: Failed to list tenant themes." && exit 1)
+
+delete-tenant: ## Delete a tenant (use: make delete-tenant ID=uuid or IDENTIFIER=identifier [FORCE=yes])
+	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
+		echo "Error: ID or IDENTIFIER is required"; \
+		echo "Usage: make delete-tenant ID=uuid or make delete-tenant IDENTIFIER=default"; \
+		echo "Add FORCE=yes to skip confirmation"; \
+		exit 1; \
+	fi
+	@if [ "$(FORCE)" != "yes" ]; then \
+		echo "WARNING: This will delete the tenant and all associated themes!"; \
+		echo "Press Ctrl+C to cancel, or Enter to continue..."; \
+		read confirm; \
+	fi
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); theme_count = tenant.themes.count(); tenant_name = tenant.name; tenant_identifier = tenant.identifier; tenant.delete(); print(f'✓ Tenant \"{tenant_name}\" (identifier: {tenant_identifier}) deleted'); print(f'  Deleted {theme_count} associated theme(s)')" || (echo "Error: Failed to delete tenant." && exit 1)
+
+test-api-auth: ## Test API token authentication (use: make test-api-auth TOKEN=token [SERVER=url])
+	@if [ -z "$(TOKEN)" ]; then \
+		echo "Error: TOKEN is required"; \
+		echo "Usage: make test-api-auth TOKEN=your-token-here [SERVER=http://localhost:8000]"; \
+		echo "Example: make test-api-auth TOKEN=abc123 SERVER=https://api.example.com"; \
+		exit 1; \
+	fi
+	@echo "Testing API authentication on $(SERVER)..."
+	@if echo "$(TOKEN)" | grep -q "^eyJ"; then \
+		AUTH_HEADER="Bearer $(TOKEN)"; \
+	else \
+		AUTH_HEADER="Token $(TOKEN)"; \
+		echo "Detected DRF token, using Token authentication..."; \
+	fi
+	@RESPONSE=$$(curl -s -w "\nHTTP_CODE:%{http_code}" -X GET $(SERVER)/api/v1/webpages/themes/sync/status/ \
+		-H "Authorization: $$AUTH_HEADER" -H "Content-Type: application/json"); \
+	HTTP_CODE=$$(echo "$$RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2); \
+	BODY=$$(echo "$$RESPONSE" | sed '/HTTP_CODE:/d'); \
+	if [ "$$HTTP_CODE" = "200" ]; then \
+		echo "✓ Authentication successful!"; \
+		echo "$$BODY" | python3 -m json.tool 2>/dev/null || echo "$$BODY"; \
+	elif [ "$$HTTP_CODE" = "403" ]; then \
+		if echo "$$BODY" | grep -q "THEME_SYNC_ENABLED"; then \
+			echo "✗ Error: Theme sync is disabled on server"; \
+			echo "Set THEME_SYNC_ENABLED=True in backend environment"; \
+		else \
+			echo "✗ Error: Access forbidden (403)"; \
+			echo "Response: $$BODY" | head -5; \
+		fi; \
+		exit 1; \
+	elif [ "$$HTTP_CODE" = "401" ]; then \
+		echo "✗ Error: Authentication failed (401)"; \
+		echo "Token is invalid or expired"; \
+		exit 1; \
+	elif [ "$$HTTP_CODE" = "404" ]; then \
+		echo "✗ Error: Endpoint not found (404)"; \
+		echo "Check that the server URL is correct: $(SERVER)"; \
+		exit 1; \
+	else \
+		echo "✗ Error: Unexpected response (HTTP $$HTTP_CODE)"; \
+		echo "Response: $$BODY" | head -10; \
+		exit 1; \
+	fi
 
 # Create sample data
 sample-content:

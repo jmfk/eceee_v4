@@ -529,6 +529,15 @@ class MediaFile(models.Model):
     namespace = models.ForeignKey(
         Namespace, on_delete=models.CASCADE, help_text="Namespace this file belongs to"
     )
+    
+    # Multi-tenancy support
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        related_name="media_files",
+        help_text="Tenant this media file belongs to",
+    )
+    
     tags = models.ManyToManyField(MediaTag, blank=True)
     collections = models.ManyToManyField(MediaCollection, blank=True)
 
@@ -595,6 +604,7 @@ class MediaFile(models.Model):
             models.Index(fields=["file_hash"]),
             models.Index(fields=["content_type"]),
             models.Index(fields=["created_by"]),
+            models.Index(fields=["tenant_id"], name="mediafile_tenant_idx"),
             # Search indexes
             models.Index(fields=["namespace", "title"]),
             models.Index(fields=["namespace", "slug"]),

@@ -589,6 +589,15 @@ class ObjectInstance(MPTTModel):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Multi-tenancy support
+    tenant = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        related_name="object_instances",
+        help_text="Tenant this object instance belongs to",
+    )
+    
     metadata = models.JSONField(
         default=dict, help_text="Additional extensible properties for this object"
     )
@@ -611,6 +620,7 @@ class ObjectInstance(MPTTModel):
             models.Index(fields=["status", "publish_date"]),
             models.Index(fields=["parent"]),
             models.Index(fields=["current_version"]),
+            models.Index(fields=["tenant_id"], name="objectinstance_tenant_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
