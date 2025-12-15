@@ -2,12 +2,48 @@
 Header widget implementation.
 """
 
-from typing import Type, Optional
+from typing import Type, Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 from utils.dict_utils import DictToObj
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+
+
+class BreakpointConfig(BaseModel):
+    """Configuration for a single breakpoint"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    image: Optional[dict] = Field(
+        None,
+        description="MediaFile object for header image at this breakpoint",
+        json_schema_extra={
+            "component": "ImageInput",
+            "mediaTypes": ["image"],
+            "allowCollections": False,
+            "multiple": False,
+        },
+    )
+    width: int = Field(
+        ...,
+        description="Min-width in pixels for this breakpoint (media query threshold)",
+        json_schema_extra={
+            "component": "NumberInput",
+            "min": 1,
+        },
+    )
+    height: int = Field(
+        ...,
+        description="Header height in pixels for this breakpoint",
+        json_schema_extra={
+            "component": "NumberInput",
+            "min": 1,
+        },
+    )
 
 
 class HeaderConfig(BaseModel):
@@ -18,103 +54,19 @@ class HeaderConfig(BaseModel):
         populate_by_name=True,
     )
 
-    # Mobile settings (grouped)
-    mobile_image: Optional[dict] = Field(
-        None,
-        description="MediaFile object for mobile header image",
+    breakpoints: List[BreakpointConfig] = Field(
+        default_factory=lambda: [
+            BreakpointConfig(image=None, width=640, height=80),   # Mobile
+            BreakpointConfig(image=None, width=1024, height=112),  # Tablet
+            BreakpointConfig(image=None, width=1280, height=112),  # Desktop
+        ],
+        description="List of responsive breakpoints with image, width, and height",
         json_schema_extra={
-            "component": "ImageInput",
-            "order": 1,
-            "mediaTypes": ["image"],
-            "group": "mobile",
-            "allowCollections": False,
-            "multiple": False,
-        },
-    )
-    mobile_width: int = Field(
-        640,
-        description="Mobile header width in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 2,
-            "group": "mobile",
-            "min": 1,
-        },
-    )
-    mobile_height: int = Field(
-        80,
-        description="Mobile header height in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 3,
-            "group": "mobile",
-            "min": 1,
-        },
-    )
-
-    # Tablet settings (grouped)
-    tablet_image: Optional[dict] = Field(
-        None,
-        description="MediaFile object for tablet header image",
-        json_schema_extra={
-            "component": "ImageInput",
-            "order": 5,
-            "mediaTypes": ["image"],
-            "group": "tablet",
-            "allowCollections": False,
-            "multiple": False,
-        },
-    )
-    tablet_width: int = Field(
-        1024,
-        description="Tablet header width in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 6,
-            "group": "tablet",
-            "min": 1,
-        },
-    )
-    tablet_height: int = Field(
-        112,
-        description="Tablet header height in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 7,
-            "group": "tablet",
-            "min": 1,
-        },
-    )
-
-    # Desktop settings (grouped)
-    image: Optional[dict] = Field(
-        None,
-        description="MediaFile object for desktop header image",
-        json_schema_extra={
-            "component": "ImageInput",
-            "order": 9,
-            "mediaTypes": ["image"],
-            "group": "desktop",
-        },
-    )
-    width: int = Field(
-        1280,
-        description="Desktop header width in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 10,
-            "group": "desktop",
-            "min": 1,
-        },
-    )
-    height: int = Field(
-        112,
-        description="Desktop header height in pixels",
-        json_schema_extra={
-            "component": "NumberInput",
-            "order": 11,
-            "group": "desktop",
-            "min": 1,
+            "component": "ReorderableListInput",
+            "allowAdd": True,
+            "allowRemove": True,
+            "allowReorder": True,
+            "itemTemplate": {"image": None, "width": 640, "height": 80},
         },
     )
     component_style: str = Field(
@@ -148,36 +100,19 @@ class HeaderWidget(BaseWidget):
         },
     }
 
-    widget_css = """
+    @property
+    def widget_css(self):
+        """Generate CSS dynamically based on breakpoints"""
+        # This will be populated by prepare_template_context with actual breakpoints
+        # For now, return base CSS that will be enhanced with variables
+        return """
         .widget-type-header {
             width: 100%;
-            background-image: var(--mobile-bg-image);
             background-size: cover;
             background-repeat: no-repeat;
             background-position: center center;
-            aspect-ratio: var(--mobile-header-ar, 640 / 80);
         }
-
-        @media (min-width: 640px) {
-            .widget-type-header {
-                background-image: var(--tablet-bg-image);
-                height: var(--tablet-header-h, 112px);
-                aspect-ratio: auto;
-                background-size: auto 100%;
-                background-position: top left;
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .widget-type-header {
-                background-image: var(--desktop-bg-image);
-                height: var(--desktop-header-h, 112px);
-                aspect-ratio: auto;
-                background-size: auto 100%;
-                background-position: top left;
-            }
-        }
-    """
+        """
 
     css_variables = {}
 
@@ -256,60 +191,148 @@ class HeaderWidget(BaseWidget):
 
         template_config = super().prepare_template_context(config, context)
 
+        # Handle migration from old format to new format
+        breakpoints = config.get("breakpoints", [])
+        
+        # If breakpoints is empty or not in new format, migrate from old format
+        if not breakpoints or (isinstance(breakpoints, list) and len(breakpoints) == 0):
+            # Check for old format fields
+            if "mobile_width" in config or "tablet_width" in config or "width" in config:
+                breakpoints = []
+                # Mobile
+                if "mobile_width" in config or "mobile_image" in config:
+                    breakpoints.append({
+                        "image": config.get("mobile_image"),
+                        "width": config.get("mobile_width", 640),
+                        "height": config.get("mobile_height", 80),
+                    })
+                # Tablet
+                if "tablet_width" in config or "tablet_image" in config:
+                    breakpoints.append({
+                        "image": config.get("tablet_image"),
+                        "width": config.get("tablet_width", 1024),
+                        "height": config.get("tablet_height", 112),
+                    })
+                # Desktop
+                if "width" in config or "image" in config:
+                    breakpoints.append({
+                        "image": config.get("image"),
+                        "width": config.get("width", 1280),
+                        "height": config.get("height", 112),
+                    })
+                
+                # If still empty, use defaults
+                if not breakpoints:
+                    breakpoints = [
+                        {"image": None, "width": 640, "height": 80},
+                        {"image": None, "width": 1024, "height": 112},
+                        {"image": None, "width": 1280, "height": 112},
+                    ]
+
+        # Ensure breakpoints is a list of dicts
+        if not isinstance(breakpoints, list):
+            breakpoints = []
+
+        # Convert to list of dicts if needed (handle Pydantic models)
+        breakpoint_dicts = []
+        for bp in breakpoints:
+            if isinstance(bp, dict):
+                breakpoint_dicts.append(bp)
+            else:
+                # Pydantic model or similar - try to convert to dict
+                try:
+                    # Try Pydantic v2 method first
+                    if hasattr(bp, "model_dump"):
+                        bp_dict = bp.model_dump()
+                    # Try Pydantic v1 method
+                    elif hasattr(bp, "dict"):
+                        bp_dict = bp.dict()
+                    # Fallback to accessing attributes directly
+                    else:
+                        bp_dict = {
+                            "image": getattr(bp, "image", None),
+                            "width": getattr(bp, "width", 640),
+                            "height": getattr(bp, "height", 80),
+                        }
+                    breakpoint_dicts.append(bp_dict)
+                except Exception:
+                    # Last resort: build dict manually
+                    breakpoint_dicts.append({
+                        "image": getattr(bp, "image", None),
+                        "width": getattr(bp, "width", 640),
+                        "height": getattr(bp, "height", 80),
+                    })
+
+        # Sort breakpoints by width (ascending) for proper CSS media query ordering
+        breakpoint_dicts.sort(key=lambda x: x.get("width", 0))
+
         # Build complete inline style string
         style_parts = []
 
-        # Get manual dimensions from config (with defaults)
-        mobile_width = config.get("mobile_width", 640)
-        mobile_height = config.get("mobile_height", 80)
-        tablet_width = config.get("tablet_width", 1024)
-        tablet_height = config.get("tablet_height", 112)
-        desktop_width = config.get("width", 1280)
-        desktop_height = config.get("height", 112)
+        # Build image fallback chain (each breakpoint falls back to previous)
+        last_image = None
+        for idx, bp in enumerate(breakpoint_dicts):
+            bp_image = bp.get("image") or last_image
+            bp_width = bp.get("width", 640)
+            bp_height = bp.get("height", 80)
 
-        # Get images
-        image = config.get("image")
-        mobile_image = config.get("mobile_image")
-        tablet_image = config.get("tablet_image")
+            # Build CSS variable for this breakpoint's image
+            css_var_name = f"--breakpoint-{idx}-bg-image"
+            image_style = _build_image_var(
+                css_var_name=css_var_name,
+                image_obj=bp_image,
+            )
+            if image_style:
+                style_parts.append(image_style)
 
-        # Determine breakpoint sources (fallback chain)
-        tablet_source = tablet_image or image
-        mobile_source = mobile_image or tablet_image or image
+            # Store height and aspect ratio
+            style_parts.append(f"--breakpoint-{idx}-height: {bp_height}px;")
+            style_parts.append(f"--breakpoint-{idx}-ar: {bp_width} / {bp_height};")
 
-        # Desktop (uses desktop image only)
-        desktop_style = _build_image_var(
-            css_var_name="--desktop-bg-image",
-            image_obj=image,
-        )
-        if desktop_style:
-            style_parts.append(desktop_style)
+            # Update last_image for fallback chain
+            if bp.get("image"):
+                last_image = bp.get("image")
 
-        # Tablet (fallback to desktop image)
-        tablet_style = _build_image_var(
-            css_var_name="--tablet-bg-image",
-            image_obj=tablet_source,
-        )
-        if tablet_style:
-            style_parts.append(tablet_style)
+        # Generate dynamic CSS for media queries
+        css_parts = []
+        if breakpoint_dicts:
+            # Base styles (first/smallest breakpoint)
+            first_bp = breakpoint_dicts[0]
+            first_width = first_bp.get("width", 640)
+            first_height = first_bp.get("height", 80)
+            
+            css_parts.append(f"""
+        .widget-type-header {{
+            width: 100%;
+            background-image: var(--breakpoint-0-bg-image);
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center center;
+            height: {first_height}px;
+            aspect-ratio: var(--breakpoint-0-ar, {first_width} / {first_height});
+        }}""")
 
-        # Mobile (fallback to tablet, then desktop)
-        mobile_style = _build_image_var(
-            css_var_name="--mobile-bg-image",
-            image_obj=mobile_source,
-        )
-        if mobile_style:
-            style_parts.append(mobile_style)
+            # Media queries for subsequent breakpoints
+            for idx in range(1, len(breakpoint_dicts)):
+                bp = breakpoint_dicts[idx]
+                bp_width = bp.get("width", 640)
+                bp_height = bp.get("height", 80)
+                
+                css_parts.append(f"""
+        @media (min-width: {bp_width}px) {{
+            .widget-type-header {{
+                background-image: var(--breakpoint-{idx}-bg-image);
+                height: {bp_height}px;
+                aspect-ratio: auto;
+                background-size: auto 100%;
+                background-position: top left;
+            }}
+        }}""")
 
-        # Aspect ratios (always emitted; use manual dimensions)
-        style_parts.append(f"--desktop-header-ar: {desktop_width} / {desktop_height};")
-        style_parts.append(f"--tablet-header-ar: {tablet_width} / {tablet_height};")
-        style_parts.append(f"--mobile-header-ar: {mobile_width} / {mobile_height};")
-
-        # Fixed heights for tablet/desktop (mobile remains responsive via aspect-ratio)
-        style_parts.append(f"--tablet-header-h: {tablet_height}px;")
-        style_parts.append(f"--desktop-header-h: {desktop_height}px;")
-
-        # Join all style parts
-        template_config["header_style"] = " ".join(style_parts)
+        # Store generated CSS in template config
+        template_config["header_css"] = "".join(css_parts)
+        
+        # Join all style parts for inline styles
+        template_config["header_style"] = " ".join(style_parts) if style_parts else ""
 
         return template_config
