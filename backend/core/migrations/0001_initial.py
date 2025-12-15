@@ -16,20 +16,64 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Tenant',
+            name="Tenant",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, help_text='Unique identifier for this tenant', primary_key=True, serialize=False)),
-                ('name', models.CharField(help_text='Human-readable name for this tenant', max_length=255)),
-                ('identifier', models.SlugField(help_text="URL-safe identifier used for theme-sync directory structure (e.g., 'eceee_org')", max_length=100, unique=True)),
-                ('settings', models.JSONField(blank=True, default=dict, help_text='Tenant-specific configuration (theme defaults, feature flags, etc.)')),
-                ('is_active', models.BooleanField(default=True, help_text='Whether this tenant is active')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('created_by', models.ForeignKey(help_text='User who created this tenant', on_delete=django.db.models.deletion.PROTECT, related_name='created_tenants', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        help_text="Unique identifier for this tenant",
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Human-readable name for this tenant", max_length=255
+                    ),
+                ),
+                (
+                    "identifier",
+                    models.SlugField(
+                        help_text="URL-safe identifier used for theme-sync directory structure (e.g., 'eceee_org')",
+                        max_length=100,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "settings",
+                    models.JSONField(
+                        blank=True,
+                        default=dict,
+                        help_text="Tenant-specific configuration (theme defaults, feature flags, etc.)",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True, help_text="Whether this tenant is active"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        help_text="User who created this tenant",
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="created_tenants",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name'],
-                'indexes': [models.Index(fields=['identifier'], name='tenant_identifier_idx'), models.Index(fields=['is_active'], name='tenant_is_active_idx')],
+                "ordering": ["name"],
+                "indexes": [
+                    models.Index(fields=["identifier"], name="tenant_identifier_idx"),
+                    models.Index(fields=["is_active"], name="tenant_is_active_idx"),
+                ],
             },
         ),
     ]

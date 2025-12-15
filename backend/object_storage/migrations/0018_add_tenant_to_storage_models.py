@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0005_enable_rls_for_webpage'),
+        ('core', '0001_initial'),
         ('object_storage', '0017_remove_objectinstance_obj_inst_relationships_gin_idx_and_more'),
     ]
 
