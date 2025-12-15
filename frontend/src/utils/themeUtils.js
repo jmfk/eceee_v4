@@ -216,6 +216,48 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
         // Generate layout properties CSS (using layout part classes)
         if (group.layoutProperties) {
+            // First, collect all images and special color variables from all breakpoints and parts
+            const cssVariables = [];
+            for (const [part, partBreakpoints] of Object.entries(group.layoutProperties)) {
+                for (const bpKey of ['sm', 'md', 'lg', 'xl']) {
+                    const bpProps = partBreakpoints[bpKey];
+                    if (bpProps) {
+                        // Handle images
+                        if (bpProps.images) {
+                            for (const [imageKey, imageData] of Object.entries(bpProps.images)) {
+                                if (imageData && imageData.fileUrl) {
+                                    // Generate CSS variable name: --{part}-{imageKey}-{breakpoint}
+                                    const varName = `--${part}-${imageKey}-${bpKey}`;
+                                    const imageUrl = imageData.fileUrl;
+                                    cssVariables.push(`  ${varName}: url('${imageUrl}');`);
+                                }
+                            }
+                        }
+                        
+                        // Handle special color variables for navbar and footer
+                        if (part === 'navbar-widget' || part === 'footer-widget') {
+                            const partName = part.replace('-widget', '');
+                            if (bpProps.backgroundColor) {
+                                const varName = `--${partName}-bg-color-${bpKey}`;
+                                cssVariables.push(`  ${varName}: ${bpProps.backgroundColor};`);
+                            }
+                            if (bpProps.color) {
+                                const varName = `--${partName}-text-color-${bpKey}`;
+                                cssVariables.push(`  ${varName}: ${bpProps.color};`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Generate CSS variable declarations at design group scope
+            if (cssVariables.length > 0) {
+                const selector = baseSelectors.join(',\n') || ':root';
+                const rule = `${selector} {\n${cssVariables.join('\n')}\n}`;
+                cssParts.push(rule);
+            }
+
+            // Now generate regular CSS properties for layout parts
             for (const [part, partBreakpoints] of Object.entries(group.layoutProperties)) {
                 // Mobile-first approach: Handle each breakpoint in order
                 for (const bpKey of ['sm', 'md', 'lg', 'xl']) {
@@ -262,11 +304,23 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         }
                     }).join(',\n');
 
-                    // Convert properties to CSS
+                    // Convert properties to CSS (skip 'images' field and special color vars)
                     const cssRules = [];
                     for (const [prop, value] of Object.entries(bpProps)) {
+                        if (prop === 'images') continue; // Skip images - handled as CSS variables
+                        
+                        // Skip backgroundColor and color for navbar/footer - handled as CSS variables
+                        if (part === 'navbar-widget' || part === 'footer-widget') {
+                            if (prop === 'backgroundColor' || prop === 'color') continue;
+                        }
+                        
                         const cssProp = camelToKebab(prop);
                         cssRules.push(`  ${cssProp}: ${value};`);
+                    }
+
+                    // Only generate CSS rule if there are actual CSS properties
+                    if (cssRules.length === 0) {
+                        continue;
                     }
 
                     // Generate CSS rule

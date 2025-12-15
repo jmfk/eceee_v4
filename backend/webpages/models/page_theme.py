@@ -1622,6 +1622,43 @@ class PageTheme(models.Model):
                                 if isinstance(part_config, dict) and part_config.get("selector"):
                                     part_selector_map[part_id] = part_config["selector"]
 
+                # Collect all images and special color variables from all breakpoints and parts
+                css_variables = []
+                for part, part_breakpoints in layout_properties.items():
+                    for bp_key in ["sm", "md", "lg", "xl"]:
+                        bp_props = part_breakpoints.get(bp_key)
+                        if bp_props and isinstance(bp_props, dict):
+                            # Handle images
+                            if "images" in bp_props:
+                                images = bp_props["images"]
+                                if isinstance(images, dict):
+                                    for image_key, image_data in images.items():
+                                        if isinstance(image_data, dict) and image_data.get("fileUrl"):
+                                            # Generate CSS variable name: --{part}-{imageKey}-{breakpoint}
+                                            var_name = f"--{part}-{image_key}-{bp_key}"
+                                            image_url = image_data["fileUrl"]
+                                            css_variables.append(f"  {var_name}: url('{image_url}');")
+                            
+                            # Handle special color variables for navbar and footer
+                            # These need to be CSS variables for responsive color changes
+                            if part in ['navbar-widget', 'footer-widget']:
+                                if 'backgroundColor' in bp_props:
+                                    var_name = f"--{part.replace('-widget', '')}-bg-color-{bp_key}"
+                                    css_variables.append(f"  {var_name}: {bp_props['backgroundColor']};")
+                                if 'color' in bp_props:
+                                    var_name = f"--{part.replace('-widget', '')}-text-color-{bp_key}"
+                                    css_variables.append(f"  {var_name}: {bp_props['color']};")
+
+                # Generate CSS variable declarations at design group scope
+                if css_variables:
+                    selector = ",\n".join(base_selectors) if base_selectors else ":root"
+                    if not selector:
+                        selector = ":root"
+                    css_rule = f"{selector} {{\n"
+                    css_rule += "\n".join(css_variables)
+                    css_rule += "\n}"
+                    css_parts.append(css_rule)
+
                 for part, part_breakpoints in layout_properties.items():
                     # Handle each breakpoint in mobile-first order
                     for bp_key in ["sm", "md", "lg", "xl"]:
@@ -1709,6 +1746,15 @@ class PageTheme(models.Model):
                         # Convert properties to CSS
                         css_rules = []
                         for prop_name, prop_value in bp_props.items():
+                            # Skip 'images' field - it's handled separately as CSS variables
+                            if prop_name == "images":
+                                continue
+                            
+                            # Skip backgroundColor and color for navbar/footer - handled as CSS variables
+                            if part in ['navbar-widget', 'footer-widget']:
+                                if prop_name in ['backgroundColor', 'color']:
+                                    continue
+
                             css_prop = (
                                 self._camel_to_kebab(prop_name)
                                 if "_" not in prop_name

@@ -17,34 +17,6 @@ class FooterConfig(BaseModel):
         populate_by_name=True,
     )
 
-    background_color: Optional[str] = Field(
-        None,
-        description="Background color (hex or CSS color)",
-        json_schema_extra={
-            "component": "ColorInput",
-            "order": 1,
-            "group": "Styling",
-        },
-    )
-    background_image: Optional[dict] = Field(
-        None,
-        description="MediaFile object for background image",
-        json_schema_extra={
-            "component": "ImageInput",
-            "order": 2,
-            "mediaTypes": ["image"],
-            "group": "Styling",
-        },
-    )
-    text_color: Optional[str] = Field(
-        None,
-        description="Text color (hex or CSS color)",
-        json_schema_extra={
-            "component": "ColorInput",
-            "order": 3,
-            "group": "Styling",
-        },
-    )
     slots: Dict[str, List] = Field(
         default_factory=lambda: {"content": []},
         description="Widget slots (content slot for footer widgets)",
@@ -77,13 +49,43 @@ class FooterWidget(BaseWidget):
     }
 
     widget_css = """
-    .footer-widget {
+    .widget-type-footer {
         box-sizing: border-box;
         width: 100%;
         min-height: 310px;
         flex: 1;
         display: flex;
         flex-direction: column;
+        background-image: var(--footer-widget-background-sm, none);
+        background-color: var(--footer-bg-color-sm, transparent);
+        color: var(--footer-text-color-sm, inherit);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+
+    @media (min-width: 768px) {
+        .widget-type-footer {
+            background-image: var(--footer-widget-background-md, var(--footer-widget-background-sm, none));
+            background-color: var(--footer-bg-color-md, var(--footer-bg-color-sm, transparent));
+            color: var(--footer-text-color-md, var(--footer-text-color-sm, inherit));
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .widget-type-footer {
+            background-image: var(--footer-widget-background-lg, var(--footer-widget-background-md, var(--footer-widget-background-sm, none)));
+            background-color: var(--footer-bg-color-lg, var(--footer-bg-color-md, var(--footer-bg-color-sm, transparent)));
+            color: var(--footer-text-color-lg, var(--footer-text-color-md, var(--footer-text-color-sm, inherit)));
+        }
+    }
+
+    @media (min-width: 1280px) {
+        .widget-type-footer {
+            background-image: var(--footer-widget-background-xl, var(--footer-widget-background-lg, var(--footer-widget-background-md, var(--footer-widget-background-sm, none))));
+            background-color: var(--footer-bg-color-xl, var(--footer-bg-color-lg, var(--footer-bg-color-md, var(--footer-bg-color-sm, transparent)));
+            color: var(--footer-text-color-xl, var(--footer-text-color-lg, var(--footer-text-color-md, var(--footer-text-color-sm, inherit)));
+        }
     }
     
     .empty-slot {
@@ -102,64 +104,6 @@ class FooterWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return FooterConfig
 
-    def render_with_style(self, config, theme):
-        """
-        Render footer with custom component style from theme.
-
-        Args:
-            config: Widget configuration
-            theme: PageTheme instance
-
-        Returns:
-            Tuple of (html, css) or None for default rendering
-        """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
-        from django.template.loader import render_to_string
-
-        style_name = config.get("component_style", "default")
-
-        # For default style, return None to use standard Django template rendering
-        if not style_name or style_name == "default":
-            return None
-
-        styles = theme.component_styles or {}
-        style = styles.get(style_name)
-
-        # If style not found in theme, fall back to default rendering
-        if not style:
-            return None
-
-        template_str = style.get("template", "")
-        css = style.get("css", "")
-
-        # Check for passthru marker (must be only content in template after trimming)
-        if template_str.strip() == "{{passthru}}":
-            # Passthru mode: use default rendering but inject CSS
-            return None, css
-
-        # Prepare template context first
-        prepared_config = self.prepare_template_context(config, {"theme": theme})
-
-        # Render the footer HTML using the default template first
-        footer_html = render_to_string(
-            self.template_name, {"config": prepared_config, "widget_type": self}
-        )
-
-        # Prepare context with rendered footer as content
-        context = prepare_component_context(
-            content=footer_html,
-            anchor="",
-            style_vars=style.get("variables", {}),
-            config=prepared_config,  # Pass processed config for granular control
-        )
-
-        # Render with style template
-        html = render_mustache(template_str, context)
-        return html, css
-
     def render(self, config, context=None):
         """Override render to skip rendering if footer is empty"""
         # Get slots data
@@ -174,39 +118,8 @@ class FooterWidget(BaseWidget):
         return super().render(config, context)
 
     def prepare_template_context(self, config, context=None):
-        """Prepare context with slot rendering and background image processing"""
-        from file_manager.imgproxy import imgproxy_service
-        from webpages.utils.color_utils import resolve_color_value
-
+        """Prepare context with slot rendering (styling from design groups)"""
         template_config = super().prepare_template_context(config, context)
-
-        # Get theme colors for CSS variable conversion
-        theme = context.get("theme") if context else None
-        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
-
-        # Resolve color values
-        background_color = config.get("background_color")
-        text_color = config.get("text_color")
-        
-        if background_color:
-            template_config["background_color"] = resolve_color_value(background_color, theme_colors)
-        if text_color:
-            template_config["text_color"] = resolve_color_value(text_color, theme_colors)
-
-        # Process background image if provided
-        background_image = config.get("background_image")
-        if background_image and isinstance(background_image, dict):
-            imgproxy_base_url = background_image.get("imgproxy_base_url")
-            if imgproxy_base_url:
-                # Generate responsive image URL for footer
-                image_url = imgproxy_service.generate_url(
-                    source_url=imgproxy_base_url,
-                    width=1920,
-                    height=400,
-                    resize_type="fill",
-                )
-                if image_url:
-                    template_config["background_image"] = image_url
 
         # Get slots data (single 'content' slot)
         slots_data = config.get("slots", {"content": []})

@@ -222,7 +222,8 @@ const ContentCardWidget = ({
                     placeholder: 'Enter card content...',
                     element: 'div',
                     allowedButtons: ['format', 'bold', 'italic', 'link'],
-                    allowedFormats: ['<p>', '<h2>', '<h3>']
+                    allowedFormats: ['<p>', '<h2>', '<h3>'],
+                    pageId: pageId
                 })
                 contentEditorRef.current.render()
             }

@@ -10,6 +10,8 @@
  * Integrates with the global WYSIWYG toolbar system (wysiwygToolbarManager)
  */
 
+import { LinkPickerModal } from '../../components/special-editors/LinkPickerModal.js'
+
 /**
  * Clean HTML to only allow inline formatting
  */
@@ -150,6 +152,7 @@ export class SimpleTextEditorRenderer {
 
         this.editorElement = null
         this.isActive = false
+        this.linkPickerModal = null
 
         // Track last externally-provided content to prevent unnecessary updates
         this.lastExternalContent = options.content || ''
@@ -466,8 +469,10 @@ export class SimpleTextEditorRenderer {
         const selection = window.getSelection()
         if (!selection.rangeCount) return
 
+        const range = selection.getRangeAt(0)
         let url = ''
         let linkElement = null
+        let selectedText = selection.toString()
 
         // Check if we're inside a link
         let node = selection.anchorNode
@@ -480,34 +485,83 @@ export class SimpleTextEditorRenderer {
             node = node.parentElement
         }
 
-        // Prompt for URL
-        const newUrl = window.prompt('Enter URL:', url)
-
-        if (newUrl === null) {
-            // User cancelled
-            return
+        // Initialize LinkPickerModal if not already done
+        if (!this.linkPickerModal) {
+            this.linkPickerModal = new LinkPickerModal()
         }
 
-        if (newUrl === '') {
-            // Remove link
-            if (linkElement) {
-                const parent = linkElement.parentNode
-                while (linkElement.firstChild) {
-                    parent.insertBefore(linkElement.firstChild, linkElement)
+        // Get current page context from options
+        const currentPageId = this.options?.pageId || null
+        const currentSiteRootId = this.options?.siteRootId || null
+
+        // Show the link picker
+        this.linkPickerModal.show({
+            url: url,
+            text: selectedText,
+            openInNewTab: linkElement && linkElement.getAttribute('target') === '_blank',
+            linkElement: linkElement,
+            currentPageId: currentPageId,
+            currentSiteRootId: currentSiteRootId
+        }).then(result => {
+            if (result.action === 'remove') {
+                // Remove link
+                if (linkElement) {
+                    const parent = linkElement.parentNode
+                    while (linkElement.firstChild) {
+                        parent.insertBefore(linkElement.firstChild, linkElement)
+                    }
+                    parent.removeChild(linkElement)
+                    this.handleContentChange()
                 }
-                parent.removeChild(linkElement)
-            }
-        } else {
-            // Create or update link
-            if (linkElement) {
-                linkElement.href = newUrl
-            } else {
-                document.execCommand('createLink', false, newUrl)
-            }
-        }
+            } else if (result.action === 'insert') {
+                const newUrl = result.url
+                const newText = result.replaceText ? result.text : selectedText
+                const openInNewTab = result.openInNewTab
 
-        this.editorElement.focus()
-        this.handleContentChange()
+                if (linkElement) {
+                    // Update existing link
+                    linkElement.href = newUrl
+                    if (openInNewTab) {
+                        linkElement.setAttribute('target', '_blank')
+                    } else {
+                        linkElement.removeAttribute('target')
+                    }
+                    if (result.replaceText && newText) {
+                        linkElement.textContent = newText
+                    }
+                } else {
+                    // Create new link
+                    // Restore selection
+                    selection.removeAllRanges()
+                    selection.addRange(range)
+
+                    // Create link element
+                    const link = document.createElement('a')
+                    link.href = newUrl
+                    if (openInNewTab) {
+                        link.setAttribute('target', '_blank')
+                    }
+                    link.textContent = newText || selectedText || newUrl
+
+                    // Insert link at current position
+                    range.deleteContents()
+                    range.insertNode(link)
+
+                    // Move cursor after link
+                    range.setStartAfter(link)
+                    range.collapse(true)
+                    selection.removeAllRanges()
+                    selection.addRange(range)
+                }
+
+                this.handleContentChange()
+            }
+
+            this.editorElement.focus()
+        }).catch(() => {
+            // User cancelled
+            this.editorElement.focus()
+        })
     }
 
     /**

@@ -293,7 +293,8 @@ const BannerWidget = ({
                     element: element,
                     allowedButtons: allowedButtons,
                     allowedFormats: allowedFormatsForMode,
-                    maxBreaks: bannerMode === 'header' ? 1 : undefined
+                    maxBreaks: bannerMode === 'header' ? 1 : undefined,
+                    pageId: pageId
                 })
                 contentEditorRef.current.render()
             }

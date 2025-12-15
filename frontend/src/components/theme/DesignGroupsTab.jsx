@@ -28,6 +28,7 @@ import { useWidgets } from '../../hooks/useWidgets';
 import ConfirmDialog from '../ConfirmDialog';
 import { useQuery } from '@tanstack/react-query';
 import layoutsApi from '../../api/layouts';
+import ImagePropertyField from './design-groups/ImagePropertyField';
 
 // Autocomplete Component for Widget Types
 const WidgetTypeAutocomplete = ({ availableWidgets, onSelect, disabled }) => {
@@ -490,6 +491,79 @@ const CSS_PROPERTIES = {
   textTransform: { type: 'select', label: 'Text Transform', options: ['none', 'uppercase', 'lowercase', 'capitalize'] },
 };
 
+/**
+ * Extract all unique filter options from design groups
+ * @param {Array} groups - Array of design group objects
+ * @param {Array} widgetTypes - Array of widget type objects with name and type
+ * @returns {Array} Array of categorized filter options
+ */
+const extractFilterOptions = (groups, widgetTypes = []) => {
+  const options = [];
+  const seenWidgetTypes = new Set();
+  const seenSlots = new Set();
+  const seenSelectors = new Set();
+
+  groups.forEach(group => {
+    // Extract widget types
+    const groupWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
+    groupWidgetTypes.forEach(wt => seenWidgetTypes.add(wt));
+
+    // Extract slots
+    const groupSlots = group.slots || (group.slot ? [group.slot] : []);
+    groupSlots.forEach(slot => seenSlots.add(slot));
+
+    // Extract selectors from calculatedSelectors
+    if (group.calculatedSelectors) {
+      // calculatedSelectors is an object with base_selectors, element_selectors, layout_part_selectors
+      if (group.calculatedSelectors.base_selectors) {
+        group.calculatedSelectors.base_selectors.forEach(sel => seenSelectors.add(sel));
+      }
+    }
+
+    // Extract selectors from targetCssClasses
+    if (group.targetCssClasses) {
+      const customSelectors = group.targetCssClasses.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+      customSelectors.forEach(sel => seenSelectors.add(sel));
+    }
+  });
+
+  // Add widget type options
+  Array.from(seenWidgetTypes).sort().forEach(wtType => {
+    const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+    options.push({
+      value: `widgetType:${wtType}`,
+      label: widgetMeta?.name || wtType,
+      category: 'Widget Types',
+      filterType: 'widgetType',
+      filterValue: wtType
+    });
+  });
+
+  // Add slot options
+  Array.from(seenSlots).sort().forEach(slot => {
+    options.push({
+      value: `slot:${slot}`,
+      label: slot,
+      category: 'Slots',
+      filterType: 'slot',
+      filterValue: slot
+    });
+  });
+
+  // Add selector options (limit to reasonable number)
+  Array.from(seenSelectors).sort().slice(0, 50).forEach(selector => {
+    options.push({
+      value: `selector:${selector}`,
+      label: selector,
+      category: 'Selectors',
+      filterType: 'selector',
+      filterValue: selector
+    });
+  });
+
+  return options;
+};
+
 const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, onDirty }) => {
   const groups = designGroups?.groups || [];
 
@@ -521,6 +595,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   // Confirmation dialog state for widget type removal
   const [widgetTypeRemovalDialog, setWidgetTypeRemovalDialog] = useState(null); // { groupIndex, widgetType, hasProperties }
+
+  // Filter state
+  const [filterValue, setFilterValue] = useState(null); // { type: 'widgetType' | 'slot' | 'selector', value: string }
 
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
@@ -2804,6 +2881,43 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                                                           return (
                                                             <>
+                                                              {/* Images Section (for header-widget, navbar-widget, footer-widget) */}
+                                                              {(part === 'header-widget' || part === 'navbar-widget' || part === 'footer-widget') && (
+                                                                <div className="p-4 border-b border-gray-200">
+                                                                  <ImagePropertyField
+                                                                    value={breakpointProps?.images?.background}
+                                                                    onChange={(mediaFile) => {
+                                                                      const updatedGroups = [...groups];
+                                                                      const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
+                                                                      const partProps = layoutProperties[part] || {};
+                                                                      const bpProps = partProps[breakpoint] || {};
+                                                                      
+                                                                      if (mediaFile) {
+                                                                        bpProps.images = { ...bpProps.images, background: mediaFile };
+                                                                      } else {
+                                                                        // Remove image
+                                                                        if (bpProps.images) {
+                                                                          delete bpProps.images.background;
+                                                                          if (Object.keys(bpProps.images).length === 0) {
+                                                                            delete bpProps.images;
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                      
+                                                                      partProps[breakpoint] = bpProps;
+                                                                      layoutProperties[part] = partProps;
+                                                                      updatedGroups[groupIndex].layoutProperties = layoutProperties;
+                                                                      
+                                                                      onChange({ groups: updatedGroups });
+                                                                      if (onDirty) onDirty();
+                                                                    }}
+                                                                    label={`${part === 'header-widget' ? 'Header' : part === 'navbar-widget' ? 'Navbar' : 'Footer'} Background Image (${breakpoint.toUpperCase()})`}
+                                                                    breakpoint={breakpoint}
+                                                                    part={part}
+                                                                  />
+                                                                </div>
+                                                              )}
+
                                                               {/* Existing Properties */}
                                                               {usedProperties.length > 0 && (
                                                                 <div className="p-4 space-y-3">

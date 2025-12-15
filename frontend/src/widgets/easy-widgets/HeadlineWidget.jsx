@@ -159,7 +159,8 @@ const HeadlineWidget = ({
                     onChange: handleContentChange,
                     placeholder: 'Enter headline...',
                     element: configRef.current.headerLevel || 'h1',
-                    allowedButtons: ['bold', 'italic', 'link']
+                    allowedButtons: ['bold', 'italic', 'link'],
+                    pageId: pageId
                 })
                 contentEditorRef.current.render()
             }

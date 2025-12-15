@@ -86,36 +86,6 @@ class NavbarConfig(BaseModel):
             "hidden": True,  # Hidden from sidebar - use special editor instead
         },
     )
-    background_image: Optional[str] = Field(
-        None,
-        description="Background image URL",
-        json_schema_extra={
-            "component": "ImageInput",
-            "order": 2,
-            "mediaTypes": ["image"],
-        },
-    )
-    background_alignment: Literal["left", "center", "right"] = Field(
-        "center",
-        description="Background Alignment",
-        json_schema_extra={
-            "component": "SelectInput",
-            "order": 3,
-            "options": [
-                {"value": "left", "label": "Left"},
-                {"value": "center", "label": "Center"},
-                {"value": "right", "label": "Right"},
-            ],
-        },
-    )
-    background_color: Optional[str] = Field(
-        None,
-        description="Background color (hex or CSS color)",
-        json_schema_extra={
-            "component": "ColorInput",
-            "order": 4,
-        },
-    )
     hamburger_breakpoint: int = Field(
         768,
         ge=320,
@@ -128,13 +98,6 @@ class NavbarConfig(BaseModel):
             "max": 2560,
             "step": 1,
             "suffix": "px",
-        },
-    )
-    component_style: str = Field(
-        "default",
-        description="Component style from theme",
-        json_schema_extra={
-            "component": "ComponentStyleSelector",
         },
     )
 
@@ -164,7 +127,41 @@ class NavbarWidget(BaseWidget):
     }
 
     widget_css = """
-        /* Navbar Widget - Override only conflicting theme styles */
+        /* Navbar Widget - Styling from design groups */
+        .widget-type-navbar {
+            background-image: var(--navbar-widget-background-sm, none);
+            background-color: var(--navbar-bg-color-sm, #3b82f6);
+            color: var(--navbar-text-color-sm, #ffffff);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        @media (min-width: 768px) {
+            .widget-type-navbar {
+                background-image: var(--navbar-widget-background-md, var(--navbar-widget-background-sm, none));
+                background-color: var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6));
+                color: var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff));
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .widget-type-navbar {
+                background-image: var(--navbar-widget-background-lg, var(--navbar-widget-background-md, var(--navbar-widget-background-sm, none)));
+                background-color: var(--navbar-bg-color-lg, var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6)));
+                color: var(--navbar-text-color-lg, var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff)));
+            }
+        }
+
+        @media (min-width: 1280px) {
+            .widget-type-navbar {
+                background-image: var(--navbar-widget-background-xl, var(--navbar-widget-background-lg, var(--navbar-widget-background-md, var(--navbar-widget-background-sm, none))));
+                background-color: var(--navbar-bg-color-xl, var(--navbar-bg-color-lg, var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6)));
+                color: var(--navbar-text-color-xl, var(--navbar-text-color-lg, var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff)));
+            }
+        }
+
+        /* Navbar Menu Styling */
         .navbar-menu-list {
             list-style: none !important;
             font-size: 16px;
@@ -187,10 +184,11 @@ class NavbarWidget(BaseWidget):
 
         .navbar-menu-item  a {
             font-size: 14px;
-            color: #ffffff;
+            color: inherit;
             font-family: "Source Sans 3", sans-serif;
             font-weight: 500;
         }
+        
         .navbar-secondary-menu {
             display: flex;
             gap: 0;
@@ -199,6 +197,7 @@ class NavbarWidget(BaseWidget):
             padding: 0;
             align-items: flex-end;
         }
+        
         .navbar-secondary-menu .navbar-menu-item {
             text-align: left;
             width: 140px;
@@ -206,6 +205,7 @@ class NavbarWidget(BaseWidget):
             margin-top: 2px;
             box-shadow: inset -1px -1px 1px rgba(0, 0, 0, 0.2);
         }
+        
         .navbar-secondary-menu .navbar-menu-item a {
             border-radius: 0 0 0 0;
         }
@@ -223,108 +223,9 @@ class NavbarWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return NavbarConfig
 
-    def render_with_style(self, config, theme):
-        """
-        Render navbar with Mustache template (default or custom from theme).
-
-        Args:
-            config: Widget configuration (already prepared via prepare_template_context)
-            theme: PageTheme instance
-
-        Returns:
-            Tuple of (html, css) - always returns Mustache-rendered output
-        """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            load_mustache_template,
-        )
-
-        style_name = config.get("component_style", "default")
-
-        # Check if using custom theme component style
-        if style_name and style_name != "default" and theme:
-            styles = theme.component_styles or {}
-            style = styles.get(style_name)
-
-            if style:
-                # Use theme's custom Mustache template
-                template = style.get("template", "")
-                css = style.get("css", "")
-
-                # Prepare context for theme template
-                context = {
-                    **config,
-                    **(style.get("variables", {})),
-                }
-
-                html = render_mustache(template, context)
-                return html, css
-
-        # Use default Mustache template
-        try:
-            template = load_mustache_template(self.mustache_template_name)
-            html = render_mustache(template, config)
-            return html, ""
-        except Exception as e:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error rendering navbar with Mustache template: {e}")
-            # Return None to fall back to Django template
-            return None
-
     def prepare_template_context(self, config, context=None):
-        """Prepare navbar menu items and background styling for Mustache template"""
-        from webpages.utils.color_utils import resolve_color_value
-
+        """Prepare navbar menu items for Mustache template (styling from design groups)"""
         template_config = super().prepare_template_context(config, context)
-        context_obj = DictToObj(context)
-
-        # Get theme colors for CSS variable conversion
-        theme = context.get("theme") if context else None
-        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
-
-        # Build complete inline style string in Python
-        style_parts = []
-
-        # Handle background image
-        background_image = config.get("background_image")
-        if background_image:
-            imgproxy_base_url = background_image.get("imgproxy_base_url")
-            imgproxy_url = imgproxy_service.generate_url(
-                source_url=imgproxy_base_url,
-                width=context_obj.slot.dimensions.desktop.width,
-                height=context_obj.slot.dimensions.desktop.height or 28,
-                resize_type="fill",
-            )
-
-            if imgproxy_url:
-                background_alignment = config.get("background_alignment", "left")
-                style_parts.append(f"background-image: url('{imgproxy_url}');")
-                style_parts.append("background-size: cover;")
-                # Use two-value syntax for background-position (horizontal vertical)
-                style_parts.append(
-                    f"background-position: {background_alignment} center;"
-                )
-                style_parts.append("background-repeat: no-repeat;")
-
-        # Handle background color with fallback logic
-        background_color = config.get("background_color")
-        if not background_color:
-            background_color = "#3b82f6"
-
-        # Convert color name to CSS variable if it's in theme colors
-        background_color = resolve_color_value(background_color, theme_colors)
-
-        if background_color:
-            style_parts.append(f"background-color: {background_color};")
-
-        # Add fixed styles
-        # style_parts.append("box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);")
-        # style_parts.append("height: 28px;")
-
-        # Join all style parts with a space
-        template_config["navbarStyle"] = " ".join(style_parts)
 
         # Process and filter menu items
         processed_menu_items = self._process_menu_items(
@@ -344,6 +245,9 @@ class NavbarWidget(BaseWidget):
 
         # Add widget type CSS class
         template_config["widgetTypeCssClass"] = "navbar"
+
+        # No inline styles - all styling from design groups CSS variables
+        template_config["navbarStyle"] = ""
 
         return template_config
 

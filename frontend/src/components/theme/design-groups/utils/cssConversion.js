@@ -111,56 +111,82 @@ export const layoutPropertiesToCSS = (layoutProperties, groupIndex, groups, widg
     // Use custom selector if available, otherwise fallback to .{part}
     const selector = partSelectorMap[part] || `.${part}`;
 
+    // Helper to filter out 'images' field when generating CSS
+    const filterImages = (props) => {
+      const filtered = {};
+      for (const [key, value] of Object.entries(props)) {
+        if (key !== 'images') {
+          filtered[key] = value;
+        }
+      }
+      return filtered;
+    };
+
     // Default (no media query)
     if (bpStyles.default && Object.keys(bpStyles.default).length > 0) {
-      let cssRule = `${selector} {\n`;
-      for (const [prop, value] of Object.entries(bpStyles.default)) {
-        cssRule += formatPropertyValue(prop, value);
+      const props = filterImages(bpStyles.default);
+      if (Object.keys(props).length > 0) {
+        let cssRule = `${selector} {\n`;
+        for (const [prop, value] of Object.entries(props)) {
+          cssRule += formatPropertyValue(prop, value);
+        }
+        cssRule += '}';
+        cssParts.push(cssRule);
       }
-      cssRule += '}';
-      cssParts.push(cssRule);
     }
 
     // Legacy desktop support (migrate to default)
     else if (bpStyles.desktop && Object.keys(bpStyles.desktop).length > 0) {
-      let cssRule = `${selector} {\n`;
-      for (const [prop, value] of Object.entries(bpStyles.desktop)) {
-        cssRule += formatPropertyValue(prop, value);
+      const props = filterImages(bpStyles.desktop);
+      if (Object.keys(props).length > 0) {
+        let cssRule = `${selector} {\n`;
+        for (const [prop, value] of Object.entries(props)) {
+          cssRule += formatPropertyValue(prop, value);
+        }
+        cssRule += '}';
+        cssParts.push(cssRule);
       }
-      cssRule += '}';
-      cssParts.push(cssRule);
     }
 
     // Generate media queries for each breakpoint (mobile-first)
     ['sm', 'md', 'lg', 'xl'].forEach(bp => {
       if (bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0 && effectiveBreakpoints[bp]) {
-        let cssRule = `@media (min-width: ${effectiveBreakpoints[bp]}px) {\n  ${selector} {\n`;
-        for (const [prop, value] of Object.entries(bpStyles[bp])) {
-          cssRule += '  ' + formatPropertyValue(prop, value);
+        const props = filterImages(bpStyles[bp]);
+        if (Object.keys(props).length > 0) {
+          let cssRule = `@media (min-width: ${effectiveBreakpoints[bp]}px) {\n  ${selector} {\n`;
+          for (const [prop, value] of Object.entries(props)) {
+            cssRule += '  ' + formatPropertyValue(prop, value);
+          }
+          cssRule += '  }\n}';
+          cssParts.push(cssRule);
         }
-        cssRule += '  }\n}';
-        cssParts.push(cssRule);
       }
     });
 
     // Legacy tablet support (migrate to md)
     if (bpStyles.tablet && Object.keys(bpStyles.tablet).length > 0 && !bpStyles.md) {
-      let cssRule = `@media (min-width: ${effectiveBreakpoints.md}px) {\n  ${selector} {\n`;
-      for (const [prop, value] of Object.entries(bpStyles.tablet)) {
-        cssRule += '  ' + formatPropertyValue(prop, value);
+      const props = filterImages(bpStyles.tablet);
+      if (Object.keys(props).length > 0) {
+        let cssRule = `@media (min-width: ${effectiveBreakpoints.md}px) {\n  ${selector} {\n`;
+        for (const [prop, value] of Object.entries(props)) {
+          cssRule += '  ' + formatPropertyValue(prop, value);
+        }
+        cssRule += '  }\n}';
+        cssParts.push(cssRule);
       }
-      cssRule += '  }\n}';
-      cssParts.push(cssRule);
     }
 
     // Legacy mobile support (migrate to sm)
     if (bpStyles.mobile && Object.keys(bpStyles.mobile).length > 0 && !bpStyles.sm) {
-      let cssRule = `@media (min-width: ${effectiveBreakpoints.sm}px) {\n  ${selector} {\n`;
-      for (const [prop, value] of Object.entries(bpStyles.mobile)) {
-        cssRule += '  ' + formatPropertyValue(prop, value);
+      const props = filterImages(bpStyles.mobile);
+      if (Object.keys(props).length > 0) {
+        let cssRule = `@media (min-width: ${effectiveBreakpoints.sm}px) {\n  ${selector} {\n`;
+        for (const [prop, value] of Object.entries(props)) {
+          cssRule += '  ' + formatPropertyValue(prop, value);
+        }
+        cssRule += '  }\n}';
+        cssParts.push(cssRule);
       }
-      cssRule += '  }\n}';
-      cssParts.push(cssRule);
     }
   }
 
@@ -174,6 +200,18 @@ export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, 
   // Get selected widget types for this group to build selector-to-partId map
   const group = groups[groupIndex];
   const selectedWidgetTypes = group?.widgetTypes || (group?.widgetType ? [group.widgetType] : []);
+
+  // Preserve existing images from the group's layoutProperties
+  const existingLayoutProps = group?.layoutProperties || {};
+  for (const [part, partBreakpoints] of Object.entries(existingLayoutProps)) {
+    for (const [bp, bpProps] of Object.entries(partBreakpoints)) {
+      if (bpProps && bpProps.images) {
+        if (!layoutProperties[part]) layoutProperties[part] = {};
+        if (!layoutProperties[part][bp]) layoutProperties[part][bp] = {};
+        layoutProperties[part][bp].images = bpProps.images;
+      }
+    }
+  }
 
   // Build reverse map: selector -> part_id
   const selectorToPartMap = {};  // selector -> part_id
