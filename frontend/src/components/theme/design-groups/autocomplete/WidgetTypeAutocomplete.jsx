@@ -150,3 +150,5 @@ const WidgetTypeAutocomplete = ({ availableWidgets, onSelect, disabled }) => {
 export default WidgetTypeAutocomplete;
 
 
+
+

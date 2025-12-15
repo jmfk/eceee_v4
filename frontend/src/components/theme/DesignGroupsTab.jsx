@@ -507,7 +507,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const [groupEditMode, setGroupEditMode] = useState({}); // { groupIndex: 'tags' | 'css' }
   const [layoutEditMode, setLayoutEditMode] = useState({}); // { groupIndex: 'form' | 'css' }
   const [importModal, setImportModal] = useState(null); // { type: 'global' | 'group' | 'element', groupIndex?: number, elementKey?: string }
+  const [importMode, setImportMode] = useState('css'); // 'css' | 'json'
   const [importCSSText, setImportCSSText] = useState('');
+  const [importJSONText, setImportJSONText] = useState('');
   const [layoutInputValues, setLayoutInputValues] = useState({}); // Local state for layout property inputs
   const layoutDebounceTimerRef = useRef({});
   const [elementInputValues, setElementInputValues] = useState({}); // Local state for element property inputs
@@ -1306,24 +1308,40 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     }
   };
 
-  // CSS Import Handlers
+  // Import Handlers
   const openImportModal = (type, groupIndex = null, elementKey = null) => {
     setImportModal({ type, groupIndex, elementKey });
+    setImportMode('css');
     setImportCSSText('');
+    setImportJSONText('');
   };
 
   const closeImportModal = () => {
     setImportModal(null);
+    setImportMode('css');
     setImportCSSText('');
+    setImportJSONText('');
   };
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Detect file type and set mode
+    const fileName = file.name.toLowerCase();
+    if (fileName.endsWith('.json')) {
+      setImportMode('json');
+    } else if (fileName.endsWith('.css')) {
+      setImportMode('css');
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
-      setImportCSSText(e.target.result);
+      if (fileName.endsWith('.json')) {
+        setImportJSONText(e.target.result);
+      } else {
+        setImportCSSText(e.target.result);
+      }
     };
     reader.readAsText(file);
     event.target.value = ''; // Reset file input
@@ -1420,6 +1438,157 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       closeImportModal();
     } catch (error) {
       addNotification({ type: 'error', message: `Failed to parse CSS: ${error.message}` });
+    }
+  };
+
+  // JSON Import Handler
+  const handleImportJSON = () => {
+    const jsonText = importJSONText.trim();
+    if (!jsonText) {
+      addNotification({ type: 'error', message: 'Please enter or upload JSON' });
+      return;
+    }
+
+    try {
+      let parsedData;
+      try {
+        parsedData = JSON.parse(jsonText);
+      } catch (parseError) {
+        addNotification({ type: 'error', message: `Invalid JSON syntax: ${parseError.message}` });
+        return;
+      }
+
+      if (importModal.type === 'global') {
+        // Create new group(s) from JSON
+        let groupsToAdd = [];
+
+        // Auto-detect format
+        if (parsedData.groups && Array.isArray(parsedData.groups)) {
+          // Full structure format: { groups: [...] }
+          groupsToAdd = parsedData.groups.map(group => {
+            const newGroup = {
+              name: group.name || `Imported Group ${groups.length + 1}`,
+              className: group.className || generateClassName(group.name || `Imported Group ${groups.length + 1}`),
+              isDefault: group.isDefault || false,
+              widgetTypes: group.widgetTypes || group.widget_types || [],
+              slots: group.slots || [],
+              widgetType: group.widgetType || group.widget_type || null,
+              slot: group.slot || null,
+              targetingMode: group.targetingMode || group.targeting_mode || 'widget-slot',
+              targetCssClasses: group.targetCssClasses || group.target_css_classes || null,
+              colorScheme: group.colorScheme || group.color_scheme || { background: null, text: null },
+              elements: group.elements || {},
+              layoutProperties: group.layoutProperties || group.layout_properties || {},
+            };
+            return newGroup;
+          });
+        } else if (parsedData.name || parsedData.elements) {
+          // Single group format: { name, elements, ... }
+          const newGroup = {
+            name: parsedData.name || `Imported Group ${groups.length + 1}`,
+            className: parsedData.className || generateClassName(parsedData.name || `Imported Group ${groups.length + 1}`),
+            isDefault: parsedData.isDefault || false,
+            widgetTypes: parsedData.widgetTypes || parsedData.widget_types || [],
+            slots: parsedData.slots || [],
+            widgetType: parsedData.widgetType || parsedData.widget_type || null,
+            slot: parsedData.slot || null,
+            targetingMode: parsedData.targetingMode || parsedData.targeting_mode || 'widget-slot',
+            targetCssClasses: parsedData.targetCssClasses || parsedData.target_css_classes || null,
+            colorScheme: parsedData.colorScheme || parsedData.color_scheme || { background: null, text: null },
+            elements: parsedData.elements || {},
+            layoutProperties: parsedData.layoutProperties || parsedData.layout_properties || {},
+          };
+          groupsToAdd = [newGroup];
+        } else {
+          addNotification({ type: 'error', message: 'Invalid JSON format. Expected { groups: [...] } or { name, elements, ... }' });
+          return;
+        }
+
+        if (groupsToAdd.length === 0) {
+          addNotification({ type: 'error', message: 'No valid groups found in JSON' });
+          return;
+        }
+
+        const updatedGroups = [...groups, ...groupsToAdd];
+        onChange({ ...(designGroups || {}), groups: updatedGroups });
+
+        // Auto-expand new groups
+        const newExpandedContent = { ...expandedContent };
+        groupsToAdd.forEach((_, index) => {
+          newExpandedContent[groups.length + index] = true;
+        });
+        setExpandedContent(newExpandedContent);
+
+        addNotification({ 
+          type: 'success', 
+          message: `Created ${groupsToAdd.length} ${groupsToAdd.length === 1 ? 'group' : 'groups'} from JSON` 
+        });
+
+      } else if (importModal.type === 'group') {
+        // Update existing group with JSON data
+        if (!parsedData.elements && !parsedData.layoutProperties && !parsedData.layout_properties) {
+          addNotification({ type: 'error', message: 'JSON must contain elements or layoutProperties to update a group' });
+          return;
+        }
+
+        const updatedGroups = [...groups];
+        const currentGroup = updatedGroups[importModal.groupIndex];
+
+        // Merge with existing group data
+        updatedGroups[importModal.groupIndex] = {
+          ...currentGroup,
+          ...(parsedData.name && { name: parsedData.name }),
+          ...(parsedData.className && { className: parsedData.className }),
+          ...(parsedData.isDefault !== undefined && { isDefault: parsedData.isDefault }),
+          ...(parsedData.widgetTypes && { widgetTypes: parsedData.widgetTypes }),
+          ...(parsedData.widget_types && { widgetTypes: parsedData.widget_types }),
+          ...(parsedData.slots && { slots: parsedData.slots }),
+          ...(parsedData.widgetType !== undefined && { widgetType: parsedData.widgetType }),
+          ...(parsedData.widget_type !== undefined && { widgetType: parsedData.widget_type }),
+          ...(parsedData.slot !== undefined && { slot: parsedData.slot }),
+          ...(parsedData.targetingMode && { targetingMode: parsedData.targetingMode }),
+          ...(parsedData.targeting_mode && { targetingMode: parsedData.targeting_mode }),
+          ...(parsedData.targetCssClasses !== undefined && { targetCssClasses: parsedData.targetCssClasses }),
+          ...(parsedData.target_css_classes !== undefined && { targetCssClasses: parsedData.target_css_classes }),
+          ...(parsedData.colorScheme && { colorScheme: parsedData.colorScheme }),
+          ...(parsedData.color_scheme && { colorScheme: parsedData.color_scheme }),
+          ...(parsedData.elements && { elements: { ...currentGroup.elements, ...parsedData.elements } }),
+          ...(parsedData.layoutProperties && { layoutProperties: { ...currentGroup.layoutProperties, ...parsedData.layoutProperties } }),
+          ...(parsedData.layout_properties && { layoutProperties: { ...currentGroup.layoutProperties, ...parsedData.layout_properties } }),
+        };
+
+        onChange({ ...(designGroups || {}), groups: updatedGroups });
+        addNotification({ type: 'success', message: 'Updated group from JSON' });
+
+      } else if (importModal.type === 'element') {
+        // Update single element properties from JSON object
+        if (typeof parsedData !== 'object' || Array.isArray(parsedData)) {
+          addNotification({ type: 'error', message: 'Element import expects a JSON object with property names and values' });
+          return;
+        }
+
+        const updatedGroups = [...groups];
+        const currentStyles = updatedGroups[importModal.groupIndex].elements[importModal.elementKey] || {};
+
+        // Merge properties
+        updatedGroups[importModal.groupIndex] = {
+          ...updatedGroups[importModal.groupIndex],
+          elements: {
+            ...updatedGroups[importModal.groupIndex].elements,
+            [importModal.elementKey]: { ...currentStyles, ...parsedData },
+          },
+        };
+
+        onChange({ ...(designGroups || {}), groups: updatedGroups });
+        addNotification({ 
+          type: 'success', 
+          message: `Updated ${importModal.elementKey} with ${Object.keys(parsedData).length} ${Object.keys(parsedData).length === 1 ? 'property' : 'properties'}` 
+        });
+      }
+
+      closeImportModal();
+    } catch (error) {
+      addNotification({ type: 'error', message: `Failed to import JSON: ${error.message}` });
     }
   };
 
@@ -3145,35 +3314,74 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         </div>
       </div>
 
-      {/* CSS Import Modal */}
+      {/* Import Modal */}
       {importModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
-                Import CSS {
+                Import {importMode === 'json' ? 'JSON' : 'CSS'} {
                   importModal.type === 'global' ? 'to Create New Group' :
                     importModal.type === 'group' ? 'to Update Group' :
                       `for ${importModal.elementKey}`
                 }
               </div>
               <div className="text-sm text-gray-600 mt-1">
-                {importModal.type === 'global' && 'Paste CSS rules with selectors (e.g., h1 { font-size: 2.5rem; })'}
-                {importModal.type === 'group' && 'Paste CSS rules with selectors to update all elements in this group'}
-                {importModal.type === 'element' && 'Paste CSS properties without selector (e.g., font-size: 2.5rem; color: blue;)'}
+                {importMode === 'css' && (
+                  <>
+                    {importModal.type === 'global' && 'Paste CSS rules with selectors (e.g., h1 { font-size: 2.5rem; })'}
+                    {importModal.type === 'group' && 'Paste CSS rules with selectors to update all elements in this group'}
+                    {importModal.type === 'element' && 'Paste CSS properties without selector (e.g., font-size: 2.5rem; color: blue;)'}
+                  </>
+                )}
+                {importMode === 'json' && (
+                  <>
+                    {importModal.type === 'global' && 'Paste JSON with groups array or single group object'}
+                    {importModal.type === 'group' && 'Paste JSON object to update this group (elements, layoutProperties, etc.)'}
+                    {importModal.type === 'element' && 'Paste JSON object with property names and values (e.g., { "fontSize": "2rem", "color": "#333" })'}
+                  </>
+                )}
               </div>
             </div>
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Import Mode Toggle */}
+              <div className="flex gap-2 border-b border-gray-200 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setImportMode('css')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    importMode === 'css'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  CSS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportMode('json')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    importMode === 'json'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  JSON
+                </button>
+              </div>
+
               {/* File Upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Upload CSS File</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload {importMode === 'json' ? 'JSON' : 'CSS'} File
+                </label>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".css"
+                  accept={importMode === 'json' ? '.json' : '.css'}
                   onChange={handleFileUpload}
                   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
@@ -3185,27 +3393,44 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                   <div className="w-full border-t border-gray-300"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">or paste CSS</span>
+                  <span className="px-2 bg-white text-gray-500">or paste {importMode === 'json' ? 'JSON' : 'CSS'}</span>
                 </div>
               </div>
 
-              {/* CSS Textarea */}
+              {/* Textarea */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">CSS Code</label>
-                <textarea
-                  value={importCSSText}
-                  onChange={(e) => setImportCSSText(e.target.value)}
-                  placeholder={
-                    importModal.type === 'element'
-                      ? 'font-size: 2.5rem;\nfont-weight: 700;\ncolor: #333;'
-                      : 'h1 {\n  font-size: 2.5rem;\n  font-weight: 700;\n}\n\np {\n  font-size: 1rem;\n  line-height: 1.6;\n}'
-                  }
-                  className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {importMode === 'json' ? 'JSON' : 'CSS'} Code
+                </label>
+                {importMode === 'css' ? (
+                  <textarea
+                    value={importCSSText}
+                    onChange={(e) => setImportCSSText(e.target.value)}
+                    placeholder={
+                      importModal.type === 'element'
+                        ? 'font-size: 2.5rem;\nfont-weight: 700;\ncolor: #333;'
+                        : 'h1 {\n  font-size: 2.5rem;\n  font-weight: 700;\n}\n\np {\n  font-size: 1rem;\n  line-height: 1.6;\n}'
+                    }
+                    className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                ) : (
+                  <textarea
+                    value={importJSONText}
+                    onChange={(e) => setImportJSONText(e.target.value)}
+                    placeholder={
+                      importModal.type === 'element'
+                        ? '{\n  "fontSize": "2rem",\n  "color": "#333",\n  "fontWeight": "700"\n}'
+                        : importModal.type === 'global'
+                        ? '{\n  "groups": [\n    {\n      "name": "My Group",\n      "elements": { "h1": { "fontSize": "2rem" } }\n    }\n  ]\n}'
+                        : '{\n  "elements": { "h1": { "fontSize": "2rem" } },\n  "layoutProperties": { ... }\n}'
+                    }
+                    className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                )}
               </div>
 
               {/* Preview Info */}
-              {importCSSText.trim() && (
+              {importMode === 'css' && importCSSText.trim() && (
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                   <div className="text-sm text-blue-800">
                     {(() => {
@@ -3231,6 +3456,40 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                   </div>
                 </div>
               )}
+              {importMode === 'json' && importJSONText.trim() && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <div className="text-sm text-blue-800">
+                    {(() => {
+                      try {
+                        const parsed = JSON.parse(importJSONText);
+                        if (importModal.type === 'element') {
+                          if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                            const count = Object.keys(parsed).length;
+                            return count > 0
+                              ? `✓ ${count} ${count === 1 ? 'property' : 'properties'} detected: ${Object.keys(parsed).join(', ')}`
+                              : '⚠ Empty object';
+                          }
+                          return '⚠ Expected object with property names and values';
+                        } else if (importModal.type === 'global') {
+                          if (parsed.groups && Array.isArray(parsed.groups)) {
+                            return `✓ ${parsed.groups.length} ${parsed.groups.length === 1 ? 'group' : 'groups'} detected`;
+                          } else if (parsed.name || parsed.elements) {
+                            return '✓ Single group object detected';
+                          }
+                          return '⚠ Expected { groups: [...] } or { name, elements, ... }';
+                        } else {
+                          if (parsed.elements || parsed.layoutProperties || parsed.layout_properties) {
+                            return '✓ Valid group update data detected';
+                          }
+                          return '⚠ Expected object with elements or layoutProperties';
+                        }
+                      } catch (error) {
+                        return `⚠ Invalid JSON: ${error.message}`;
+                      }
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -3244,8 +3503,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
               </button>
               <button
                 type="button"
-                onClick={handleImportCSS}
-                disabled={!importCSSText.trim()}
+                onClick={importMode === 'json' ? handleImportJSON : handleImportCSS}
+                disabled={importMode === 'json' ? !importJSONText.trim() : !importCSSText.trim()}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Import
