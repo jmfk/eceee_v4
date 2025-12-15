@@ -590,6 +590,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const layoutDebounceTimerRef = useRef({});
   const [elementInputValues, setElementInputValues] = useState({}); // Local state for element property inputs
   const elementDebounceTimerRef = useRef({});
+  const [groupNameValues, setGroupNameValues] = useState({}); // Local state for group name inputs
+  const groupNameDebounceTimerRef = useRef({});
   const [selectorPopup, setSelectorPopup] = useState(null); // { type: 'tag' | 'breakpoint', selectors: [], position: {x, y} }
   const { addNotification } = useGlobalNotifications();
 
@@ -620,13 +622,16 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const availableSlots = slotsData?.slots || [];
 
 
-  // Cleanup layout debounce timers on unmount
+  // Cleanup debounce timers on unmount
   useEffect(() => {
     return () => {
       Object.values(layoutDebounceTimerRef.current).forEach(timer => {
         if (timer) clearTimeout(timer);
       });
       Object.values(elementDebounceTimerRef.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+      Object.values(groupNameDebounceTimerRef.current).forEach(timer => {
         if (timer) clearTimeout(timer);
       });
     };
@@ -708,17 +713,65 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const toggleTargeting = (groupIndex) => {
     setExpandedTargeting({
       ...expandedTargeting,
-      [groupIndex]: !expandedTargeting[groupIndex],
+      [groupIndex]: !expandedTargeting[originalGroupIndex],
     });
   };
 
   const handleUpdateGroupName = (index, newName) => {
-    const updatedGroups = [...groups];
-    updatedGroups[index] = {
-      ...updatedGroups[index],
-      name: newName,
-    };
-    onChange({ ...(designGroups || {}), groups: updatedGroups });
+    // Store in local state immediately for responsive typing
+    setGroupNameValues(prev => ({
+      ...prev,
+      [index]: newName,
+    }));
+
+    // Clear any existing timer
+    if (groupNameDebounceTimerRef.current[index]) {
+      clearTimeout(groupNameDebounceTimerRef.current[index]);
+    }
+
+    // Debounce the actual update
+    groupNameDebounceTimerRef.current[index] = setTimeout(() => {
+      const updatedGroups = [...groups];
+      updatedGroups[index] = {
+        ...updatedGroups[index],
+        name: newName,
+      };
+      onChange({ ...(designGroups || {}), groups: updatedGroups });
+
+      // Clear local state after successful update
+      setGroupNameValues(prev => {
+        const newState = { ...prev };
+        delete newState[index];
+        return newState;
+      });
+    }, 500);
+
+    if (onDirty) onDirty();
+  };
+
+  const handleGroupNameBlur = (index) => {
+    // Clear any pending debounce timer
+    if (groupNameDebounceTimerRef.current[index]) {
+      clearTimeout(groupNameDebounceTimerRef.current[index]);
+    }
+
+    // Trigger immediate update with current local value
+    const value = groupNameValues[index];
+    if (value !== undefined) {
+      const updatedGroups = [...groups];
+      updatedGroups[index] = {
+        ...updatedGroups[index],
+        name: value,
+      };
+      onChange({ ...(designGroups || {}), groups: updatedGroups });
+
+      // Clear local state
+      setGroupNameValues(prev => {
+        const newState = { ...prev };
+        delete newState[index];
+        return newState;
+      });
+    }
   };
 
   const handleUpdateWidgetTypes = (index, selectedTypes) => {
@@ -869,7 +922,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const toggleLayoutProps = (groupIndex) => {
     setExpandedLayoutProps({
       ...expandedLayoutProps,
-      [groupIndex]: !expandedLayoutProps[groupIndex],
+      [groupIndex]: !expandedLayoutProps[originalGroupIndex],
     });
   };
 
@@ -992,7 +1045,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     }
 
     // Always ensure Layout Properties section is expanded
-    if (!expandedLayoutProps[groupIndex]) {
+    if (!expandedLayoutProps[originalGroupIndex]) {
       setExpandedLayoutProps({ ...expandedLayoutProps, [groupIndex]: true });
     }
 
@@ -1799,7 +1852,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   // Toggle group edit mode between 'tags' and 'css'
   const toggleGroupEditMode = (groupIndex) => {
-    const currentMode = groupEditMode[groupIndex] || 'tags';
+    const currentMode = groupEditMode[originalGroupIndex] || 'tags';
 
     // If switching from CSS to tags, save the CSS first
     if (currentMode === 'css') {
@@ -2072,11 +2125,86 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     }
   };
 
+  // Extract filter options from all groups
+  const filterOptions = extractFilterOptions(groups, widgetTypes);
+
+  // Filter groups based on selected filter (OR logic - match ANY criteria)
+  const filteredGroups = filterValue ? groups.filter((group, index) => {
+    const { filterType, filterValue: fValue } = filterValue;
+
+    if (filterType === 'widgetType') {
+      const groupWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
+      return groupWidgetTypes.includes(fValue);
+    } else if (filterType === 'slot') {
+      const groupSlots = group.slots || (group.slot ? [group.slot] : []);
+      return groupSlots.includes(fValue);
+    } else if (filterType === 'selector') {
+      // Check in calculatedSelectors
+      if (group.calculatedSelectors?.base_selectors?.includes(fValue)) {
+        return true;
+      }
+      // Check in targetCssClasses
+      if (group.targetCssClasses) {
+        const customSelectors = group.targetCssClasses.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+        return customSelectors.includes(fValue);
+      }
+      return false;
+    }
+    return false;
+  }) : groups;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Design Groups</div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Filter Combobox */}
+          <div className="relative">
+            <select
+              value={filterValue ? filterValue.value : ''}
+              onChange={(e) => {
+                if (!e.target.value) {
+                  setFilterValue(null);
+                } else {
+                  const option = filterOptions.find(opt => opt.value === e.target.value);
+                  if (option) {
+                    setFilterValue({ filterType: option.filterType, filterValue: option.filterValue, value: option.value, label: option.label });
+                  }
+                }
+              }}
+              className="pl-3 pr-10 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Filter by... ({filteredGroups.length}/{groups.length})</option>
+              {filterOptions.length > 0 && (
+                <>
+                  {['Widget Types', 'Slots', 'Selectors'].map(category => {
+                    const categoryOptions = filterOptions.filter(opt => opt.category === category);
+                    if (categoryOptions.length === 0) return null;
+                    return (
+                      <optgroup key={category} label={category}>
+                        {categoryOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </>
+              )}
+            </select>
+            {filterValue && (
+              <button
+                type="button"
+                onClick={() => setFilterValue(null)}
+                className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
+                title="Clear filter"
+              >
+                <X className="w-3 h-3 text-gray-500" />
+              </button>
+            )}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            </div>
+          </div>
           <CopyButton
             data={designGroups}
             level="section"
@@ -2109,14 +2237,16 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Groups Editor - takes 2 columns */}
         <div className="lg:col-span-2 space-y-4">
-          {groups.length > 0 ? (
-            groups.map((group, groupIndex) => {
+          {filteredGroups.length > 0 ? (
+            filteredGroups.map((group, groupIndex) => {
+              // Get original group index for handlers
+              const originalGroupIndex = groups.indexOf(group);
               const tagGroupsInGroup = getTagGroupsInGroup(group);
               const availableTagGroups = getAvailableTagGroups(group);
 
               return (
                 <div
-                  key={groupIndex}
+                  key={originalGroupIndex}
                   className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm"
                 >
                   {/* Group Header */}
@@ -2126,14 +2256,14 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                       <div className="flex items-center gap-1" title="Mark as default/base group">
                         <input
                           type="radio"
-                          id={`default-group-${groupIndex}`}
+                          id={`default-group-${originalGroupIndex}`}
                           name="default-group"
                           checked={group.isDefault === true}
-                          onChange={() => handleToggleDefault(groupIndex)}
+                          onChange={() => handleToggleDefault(originalGroupIndex)}
                           className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
                         />
                         <label
-                          htmlFor={`default-group-${groupIndex}`}
+                          htmlFor={`default-group-${originalGroupIndex}`}
                           className="text-xs text-gray-600 font-medium cursor-pointer"
                         >
                           Default
@@ -2142,8 +2272,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                       <input
                         type="text"
-                        value={group.name}
-                        onChange={(e) => handleUpdateGroupName(groupIndex, e.target.value)}
+                        value={groupNameValues[originalGroupIndex] ?? group.name}
+                        onChange={(e) => handleUpdateGroupName(originalGroupIndex, e.target.value)}
+                        onBlur={() => handleGroupNameBlur(originalGroupIndex)}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Group name"
                       />
@@ -2191,14 +2322,14 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                         {/* Toggle between Tags and CSS mode */}
                         <button
                           type="button"
-                          onClick={() => toggleGroupEditMode(groupIndex)}
-                          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded transition-colors ${(groupEditMode[groupIndex] || 'tags') === 'css'
+                          onClick={() => toggleGroupEditMode(originalGroupIndex)}
+                          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded transition-colors ${(groupEditMode[originalGroupIndex] || 'tags') === 'css'
                             ? 'bg-blue-100 text-blue-700'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
-                          title={(groupEditMode[groupIndex] || 'tags') === 'css' ? 'Switch to tag editor' : 'Edit all CSS'}
+                          title={(groupEditMode[originalGroupIndex] || 'tags') === 'css' ? 'Switch to tag editor' : 'Edit all CSS'}
                         >
-                          {(groupEditMode[groupIndex] || 'tags') === 'css' ? (
+                          {(groupEditMode[originalGroupIndex] || 'tags') === 'css' ? (
                             <>
                               <FileText className="w-3 h-3 mr-1" />
                               Tags
@@ -2213,7 +2344,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                         <button
                           type="button"
-                          onClick={() => openImportModal('group', groupIndex)}
+                          onClick={() => openImportModal('group', originalGroupIndex)}
                           className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
                           title="Import CSS to this group"
                         >
@@ -2235,7 +2366,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                         <button
                           type="button"
-                          onClick={() => handlePaste(groupIndex)}
+                          onClick={() => handlePaste(originalGroupIndex)}
                           disabled={!clipboard || clipboard.type !== 'group'}
                           className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Paste styles to all tags (creates tags if needed)"
@@ -2245,7 +2376,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                         <button
                           type="button"
-                          onClick={() => handleCloneGroup(groupIndex)}
+                          onClick={() => handleCloneGroup(originalGroupIndex)}
                           className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                           title="Clone this group"
                         >
@@ -2255,7 +2386,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                       <button
                         type="button"
-                        onClick={() => handleRemoveGroup(groupIndex)}
+                        onClick={() => handleRemoveGroup(originalGroupIndex)}
                         className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -2267,10 +2398,10 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                   <div className="border-t border-gray-200">
                     <button
                       type="button"
-                      onClick={() => toggleTargeting(groupIndex)}
+                      onClick={() => toggleTargeting(originalGroupIndex)}
                       className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                     >
-                      {expandedTargeting[groupIndex] ? (
+                      {expandedTargeting[originalGroupIndex] ? (
                         <ChevronDown size={18} className="text-gray-600" />
                       ) : (
                         <ChevronRight size={18} className="text-gray-600" />
@@ -2280,13 +2411,13 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                       </span>
                     </button>
 
-                    {expandedTargeting[groupIndex] && (
+                    {expandedTargeting[originalGroupIndex] && (
                       <div className="px-4 pb-4">
                         {/* Targeting Mode Toggle */}
                         <div className="mb-4 flex gap-2">
                           <button
                             type="button"
-                            onClick={() => handleUpdateTargetingMode(groupIndex, 'widget-slot')}
+                            onClick={() => handleUpdateTargetingMode(originalGroupIndex, 'widget-slot')}
                             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${(group.targetingMode || 'widget-slot') === 'widget-slot'
                               ? 'bg-blue-100 text-blue-700 border border-blue-300'
                               : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
@@ -2296,7 +2427,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleUpdateTargetingMode(groupIndex, 'css-classes')}
+                            onClick={() => handleUpdateTargetingMode(originalGroupIndex, 'css-classes')}
                             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${group.targetingMode === 'css-classes'
                               ? 'bg-blue-100 text-blue-700 border border-blue-300'
                               : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
@@ -2318,7 +2449,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                   const selectedTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
                                   return widgetTypes.filter(wt => !selectedTypes.includes(wt.type));
                                 })()}
-                                onSelect={(widgetType) => handleAddWidgetType(groupIndex, widgetType)}
+                                onSelect={(widgetType) => handleAddWidgetType(originalGroupIndex, widgetType)}
                                 disabled={isLoadingTypes}
                               />
                               <div className="text-xs text-gray-500 mt-1">Search and select widget types to apply this design group. Empty = all widgets</div>
@@ -2338,7 +2469,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                           <span>{widgetMeta?.name || wtType}</span>
                                           <button
                                             type="button"
-                                            onClick={() => handleRemoveWidgetType(groupIndex, wtType)}
+                                            onClick={() => handleRemoveWidgetType(originalGroupIndex, wtType)}
                                             className="hover:bg-blue-200 rounded-sm p-0.5 transition-colors"
                                             title="Remove widget type"
                                           >
@@ -2362,7 +2493,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                   const selectedSlots = group.slots || (group.slot ? [group.slot] : []);
                                   return availableSlots.filter(slot => !selectedSlots.includes(slot.name));
                                 })()}
-                                onSelect={(slotName) => handleAddSlot(groupIndex, slotName)}
+                                onSelect={(slotName) => handleAddSlot(originalGroupIndex, slotName)}
                                 disabled={isLoadingSlots}
                               />
                               <div className="text-xs text-gray-500 mt-1">Search and select slots to apply this design group. Empty = all slots</div>
@@ -2380,7 +2511,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                         <span>{slotName}</span>
                                         <button
                                           type="button"
-                                          onClick={() => handleRemoveSlot(groupIndex, slotName)}
+                                          onClick={() => handleRemoveSlot(originalGroupIndex, slotName)}
                                           className="hover:bg-green-200 rounded-sm p-0.5 transition-colors"
                                           title="Remove slot"
                                         >
@@ -2398,7 +2529,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                             <label className="block text-xs text-gray-700 font-medium mb-1">Target CSS Selectors:</label>
                             <textarea
                               value={group.targetCssClasses || ''}
-                              onChange={(e) => handleUpdateTargetCssClasses(groupIndex, e.target.value)}
+                              onChange={(e) => handleUpdateTargetCssClasses(originalGroupIndex, e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
                               placeholder=".my-custom-class, .another-class&#10;.complex > .selector&#10;#specific-id"
                             />
@@ -2427,10 +2558,10 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                   <div className="border-t border-gray-200">
                     <button
                       type="button"
-                      onClick={() => toggleLayoutProps(groupIndex)}
+                      onClick={() => toggleLayoutProps(originalGroupIndex)}
                       className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                     >
-                      {expandedLayoutProps[groupIndex] ? (
+                      {expandedLayoutProps[originalGroupIndex] ? (
                         <ChevronDown size={18} className="text-gray-600" />
                       ) : (
                         <ChevronRight size={18} className="text-gray-600" />
@@ -2440,7 +2571,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                       </span>
                     </button>
 
-                    {expandedLayoutProps[groupIndex] && (
+                    {expandedLayoutProps[originalGroupIndex] && (
                       <div className="px-4 pb-4">
                         {(() => {
                           const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
@@ -2496,7 +2627,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                     <button
                                       key={part}
                                       type="button"
-                                      onClick={() => handleAddLayoutPart(groupIndex, part)}
+                                      onClick={() => handleAddLayoutPart(originalGroupIndex, part)}
                                       className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                                       title={`Add ${getPartLabel(part, selectedWidgetTypes)}`}
                                     >
@@ -2600,7 +2731,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleRemoveLayoutPart(groupIndex, part);
+                                          handleRemoveLayoutPart(originalGroupIndex, part);
                                         }}
                                         className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                                         title="Remove this layout part"
@@ -2636,7 +2767,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                     <button
                                                       key={bp}
                                                       type="button"
-                                                      onClick={() => handleAddBreakpoint(groupIndex, part, bp)}
+                                                      onClick={() => handleAddBreakpoint(originalGroupIndex, part, bp)}
                                                       className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
                                                       title={`Add ${getBreakpointLabel(bp)}`}
                                                     >
@@ -2802,7 +2933,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                         {/* Delete Breakpoint Button */}
                                                         <button
                                                           type="button"
-                                                          onClick={() => handleRemoveBreakpoint(groupIndex, part, breakpoint)}
+                                                          onClick={() => handleRemoveBreakpoint(originalGroupIndex, part, breakpoint)}
                                                           className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                                                           title="Remove this breakpoint"
                                                         >
@@ -2937,7 +3068,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                                             {config.type === 'color' ? (
                                                                               <ColorSelector
                                                                                 value={value}
-                                                                                onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
+                                                                                onChange={(newValue) => handleUpdateLayoutProperty(originalGroupIndex, part, breakpoint, prop, newValue || null, true)}
                                                                                 colors={colors}
                                                                                 className="w-full"
                                                                               />
@@ -2945,23 +3076,23 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                                               <FontSelector
                                                                                 fontFamily={value}
                                                                                 fontWeight={breakpointProps.fontWeight}
-                                                                                onFontFamilyChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
-                                                                                onFontWeightChange={(newWeight) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, 'fontWeight', newWeight || null, true)}
+                                                                                onFontFamilyChange={(newValue) => handleUpdateLayoutProperty(originalGroupIndex, part, breakpoint, prop, newValue || null, true)}
+                                                                                onFontWeightChange={(newWeight) => handleUpdateLayoutProperty(originalGroupIndex, part, breakpoint, 'fontWeight', newWeight || null, true)}
                                                                                 fonts={fonts}
                                                                                 className="w-full"
                                                                               />
                                                                             ) : config.type === 'numeric' ? (
                                                                               <NumericInput
                                                                                 value={value}
-                                                                                onChange={(newValue) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, newValue || null)}
-                                                                                onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
+                                                                                onChange={(newValue) => handleUpdateLayoutProperty(originalGroupIndex, part, breakpoint, prop, newValue || null)}
+                                                                                onBlur={() => handleLayoutPropertyBlur(originalGroupIndex, part, breakpoint, prop)}
                                                                                 property={prop}
                                                                                 className="w-full"
                                                                               />
                                                                             ) : config.type === 'select' ? (
                                                                               <select
                                                                                 value={value}
-                                                                                onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null, true)}
+                                                                                onChange={(e) => handleUpdateLayoutProperty(originalGroupIndex, part, breakpoint, prop, e.target.value || null, true)}
                                                                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                                               >
                                                                                 <option value="">None</option>
@@ -2973,8 +3104,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                                               <input
                                                                                 type="text"
                                                                                 value={value}
-                                                                                onChange={(e) => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, e.target.value || null)}
-                                                                                onBlur={() => handleLayoutPropertyBlur(groupIndex, part, breakpoint, prop)}
+                                                                                onChange={(e) => handleUpdateLayoutProperty(originalGroupIndex, part, breakpoint, prop, e.target.value || null)}
+                                                                                onBlur={() => handleLayoutPropertyBlur(originalGroupIndex, part, breakpoint, prop)}
                                                                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                                                 placeholder={config.placeholder}
                                                                               />
@@ -2982,7 +3113,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                                           </div>
                                                                           <button
                                                                             type="button"
-                                                                            onClick={() => handleUpdateLayoutProperty(groupIndex, part, breakpoint, prop, null, true)}
+                                                                            onClick={() => handleUpdateLayoutProperty(originalGroupIndex, part, breakpoint, prop, null, true)}
                                                                             className="mt-6 p-1 text-red-600 hover:text-red-700"
                                                                             title="Remove property"
                                                                           >
@@ -3001,7 +3132,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                                     <button
                                                                       key={prop}
                                                                       type="button"
-                                                                      onClick={() => handleAddProperty(groupIndex, part, breakpoint, prop)}
+                                                                      onClick={() => handleAddProperty(originalGroupIndex, part, breakpoint, prop)}
                                                                       className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                                                                       title={`Add ${config.label}`}
                                                                     >
@@ -3037,10 +3168,10 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                   <div className="border-t border-gray-200">
                     <button
                       type="button"
-                      onClick={() => toggleContent(groupIndex)}
+                      onClick={() => toggleContent(originalGroupIndex)}
                       className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                     >
-                      {expandedContent[groupIndex] ? (
+                      {expandedContent[originalGroupIndex] ? (
                         <ChevronDown size={18} className="text-gray-600" />
                       ) : (
                         <ChevronRight size={18} className="text-gray-600" />
@@ -3053,9 +3184,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                       </span>
                     </button>
 
-                    {expandedContent[groupIndex] && (
+                    {expandedContent[originalGroupIndex] && (
                       <div className="p-4 space-y-4">
-                        {(groupEditMode[groupIndex] || 'tags') === 'css' ? (
+                        {(groupEditMode[originalGroupIndex] || 'tags') === 'css' ? (
                           /* CSS Editor Mode - Edit all group CSS at once */
                           <div className="space-y-3">
                             <div className="text-sm text-gray-600 mb-2">
@@ -3085,7 +3216,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                   <button
                                     key={tagGroup.base}
                                     type="button"
-                                    onClick={() => handleAddTagGroup(groupIndex, tagGroup)}
+                                    onClick={() => handleAddTagGroup(originalGroupIndex, tagGroup)}
                                     className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                                     title={`Add ${tagGroup.label}`}
                                   >
@@ -3097,7 +3228,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                             {/* Tag Groups */}
                             {tagGroupsInGroup.map((tagGroup) => {
-                              const isTagExpanded = expandedTags[`${groupIndex}-${tagGroup.base}`] ?? false;
+                              const isTagExpanded = expandedTags[`${originalGroupIndex}-${tagGroup.base}`] ?? false;
                               const baseStyles = group.elements[tagGroup.base] || {};
 
                               return (
@@ -3105,14 +3236,14 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                   {/* Tag Header */}
                                   <div
                                     className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200"
-                                    onPaste={(e) => handleElementPaste(e, groupIndex, tagGroup.base)}
+                                    onPaste={(e) => handleElementPaste(e, originalGroupIndex, tagGroup.base)}
                                     tabIndex={-1}
                                   >
                                     {/* Only show toggle for links */}
                                     {tagGroup.hasGroup && (
                                       <button
                                         type="button"
-                                        onClick={() => toggleTag(groupIndex, tagGroup.base)}
+                                        onClick={() => toggleTag(originalGroupIndex, tagGroup.base)}
                                         className="text-gray-600 hover:text-gray-900"
                                       >
                                         {isTagExpanded ? (
@@ -3159,7 +3290,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                     <div className="flex gap-1">
                                       <button
                                         type="button"
-                                        onClick={() => openImportModal('element', groupIndex, tagGroup.base)}
+                                        onClick={() => openImportModal('element', originalGroupIndex, tagGroup.base)}
                                         className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
                                         title="Import CSS for this element"
                                       >
@@ -3181,7 +3312,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                                       <button
                                         type="button"
-                                        onClick={() => handlePaste(groupIndex, tagGroup.base)}
+                                        onClick={() => handlePaste(originalGroupIndex, tagGroup.base)}
                                         disabled={!clipboard || clipboard.type !== 'tag'}
                                         className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                         title="Paste tag styles"
@@ -3191,7 +3322,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
                                       <button
                                         type="button"
-                                        onClick={() => handleRemoveTagGroup(groupIndex, tagGroup)}
+                                        onClick={() => handleRemoveTagGroup(originalGroupIndex, tagGroup)}
                                         className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                                       >
                                         <Trash2 className="w-4 h-4" />
@@ -3222,7 +3353,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                               <div className="flex gap-1 ml-auto">
                                                 <button
                                                   type="button"
-                                                  onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
+                                                  onClick={() => toggleEditMode(originalGroupIndex, tagGroup.base, variant)}
                                                   className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'form'
                                                     ? 'bg-blue-100 text-blue-700'
                                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -3233,7 +3364,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                 </button>
                                                 <button
                                                   type="button"
-                                                  onClick={() => toggleEditMode(groupIndex, tagGroup.base, variant)}
+                                                  onClick={() => toggleEditMode(originalGroupIndex, tagGroup.base, variant)}
                                                   className={`inline-flex items-center px-2 py-1 text-xs rounded transition-colors ${currentEditMode === 'css'
                                                     ? 'bg-blue-100 text-blue-700'
                                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -3255,11 +3386,11 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                       <label className="block text-xs font-medium text-gray-600 mb-1">
                                                         {CSS_PROPERTIES[property]?.label || property}
                                                       </label>
-                                                      {renderPropertyField(groupIndex, variant, property, value)}
+                                                      {renderPropertyField(originalGroupIndex, variant, property, value)}
                                                     </div>
                                                     <button
                                                       type="button"
-                                                      onClick={() => handleRemoveProperty(groupIndex, variant, property)}
+                                                      onClick={() => handleRemoveProperty(originalGroupIndex, variant, property)}
                                                       className="mt-6 p-1 text-red-600 hover:text-red-700"
                                                       title="Remove property"
                                                     >
@@ -3276,7 +3407,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                       <button
                                                         key={prop}
                                                         type="button"
-                                                        onClick={() => handleUpdateElement(groupIndex, variant, prop, '')}
+                                                        onClick={() => handleUpdateElement(originalGroupIndex, variant, prop, '')}
                                                         className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                                                         title={`Add ${config.label}`}
                                                       >

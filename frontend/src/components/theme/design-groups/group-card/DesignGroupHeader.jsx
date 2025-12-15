@@ -21,8 +21,10 @@ const DesignGroupHeader = ({
     groupEditMode,
     clipboard,
     copiedIndicator,
+    localGroupName,
     // Handlers
     onUpdateName,
+    onBlurName,
     onToggleDefault,
     onToggleGroupEditMode,
     onImport,
@@ -60,8 +62,9 @@ const DesignGroupHeader = ({
 
                 <input
                     type="text"
-                    value={group.name}
+                    value={localGroupName ?? group.name}
                     onChange={(e) => onUpdateName(groupIndex, e.target.value)}
+                    onBlur={() => onBlurName(groupIndex)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Group name"
                 />
