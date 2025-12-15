@@ -14,6 +14,7 @@ import ColorSelector from '../../form-fields/ColorSelector';
 import FontSelector from '../../form-fields/FontSelector';
 import NumericInput from '../../form-fields/NumericInput';
 import { cssPropertyToKebab } from '../utils/cssConversion';
+import SelectorDisplay from '../SelectorDisplay';
 
 const BreakpointPropertyEditor = ({
     groupIndex,
@@ -100,31 +101,19 @@ const BreakpointPropertyEditor = ({
                         <ChevronRight className="w-4 h-4 text-gray-600" />
                     )}
                     <div className="flex-1">
-                        <div className="font-mono text-sm font-semibold text-gray-900">
-                            {breakpointLabel}
-                        </div>
-                        {/* Breakpoint Selectors Display */}
-                        {partSelectors && partSelectors.length > 0 && (
-                            <div className="mt-1">
-                                {partSelectors.length === 1 ? (
-                                    <div className="inline-block px-1.5 py-0.5 bg-purple-50 text-purple-600 text-xs font-mono rounded">
-                                        {partSelectors[0]}
-                                    </div>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onOpenSelectorPopup('breakpoint', partSelectors, { x: e.clientX, y: e.clientY });
-                                        }}
-                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 text-xs font-mono rounded hover:bg-purple-100 transition-colors"
-                                    >
-                                        {partSelectors.length} selectors
-                                        <ChevronDown className="w-3 h-3" />
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                                                        <div className="font-mono text-sm font-semibold text-gray-900">
+                                                            {breakpointLabel}
+                                                        </div>
+                                                        {/* Breakpoint Selectors Display */}
+                                                        {partSelectors && partSelectors.length > 0 && (
+                                                            <div className="mt-1">
+                                                                <SelectorDisplay
+                                                                    selectors={partSelectors}
+                                                                    type="breakpoint"
+                                                                    onOpenPopup={(selectors, position) => onOpenSelectorPopup('breakpoint', selectors, position)}
+                                                                />
+                                                            </div>
+                                                        )}
                     </div>
                 </button>
                 <div className="flex gap-1">

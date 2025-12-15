@@ -3,13 +3,26 @@
  * 
  * Popup showing list of CSS selectors when there are multiple selectors.
  * Positioned at click location with overflow handling.
+ * Each selector can be clicked to copy to clipboard.
  */
 
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Copy, Check } from 'lucide-react';
 
 const SelectorPopup = ({ selectors, position, type, onClose }) => {
+    const [copiedIndex, setCopiedIndex] = useState(null);
+
     if (!selectors || selectors.length === 0) return null;
+
+    const handleCopy = async (selector, index) => {
+        try {
+            await navigator.clipboard.writeText(selector);
+            setCopiedIndex(index);
+            setTimeout(() => setCopiedIndex(null), 2000);
+        } catch (error) {
+            console.error('Failed to copy selector:', error);
+        }
+    };
 
     return (
         <>
@@ -37,14 +50,34 @@ const SelectorPopup = ({ selectors, position, type, onClose }) => {
                     </button>
                 </div>
                 <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {selectors.map((selector, idx) => (
-                        <div
-                            key={idx}
-                            className={`px-2 py-1 ${type === 'tag' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'} text-xs font-mono rounded`}
-                        >
-                            {selector || '(global)'}
-                        </div>
-                    ))}
+                    {selectors.map((selector, idx) => {
+                        const selectorText = selector || '(global)';
+                        const isCopied = copiedIndex === idx;
+                        return (
+                            <div
+                                key={idx}
+                                className={`flex items-center justify-between gap-2 px-2 py-1.5 ${type === 'tag' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'} text-xs font-mono rounded hover:opacity-80 transition-opacity cursor-pointer`}
+                                onClick={() => handleCopy(selectorText, idx)}
+                            >
+                                <span className="flex-1 select-all">{selectorText}</span>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCopy(selectorText, idx);
+                                    }}
+                                    className="p-1 hover:bg-white/50 rounded transition-colors"
+                                    title="Copy selector"
+                                >
+                                    {isCopied ? (
+                                        <Check className="w-3 h-3 text-green-600" />
+                                    ) : (
+                                        <Copy className="w-3 h-3" />
+                                    )}
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </>

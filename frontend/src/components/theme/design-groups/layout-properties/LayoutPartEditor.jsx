@@ -11,6 +11,7 @@
 import React from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import BreakpointPropertyEditor from './BreakpointPropertyEditor';
+import SelectorDisplay from '../SelectorDisplay';
 
 const BREAKPOINTS = ['sm', 'md', 'lg', 'xl'];
 
@@ -97,14 +98,12 @@ const LayoutPartEditor = ({
                             {Object.keys(availableProperties).length} {Object.keys(availableProperties).length === 1 ? 'property' : 'properties'}
                         </span>
                     )}
-                    {partSelectors && (
-                        <div className="flex flex-wrap gap-1">
-                            {partSelectors.map((selector, idx) => (
-                                <span key={idx} className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-mono rounded">
-                                    {selector}
-                                </span>
-                            ))}
-                        </div>
+                    {partSelectors && partSelectors.length > 0 && (
+                        <SelectorDisplay
+                            selectors={partSelectors}
+                            type="breakpoint"
+                            onOpenPopup={onOpenSelectorPopup}
+                        />
                     )}
                 </button>
                 <button
@@ -122,20 +121,6 @@ const LayoutPartEditor = ({
 
             {isExpanded && (
                 <div className="p-3 pt-0">
-                    {/* Part-specific selectors */}
-                    {partSelectors && (
-                        <div className="mb-2 flex items-center gap-2">
-                            <span className="text-xs text-gray-500">→</span>
-                            <div className="flex flex-wrap gap-1">
-                                {partSelectors.map((selector, idx) => (
-                                    <span key={idx} className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-mono rounded">
-                                        {selector}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Pills for unused breakpoints */}
                     {unusedBreakpoints.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
