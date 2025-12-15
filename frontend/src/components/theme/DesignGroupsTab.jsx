@@ -1462,10 +1462,19 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         // Create new group(s) from JSON
         let groupsToAdd = [];
 
+        // Check for theme copy/paste format first
+        let groupsData = null;
+        if (parsedData.type === 'theme-settings' && parsedData.data?.groups) {
+          // Theme copy/paste format: { type: 'theme-settings', data: { groups: [...] } }
+          groupsData = parsedData.data.groups;
+        } else if (parsedData.groups && Array.isArray(parsedData.groups)) {
+          // Direct format: { groups: [...] }
+          groupsData = parsedData.groups;
+        }
+
         // Auto-detect format
-        if (parsedData.groups && Array.isArray(parsedData.groups)) {
-          // Full structure format: { groups: [...] }
-          groupsToAdd = parsedData.groups.map(group => {
+        if (groupsData) {
+          groupsToAdd = groupsData.map(group => {
             const newGroup = {
               name: group.name || `Imported Group ${groups.length + 1}`,
               className: group.className || generateClassName(group.name || `Imported Group ${groups.length + 1}`),
@@ -1479,6 +1488,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
               colorScheme: group.colorScheme || group.color_scheme || { background: null, text: null },
               elements: group.elements || {},
               layoutProperties: group.layoutProperties || group.layout_properties || {},
+              // Preserve calculatedSelectors if present, otherwise it will be recalculated
+              ...(group.calculatedSelectors && { calculatedSelectors: group.calculatedSelectors }),
             };
             return newGroup;
           });
@@ -1497,10 +1508,12 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
             colorScheme: parsedData.colorScheme || parsedData.color_scheme || { background: null, text: null },
             elements: parsedData.elements || {},
             layoutProperties: parsedData.layoutProperties || parsedData.layout_properties || {},
+            // Preserve calculatedSelectors if present
+            ...(parsedData.calculatedSelectors && { calculatedSelectors: parsedData.calculatedSelectors }),
           };
           groupsToAdd = [newGroup];
         } else {
-          addNotification({ type: 'error', message: 'Invalid JSON format. Expected { groups: [...] } or { name, elements, ... }' });
+          addNotification({ type: 'error', message: 'Invalid JSON format. Expected theme copy/paste format ({ type: "theme-settings", data: { groups: [...] } }), direct format ({ groups: [...] }), or single group format ({ name, elements, ... })' });
           return;
         }
 
