@@ -1,9 +1,28 @@
-import React, { Suspense, useMemo, useCallback } from 'react'
+import React, { Suspense, useMemo, useCallback, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
 import { getFieldComponent, FIELD_COMPONENTS } from '../form-fields'
 import { Loader2 } from 'lucide-react'
 import LocalStateFieldWrapper from './LocalStateFieldWrapper'
 import { formatFieldLabel } from '../../utils/labelFormatting'
+import { api } from '../../api/client'
+import { endpoints } from '../../api/endpoints'
+
+/**
+ * Simple slugify function to normalize anchor values for comparison
+ */
+const slugify = (text) => {
+    if (!text || typeof text !== 'string') return ''
+    return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')     // Replace spaces with -
+        .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+        .replace(/\-\-+/g, '-')   // Replace multiple - with single -
+        .replace(/^-+/, '')       // Trim - from start of text
+        .replace(/-+$/, '')       // Trim - from end of text
+}
 
 /**
  * FieldPlaceholder - Shows a visual representation of the field while loading
@@ -129,6 +148,111 @@ const SchemaFieldRenderer = ({
     schema = null, // Full schema for resolving $refs
     ...props
 }) => {
+    // Store original anchor value to exclude from duplicate check
+    const originalAnchorRef = useRef(value || '')
+    
+    // Update original anchor ref when value changes from external source (initial mount)
+    React.useEffect(() => {
+        if (value !== undefined) {
+            originalAnchorRef.current = value || ''
+        }
+    }, []) // Only run on mount
+
+    // Create anchor validation function factory
+    const createAnchorValidation = useCallback((pageId) => {
+        return async (fieldName, currentValue) => {
+            if (!pageId || !currentValue || currentValue.trim() === '') {
+                // Empty value - no validation needed
+                return {
+                    isValid: true,
+                    errors: [],
+                    warnings: []
+                }
+            }
+
+            const normalizedCurrent = slugify(currentValue)
+            const normalizedOriginal = slugify(originalAnchorRef.current)
+
+            // If it's the same as the original, it's not a duplicate
+            if (normalizedCurrent === normalizedOriginal) {
+                return {
+                    isValid: true,
+                    errors: [],
+                    warnings: []
+                }
+            }
+
+            try {
+                // Fetch anchors from the page
+                const response = await api.get(endpoints.pages.anchors(pageId))
+                let anchors = []
+                
+                // Handle different response formats
+                if (Array.isArray(response)) {
+                    anchors = response
+                } else if (response && Array.isArray(response.results)) {
+                    anchors = response.results
+                } else if (response && Array.isArray(response.data)) {
+                    anchors = response.data
+                }
+
+                // Check if the normalized current value matches any anchor (excluding original)
+                const hasDuplicate = anchors.some(anchor => {
+                    const anchorValue = anchor.anchor || anchor
+                    const normalizedAnchor = typeof anchorValue === 'string' ? slugify(anchorValue) : ''
+                    return normalizedAnchor === normalizedCurrent && normalizedAnchor !== normalizedOriginal
+                })
+
+                if (hasDuplicate) {
+                    return {
+                        isValid: true, // Still valid, just a warning
+                        errors: [],
+                        warnings: ['This anchor already exists on this page']
+                    }
+                }
+
+                return {
+                    isValid: true,
+                    errors: [],
+                    warnings: []
+                }
+            } catch (error) {
+                console.error('[AnchorValidation] Error validating anchor:', error)
+                // On error, don't block the user - just return valid
+                return {
+                    isValid: true,
+                    errors: [],
+                    warnings: []
+                }
+            }
+        }
+    }, [])
+
+    // Create anchor validation function if this is an anchor field with pageId
+    const anchorValidation = useMemo(() => {
+        if (fieldName === 'anchor' && context?.pageId) {
+            return createAnchorValidation(context.pageId)
+        }
+        return null
+    }, [fieldName, context?.pageId, createAnchorValidation])
+
+    // Combine anchor validation with existing validation
+    const combinedValidation = useCallback(async (fieldName, value) => {
+        // First run anchor validation if applicable
+        if (anchorValidation) {
+            const anchorResult = await anchorValidation(fieldName, value)
+            // If anchor validation found a duplicate, return it
+            if (anchorResult.warnings?.length > 0) {
+                return anchorResult
+            }
+        }
+        // Otherwise, run the existing validation
+        if (props.onValidation) {
+            return await props.onValidation(fieldName, value)
+        }
+        return null
+    }, [anchorValidation, props.onValidation])
+
     // Map JSON Schema type/format to our field type system
     const mapSchemaToFieldType = (schema) => {
         const { type, format, enum: enumValues, controlType } = schema
@@ -288,7 +412,7 @@ const SchemaFieldRenderer = ({
                     FieldComponent={FieldComponent}
                     fieldProps={fieldProps}
                     onFieldChange={onChange}
-                    onFieldValidation={props.onValidation}
+                    onFieldValidation={combinedValidation}
                     debounceMs={200}
                     validateOnChange={true}
                 />
@@ -431,7 +555,7 @@ const SchemaFieldRenderer = ({
                 FieldComponent={FieldComponent}
                 fieldProps={fieldProps}
                 onFieldChange={onChange}
-                onFieldValidation={props.onValidation}
+                onFieldValidation={combinedValidation}
                 debounceMs={200}
                 validateOnChange={true}
             />
