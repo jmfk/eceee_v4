@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { Image as ImageIcon } from 'lucide-react'
-import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 
 /**
  * EASY Header Widget Component
@@ -8,7 +7,7 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
  * - Mobile: 640x80px (default)
  * - Tablet: 1024x112px (default)
  * - Desktop: 1280x112px (default)
- * - Uses object-fit: cover to fill the space
+ * - Uses original images as-is, CSS handles clipping/overflow
  * - Supports per-breakpoint alignment (left, center, right)
  */
 const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
@@ -28,118 +27,16 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
         alignment = 'center'
     } = config
 
-    // State for optimized image URLs (1x and 2x for retina)
-    const [mobileUrl, setMobileUrl] = useState('')
-    const [mobileUrl2x, setMobileUrl2x] = useState('')
-    const [tabletUrl, setTabletUrl] = useState('')
-    const [tabletUrl2x, setTabletUrl2x] = useState('')
-    const [desktopUrl, setDesktopUrl] = useState('')
-    const [desktopUrl2x, setDesktopUrl2x] = useState('')
-    const [imageLoading, setImageLoading] = useState(false)
+    // Helper function to extract original URL from image object
+    const getImageUrl = (imageObj) => {
+        if (!imageObj) return ''
+        return imageObj.imgproxyBaseUrl || imageObj.fileUrl || imageObj.imgproxy_base_url || imageObj.file_url || ''
+    }
 
-    // Load optimized image URLs from backend API
-    useEffect(() => {
-        const loadImages = async () => {
-            setImageLoading(true)
-
-            try {
-                // Desktop image (1x and 2x)
-                if (image) {
-                    const url1x = await getImgproxyUrlFromImage(image, {
-                        width,
-                        height,
-                        resizeType: 'fill'
-                    })
-                    const url2x = await getImgproxyUrlFromImage(image, {
-                        width: width * 2,
-                        height: height * 2,
-                        resizeType: 'fill'
-                    })
-                    setDesktopUrl(url1x)
-                    setDesktopUrl2x(url2x)
-                }
-
-                // Tablet image (1x and 2x, fallback to desktop)
-                if (tabletImage) {
-                    const url1x = await getImgproxyUrlFromImage(tabletImage, {
-                        width: tabletWidth,
-                        height: tabletHeight,
-                        resizeType: 'fill'
-                    })
-                    const url2x = await getImgproxyUrlFromImage(tabletImage, {
-                        width: tabletWidth * 2,
-                        height: tabletHeight * 2,
-                        resizeType: 'fill'
-                    })
-                    setTabletUrl(url1x)
-                    setTabletUrl2x(url2x)
-                } else if (image) {
-                    const url1x = await getImgproxyUrlFromImage(image, {
-                        width: tabletWidth,
-                        height: tabletHeight,
-                        resizeType: 'fill'
-                    })
-                    const url2x = await getImgproxyUrlFromImage(image, {
-                        width: tabletWidth * 2,
-                        height: tabletHeight * 2,
-                        resizeType: 'fill'
-                    })
-                    setTabletUrl(url1x)
-                    setTabletUrl2x(url2x)
-                }
-
-                // Mobile image (1x and 2x, fallback to tablet or desktop)
-                if (mobileImage) {
-                    const url1x = await getImgproxyUrlFromImage(mobileImage, {
-                        width: mobileWidth,
-                        height: mobileHeight,
-                        resizeType: 'fill'
-                    })
-                    const url2x = await getImgproxyUrlFromImage(mobileImage, {
-                        width: mobileWidth * 2,
-                        height: mobileHeight * 2,
-                        resizeType: 'fill'
-                    })
-                    setMobileUrl(url1x)
-                    setMobileUrl2x(url2x)
-                } else if (tabletImage) {
-                    const url1x = await getImgproxyUrlFromImage(tabletImage, {
-                        width: mobileWidth,
-                        height: mobileHeight,
-                        resizeType: 'fill'
-                    })
-                    const url2x = await getImgproxyUrlFromImage(tabletImage, {
-                        width: mobileWidth * 2,
-                        height: mobileHeight * 2,
-                        resizeType: 'fill'
-                    })
-                    setMobileUrl(url1x)
-                    setMobileUrl2x(url2x)
-                } else if (image) {
-                    const url1x = await getImgproxyUrlFromImage(image, {
-                        width: mobileWidth,
-                        height: mobileHeight,
-                        resizeType: 'fill'
-                    })
-                    const url2x = await getImgproxyUrlFromImage(image, {
-                        width: mobileWidth * 2,
-                        height: mobileHeight * 2,
-                        resizeType: 'fill'
-                    })
-                    setMobileUrl(url1x)
-                    setMobileUrl2x(url2x)
-                }
-            } catch (error) {
-                console.error('Failed to load optimized header images:', error)
-            } finally {
-                setImageLoading(false)
-            }
-        }
-
-        if (image || tabletImage || mobileImage) {
-            loadImages()
-        }
-    }, [image, tabletImage, mobileImage, width, height, tabletWidth, tabletHeight, mobileWidth, mobileHeight])
+    // Get original image URLs directly (no resizing)
+    const desktopUrl = getImageUrl(image)
+    const tabletUrl = getImageUrl(tabletImage) || desktopUrl
+    const mobileUrl = getImageUrl(mobileImage) || tabletUrl || desktopUrl
 
     // Map alignment to background-position
     const getBackgroundPosition = (align) => {
@@ -165,18 +62,13 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
 
         return (
             <div className="header-widget w-full overflow-hidden relative">
-                {imageLoading && (
-                    <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
-                        Optimizing images...
-                    </div>
-                )}
                 <div className="header-image w-full" />
                 <style dangerouslySetInnerHTML={{
                     __html: `
                     .header-widget .header-image {
                         width: 100%;
                         height: ${mobileHeight}px;
-                        background-image: ${mobileUrl && mobileUrl2x ? `image-set(url('${mobileUrl}') 1x, url('${mobileUrl2x}') 2x)` : `url('${mobileUrl}')`};
+                        background-image: ${mobileUrl ? `url('${mobileUrl}')` : 'none'};
                         background-size: cover;
                         background-position: ${getBackgroundPosition(mobileAlignment)};
                         background-repeat: no-repeat;
@@ -185,7 +77,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
                     @media (min-width: ${mobileWidth}px) {
                         .header-widget .header-image {
                             height: ${tabletHeight}px;
-                            background-image: ${(tabletUrl || mobileUrl) && (tabletUrl2x || mobileUrl2x) ? `image-set(url('${tabletUrl || mobileUrl}') 1x, url('${tabletUrl2x || mobileUrl2x}') 2x)` : `url('${tabletUrl || mobileUrl}')`};
+                            background-image: ${tabletUrl ? `url('${tabletUrl}')` : 'none'};
                             background-position: ${getBackgroundPosition(tabletAlignment)};
                         }
                     }
@@ -193,7 +85,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
                     @media (min-width: ${tabletWidth}px) {
                         .header-widget .header-image {
                             height: ${height}px;
-                            background-image: ${(desktopUrl || tabletUrl || mobileUrl) && (desktopUrl2x || tabletUrl2x || mobileUrl2x) ? `image-set(url('${desktopUrl || tabletUrl || mobileUrl}') 1x, url('${desktopUrl2x || tabletUrl2x || mobileUrl2x}') 2x)` : `url('${desktopUrl || tabletUrl || mobileUrl}')`};
+                            background-image: ${desktopUrl ? `url('${desktopUrl}')` : 'none'};
                             background-position: ${getBackgroundPosition(alignment)};
                         }
                     }
@@ -215,7 +107,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
                 .header-widget .header-image {
                     width: 100%;
                     height: ${mobileHeight}px;
-                    background-image: ${mobileUrl && mobileUrl2x ? `image-set(url('${mobileUrl}') 1x, url('${mobileUrl2x}') 2x)` : `url('${mobileUrl}')`};
+                    background-image: ${mobileUrl ? `url('${mobileUrl}')` : 'none'};
                     background-size: cover;
                     background-position: ${getBackgroundPosition(mobileAlignment)};
                     background-repeat: no-repeat;
@@ -224,7 +116,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
                 @media (min-width: ${mobileWidth}px) {
                     .header-widget .header-image {
                         height: ${tabletHeight}px;
-                        background-image: ${(tabletUrl || mobileUrl) && (tabletUrl2x || mobileUrl2x) ? `image-set(url('${tabletUrl || mobileUrl}') 1x, url('${tabletUrl2x || mobileUrl2x}') 2x)` : `url('${tabletUrl || mobileUrl}')`};
+                        background-image: ${tabletUrl ? `url('${tabletUrl}')` : 'none'};
                         background-position: ${getBackgroundPosition(tabletAlignment)};
                     }
                 }
@@ -232,7 +124,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
                 @media (min-width: ${tabletWidth}px) {
                     .header-widget .header-image {
                         height: ${height}px;
-                        background-image: ${(desktopUrl || tabletUrl || mobileUrl) && (desktopUrl2x || tabletUrl2x || mobileUrl2x) ? `image-set(url('${desktopUrl || tabletUrl || mobileUrl}') 1x, url('${desktopUrl2x || tabletUrl2x || mobileUrl2x}') 2x)` : `url('${desktopUrl || tabletUrl || mobileUrl}')`};
+                        background-image: ${desktopUrl ? `url('${desktopUrl}')` : 'none'};
                         background-position: ${getBackgroundPosition(alignment)};
                     }
                 }

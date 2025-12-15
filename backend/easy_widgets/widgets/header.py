@@ -233,48 +233,26 @@ class HeaderWidget(BaseWidget):
         return html, css
 
     def prepare_template_context(self, config, context=None):
-        """Build header background styling with manual dimensions from config"""
-        from file_manager.imgproxy import imgproxy_service
+        """Build header background styling with original images (no resizing)"""
 
-        def _build_image_set_var(
+        def _build_image_var(
             *,
             css_var_name: str,
             image_obj: Optional[dict],
-            width: int,
-            height: int,
         ) -> Optional[str]:
-            """Build CSS image-set variable using manual dimensions"""
+            """Build CSS variable using original image URL (no resizing)"""
             if not image_obj:
                 return None
 
-            imgproxy_base_url = image_obj.get("imgproxy_base_url") or image_obj.get(
+            # Extract original URL directly (no imgproxy resizing)
+            original_url = image_obj.get("imgproxy_base_url") or image_obj.get(
                 "file_url"
             )
-            if not imgproxy_base_url:
+            if not original_url:
                 return None
 
-            # Generate 1x and 2x versions
-            entries: list[tuple[int, str]] = []
-            for scale in (1, 2):
-                url = imgproxy_service.generate_url(
-                    source_url=imgproxy_base_url,
-                    width=width * scale,
-                    height=height * scale,
-                    resize_type="fill",
-                )
-                if url:
-                    entries.append((scale, url))
-
-            if not entries:
-                return None
-
-            if len(entries) == 1:
-                return f"{css_var_name}: url('{entries[0][1]}');"
-
-            image_set_parts = ", ".join(
-                [f"url('{url}') {scale}x" for scale, url in entries]
-            )
-            return f"{css_var_name}: image-set({image_set_parts});"
+            # Use original URL as-is
+            return f"{css_var_name}: url('{original_url}');"
 
         template_config = super().prepare_template_context(config, context)
 
@@ -299,31 +277,25 @@ class HeaderWidget(BaseWidget):
         mobile_source = mobile_image or tablet_image or image
 
         # Desktop (uses desktop image only)
-        desktop_style = _build_image_set_var(
+        desktop_style = _build_image_var(
             css_var_name="--desktop-bg-image",
             image_obj=image,
-            width=desktop_width,
-            height=desktop_height,
         )
         if desktop_style:
             style_parts.append(desktop_style)
 
         # Tablet (fallback to desktop image)
-        tablet_style = _build_image_set_var(
+        tablet_style = _build_image_var(
             css_var_name="--tablet-bg-image",
             image_obj=tablet_source,
-            width=tablet_width,
-            height=tablet_height,
         )
         if tablet_style:
             style_parts.append(tablet_style)
 
         # Mobile (fallback to tablet, then desktop)
-        mobile_style = _build_image_set_var(
+        mobile_style = _build_image_var(
             css_var_name="--mobile-bg-image",
             image_obj=mobile_source,
-            width=mobile_width,
-            height=mobile_height,
         )
         if mobile_style:
             style_parts.append(mobile_style)
