@@ -60,15 +60,15 @@ class HeaderWidget(BaseWidget):
 
         @media (min-width: 1024px) {
             .widget-type-header {
-                background-image: var(--header-widget-background-lg, var(--header-widget-background-md, var(--header-widget-background-sm, none)));
-                height: var(--header-height-lg, var(--header-height-md, 112px));
+                background-image: var(--header-widget-background-lg, none);
+                height: var(--header-height-lg, 112px);
             }
         }
 
         @media (min-width: 1280px) {
             .widget-type-header {
-                background-image: var(--header-widget-background-xl, var(--header-widget-background-lg, var(--header-widget-background-md, var(--header-widget-background-sm, none))));
-                height: var(--header-height-xl, var(--header-height-lg, var(--header-height-md, 112px)));
+                background-image: var(--header-widget-background-xl, none);
+                height: var(--header-height-xl, 112px);
             }
         }
     """

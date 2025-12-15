@@ -147,17 +147,17 @@ class NavbarWidget(BaseWidget):
 
         @media (min-width: 1024px) {
             .widget-type-navbar {
-                background-image: var(--navbar-widget-background-lg, var(--navbar-widget-background-md, var(--navbar-widget-background-sm, none)));
-                background-color: var(--navbar-bg-color-lg, var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6)));
-                color: var(--navbar-text-color-lg, var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff)));
+                background-image: var(--navbar-widget-background-lg, none);
+                background-color: var(--navbar-bg-color-lg, #3b82f6);
+                color: var(--navbar-text-color-lg, #ffffff);
             }
         }
 
         @media (min-width: 1280px) {
             .widget-type-navbar {
-                background-image: var(--navbar-widget-background-xl, var(--navbar-widget-background-lg, var(--navbar-widget-background-md, var(--navbar-widget-background-sm, none))));
-                background-color: var(--navbar-bg-color-xl, var(--navbar-bg-color-lg, var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6)));
-                color: var(--navbar-text-color-xl, var(--navbar-text-color-lg, var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff)));
+                background-image: var(--navbar-widget-background-xl, none);
+                background-color: var(--navbar-bg-color-xl, #3b82f6);
+                color: var(--navbar-text-color-xl, #ffffff);
             }
         }
 

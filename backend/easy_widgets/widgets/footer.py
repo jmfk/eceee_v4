@@ -74,17 +74,17 @@ class FooterWidget(BaseWidget):
 
     @media (min-width: 1024px) {
         .widget-type-footer {
-            background-image: var(--footer-widget-background-lg, var(--footer-widget-background-md, var(--footer-widget-background-sm, none)));
-            background-color: var(--footer-bg-color-lg, var(--footer-bg-color-md, var(--footer-bg-color-sm, transparent)));
-            color: var(--footer-text-color-lg, var(--footer-text-color-md, var(--footer-text-color-sm, inherit)));
+            background-image: var(--footer-widget-background-lg, none);
+            background-color: var(--footer-bg-color-lg, transparent);
+            color: var(--footer-text-color-lg, inherit);
         }
     }
 
     @media (min-width: 1280px) {
         .widget-type-footer {
-            background-image: var(--footer-widget-background-xl, var(--footer-widget-background-lg, var(--footer-widget-background-md, var(--footer-widget-background-sm, none))));
-            background-color: var(--footer-bg-color-xl, var(--footer-bg-color-lg, var(--footer-bg-color-md, var(--footer-bg-color-sm, transparent)));
-            color: var(--footer-text-color-xl, var(--footer-text-color-lg, var(--footer-text-color-md, var(--footer-text-color-sm, inherit)));
+            background-image: var(--footer-widget-background-xl, none);
+            background-color: var(--footer-bg-color-xl, transparent);
+            color: var(--footer-text-color-xl, inherit);
         }
     }
     
