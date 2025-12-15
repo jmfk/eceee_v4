@@ -8,7 +8,7 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0004_add_tenant_to_webpage'),
+        ('core', '0001_initial'),
         ('webpages', '0062_make_tenant_required'),
     ]
 

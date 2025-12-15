@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0005_enable_rls_for_webpage'),
+        ('core', '0001_initial'),
         ('file_manager', '0010_mediafile_metadata'),
     ]
 

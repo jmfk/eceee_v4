@@ -52,7 +52,7 @@ def reverse_migration(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0004_add_tenant_to_webpage'),
+        ('core', '0001_initial'),
         ('webpages', '0063_add_tenant_to_webpage'),
     ]
 
