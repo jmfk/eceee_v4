@@ -996,6 +996,9 @@ class MediaFile(models.Model):
         storage = S3MediaStorage()
         source_url = storage.get_public_url(self.file_path)
 
+        # Use file hash as version for cache-busting
+        kwargs.setdefault("version", self.file_hash)
+
         return get_image_url(
             source_url=source_url, width=width, height=height, **kwargs
         )
@@ -1019,7 +1022,7 @@ class MediaFile(models.Model):
         storage = S3MediaStorage()
         source_url = storage.get_public_url(self.file_path)
 
-        return get_thumbnail_url(source_url=source_url, size=size)
+        return get_thumbnail_url(source_url=source_url, size=size, version=self.file_hash)
 
     def get_preset_url(self, preset):
         """
@@ -1040,7 +1043,7 @@ class MediaFile(models.Model):
         storage = S3MediaStorage()
         source_url = storage.get_public_url(self.file_path)
 
-        return imgproxy_service.get_preset_url(source_url=source_url, preset=preset)
+        return imgproxy_service.get_preset_url(source_url=source_url, preset=preset, version=self.file_hash)
 
     def get_optimized_url(self, width=None, height=None, webp=True, quality=85):
         """
@@ -1070,6 +1073,7 @@ class MediaFile(models.Model):
             height=height,
             webp=webp,
             quality=quality,
+            version=self.file_hash,
         )
 
     def get_file_url(self):

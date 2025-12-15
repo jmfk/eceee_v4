@@ -401,6 +401,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
             # Scenario 3: Unique hash -> overwrite object in-place at current key
             s3_storage = S3MediaStorage()
+            old_source_url = s3_storage.get_public_url(media_file.file_path)
             upload_result = s3_storage.overwrite_file(media_file.file_path, uploaded_file)
 
             with transaction.atomic():
@@ -413,6 +414,11 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 media_file.last_modified_by = request.user
                 media_file.replaced_by = None
                 media_file.save()
+
+            # Clear imgproxy cache entries for the old source URL
+            # Since we now use version parameters, old cache entries will be bypassed,
+            # but we should still try to clear them for immediate effect
+            self._clear_imgproxy_cache(old_source_url)
 
             # Log the file replacement
             SecurityAuditLogger.log_file_upload(
@@ -437,6 +443,62 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 {"error": f"Failed to replace file: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def _clear_imgproxy_cache(self, source_url: str):
+        """
+        Clear Django cache entries for imgproxy URLs matching the source URL.
+        
+        Args:
+            source_url: The source URL to clear cache entries for
+        """
+        from django.core.cache import cache
+        import hashlib
+        
+        try:
+            # Try to clear cache entries using pattern matching (Redis backend)
+            # Cache keys are in format: imgproxy_url:{md5_hash}
+            # We need to find all keys that contain this source_url in their hash
+            
+            # Try delete_pattern if available (Redis cache backend)
+            try:
+                # Generate pattern to match cache keys for this source URL
+                # Since cache keys include all parameters, we'll try to clear
+                # entries that might contain this source URL
+                pattern = f"imgproxy_url:*"
+                cache.delete_pattern(pattern)
+                logger.info(f"Cleared imgproxy cache pattern: {pattern}")
+            except AttributeError:
+                # Pattern deletion not available (non-Redis cache)
+                # Try to clear common cache key variations
+                # Generate cache keys for common parameter combinations
+                common_params = [
+                    {"width": None, "height": None, "resize_type": "fit", "gravity": "sm"},
+                    {"width": 150, "height": 150, "resize_type": "fill", "gravity": "sm"},
+                    {"width": 300, "height": 300, "resize_type": "fit"},
+                    {"width": 600, "height": 600, "resize_type": "fit"},
+                    {"width": 1280, "height": 720, "resize_type": "fill", "gravity": "sm"},
+                ]
+                
+                for params in common_params:
+                    cache_key_parts = [
+                        source_url,
+                        str(params.get("width")),
+                        str(params.get("height")),
+                        params.get("resize_type", "fit"),
+                        params.get("gravity", "sm"),
+                        str(params.get("quality")),
+                        str(params.get("format")),
+                        str(params.get("preset")),
+                    ]
+                    cache_key_string = "|".join(str(p) for p in cache_key_parts if p)
+                    cache_key = f"imgproxy_url:{hashlib.md5(cache_key_string.encode()).hexdigest()}"
+                    cache.delete(cache_key)
+                
+                logger.info(f"Cleared imgproxy cache entries for source URL: {source_url}")
+                
+        except Exception as e:
+            # Don't fail the request if cache clearing fails
+            logger.warning(f"Failed to clear imgproxy cache for {source_url}: {e}")
 
     @action(detail=True, methods=["post"])
     def add_tags(self, request, pk=None):

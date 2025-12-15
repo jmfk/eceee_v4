@@ -47,6 +47,7 @@ class ImgProxyService:
         quality: Optional[int] = None,
         format: Optional[str] = None,
         preset: Optional[str] = None,
+        version: Optional[str] = None,
         **kwargs,
     ) -> str:
         """
@@ -61,6 +62,7 @@ class ImgProxyService:
             quality: JPEG/WebP quality (1-100)
             format: Output format ('jpg', 'png', 'webp', 'avif', 'gif', 'ico', 'svg')
             preset: Predefined preset name
+            version: Version parameter for cache-busting (e.g., file hash or timestamp)
             **kwargs: Additional processing options
 
         Returns:
@@ -93,6 +95,12 @@ class ImgProxyService:
             for key, value in kwargs.items():
                 if value is not None:
                     processing_options.append(f"{key}:{value}")
+
+            # Add version parameter to source URL for cache-busting
+            if version:
+                # Check if source_url already has query parameters
+                separator = "&" if "?" in source_url else "?"
+                source_url = f"{source_url}{separator}v={version}"
 
             # Encode source URL
             encoded_source_url = (
@@ -148,18 +156,19 @@ class ImgProxyService:
             logger.error(f"Failed to generate imgproxy signature: {e}")
             return "unsigned"
 
-    def get_preset_url(self, source_url: str, preset: str) -> str:
+    def get_preset_url(self, source_url: str, preset: str, version: Optional[str] = None) -> str:
         """
         Generate imgproxy URL using a predefined preset.
 
         Args:
             source_url: Source image URL
             preset: Preset name (thumbnail, small, medium, large, hero, avatar)
+            version: Version parameter for cache-busting
 
         Returns:
             imgproxy URL with preset
         """
-        return self.generate_url(source_url=source_url, preset=preset)
+        return self.generate_url(source_url=source_url, preset=preset, version=version)
 
     def get_optimized_url(
         self,
@@ -168,6 +177,7 @@ class ImgProxyService:
         height: Optional[int] = None,
         webp: bool = True,
         quality: int = 85,
+        version: Optional[str] = None,
     ) -> str:
         """
         Generate optimized image URL with modern format support.
@@ -178,6 +188,7 @@ class ImgProxyService:
             height: Target height
             webp: Enable WebP format detection
             quality: Image quality
+            version: Version parameter for cache-busting
 
         Returns:
             Optimized imgproxy URL
@@ -191,6 +202,7 @@ class ImgProxyService:
             resize_type="fit",
             format=format_type,
             quality=quality,
+            version=version,
         )
 
     def _constrain_dimensions(
@@ -399,19 +411,20 @@ def get_image_url(
     )
 
 
-def get_thumbnail_url(source_url: str, size: int = 150) -> str:
+def get_thumbnail_url(source_url: str, size: int = 150, version: Optional[str] = None) -> str:
     """
     Generate thumbnail URL.
 
     Args:
         source_url: Source image URL
         size: Thumbnail size (square)
+        version: Version parameter for cache-busting
 
     Returns:
         Thumbnail imgproxy URL
     """
     return imgproxy_service.generate_url(
-        source_url=source_url, width=size, height=size, resize_type="fill", gravity="sm"
+        source_url=source_url, width=size, height=size, resize_type="fill", gravity="sm", version=version
     )
 
 

@@ -72,6 +72,7 @@ def sign_imgproxy_url(request):
         brightness = request.data.get("brightness")
         contrast = request.data.get("contrast")
         grayscale = request.data.get("grayscale")
+        version = request.data.get("version")
 
         # Create cache key from parameters
         cache_key_parts = [
@@ -88,6 +89,7 @@ def sign_imgproxy_url(request):
             str(brightness),
             str(contrast),
             str(grayscale),
+            str(version),
         ]
         cache_key_string = "|".join(str(p) for p in cache_key_parts if p)
         cache_key = f"imgproxy_url:{hashlib.md5(cache_key_string.encode()).hexdigest()}"
@@ -126,6 +128,7 @@ def sign_imgproxy_url(request):
             quality=quality,
             format=format_type,
             preset=preset,
+            version=version,
             **kwargs,
         )
 
@@ -211,6 +214,7 @@ def batch_sign_imgproxy_urls(request):
                     quality=req_data.get("quality"),
                     format=req_data.get("format"),
                     preset=req_data.get("preset"),
+                    version=req_data.get("version"),
                 )
 
                 results.append(
@@ -300,6 +304,9 @@ def generate_responsive_imgproxy_urls(request):
         densities = request.data.get("densities", [1, 2])
         width_multiplier = request.data.get("width_multiplier", 1.0)
 
+        # Version parameter for cache-busting
+        version = request.data.get("version")
+        
         # Create cache key
         cache_key_parts = [
             source_url,
@@ -312,6 +319,7 @@ def generate_responsive_imgproxy_urls(request):
             str(format_type),
             str(densities),
             str(width_multiplier),
+            str(version),
         ]
         cache_key_string = "|".join(str(p) for p in cache_key_parts if p)
         cache_key = f"imgproxy_responsive:{hashlib.md5(cache_key_string.encode()).hexdigest()}"
@@ -350,6 +358,7 @@ def generate_responsive_imgproxy_urls(request):
                         density_width = int(density_height / aspect_ratio)
                 
                 # Generate URL
+                version = request.data.get("version")
                 img_url = imgproxy_service.generate_url(
                     source_url=source_url,
                     width=density_width,
@@ -358,6 +367,7 @@ def generate_responsive_imgproxy_urls(request):
                     gravity=gravity,
                     quality=quality,
                     format=format_type,
+                    version=version,
                 )
                 
                 density_key = f"{density}x"
