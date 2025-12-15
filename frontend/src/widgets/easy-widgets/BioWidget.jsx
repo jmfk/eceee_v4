@@ -19,7 +19,7 @@ import MediaSelectModal from '../../components/media/MediaSelectModal'
  * Vanilla JS Editor Wrapper Component for Bio Text
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId }) => {
+const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -36,6 +36,7 @@ const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimen
                 namespace,
                 slotDimensions,
                 pageId,
+                siteRootId,  // Pass siteRootId for link picker navigation
                 detachedToolbar: true,
                 allowedFormats: ['<p>', '<h3>', '<h4>']
             })
@@ -250,6 +251,7 @@ const BioWidget = memo(({
                         namespace={namespace}
                         slotDimensions={slotConfig?.dimensions}
                         pageId={context?.pageId}
+                        siteRootId={context?.siteRootId}
                     />
                 </div>
                 {/* Media Insert Modal */}

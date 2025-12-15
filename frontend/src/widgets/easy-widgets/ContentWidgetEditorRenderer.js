@@ -546,6 +546,7 @@ class ContentWidgetEditorRenderer {
         this.namespace = options.namespace || null // Namespace for media browser
         this.slotDimensions = options.slotDimensions || null // Slot dimensions for imgproxy sizing
         this.pageId = options.pageId || null // Page ID for theme context
+        this.siteRootId = options.siteRootId || null // Site root ID for link picker navigation
 
         // Theme configuration
         this.maxHeaderLevel = options.maxHeaderLevel || this.getThemeHeaderLevel() || 3

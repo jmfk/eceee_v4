@@ -52,7 +52,7 @@ const cleanHTML = (html) => {
  * Vanilla JS Editor Wrapper Component
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId }) => {
+const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -69,6 +69,7 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
                 namespace,  // Pass namespace for media browser
                 slotDimensions,  // Pass slot dimensions for imgproxy sizing
                 pageId,  // Pass pageId for theme context
+                siteRootId,  // Pass siteRootId for link picker navigation
                 detachedToolbar: true,  // Enable global toolbar mode
                 allowedFormats: ['<p>', '<h1>', '<h2>', '<h3>', '<h4>']  // Restrict to Paragraph, H1-H4
             })
@@ -233,6 +234,7 @@ const ContentWidget = memo(({
                 namespace={namespace}
                 slotDimensions={slotConfig?.dimensions}
                 pageId={context?.pageId}
+                siteRootId={context?.siteRootId}
             />
         )
     }

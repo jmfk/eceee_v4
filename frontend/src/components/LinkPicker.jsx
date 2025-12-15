@@ -328,7 +328,7 @@ const PageBrowser = ({
  * Anchor Selector Component
  */
 const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
-    const { data: anchorsData, isLoading } = useQuery({
+    const { data: anchorsData, isLoading, error } = useQuery({
         queryKey: ['page-anchors', pageId],
         queryFn: async () => {
             if (!pageId) return []
@@ -339,6 +339,10 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
             }
             if (response && Array.isArray(response.results)) {
                 return response.results
+            }
+            // Check for Axios response.data format
+            if (response && Array.isArray(response.data)) {
+                return response.data
             }
             return []
         },
@@ -362,6 +366,15 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
             <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Loading anchors...
+            </div>
+        )
+    }
+
+    if (error) {
+        console.error('[AnchorSelector] Error fetching anchors:', error)
+        return (
+            <div className="text-sm text-red-500 p-2">
+                Error loading anchors: {error.message}
             </div>
         )
     }
@@ -456,11 +469,12 @@ const InternalPageTab = ({
         }
     }, [pathLookupResult, data, onChange])
 
+    // Update selectedPage when pageInfo loads (only if we don't have a selected page yet)
     useEffect(() => {
-        if (pageInfo) {
+        if (pageInfo && !selectedPage) {
             setSelectedPage(pageInfo)
         }
-    }, [pageInfo])
+    }, [pageInfo, selectedPage])
 
     const handleSelectPage = (page) => {
         setSelectedPage(page)
@@ -481,18 +495,49 @@ const InternalPageTab = ({
         })
     }
 
+    // Handle current page selection
+    const handleSelectCurrentPage = () => {
+        if (currentPageId) {
+            handleSelectPage({
+                id: currentPageId,
+                title: 'Current Page',
+                shortTitle: 'Current Page'
+            })
+        }
+    }
+
     return (
         <div className="grid grid-cols-2 gap-4 h-80">
             {/* Page browser */}
-            <div className="border border-gray-200 rounded-md overflow-hidden">
-                <PageBrowser
-                    selectedPageId={data.pageId}
-                    onSelectPage={handleSelectPage}
-                    currentSiteRootId={currentSiteRootId}
-                    searchTerm={searchTerm}
-                    onSearchChange={setSearchTerm}
-                    initialParentId={pageInfo?.parentId || null}
-                />
+            <div className="border border-gray-200 rounded-md overflow-hidden flex flex-col">
+                {/* Current Page quick select */}
+                {currentPageId && (
+                    <div className="p-2 border-b border-gray-200 bg-blue-50">
+                        <button
+                            onClick={handleSelectCurrentPage}
+                            className={`w-full px-3 py-2 text-sm rounded-md transition-colors ${
+                                data.pageId === currentPageId
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200'
+                            }`}
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                <FileText className="w-4 h-4" />
+                                <span className="font-medium">Current Page</span>
+                            </div>
+                        </button>
+                    </div>
+                )}
+                <div className="flex-1 overflow-hidden">
+                    <PageBrowser
+                        selectedPageId={data.pageId}
+                        onSelectPage={handleSelectPage}
+                        currentSiteRootId={currentSiteRootId}
+                        searchTerm={searchTerm}
+                        onSearchChange={setSearchTerm}
+                        initialParentId={pageInfo?.parentId || null}
+                    />
+                </div>
             </div>
 
             {/* Selected page info and anchors */}

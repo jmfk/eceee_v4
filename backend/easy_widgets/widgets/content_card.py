@@ -325,4 +325,20 @@ class ContentCardWidget(BaseWidget):
         template_config["image_1"] = image1
         template_config["image1"] = image1
 
+        # Resolve link objects in content HTML (similar to ContentWidget)
+        content_html = config.get("content", "")
+        if content_html:
+            from bs4 import BeautifulSoup
+            from webpages.services.link_resolver import resolve_links_in_html
+            
+            soup = BeautifulSoup(content_html, "html.parser")
+            content_str = str(soup)
+            resolved_content = resolve_links_in_html(
+                content_str, 
+                context.get("request") if context else None
+            )
+            if resolved_content != content_str:
+                template_config["content"] = resolved_content
+                template_config["processed_content"] = resolved_content
+
         return template_config

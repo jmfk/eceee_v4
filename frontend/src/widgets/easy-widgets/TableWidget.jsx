@@ -98,6 +98,8 @@ const TableWidget = memo(({
                 onChange={handleConfigChange}
                 className=""
                 slotDimensions={slotConfig?.dimensions}
+                pageId={context?.pageId}
+                siteRootId={context?.siteRootId}
             />
         )
     }

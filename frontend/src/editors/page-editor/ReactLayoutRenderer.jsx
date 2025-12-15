@@ -149,6 +149,7 @@ const ReactLayoutRenderer = forwardRef(({
         parentComponentId: componentId,
         contextType: 'page',
         pageId: context?.pageId || webpageData?.id,
+        siteRootId: context?.siteRootId || webpageData?.cachedRootId || null,  // Site root for link picker navigation
         // Full page data for widget context
         webpageData: webpageData,
         pageVersionData: pageVersionData,
@@ -158,7 +159,7 @@ const ReactLayoutRenderer = forwardRef(({
         pathVariables: pathVariables,
         simulatedPath: simulatedPath,
         onSimulatedPathChange: onSimulatedPathChange
-    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId, webpageData, pageVersionData, onOpenWidgetEditor, pathVariables, simulatedPath, onSimulatedPathChange]);
+    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId, context?.siteRootId, webpageData, pageVersionData, onOpenWidgetEditor, pathVariables, simulatedPath, onSimulatedPathChange]);
 
     // Handle widget actions
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {

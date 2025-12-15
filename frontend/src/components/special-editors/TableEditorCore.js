@@ -18,6 +18,8 @@ export class TableEditorCore {
             onChange: options.onChange || (() => { }),
             onSelectionChange: options.onSelectionChange || (() => { }),
             detachedToolbar: options.detachedToolbar || false,
+            pageId: options.pageId || null,  // Page ID for link picker context
+            siteRootId: options.siteRootId || null,  // Site root ID for link picker navigation
             ...options
         }
 

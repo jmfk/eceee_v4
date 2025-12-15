@@ -9,7 +9,7 @@ import React, { useRef, useEffect, useCallback, memo, useState } from 'react';
 import { TableEditorCore } from '../../components/special-editors/TableEditorCore';
 import TableImportModal from '../../components/special-editors/TableImportModal';
 
-const TableWidgetEditor = memo(({ config, onChange, className, slotDimensions }) => {
+const TableWidgetEditor = memo(({ config, onChange, className, slotDimensions, pageId, siteRootId }) => {
     const containerRef = useRef(null);
     const coreRef = useRef(null);
     const lastExternalConfigRef = useRef(config);
@@ -22,6 +22,8 @@ const TableWidgetEditor = memo(({ config, onChange, className, slotDimensions })
             // Initialize vanilla JS table editor with detached toolbar mode
             coreRef.current = new TableEditorCore(config, {
                 onChange,
+                pageId,  // Pass pageId for link picker context
+                siteRootId,  // Pass siteRootId for link picker navigation
                 detachedToolbar: true,
                 onSelectionChange: (cells) => {
                     // Selection changes are handled by the core and toolbar manager
