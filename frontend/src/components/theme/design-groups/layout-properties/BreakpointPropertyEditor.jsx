@@ -80,7 +80,7 @@ const BreakpointPropertyEditor = ({
     };
 
     // Get part-specific selectors for display
-    const partSelectors = group.calculatedSelectors?.layout_part_selectors?.[part];
+    const partSelectors = group.calculatedSelectors?.layoutPartSelectors?.[part];
 
     const usedProperties = Object.keys(breakpointProps);
     const unusedProperties = Object.entries(availableProperties)

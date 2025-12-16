@@ -291,11 +291,11 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                     <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-blue-900">
                         <div className="font-medium mb-1">How Breakpoints Work</div>
-                        <div className="list-disc list-inside space-y-1 text-blue-800" role="list">
-                            <li>Breakpoints define max-width values for responsive media queries</li>
-                            <li>Larger screens inherit styles from smaller breakpoints</li>
-                            <li>Values must be in ascending order (sm &lt; md &lt; lg &lt; xl)</li>
-                            <li>Leave fields empty to use theme defaults ({breakpointConfig.map(b => `${b.key}: ${b.default}px`).join(', ')})</li>
+                        <div className="space-y-1 text-blue-800" role="list">
+                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Breakpoints define max-width values for responsive media queries</span></div>
+                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Larger screens inherit styles from smaller breakpoints</span></div>
+                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Values must be in ascending order (sm &lt; md &lt; lg &lt; xl)</span></div>
+                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Leave fields empty to use theme defaults ({breakpointConfig.map(b => `${b.key}: ${b.default}px`).join(', ')})</span></div>
                         </div>
                     </div>
                 </div>

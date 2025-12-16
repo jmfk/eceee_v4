@@ -58,9 +58,9 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <div className="text-lg font-semibold text-gray-900">
                             Select Image from Library
-                        </h3>
+                        </div>
                         <button
                             onClick={onCancel}
                             className="text-gray-400 hover:text-gray-600 transition"
@@ -91,9 +91,9 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
                     ) : filteredImages.length === 0 ? (
                         <div className="text-center py-12">
                             <ImageIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                            <h4 className="text-lg font-medium text-gray-900 mb-2">
+                            <div className="text-lg font-medium text-gray-900 mb-2">
                                 {searchTerm ? 'No matching images' : 'No images in library'}
-                            </h4>
+                            </div>
                             <p className="text-gray-600">
                                 {searchTerm 
                                     ? 'Try a different search term' 

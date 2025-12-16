@@ -813,9 +813,9 @@ const ImageStyleEditPage = () => {
                                     <div className="space-y-1">
                                         {currentScenario.variables.map((variable) => (
                                             <div key={variable.name} className="flex items-start gap-2">
-                                                <code className="px-2 py-1 bg-white rounded text-xs border font-mono">
+                                                <span className="px-2 py-1 bg-white rounded text-xs border font-mono">
                                                     {variable.name}
-                                                </code>
+                                                </span>
                                                 <span className="text-xs text-gray-600 flex-1">
                                                     ({variable.type}) {variable.description}
                                                 </span>
@@ -831,9 +831,9 @@ const ImageStyleEditPage = () => {
                                         <div className="space-y-1">
                                             {currentScenario.itemProperties.map((prop) => (
                                                 <div key={prop.name} className="flex items-start gap-2">
-                                                    <code className="px-2 py-1 bg-white rounded text-xs border font-mono">
+                                                    <span className="px-2 py-1 bg-white rounded text-xs border font-mono">
                                                         {prop.name}
-                                                    </code>
+                                                    </span>
                                                     <span className="text-xs text-gray-600 flex-1">
                                                         ({prop.type}) {prop.description}
                                                     </span>
@@ -864,9 +864,9 @@ const ImageStyleEditPage = () => {
                                             )}
                                         </button>
                                     </div>
-                                    <pre className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono">
+                                    <div className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono whitespace-pre">
                                         {currentScenario.template}
-                                    </pre>
+                                    </div>
                                 </div>
 
                                 {/* CSS Example */}
@@ -890,9 +890,9 @@ const ImageStyleEditPage = () => {
                                             )}
                                         </button>
                                     </div>
-                                    <pre className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono">
+                                    <div className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono whitespace-pre">
                                         {currentScenario.css}
-                                    </pre>
+                                    </div>
                                 </div>
 
                                 {/* Mustache Syntax Reminder */}

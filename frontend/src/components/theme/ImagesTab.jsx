@@ -46,9 +46,9 @@ const EmptyStateDropZone = ({ onUpload, onFilesDropped }) => {
                 <ImageIcon className={`h-10 w-10 flex-shrink-0 transition-colors ${dragActive ? 'text-purple-500' : 'text-gray-400'
                     }`} />
                 <div className="text-left">
-                    <h4 className="text-sm font-medium text-gray-900 mb-1">
+                    <div className="text-sm font-medium text-gray-900 mb-1">
                         {dragActive ? 'Drop images here to upload' : 'No images in library'}
-                    </h4>
+                    </div>
                     <p className="text-xs text-gray-600">
                         Drag and drop images here or click to select • JPG, PNG, GIF, WebP, SVG (max 10MB)
                     </p>
@@ -350,10 +350,10 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
             <div className="mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Theme Image Library</h3>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <div className="text-lg font-semibold text-gray-900">Theme Image Library</div>
+                        <div className="text-sm text-gray-600 mt-1">
                             Manage images for this theme. Images are stored in the theme's library and can be used in design groups.
-                        </p>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* View mode toggle */}
@@ -445,11 +445,11 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
             ) : uploading ? (
                 <div className="text-center py-12">
                     <Loader2 className="h-12 w-12 text-purple-600 animate-spin mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Uploading Images</h4>
+                    <div className="text-lg font-medium text-gray-900 mb-2">Uploading Images</div>
                     {uploadProgress && (
-                        <p className="text-gray-600">
+                        <div className="text-gray-600">
                             {uploadProgress.completed} of {uploadProgress.total} images uploaded
-                        </p>
+                        </div>
                     )}
                 </div>
             ) : images.length === 0 ? (

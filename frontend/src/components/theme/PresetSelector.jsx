@@ -374,9 +374,9 @@ const PresetPreview = ({ preset, onClose, onInsert }) => {
                 </div>
 
                 <div className="preset-preview-content">
-                    <pre className="preset-code">
-                        <code>{activeTab === 'template' ? preset.template : preset.css}</code>
-                    </pre>
+                    <div className="preset-code">
+                        <div className="font-mono whitespace-pre">{activeTab === 'template' ? preset.template : preset.css}</div>
+                    </div>
                 </div>
 
                 <div className="preset-preview-footer">

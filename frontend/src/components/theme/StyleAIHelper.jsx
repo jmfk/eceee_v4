@@ -219,26 +219,26 @@ const StyleAIHelper = ({
             {contextLog.length === 0 && (
                 <div className="text-xs text-gray-600">
                     <span className="font-bold">Examples:</span>
-                    <div className="list-disc list-inside mt-1 space-y-1" role="list">
+                    <div className="mt-1 space-y-1" role="list">
                         {styleType === 'gallery' && (
                             <>
-                                <li>"Create a masonry gallery with 3 columns"</li>
-                                <li>"Add hover zoom effect to gallery images"</li>
-                                <li>"Make gallery responsive for mobile"</li>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Create a masonry gallery with 3 columns"</span></div>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Add hover zoom effect to gallery images"</span></div>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Make gallery responsive for mobile"</span></div>
                             </>
                         )}
                         {styleType === 'carousel' && (
                             <>
-                                <li>"Create a hero carousel with fade transitions"</li>
-                                <li>"Add dot navigation below carousel"</li>
-                                <li>"Make carousel auto-play every 5 seconds"</li>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Create a hero carousel with fade transitions"</span></div>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Add dot navigation below carousel"</span></div>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Make carousel auto-play every 5 seconds"</span></div>
                             </>
                         )}
                         {styleType === 'component' && (
                             <>
-                                <li>"Create a card component with rounded corners"</li>
-                                <li>"Design a modern navigation menu"</li>
-                                <li>"Add shadow on hover to component"</li>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Create a card component with rounded corners"</span></div>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Design a modern navigation menu"</span></div>
+                                <div className="flex items-start gap-1"><span>•</span><span>"Add shadow on hover to component"</span></div>
                             </>
                         )}
                     </div>

@@ -113,9 +113,9 @@ const BulkImageUpload = ({ themeId, onUploadComplete, onCancel }) => {
             <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <div className="text-lg font-semibold text-gray-900">
                         Upload Images to Library
-                    </h3>
+                    </div>
                     <button
                         onClick={onCancel}
                         className="text-gray-400 hover:text-gray-600 transition"
@@ -170,9 +170,9 @@ const BulkImageUpload = ({ themeId, onUploadComplete, onCancel }) => {
                             {files.length > 0 && (
                                 <div className="mt-6">
                                     <div className="flex items-center justify-between mb-3">
-                                        <h4 className="text-sm font-medium text-gray-700">
+                                        <div className="text-sm font-medium text-gray-700">
                                             Selected Files ({validFilesCount} valid, {invalidFilesCount} invalid)
-                                        </h4>
+                                        </div>
                                         <button
                                             onClick={() => setFiles([])}
                                             className="text-sm text-gray-500 hover:text-gray-700"
@@ -233,9 +233,9 @@ const BulkImageUpload = ({ themeId, onUploadComplete, onCancel }) => {
                                 {uploadResults.success > 0 ? (
                                     <>
                                         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                                        <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                                        <div className="text-lg font-semibold text-gray-900 mb-2">
                                             Upload Complete!
-                                        </h4>
+                                        </div>
                                         <p className="text-gray-600">
                                             {uploadResults.success} {uploadResults.success === 1 ? 'image' : 'images'} uploaded successfully
                                         </p>
@@ -243,9 +243,9 @@ const BulkImageUpload = ({ themeId, onUploadComplete, onCancel }) => {
                                 ) : (
                                     <>
                                         <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                                        <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                                        <div className="text-lg font-semibold text-gray-900 mb-2">
                                             Upload Failed
-                                        </h4>
+                                        </div>
                                         <p className="text-gray-600">
                                             All uploads failed
                                         </p>
@@ -255,7 +255,7 @@ const BulkImageUpload = ({ themeId, onUploadComplete, onCancel }) => {
 
                             {uploadResults.errors && uploadResults.errors.length > 0 && (
                                 <div className="mt-4">
-                                    <h5 className="text-sm font-medium text-gray-700 mb-2">Errors:</h5>
+                                    <div className="text-sm font-medium text-gray-700 mb-2">Errors:</div>
                                     <div className="space-y-1">
                                         {uploadResults.errors.map((error, idx) => (
                                             <div key={idx} className="text-sm text-red-600 bg-red-50 p-2 rounded">

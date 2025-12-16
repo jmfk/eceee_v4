@@ -200,9 +200,9 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
 
             <div className="text-sm text-gray-600">
                 Gallery styles use Mustache templates to render image galleries. Available variables:
-                <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">images</code>,
-                <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">imageCount</code>,
-                <code className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1">showCaptions</code>
+                <span className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1 font-mono">images</span>,
+                <span className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1 font-mono">imageCount</span>,
+                <span className="px-1 py-0.5 bg-gray-100 rounded text-xs mx-1 font-mono">showCaptions</span>
             </div>
 
             {/* Add Style Form removed: creation happens via header button and redirect */}

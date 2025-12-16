@@ -85,9 +85,9 @@ const ConflictResolutionDialog = ({ conflicts, onResolve, onCancel }) => {
 
         // For complex objects, show JSON
         return (
-            <pre className="text-xs text-gray-700 bg-gray-50 p-2 rounded overflow-x-auto max-h-32">
+            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded overflow-x-auto max-h-32 font-mono whitespace-pre">
                 {JSON.stringify(value, null, 2)}
-            </pre>
+            </div>
         );
     };
 

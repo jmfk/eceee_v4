@@ -277,8 +277,8 @@ const ComponentStyleEditPage = () => {
                             <button
                                 onClick={() => setShowPreview(!showPreview)}
                                 className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${showPreview
-                                        ? 'bg-gray-600 text-white hover:bg-gray-700'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-gray-600 text-white hover:bg-gray-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
                             >
                                 <Eye className="w-4 h-4" />
@@ -370,7 +370,7 @@ const ComponentStyleEditPage = () => {
                                     Mustache Template
                                 </label>
                                 <div className="mb-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                                    <span className="font-bold">⚠️ Important:</span> Use triple braces <code className="bg-white px-1 rounded">{'{{{content}}}'}</code> for HTML content!
+                                    <span className="font-semibold">⚠️ Important:</span> Use triple braces <span className="bg-white px-1 rounded font-mono">{'{{{content}}}'}</span> for HTML content!
                                 </div>
                                 <CodeEditorPanel
                                     data={template}
@@ -393,8 +393,8 @@ const ComponentStyleEditPage = () => {
                                             type="button"
                                             onClick={() => setActiveBreakpoint(bp)}
                                             className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${activeBreakpoint === bp
-                                                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                                                 }`}
                                         >
                                             {getBreakpointLabel(bp, themeData)}
@@ -449,9 +449,9 @@ const ComponentStyleEditPage = () => {
                                     <div className="space-y-1">
                                         {currentScenario.variables.map((variable) => (
                                             <div key={variable.name} className="flex items-start gap-2">
-                                                <code className="px-2 py-1 bg-white rounded text-xs border font-mono">
+                                                <span className="px-2 py-1 bg-white rounded text-xs border font-mono">
                                                     {variable.name}
-                                                </code>
+                                                </span>
                                                 <span className="text-xs text-gray-600 flex-1">
                                                     <span className="text-gray-400">({variable.type})</span> {variable.description}
                                                 </span>
@@ -467,9 +467,9 @@ const ComponentStyleEditPage = () => {
                                         <div className="space-y-1">
                                             {currentScenario.itemProperties.map((prop) => (
                                                 <div key={prop.name} className="flex items-start gap-2">
-                                                    <code className="px-2 py-1 bg-white rounded text-xs border font-mono">
+                                                    <span className="px-2 py-1 bg-white rounded text-xs border font-mono">
                                                         {prop.name}
-                                                    </code>
+                                                    </span>
                                                     <span className="text-xs text-gray-600 flex-1">
                                                         <span className="text-gray-400">({prop.type})</span> {prop.description}
                                                     </span>
@@ -501,9 +501,9 @@ const ComponentStyleEditPage = () => {
                                             )}
                                         </button>
                                     </div>
-                                    <pre className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono">
+                                    <div className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono whitespace-pre">
                                         {currentScenario.template}
-                                    </pre>
+                                    </div>
                                 </div>
 
                                 {/* CSS Example */}
@@ -528,14 +528,14 @@ const ComponentStyleEditPage = () => {
                                             )}
                                         </button>
                                     </div>
-                                    <pre className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono">
+                                    <div className="bg-white p-3 rounded text-xs overflow-x-auto border font-mono whitespace-pre">
                                         {currentScenario.css}
-                                    </pre>
+                                    </div>
                                 </div>
 
                                 {/* Mustache Syntax Reminder */}
                                 <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                                    <span className="font-bold">⚠️ Important:</span> Use triple braces <code className="bg-white px-1 rounded">{'{{{content}}}'}</code> for HTML content to avoid escaping!
+                                    <span className="font-semibold">⚠️ Important:</span> Use triple braces <span className="bg-white px-1 rounded font-mono">{'{{{content}}}'}</span> for HTML content to avoid escaping!
                                 </div>
                             </div>
                         </div>

@@ -165,11 +165,11 @@ const TargetingSection = ({
                     )}
 
                     {/* Calculated Selectors Display */}
-                    {group.calculatedSelectors && group.calculatedSelectors.base_selectors && group.calculatedSelectors.base_selectors.length > 0 && (
+                    {group.calculatedSelectors && group.calculatedSelectors.baseSelectors && group.calculatedSelectors.baseSelectors.length > 0 && (
                         <div className="mt-3 flex items-center gap-2">
                             <span className="text-xs text-gray-500">→</span>
                             <div className="flex flex-wrap gap-1">
-                                {group.calculatedSelectors.base_selectors.map((selector, idx) => (
+                                {group.calculatedSelectors.baseSelectors.map((selector, idx) => (
                                     <span key={idx} className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
                                         {selector || '(global)'}
                                     </span>

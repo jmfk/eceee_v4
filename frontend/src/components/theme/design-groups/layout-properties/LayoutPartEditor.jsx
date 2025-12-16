@@ -74,7 +74,7 @@ const LayoutPartEditor = ({
     });
 
     // Get part-specific selectors for display
-    const partSelectors = group.calculatedSelectors?.layout_part_selectors?.[part];
+    const partSelectors = group.calculatedSelectors?.layoutPartSelectors?.[part];
 
     return (
         <div className="bg-white rounded border border-gray-200">

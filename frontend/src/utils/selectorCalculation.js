@@ -23,7 +23,7 @@ function normalizeForCSS(name) {
  * @param {Object} group - Design group object
  * @param {string} scope - CSS scope selector (default: '')
  * @param {boolean} frontendScoped - If true, prepend .cms-content (default: false)
- * @returns {Object} - Object with base_selectors, layout_part_selectors, and element_selectors
+ * @returns {Object} - Object with baseSelectors, layoutPartSelectors, and elementSelectors
  */
 export function calculateSelectorsForGroup(group, scope = '', frontendScoped = false) {
     // Check targeting mode
@@ -138,9 +138,9 @@ export function calculateSelectorsForGroup(group, scope = '', frontendScoped = f
     }
     
     return {
-        base_selectors: baseSelectors,
-        layout_part_selectors: layoutPartSelectors,
-        element_selectors: elementSelectors
+        baseSelectors: baseSelectors,
+        layoutPartSelectors: layoutPartSelectors,
+        elementSelectors: elementSelectors
     };
 }
 

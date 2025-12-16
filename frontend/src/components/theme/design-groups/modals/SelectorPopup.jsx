@@ -40,7 +40,7 @@ const SelectorPopup = ({ selectors, position, type, onClose }) => {
                 }}
             >
                 <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-gray-700">CSS Selectors</h3>
+                    <div className="text-sm font-semibold text-gray-700">CSS Selectors</div>
                     <button
                         type="button"
                         onClick={onClose}

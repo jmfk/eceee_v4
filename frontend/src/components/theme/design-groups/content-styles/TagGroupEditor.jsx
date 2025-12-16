@@ -92,22 +92,22 @@ const TagGroupEditor = ({
                         <div className="text-xs text-gray-500 font-mono">{tagGroup.variants.join(', ')}</div>
                     )}
                     {/* Tag Selectors Display */}
-                    {group.calculatedSelectors?.base_selectors && group.calculatedSelectors.base_selectors.length > 0 && (
+                    {group.calculatedSelectors?.baseSelectors && group.calculatedSelectors.baseSelectors.length > 0 && (
                         <div className="mt-1">
-                            {group.calculatedSelectors.base_selectors.length === 1 ? (
+                            {group.calculatedSelectors.baseSelectors.length === 1 ? (
                                 <div className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs font-mono rounded">
-                                    {group.calculatedSelectors.base_selectors[0] || '(global)'}
+                                    {group.calculatedSelectors.baseSelectors[0] || '(global)'}
                                 </div>
                             ) : (
                                 <button
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onOpenSelectorPopup('tag', group.calculatedSelectors.base_selectors, { x: e.clientX, y: e.clientY });
+                                        onOpenSelectorPopup('tag', group.calculatedSelectors.baseSelectors, { x: e.clientX, y: e.clientY });
                                     }}
                                     className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs font-mono rounded hover:bg-blue-100 transition-colors"
                                 >
-                                    {group.calculatedSelectors.base_selectors.length} selectors
+                                    {group.calculatedSelectors.baseSelectors.length} selectors
                                     <ChevronDown className="w-3 h-3" />
                                 </button>
                             )}

@@ -356,6 +356,31 @@ def render_page_seo(context, page=None, version=None, page_data=None):
     return mark_safe("\n    ".join(meta_tags))
 
 
+@register.simple_tag(takes_context=True)
+def render_mustache(context, template_name, config):
+    """
+    Render a Mustache template with config data.
+    Usage: {% render_mustache widget_type.mustache_template_name config %}
+    """
+    from django.utils.safestring import mark_safe
+    from webpages.utils.mustache_renderer import load_mustache_template, render_mustache as render_mustache_util
+
+    try:
+        # Load the Mustache template
+        template_str = load_mustache_template(template_name)
+        
+        # Render the template with config as context
+        rendered = render_mustache_util(template_str, config)
+        return mark_safe(rendered)
+    except Exception as e:
+        # Return error message in development, empty in production
+        from django.conf import settings
+
+        if settings.DEBUG:
+            return mark_safe(f"<!-- Error rendering Mustache template {template_name}: {e} -->")
+        return mark_safe("")
+
+
 @register.simple_tag
 def render_site_icons(root_page=None):
     """
