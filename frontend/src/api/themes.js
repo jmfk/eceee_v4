@@ -205,7 +205,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Success response
      */
     clearCache: wrapApiCall(async (themeId) => {
-        return api.post(`${endpoints.themes.detail(themeId)}clear_cache/`)
+        return api.post(`${endpoints.themes.detail(themeId)}/clear_cache/`)
     }, 'themes.clearCache'),
 
     /**
@@ -214,7 +214,7 @@ export const themesApi = {
      * @returns {Promise<Blob>} Zip file blob
      */
     exportTheme: wrapApiCall(async (themeId) => {
-        return api.get(`${endpoints.themes.detail(themeId)}export_theme/`, {
+        return api.get(`${endpoints.themes.detail(themeId)}/export_theme/`, {
             responseType: 'blob'
         })
     }, 'themes.exportTheme'),
