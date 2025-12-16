@@ -289,11 +289,112 @@ class ThemeSyncService:
             logger.error(f"Error reading theme file {theme_file}: {e}")
         return None
 
+    def upload_design_group_images(self, theme_data: dict) -> dict:
+        """
+        Upload design group images marked with __local_file__ and update URLs.
+
+        Args:
+            theme_data: Theme data with potential __local_file__ markers
+
+        Returns:
+            Updated theme_data with uploaded image URLs
+        """
+        from pathlib import Path
+
+        # First, get theme ID from theme_data (need to find existing theme)
+        theme_name = theme_data.get("name")
+        if not theme_name:
+            return theme_data
+
+        # Get theme ID from server
+        try:
+            response = self.session.get(
+                f"{self.api_base}/webpages/themes/", params={"name": theme_name}
+            )
+            if response.status_code == 200:
+                themes = response.json().get("results", [])
+                if themes:
+                    theme_id = themes[0]["id"]
+                else:
+                    # Theme doesn't exist yet, can't upload images
+                    logger.warning(
+                        f"Theme {theme_name} not found, skipping image upload"
+                    )
+                    return theme_data
+            else:
+                logger.warning(f"Failed to get theme ID for {theme_name}")
+                return theme_data
+        except Exception as e:
+            logger.error(f"Error getting theme ID: {e}")
+            return theme_data
+
+        # Process design_groups images
+        design_groups = theme_data.get("design_groups", {})
+        if not design_groups or "groups" not in design_groups:
+            return theme_data
+
+        for group in design_groups["groups"]:
+            if "layoutProperties" not in group:
+                continue
+
+            for part, breakpoints in group["layoutProperties"].items():
+                for bp, props in breakpoints.items():
+                    if "images" not in props or not isinstance(props["images"], dict):
+                        continue
+
+                    for image_key, image_data in props["images"].items():
+                        if not isinstance(image_data, dict):
+                            continue
+
+                        # Check for __local_file__ marker
+                        local_file = image_data.get("__local_file__")
+                        if not local_file:
+                            continue
+
+                        try:
+                            # Upload the file
+                            file_path = Path(local_file)
+                            if not file_path.exists():
+                                logger.warning(f"Local file not found: {file_path}")
+                                continue
+
+                            with open(file_path, "rb") as f:
+                                files = {"image": (file_path.name, f, "image/*")}
+                                response = self.session.post(
+                                    f"{self.api_base}/webpages/themes/{theme_id}/upload_design_group_image/",
+                                    files=files,
+                                )
+
+                            if response.status_code in [200, 201]:
+                                result = response.json()
+                                # Update image_data with uploaded URL
+                                image_data["url"] = result["url"]
+                                image_data["filename"] = result["filename"]
+                                image_data["size"] = result["size"]
+                                # Remove the marker
+                                del image_data["__local_file__"]
+                                logger.info(
+                                    f"Uploaded design group image: {file_path.name}"
+                                )
+                            else:
+                                logger.error(
+                                    f"Failed to upload image {file_path.name}: "
+                                    f"HTTP {response.status_code}"
+                                )
+
+                        except Exception as e:
+                            logger.error(f"Error uploading image {local_file}: {e}")
+
+        return theme_data
+
     def push_theme(self, theme_file: Path, theme_name: str):
         """Push theme to server."""
         try:
             # Convert Python to JSON
             theme_data = convert_theme_to_json(theme_file)
+
+            # Upload design group images if they have __local_file__ markers
+            theme_data = self.upload_design_group_images(theme_data)
 
             # Get current version
             client_version = self.sync_state.get(theme_name, 1)

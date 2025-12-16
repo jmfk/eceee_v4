@@ -99,7 +99,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                 .map(s => s.trim())
                 .filter(Boolean);
             baseSelectors = customSelectors;
-            
+
             // Note: In css-classes mode, selectors are used exactly as provided
             // Frontend scoping is still applied if requested
         } else {
@@ -225,15 +225,16 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         // Handle images
                         if (bpProps.images) {
                             for (const [imageKey, imageData] of Object.entries(bpProps.images)) {
-                                if (imageData && imageData.fileUrl) {
+                                // Support both new format (url) and old format (fileUrl) for backward compatibility
+                                const imageUrl = imageData?.url || imageData?.fileUrl;
+                                if (imageUrl) {
                                     // Generate CSS variable name: --{part}-{imageKey}-{breakpoint}
                                     const varName = `--${part}-${imageKey}-${bpKey}`;
-                                    const imageUrl = imageData.fileUrl;
                                     cssVariables.push(`  ${varName}: url('${imageUrl}');`);
                                 }
                             }
                         }
-                        
+
                         // Handle special color variables for navbar and footer
                         if (part === 'navbar-widget' || part === 'footer-widget') {
                             const partName = part.replace('-widget', '');
@@ -286,7 +287,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     // so we use a same-element selector (no space).
                     // For child elements, we use descendant selectors (with space).
                     const isRootElement = part.endsWith('-widget') || part === 'container';
-                    
+
                     const partSelectors = baseSelectors.map(base => {
                         if (base) {
                             if (isRootElement) {
@@ -308,12 +309,12 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     const cssRules = [];
                     for (const [prop, value] of Object.entries(bpProps)) {
                         if (prop === 'images') continue; // Skip images - handled as CSS variables
-                        
+
                         // Skip backgroundColor and color for navbar/footer - handled as CSS variables
                         if (part === 'navbar-widget' || part === 'footer-widget') {
                             if (prop === 'backgroundColor' || prop === 'color') continue;
                         }
-                        
+
                         const cssProp = camelToKebab(prop);
                         cssRules.push(`  ${cssProp}: ${value};`);
                     }

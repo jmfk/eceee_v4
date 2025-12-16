@@ -144,7 +144,7 @@ const ThemeEditor = ({ onSave }) => {
         } else if (isEditing && selectedThemeData) {
             // Normalize theme data before initializing UDC (handles legacy fields)
             const normalizedData = normalizeThemeData(selectedThemeData);
-            
+
             // Initialize theme from fresh server data
             const themeForUDC = {
                 id: String(normalizedData.id),
@@ -391,15 +391,15 @@ const ThemeEditor = ({ onSave }) => {
 
             // Update the theme
             await themesApi.update(themeToPaste.id, updateData);
-            
+
             await queryClient.invalidateQueries(['themes']);
             await queryClient.refetchQueries(['themes']);
-            
+
             addNotification({
                 type: 'success',
                 message: `Theme "${themeToPaste.name}" updated with pasted data`,
             });
-            
+
             // Close dialog immediately after successful paste
             setPasteDialogOpen(false);
             setThemeToPaste(null);
@@ -417,7 +417,7 @@ const ThemeEditor = ({ onSave }) => {
     const handleExport = async (theme) => {
         try {
             const blob = await themesApi.exportTheme(theme.id);
-            
+
             // Create download link
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -427,7 +427,7 @@ const ThemeEditor = ({ onSave }) => {
             link.click();
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
-            
+
             addNotification({
                 type: 'success',
                 message: `Theme "${theme.name}" exported successfully`,
@@ -446,10 +446,10 @@ const ThemeEditor = ({ onSave }) => {
 
         try {
             const result = await themesApi.importTheme(file);
-            
+
             await queryClient.invalidateQueries(['themes']);
             await queryClient.refetchQueries(['themes']);
-            
+
             addNotification({
                 type: 'success',
                 message: result.message || 'Theme imported successfully',
@@ -575,214 +575,214 @@ const ThemeEditor = ({ onSave }) => {
     if (currentView === 'list') {
         return (
             <>
-            <div className="p-6">
-                <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Theme Management</div>
-                            <div className="text-sm text-gray-600 mt-1">
-                                Create and manage themes with fonts, colors, typography, component styles, and table templates
+                <div className="p-6">
+                    <div className="mb-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Theme Management</div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                    Create and manage themes with fonts, colors, typography, component styles, and table templates
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                                    <FileUp className="w-4 h-4 mr-2" />
+                                    Import Theme
+                                    <input
+                                        type="file"
+                                        accept=".zip"
+                                        onChange={handleImport}
+                                        className="hidden"
+                                    />
+                                </label>
+                                <button
+                                    onClick={handleCreateNew}
+                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Create Theme
+                                </button>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
-                                <FileUp className="w-4 h-4 mr-2" />
-                                Import Theme
-                                <input
-                                    type="file"
-                                    accept=".zip"
-                                    onChange={handleImport}
-                                    className="hidden"
-                                />
-                            </label>
-                            <button
-                                onClick={handleCreateNew}
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                            >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Create Theme
-                            </button>
+
+                        {/* Search */}
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search themes..."
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    {/* Themes List */}
+                    {isLoading ? (
+                        <div className="text-center py-8">
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <div className="mt-2 text-gray-600">Loading themes...</div>
                         </div>
-                    </div>
-
-                    {/* Search */}
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search themes..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-
-                {/* Themes List */}
-                {isLoading ? (
-                    <div className="text-center py-8">
-                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <div className="mt-2 text-gray-600">Loading themes...</div>
-                    </div>
-                ) : filteredThemes.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredThemes.map((theme) => (
-                            <div
-                                key={theme.id}
-                                className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-colors flex flex-col"
-                            >
-                                {/* Theme Preview Image */}
-                                {theme.image ? (
-                                    <div className="w-full h-32 bg-gray-100 overflow-hidden">
-                                        <img
-                                            src={theme.image}
-                                            alt={theme.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="w-full h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                                        <div className="text-gray-400 text-center">
-                                            <Palette className="w-8 h-8 mx-auto mb-1" />
-                                            <div className="text-xs">No Preview</div>
+                    ) : filteredThemes.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredThemes.map((theme) => (
+                                <div
+                                    key={theme.id}
+                                    className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-colors flex flex-col"
+                                >
+                                    {/* Theme Preview Image */}
+                                    {theme.image ? (
+                                        <div className="w-full h-32 bg-gray-100 overflow-hidden">
+                                            <img
+                                                src={theme.image}
+                                                alt={theme.name}
+                                                className="w-full h-full object-cover"
+                                            />
                                         </div>
-                                    </div>
-                                )}
-
-                                {/* Content */}
-                                <div className="p-4 flex-1 flex flex-col">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div className="flex-1">
-                                            <div className="font-semibold text-gray-900 flex items-center gap-2" role="heading" aria-level="3">
-                                                {theme.name}
-                                                {theme.isDefault && (
-                                                    <Star className="w-4 h-4 text-yellow-500 fill-current" title="Default Theme" />
-                                                )}
+                                    ) : (
+                                        <div className="w-full h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                                            <div className="text-gray-400 text-center">
+                                                <Palette className="w-8 h-8 mx-auto mb-1" />
+                                                <div className="text-xs">No Preview</div>
                                             </div>
-                                            {theme.description && (
-                                                <div className="text-sm text-gray-600 mt-1 line-clamp-2">{theme.description}</div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Color Palette Preview */}
-                                    {theme.colors && Object.keys(theme.colors).length > 0 && (
-                                        <div className="flex gap-1 mt-2 mb-4">
-                                            {Object.entries(theme.colors).slice(0, 6).map(([name, color]) => (
-                                                <div
-                                                    key={name}
-                                                    className="w-6 h-6 rounded border border-gray-200"
-                                                    style={{ backgroundColor: color }}
-                                                    title={name}
-                                                />
-                                            ))}
-                                            {Object.keys(theme.colors).length > 6 && (
-                                                <div className="w-6 h-6 rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
-                                                    +{Object.keys(theme.colors).length - 6}
-                                                </div>
-                                            )}
                                         </div>
                                     )}
 
-                                    {/* Spacer to push buttons to bottom */}
-                                    <div className="flex-1"></div>
+                                    {/* Content */}
+                                    <div className="p-4 flex-1 flex flex-col">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <div className="flex-1">
+                                                <div className="font-semibold text-gray-900 flex items-center gap-2" role="heading" aria-level="3">
+                                                    {theme.name}
+                                                    {theme.isDefault && (
+                                                        <Star className="w-4 h-4 text-yellow-500 fill-current" title="Default Theme" />
+                                                    )}
+                                                </div>
+                                                {theme.description && (
+                                                    <div className="text-sm text-gray-600 mt-1 line-clamp-2">{theme.description}</div>
+                                                )}
+                                            </div>
+                                        </div>
 
-                                    {/* Buttons aligned to bottom */}
-                                    <div className="space-y-2 mt-auto">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleEditTheme(theme)}
-                                                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                            >
-                                                <Edit3 className="w-4 h-4 mr-1" />
-                                                Edit
-                                            </button>
-                                            <div className="flex items-center gap-0">
-                                                <CopyButton
-                                                    data={{
-                                                        name: theme.name, // Include source theme name
-                                                        description: theme.description, // Include source description
-                                                        fonts: theme.fonts || {},
-                                                        colors: theme.colors || {},
-                                                        designGroups: theme.designGroups || {},
-                                                        componentStyles: theme.componentStyles || {},
-                                                        imageStyles: theme.imageStyles || {},
-                                                        tableTemplates: theme.tableTemplates || {},
-                                                        image: theme.image || null,
-                                                    }}
-                                                    level="full"
-                                                    iconOnly
-                                                    className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md border-r-0 text-gray-700 bg-white hover:bg-gray-50"
-                                                    onSuccess={() => addNotification({ type: 'success', message: `Theme "${theme.name}" copied to clipboard` })}
-                                                    onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
-                                                />
+                                        {/* Color Palette Preview */}
+                                        {theme.colors && Object.keys(theme.colors).length > 0 && (
+                                            <div className="flex gap-1 mt-2 mb-4">
+                                                {Object.entries(theme.colors).slice(0, 6).map(([name, color]) => (
+                                                    <div
+                                                        key={name}
+                                                        className="w-6 h-6 rounded border border-gray-200"
+                                                        style={{ backgroundColor: color }}
+                                                        title={name}
+                                                    />
+                                                ))}
+                                                {Object.keys(theme.colors).length > 6 && (
+                                                    <div className="w-6 h-6 rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                                                        +{Object.keys(theme.colors).length - 6}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Spacer to push buttons to bottom */}
+                                        <div className="flex-1"></div>
+
+                                        {/* Buttons aligned to bottom */}
+                                        <div className="space-y-2 mt-auto">
+                                            <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={() => handlePaste(theme)}
-                                                    className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50"
-                                                    title="Paste theme data from clipboard"
+                                                    onClick={() => handleEditTheme(theme)}
+                                                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                                 >
-                                                    <Clipboard className="w-4 h-4" />
+                                                    <Edit3 className="w-4 h-4 mr-1" />
+                                                    Edit
+                                                </button>
+                                                <div className="flex items-center gap-0">
+                                                    <CopyButton
+                                                        data={{
+                                                            name: theme.name, // Include source theme name
+                                                            description: theme.description, // Include source description
+                                                            fonts: theme.fonts || {},
+                                                            colors: theme.colors || {},
+                                                            designGroups: theme.designGroups || {},
+                                                            componentStyles: theme.componentStyles || {},
+                                                            imageStyles: theme.imageStyles || {},
+                                                            tableTemplates: theme.tableTemplates || {},
+                                                            image: theme.image || null,
+                                                        }}
+                                                        level="full"
+                                                        iconOnly
+                                                        className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-l-md border-r-0 text-gray-700 bg-white hover:bg-gray-50"
+                                                        onSuccess={() => addNotification({ type: 'success', message: `Theme "${theme.name}" copied to clipboard` })}
+                                                        onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
+                                                    />
+                                                    <button
+                                                        onClick={() => handlePaste(theme)}
+                                                        className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-white hover:bg-gray-50"
+                                                        title="Paste theme data from clipboard"
+                                                    >
+                                                        <Clipboard className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleClone(theme)}
+                                                    className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                    title="Clone theme"
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(theme)}
+                                                    className="inline-flex items-center justify-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
+                                                    title="Delete theme"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
-                                            <button
-                                                onClick={() => handleClone(theme)}
-                                                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                                title="Clone theme"
-                                            >
-                                                <Copy className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(theme)}
-                                                className="inline-flex items-center justify-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
-                                                title="Delete theme"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleExport(theme)}
-                                                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                                                title="Export theme as zip"
-                                            >
-                                                <Download className="w-4 h-4 mr-1" />
-                                                Export
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleExport(theme)}
+                                                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                    title="Export theme as zip"
+                                                >
+                                                    <Download className="w-4 h-4 mr-1" />
+                                                    Export
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                        <div className="text-gray-600">
-                            {searchTerm ? 'No themes found matching your search' : 'No themes created yet'}
+                            ))}
                         </div>
-                    </div>
-                )}
-            </div>
+                    ) : (
+                        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                            <div className="text-gray-600">
+                                {searchTerm ? 'No themes found matching your search' : 'No themes created yet'}
+                            </div>
+                        </div>
+                    )}
+                </div>
 
-            {/* Clone Theme Dialog */}
-            <CloneThemeDialog
-                isOpen={cloneDialogOpen}
-                onClose={() => {
-                    setCloneDialogOpen(false);
-                    setThemeToClone(null);
-                }}
-                onConfirm={handleCloneConfirm}
-                themeName={themeToClone?.name}
-                existingNames={themes.map(t => t.name)}
-            />
+                {/* Clone Theme Dialog */}
+                <CloneThemeDialog
+                    isOpen={cloneDialogOpen}
+                    onClose={() => {
+                        setCloneDialogOpen(false);
+                        setThemeToClone(null);
+                    }}
+                    onConfirm={handleCloneConfirm}
+                    themeName={themeToClone?.name}
+                    existingNames={themes.map(t => t.name)}
+                />
 
-            {/* Paste Theme Dialog */}
-            <PasteThemeDialog
-                isOpen={pasteDialogOpen}
-                onClose={() => {
-                    setPasteDialogOpen(false);
-                    setThemeToPaste(null);
-                }}
-                onConfirm={handlePasteConfirm}
-                targetTheme={themeToPaste}
-                isPasting={isPasting}
-            />
+                {/* Paste Theme Dialog */}
+                <PasteThemeDialog
+                    isOpen={pasteDialogOpen}
+                    onClose={() => {
+                        setPasteDialogOpen(false);
+                        setThemeToPaste(null);
+                    }}
+                    onConfirm={handlePasteConfirm}
+                    targetTheme={themeToPaste}
+                    isPasting={isPasting}
+                />
             </>
         );
     }
@@ -954,6 +954,7 @@ const ThemeEditor = ({ onSave }) => {
 
                     {activeTab === 'typography' && (
                         <DesignGroupsTab
+                            themeId={themeId}
                             designGroups={themeData?.designGroups || themeData?.typography || { groups: [] }}
                             colors={themeData?.colors || {}}
                             fonts={themeData?.fonts || {}}

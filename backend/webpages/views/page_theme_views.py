@@ -368,6 +368,86 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["post"])
+    def upload_design_group_image(self, request, pk=None):
+        """
+        Upload an image for design group layoutProperties.
+        Stores in: theme_images/{theme_id}/design_groups/{filename}
+        Returns: { "url": "s3://bucket/path", "public_url": "https://..." }
+        """
+        from file_manager.storage import S3MediaStorage
+        import os
+        import uuid
+        import logging
+
+        logger = logging.getLogger(__name__)
+        theme = self.get_object()
+
+        if "image" not in request.FILES:
+            return Response(
+                {"error": "No image file provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        image_file = request.FILES["image"]
+
+        # Validate file type
+        allowed_types = [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/svg+xml",
+        ]
+        if image_file.content_type not in allowed_types:
+            return Response(
+                {
+                    "error": f'Invalid file type. Allowed types: {", ".join(allowed_types)}'
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate file size (10MB max)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if image_file.size > max_size:
+            return Response(
+                {"error": "File too large. Maximum size is 10MB"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Generate unique filename
+            file_extension = os.path.splitext(image_file.name)[1].lower()
+            unique_filename = f"{uuid.uuid4()}{file_extension}"
+
+            # Upload to object storage
+            storage = S3MediaStorage()
+            file_path = f"theme_images/{theme.id}/design_groups/{unique_filename}"
+
+            # Save the file
+            storage._save(file_path, ContentFile(image_file.read()))
+
+            # Get URLs
+            s3_url = storage.url(file_path)  # s3:// protocol for imgproxy
+            public_url = storage.get_public_url(file_path)  # https:// for direct access
+
+            return Response(
+                {
+                    "url": s3_url,
+                    "public_url": public_url,
+                    "filename": image_file.name,
+                    "size": image_file.size,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to upload design group image: {str(e)}")
+            return Response(
+                {"error": f"Failed to upload image: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["post"], url_path="ai-style-helper")
     def ai_style_helper(self, request, pk=None):
         """
@@ -496,9 +576,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "description": theme.description,
                 "created_at": theme.created_at.isoformat(),
                 "updated_at": theme.updated_at.isoformat(),
-                "created_by": (
-                    theme.created_by.username if theme.created_by else None
-                ),
+                "created_by": (theme.created_by.username if theme.created_by else None),
                 "version": "1.0",
                 "export_date": datetime.now().isoformat(),
             }
@@ -516,6 +594,43 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 except Exception as e:
                     # Log error but continue
                     logger.warning(f"Failed to add image to export: {str(e)}")
+
+            # Add design group images if they exist
+            design_group_images = theme.get_design_group_image_urls()
+            if design_group_images:
+                from file_manager.storage import S3MediaStorage
+                import logging
+
+                logger = logging.getLogger(__name__)
+                storage = S3MediaStorage()
+
+                for url, metadata in design_group_images:
+                    try:
+                        # Extract path from URL
+                        path = theme._extract_path_from_url(url)
+                        if not path:
+                            continue
+
+                        # Extract filename
+                        filename = path.split("/")[-1]
+
+                        # Read file from storage
+                        if storage.exists(path):
+                            file_obj = storage._open(path, "rb")
+                            file_content = file_obj.read()
+                            file_obj.close()
+
+                            # Add to zip at: design_group_images/{filename}
+                            zip_file.writestr(
+                                f"design_group_images/{filename}", file_content
+                            )
+                        else:
+                            logger.warning(f"Design group image not found: {path}")
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to add design group image to export: {str(e)}"
+                        )
 
         # Prepare response
         zip_buffer.seek(0)
@@ -597,6 +712,86 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     new_theme.image.save(
                         image_name, ContentFile(image_content), save=True
                     )
+
+                # Handle design group images
+                design_group_images = [
+                    f for f in zf.namelist() if f.startswith("design_group_images/")
+                ]
+                if design_group_images:
+                    from file_manager.storage import S3MediaStorage
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    storage = S3MediaStorage()
+                    url_mapping = {}  # old_url -> new_url
+
+                    for image_file in design_group_images:
+                        try:
+                            image_name = image_file.split("/")[-1]
+                            image_content = zf.read(image_file)
+
+                            # Upload to new theme's directory
+                            new_path = f"theme_images/{new_theme.id}/design_groups/{image_name}"
+                            storage._save(new_path, ContentFile(image_content))
+                            new_url = storage.url(new_path)
+
+                            # Build mapping of filenames to new URLs
+                            # We'll use filename as the key since we don't have old URLs
+                            url_mapping[image_name] = new_url
+
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to import design group image {image_file}: {str(e)}"
+                            )
+
+                    # Update image URLs in design_groups JSON
+                    # Need to match by filename and update URLs
+                    if url_mapping and new_theme.design_groups:
+                        updated_groups = new_theme.design_groups.copy()
+                        if "groups" in updated_groups:
+                            for group in updated_groups["groups"]:
+                                if "layoutProperties" in group:
+                                    for part, breakpoints in group[
+                                        "layoutProperties"
+                                    ].items():
+                                        for bp, props in breakpoints.items():
+                                            if "images" in props and isinstance(
+                                                props["images"], dict
+                                            ):
+                                                for (
+                                                    image_key,
+                                                    image_data,
+                                                ) in props["images"].items():
+                                                    if isinstance(image_data, dict):
+                                                        # Try to match by filename
+                                                        old_url = image_data.get(
+                                                            "url"
+                                                        ) or image_data.get("fileUrl")
+                                                        if old_url:
+                                                            # Extract filename from old URL
+                                                            old_filename = (
+                                                                old_url.split("/")[-1]
+                                                            )
+                                                            if (
+                                                                old_filename
+                                                                in url_mapping
+                                                            ):
+                                                                image_data["url"] = (
+                                                                    url_mapping[
+                                                                        old_filename
+                                                                    ]
+                                                                )
+                                                                # Remove fileUrl if present
+                                                                if (
+                                                                    "fileUrl"
+                                                                    in image_data
+                                                                ):
+                                                                    del image_data[
+                                                                        "fileUrl"
+                                                                    ]
+
+                        new_theme.design_groups = updated_groups
+                        new_theme.save()
 
             serializer = PageThemeSerializer(new_theme, context={"request": request})
             return Response(

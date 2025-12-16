@@ -95,6 +95,23 @@ export const themesApi = {
     }, 'themes.updateImage'),
 
     /**
+     * Upload a design group image directly to object storage
+     * @param {number} themeId - Theme ID
+     * @param {File} imageFile - Image file to upload
+     * @returns {Promise<Object>} Response with url, public_url, filename, size
+     */
+    uploadDesignGroupImage: wrapApiCall(async (themeId, imageFile) => {
+        const formData = new FormData()
+        formData.append('image', imageFile)
+
+        return api.post(`${endpoints.themes.detail(themeId)}/upload_design_group_image/`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.uploadDesignGroupImage'),
+
+    /**
      * Delete a theme
      * @param {number} themeId - Theme ID
      * @returns {Promise<void>}

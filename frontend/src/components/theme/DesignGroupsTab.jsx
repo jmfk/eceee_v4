@@ -564,7 +564,7 @@ const extractFilterOptions = (groups, widgetTypes = []) => {
   return options;
 };
 
-const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, onDirty }) => {
+const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, onChange, onDirty }) => {
   const groups = designGroups?.groups || [];
 
   // #region agent log
@@ -594,6 +594,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const groupNameDebounceTimerRef = useRef({});
   const [selectorPopup, setSelectorPopup] = useState(null); // { type: 'tag' | 'breakpoint', selectors: [], position: {x, y} }
   const { addNotification } = useGlobalNotifications();
+  const selectorsCalculatedRef = useRef(new Set()); // Track which groups have had selectors calculated
 
   // Confirmation dialog state for widget type removal
   const [widgetTypeRemovalDialog, setWidgetTypeRemovalDialog] = useState(null); // { groupIndex, widgetType, hasProperties }
@@ -620,6 +621,35 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   });
 
   const availableSlots = slotsData?.slots || [];
+
+  // Calculate selectors for all groups that are missing them
+  useEffect(() => {
+    if (!groups || groups.length === 0) return;
+
+    // Check if any groups need their selectors calculated
+    const groupsNeedingCalculation = groups.filter((group, index) => {
+      const groupKey = `${index}-${group.name || ''}-${JSON.stringify(group.widgetTypes || [])}-${JSON.stringify(group.slots || [])}`;
+      return !group.calculatedSelectors && !selectorsCalculatedRef.current.has(groupKey);
+    });
+
+    if (groupsNeedingCalculation.length > 0) {
+      const updatedGroups = groups.map((group, index) => {
+        const groupKey = `${index}-${group.name || ''}-${JSON.stringify(group.widgetTypes || [])}-${JSON.stringify(group.slots || [])}`;
+
+        if (!group.calculatedSelectors && !selectorsCalculatedRef.current.has(groupKey)) {
+          selectorsCalculatedRef.current.add(groupKey);
+          return {
+            ...group,
+            calculatedSelectors: calculateSelectorsForGroup(group)
+          };
+        }
+        return group;
+      });
+
+      // Update with calculated selectors
+      onChange({ ...(designGroups || {}), groups: updatedGroups });
+    }
+  }, [groups, designGroups, onChange]); // Run when groups change
 
 
   // Cleanup debounce timers on unmount
@@ -713,7 +743,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const toggleTargeting = (groupIndex) => {
     setExpandedTargeting({
       ...expandedTargeting,
-      [groupIndex]: !expandedTargeting[originalGroupIndex],
+      [groupIndex]: !expandedTargeting[groupIndex],
     });
   };
 
@@ -922,7 +952,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
   const toggleLayoutProps = (groupIndex) => {
     setExpandedLayoutProps({
       ...expandedLayoutProps,
-      [groupIndex]: !expandedLayoutProps[originalGroupIndex],
+      [groupIndex]: !expandedLayoutProps[groupIndex],
     });
   };
 
@@ -1045,7 +1075,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
     }
 
     // Always ensure Layout Properties section is expanded
-    if (!expandedLayoutProps[originalGroupIndex]) {
+    if (!expandedLayoutProps[groupIndex]) {
       setExpandedLayoutProps({ ...expandedLayoutProps, [groupIndex]: true });
     }
 
@@ -1615,9 +1645,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         });
         setExpandedContent(newExpandedContent);
 
-        addNotification({ 
-          type: 'success', 
-          message: `Created ${groupsToAdd.length} ${groupsToAdd.length === 1 ? 'group' : 'groups'} from JSON` 
+        addNotification({
+          type: 'success',
+          message: `Created ${groupsToAdd.length} ${groupsToAdd.length === 1 ? 'group' : 'groups'} from JSON`
         });
 
       } else if (importModal.type === 'group') {
@@ -1676,9 +1706,9 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
         };
 
         onChange({ ...(designGroups || {}), groups: updatedGroups });
-        addNotification({ 
-          type: 'success', 
-          message: `Updated ${importModal.elementKey} with ${Object.keys(parsedData).length} ${Object.keys(parsedData).length === 1 ? 'property' : 'properties'}` 
+        addNotification({
+          type: 'success',
+          message: `Updated ${importModal.elementKey} with ${Object.keys(parsedData).length} ${Object.keys(parsedData).length === 1 ? 'property' : 'properties'}`
         });
       }
 
@@ -1852,7 +1882,7 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
 
   // Toggle group edit mode between 'tags' and 'css'
   const toggleGroupEditMode = (groupIndex) => {
-    const currentMode = groupEditMode[originalGroupIndex] || 'tags';
+    const currentMode = groupEditMode[groupIndex] || 'tags';
 
     // If switching from CSS to tags, save the CSS first
     if (currentMode === 'css') {
@@ -2715,18 +2745,18 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                             {allowedProperties.length} {allowedProperties.length === 1 ? 'property' : 'properties'}
                                           </span>
                                         )}
-                                        {group.calculatedSelectors?.layout_part_selectors?.[part] && (
-                                          <SelectorDisplay
-                                            selectors={group.calculatedSelectors.layout_part_selectors[part]}
-                                            type="breakpoint"
-                                            onOpenPopup={(selectors, position) => setSelectorPopup({
-                                              type: 'breakpoint',
-                                              selectors,
-                                              position
-                                            })}
-                                          />
-                                        )}
                                       </button>
+                                      {group.calculatedSelectors?.layout_part_selectors?.[part] && (
+                                        <SelectorDisplay
+                                          selectors={group.calculatedSelectors.layout_part_selectors[part]}
+                                          type="breakpoint"
+                                          onOpenPopup={(selectors, position) => setSelectorPopup({
+                                            type: 'breakpoint',
+                                            selectors,
+                                            position
+                                          })}
+                                        />
+                                      )}
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -2822,36 +2852,31 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                           <div className="font-mono text-sm font-semibold text-gray-900">
                                                             {getBreakpointLabel(breakpoint)}
                                                           </div>
-                                                          {/* Breakpoint Selectors Display */}
-                                                          {(() => {
-                                                            const partSelectors = group.calculatedSelectors?.layout_part_selectors?.[part];
-
-                                                            // #region agent log
-                                                            fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:2503', message: 'Selector rendering check', data: { groupIndex, part, breakpoint, hasCalculatedSelectors: !!group.calculatedSelectors, hasLayoutPartSelectors: !!group.calculatedSelectors?.layout_part_selectors, layoutPartSelectorKeys: group.calculatedSelectors?.layout_part_selectors ? Object.keys(group.calculatedSelectors.layout_part_selectors) : [], partSelectors: partSelectors || null, baseSelectors: group.calculatedSelectors?.base_selectors || null }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'selector-debug' }) }).catch(() => { });
-                                                            // #endregion
-
-                                                            if (!partSelectors || partSelectors.length === 0) {
-                                                              return null;
-                                                            }
-
-                                                            return (
-                                                              <div className="mt-1">
-                                                                <SelectorDisplay
-                                                                  selectors={partSelectors}
-                                                                  type="breakpoint"
-                                                                  onOpenPopup={(selectors, position) => {
-                                                                    setSelectorPopup({
-                                                                      type: 'breakpoint',
-                                                                      selectors,
-                                                                      position
-                                                                    });
-                                                                  }}
-                                                                />
-                                                              </div>
-                                                            );
-                                                          })()}
                                                         </div>
                                                       </button>
+                                                      {(() => {
+                                                        const partSelectors = group.calculatedSelectors?.layout_part_selectors?.[part];
+
+                                                        if (!partSelectors || partSelectors.length === 0) {
+                                                          return null;
+                                                        }
+
+                                                        return (
+                                                          <div className="mx-2">
+                                                            <SelectorDisplay
+                                                              selectors={partSelectors}
+                                                              type="breakpoint"
+                                                              onOpenPopup={(selectors, position) => {
+                                                                setSelectorPopup({
+                                                                  type: 'breakpoint',
+                                                                  selectors,
+                                                                  position
+                                                                });
+                                                              }}
+                                                            />
+                                                          </div>
+                                                        );
+                                                      })()}
                                                       <div className="flex gap-1">
                                                         {/* Copy/Paste Buttons */}
                                                         <button
@@ -3016,15 +3041,24 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                               {(part === 'header-widget' || part === 'navbar-widget' || part === 'footer-widget') && (
                                                                 <div className="p-4 border-b border-gray-200">
                                                                   <ImagePropertyField
+                                                                    themeId={themeId}
                                                                     value={breakpointProps?.images?.background}
-                                                                    onChange={(mediaFile) => {
+                                                                    onChange={(imageData) => {
                                                                       const updatedGroups = [...groups];
                                                                       const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
                                                                       const partProps = layoutProperties[part] || {};
                                                                       const bpProps = partProps[breakpoint] || {};
-                                                                      
-                                                                      if (mediaFile) {
-                                                                        bpProps.images = { ...bpProps.images, background: mediaFile };
+
+                                                                      if (imageData) {
+                                                                        // Store simple URL object
+                                                                        bpProps.images = {
+                                                                          ...bpProps.images,
+                                                                          background: {
+                                                                            url: imageData.url,
+                                                                            filename: imageData.filename,
+                                                                            size: imageData.size
+                                                                          }
+                                                                        };
                                                                       } else {
                                                                         // Remove image
                                                                         if (bpProps.images) {
@@ -3034,11 +3068,11 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                                                                           }
                                                                         }
                                                                       }
-                                                                      
+
                                                                       partProps[breakpoint] = bpProps;
                                                                       layoutProperties[part] = partProps;
                                                                       updatedGroups[groupIndex].layoutProperties = layoutProperties;
-                                                                      
+
                                                                       onChange({ groups: updatedGroups });
                                                                       if (onDirty) onDirty();
                                                                     }}
@@ -3502,22 +3536,20 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                 <button
                   type="button"
                   onClick={() => setImportMode('css')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    importMode === 'css'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${importMode === 'css'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                 >
                   CSS
                 </button>
                 <button
                   type="button"
                   onClick={() => setImportMode('json')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    importMode === 'json'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${importMode === 'json'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                 >
                   JSON
                 </button>
@@ -3571,8 +3603,8 @@ const DesignGroupsTab = ({ designGroups, colors, fonts, breakpoints, onChange, o
                       importModal.type === 'element'
                         ? '{\n  "fontSize": "2rem",\n  "color": "#333",\n  "fontWeight": "700"\n}'
                         : importModal.type === 'global'
-                        ? '{\n  "groups": [\n    {\n      "name": "My Group",\n      "elements": { "h1": { "fontSize": "2rem" } }\n    }\n  ]\n}'
-                        : '{\n  "elements": { "h1": { "fontSize": "2rem" } },\n  "layoutProperties": { ... }\n}'
+                          ? '{\n  "groups": [\n    {\n      "name": "My Group",\n      "elements": { "h1": { "fontSize": "2rem" } }\n    }\n  ]\n}'
+                          : '{\n  "elements": { "h1": { "fontSize": "2rem" } },\n  "layoutProperties": { ... }\n}'
                     }
                     className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />

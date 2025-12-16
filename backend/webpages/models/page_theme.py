@@ -1957,6 +1957,109 @@ class PageTheme(models.Model):
             return self.table_templates[template_name]
         return None
 
+    def get_design_group_image_urls(self):
+        """
+        Extract all image URLs from design_groups.layoutProperties.
+        Returns list of tuples: [(url, metadata_dict), ...]
+        where metadata_dict contains 'filename' and 'size' if available.
+        """
+        image_data_list = []
+        if self.design_groups and "groups" in self.design_groups:
+            for group in self.design_groups["groups"]:
+                if "layoutProperties" in group:
+                    for part, breakpoints in group["layoutProperties"].items():
+                        for bp, props in breakpoints.items():
+                            if "images" in props and isinstance(props["images"], dict):
+                                for image_key, image_data in props["images"].items():
+                                    if isinstance(image_data, dict):
+                                        # Support both new format (url) and old format (fileUrl)
+                                        url = image_data.get("url") or image_data.get(
+                                            "fileUrl"
+                                        )
+                                        if url:
+                                            metadata = {
+                                                "filename": image_data.get(
+                                                    "filename", ""
+                                                ),
+                                                "size": image_data.get("size", 0),
+                                                "part": part,
+                                                "breakpoint": bp,
+                                                "image_key": image_key,
+                                            }
+                                            image_data_list.append((url, metadata))
+        return image_data_list
+
+    @staticmethod
+    def _extract_path_from_url(url):
+        """Extract storage path from s3:// or https:// URL"""
+        if not url:
+            return None
+        # Handle s3:// protocol
+        if url.startswith("s3://"):
+            # Format: s3://bucket/path -> path
+            parts = url.replace("s3://", "").split("/", 1)
+            return parts[1] if len(parts) > 1 else None
+        # Handle https:// protocol
+        elif "theme_images/" in url:
+            # Extract everything from theme_images/ onward
+            idx = url.find("theme_images/")
+            return url[idx:]
+        return None
+
+    @staticmethod
+    def _update_image_urls_in_design_groups(design_groups, url_mapping):
+        """
+        Update all image URLs in design_groups JSON using url_mapping.
+        url_mapping: dict of old_url -> new_url
+        Returns updated design_groups dict.
+        """
+        import copy
+
+        updated_groups = copy.deepcopy(design_groups)
+        if updated_groups and "groups" in updated_groups:
+            for group in updated_groups["groups"]:
+                if "layoutProperties" in group:
+                    for part, breakpoints in group["layoutProperties"].items():
+                        for bp, props in breakpoints.items():
+                            if "images" in props and isinstance(props["images"], dict):
+                                for image_key, image_data in props["images"].items():
+                                    if isinstance(image_data, dict):
+                                        # Check both url and fileUrl for backward compatibility
+                                        old_url = image_data.get(
+                                            "url"
+                                        ) or image_data.get("fileUrl")
+                                        if old_url and old_url in url_mapping:
+                                            image_data["url"] = url_mapping[old_url]
+                                            # Remove fileUrl if it exists (migration to new format)
+                                            if "fileUrl" in image_data:
+                                                del image_data["fileUrl"]
+        return updated_groups
+
+    def delete(self, *args, **kwargs):
+        """Delete theme and cleanup design group images from object storage"""
+        import logging
+        from file_manager.storage import S3MediaStorage
+
+        logger = logging.getLogger(__name__)
+
+        # Delete design group images from object storage
+        design_group_images = self.get_design_group_image_urls()
+        if design_group_images:
+            storage = S3MediaStorage()
+            for url, metadata in design_group_images:
+                try:
+                    path = self._extract_path_from_url(url)
+                    if path and storage.exists(path):
+                        storage.delete(path)
+                        logger.info(f"Deleted design group image: {path}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to delete design group image {url}: {str(e)}"
+                    )
+
+        # Call parent delete
+        super().delete(*args, **kwargs)
+
     def clone(self, new_name=None, created_by=None):
         """Create a copy of this theme with all data"""
         if not new_name:
@@ -1994,5 +2097,60 @@ class PageTheme(models.Model):
         if self.image:
             cloned_theme.image = self.image
             cloned_theme.save()
+
+        # Copy design group images to new theme's directory
+        design_group_images = self.get_design_group_image_urls()
+        if design_group_images:
+            import logging
+            from file_manager.storage import S3MediaStorage
+
+            logger = logging.getLogger(__name__)
+            storage = S3MediaStorage()
+            url_mapping = {}
+
+            for old_url, metadata in design_group_images:
+                try:
+                    # Extract path from old URL
+                    old_path = self._extract_path_from_url(old_url)
+                    if not old_path:
+                        continue
+
+                    # Extract filename from path
+                    filename = old_path.split("/")[-1]
+
+                    # Generate new path with cloned theme's ID
+                    new_path = (
+                        f"theme_images/{cloned_theme.id}/design_groups/{filename}"
+                    )
+
+                    # Check if source file exists
+                    if storage.exists(old_path):
+                        # Read old file
+                        old_file = storage._open(old_path, "rb")
+                        file_content = old_file.read()
+                        old_file.close()
+
+                        # Write to new path
+                        storage._save(new_path, ContentFile(file_content))
+
+                        # Get new URL
+                        new_url = storage.url(new_path)
+                        url_mapping[old_url] = new_url
+                    else:
+                        logger.warning(
+                            f"Source image not found during clone: {old_path}"
+                        )
+
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to copy design group image during clone: {str(e)}"
+                    )
+
+            # Update design_groups JSON with new URLs
+            if url_mapping:
+                cloned_theme.design_groups = self._update_image_urls_in_design_groups(
+                    cloned_theme.design_groups, url_mapping
+                )
+                cloned_theme.save()
 
         return cloned_theme
