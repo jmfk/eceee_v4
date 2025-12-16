@@ -567,10 +567,6 @@ const extractFilterOptions = (groups, widgetTypes = []) => {
 const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, onChange, onDirty }) => {
   const groups = designGroups?.groups || [];
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:346', message: 'Component render - groups data', data: { groupCount: groups.length, group1HasCalcSelectors: groups[1] ? !!groups[1].calculatedSelectors : false, group1CalcSelectors: groups[1]?.calculatedSelectors || null }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'component-render' }) }).catch(() => { });
-  // #endregion
-
   const [expandedContent, setExpandedContent] = useState({});
   const [expandedTags, setExpandedTags] = useState({});
   const [expandedTargeting, setExpandedTargeting] = useState({});
@@ -959,10 +955,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
   const handleUpdateLayoutProperty = (groupIndex, part, breakpoint, property, value, immediate = false) => {
     const key = `${groupIndex}-${part}-${breakpoint}-${property}`;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:638', message: 'handleUpdateLayoutProperty ENTRY', data: { groupIndex, part, breakpoint, property, value, immediate, key }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'E' }) }).catch(() => { });
-    // #endregion
-
     // Update local input state immediately
     setLayoutInputValues(prev => ({
       ...prev,
@@ -980,10 +972,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
       const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
       const partProps = layoutProperties[part] || {};
       const breakpointProps = partProps[breakpoint] || {};
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:660', message: 'performUpdate BEFORE cleanup', data: { value, isEmpty: value === '' || value === null, breakpointPropsBefore: { ...breakpointProps }, breakpointPropsKeys: Object.keys(breakpointProps) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'E' }) }).catch(() => { });
-      // #endregion
 
       // Update or remove property
       if (value === null) {
@@ -1006,10 +994,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
       } else {
         layoutProperties[part] = partProps;
       }
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:683', message: 'performUpdate AFTER cleanup', data: { breakpointPropsAfter: { ...breakpointProps }, breakpointPropsKeysAfter: Object.keys(breakpointProps), partPropsKeys: Object.keys(partProps), layoutPropsKeys: Object.keys(layoutProperties), willDeletePart: Object.keys(partProps).length === 0 }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'E' }) }).catch(() => { });
-      // #endregion
 
       updatedGroups[groupIndex] = {
         ...updatedGroups[groupIndex],
@@ -2827,10 +2811,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                                 const breakpointKey = `${groupIndex}-${part}-${breakpoint}`;
                                                 const isBreakpointExpanded = expandedLayoutBreakpoints[breakpointKey] === true; // Only expanded if explicitly set
 
-                                                // #region agent log
-                                                fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:2220', message: 'Breakpoint render', data: { groupIndex, part, breakpoint, breakpointKey, isBreakpointExpanded, expandedValue: expandedLayoutBreakpoints[breakpointKey], breakpointPropsKeys: Object.keys(breakpointProps) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'D' }) }).catch(() => { });
-                                                // #endregion
-
                                                 return (
                                                   <div key={breakpoint} className="mb-3 last:mb-0 border border-gray-200 rounded-lg bg-white shadow-sm">
                                                     {/* Breakpoint Header - Collapsible */}
@@ -3030,10 +3010,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                                           const usedProperties = Object.keys(breakpointProps);
                                                           const unusedProperties = Object.entries(availableProperties)
                                                             .filter(([prop]) => !usedProperties.includes(prop));
-
-                                                          // #region agent log
-                                                          fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DesignGroupsTab.jsx:2389', message: 'Property filtering', data: { groupIndex, part, breakpoint, breakpointProps: { ...breakpointProps }, usedProperties, unusedPropertiesCount: unusedProperties.length, isBreakpointExpanded }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'A,C' }) }).catch(() => { });
-                                                          // #endregion
 
                                                           return (
                                                             <>

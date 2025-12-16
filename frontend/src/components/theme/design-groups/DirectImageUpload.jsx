@@ -6,13 +6,15 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, X, ImageIcon, Loader2, FolderOpen } from 'lucide-react';
 import { themesApi } from '../../../api/themes';
 import { useGlobalNotifications } from '../../../contexts/GlobalNotificationContext';
+import ImageLibraryPicker from '../ImageLibraryPicker';
 
 const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [dragActive, setDragActive] = useState(false);
+    const [showLibraryPicker, setShowLibraryPicker] = useState(false);
     const fileInputRef = useRef(null);
     const { addNotification } = useGlobalNotifications();
 
@@ -105,6 +107,15 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
         }
     };
 
+    const handleLibrarySelect = (image) => {
+        onChange({
+            url: image.url,
+            filename: image.filename,
+            size: image.size,
+        });
+        setShowLibraryPicker(false);
+    };
+
     // Extract image info for display
     const imageUrl = value?.url;
     const imageFilename = value?.filename || 'Image';
@@ -154,13 +165,22 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                         </button>
                     </div>
 
-                    {/* Change button */}
-                    <div className="pt-3 border-t border-gray-200">
+                    {/* Change buttons */}
+                    <div className="pt-3 border-t border-gray-200 flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowLibraryPicker(true)}
+                            disabled={disabled || isUploading}
+                            className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                        >
+                            <FolderOpen className="h-3 w-3" />
+                            From Library
+                        </button>
                         <button
                             type="button"
                             onClick={handleClick}
                             disabled={disabled || isUploading}
-                            className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                         >
                             {isUploading ? (
                                 <span className="flex items-center justify-center gap-2">
@@ -168,7 +188,10 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                                     Uploading...
                                 </span>
                             ) : (
-                                'Change Image'
+                                <>
+                                    <Upload className="h-3 w-3" />
+                                    Upload New
+                                </>
                             )}
                         </button>
                     </div>
@@ -178,31 +201,53 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                 <div
                     className={`
                         border-2 border-dashed rounded-lg p-6 transition
-                        ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'}
-                        ${disabled || isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 cursor-pointer'}
+                        ${dragActive ? 'border-purple-500 bg-purple-50' : 'border-gray-300 bg-gray-50'}
+                        ${disabled || isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'}
                     `}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
-                    onClick={handleClick}
                 >
                     <div className="flex flex-col items-center justify-center text-center">
                         {isUploading ? (
                             <>
-                                <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
+                                <Loader2 className="h-8 w-8 text-purple-500 animate-spin mb-2" />
                                 <div className="text-sm text-gray-600">
                                     Uploading...
                                 </div>
                             </>
                         ) : (
                             <>
-                                <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                                <div className="text-sm text-gray-600 mb-1">
-                                    Click to upload or drag and drop
+                                <ImageIcon className="h-10 w-10 text-gray-400 mb-2" />
+                                <div className="text-sm text-gray-600 mb-3">
+                                    Drop an image here or choose from library
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                    JPG, PNG, GIF, WebP, SVG (max 10MB)
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowLibraryPicker(true);
+                                        }}
+                                        disabled={disabled}
+                                        className="px-3 py-2 text-sm border border-purple-600 text-purple-600 rounded-md hover:bg-purple-50 transition disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                        <FolderOpen className="h-4 w-4" />
+                                        Choose from Library
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleClick();
+                                        }}
+                                        disabled={disabled}
+                                        className="px-3 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                        <Upload className="h-4 w-4" />
+                                        Upload New
+                                    </button>
                                 </div>
                             </>
                         )}
@@ -219,6 +264,16 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                 disabled={disabled || isUploading}
                 className="hidden"
             />
+
+            {/* Library Picker Modal */}
+            {showLibraryPicker && (
+                <ImageLibraryPicker
+                    themeId={themeId}
+                    currentSelection={value}
+                    onSelect={handleLibrarySelect}
+                    onCancel={() => setShowLibraryPicker(false)}
+                />
+            )}
         </div>
     );
 };

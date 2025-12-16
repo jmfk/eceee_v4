@@ -70,6 +70,60 @@ class S3MediaStorage(Storage):
             endpoint_url=self.endpoint_url,
         )
 
+    def listdir(self, path):
+        """
+        List the contents of the specified path.
+
+        Args:
+            path: Directory path to list
+
+        Returns:
+            Tuple of (directories, files) lists
+        """
+        # Ensure path ends with / for directory listing
+        if path and not path.endswith("/"):
+            path = path + "/"
+
+        directories = []
+        files = []
+
+        try:
+            # Use list_objects_v2 for better performance
+            response = self.client.list_objects_v2(
+                Bucket=self.bucket_name, Prefix=path, Delimiter="/"
+            )
+
+            # Log for debugging
+            logger.info(
+                f"list_objects_v2 response for {path}: {response.get('Contents', [])} directories: {response.get('CommonPrefixes', [])}"
+            )
+
+            # Get subdirectories (CommonPrefixes)
+            for prefix in response.get("CommonPrefixes", []):
+                dir_name = prefix["Prefix"].rstrip("/").split("/")[-1]
+                if dir_name:
+                    directories.append(dir_name)
+
+            # Get files (Contents)
+            for obj in response.get("Contents", []):
+                # Skip the directory itself
+                if obj["Key"] == path:
+                    continue
+                # Only get direct children (not nested)
+                file_path = obj["Key"][len(path) :]
+                if "/" not in file_path:
+                    files.append(file_path)
+
+            logger.info(f"listdir found directories: {directories}, files: {files}")
+            return (directories, files)
+
+        except ClientError as e:
+            logger.error(f"Error listing directory {path}: {str(e)}")
+            return ([], [])
+        except Exception as e:
+            logger.error(f"Unexpected error listing directory {path}: {str(e)}")
+            return ([], [])
+
     def upload_file(self, file: UploadedFile, folder_path: str = "") -> Dict[str, Any]:
         """
         Upload a file to S3 with metadata extraction and hash generation.
@@ -182,7 +236,9 @@ class S3MediaStorage(Storage):
         try:
             self._save(file_path, file)
         except Exception as e:
-            logger.error(f"Failed to overwrite file {file.name} to S3 path {file_path}: {e}")
+            logger.error(
+                f"Failed to overwrite file {file.name} to S3 path {file_path}: {e}"
+            )
             raise
 
         return result

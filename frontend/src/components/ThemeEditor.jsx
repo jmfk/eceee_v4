@@ -30,6 +30,7 @@ import ComponentStylesTab from './theme/ComponentStylesTab';
 import ImageStylesTab from './theme/ImageStylesTab';
 import TableTemplatesTab from './theme/TableTemplatesTab';
 import BreakpointsTab from './theme/BreakpointsTab';
+import ImagesTab from './theme/ImagesTab';
 import ImageUpload from './theme/ImageUpload';
 import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
 import CopyButton from './theme/CopyButton';
@@ -563,6 +564,7 @@ const ThemeEditor = ({ onSave }) => {
 
     const tabs = [
         { id: 'basic', label: 'Basic Info' },
+        { id: 'images', label: 'Images' },
         { id: 'fonts', label: 'Fonts' },
         { id: 'colors', label: 'Colors' },
         { id: 'breakpoints', label: 'Breakpoints' },
@@ -942,6 +944,18 @@ const ThemeEditor = ({ onSave }) => {
                             colors={themeData?.colors || {}}
                             onChange={(colors) => updateThemeField('colors', colors)}
                             onDirty={() => setThemeDirty(true)}
+                        />
+                    )}
+
+                    {activeTab === 'images' && (
+                        <ImagesTab
+                            themeId={themeId}
+                            theme={themeData}
+                            onThemeUpdate={() => {
+                                // Reload theme data when images are updated
+                                queryClient.invalidateQueries(['themes', themeId]);
+                                queryClient.invalidateQueries(['themes']);
+                            }}
                         />
                     )}
 

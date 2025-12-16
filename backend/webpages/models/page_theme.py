@@ -1988,6 +1988,94 @@ class PageTheme(models.Model):
                                             }
                                             image_data_list.append((url, metadata))
         return image_data_list
+    
+    def list_library_images(self):
+        """
+        List all images in the theme's library folder.
+        Returns list of filenames.
+        """
+        from file_manager.storage import S3MediaStorage
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        storage = S3MediaStorage()
+        library_path = f"theme_images/{self.id}/library/"
+        
+        try:
+            if hasattr(storage, 'listdir'):
+                directories, files = storage.listdir(library_path)
+                return files
+            return []
+        except Exception as e:
+            logger.warning(f"Failed to list library images for theme {self.id}: {str(e)}")
+            return []
+    
+    def get_image_usage(self, filename):
+        """
+        Track where a library image is used within the theme.
+        Returns list of usage locations: ["design_group:Group Name", "preview", etc.]
+        """
+        usage = []
+        
+        # Check if it's the preview image
+        if self.image and filename in str(self.image):
+            usage.append("preview")
+        
+        # Check design groups
+        if self.design_groups and "groups" in self.design_groups:
+            for group in self.design_groups["groups"]:
+                group_name = group.get("name", "Unnamed Group")
+                if "layoutProperties" in group:
+                    for part, breakpoints in group["layoutProperties"].items():
+                        for bp, props in breakpoints.items():
+                            if "images" in props and isinstance(props["images"], dict):
+                                for image_key, image_data in props["images"].items():
+                                    if isinstance(image_data, dict):
+                                        url = image_data.get("url") or image_data.get("fileUrl")
+                                        if url and filename in url:
+                                            usage.append(f"design_group:{group_name}")
+                                            break
+        
+        return list(set(usage))  # Remove duplicates
+    
+    def delete_library_image(self, filename):
+        """
+        Delete a library image and remove all references to it in the theme.
+        This updates design_groups to remove the image references.
+        """
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # Update design groups to remove image references
+        if self.design_groups and "groups" in self.design_groups:
+            updated = False
+            for group in self.design_groups["groups"]:
+                if "layoutProperties" in group:
+                    for part, breakpoints in group["layoutProperties"].items():
+                        for bp, props in breakpoints.items():
+                            if "images" in props and isinstance(props["images"], dict):
+                                images_to_remove = []
+                                for image_key, image_data in props["images"].items():
+                                    if isinstance(image_data, dict):
+                                        url = image_data.get("url") or image_data.get("fileUrl")
+                                        if url and filename in url:
+                                            images_to_remove.append(image_key)
+                                            updated = True
+                                
+                                # Remove the images
+                                for image_key in images_to_remove:
+                                    del props["images"][image_key]
+            
+            if updated:
+                self.save(update_fields=["design_groups"])
+                logger.info(f"Removed references to {filename} from theme {self.id}")
+        
+        # Clear preview image if it matches
+        if self.image and filename in str(self.image):
+            self.image = None
+            self.save(update_fields=["image"])
+            logger.info(f"Cleared preview image reference to {filename} from theme {self.id}")
 
     @staticmethod
     def _extract_path_from_url(url):
@@ -2098,9 +2186,9 @@ class PageTheme(models.Model):
             cloned_theme.image = self.image
             cloned_theme.save()
 
-        # Copy design group images to new theme's directory
-        design_group_images = self.get_design_group_image_urls()
-        if design_group_images:
+        # Copy all library images to new theme's directory
+        library_images = self.list_library_images()
+        if library_images:
             import logging
             from file_manager.storage import S3MediaStorage
 
@@ -2108,20 +2196,11 @@ class PageTheme(models.Model):
             storage = S3MediaStorage()
             url_mapping = {}
 
-            for old_url, metadata in design_group_images:
+            for filename in library_images:
                 try:
-                    # Extract path from old URL
-                    old_path = self._extract_path_from_url(old_url)
-                    if not old_path:
-                        continue
-
-                    # Extract filename from path
-                    filename = old_path.split("/")[-1]
-
-                    # Generate new path with cloned theme's ID
-                    new_path = (
-                        f"theme_images/{cloned_theme.id}/design_groups/{filename}"
-                    )
+                    # Source and destination paths
+                    old_path = f"theme_images/{self.id}/library/{filename}"
+                    new_path = f"theme_images/{cloned_theme.id}/library/{filename}"
 
                     # Check if source file exists
                     if storage.exists(old_path):
@@ -2133,9 +2212,14 @@ class PageTheme(models.Model):
                         # Write to new path
                         storage._save(new_path, ContentFile(file_content))
 
-                        # Get new URL
+                        # Build URL mapping for updating references
+                        old_url = storage.url(old_path)
                         new_url = storage.url(new_path)
                         url_mapping[old_url] = new_url
+                        
+                        # Also map any variations of the path
+                        url_mapping[old_path] = new_path
+                        url_mapping[f"theme_images/{self.id}/library/{filename}"] = f"theme_images/{cloned_theme.id}/library/{filename}"
                     else:
                         logger.warning(
                             f"Source image not found during clone: {old_path}"
@@ -2143,7 +2227,7 @@ class PageTheme(models.Model):
 
                 except Exception as e:
                     logger.warning(
-                        f"Failed to copy design group image during clone: {str(e)}"
+                        f"Failed to copy library image during clone: {str(e)}"
                     )
 
             # Update design_groups JSON with new URLs
@@ -2152,5 +2236,29 @@ class PageTheme(models.Model):
                     cloned_theme.design_groups, url_mapping
                 )
                 cloned_theme.save()
+
+        # Also handle legacy design_groups images (backward compatibility)
+        # Check for old design_groups path and migrate during clone
+        old_design_groups_path = f"theme_images/{self.id}/design_groups/"
+        try:
+            from file_manager.storage import S3MediaStorage
+            storage = S3MediaStorage()
+            if hasattr(storage, 'listdir'):
+                try:
+                    directories, files = storage.listdir(old_design_groups_path)
+                    if files:
+                        logger.info(f"Found {len(files)} legacy design_groups images to migrate during clone")
+                        for filename in files:
+                            old_path = f"{old_design_groups_path}{filename}"
+                            new_path = f"theme_images/{cloned_theme.id}/library/{filename}"
+                            if storage.exists(old_path):
+                                old_file = storage._open(old_path, "rb")
+                                file_content = old_file.read()
+                                old_file.close()
+                                storage._save(new_path, ContentFile(file_content))
+                except:
+                    pass  # Directory might not exist
+        except Exception as e:
+            logger.warning(f"Failed to check legacy design_groups during clone: {str(e)}")
 
         return cloned_theme

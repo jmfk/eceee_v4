@@ -448,6 +448,516 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=True, methods=["get", "post"], url_path="library_images")
+    def library_images(self, request, pk=None):
+        """
+        GET: List all images in theme library with metadata
+        POST: Upload single or multiple images to library
+        """
+        from file_manager.storage import S3MediaStorage
+        import os
+        import uuid
+        import logging
+        from datetime import datetime
+
+        logger = logging.getLogger(__name__)
+        theme = self.get_object()
+        storage = S3MediaStorage()
+
+        if request.method == "GET":
+            # List all images in library
+            library_path = f"theme_images/{theme.id}/library/"
+
+            try:
+                images = []
+
+                # List files with metadata directly from S3
+                response = storage.client.list_objects_v2(
+                    Bucket=storage.bucket_name, Prefix=library_path
+                )
+
+                logger.info(f"Listing library path: {library_path}")
+
+                for obj in response.get("Contents", []):
+                    # Skip the directory itself
+                    if obj["Key"] == library_path:
+                        continue
+
+                    # Only get direct children (not nested)
+                    file_path = obj["Key"][len(library_path) :]
+                    if "/" in file_path:
+                        continue
+
+                    filename = file_path
+                    full_path = obj["Key"]
+
+                    try:
+                        # Get URLs
+                        url = storage.url(full_path)
+                        public_url = (
+                            storage.get_public_url(full_path)
+                            if hasattr(storage, "get_public_url")
+                            else url
+                        )
+
+                        # Get metadata from the list response
+                        size = obj.get("Size", 0)
+                        modified = obj.get("LastModified", datetime.now())
+
+                        # Get usage information
+                        used_in = theme.get_image_usage(filename)
+
+                        images.append(
+                            {
+                                "filename": filename,
+                                "url": url,
+                                "publicUrl": public_url,
+                                "size": size,
+                                "uploadedAt": (
+                                    modified.isoformat()
+                                    if hasattr(modified, "isoformat")
+                                    else str(modified)
+                                ),
+                                "usedIn": used_in,
+                            }
+                        )
+                        logger.info(f"Added image to list: {filename}")
+                    except Exception as e:
+                        logger.warning(f"Failed to get info for {filename}: {str(e)}")
+
+                logger.info(f"Returning {len(images)} images")
+                return Response({"images": images})
+
+            except Exception as e:
+                logger.error(f"Failed to list library images: {str(e)}")
+                return Response(
+                    {"error": f"Failed to list images: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        elif request.method == "POST":
+            # Upload images to library
+            if not request.FILES:
+                return Response(
+                    {"error": "No image files provided"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            allowed_types = [
+                "image/jpeg",
+                "image/png",
+                "image/gif",
+                "image/webp",
+                "image/svg+xml",
+            ]
+            max_size = 10 * 1024 * 1024  # 10MB
+
+            uploaded_images = []
+            errors = []
+
+            for key, image_file in request.FILES.items():
+                try:
+                    # Validate file type
+                    if image_file.content_type not in allowed_types:
+                        errors.append(
+                            {
+                                "filename": image_file.name,
+                                "error": f"Invalid file type: {image_file.content_type}",
+                            }
+                        )
+                        continue
+
+                    # Validate file size
+                    if image_file.size > max_size:
+                        errors.append(
+                            {
+                                "filename": image_file.name,
+                                "error": "File too large. Maximum size is 10MB",
+                            }
+                        )
+                        continue
+
+                    # Generate unique filename
+                    file_extension = os.path.splitext(image_file.name)[1].lower()
+                    base_name = os.path.splitext(image_file.name)[0]
+                    unique_filename = (
+                        f"{base_name}_{uuid.uuid4().hex[:8]}{file_extension}"
+                    )
+
+                    # Upload to library
+                    file_path = f"theme_images/{theme.id}/library/{unique_filename}"
+                    logger.info(f"Uploading to path: {file_path}")
+                    saved_path = storage._save(
+                        file_path, ContentFile(image_file.read())
+                    )
+                    logger.info(f"Saved to: {saved_path}")
+
+                    # Verify file exists
+                    exists = storage.exists(file_path)
+                    logger.info(f"File exists after save: {exists}")
+
+                    # Get URLs
+                    url = storage.url(file_path)
+                    public_url = (
+                        storage.get_public_url(file_path)
+                        if hasattr(storage, "get_public_url")
+                        else url
+                    )
+                    logger.info(f"Generated URL: {url}")
+
+                    uploaded_images.append(
+                        {
+                            "filename": unique_filename,
+                            "originalFilename": image_file.name,
+                            "url": url,
+                            "publicUrl": public_url,
+                            "size": image_file.size,
+                        }
+                    )
+
+                except Exception as e:
+                    logger.error(f"Failed to upload {image_file.name}: {str(e)}")
+                    errors.append({"filename": image_file.name, "error": str(e)})
+
+            return Response(
+                {
+                    "uploaded": uploaded_images,
+                    "errors": errors,
+                    "success": len(uploaded_images),
+                    "failed": len(errors),
+                },
+                status=(
+                    status.HTTP_201_CREATED
+                    if uploaded_images
+                    else status.HTTP_400_BAD_REQUEST
+                ),
+            )
+
+    @action(
+        detail=True, methods=["delete"], url_path="library_images/(?P<filename>[^/]+)"
+    )
+    def delete_library_image(self, request, pk=None, filename=None):
+        """
+        Delete a specific image from theme library
+        """
+        from file_manager.storage import S3MediaStorage
+        import logging
+
+        logger = logging.getLogger(__name__)
+        theme = self.get_object()
+        storage = S3MediaStorage()
+
+        if not filename:
+            return Response(
+                {"error": "Filename is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            file_path = f"theme_images/{theme.id}/library/{filename}"
+
+            if not storage.exists(file_path):
+                return Response(
+                    {"error": "Image not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Check usage before deleting
+            used_in = theme.get_image_usage(filename)
+            if used_in and request.query_params.get("force") != "true":
+                return Response(
+                    {
+                        "error": "Image is in use",
+                        "usedIn": used_in,
+                        "message": "Add ?force=true to delete anyway",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            # Delete the file
+            storage.delete(file_path)
+
+            # If forced, clean up references
+            if used_in:
+                theme.delete_library_image(filename)
+
+            return Response(
+                {"message": f"Image '{filename}' deleted successfully"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to delete library image: {str(e)}")
+            return Response(
+                {"error": f"Failed to delete image: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"], url_path="library_images/bulk_delete")
+    def bulk_delete_library_images(self, request, pk=None):
+        """
+        Delete multiple images from theme library
+        """
+        from file_manager.storage import S3MediaStorage
+        import logging
+
+        logger = logging.getLogger(__name__)
+        theme = self.get_object()
+        storage = S3MediaStorage()
+
+        filenames = request.data.get("filenames", [])
+        force = request.data.get("force", False)
+
+        if not filenames:
+            return Response(
+                {"error": "No filenames provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        deleted = []
+        errors = []
+        in_use = []
+
+        for filename in filenames:
+            try:
+                file_path = f"theme_images/{theme.id}/library/{filename}"
+
+                if not storage.exists(file_path):
+                    errors.append({"filename": filename, "error": "Image not found"})
+                    continue
+
+                # Check usage
+                used_in = theme.get_image_usage(filename)
+                if used_in and not force:
+                    in_use.append({"filename": filename, "usedIn": used_in})
+                    continue
+
+                # Delete the file
+                storage.delete(file_path)
+
+                # Clean up references if forced
+                if used_in:
+                    theme.delete_library_image(filename)
+
+                deleted.append(filename)
+
+            except Exception as e:
+                logger.error(f"Failed to delete {filename}: {str(e)}")
+                errors.append({"filename": filename, "error": str(e)})
+
+        return Response(
+            {
+                "deleted": deleted,
+                "errors": errors,
+                "inUse": in_use,
+                "success": len(deleted),
+                "failed": len(errors) + len(in_use),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="library_images/(?P<filename>[^/]+)/usage",
+    )
+    def library_image_usage(self, request, pk=None, filename=None):
+        """
+        Get usage information for a specific library image
+        """
+        theme = self.get_object()
+
+        if not filename:
+            return Response(
+                {"error": "Filename is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            used_in = theme.get_image_usage(filename)
+            return Response(
+                {"filename": filename, "usedIn": used_in, "isUsed": len(used_in) > 0}
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get usage: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="library_images/(?P<filename>[^/]+)/rename",
+    )
+    def rename_library_image(self, request, pk=None, filename=None):
+        """
+        Rename a library image and update all references
+        """
+        from file_manager.storage import S3MediaStorage
+        import logging
+        import os
+
+        logger = logging.getLogger(__name__)
+        theme = self.get_object()
+        storage = S3MediaStorage()
+
+        if not filename:
+            return Response(
+                {"error": "Filename is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_filename = request.data.get("new_filename")
+        if not new_filename:
+            return Response(
+                {"error": "new_filename is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            old_path = f"theme_images/{theme.id}/library/{filename}"
+            new_path = f"theme_images/{theme.id}/library/{new_filename}"
+
+            # Check if old file exists
+            if not storage.exists(old_path):
+                return Response(
+                    {"error": "Image not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Check if new filename already exists
+            if storage.exists(new_path):
+                return Response(
+                    {"error": "A file with the new name already exists"},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            # Copy file to new location
+            file_content = storage.open(old_path, "rb").read()
+            storage.save(new_path, ContentFile(file_content))
+
+            # Delete old file
+            storage.delete(old_path)
+
+            # Update references in design_groups
+            if theme.design_groups:
+                updated = False
+                for group in theme.design_groups:
+                    if "image" in group and group["image"]:
+                        if filename in group["image"]:
+                            group["image"] = group["image"].replace(
+                                filename, new_filename
+                            )
+                            updated = True
+                if updated:
+                    theme.save(update_fields=["design_groups"])
+
+            # Update theme preview image if it matches
+            if theme.image and filename in theme.image.name:
+                # Note: This might need manual handling as it's an ImageField
+                logger.warning(
+                    f"Theme preview image contains old filename: {theme.image.name}"
+                )
+
+            return Response(
+                {
+                    "message": "Image renamed successfully",
+                    "old_filename": filename,
+                    "new_filename": new_filename,
+                    "url": storage.get_public_url(new_path),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to rename library image: {str(e)}")
+            return Response(
+                {"error": f"Failed to rename image: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="library_images/(?P<filename>[^/]+)/replace",
+    )
+    def replace_library_image(self, request, pk=None, filename=None):
+        """
+        Replace a library image with a new file (keeping the same filename)
+        """
+        from file_manager.storage import S3MediaStorage
+        import logging
+        import uuid
+
+        logger = logging.getLogger(__name__)
+        theme = self.get_object()
+        storage = S3MediaStorage()
+
+        if not filename:
+            return Response(
+                {"error": "Filename is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if "image" not in request.FILES:
+            return Response(
+                {"error": "No image file provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            file = request.FILES["image"]
+
+            # Validate file type
+            allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif"]
+            if file.content_type not in allowed_types:
+                return Response(
+                    {"error": f"Invalid file type: {file.content_type}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate file size (max 10MB)
+            max_size = 10 * 1024 * 1024
+            if file.size > max_size:
+                return Response(
+                    {"error": "File too large (max 10MB)"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            file_path = f"theme_images/{theme.id}/library/{filename}"
+
+            # Check if file exists
+            if not storage.exists(file_path):
+                return Response(
+                    {"error": "Image not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Delete old file
+            storage.delete(file_path)
+
+            # Save new file with same filename
+            saved_path = storage.save(file_path, file)
+            public_url = storage.get_public_url(saved_path)
+
+            return Response(
+                {
+                    "message": "Image replaced successfully",
+                    "filename": filename,
+                    "url": saved_path,
+                    "publicUrl": public_url,
+                    "size": file.size,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to replace library image: {str(e)}")
+            return Response(
+                {"error": f"Failed to replace image: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["post"], url_path="ai-style-helper")
     def ai_style_helper(self, request, pk=None):
         """
@@ -595,15 +1105,43 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     # Log error but continue
                     logger.warning(f"Failed to add image to export: {str(e)}")
 
-            # Add design group images if they exist
-            design_group_images = theme.get_design_group_image_urls()
-            if design_group_images:
+            # Add library images
+            library_images = theme.list_library_images()
+            if library_images:
                 from file_manager.storage import S3MediaStorage
                 import logging
 
                 logger = logging.getLogger(__name__)
                 storage = S3MediaStorage()
 
+                for filename in library_images:
+                    try:
+                        path = f"theme_images/{theme.id}/library/{filename}"
+
+                        # Read file from storage
+                        if storage.exists(path):
+                            file_obj = storage._open(path, "rb")
+                            file_content = file_obj.read()
+                            file_obj.close()
+
+                            # Add to zip at: library_images/{filename}
+                            zip_file.writestr(
+                                f"library_images/{filename}", file_content
+                            )
+                        else:
+                            logger.warning(f"Library image not found: {path}")
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to add library image to export: {str(e)}"
+                        )
+
+            # Also include legacy design_group_images for backward compatibility
+            design_group_images = theme.get_design_group_image_urls()
+            if design_group_images:
+                logger.info(
+                    f"Found {len(design_group_images)} design group images (legacy)"
+                )
                 for url, metadata in design_group_images:
                     try:
                         # Extract path from URL
@@ -614,15 +1152,19 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         # Extract filename
                         filename = path.split("/")[-1]
 
+                        # Skip if already in library
+                        if filename in library_images:
+                            continue
+
                         # Read file from storage
                         if storage.exists(path):
                             file_obj = storage._open(path, "rb")
                             file_content = file_obj.read()
                             file_obj.close()
 
-                            # Add to zip at: design_group_images/{filename}
+                            # Add to zip at: library_images/{filename} (migrate to library)
                             zip_file.writestr(
-                                f"design_group_images/{filename}", file_content
+                                f"library_images/{filename}", file_content
                             )
                         else:
                             logger.warning(f"Design group image not found: {path}")
@@ -713,39 +1255,48 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         image_name, ContentFile(image_content), save=True
                     )
 
-                # Handle design group images
-                design_group_images = [
+                # Handle library images (new format)
+                library_images = [
+                    f for f in zf.namelist() if f.startswith("library_images/")
+                ]
+
+                # Also check for legacy design_group_images
+                legacy_images = [
                     f for f in zf.namelist() if f.startswith("design_group_images/")
                 ]
-                if design_group_images:
+
+                # Combine both lists
+                all_images = library_images + legacy_images
+
+                if all_images:
                     from file_manager.storage import S3MediaStorage
                     import logging
 
                     logger = logging.getLogger(__name__)
                     storage = S3MediaStorage()
-                    url_mapping = {}  # old_url -> new_url
+                    url_mapping = {}  # filename -> new_url
 
-                    for image_file in design_group_images:
+                    for image_file in all_images:
                         try:
                             image_name = image_file.split("/")[-1]
                             image_content = zf.read(image_file)
 
-                            # Upload to new theme's directory
-                            new_path = f"theme_images/{new_theme.id}/design_groups/{image_name}"
+                            # Upload to new theme's library directory
+                            new_path = (
+                                f"theme_images/{new_theme.id}/library/{image_name}"
+                            )
                             storage._save(new_path, ContentFile(image_content))
                             new_url = storage.url(new_path)
 
                             # Build mapping of filenames to new URLs
-                            # We'll use filename as the key since we don't have old URLs
                             url_mapping[image_name] = new_url
 
                         except Exception as e:
                             logger.warning(
-                                f"Failed to import design group image {image_file}: {str(e)}"
+                                f"Failed to import image {image_file}: {str(e)}"
                             )
 
                     # Update image URLs in design_groups JSON
-                    # Need to match by filename and update URLs
                     if url_mapping and new_theme.design_groups:
                         updated_groups = new_theme.design_groups.copy()
                         if "groups" in updated_groups:

@@ -70,3 +70,58 @@ class LinodeObjectStorage(S3Boto3Storage):
 
         # Priority 3: Standard AWS S3 URL format
         return f"https://{bucket}.s3.{region}.amazonaws.com/{name}"
+    
+    def listdir(self, path):
+        """
+        List the contents of the specified path.
+        
+        Args:
+            path: Directory path to list
+            
+        Returns:
+            Tuple of (directories, files) lists
+        """
+        # Ensure path ends with / for directory listing
+        if path and not path.endswith('/'):
+            path = path + '/'
+        
+        directories = []
+        files = []
+        
+        try:
+            # Get the S3 connection
+            connection = self.connection
+            bucket = connection.Bucket(self.bucket_name)
+            
+            # Use list_objects to get all objects with the prefix
+            paginator = connection.meta.client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(
+                Bucket=self.bucket_name,
+                Prefix=path,
+                Delimiter='/'
+            )
+            
+            for page in pages:
+                # Get subdirectories (CommonPrefixes)
+                for prefix in page.get('CommonPrefixes', []):
+                    dir_name = prefix['Prefix'].rstrip('/').split('/')[-1]
+                    if dir_name:
+                        directories.append(dir_name)
+                
+                # Get files (Contents)
+                for obj in page.get('Contents', []):
+                    # Skip the directory itself
+                    if obj['Key'] == path:
+                        continue
+                    # Only get direct children (not nested)
+                    file_path = obj['Key'][len(path):]
+                    if '/' not in file_path:
+                        files.append(file_path)
+            
+            return (directories, files)
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error listing directory {path}: {str(e)}")
+            return ([], [])

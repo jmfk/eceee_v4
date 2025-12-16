@@ -101,21 +101,20 @@ const BreakpointPropertyEditor = ({
                         <ChevronRight className="w-4 h-4 text-gray-600" />
                     )}
                     <div className="flex-1">
-                                                        <div className="font-mono text-sm font-semibold text-gray-900">
-                                                            {breakpointLabel}
-                                                        </div>
-                                                        {/* Breakpoint Selectors Display */}
-                                                        {partSelectors && partSelectors.length > 0 && (
-                                                            <div className="mt-1">
-                                                                <SelectorDisplay
-                                                                    selectors={partSelectors}
-                                                                    type="breakpoint"
-                                                                    onOpenPopup={(selectors, position) => onOpenSelectorPopup('breakpoint', selectors, position)}
-                                                                />
-                                                            </div>
-                                                        )}
+                        <div className="font-mono text-sm font-semibold text-gray-900">
+                            {breakpointLabel}
+                        </div>
                     </div>
                 </button>
+                {partSelectors && partSelectors.length > 0 && (
+                    <div className="mx-2">
+                        <SelectorDisplay
+                            selectors={partSelectors}
+                            type="breakpoint"
+                            onOpenPopup={(selectors, position) => onOpenSelectorPopup('breakpoint', selectors, position)}
+                        />
+                    </div>
+                )}
                 <div className="flex gap-1">
                     {/* Copy/Paste Buttons */}
                     <button

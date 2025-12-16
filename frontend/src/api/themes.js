@@ -232,7 +232,104 @@ export const themesApi = {
                 'Content-Type': 'multipart/form-data'
             }
         })
-    }, 'themes.importTheme')
+    }, 'themes.importTheme'),
+
+    /**
+     * List all images in theme library
+     * @param {number} themeId - Theme ID
+     * @returns {Promise<Object>} Library images list
+     */
+    listLibraryImages: wrapApiCall(async (themeId) => {
+        return api.get(`${endpoints.themes.detail(themeId)}/library_images/`)
+    }, 'themes.listLibraryImages'),
+
+    /**
+     * Upload images to theme library
+     * @param {number} themeId - Theme ID
+     * @param {File[]} files - Array of image files to upload
+     * @returns {Promise<Object>} Upload results with uploaded/errors
+     */
+    uploadLibraryImages: wrapApiCall(async (themeId, files) => {
+        const formData = new FormData()
+
+        // Append each file with a unique key
+        files.forEach((file, index) => {
+            formData.append(`image_${index}`, file)
+        })
+
+        return api.post(`${endpoints.themes.detail(themeId)}/library_images/`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.uploadLibraryImages'),
+
+    /**
+     * Delete a specific image from theme library
+     * @param {number} themeId - Theme ID
+     * @param {string} filename - Image filename to delete
+     * @param {boolean} force - Force delete even if in use
+     * @returns {Promise<Object>} Deletion result
+     */
+    deleteLibraryImage: wrapApiCall(async (themeId, filename, force = false) => {
+        const queryString = force ? '?force=true' : ''
+        return api.delete(`${endpoints.themes.detail(themeId)}/library_images/${filename}/${queryString}`)
+    }, 'themes.deleteLibraryImage'),
+
+    /**
+     * Delete multiple images from theme library
+     * @param {number} themeId - Theme ID
+     * @param {string[]} filenames - Array of filenames to delete
+     * @param {boolean} force - Force delete even if in use
+     * @returns {Promise<Object>} Bulk deletion results
+     */
+    bulkDeleteLibraryImages: wrapApiCall(async (themeId, filenames, force = false) => {
+        return api.post(`${endpoints.themes.detail(themeId)}/library_images/bulk_delete/`, {
+            filenames,
+            force
+        })
+    }, 'themes.bulkDeleteLibraryImages'),
+
+    /**
+     * Get usage information for a library image
+     * @param {number} themeId - Theme ID
+     * @param {string} filename - Image filename
+     * @returns {Promise<Object>} Usage information
+     */
+    getImageUsage: wrapApiCall(async (themeId, filename) => {
+        return api.get(`${endpoints.themes.detail(themeId)}/library_images/${filename}/usage/`)
+    }, 'themes.getImageUsage'),
+
+    /**
+     * Rename a library image
+     * @param {number} themeId - Theme ID
+     * @param {string} oldFilename - Current filename
+     * @param {string} newFilename - New filename
+     * @returns {Promise<Object>} Rename result
+     */
+    renameLibraryImage: wrapApiCall(async (themeId, oldFilename, newFilename) => {
+        return api.post(`${endpoints.themes.detail(themeId)}/library_images/${oldFilename}/rename/`, {
+            new_filename: newFilename
+        })
+    }, 'themes.renameLibraryImage'),
+
+    /**
+     * Replace a library image with a new file
+     * @param {number} themeId - Theme ID
+     * @param {string} filename - Filename to replace
+     * @param {File} file - New image file
+     * @returns {Promise<Object>} Replace result
+     */
+    replaceLibraryImage: wrapApiCall(async (themeId, filename, file) => {
+        const formData = new FormData()
+        formData.append('image', file)
+
+        return api.post(`${endpoints.themes.detail(themeId)}/library_images/${filename}/replace/`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.replaceLibraryImage')
 }
 
 export default themesApi

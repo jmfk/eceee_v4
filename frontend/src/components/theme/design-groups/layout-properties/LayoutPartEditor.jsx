@@ -98,14 +98,14 @@ const LayoutPartEditor = ({
                             {Object.keys(availableProperties).length} {Object.keys(availableProperties).length === 1 ? 'property' : 'properties'}
                         </span>
                     )}
-                    {partSelectors && partSelectors.length > 0 && (
-                        <SelectorDisplay
-                            selectors={partSelectors}
-                            type="breakpoint"
-                            onOpenPopup={onOpenSelectorPopup}
-                        />
-                    )}
                 </button>
+                {partSelectors && partSelectors.length > 0 && (
+                    <SelectorDisplay
+                        selectors={partSelectors}
+                        type="breakpoint"
+                        onOpenPopup={onOpenSelectorPopup}
+                    />
+                )}
                 <button
                     type="button"
                     onClick={(e) => {

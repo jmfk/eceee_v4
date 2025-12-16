@@ -214,10 +214,6 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
     const applyPaste = (resolutions, replaceMode = false) => {
         const { level, section, data } = parsedData;
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ThemeCopyPasteManager.jsx:204', message: 'applyPaste entry', data: { level, section, replaceMode, hasDesignGroupsInData: !!data?.designGroups, designGroupsType: typeof data?.designGroups, designGroupsGroups: data?.designGroups?.groups?.length, hasDesignGroupsInTheme: !!themeData?.designGroups, themeDesignGroupsType: typeof themeData?.designGroups, themeDesignGroupsGroups: themeData?.designGroups?.groups?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-        // #endregion
-
         let existingData;
         if (level === 'full') {
             existingData = {
@@ -233,21 +229,9 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             existingData = themeData?.[section] || {};
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ThemeCopyPasteManager.jsx:220', message: 'before mergeThemeData', data: { existingDesignGroups: JSON.stringify(existingData.designGroups), incomingDesignGroups: JSON.stringify(data.designGroups), resolutions: JSON.stringify(resolutions) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
-        // #endregion
-
         const merged = mergeThemeData(existingData, data, level, section, resolutions, replaceMode);
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ThemeCopyPasteManager.jsx:222', message: 'after mergeThemeData', data: { mergedDesignGroups: JSON.stringify(merged.designGroups), mergedDesignGroupsGroups: merged.designGroups?.groups?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
-        // #endregion
-
         // Apply update
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/c8b75885-14df-434e-9b57-f5e9971d8cca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ThemeCopyPasteManager.jsx:225', message: 'before onUpdate', data: { level, willUpdateFull: level === 'full', updateDataDesignGroups: JSON.stringify(level === 'full' ? merged.designGroups : merged[section]?.designGroups) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-        // #endregion
-
         if (level === 'full') {
             onUpdate(merged);
         } else {
