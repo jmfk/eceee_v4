@@ -50,7 +50,6 @@ uvicorn[standard]>=0.24.0
 
 # Image handling and S3 storage
 Pillow>=10.0.0
-boto3>=1.34.0  # Production deployment pins to 1.26.137 for Linode compatibility
 django-storages>=1.14.0
 python-magic>=0.4.27
 opencv-python-headless>=4.8.0
@@ -61,7 +60,7 @@ PyPDF2>=3.0.0
 # Document processing
 pdf2image>=1.16.3
 python-docx>=1.1.0
-python-markdown>=3.5
+Markdown>=3.5
 
 # Monitoring and logging
 django-prometheus>=2.3.0

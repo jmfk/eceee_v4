@@ -5,6 +5,8 @@
 django-debug-toolbar>=4.2.0
 django-querycount>=0.8.0
 
+boto3>=1.34.0
+
 # Testing
 pytest>=7.4.0
 pytest-django>=4.5.0
