@@ -61,7 +61,7 @@ PyPDF2>=3.0.0
 # Document processing
 pdf2image>=1.16.3
 python-docx>=1.1.0
-python-markdown>=3.5
+Markdown>=3.5
 
 # Monitoring and logging
 django-prometheus>=2.3.0
