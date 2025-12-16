@@ -493,6 +493,53 @@ const CSS_PROPERTIES = {
 };
 
 /**
+ * Normalize elements structure from imported data
+ * Handles:
+ * - Array to object conversion
+ * - Null/undefined element values
+ * - Snake_case to camelCase property key conversion
+ * - Invalid data structures
+ */
+const normalizeElements = (elements) => {
+  // Handle null, undefined, or non-object
+  if (!elements || typeof elements !== 'object') {
+    return {};
+  }
+  
+  // Handle array (incorrect structure)
+  if (Array.isArray(elements)) {
+    console.warn('Design group elements is an array, converting to object');
+    return {};
+  }
+  
+  // Normalize each element
+  const normalized = {};
+  Object.entries(elements).forEach(([key, value]) => {
+    // Skip null/undefined values
+    if (value == null) {
+      return;
+    }
+    
+    // Ensure value is an object
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      console.warn(`Element ${key} has invalid value type, skipping`);
+      return;
+    }
+    
+    // Convert property keys from snake_case to camelCase
+    const normalizedValue = {};
+    Object.entries(value).forEach(([propKey, propValue]) => {
+      const camelKey = propKey.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      normalizedValue[camelKey] = propValue;
+    });
+    
+    normalized[key] = normalizedValue;
+  });
+  
+  return normalized;
+};
+
+/**
  * Extract all unique filter options from design groups
  * @param {Array} groups - Array of design group objects
  * @param {Array} widgetTypes - Array of widget type objects with name and type
@@ -1584,7 +1631,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
               targetingMode: group.targetingMode || group.targeting_mode || 'widget-slot',
               targetCssClasses: group.targetCssClasses || group.target_css_classes || null,
               colorScheme: group.colorScheme || group.color_scheme || { background: null, text: null },
-              elements: group.elements || {},
+              elements: normalizeElements(group.elements || {}),
               layoutProperties: group.layoutProperties || group.layout_properties || {},
               // Preserve calculatedSelectors if present, otherwise it will be recalculated
               ...(group.calculatedSelectors && { calculatedSelectors: group.calculatedSelectors }),
@@ -1604,7 +1651,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
             targetingMode: parsedData.targetingMode || parsedData.targeting_mode || 'widget-slot',
             targetCssClasses: parsedData.targetCssClasses || parsedData.target_css_classes || null,
             colorScheme: parsedData.colorScheme || parsedData.color_scheme || { background: null, text: null },
-            elements: parsedData.elements || {},
+            elements: normalizeElements(parsedData.elements || {}),
             layoutProperties: parsedData.layoutProperties || parsedData.layout_properties || {},
             // Preserve calculatedSelectors if present
             ...(parsedData.calculatedSelectors && { calculatedSelectors: parsedData.calculatedSelectors }),
@@ -1663,7 +1710,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
           ...(parsedData.target_css_classes !== undefined && { targetCssClasses: parsedData.target_css_classes }),
           ...(parsedData.colorScheme && { colorScheme: parsedData.colorScheme }),
           ...(parsedData.color_scheme && { colorScheme: parsedData.color_scheme }),
-          ...(parsedData.elements && { elements: { ...currentGroup.elements, ...parsedData.elements } }),
+          ...(parsedData.elements && { elements: { ...currentGroup.elements, ...normalizeElements(parsedData.elements) } }),
           ...(parsedData.layoutProperties && { layoutProperties: { ...currentGroup.layoutProperties, ...parsedData.layoutProperties } }),
           ...(parsedData.layout_properties && { layoutProperties: { ...currentGroup.layoutProperties, ...parsedData.layout_properties } }),
         };
@@ -1681,19 +1728,26 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
         const updatedGroups = [...groups];
         const currentStyles = updatedGroups[importModal.groupIndex].elements[importModal.elementKey] || {};
 
+        // Normalize property keys (snake_case to camelCase)
+        const normalizedProperties = {};
+        Object.entries(parsedData).forEach(([propKey, propValue]) => {
+          const camelKey = propKey.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+          normalizedProperties[camelKey] = propValue;
+        });
+
         // Merge properties
         updatedGroups[importModal.groupIndex] = {
           ...updatedGroups[importModal.groupIndex],
           elements: {
             ...updatedGroups[importModal.groupIndex].elements,
-            [importModal.elementKey]: { ...currentStyles, ...parsedData },
+            [importModal.elementKey]: { ...currentStyles, ...normalizedProperties },
           },
         };
 
         onChange({ ...(designGroups || {}), groups: updatedGroups });
         addNotification({
           type: 'success',
-          message: `Updated ${importModal.elementKey} with ${Object.keys(parsedData).length} ${Object.keys(parsedData).length === 1 ? 'property' : 'properties'}`
+          message: `Updated ${importModal.elementKey} with ${Object.keys(normalizedProperties).length} ${Object.keys(normalizedProperties).length === 1 ? 'property' : 'properties'}`
         });
       }
 
@@ -1721,6 +1775,16 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
     const performUpdate = () => {
       const updatedGroups = [...groups];
       const currentStyles = updatedGroups[groupIndex].elements[element] || {};
+
+      // Validate element structure
+      if (!currentStyles || typeof currentStyles !== 'object' || Array.isArray(currentStyles)) {
+        console.error('Invalid element structure:', { groupIndex, element, currentStyles });
+        addNotification({
+          type: 'error',
+          message: `Cannot edit ${element}: data structure is corrupted. Try removing and re-adding the element.`
+        });
+        return;
+      }
 
       // Validate CSS values and warn about common issues
       if (value && typeof value === 'string') {
@@ -3350,7 +3414,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                   </div>
 
                                   {/* Tag Content */}
-                                  {isTagExpanded && (
+                                  {(isTagExpanded || !tagGroup.hasGroup) && (
                                     <div className="p-4 space-y-4">
                                       {/* Render each variant */}
                                       {tagGroup.variants.map(variant => {

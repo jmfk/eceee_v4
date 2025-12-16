@@ -168,6 +168,9 @@ const TagGroupEditor = ({
                         const editModeKey = `${groupIndex}-${tagGroup.base}-${variant}`;
                         const currentEditMode = editMode[editModeKey] || 'form';
 
+                        // Check if element data is corrupted
+                        const isCorrupted = typeof styles !== 'object' || Array.isArray(styles);
+
                         return (
                             <div key={variant} className="space-y-3 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
                                 <div className="flex items-center justify-between">
@@ -204,7 +207,14 @@ const TagGroupEditor = ({
                                     </div>
                                 </div>
 
-                                {currentEditMode === 'form' ? (
+                                {isCorrupted ? (
+                                    <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                                        <div className="font-semibold mb-1">⚠️ Corrupted Data</div>
+                                        <div className="text-xs">
+                                            This element has corrupted data structure. Please remove it and add it again.
+                                        </div>
+                                    </div>
+                                ) : currentEditMode === 'form' ? (
                                     /* Form View */
                                     <>
                                         {/* Existing Properties */}
@@ -277,7 +287,7 @@ const TagGroupEditor = ({
                                         rows={Math.max(5, Object.keys(styles).length + 2)}
                                         placeholder="property: value;"
                                     />
-                                )}
+                                ))}
                             </div>
                         );
                     })}
