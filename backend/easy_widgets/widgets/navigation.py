@@ -168,7 +168,7 @@ class NavigationWidget(BaseWidget):
         template_config["hasDynamicItems"] = len(dynamic_items) > 0
 
         # Add widget type CSS class
-        template_config["widgetTypeCssClass"] = "navigation"
+        template_config["widgetTypeCssClass"] = self.css_class_name
 
         # Add nav container height
         template_config["navContainerHeight"] = config.get(

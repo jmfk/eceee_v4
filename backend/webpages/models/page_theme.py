@@ -1546,11 +1546,11 @@ class PageTheme(models.Model):
                         slot_normalized = normalize_for_css(slot)
                         if scope:
                             base_selectors.append(
-                                f"{scope}.slot-{slot_normalized} > .widget-type-{wt_normalized}"
+                                f"{scope}.slot-{slot_normalized}>.widget-type-{wt_normalized}"
                             )
                         else:
                             base_selectors.append(
-                                f".slot-{slot_normalized} > .widget-type-{wt_normalized}"
+                                f".slot-{slot_normalized}>.widget-type-{wt_normalized}"
                             )
 
             # Apply frontend scoping if requested
@@ -1659,8 +1659,8 @@ class PageTheme(models.Model):
                 # Get theme breakpoints for media queries
                 breakpoints = self.get_breakpoints()
 
-                # Get widget type metadata to look up selectors for layout parts
-                part_selector_map = {}  # part_id -> custom selector
+                # Get widget type metadata to look up selectors and relationships for layout parts
+                part_metadata_map = {}  # part_id -> {selector, relationship}
                 if widget_types:
                     from webpages.widget_registry import widget_type_registry
 
@@ -1668,55 +1668,14 @@ class PageTheme(models.Model):
                         wt_class = widget_type_registry.get_widget_type_by_type(wt_type)
                         if wt_class and hasattr(wt_class, "layout_parts"):
                             for part_id, part_config in wt_class.layout_parts.items():
-                                if isinstance(part_config, dict) and part_config.get(
-                                    "selector"
-                                ):
-                                    part_selector_map[part_id] = part_config["selector"]
+                                if isinstance(part_config, dict):
+                                    part_metadata_map[part_id] = {
+                                        "selector": part_config.get("selector"),
+                                        "relationship": part_config.get("relationship", "auto")
+                                    }
 
-                # Collect all images and special color variables from all breakpoints and parts
-                css_variables = []
-                for part, part_breakpoints in layout_properties.items():
-                    for bp_key in ["sm", "md", "lg", "xl"]:
-                        bp_props = part_breakpoints.get(bp_key)
-                        if bp_props and isinstance(bp_props, dict):
-                            # Handle images
-                            if "images" in bp_props:
-                                images = bp_props["images"]
-                                if isinstance(images, dict):
-                                    for image_key, image_data in images.items():
-                                        if isinstance(
-                                            image_data, dict
-                                        ) and image_data.get("fileUrl"):
-                                            # Generate CSS variable name: --{part}-{imageKey}-{breakpoint}
-                                            var_name = f"--{part}-{image_key}-{bp_key}"
-                                            image_url = image_data["fileUrl"]
-                                            css_variables.append(
-                                                f"  {var_name}: url('{image_url}');"
-                                            )
-
-                            # Handle special color variables for navbar and footer
-                            # These need to be CSS variables for responsive color changes
-                            if part in ["navbar-widget", "footer-widget"]:
-                                if "backgroundColor" in bp_props:
-                                    var_name = f"--{part.replace('-widget', '')}-bg-color-{bp_key}"
-                                    css_variables.append(
-                                        f"  {var_name}: {bp_props['backgroundColor']};"
-                                    )
-                                if "color" in bp_props:
-                                    var_name = f"--{part.replace('-widget', '')}-text-color-{bp_key}"
-                                    css_variables.append(
-                                        f"  {var_name}: {bp_props['color']};"
-                                    )
-
-                # Generate CSS variable declarations at design group scope
-                if css_variables:
-                    selector = ",\n".join(base_selectors) if base_selectors else ":root"
-                    if not selector:
-                        selector = ":root"
-                    css_rule = f"{selector} {{\n"
-                    css_rule += "\n".join(css_variables)
-                    css_rule += "\n}"
-                    css_parts.append(css_rule)
+                # Note: Images and colors are now generated as direct CSS properties
+                # in the main loop below, not as CSS variables
 
                 for part, part_breakpoints in layout_properties.items():
                     # Handle each breakpoint in mobile-first order
@@ -1757,9 +1716,10 @@ class PageTheme(models.Model):
                         if not bp_props or len(bp_props) == 0:
                             continue
 
-                        # Build selectors using layout part classes or custom selectors
-                        # Check if this part has a custom selector defined in widget metadata
-                        custom_selector = part_selector_map.get(part)
+                        # Build selectors using layout part classes, custom selectors, and relationships
+                        part_metadata = part_metadata_map.get(part, {})
+                        custom_selector = part_metadata.get("selector")
+                        relationship = part_metadata.get("relationship", "auto")
 
                         if custom_selector:
                             # Use custom selector (e.g., ".nav-container a")
@@ -1779,24 +1739,27 @@ class PageTheme(models.Model):
                             # base_selectors contain widget-type classes like:
                             # .widget-type-easy-widgets-contentcardwidget
                             #
-                            # For widget root elements (parts ending in '-widget' or named 'container'),
-                            # the widget-type class and part class are on the SAME element,
-                            # so we use a same-element selector (no space).
-                            # For child elements, we use descendant selectors (with space).
-                            is_root_element = (
-                                part.endswith("-widget") or part == "container"
-                            )
+                            # Determine relationship based on "relationship" field or auto-detect
+                            if relationship == "auto":
+                                # Auto: For widget root elements (parts ending in '-widget' or named 'container'),
+                                # the widget-type class and part class are on the SAME element.
+                                # For child elements, use descendant selectors.
+                                relationship = "same-element" if (part.endswith("-widget") or part == "container") else "descendant"
 
                             part_selectors = []
                             for base in base_selectors:
                                 if base:
-                                    if is_root_element:
-                                        # Root element: both classes on same div
-                                        # .slot-main .widget-type-{type}.{part}
+                                    if relationship == "same-element":
+                                        # Same element: both classes on same element
+                                        # .slot-main>.widget-type-{type}.{part}
                                         part_selectors.append(f"{base}.{part}".strip())
-                                    else:
-                                        # Child element: descendant selector
-                                        # .slot-main .widget-type-{type} .{part}
+                                    elif relationship == "direct-child":
+                                        # Direct child: immediate child selector
+                                        # .slot-main>.widget-type-{type}>.{part}
+                                        part_selectors.append(f"{base}>.{part}".strip())
+                                    else:  # "descendant"
+                                        # Descendant: any nested child
+                                        # .slot-main>.widget-type-{type} .{part}
                                         part_selectors.append(f"{base} .{part}".strip())
                                 else:
                                     # Fallback for global layout parts
@@ -1807,14 +1770,24 @@ class PageTheme(models.Model):
                         # Convert properties to CSS
                         css_rules = []
                         for prop_name, prop_value in bp_props.items():
-                            # Skip 'images' field - it's handled separately as CSS variables
+                            # Handle 'images' field - convert to background-image properties
                             if prop_name == "images":
+                                if isinstance(prop_value, dict):
+                                    for image_key, image_data in prop_value.items():
+                                        # Support both new format (url) and old format (fileUrl)
+                                        if isinstance(image_data, dict):
+                                            image_url = image_data.get("url") or image_data.get("fileUrl")
+                                            if image_url:
+                                                # Map common image keys to CSS properties
+                                                if image_key == "background":
+                                                    css_rules.append(f"  background-image: url('{image_url}');")
+                                                elif image_key == "backgroundImage":
+                                                    css_rules.append(f"  background-image: url('{image_url}');")
+                                                else:
+                                                    # For other image keys, use as custom property or skip
+                                                    # This handles legacy cases
+                                                    pass
                                 continue
-
-                            # Skip backgroundColor and color for navbar/footer - handled as CSS variables
-                            if part in ["navbar-widget", "footer-widget"]:
-                                if prop_name in ["backgroundColor", "color"]:
-                                    continue
 
                             css_prop = (
                                 self._camel_to_kebab(prop_name)

@@ -28,11 +28,13 @@ class HeaderWidget(BaseWidget):
         "Simple header widget with responsive image that scales to fill header height"
     )
     template_name = "easy_widgets/widgets/header.html"
+    mustache_template_name = "easy_widgets/widgets/header.mustache"
 
     layout_parts = {
         "header-widget": {
             "label": "Header container",
             "selector": ".header-widget",
+            "relationship": "same-element",  # Both widget-type and header-widget classes on same element
             "properties": [
                 "padding",
                 "margin",
@@ -44,7 +46,6 @@ class HeaderWidget(BaseWidget):
     widget_css = """
         .widget-type-header {
             width: 100%;
-            background-image: var(--header-widget-background-sm, none);
             background-size: cover;
             background-repeat: no-repeat;
             background-position: center center;
@@ -53,21 +54,18 @@ class HeaderWidget(BaseWidget):
 
         @media (min-width: 768px) {
             .widget-type-header {
-                background-image: var(--header-widget-background-md, var(--header-widget-background-sm, none));
                 height: var(--header-height-md, 112px);
             }
         }
 
         @media (min-width: 1024px) {
             .widget-type-header {
-                background-image: var(--header-widget-background-lg, none);
                 height: var(--header-height-lg, 112px);
             }
         }
 
         @media (min-width: 1280px) {
             .widget-type-header {
-                background-image: var(--header-widget-background-xl, none);
                 height: var(--header-height-xl, 112px);
             }
         }
@@ -80,3 +78,12 @@ class HeaderWidget(BaseWidget):
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return HeaderConfig
+
+    def prepare_template_context(self, config, context=None):
+        """Prepare header template context for Mustache template"""
+        template_config = super().prepare_template_context(config, context)
+
+        # Add widget type CSS class (normalized)
+        template_config["widgetTypeCssClass"] = self.css_class_name
+
+        return template_config

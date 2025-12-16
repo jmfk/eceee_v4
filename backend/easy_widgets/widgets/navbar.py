@@ -244,7 +244,7 @@ class NavbarWidget(BaseWidget):
         template_config["hamburgerBreakpoint"] = config.get("hamburger_breakpoint", 768)
 
         # Add widget type CSS class
-        template_config["widgetTypeCssClass"] = "navbar"
+        template_config["widgetTypeCssClass"] = self.css_class_name
 
         # No inline styles - all styling from design groups CSS variables
         template_config["navbarStyle"] = ""

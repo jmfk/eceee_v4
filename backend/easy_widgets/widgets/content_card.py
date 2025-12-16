@@ -117,6 +117,7 @@ class ContentCardWidget(BaseWidget):
         "content-card-widget": {
             "label": "Content Card Widget",
             "selector": ".content-card-widget",
+            "relationship": "same-element",  # Root element
             "properties": [
                 "width",
                 "height",
@@ -129,6 +130,7 @@ class ContentCardWidget(BaseWidget):
         "content-card-header": {
             "label": "Card Header",
             "selector": ".content-card-header",
+            "relationship": "direct-child",  # Direct child of root element
             "properties": [
                 "width",
                 "height",
