@@ -352,14 +352,6 @@ const TwoColumnsWidget = ({
                         parseWidgetPath={parseWidgetPath}
                         showClearButton={false} // Hide Clear Slot button
                         compactAddButton={true} // Show just + icon
-                        // Selection props
-                        selectedWidgets={selectedWidgets}
-                        cutWidgets={cutWidgets}
-                        onToggleWidgetSelection={onToggleWidgetSelection}
-                        isWidgetSelected={isWidgetSelected}
-                        isWidgetCut={isWidgetCut}
-                        buildWidgetPath={buildWidgetPath}
-                        parseWidgetPath={parseWidgetPath}
                     />
                 </div>
             </div>
