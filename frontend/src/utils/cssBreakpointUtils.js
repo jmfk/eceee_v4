@@ -26,13 +26,13 @@ export function generateCSSFromBreakpoints(cssObj, theme) {
     
     const parts = [];
     
-    // Base styles (sm - no media query)
-    if (cssObj.sm) {
-        parts.push(cssObj.sm);
+    // Base styles (xs - no media query)
+    if (cssObj.xs) {
+        parts.push(cssObj.xs);
     }
     
     // Generate media queries for larger breakpoints (mobile-first)
-    ['md', 'lg', 'xl'].forEach(bp => {
+    ['sm', 'md', 'lg', 'xl'].forEach(bp => {
         if (cssObj[bp] && cssObj[bp].trim() && breakpoints[bp]) {
             const mediaQuery = `@media (min-width: ${breakpoints[bp]}px) {\n${cssObj[bp]}\n}`;
             parts.push(mediaQuery);
@@ -46,7 +46,7 @@ export function generateCSSFromBreakpoints(cssObj, theme) {
  * Convert legacy string CSS to object format
  * 
  * @param {string} css - CSS string
- * @returns {Object} - CSS object with sm (base) key
+ * @returns {Object} - CSS object with xs (base) key
  */
 export function migrateLegacyCSS(css) {
     if (typeof css === 'object' && css !== null) {
@@ -54,7 +54,7 @@ export function migrateLegacyCSS(css) {
     }
     
     return {
-        sm: css || ''
+        xs: css || ''
     };
 }
 
@@ -62,14 +62,14 @@ export function migrateLegacyCSS(css) {
  * Convert CSS object to string (for backwards compatibility)
  * 
  * @param {Object} cssObj - CSS object with breakpoints
- * @returns {string} - CSS as string (only sm/base breakpoint)
+ * @returns {string} - CSS as string (only xs/base breakpoint)
  */
 export function cssObjectToString(cssObj) {
     if (typeof cssObj === 'string') {
         return cssObj;
     }
     
-    return cssObj.sm || '';
+    return cssObj.xs || cssObj.sm || '';
 }
 
 /**
@@ -83,14 +83,14 @@ export function hasBreakpointStyles(cssObj) {
         return false;
     }
     
-    return ['sm', 'md', 'lg', 'xl'].some(bp => cssObj[bp] && cssObj[bp].trim());
+    return ['xs', 'sm', 'md', 'lg', 'xl'].some(bp => cssObj[bp] && cssObj[bp].trim());
 }
 
 /**
  * Copy CSS from one breakpoint to another
  * 
  * @param {Object} cssObj - CSS object
- * @param {string} fromBreakpoint - Source breakpoint (default, sm, md, lg, xl)
+ * @param {string} fromBreakpoint - Source breakpoint (xs, sm, md, lg, xl)
  * @param {string} toBreakpoint - Target breakpoint
  * @returns {Object} - Updated CSS object
  */
@@ -123,7 +123,7 @@ export function clearBreakpointCSS(cssObj, breakpoint) {
  * @returns {Array} - Array of breakpoint keys
  */
 export function getBreakpointKeys() {
-    return ['sm', 'md', 'lg', 'xl'];
+    return ['xs', 'sm', 'md', 'lg', 'xl'];
 }
 
 /**
@@ -137,7 +137,8 @@ export function getBreakpointLabel(breakpoint, theme) {
     const breakpoints = getBreakpoints(theme);
     
     const labels = {
-        sm: 'Base / SM & Up',
+        xs: `XS - Base (<${breakpoints.sm}px)`,
+        sm: `SM & Up (≥${breakpoints.sm}px)`,
         md: `MD & Up (≥${breakpoints.md}px)`,
         lg: `LG & Up (≥${breakpoints.lg}px)`,
         xl: `XL & Up (≥${breakpoints.xl}px)`,

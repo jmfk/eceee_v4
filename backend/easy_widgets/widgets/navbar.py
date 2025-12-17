@@ -128,12 +128,20 @@ class NavbarWidget(BaseWidget):
     widget_css = """
         /* Navbar Widget - Styling from design groups */
         .widget-type-navbar {
-            background-image: var(--navbar-widget-background-sm, none);
-            background-color: var(--navbar-bg-color-sm, #3b82f6);
-            color: var(--navbar-text-color-sm, #ffffff);
+            background-image: var(--navbar-widget-background-xs, none);
+            background-color: var(--navbar-bg-color-xs, #3b82f6);
+            color: var(--navbar-text-color-xs, #ffffff);
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
+        }
+
+        @media (min-width: 640px) {
+            .widget-type-navbar {
+                background-image: var(--navbar-widget-background-sm, var(--navbar-widget-background-xs, none));
+                background-color: var(--navbar-bg-color-sm, var(--navbar-bg-color-xs, #3b82f6));
+                color: var(--navbar-text-color-sm, var(--navbar-text-color-xs, #ffffff));
+            }
         }
 
         @media (min-width: 768px) {

@@ -136,7 +136,7 @@ export const layoutPropertiesToCSS = (layoutProperties, groupIndex, groups, widg
     const isCustomBreakpoint = (bp) => !isNaN(bp);
 
     // Collect all breakpoints (standard + custom) and sort them
-    const standardBreakpoints = ['sm', 'md', 'lg', 'xl'];
+    const standardBreakpoints = ['xs', 'sm', 'md', 'lg', 'xl'];
     const customBreakpoints = Object.keys(bpStyles).filter(bp => 
       bp !== 'default' && bp !== 'desktop' && bp !== 'tablet' && bp !== 'mobile' && 
       !standardBreakpoints.includes(bp)
@@ -351,7 +351,7 @@ export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, 
     const effectiveBreakpoints = breakpoints;
     
     // Parse standard breakpoints
-    ['sm', 'md', 'lg', 'xl'].forEach(bp => {
+    ['xs', 'sm', 'md', 'lg', 'xl'].forEach(bp => {
       const bpValue = effectiveBreakpoints[bp];
       if (!bpValue) return;
 

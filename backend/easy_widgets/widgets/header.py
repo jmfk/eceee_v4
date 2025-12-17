@@ -24,7 +24,7 @@ class HeaderWidget(BaseWidget):
     """Simple header widget with image"""
 
     name = "Header"
-    description = "Header widget - mobile shows full image (auto height), desktop uses fixed height with cropped image"
+    description = "Header widget - xs breakpoint shows full image (auto height), sm+ uses fixed height with cropped image"
     mustache_template_name = "easy_widgets/widgets/header.mustache"
 
     layout_parts = {
@@ -44,21 +44,22 @@ class HeaderWidget(BaseWidget):
     }
 
     widget_css = """
+        /* Base mobile styles (< 640px) */
         .widget-type-header {
             width: 100%;
-            /* Mobile: auto height to show full image */
-            height: auto;
-            background-size: contain;
+            height: var(--header-height-xs, auto);
+            background-size: cover;
             background-repeat: no-repeat;
             background-position: top left;
+            aspect-ratio: var(--header-aspect-ratio-xs, 16 / 9);
         }
 
-        /* Desktop: fixed height with clipped/cropped image */
+        /* Small devices and up (≥ 640px) - fixed height with cover */
         @media (min-width: 640px) {
             .widget-type-header {
                 height: var(--header-height-sm, 120px);
                 aspect-ratio: auto;
-                background-size: cover;
+                background-size: contain;
             }
         }
 

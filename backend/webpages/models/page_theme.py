@@ -150,13 +150,14 @@ class PageTheme(models.Model):
         Returns theme-specific breakpoints or hard defaults.
 
         Returns:
-            dict: Breakpoint configuration with keys 'sm', 'md', 'lg', 'xl'
+            dict: Breakpoint configuration with keys 'xs', 'sm', 'md', 'lg', 'xl'
         """
         DEFAULT_BREAKPOINTS = {
-            "sm": 640,  # Tailwind sm
-            "md": 768,  # Tailwind md (Bootstrap md)
-            "lg": 1024,  # Tailwind lg (Bootstrap lg)
-            "xl": 1280,  # Tailwind xl (Bootstrap xl)
+            "xs": 0,    # Extra small - mobile (base, no media query)
+            "sm": 640,  # Small - large mobile / small tablet
+            "md": 768,  # Medium - tablet
+            "lg": 1024, # Large - laptop
+            "xl": 1280, # Extra large - desktop
         }
 
         if self.breakpoints and isinstance(self.breakpoints, dict):
@@ -1684,7 +1685,7 @@ class PageTheme(models.Model):
 
                 for part, part_breakpoints in layout_properties.items():
                     # Collect all breakpoints (standard + custom) and sort by pixel value
-                    standard_breakpoints = ["sm", "md", "lg", "xl"]
+                    standard_breakpoints = ["xs", "sm", "md", "lg", "xl"]
                     legacy_breakpoints = ["default", "desktop", "tablet", "mobile"]
 
                     # Find custom breakpoints (numeric string keys)
@@ -1711,7 +1712,7 @@ class PageTheme(models.Model):
                         [
                             bp
                             for bp in all_breakpoints
-                            if bp in part_breakpoints or bp == "sm"
+                            if bp in part_breakpoints or bp == "xs"
                         ],
                         key=get_breakpoint_value,
                     )
@@ -1719,25 +1720,26 @@ class PageTheme(models.Model):
                     # Handle each breakpoint in sorted order
                     for bp_key in sorted_breakpoints:
                         # Get properties for this breakpoint with legacy support
-                        if bp_key == "sm":
-                            # Merge legacy formats into sm (base)
+                        if bp_key == "xs":
+                            # xs is the base - merge legacy mobile formats
                             bp_props = {}
-                            if part_breakpoints.get("default"):  # Legacy: default -> sm
+                            if part_breakpoints.get("default"):  # Legacy: default -> xs
                                 bp_props.update(part_breakpoints["default"])
+                            if part_breakpoints.get(
+                                "mobile"
+                            ):  # Legacy: mobile -> xs
+                                bp_props.update(part_breakpoints["mobile"])
+                            if part_breakpoints.get(
+                                "xs"
+                            ):  # New format (takes precedence)
+                                bp_props.update(part_breakpoints["xs"])
+                        elif bp_key == "sm":
+                            # sm was previously base, now check for legacy desktop
+                            bp_props = {}
                             if part_breakpoints.get(
                                 "desktop"
                             ):  # Very old: desktop -> sm
                                 bp_props.update(part_breakpoints["desktop"])
-                            if part_breakpoints.get(
-                                "mobile"
-                            ):  # Legacy: mobile -> sm (lower priority)
-                                temp = (
-                                    part_breakpoints["mobile"].copy()
-                                    if isinstance(part_breakpoints.get("mobile"), dict)
-                                    else {}
-                                )
-                                temp.update(bp_props)
-                                bp_props = temp
                             if part_breakpoints.get(
                                 "sm"
                             ):  # New format (takes precedence)
@@ -1849,10 +1851,25 @@ class PageTheme(models.Model):
                                         if use_aspect_ratio is True and aspect_ratio and str(aspect_ratio).strip():
                                             css_rules.append(f"  aspect-ratio: {aspect_ratio};")
                                 elif isinstance(prop_value, str):
-                                    # String format: just a URL
-                                    css_rules.append(
-                                        f"  background-image: url('{prop_value}');"
-                                    )
+                                    # String format: just a URL - route through imgproxy for caching/headers
+                                    from file_manager.imgproxy import imgproxy_service
+                                    try:
+                                        # Generate imgproxy URL without resize (original size for caching)
+                                        imgproxy_url = imgproxy_service.generate_url(
+                                            source_url=prop_value,
+                                            width=0,  # 0 means no resize, use original
+                                            height=0,
+                                            resize_type="auto",
+                                        )
+                                        css_rules.append(
+                                            f"  background-image: url('{imgproxy_url}');"
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"Failed to generate imgproxy URL for legacy string: {e}")
+                                        # Fallback to original URL if imgproxy fails
+                                        css_rules.append(
+                                            f"  background-image: url('{prop_value}');"
+                                        )
                                 else:
                                     logger.warning(
                                         f"Unexpected background_image type in '{part}.{bp_key}': {type(prop_value)}"
@@ -1890,8 +1907,8 @@ class PageTheme(models.Model):
                             css_rules.append(f"  {css_prop}: {prop_value};")
 
                         # Generate CSS rule
-                        if bp_key == "sm":
-                            # Base styles - NO media query
+                        if bp_key == "xs":
+                            # Base styles - NO media query (applies to all sizes < sm)
                             rule = f"{selector} {{\n" + "\n".join(css_rules) + "\n}"
                         else:
                             # Media query for larger breakpoints (mobile-first)
@@ -1971,8 +1988,18 @@ class PageTheme(models.Model):
                 css_rules.append(f"  {css_property}: url('{image_url}');")
                 return css_rules
 
-            # Use original URL for max DPR (no transformation)
-            url_max = image_url
+            # Generate imgproxy URL for max DPR at original dimensions (for caching/headers)
+            try:
+                url_max = imgproxy_service.generate_url(
+                    source_url=image_url,
+                    width=width,
+                    height=height,
+                    resize_type="fit",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to generate imgproxy URL for max DPR: {e}")
+                # Fallback to original URL if imgproxy fails
+                url_max = image_url
 
             # Generate image-set CSS with both webkit and standard syntax
             # Webkit prefix for older Safari versions
@@ -1990,10 +2017,22 @@ class PageTheme(models.Model):
                 f");"
             )
         else:
-            # No dimensions available or dpr=1 - use simple URL without retina support
+            # No dimensions available or dpr=1 - route through imgproxy for caching
             if not width or not height:
-                logger.debug(f"No dimensions available for image, using simple URL")
-            css_rules.append(f"  {css_property}: url('{image_url}');")
+                logger.debug(f"No dimensions available for image, routing through imgproxy for caching")
+            try:
+                # Generate imgproxy URL without resize (original size for caching)
+                imgproxy_url = imgproxy_service.generate_url(
+                    source_url=image_url,
+                    width=0,  # 0 means no resize, use original
+                    height=0,
+                    resize_type="auto",
+                )
+                css_rules.append(f"  {css_property}: url('{imgproxy_url}');")
+            except Exception as e:
+                logger.warning(f"Failed to generate imgproxy URL: {e}")
+                # Fallback to original URL if imgproxy fails
+                css_rules.append(f"  {css_property}: url('{image_url}');")
 
         return css_rules
 

@@ -56,12 +56,20 @@ class FooterWidget(BaseWidget):
         flex: 1;
         display: flex;
         flex-direction: column;
-        background-image: var(--footer-widget-background-sm, none);
-        background-color: var(--footer-bg-color-sm, transparent);
-        color: var(--footer-text-color-sm, inherit);
+        background-image: var(--footer-widget-background-xs, none);
+        background-color: var(--footer-bg-color-xs, transparent);
+        color: var(--footer-text-color-xs, inherit);
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
+    }
+
+    @media (min-width: 640px) {
+        .widget-type-footer {
+            background-image: var(--footer-widget-background-sm, var(--footer-widget-background-xs, none));
+            background-color: var(--footer-bg-color-sm, var(--footer-bg-color-xs, transparent));
+            color: var(--footer-text-color-sm, var(--footer-text-color-xs, inherit));
+        }
     }
 
     @media (min-width: 768px) {

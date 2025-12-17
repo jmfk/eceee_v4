@@ -13,7 +13,7 @@ import { ChevronDown, ChevronRight, Trash2, Settings } from 'lucide-react';
 import BreakpointPropertyEditor from './BreakpointPropertyEditor';
 import CustomBreakpointsModal from './CustomBreakpointsModal';
 
-const STANDARD_BREAKPOINTS = ['sm', 'md', 'lg', 'xl'];
+const STANDARD_BREAKPOINTS = ['xs', 'sm', 'md', 'lg', 'xl'];
 
 const LayoutPartEditor = ({
     groupIndex,
@@ -67,7 +67,8 @@ const LayoutPartEditor = ({
         }
         // Standard breakpoint
         const labels = {
-            sm: 'sm',
+            xs: `xs (<${breakpoints.sm}px)`,
+            sm: `sm (≥${breakpoints.sm}px)`,
             md: `md (≥${breakpoints.md}px)`,
             lg: `lg (≥${breakpoints.lg}px)`,
             xl: `xl (≥${breakpoints.xl}px)`,

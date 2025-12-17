@@ -292,8 +292,8 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                     <div className="text-sm text-blue-900">
                         <div className="font-medium mb-1">How Breakpoints Work</div>
                         <div className="space-y-1 text-blue-800" role="list">
-                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Breakpoints define max-width values for responsive media queries</span></div>
-                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Larger screens inherit styles from smaller breakpoints</span></div>
+                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Breakpoints define min-width values for mobile-first responsive design</span></div>
+                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Base xs (&lt;640px) always applies; larger screens add/override with media queries</span></div>
                             <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Values must be in ascending order (sm &lt; md &lt; lg &lt; xl)</span></div>
                             <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Leave fields empty to use theme defaults ({breakpointConfig.map(b => `${b.key}: ${b.default}px`).join(', ')})</span></div>
                         </div>
