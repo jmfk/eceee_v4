@@ -1678,8 +1678,35 @@ class PageTheme(models.Model):
                 # in the main loop below, not as CSS variables
 
                 for part, part_breakpoints in layout_properties.items():
-                    # Handle each breakpoint in mobile-first order
-                    for bp_key in ["sm", "md", "lg", "xl"]:
+                    # Collect all breakpoints (standard + custom) and sort by pixel value
+                    standard_breakpoints = ["sm", "md", "lg", "xl"]
+                    legacy_breakpoints = ["default", "desktop", "tablet", "mobile"]
+                    
+                    # Find custom breakpoints (numeric string keys)
+                    custom_breakpoints = [
+                        bp for bp in part_breakpoints.keys()
+                        if bp not in standard_breakpoints and bp not in legacy_breakpoints
+                        and bp.isdigit()
+                    ]
+                    
+                    # Combine all breakpoints
+                    all_breakpoints = standard_breakpoints + custom_breakpoints
+                    
+                    # Sort breakpoints by pixel value (mobile-first)
+                    def get_breakpoint_value(bp):
+                        # Custom breakpoint (numeric string)
+                        if bp.isdigit():
+                            return int(bp)
+                        # Standard breakpoint from theme
+                        return breakpoints.get(bp, 0)
+                    
+                    sorted_breakpoints = sorted(
+                        [bp for bp in all_breakpoints if bp in part_breakpoints or bp == "sm"],
+                        key=get_breakpoint_value
+                    )
+                    
+                    # Handle each breakpoint in sorted order
+                    for bp_key in sorted_breakpoints:
                         # Get properties for this breakpoint with legacy support
                         if bp_key == "sm":
                             # Merge legacy formats into sm (base)
@@ -1711,6 +1738,7 @@ class PageTheme(models.Model):
                                 or {}
                             )
                         else:
+                            # Standard or custom breakpoint
                             bp_props = part_breakpoints.get(bp_key) or {}
 
                         if not bp_props or len(bp_props) == 0:
@@ -1820,11 +1848,22 @@ class PageTheme(models.Model):
                             rule = f"{selector} {{\n" + "\n".join(css_rules) + "\n}"
                         else:
                             # Media query for larger breakpoints (mobile-first)
-                            bp_px = breakpoints.get(bp_key)
-                            rule = f"@media (min-width: {bp_px}px) {{\n"
-                            rule += f"  {selector} {{\n"
-                            rule += "\n".join(f"  {r}" for r in css_rules)
-                            rule += "\n  }\n}"
+                            # Handle both standard and custom breakpoints
+                            if bp_key.isdigit():
+                                # Custom breakpoint - use the numeric value directly
+                                bp_px = int(bp_key)
+                            else:
+                                # Standard breakpoint - look up from theme
+                                bp_px = breakpoints.get(bp_key)
+                            
+                            if bp_px:
+                                rule = f"@media (min-width: {bp_px}px) {{\n"
+                                rule += f"  {selector} {{\n"
+                                rule += "\n".join(f"  {r}" for r in css_rules)
+                                rule += "\n  }\n}"
+                            else:
+                                # Skip if we can't determine the pixel value
+                                continue
 
                         css_parts.append(rule)
 

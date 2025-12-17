@@ -122,6 +122,35 @@ export const layoutPropertiesToCSS = (layoutProperties, groupIndex, groups, widg
       return filtered;
     };
 
+    // Helper to get pixel value for a breakpoint
+    const getBreakpointValue = (bp) => {
+      // Check if it's a custom breakpoint (numeric string)
+      if (!isNaN(bp)) {
+        return parseInt(bp);
+      }
+      // Standard breakpoint from theme
+      return effectiveBreakpoints[bp] || 0;
+    };
+
+    // Helper to check if a breakpoint is custom
+    const isCustomBreakpoint = (bp) => !isNaN(bp);
+
+    // Collect all breakpoints (standard + custom) and sort them
+    const standardBreakpoints = ['sm', 'md', 'lg', 'xl'];
+    const customBreakpoints = Object.keys(bpStyles).filter(bp => 
+      bp !== 'default' && bp !== 'desktop' && bp !== 'tablet' && bp !== 'mobile' && 
+      !standardBreakpoints.includes(bp)
+    );
+    
+    const allBreakpoints = [...standardBreakpoints, ...customBreakpoints].filter(bp => 
+      bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0
+    );
+
+    // Sort breakpoints by pixel value (mobile-first)
+    const sortedBreakpoints = allBreakpoints.sort((a, b) => {
+      return getBreakpointValue(a) - getBreakpointValue(b);
+    });
+
     // Default (no media query)
     if (bpStyles.default && Object.keys(bpStyles.default).length > 0) {
       const props = filterImages(bpStyles.default);
@@ -148,18 +177,21 @@ export const layoutPropertiesToCSS = (layoutProperties, groupIndex, groups, widg
       }
     }
 
-    // Generate media queries for each breakpoint (mobile-first)
-    ['sm', 'md', 'lg', 'xl'].forEach(bp => {
-      if (bpStyles[bp] && Object.keys(bpStyles[bp]).length > 0 && effectiveBreakpoints[bp]) {
-        const props = filterImages(bpStyles[bp]);
-        if (Object.keys(props).length > 0) {
-          let cssRule = `@media (min-width: ${effectiveBreakpoints[bp]}px) {\n  ${selector} {\n`;
-          for (const [prop, value] of Object.entries(props)) {
-            cssRule += '  ' + formatPropertyValue(prop, value);
-          }
-          cssRule += '  }\n}';
-          cssParts.push(cssRule);
+    // Generate media queries for all breakpoints (standard + custom) in sorted order
+    sortedBreakpoints.forEach(bp => {
+      const bpValue = getBreakpointValue(bp);
+      
+      // Skip if breakpoint value is invalid
+      if (!bpValue || bpValue <= 0) return;
+
+      const props = filterImages(bpStyles[bp]);
+      if (Object.keys(props).length > 0) {
+        let cssRule = `@media (min-width: ${bpValue}px) {\n  ${selector} {\n`;
+        for (const [prop, value] of Object.entries(props)) {
+          cssRule += '  ' + formatPropertyValue(prop, value);
         }
+        cssRule += '  }\n}';
+        cssParts.push(cssRule);
       }
     });
 
@@ -273,6 +305,8 @@ export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, 
 
     // Parse breakpoint media queries (mobile-first)
     const effectiveBreakpoints = breakpoints;
+    
+    // Parse standard breakpoints
     ['sm', 'md', 'lg', 'xl'].forEach(bp => {
       const bpValue = effectiveBreakpoints[bp];
       if (!bpValue) return;
@@ -316,6 +350,55 @@ export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, 
         }
       }
     });
+
+    // Parse custom breakpoints (any numeric pixel value not in standard breakpoints)
+    const customBreakpointRegex = /@media\s*\(min-width:\s*(\d+)px\)\s*\{([\s\S]*?)\n\}/g;
+    const customMatches = cssText.matchAll(customBreakpointRegex);
+
+    for (const match of customMatches) {
+      const pixelValue = match[1];
+      const content = match[2];
+
+      // Skip if this is a standard breakpoint value
+      const standardValues = Object.values(effectiveBreakpoints);
+      if (standardValues.includes(parseInt(pixelValue))) {
+        continue;
+      }
+
+      // Parse rules within this custom media query
+      const rules = content.matchAll(/([.#][\w-]+(?:\s+[.#\w\s>+~:[\]()="'-]+)?)\s*\{([^}]+)\}/g);
+
+      for (const rule of rules) {
+        const selector = rule[1].trim();
+        const properties = rule[2];
+
+        // Try to map selector to part ID
+        let part = null;
+        if (selectorToPartMap[selector]) {
+          // Custom selector matches
+          part = selectorToPartMap[selector];
+        } else if (selector.startsWith('.') && !selector.includes(' ')) {
+          // Simple class selector - extract part ID
+          const className = selector.substring(1);
+          if (partIdSet.has(className)) {
+            part = className;
+          }
+        }
+
+        if (part) {
+          if (!layoutProperties[part]) layoutProperties[part] = {};
+          if (!layoutProperties[part][pixelValue]) layoutProperties[part][pixelValue] = {};
+
+          const propMatches = properties.matchAll(/\s*([a-z-]+)\s*:\s*([^;]+);/g);
+          for (const propMatch of propMatches) {
+            const cssProp = propMatch[1];
+            const value = propMatch[2].trim();
+            const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+            layoutProperties[part][pixelValue][camelProp] = value;
+          }
+        }
+      }
+    }
 
   } catch (error) {
     console.error('Error parsing layout CSS:', error);

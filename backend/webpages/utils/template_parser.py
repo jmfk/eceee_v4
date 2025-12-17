@@ -438,6 +438,33 @@ class WidgetTemplateParser:
             re.MULTILINE,
         )
 
+    def _is_mustache_wrapper_template(self, template_source: str) -> bool:
+        """
+        Check if template is just a wrapper for render_mustache tag.
+        
+        These templates typically contain only:
+        - {% load webpages_tags %}
+        - {% render_mustache widget_type.mustache_template_name config %}
+        
+        Args:
+            template_source: Raw Django template source code
+            
+        Returns:
+            True if this is a Mustache wrapper template, False otherwise
+        """
+        # Get non-empty lines
+        lines = [line.strip() for line in template_source.strip().split('\n') if line.strip()]
+        
+        # Wrapper templates should have only 2-3 lines
+        if len(lines) > 3:
+            return False
+        
+        # Check for characteristic tags
+        has_load_tag = any('{% load' in line and 'webpages_tags' in line for line in lines)
+        has_render_mustache = any('{% render_mustache' in line for line in lines)
+        
+        return has_load_tag and has_render_mustache
+
     def _preprocess_django_template(self, template_source: str) -> str:
         """
         Pre-process Django template to convert template logic into parseable HTML elements
@@ -702,6 +729,25 @@ class WidgetTemplateParser:
         try:
             template = get_template(template_name)
             template_source = template.template.source
+
+            # Check if this is a Mustache wrapper template
+            if self._is_mustache_wrapper_template(template_source):
+                logger.debug(f"Widget {template_name} is Mustache wrapper, returning minimal structure")
+                result = {
+                    "structure": {
+                        "type": "element",
+                        "tag": "div",
+                        "attributes": {"class": "mustache-only-widget"},
+                        "children": []
+                    },
+                    "template_variables": [],
+                    "template_tags": [],
+                    "has_inline_css": False,
+                    "is_mustache_only": True,
+                }
+                # Cache the result
+                cache.set(cache_key, result, self.cache_timeout)
+                return result
 
             # Pre-process Django template logic before BeautifulSoup parsing
             processed_source = self._preprocess_django_template(template_source)

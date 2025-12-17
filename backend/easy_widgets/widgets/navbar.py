@@ -108,7 +108,6 @@ class NavbarWidget(BaseWidget):
 
     name = "Navbar"
     description = "Navigation bar with configurable menu items"
-    template_name = "easy_widgets/widgets/navbar.html"
     mustache_template_name = "easy_widgets/widgets/navbar.mustache"
 
     layout_parts = {

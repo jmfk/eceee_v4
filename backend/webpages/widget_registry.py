@@ -35,7 +35,8 @@ class BaseWidget(ABC):
     name: str = None
     app_label: str | None = None
     description: str = ""
-    template_name: str = "webpages/widgets/default.html"
+    template_name: str | None = None  # Optional - None for Mustache-only widgets
+    mustache_template_name: str | None = None  # Path to Mustache template (if using Mustache)
 
     # Inheritance and publishing defaults
     default_inheritance_level: int = (
@@ -260,6 +261,7 @@ class BaseWidget(ABC):
             "name": self.name,
             "description": self.description,
             "template_name": self.template_name,  # Include template name for backward compatibility
+            "mustache_template_name": self.mustache_template_name,  # Mustache template path
             "widget_class": self.__class__.__name__,
             "is_active": self.is_active,
             "configuration_schema": self.configuration_model.model_json_schema(),
@@ -300,6 +302,16 @@ class BaseWidget(ABC):
             template_json = self.get_template_json()
             if template_json:
                 result["template_json"] = template_json
+        
+        # Include Mustache template content if available
+        if self.mustache_template_name:
+            try:
+                from webpages.utils.mustache_renderer import load_mustache_template
+                mustache_content = load_mustache_template(self.mustache_template_name)
+                result["mustache_template"] = mustache_content
+            except Exception as e:
+                logger.debug(f"Could not load Mustache template for {self.name}: {e}")
+                result["mustache_template"] = None
 
         return result
 

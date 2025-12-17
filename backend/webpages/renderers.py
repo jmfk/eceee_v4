@@ -19,6 +19,35 @@ class WebPageRenderer:
         self.request = request
         self._rendered_css = set()  # Track rendered CSS to avoid duplicates
 
+    def _is_mustache_wrapper_template(self, template_name):
+        """
+        Check if a Django template is just a wrapper for render_mustache tag.
+        
+        Args:
+            template_name: Path to template file
+            
+        Returns:
+            True if template is a Mustache wrapper, False otherwise
+        """
+        try:
+            template = get_template(template_name)
+            template_source = template.template.source
+            
+            # Get non-empty lines
+            lines = [line.strip() for line in template_source.strip().split('\n') if line.strip()]
+            
+            # Wrapper templates should have only 2-3 lines
+            if len(lines) > 3:
+                return False
+            
+            # Check for characteristic tags
+            has_load_tag = any('{% load' in line and 'webpages_tags' in line for line in lines)
+            has_render_mustache = any('{% render_mustache' in line for line in lines)
+            
+            return has_load_tag and has_render_mustache
+        except Exception:
+            return False
+
     def _process_component_css(self, css_content, theme=None):
         """
         Process component CSS, converting breakpoint dictionaries to proper CSS with media queries.
@@ -223,6 +252,36 @@ class WebPageRenderer:
                 )
                 return f"<style>{processed_css}</style>\n{custom_style_html}"
             return custom_style_html
+
+        # Check for Mustache-only widgets (no Django template or wrapper template)
+        if hasattr(widget_type, 'mustache_template_name') and widget_type.mustache_template_name:
+            # Check if template_name is None or is a wrapper template
+            is_mustache_only = (
+                widget_type.template_name is None or 
+                self._is_mustache_wrapper_template(widget_type.template_name)
+            )
+            
+            if is_mustache_only:
+                try:
+                    from webpages.utils.mustache_renderer import (
+                        load_mustache_template,
+                        render_mustache
+                    )
+                    # Load and render Mustache template directly
+                    template_str = load_mustache_template(widget_type.mustache_template_name)
+                    widget_html = render_mustache(template_str, template_config)
+                    
+                    # Inject custom CSS in passthru mode
+                    if custom_style_css:
+                        processed_css = self._process_component_css(
+                            custom_style_css, enhanced_context.get("theme")
+                        )
+                        widget_html = f"<style>{processed_css}</style>\n{widget_html}"
+                    
+                    return widget_html
+                except Exception as e:
+                    logger.error(f"Error rendering Mustache template for {widget_type.name}: {e}")
+                    return f"<!-- Error rendering Mustache widget: {e} -->"
 
         slot_name = context.get("slot_name", "")
         layout_name = context.get("layout_name", "")

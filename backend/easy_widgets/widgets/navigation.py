@@ -70,7 +70,6 @@ class NavigationWidget(BaseWidget):
 
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
-    template_name = "easy_widgets/widgets/navigation.html"
     mustache_template_name = "easy_widgets/widgets/navigation.mustache"
 
     layout_parts = {

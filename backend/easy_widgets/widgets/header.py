@@ -27,7 +27,6 @@ class HeaderWidget(BaseWidget):
     description = (
         "Simple header widget with responsive image that scales to fill header height"
     )
-    template_name = "easy_widgets/widgets/header.html"
     mustache_template_name = "easy_widgets/widgets/header.mustache"
 
     layout_parts = {
@@ -36,9 +35,14 @@ class HeaderWidget(BaseWidget):
             "selector": ".header-widget",
             "relationship": "same-element",  # Both widget-type and header-widget classes on same element
             "properties": [
+                "width",
+                "height",
                 "padding",
                 "margin",
                 "backgroundColor",
+                "backgroundPosition",
+                "backgroundSize",
+                "backgroundRepeat",
             ],
         },
     }
@@ -46,26 +50,36 @@ class HeaderWidget(BaseWidget):
     widget_css = """
         .widget-type-header {
             width: 100%;
+            height: auto;
             background-size: cover;
             background-repeat: no-repeat;
-            background-position: center center;
-            height: var(--header-height-sm, 80px);
+            background-position: top left;
+        }
+
+        @media (min-width: 640px) {
+            .widget-type-header {
+                width: auto;
+                height: var(--header-height-md, 112px);
+            }
         }
 
         @media (min-width: 768px) {
             .widget-type-header {
+                width: auto;
                 height: var(--header-height-md, 112px);
             }
         }
 
         @media (min-width: 1024px) {
             .widget-type-header {
+                width: auto;
                 height: var(--header-height-lg, 112px);
             }
         }
 
         @media (min-width: 1280px) {
             .widget-type-header {
+                width: auto;
                 height: var(--header-height-xl, 112px);
             }
         }

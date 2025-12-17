@@ -79,7 +79,7 @@ const LayoutPartEditor = ({
 
     // Get all breakpoints (standard + custom) for this part
     const getAllBreakpoints = () => {
-        const customBps = Object.keys(partProps || {}).filter(bp => 
+        const customBps = Object.keys(partProps || {}).filter(bp =>
             bp !== 'default' && !STANDARD_BREAKPOINTS.includes(bp)
         );
         return [...STANDARD_BREAKPOINTS, ...customBps];
@@ -91,7 +91,7 @@ const LayoutPartEditor = ({
             // 'default' always comes first
             if (a === 'default') return -1;
             if (b === 'default') return 1;
-            
+
             const aValue = getBreakpointValue(a);
             const bValue = getBreakpointValue(b);
             return aValue - bValue;
@@ -102,11 +102,11 @@ const LayoutPartEditor = ({
     const handleUpdateBreakpoint = (oldValue, newValue) => {
         // Get the properties from the old breakpoint
         const oldProps = partProps[oldValue] || {};
-        
+
         // Remove the old breakpoint and add the new one with the same properties
         onRemoveBreakpoint(oldValue);
         onAddBreakpoint(newValue);
-        
+
         // If there were properties, we need to copy them over
         // This is handled by the parent component via onDirty
         if (Object.keys(oldProps).length > 0) {
@@ -135,7 +135,7 @@ const LayoutPartEditor = ({
     });
 
     // Get custom breakpoints that are in use
-    const customBreakpoints = Object.keys(partProps || {}).filter(bp => 
+    const customBreakpoints = Object.keys(partProps || {}).filter(bp =>
         bp !== 'default' && !STANDARD_BREAKPOINTS.includes(bp)
     );
 
@@ -193,7 +193,7 @@ const LayoutPartEditor = ({
                                 + {getBreakpointLabel(bp)}
                             </button>
                         ))}
-                        
+
                         {/* Custom breakpoint button */}
                         <button
                             type="button"

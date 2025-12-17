@@ -124,7 +124,7 @@ export const endpoints = {
     themes: {
         base: `${BASE_PATH}/webpages/themes`,
         list: `${BASE_PATH}/webpages/themes/`,
-        detail: (id) => `${BASE_PATH}/webpages/themes/${id}`,
+        detail: (id) => `${BASE_PATH}/webpages/themes/${id}/`,
     },
 
     // Preview sizes endpoints
