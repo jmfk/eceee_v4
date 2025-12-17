@@ -416,16 +416,34 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             )
 
         try:
+            from PIL import Image
+            
             # Generate unique filename
             file_extension = os.path.splitext(image_file.name)[1].lower()
             unique_filename = f"{uuid.uuid4()}{file_extension}"
+
+            # Read file content for dimension extraction
+            image_file.seek(0)
+            file_content = image_file.read()
+            
+            # Extract image dimensions
+            width = None
+            height = None
+            if image_file.content_type.startswith("image/") and image_file.content_type != "image/svg+xml":
+                try:
+                    from io import BytesIO
+                    img = Image.open(BytesIO(file_content))
+                    width = img.width
+                    height = img.height
+                except Exception as e:
+                    logger.warning(f"Failed to extract image dimensions: {e}")
 
             # Upload to object storage
             storage = S3MediaStorage()
             file_path = f"theme_images/{theme.id}/design_groups/{unique_filename}"
 
             # Save the file
-            storage._save(file_path, ContentFile(image_file.read()))
+            storage._save(file_path, ContentFile(file_content))
 
             # Get URLs
             s3_url = storage.url(file_path)  # s3:// protocol for imgproxy
@@ -437,6 +455,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     "public_url": public_url,
                     "filename": image_file.name,
                     "size": image_file.size,
+                    "width": width,
+                    "height": height,
                 },
                 status=status.HTTP_201_CREATED,
             )

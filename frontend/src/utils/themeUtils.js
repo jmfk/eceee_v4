@@ -222,15 +222,42 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                 for (const bpKey of ['sm', 'md', 'lg', 'xl']) {
                     const bpProps = partBreakpoints[bpKey];
                     if (bpProps) {
-                        // Handle images
+                        // Handle images with DPR support
                         if (bpProps.images) {
+                            // Get breakpoint width for imgproxy sizing
+                            const bpWidths = breakpoints || { sm: 640, md: 768, lg: 1024, xl: 1280 };
+                            const breakpointWidth = bpWidths[bpKey] || 640;
+                            
                             for (const [imageKey, imageData] of Object.entries(bpProps.images)) {
                                 // Support both new format (url) and old format (fileUrl) for backward compatibility
                                 const imageUrl = imageData?.url || imageData?.fileUrl;
                                 if (imageUrl) {
-                                    // Generate CSS variable name: --{part}-{imageKey}-{breakpoint}
-                                    const varName = `--${part}-${imageKey}-${bpKey}`;
-                                    cssVariables.push(`  ${varName}: url('${imageUrl}');`);
+                                    // Generate imgproxy URLs with DPR inline
+                                    // Note: In production, these should be generated server-side with proper signing
+                                    // For now, we'll use a simple approach that works with the backend
+                                    
+                                    // For s3:// URLs, we need to use imgproxy
+                                    if (imageUrl.startsWith('s3://')) {
+                                        // Generate base64-encoded source URL for imgproxy
+                                        const encodedUrl = btoa(imageUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+                                        const imgproxyBase = window.IMGPROXY_URL || 'https://imgproxy.eceee.fred.nu';
+                                        
+                                        // Generate URLs with DPR
+                                        const url1x = `${imgproxyBase}/unsafe/resize:fill:${breakpointWidth}:0/dpr:1/${encodedUrl}`;
+                                        const url2x = `${imgproxyBase}/unsafe/resize:fill:${breakpointWidth}:0/dpr:2/${encodedUrl}`;
+                                        
+                                        // Generate CSS variable with image-set for retina support
+                                        const varName = `--${part}-${imageKey}-${bpKey}`;
+                                        // Fallback for older browsers
+                                        cssVariables.push(`  ${varName}: url('${url1x}');`);
+                                        // Modern browsers with retina support
+                                        cssVariables.push(`  ${varName}: -webkit-image-set(url('${url1x}') 1x, url('${url2x}') 2x);`);
+                                        cssVariables.push(`  ${varName}: image-set(url('${url1x}') 1x, url('${url2x}') 2x);`);
+                                    } else {
+                                        // For regular URLs, use as-is (no imgproxy processing)
+                                        const varName = `--${part}-${imageKey}-${bpKey}`;
+                                        cssVariables.push(`  ${varName}: url('${imageUrl}');`);
+                                    }
                                 }
                             }
                         }

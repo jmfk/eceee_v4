@@ -48,6 +48,7 @@ class ImgProxyService:
         format: Optional[str] = None,
         preset: Optional[str] = None,
         version: Optional[str] = None,
+        dpr: Optional[float] = None,
         **kwargs,
     ) -> str:
         """
@@ -63,6 +64,7 @@ class ImgProxyService:
             format: Output format ('jpg', 'png', 'webp', 'avif', 'gif', 'ico', 'svg')
             preset: Predefined preset name
             version: Version parameter for cache-busting (e.g., file hash or timestamp)
+            dpr: Device pixel ratio (1.0, 2.0, etc.) for retina displays
             **kwargs: Additional processing options
 
         Returns:
@@ -90,6 +92,10 @@ class ImgProxyService:
 
                 if format:
                     processing_options.append(f"format:{format}")
+                
+                # Add DPR parameter for retina displays
+                if dpr and dpr != 1.0:
+                    processing_options.append(f"dpr:{dpr}")
 
             # Add additional options
             for key, value in kwargs.items():

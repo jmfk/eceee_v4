@@ -5,16 +5,18 @@
  * Bypasses Media Manager for simpler, direct uploads.
  */
 
-import React, { useState, useRef } from 'react';
-import { Upload, X, ImageIcon, Loader2, FolderOpen } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, X, ImageIcon, Loader2, FolderOpen, AlertCircle, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 import { themesApi } from '../../../api/themes';
 import { useGlobalNotifications } from '../../../contexts/GlobalNotificationContext';
 import ImageLibraryPicker from '../ImageLibraryPicker';
+import { validateDesignGroupImage, getRecommendedDimensions } from '../../../utils/imageValidation';
 
-const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }) => {
+const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false, breakpoint = null, theme = null }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+    const [validationWarnings, setValidationWarnings] = useState([]);
     const fileInputRef = useRef(null);
     const { addNotification } = useGlobalNotifications();
 
@@ -45,17 +47,41 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
         try {
             const result = await themesApi.uploadDesignGroupImage(themeId, file);
 
-            // Call onChange with the simple URL object
-            onChange({
+            // Call onChange with the complete image data including dimensions
+            const imageData = {
                 url: result.url,
                 filename: result.filename,
                 size: result.size,
-            });
+                width: result.width,
+                height: result.height,
+            };
+            
+            onChange(imageData);
 
-            addNotification({
-                type: 'success',
-                message: 'Image uploaded successfully',
-            });
+            // Validate the uploaded image if breakpoint and theme are provided
+            if (breakpoint && theme && result.width && result.height) {
+                const warnings = validateDesignGroupImage(imageData, breakpoint, theme);
+                setValidationWarnings(warnings);
+                
+                // Show notification based on validation results
+                const hasErrors = warnings.some(w => w.type === 'error');
+                if (hasErrors) {
+                    addNotification({
+                        type: 'warning',
+                        message: 'Image uploaded with warnings. Check size recommendations below.',
+                    });
+                } else {
+                    addNotification({
+                        type: 'success',
+                        message: 'Image uploaded successfully',
+                    });
+                }
+            } else {
+                addNotification({
+                    type: 'success',
+                    message: 'Image uploaded successfully',
+                });
+            }
         } catch (error) {
             console.error('Failed to upload image:', error);
             addNotification({
@@ -108,13 +134,34 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
     };
 
     const handleLibrarySelect = (image) => {
-        onChange({
+        const imageData = {
             url: image.url,
             filename: image.filename,
             size: image.size,
-        });
+            width: image.width,
+            height: image.height,
+        };
+        
+        onChange(imageData);
+        
+        // Validate the selected image
+        if (breakpoint && theme && image.width && image.height) {
+            const warnings = validateDesignGroupImage(imageData, breakpoint, theme);
+            setValidationWarnings(warnings);
+        }
+        
         setShowLibraryPicker(false);
     };
+    
+    // Validate existing image when component mounts or props change
+    useEffect(() => {
+        if (value && breakpoint && theme && value.width && value.height) {
+            const warnings = validateDesignGroupImage(value, breakpoint, theme);
+            setValidationWarnings(warnings);
+        } else {
+            setValidationWarnings([]);
+        }
+    }, [value, breakpoint, theme]);
 
     // Extract image info for display
     const imageUrl = value?.url;
@@ -146,11 +193,14 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                             <div className="text-sm font-medium text-gray-900 truncate">
                                 {imageFilename}
                             </div>
-                            {value?.size && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                    {(value.size / 1024).toFixed(1)} KB
-                                </div>
-                            )}
+                            <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                                {value?.size && (
+                                    <div>{(value.size / 1024).toFixed(1)} KB</div>
+                                )}
+                                {value?.width && value?.height && (
+                                    <div>{value.width} × {value.height}px</div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Remove button */}
@@ -164,6 +214,47 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                             <X className="h-4 w-4" />
                         </button>
                     </div>
+                    
+                    {/* Validation warnings */}
+                    {validationWarnings.length > 0 && (
+                        <div className="mb-3 space-y-2">
+                            {validationWarnings.map((warning, idx) => {
+                                const Icon = warning.type === 'error' ? AlertCircle :
+                                           warning.type === 'warning' ? AlertTriangle :
+                                           warning.type === 'success' ? CheckCircle : Info;
+                                
+                                const colorClasses = warning.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+                                                   warning.type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+                                                   warning.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+                                                   'bg-blue-50 border-blue-200 text-blue-800';
+                                
+                                const iconColor = warning.type === 'error' ? 'text-red-500' :
+                                                warning.type === 'warning' ? 'text-yellow-500' :
+                                                warning.type === 'success' ? 'text-green-500' :
+                                                'text-blue-500';
+                                
+                                return (
+                                    <div key={idx} className={`flex gap-2 p-2 rounded border text-xs ${colorClasses}`}>
+                                        <Icon className={`h-4 w-4 flex-shrink-0 mt-0.5 ${iconColor}`} />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-medium">{warning.message}</div>
+                                            {warning.suggestion && (
+                                                <div className="mt-1 opacity-90">{warning.suggestion}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    
+                    {/* Recommended dimensions info */}
+                    {breakpoint && theme && validationWarnings.length === 0 && (
+                        <div className="mb-3 p-2 bg-gray-50 rounded border border-gray-200 text-xs text-gray-600">
+                            <Info className="h-3 w-3 inline mr-1" />
+                            Recommended: {getRecommendedDimensions(breakpoint, theme).width2x}px wide for @2x display
+                        </div>
+                    )}
 
                     {/* Change buttons */}
                     <div className="pt-3 border-t border-gray-200 flex gap-2">

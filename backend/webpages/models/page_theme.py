@@ -1798,23 +1798,58 @@ class PageTheme(models.Model):
                         # Convert properties to CSS
                         css_rules = []
                         for prop_name, prop_value in bp_props.items():
-                            # Handle 'images' field - convert to background-image properties
+                            # Handle 'images' field - convert to background-image properties with DPR support
                             if prop_name == "images":
                                 if isinstance(prop_value, dict):
+                                    from file_manager.imgproxy import imgproxy_service
+                                    
+                                    # Get breakpoint width for imgproxy sizing
+                                    breakpoints = self.get_breakpoints()
+                                    breakpoint_width = breakpoints.get(bp_key, 640)
+                                    
                                     for image_key, image_data in prop_value.items():
                                         # Support both new format (url) and old format (fileUrl)
                                         if isinstance(image_data, dict):
                                             image_url = image_data.get("url") or image_data.get("fileUrl")
                                             if image_url:
-                                                # Map common image keys to CSS properties
-                                                if image_key == "background":
-                                                    css_rules.append(f"  background-image: url('{image_url}');")
-                                                elif image_key == "backgroundImage":
-                                                    css_rules.append(f"  background-image: url('{image_url}');")
-                                                else:
+                                                # Generate imgproxy URLs with DPR for @1x and @2x
+                                                try:
+                                                    url_1x = imgproxy_service.generate_url(
+                                                        source_url=image_url,
+                                                        width=breakpoint_width,
+                                                        resize_type="fill",
+                                                        gravity="sm",
+                                                        dpr=1.0
+                                                    )
+                                                    url_2x = imgproxy_service.generate_url(
+                                                        source_url=image_url,
+                                                        width=breakpoint_width,
+                                                        resize_type="fill",
+                                                        gravity="sm",
+                                                        dpr=2.0
+                                                    )
+                                                    
+                                                    # Map common image keys to CSS properties with image-set
+                                                    if image_key == "background" or image_key == "backgroundImage":
+                                                        # Fallback for older browsers
+                                                        css_rules.append(f"  background-image: url('{url_1x}');")
+                                                        # Modern browsers with retina support
+                                                        css_rules.append(
+                                                            f"  background-image: -webkit-image-set("
+                                                            f"url('{url_1x}') 1x, url('{url_2x}') 2x);"
+                                                        )
+                                                        css_rules.append(
+                                                            f"  background-image: image-set("
+                                                            f"url('{url_1x}') 1x, url('{url_2x}') 2x);"
+                                                        )
                                                     # For other image keys, use as custom property or skip
-                                                    # This handles legacy cases
-                                                    pass
+                                                except Exception as e:
+                                                    # Fallback to original URL if imgproxy fails
+                                                    import logging
+                                                    logger = logging.getLogger(__name__)
+                                                    logger.warning(f"Failed to generate imgproxy URL: {e}")
+                                                    if image_key == "background" or image_key == "backgroundImage":
+                                                        css_rules.append(f"  background-image: url('{image_url}');")
                                 continue
 
                             css_prop = (
