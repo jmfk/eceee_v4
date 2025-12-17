@@ -32,6 +32,7 @@ const LayoutPartEditor = ({
     clipboard,
     copiedIndicator,
     layoutInputValues,
+    imageWarnings = [],
     // Handlers
     onToggle,
     onRemovePart,
@@ -234,6 +235,7 @@ const LayoutPartEditor = ({
                                 clipboard={clipboard}
                                 copiedIndicator={copiedIndicator}
                                 layoutInputValues={layoutInputValues}
+                                imageWarnings={imageWarnings}
                                 onToggle={() => onToggleBreakpoint(breakpoint)}
                                 onSetEditMode={onSetEditMode}
                                 onCopy={(data) => onCopyBreakpoint(breakpoint, data)}

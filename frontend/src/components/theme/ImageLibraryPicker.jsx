@@ -23,6 +23,16 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
         setLoading(true);
         try {
             const result = await themesApi.listLibraryImages(themeId);
+            console.log('🔵 ImageLibraryPicker: Images loaded', {
+                count: result.images?.length,
+                sampleWithDimensions: result.images?.slice(0, 3).map(img => ({
+                    filename: img.filename,
+                    hasWidth: !!img.width,
+                    hasHeight: !!img.height,
+                    width: img.width,
+                    height: img.height
+                }))
+            });
             // Add page load timestamp for cache busting
             const pageLoadTime = Date.now();
             setImages((result.images || []).map(img => ({
@@ -68,11 +78,28 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
 
     const handleConfirm = () => {
         if (selectedImage && onSelect) {
-            onSelect({
+            console.log('🔵 ImageLibraryPicker: Confirming selection', {
+                selectedImage,
+                hasWidth: !!selectedImage.width,
+                hasHeight: !!selectedImage.height
+            });
+            
+            const imageData = {
                 url: selectedImage.url,
                 filename: selectedImage.filename,
                 size: selectedImage.size
-            });
+            };
+            
+            // Include dimensions if available
+            if (selectedImage.width && selectedImage.height) {
+                imageData.width = selectedImage.width;
+                imageData.height = selectedImage.height;
+                console.log('🟢 ImageLibraryPicker: Including dimensions', imageData);
+            } else {
+                console.log('🔴 ImageLibraryPicker: No dimensions available', imageData);
+            }
+            
+            onSelect(imageData);
         }
     };
 

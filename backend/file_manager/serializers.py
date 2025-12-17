@@ -347,6 +347,13 @@ class MediaFileListSerializer(serializers.ModelSerializer):
 
     def get_thumbnail_url(self, obj):
         """Get pre-generated thumbnail URL (150x150)."""
+        # #region agent log
+        import json
+        try:
+            with open('/Users/jmfk/code/eceee_v4/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps({"location":"serializers.py:348","message":"Serializer get_thumbnail_url","data":{"is_image":obj.is_image,"file_id":str(obj.id)},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"H3"}) + '\n')
+        except: pass
+        # #endregion
         if obj.is_image:
             return obj.get_imgproxy_thumbnail_url(size=150)
         return None

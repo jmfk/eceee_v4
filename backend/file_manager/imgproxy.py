@@ -47,8 +47,6 @@ class ImgProxyService:
         quality: Optional[int] = None,
         format: Optional[str] = None,
         preset: Optional[str] = None,
-        version: Optional[str] = None,
-        dpr: Optional[float] = None,
         **kwargs,
     ) -> str:
         """
@@ -63,8 +61,6 @@ class ImgProxyService:
             quality: JPEG/WebP quality (1-100)
             format: Output format ('jpg', 'png', 'webp', 'avif', 'gif', 'ico', 'svg')
             preset: Predefined preset name
-            version: Version parameter for cache-busting (e.g., file hash or timestamp)
-            dpr: Device pixel ratio (1.0, 2.0, etc.) for retina displays
             **kwargs: Additional processing options
 
         Returns:
@@ -92,21 +88,11 @@ class ImgProxyService:
 
                 if format:
                     processing_options.append(f"format:{format}")
-                
-                # Add DPR parameter for retina displays
-                if dpr and dpr != 1.0:
-                    processing_options.append(f"dpr:{dpr}")
 
             # Add additional options
             for key, value in kwargs.items():
                 if value is not None:
                     processing_options.append(f"{key}:{value}")
-
-            # Add version parameter to source URL for cache-busting
-            if version:
-                # Check if source_url already has query parameters
-                separator = "&" if "?" in source_url else "?"
-                source_url = f"{source_url}{separator}v={version}"
 
             # Encode source URL
             encoded_source_url = (
@@ -162,19 +148,18 @@ class ImgProxyService:
             logger.error(f"Failed to generate imgproxy signature: {e}")
             return "unsigned"
 
-    def get_preset_url(self, source_url: str, preset: str, version: Optional[str] = None) -> str:
+    def get_preset_url(self, source_url: str, preset: str) -> str:
         """
         Generate imgproxy URL using a predefined preset.
 
         Args:
             source_url: Source image URL
             preset: Preset name (thumbnail, small, medium, large, hero, avatar)
-            version: Version parameter for cache-busting
 
         Returns:
             imgproxy URL with preset
         """
-        return self.generate_url(source_url=source_url, preset=preset, version=version)
+        return self.generate_url(source_url=source_url, preset=preset)
 
     def get_optimized_url(
         self,
@@ -183,7 +168,6 @@ class ImgProxyService:
         height: Optional[int] = None,
         webp: bool = True,
         quality: int = 85,
-        version: Optional[str] = None,
     ) -> str:
         """
         Generate optimized image URL with modern format support.
@@ -194,7 +178,6 @@ class ImgProxyService:
             height: Target height
             webp: Enable WebP format detection
             quality: Image quality
-            version: Version parameter for cache-busting
 
         Returns:
             Optimized imgproxy URL
@@ -208,7 +191,6 @@ class ImgProxyService:
             resize_type="fit",
             format=format_type,
             quality=quality,
-            version=version,
         )
 
     def _constrain_dimensions(
@@ -256,16 +238,16 @@ class ImgProxyService:
         # Both dimensions requested - constrain to fit within both limits
         width_scale = requested_width / original_width
         height_scale = requested_height / original_height
-        
+
         # Don't upscale
         if width_scale >= 1.0 and height_scale >= 1.0:
             return original_width, original_height
-        
+
         # Use the smaller scale to ensure we fit within both dimensions
         scale = min(width_scale, height_scale, 1.0)
         constrained_width = int(original_width * scale)
         constrained_height = int(original_height * scale)
-        
+
         return constrained_width, constrained_height
 
     def generate_responsive_urls(
@@ -363,12 +345,14 @@ class ImgProxyService:
             srcset_parts.append(f"{url} {final_width}w")
 
             # Build sizes array
-            sizes_list.append({
-                "url": url,
-                "width": final_width,
-                "height": final_height,
-                "density": density_key,
-            })
+            sizes_list.append(
+                {
+                    "url": url,
+                    "width": final_width,
+                    "height": final_height,
+                    "density": density_key,
+                }
+            )
 
         # Add srcset string
         result["srcset"] = ", ".join(srcset_parts)
@@ -424,13 +408,23 @@ def get_thumbnail_url(source_url: str, size: int = 150, version: Optional[str] =
     Args:
         source_url: Source image URL
         size: Thumbnail size (square)
-        version: Version parameter for cache-busting
+        version: Optional cache-busting version string (e.g., file hash)
 
     Returns:
         Thumbnail imgproxy URL
     """
+    # #region agent log
+    import json
+    try:
+        with open('/Users/jmfk/code/eceee_v4/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps({"location":"imgproxy.py:404","message":"get_thumbnail_url called","data":{"source_url":source_url,"size":size,"version":version},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"post-fix","hypothesisId":"H1"}) + '\n')
+    except: pass
+    # #endregion
+    kwargs = {}
+    if version:
+        kwargs['version'] = version
     return imgproxy_service.generate_url(
-        source_url=source_url, width=size, height=size, resize_type="fill", gravity="sm", version=version
+        source_url=source_url, width=size, height=size, resize_type="fill", gravity="sm", **kwargs
     )
 
 

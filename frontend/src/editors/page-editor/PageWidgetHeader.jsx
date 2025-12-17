@@ -47,7 +47,9 @@ const PageWidgetHeader = ({
     isCut = false,
     onToggleSelection = null,
     // Active/Inactive toggle props
-    onConfigChange = null
+    onConfigChange = null,
+    // Custom actions
+    customActions = null
 }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isActive, setIsActive] = useState(widget?.config?.isActive !== false);
@@ -217,6 +219,13 @@ const PageWidgetHeader = ({
             ) : (
                 /* Normal controls for local widgets */
                 <div className="flex items-center space-x-1">
+                    {/* Custom actions - rendered first (left) */}
+                    {customActions && (
+                        <div className="flex items-center border-r border-gray-300 pr-2 mr-2">
+                            {customActions}
+                        </div>
+                    )}
+
                     {/* Move controls */}
                     {(canMoveUp || canMoveDown) && (
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2">

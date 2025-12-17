@@ -318,7 +318,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                     if (isInDropdown) {
                         setIsOverflowMenuOpen(false)
                     }
-                    if (isCollapsed) {
+                    if (showHamburger) {
                         setIsMobileMenuOpen(false)
                     }
                 }}
@@ -376,7 +376,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                     if (mode === 'editor') {
                         e.preventDefault()
                     }
-                    if (isCollapsed) {
+                    if (showHamburger) {
                         setIsMobileMenuOpen(false)
                     }
                 }}
@@ -423,7 +423,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     }
 
     // Hamburger menu mode (collapsed due to overflow or breakpoint)
-    if (isCollapsed) {
+    if (showHamburger) {
         return (
             <nav
                 ref={navRef}

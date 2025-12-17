@@ -373,12 +373,14 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         """
         Upload an image for design group layoutProperties.
         Stores in: theme_images/{theme_id}/design_groups/{filename}
-        Returns: { "url": "s3://bucket/path", "public_url": "https://..." }
+        Returns: { "url": "s3://bucket/path", "public_url": "https://...", "width": int, "height": int }
         """
         from file_manager.storage import S3MediaStorage
+        from PIL import Image
         import os
         import uuid
         import logging
+        from io import BytesIO
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
@@ -416,27 +418,23 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            from PIL import Image
+            # Read file content once
+            file_content = image_file.read()
+            
+            # Extract image dimensions (skip for SVG)
+            width = None
+            height = None
+            if image_file.content_type != "image/svg+xml":
+                try:
+                    img = Image.open(BytesIO(file_content))
+                    width, height = img.size
+                    logger.info(f"Extracted image dimensions: {width}x{height}")
+                except Exception as e:
+                    logger.warning(f"Could not extract image dimensions: {e}")
             
             # Generate unique filename
             file_extension = os.path.splitext(image_file.name)[1].lower()
             unique_filename = f"{uuid.uuid4()}{file_extension}"
-
-            # Read file content for dimension extraction
-            image_file.seek(0)
-            file_content = image_file.read()
-            
-            # Extract image dimensions
-            width = None
-            height = None
-            if image_file.content_type.startswith("image/") and image_file.content_type != "image/svg+xml":
-                try:
-                    from io import BytesIO
-                    img = Image.open(BytesIO(file_content))
-                    width = img.width
-                    height = img.height
-                except Exception as e:
-                    logger.warning(f"Failed to extract image dimensions: {e}")
 
             # Upload to object storage
             storage = S3MediaStorage()
@@ -449,15 +447,20 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             s3_url = storage.url(file_path)  # s3:// protocol for imgproxy
             public_url = storage.get_public_url(file_path)  # https:// for direct access
 
+            response_data = {
+                "url": s3_url,
+                "public_url": public_url,
+                "filename": image_file.name,
+                "size": image_file.size,
+            }
+            
+            # Add dimensions if available
+            if width is not None and height is not None:
+                response_data["width"] = width
+                response_data["height"] = height
+
             return Response(
-                {
-                    "url": s3_url,
-                    "public_url": public_url,
-                    "filename": image_file.name,
-                    "size": image_file.size,
-                    "width": width,
-                    "height": height,
-                },
+                response_data,
                 status=status.HTTP_201_CREATED,
             )
 
@@ -465,6 +468,42 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             logger.error(f"Failed to upload design group image: {str(e)}")
             return Response(
                 {"error": f"Failed to upload image: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["get"], url_path="validate-images")
+    def validate_images(self, request, pk=None):
+        """
+        Validate all design group images against breakpoint requirements.
+        
+        Returns warnings for images that are too small for optimal retina display.
+        """
+        from ..services.theme_image_validator import ThemeImageValidator
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        theme = self.get_object()
+        
+        try:
+            # Get breakpoints from theme or use defaults
+            breakpoints = theme.breakpoints if theme.breakpoints else None
+            
+            # Create validator and run validation
+            validator = ThemeImageValidator(breakpoints=breakpoints)
+            warnings = validator.validate_design_group_images(
+                theme.design_groups,
+                breakpoints
+            )
+            
+            return Response({
+                "warnings": warnings,
+                "count": len(warnings)
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to validate images: {str(e)}")
+            return Response(
+                {"error": f"Failed to validate images: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -523,41 +562,45 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         # Get metadata from the list response
                         size = obj.get("Size", 0)
                         modified = obj.get("LastModified", datetime.now())
+                        
+                        # Try to get dimensions from S3 object metadata
+                        width = None
+                        height = None
+                        try:
+                            head_response = storage.client.head_object(
+                                Bucket=storage.bucket_name,
+                                Key=full_path
+                            )
+                            metadata = head_response.get('Metadata', {})
+                            if 'width' in metadata and 'height' in metadata:
+                                width = int(metadata['width'])
+                                height = int(metadata['height'])
+                                logger.debug(f"Retrieved dimensions from metadata: {width}x{height}")
+                        except Exception as e:
+                            logger.debug(f"No dimensions in metadata for {filename}: {e}")
 
                         # Get usage information
                         used_in = theme.get_image_usage(filename)
 
-                        # Extract image dimensions
-                        width = None
-                        height = None
-                        try:
-                            file_content = storage.get_file_content(full_path)
-                            # Detect content type from filename extension
-                            import mimetypes
-                            content_type, _ = mimetypes.guess_type(filename)
-                            if content_type and content_type.startswith("image/"):
-                                metadata = storage.extract_metadata(file_content, content_type)
-                                width = metadata.get("width")
-                                height = metadata.get("height")
-                        except Exception as dim_error:
-                            logger.warning(f"Failed to extract dimensions for {filename}: {str(dim_error)}")
-
-                        images.append(
-                            {
-                                "filename": filename,
-                                "url": url,
-                                "publicUrl": public_url,
-                                "size": size,
-                                "width": width,
-                                "height": height,
-                                "uploadedAt": (
-                                    modified.isoformat()
-                                    if hasattr(modified, "isoformat")
-                                    else str(modified)
-                                ),
-                                "usedIn": used_in,
-                            }
-                        )
+                        image_data = {
+                            "filename": filename,
+                            "url": url,
+                            "publicUrl": public_url,
+                            "size": size,
+                            "uploadedAt": (
+                                modified.isoformat()
+                                if hasattr(modified, "isoformat")
+                                else str(modified)
+                            ),
+                            "usedIn": used_in,
+                        }
+                        
+                        # Add dimensions if available
+                        if width and height:
+                            image_data["width"] = width
+                            image_data["height"] = height
+                        
+                        images.append(image_data)
                         logger.info(f"Added image to list: {filename}")
                     except Exception as e:
                         logger.warning(f"Failed to get info for {filename}: {str(e)}")
@@ -613,6 +656,22 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                             }
                         )
                         continue
+                    
+                    # Read file content once
+                    file_content = image_file.read()
+                    
+                    # Extract image dimensions (skip for SVG)
+                    width = None
+                    height = None
+                    if image_file.content_type != "image/svg+xml":
+                        try:
+                            from PIL import Image
+                            from io import BytesIO
+                            img = Image.open(BytesIO(file_content))
+                            width, height = img.size
+                            logger.info(f"Extracted dimensions: {width}x{height}")
+                        except Exception as e:
+                            logger.warning(f"Could not extract dimensions: {e}")
 
                     # Generate unique filename
                     file_extension = os.path.splitext(image_file.name)[1].lower()
@@ -624,9 +683,28 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     # Upload to library
                     file_path = f"theme_images/{theme.id}/library/{unique_filename}"
                     logger.info(f"Uploading to path: {file_path}")
+                    
+                    # Save file with metadata including dimensions
                     saved_path = storage._save(
-                        file_path, ContentFile(image_file.read())
+                        file_path, ContentFile(file_content)
                     )
+                    
+                    # Store dimensions in S3 object metadata if available
+                    if width and height:
+                        try:
+                            storage.client.copy_object(
+                                Bucket=storage.bucket_name,
+                                CopySource={'Bucket': storage.bucket_name, 'Key': file_path},
+                                Key=file_path,
+                                Metadata={
+                                    'width': str(width),
+                                    'height': str(height)
+                                },
+                                MetadataDirective='REPLACE'
+                            )
+                            logger.info(f"Stored dimensions in S3 metadata: {width}x{height}")
+                        except Exception as e:
+                            logger.warning(f"Failed to store dimensions in metadata: {e}")
                     logger.info(f"Saved to: {saved_path}")
 
                     # Verify file exists
@@ -642,15 +720,22 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     )
                     logger.info(f"Generated URL: {url}")
 
-                    uploaded_images.append(
-                        {
-                            "filename": unique_filename,
-                            "originalFilename": image_file.name,
-                            "url": url,
-                            "publicUrl": public_url,
-                            "size": image_file.size,
-                        }
-                    )
+                    # Build response data
+                    image_data = {
+                        "filename": unique_filename,
+                        "originalFilename": image_file.name,
+                        "url": url,
+                        "publicUrl": public_url,
+                        "size": image_file.size,
+                    }
+                    
+                    # Include dimensions if they were extracted
+                    if width and height:
+                        image_data["width"] = width
+                        image_data["height"] = height
+                        logger.info(f"Including dimensions in response: {width}x{height}")
+                    
+                    uploaded_images.append(image_data)
 
                 except Exception as e:
                     logger.error(f"Failed to upload {image_file.name}: {str(e)}")

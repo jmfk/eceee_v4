@@ -25,6 +25,16 @@ export const useLayoutProperties = (groups, onChange, onDirty, breakpoints) => {
 
     // Update layout property with debouncing
     const handleUpdateLayoutProperty = (groupIndex, part, breakpoint, property, value, immediate = false) => {
+        console.log('🔵 useLayoutProperties: handleUpdateLayoutProperty called', {
+            groupIndex,
+            part,
+            breakpoint,
+            property,
+            valueType: typeof value,
+            isObject: typeof value === 'object',
+            value: typeof value === 'object' ? JSON.stringify(value) : value
+        });
+        
         const key = `${groupIndex}-${part}-${breakpoint}-${property}`;
 
         // Update local input state immediately
@@ -40,6 +50,7 @@ export const useLayoutProperties = (groups, onChange, onDirty, breakpoints) => {
 
         // Function to perform the actual update
         const performUpdate = () => {
+            
             const updatedGroups = [...groups];
             const layoutProperties = updatedGroups[groupIndex].layoutProperties || {};
             const partProps = layoutProperties[part] || {};
@@ -47,11 +58,38 @@ export const useLayoutProperties = (groups, onChange, onDirty, breakpoints) => {
 
             // Update or remove property
             if (value === null) {
-                // Only delete if explicitly set to null (user wants to remove)
+                // Remove property
                 delete breakpointProps[property];
+                
+                // Also clean up old 'images' sub-object format if it exists (legacy cleanup)
+                if (breakpointProps.images) {
+                    delete breakpointProps.images[property];
+                    if (Object.keys(breakpointProps.images).length === 0) {
+                        delete breakpointProps.images;
+                    }
+                }
             } else {
-                // Keep the property even if empty string (allows field to show)
+                // Store property directly (camelCase - API will convert to snake_case)
                 breakpointProps[property] = value;
+                
+                // Log what we're saving for debugging
+                if (property === 'backgroundImage' && value && typeof value === 'object') {
+                    console.log('✅ useLayoutProperties: Saving backgroundImage:', {
+                        property,
+                        value,
+                        hasWidth: !!value.width,
+                        hasHeight: !!value.height,
+                        hasDpr: !!value.dpr
+                    });
+                }
+                
+                // Clean up old 'images' sub-object format if it exists (legacy cleanup)
+                if (breakpointProps.images && breakpointProps.images[property]) {
+                    delete breakpointProps.images[property];
+                    if (Object.keys(breakpointProps.images).length === 0) {
+                        delete breakpointProps.images;
+                    }
+                }
             }
 
             // Clean up empty objects

@@ -222,42 +222,15 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                 for (const bpKey of ['sm', 'md', 'lg', 'xl']) {
                     const bpProps = partBreakpoints[bpKey];
                     if (bpProps) {
-                        // Handle images with DPR support
+                        // Handle images
                         if (bpProps.images) {
-                            // Get breakpoint width for imgproxy sizing
-                            const bpWidths = breakpoints || { sm: 640, md: 768, lg: 1024, xl: 1280 };
-                            const breakpointWidth = bpWidths[bpKey] || 640;
-                            
                             for (const [imageKey, imageData] of Object.entries(bpProps.images)) {
                                 // Support both new format (url) and old format (fileUrl) for backward compatibility
                                 const imageUrl = imageData?.url || imageData?.fileUrl;
                                 if (imageUrl) {
-                                    // Generate imgproxy URLs with DPR inline
-                                    // Note: In production, these should be generated server-side with proper signing
-                                    // For now, we'll use a simple approach that works with the backend
-                                    
-                                    // For s3:// URLs, we need to use imgproxy
-                                    if (imageUrl.startsWith('s3://')) {
-                                        // Generate base64-encoded source URL for imgproxy
-                                        const encodedUrl = btoa(imageUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-                                        const imgproxyBase = window.IMGPROXY_URL || 'https://imgproxy.eceee.fred.nu';
-                                        
-                                        // Generate URLs with DPR
-                                        const url1x = `${imgproxyBase}/unsafe/resize:fill:${breakpointWidth}:0/dpr:1/${encodedUrl}`;
-                                        const url2x = `${imgproxyBase}/unsafe/resize:fill:${breakpointWidth}:0/dpr:2/${encodedUrl}`;
-                                        
-                                        // Generate CSS variable with image-set for retina support
-                                        const varName = `--${part}-${imageKey}-${bpKey}`;
-                                        // Fallback for older browsers
-                                        cssVariables.push(`  ${varName}: url('${url1x}');`);
-                                        // Modern browsers with retina support
-                                        cssVariables.push(`  ${varName}: -webkit-image-set(url('${url1x}') 1x, url('${url2x}') 2x);`);
-                                        cssVariables.push(`  ${varName}: image-set(url('${url1x}') 1x, url('${url2x}') 2x);`);
-                                    } else {
-                                        // For regular URLs, use as-is (no imgproxy processing)
-                                        const varName = `--${part}-${imageKey}-${bpKey}`;
-                                        cssVariables.push(`  ${varName}: url('${imageUrl}');`);
-                                    }
+                                    // Generate CSS variable name: --{part}-{imageKey}-{breakpoint}
+                                    const varName = `--${part}-${imageKey}-${bpKey}`;
+                                    cssVariables.push(`  ${varName}: url('${imageUrl}');`);
                                 }
                             }
                         }
@@ -340,6 +313,27 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         // Skip backgroundColor and color for navbar/footer - handled as CSS variables
                         if (part === 'navbar-widget' || part === 'footer-widget') {
                             if (prop === 'backgroundColor' || prop === 'color') continue;
+                        }
+
+                        // Handle composite image properties (backgroundImage with url field)
+                        if (prop === 'backgroundImage' && value && typeof value === 'object' && value.url) {
+                            // Expand composite image into multiple CSS properties
+                            cssRules.push(`  background-image: url('${value.url}');`);
+                            
+                            // Only output properties if explicitly set (not empty strings)
+                            if (value.backgroundSize && value.backgroundSize.trim() !== '') {
+                                cssRules.push(`  background-size: ${value.backgroundSize};`);
+                            }
+                            if (value.backgroundPosition && value.backgroundPosition.trim() !== '') {
+                                cssRules.push(`  background-position: ${value.backgroundPosition};`);
+                            }
+                            if (value.backgroundRepeat && value.backgroundRepeat.trim() !== '') {
+                                cssRules.push(`  background-repeat: ${value.backgroundRepeat};`);
+                            }
+                            if (value.useAspectRatio === true && value.aspectRatio && value.aspectRatio.trim() !== '') {
+                                cssRules.push(`  aspect-ratio: ${value.aspectRatio};`);
+                            }
+                            continue;
                         }
 
                         const cssProp = camelToKebab(prop);

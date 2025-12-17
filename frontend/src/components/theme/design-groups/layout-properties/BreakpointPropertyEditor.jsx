@@ -14,7 +14,16 @@ import ColorSelector from '../../form-fields/ColorSelector';
 import FontSelector from '../../form-fields/FontSelector';
 import NumericInput from '../../form-fields/NumericInput';
 import ImagePropertyField from '../ImagePropertyField';
+import CompositeImagePropertyField from '../CompositeImagePropertyField';
 import { cssPropertyToKebab } from '../utils/cssConversion';
+
+// Normalize property name for storage lookup
+const normalizePropertyName = (property) => {
+    if (property === 'backgroundImage' || property === 'background') {
+        return 'background_image';
+    }
+    return property;
+};
 
 const BreakpointPropertyEditor = ({
     groupIndex,
@@ -32,6 +41,7 @@ const BreakpointPropertyEditor = ({
     clipboard,
     copiedIndicator,
     layoutInputValues,
+    imageWarnings = [],
     // Handlers
     onToggle,
     onSetEditMode,
@@ -52,6 +62,8 @@ const BreakpointPropertyEditor = ({
         if (!breakpointProps || Object.keys(breakpointProps).length === 0) return '';
         let css = '';
         for (const [prop, value] of Object.entries(breakpointProps)) {
+            // Skip the images sub-object - it's handled separately by the backend
+            if (prop === 'images') continue;
             const cssProp = cssPropertyToKebab(prop);
             css += `${cssProp}: ${value};\n`;
         }
@@ -78,7 +90,20 @@ const BreakpointPropertyEditor = ({
         }
     };
 
-    const usedProperties = Object.keys(breakpointProps).filter(prop => prop in availableProperties);
+    // Get used properties from both direct properties and images sub-object
+    // Check for both camelCase and normalized (snake_case) versions
+    const usedProperties = Object.keys(availableProperties).filter(prop => {
+        const normalizedProp = normalizePropertyName(prop);
+        // Check direct properties (both camelCase and normalized) - use 'in' to catch empty strings
+        if (prop in breakpointProps || normalizedProp in breakpointProps) {
+            return true;
+        }
+        // Check images sub-object (legacy)
+        if (breakpointProps.images && prop in breakpointProps.images) {
+            return true;
+        }
+        return false;
+    });
     const unusedProperties = Object.entries(availableProperties)
         .filter(([prop]) => !usedProperties.includes(prop));
 
@@ -185,7 +210,9 @@ const BreakpointPropertyEditor = ({
                                 .filter(([prop]) => usedProperties.includes(prop))
                                 .map(([prop, config]) => {
                                     const key = `${groupIndex}-${part}-${breakpoint}-${prop}`;
-                                    const storedValue = breakpointProps[prop] || '';
+                                    const normalizedProp = normalizePropertyName(prop);
+                                    // Check images sub-object, direct camelCase, and normalized snake_case for backward compatibility
+                                    const storedValue = breakpointProps.images?.[prop] || breakpointProps[prop] || breakpointProps[normalizedProp] || '';
                                     const value = layoutInputValues[key] !== undefined ? layoutInputValues[key] : storedValue;
 
                                     return (
@@ -217,6 +244,20 @@ const BreakpointPropertyEditor = ({
                                                         onChange={(newValue) => onUpdateProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
                                                         breakpoint={breakpoint}
                                                         part={part}
+                                                        groupIndex={groupIndex}
+                                                        imageKey={prop}
+                                                        warnings={imageWarnings}
+                                                    />
+                                                ) : config.type === 'composite-image' ? (
+                                                    <CompositeImagePropertyField
+                                                        themeId={group?.themeId}
+                                                        value={value}
+                                                        onChange={(newValue) => onUpdateProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
+                                                        breakpoint={breakpoint}
+                                                        part={part}
+                                                        groupIndex={groupIndex}
+                                                        imageKey={prop}
+                                                        warnings={imageWarnings}
                                                     />
                                                 ) : config.type === 'numeric' ? (
                                                     <NumericInput

@@ -1032,6 +1032,14 @@ class MediaFile(models.Model):
         storage = S3MediaStorage()
         source_url = storage.get_public_url(self.file_path)
 
+        # #region agent log
+        import json
+        try:
+            with open('/Users/jmfk/code/eceee_v4/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps({"location":"models.py:1035","message":"Before get_thumbnail_url call","data":{"source_url":source_url,"size":size,"version":self.file_hash},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"H1"}) + '\n')
+        except: pass
+        # #endregion
+
         return get_thumbnail_url(source_url=source_url, size=size, version=self.file_hash)
 
     def get_preset_url(self, preset):

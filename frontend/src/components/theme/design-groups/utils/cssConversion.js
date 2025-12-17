@@ -225,6 +225,47 @@ export const layoutPropertiesToCSS = (layoutProperties, groupIndex, groups, widg
   return cssParts.join('\n\n');
 };
 
+// Helper function to group background properties into composite backgroundImage object
+const groupBackgroundProperties = (props) => {
+  const result = { ...props };
+  
+  // Check if we have background-image that should be grouped
+  if (result.backgroundImage && typeof result.backgroundImage === 'string' && result.backgroundImage.startsWith('url(')) {
+    // Extract URL from url('...')
+    const urlMatch = result.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+    if (urlMatch) {
+      const compositeImage = {
+        url: urlMatch[1]
+      };
+      
+      // Group related background properties
+      if (result.backgroundSize) {
+        compositeImage.backgroundSize = result.backgroundSize;
+        delete result.backgroundSize;
+      }
+      if (result.backgroundPosition) {
+        compositeImage.backgroundPosition = result.backgroundPosition;
+        delete result.backgroundPosition;
+      }
+      if (result.backgroundRepeat) {
+        compositeImage.backgroundRepeat = result.backgroundRepeat;
+        delete result.backgroundRepeat;
+      }
+      
+      // Include aspect-ratio if present
+      if (result.aspectRatio) {
+        compositeImage.useAspectRatio = true;
+        compositeImage.aspectRatio = result.aspectRatio;
+        delete result.aspectRatio;
+      }
+      
+      result.backgroundImage = compositeImage;
+    }
+  }
+  
+  return result;
+};
+
 // Convert CSS to layout properties
 export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, breakpoints) => {
   const layoutProperties = {};
@@ -298,6 +339,9 @@ export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, 
               const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
               layoutProperties[part].default[camelProp] = value;
             }
+            
+            // Group background properties into composite objects
+            layoutProperties[part].default = groupBackgroundProperties(layoutProperties[part].default);
           }
         }
       });
@@ -346,6 +390,9 @@ export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, 
               const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
               layoutProperties[part][bp][camelProp] = value;
             }
+            
+            // Group background properties into composite objects
+            layoutProperties[part][bp] = groupBackgroundProperties(layoutProperties[part][bp]);
           }
         }
       }
@@ -396,6 +443,9 @@ export const cssToLayoutProperties = (cssText, groupIndex, groups, widgetTypes, 
             const camelProp = cssProp.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
             layoutProperties[part][pixelValue][camelProp] = value;
           }
+          
+          // Group background properties into composite objects
+          layoutProperties[part][pixelValue] = groupBackgroundProperties(layoutProperties[part][pixelValue]);
         }
       }
     }

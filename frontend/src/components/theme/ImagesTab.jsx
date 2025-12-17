@@ -88,6 +88,16 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
         setLoading(true);
         try {
             const result = await themesApi.listLibraryImages(themeId);
+            console.log('🔵 ImagesTab: Library images loaded', {
+                imageCount: result.images?.length,
+                sampleImages: result.images?.slice(0, 2).map(img => ({
+                    filename: img.filename,
+                    hasWidth: !!img.width,
+                    hasHeight: !!img.height,
+                    width: img.width,
+                    height: img.height
+                }))
+            });
             // Add a page load timestamp to force cache busting on browser refresh
             const pageLoadTime = Date.now();
             setImages((result.images || []).map(img => ({
@@ -118,12 +128,26 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
 
     const handleDirectUpload = async (files) => {
         if (!files || files.length === 0) return;
+        
+        console.log('🔵 ImagesTab: Starting upload', { fileCount: files.length, fileNames: files.map(f => f.name) });
 
         setUploading(true);
         setUploadProgress({ total: files.length, completed: 0, errors: [] });
 
         try {
             const result = await themesApi.uploadLibraryImages(themeId, files);
+            
+            console.log('🟢 ImagesTab: Upload response received', { result });
+            console.log('🟢 ImagesTab: Uploaded images data:', { 
+                uploadedCount: result.uploaded?.length,
+                uploadedImages: result.uploaded?.map(img => ({
+                    filename: img.filename,
+                    hasWidth: !!img.width,
+                    hasHeight: !!img.height,
+                    width: img.width,
+                    height: img.height
+                }))
+            });
 
             setUploadProgress({
                 total: files.length,

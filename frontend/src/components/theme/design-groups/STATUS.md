@@ -1,6 +1,14 @@
 # Design Groups Refactoring - Completion Status
 
-## ✅ COMPLETED (60% of refactoring)
+## ✅ COMPLETED (65% of refactoring)
+
+### Recent Completion: Image Storage Separation (Dec 17, 2024)
+- ✅ Separated image storage in `images` sub-object
+- ✅ Updated main component (`DesignGroupsTab.jsx`) with new storage logic
+- ✅ Backward compatibility maintained for migration
+- ✅ Documentation added (`IMAGE_STORAGE.md`)
+
+## ✅ COMPLETED COMPONENTS
 
 ### 1. Foundation Layer
 - ✅ `utils/propertyConfig.js` - All property configurations

@@ -12,7 +12,7 @@
 */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp, Globe, Package, X, Search } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check, Clipboard, Code, FileText, Upload, FileUp, Globe, Package, X, Search, AlertTriangle } from 'lucide-react';
 import { createDesignGroup, generateClassName, getBreakpoints } from '../../utils/themeUtils';
 import { parseCSSRules, cssToGroupElements, cssToElementProperties, groupElementsToCSS } from '../../utils/cssParser';
 import { calculateSelectorsForGroup } from '../../utils/selectorCalculation';
@@ -29,6 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import layoutsApi from '../../api/layouts';
 import ImagePropertyField from './design-groups/ImagePropertyField';
 import LayoutPartEditor from './design-groups/layout-properties/LayoutPartEditor';
+import { useImageValidation } from './design-groups/hooks/useImageValidation';
 
 // Autocomplete Component for Widget Types
 const WidgetTypeAutocomplete = ({ availableWidgets, onSelect, disabled }) => {
@@ -344,7 +345,7 @@ const LAYOUT_PROPERTIES = {
 
   // Colors & Backgrounds
   backgroundColor: { type: 'color', label: 'Background Color', placeholder: '#ffffff' },
-  backgroundImage: { type: 'image', label: 'Background Image' },
+  backgroundImage: { type: 'composite-image', label: 'Background Image' },
   color: { type: 'color', label: 'Text Color', placeholder: '#000000' },
   opacity: { type: 'text', label: 'Opacity', placeholder: '0.0 to 1.0' },
 
@@ -505,13 +506,13 @@ const normalizeElements = (elements) => {
   if (!elements || typeof elements !== 'object') {
     return {};
   }
-  
+
   // Handle array (incorrect structure)
   if (Array.isArray(elements)) {
     console.warn('Design group elements is an array, converting to object');
     return {};
   }
-  
+
   // Normalize each element
   const normalized = {};
   Object.entries(elements).forEach(([key, value]) => {
@@ -519,23 +520,23 @@ const normalizeElements = (elements) => {
     if (value == null) {
       return;
     }
-    
+
     // Ensure value is an object
     if (typeof value !== 'object' || Array.isArray(value)) {
       console.warn(`Element ${key} has invalid value type, skipping`);
       return;
     }
-    
+
     // Convert property keys from snake_case to camelCase
     const normalizedValue = {};
     Object.entries(value).forEach(([propKey, propValue]) => {
       const camelKey = propKey.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
       normalizedValue[camelKey] = propValue;
     });
-    
+
     normalized[key] = normalizedValue;
   });
-  
+
   return normalized;
 };
 
@@ -647,6 +648,13 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
 
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
+
+  // Image validation
+  const { warnings: imageWarnings, warningCount, countBySeverity, isValidating: isValidatingImages } = useImageValidation(
+    themeId,
+    designGroups,
+    breakpoints
+  );
 
   // Fetch all available slots from layouts
   const { data: slotsData, isLoading: isLoadingSlots } = useQuery({
@@ -1022,11 +1030,27 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
 
       // Update or remove property
       if (value === null) {
-        // Only delete if explicitly set to null (user wants to remove)
+        // Remove property
         delete breakpointProps[property];
+
+        // Also clean up old 'images' sub-object format if it exists (legacy cleanup)
+        if (breakpointProps.images) {
+          delete breakpointProps.images[property];
+          if (Object.keys(breakpointProps.images).length === 0) {
+            delete breakpointProps.images;
+          }
+        }
       } else {
-        // Keep the property even if empty string (allows field to show)
+        // Store property directly (camelCase - API will convert to snake_case)
         breakpointProps[property] = value;
+
+        // Clean up old 'images' sub-object format if it exists (legacy cleanup)
+        if (breakpointProps.images && breakpointProps.images[property]) {
+          delete breakpointProps.images[property];
+          if (Object.keys(breakpointProps.images).length === 0) {
+            delete breakpointProps.images;
+          }
+        }
       }
 
       // Clean up empty objects
@@ -2233,6 +2257,28 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
 
   return (
     <div className="space-y-6">
+      {/* Image Validation Warning Banner */}
+      {warningCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-medium text-amber-900 mb-1">
+                Image Size Warnings
+              </div>
+              <div className="text-sm text-amber-800">
+                {warningCount} {warningCount === 1 ? 'image' : 'images'} may be too small for optimal retina display.
+                {countBySeverity('critical') > 0 && (
+                  <span className="ml-1 font-medium">
+                    ({countBySeverity('critical')} critical)
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Design Groups</div>
         <div className="flex gap-2 items-center">
@@ -2788,6 +2834,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                     editMode={{}}
                                     clipboard={null}
                                     copiedIndicator={null}
+                                    imageWarnings={Object.values(imageWarnings).flat()}
                                     layoutInputValues={layoutInputValues}
                                     onToggle={() => setExpandedLayoutParts({
                                       ...expandedLayoutParts,
@@ -2812,13 +2859,13 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                     onPasteBreakpoint={(bp) => {
                                       // Copy/paste not implemented yet
                                     }}
-                                    onUpdateProperty={(gIdx, p, bp, prop, value, immediate) => 
+                                    onUpdateProperty={(gIdx, p, bp, prop, value, immediate) =>
                                       handleUpdateLayoutProperty(gIdx, p, bp, prop, value, immediate)
                                     }
-                                    onPropertyBlur={(gIdx, p, bp, prop) => 
+                                    onPropertyBlur={(gIdx, p, bp, prop) =>
                                       handleLayoutPropertyBlur(gIdx, p, bp, prop)
                                     }
-                                    onAddProperty={(gIdx, p, bp, prop) => 
+                                    onAddProperty={(gIdx, p, bp, prop) =>
                                       handleUpdateLayoutProperty(gIdx, p, bp, prop, '', true)
                                     }
                                     onDirty={onDirty}

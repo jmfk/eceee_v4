@@ -1482,6 +1482,9 @@ class PageTheme(models.Model):
             frontend_scoped: If True, prepend .cms-content to all selectors
         """
         import re
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         css_parts = []
 
@@ -1671,7 +1674,9 @@ class PageTheme(models.Model):
                                 if isinstance(part_config, dict):
                                     part_metadata_map[part_id] = {
                                         "selector": part_config.get("selector"),
-                                        "relationship": part_config.get("relationship", "auto")
+                                        "relationship": part_config.get(
+                                            "relationship", "auto"
+                                        ),
                                     }
 
                 # Note: Images and colors are now generated as direct CSS properties
@@ -1681,17 +1686,19 @@ class PageTheme(models.Model):
                     # Collect all breakpoints (standard + custom) and sort by pixel value
                     standard_breakpoints = ["sm", "md", "lg", "xl"]
                     legacy_breakpoints = ["default", "desktop", "tablet", "mobile"]
-                    
+
                     # Find custom breakpoints (numeric string keys)
                     custom_breakpoints = [
-                        bp for bp in part_breakpoints.keys()
-                        if bp not in standard_breakpoints and bp not in legacy_breakpoints
+                        bp
+                        for bp in part_breakpoints.keys()
+                        if bp not in standard_breakpoints
+                        and bp not in legacy_breakpoints
                         and bp.isdigit()
                     ]
-                    
+
                     # Combine all breakpoints
                     all_breakpoints = standard_breakpoints + custom_breakpoints
-                    
+
                     # Sort breakpoints by pixel value (mobile-first)
                     def get_breakpoint_value(bp):
                         # Custom breakpoint (numeric string)
@@ -1699,12 +1706,16 @@ class PageTheme(models.Model):
                             return int(bp)
                         # Standard breakpoint from theme
                         return breakpoints.get(bp, 0)
-                    
+
                     sorted_breakpoints = sorted(
-                        [bp for bp in all_breakpoints if bp in part_breakpoints or bp == "sm"],
-                        key=get_breakpoint_value
+                        [
+                            bp
+                            for bp in all_breakpoints
+                            if bp in part_breakpoints or bp == "sm"
+                        ],
+                        key=get_breakpoint_value,
                     )
-                    
+
                     # Handle each breakpoint in sorted order
                     for bp_key in sorted_breakpoints:
                         # Get properties for this breakpoint with legacy support
@@ -1772,7 +1783,11 @@ class PageTheme(models.Model):
                                 # Auto: For widget root elements (parts ending in '-widget' or named 'container'),
                                 # the widget-type class and part class are on the SAME element.
                                 # For child elements, use descendant selectors.
-                                relationship = "same-element" if (part.endswith("-widget") or part == "container") else "descendant"
+                                relationship = (
+                                    "same-element"
+                                    if (part.endswith("-widget") or part == "container")
+                                    else "descendant"
+                                )
 
                             part_selectors = []
                             for base in base_selectors:
@@ -1798,58 +1813,55 @@ class PageTheme(models.Model):
                         # Convert properties to CSS
                         css_rules = []
                         for prop_name, prop_value in bp_props.items():
-                            # Handle 'images' field - convert to background-image properties with DPR support
-                            if prop_name == "images":
+                            # Handle 'background_image' field (composite property with url and CSS options)
+                            # Format: {url, size, filename, width, height, dpr, backgroundSize, backgroundPosition, backgroundRepeat, useAspectRatio, aspectRatio}
+                            # dpr: device pixel ratio, defaults to 2 (means image is @2x)
+                            if prop_name in ["background_image", "backgroundImage"]:
                                 if isinstance(prop_value, dict):
-                                    from file_manager.imgproxy import imgproxy_service
-                                    
-                                    # Get breakpoint width for imgproxy sizing
-                                    breakpoints = self.get_breakpoints()
-                                    breakpoint_width = breakpoints.get(bp_key, 640)
-                                    
-                                    for image_key, image_data in prop_value.items():
-                                        # Support both new format (url) and old format (fileUrl)
-                                        if isinstance(image_data, dict):
-                                            image_url = image_data.get("url") or image_data.get("fileUrl")
-                                            if image_url:
-                                                # Generate imgproxy URLs with DPR for @1x and @2x
-                                                try:
-                                                    url_1x = imgproxy_service.generate_url(
-                                                        source_url=image_url,
-                                                        width=breakpoint_width,
-                                                        resize_type="fill",
-                                                        gravity="sm",
-                                                        dpr=1.0
-                                                    )
-                                                    url_2x = imgproxy_service.generate_url(
-                                                        source_url=image_url,
-                                                        width=breakpoint_width,
-                                                        resize_type="fill",
-                                                        gravity="sm",
-                                                        dpr=2.0
-                                                    )
-                                                    
-                                                    # Map common image keys to CSS properties with image-set
-                                                    if image_key == "background" or image_key == "backgroundImage":
-                                                        # Fallback for older browsers
-                                                        css_rules.append(f"  background-image: url('{url_1x}');")
-                                                        # Modern browsers with retina support
-                                                        css_rules.append(
-                                                            f"  background-image: -webkit-image-set("
-                                                            f"url('{url_1x}') 1x, url('{url_2x}') 2x);"
-                                                        )
-                                                        css_rules.append(
-                                                            f"  background-image: image-set("
-                                                            f"url('{url_1x}') 1x, url('{url_2x}') 2x);"
-                                                        )
-                                                    # For other image keys, use as custom property or skip
-                                                except Exception as e:
-                                                    # Fallback to original URL if imgproxy fails
-                                                    import logging
-                                                    logger = logging.getLogger(__name__)
-                                                    logger.warning(f"Failed to generate imgproxy URL: {e}")
-                                                    if image_key == "background" or image_key == "backgroundImage":
-                                                        css_rules.append(f"  background-image: url('{image_url}');")
+                                    # Dict format: composite image property
+                                    image_url = prop_value.get("url") or prop_value.get(
+                                        "fileUrl"
+                                    )
+                                    if image_url:
+                                        # Generate retina-aware CSS with image-set
+                                        image_css = self._generate_retina_image_css(
+                                            image_url, prop_value, "backgroundImage"
+                                        )
+                                        if image_css:
+                                            css_rules.extend(image_css)
+                                        
+                                        # Handle composite background properties (only if set)
+                                        bg_size = prop_value.get("background_size") or prop_value.get("backgroundSize")
+                                        if bg_size and bg_size.strip():
+                                            css_rules.append(f"  background-size: {bg_size};")
+                                        
+                                        bg_position = prop_value.get("background_position") or prop_value.get("backgroundPosition")
+                                        if bg_position and bg_position.strip():
+                                            css_rules.append(f"  background-position: {bg_position};")
+                                        
+                                        bg_repeat = prop_value.get("background_repeat") or prop_value.get("backgroundRepeat")
+                                        if bg_repeat and bg_repeat.strip():
+                                            css_rules.append(f"  background-repeat: {bg_repeat};")
+                                        
+                                        # Handle aspect-ratio (only if explicitly enabled)
+                                        use_aspect_ratio = prop_value.get("use_aspect_ratio") or prop_value.get("useAspectRatio")
+                                        aspect_ratio = prop_value.get("aspect_ratio") or prop_value.get("aspectRatio")
+                                        if use_aspect_ratio is True and aspect_ratio and str(aspect_ratio).strip():
+                                            css_rules.append(f"  aspect-ratio: {aspect_ratio};")
+                                elif isinstance(prop_value, str):
+                                    # String format: just a URL
+                                    css_rules.append(
+                                        f"  background-image: url('{prop_value}');"
+                                    )
+                                else:
+                                    logger.warning(
+                                        f"Unexpected background_image type in '{part}.{bp_key}': {type(prop_value)}"
+                                    )
+                                # Always continue after processing background_image field
+                                continue
+
+                            # Skip 'images' field - it's legacy and should not be rendered as CSS
+                            if prop_name == "images":
                                 continue
 
                             css_prop = (
@@ -1890,7 +1902,7 @@ class PageTheme(models.Model):
                             else:
                                 # Standard breakpoint - look up from theme
                                 bp_px = breakpoints.get(bp_key)
-                            
+
                             if bp_px:
                                 rule = f"@media (min-width: {bp_px}px) {{\n"
                                 rule += f"  {selector} {{\n"
@@ -1903,6 +1915,87 @@ class PageTheme(models.Model):
                         css_parts.append(rule)
 
         return "\n\n".join(css_parts)
+
+    def _generate_retina_image_css(self, image_url, image_data, image_key):
+        """
+        Generate retina-aware CSS for background images using image-set.
+
+        The image's DPR (device pixel ratio) determines how to scale:
+        - dpr=2 (default): Image is @2x, generate 1x by scaling to 50%
+        - dpr=1: Image is @1x, use as-is (no retina support)
+        - dpr=3: Image is @3x, generate 1x by scaling to 33%, 2x by scaling to 66%
+
+        Args:
+            image_url: S3 URL of the image
+            image_data: Dict containing image metadata (width, height, dpr)
+            image_key: Key name (e.g., 'background', 'backgroundImage')
+
+        Returns:
+            List of CSS rule strings
+        """
+        from file_manager.imgproxy import imgproxy_service
+        import logging
+
+        logger = logging.getLogger(__name__)
+        css_rules = []
+
+        # Determine CSS property name
+        if image_key in ["background", "backgroundImage"]:
+            css_property = "background-image"
+        else:
+            # For other image keys, skip or use as custom property
+            return []
+
+        # Get image dimensions and DPR
+        width = image_data.get("width")
+        height = image_data.get("height")
+        dpr = image_data.get("dpr", 2)  # Default to 2x (retina)
+
+        # Generate image-set CSS with retina support
+        if width and height and dpr > 1:
+            # Calculate 1x dimensions (scale down from original DPR)
+            width_1x = width // dpr
+            height_1x = height // dpr
+
+            # Generate imgproxy URL for 1x version
+            try:
+                url_1x = imgproxy_service.generate_url(
+                    source_url=image_url,
+                    width=width_1x,
+                    height=height_1x,
+                    resize_type="fit",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to generate imgproxy URL: {e}")
+                # Fallback to simple URL
+                css_rules.append(f"  {css_property}: url('{image_url}');")
+                return css_rules
+
+            # Use original URL for max DPR (no transformation)
+            url_max = image_url
+
+            # Generate image-set CSS with both webkit and standard syntax
+            # Webkit prefix for older Safari versions
+            css_rules.append(
+                f"  {css_property}: -webkit-image-set("
+                f"url('{url_1x}') 1x, "
+                f"url('{url_max}') {dpr}x"
+                f");"
+            )
+            # Standard syntax
+            css_rules.append(
+                f"  {css_property}: image-set("
+                f"url('{url_1x}') 1x, "
+                f"url('{url_max}') {dpr}x"
+                f");"
+            )
+        else:
+            # No dimensions available or dpr=1 - use simple URL without retina support
+            if not width or not height:
+                logger.debug(f"No dimensions available for image, using simple URL")
+            css_rules.append(f"  {css_property}: url('{image_url}');")
+
+        return css_rules
 
     def _camel_to_kebab(self, text):
         """Convert camelCase to kebab-case for CSS properties"""
@@ -2035,7 +2128,7 @@ class PageTheme(models.Model):
                                             }
                                             image_data_list.append((url, metadata))
         return image_data_list
-    
+
     def list_library_images(self):
         """
         List all images in the theme's library folder.
@@ -2043,31 +2136,33 @@ class PageTheme(models.Model):
         """
         from file_manager.storage import S3MediaStorage
         import logging
-        
+
         logger = logging.getLogger(__name__)
         storage = S3MediaStorage()
         library_path = f"theme_images/{self.id}/library/"
-        
+
         try:
-            if hasattr(storage, 'listdir'):
+            if hasattr(storage, "listdir"):
                 directories, files = storage.listdir(library_path)
                 return files
             return []
         except Exception as e:
-            logger.warning(f"Failed to list library images for theme {self.id}: {str(e)}")
+            logger.warning(
+                f"Failed to list library images for theme {self.id}: {str(e)}"
+            )
             return []
-    
+
     def get_image_usage(self, filename):
         """
         Track where a library image is used within the theme.
         Returns list of usage locations: ["design_group:Group Name", "preview", etc.]
         """
         usage = []
-        
+
         # Check if it's the preview image
         if self.image and filename in str(self.image):
             usage.append("preview")
-        
+
         # Check design groups
         if self.design_groups and "groups" in self.design_groups:
             for group in self.design_groups["groups"]:
@@ -2078,22 +2173,24 @@ class PageTheme(models.Model):
                             if "images" in props and isinstance(props["images"], dict):
                                 for image_key, image_data in props["images"].items():
                                     if isinstance(image_data, dict):
-                                        url = image_data.get("url") or image_data.get("fileUrl")
+                                        url = image_data.get("url") or image_data.get(
+                                            "fileUrl"
+                                        )
                                         if url and filename in url:
                                             usage.append(f"design_group:{group_name}")
                                             break
-        
+
         return list(set(usage))  # Remove duplicates
-    
+
     def delete_library_image(self, filename):
         """
         Delete a library image and remove all references to it in the theme.
         This updates design_groups to remove the image references.
         """
         import logging
-        
+
         logger = logging.getLogger(__name__)
-        
+
         # Update design groups to remove image references
         if self.design_groups and "groups" in self.design_groups:
             updated = False
@@ -2105,24 +2202,28 @@ class PageTheme(models.Model):
                                 images_to_remove = []
                                 for image_key, image_data in props["images"].items():
                                     if isinstance(image_data, dict):
-                                        url = image_data.get("url") or image_data.get("fileUrl")
+                                        url = image_data.get("url") or image_data.get(
+                                            "fileUrl"
+                                        )
                                         if url and filename in url:
                                             images_to_remove.append(image_key)
                                             updated = True
-                                
+
                                 # Remove the images
                                 for image_key in images_to_remove:
                                     del props["images"][image_key]
-            
+
             if updated:
                 self.save(update_fields=["design_groups"])
                 logger.info(f"Removed references to {filename} from theme {self.id}")
-        
+
         # Clear preview image if it matches
         if self.image and filename in str(self.image):
             self.image = None
             self.save(update_fields=["image"])
-            logger.info(f"Cleared preview image reference to {filename} from theme {self.id}")
+            logger.info(
+                f"Cleared preview image reference to {filename} from theme {self.id}"
+            )
 
     @staticmethod
     def _extract_path_from_url(url):
@@ -2263,10 +2364,12 @@ class PageTheme(models.Model):
                         old_url = storage.url(old_path)
                         new_url = storage.url(new_path)
                         url_mapping[old_url] = new_url
-                        
+
                         # Also map any variations of the path
                         url_mapping[old_path] = new_path
-                        url_mapping[f"theme_images/{self.id}/library/{filename}"] = f"theme_images/{cloned_theme.id}/library/{filename}"
+                        url_mapping[f"theme_images/{self.id}/library/{filename}"] = (
+                            f"theme_images/{cloned_theme.id}/library/{filename}"
+                        )
                     else:
                         logger.warning(
                             f"Source image not found during clone: {old_path}"
@@ -2289,15 +2392,20 @@ class PageTheme(models.Model):
         old_design_groups_path = f"theme_images/{self.id}/design_groups/"
         try:
             from file_manager.storage import S3MediaStorage
+
             storage = S3MediaStorage()
-            if hasattr(storage, 'listdir'):
+            if hasattr(storage, "listdir"):
                 try:
                     directories, files = storage.listdir(old_design_groups_path)
                     if files:
-                        logger.info(f"Found {len(files)} legacy design_groups images to migrate during clone")
+                        logger.info(
+                            f"Found {len(files)} legacy design_groups images to migrate during clone"
+                        )
                         for filename in files:
                             old_path = f"{old_design_groups_path}{filename}"
-                            new_path = f"theme_images/{cloned_theme.id}/library/{filename}"
+                            new_path = (
+                                f"theme_images/{cloned_theme.id}/library/{filename}"
+                            )
                             if storage.exists(old_path):
                                 old_file = storage._open(old_path, "rb")
                                 file_content = old_file.read()
@@ -2306,6 +2414,8 @@ class PageTheme(models.Model):
                 except:
                     pass  # Directory might not exist
         except Exception as e:
-            logger.warning(f"Failed to check legacy design_groups during clone: {str(e)}")
+            logger.warning(
+                f"Failed to check legacy design_groups during clone: {str(e)}"
+            )
 
         return cloned_theme

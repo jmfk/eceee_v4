@@ -161,7 +161,7 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
         updateNavMode() // Initial check
 
         return () => ro.disconnect()
-    }, [allItems, mode])
+    }, [dynamicMenuItems, processedMenuItems, mode])
 
     // Click outside handler for mobile menu
     useEffect(() => {

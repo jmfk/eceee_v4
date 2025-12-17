@@ -329,7 +329,16 @@ export const themesApi = {
                 'Content-Type': 'multipart/form-data'
             }
         })
-    }, 'themes.replaceLibraryImage')
+    }, 'themes.replaceLibraryImage'),
+
+    /**
+     * Validate all design group images against breakpoint requirements
+     * @param {number} themeId - Theme ID
+     * @returns {Promise<Object>} Validation warnings
+     */
+    validateImages: wrapApiCall(async (themeId) => {
+        return api.get(`${endpoints.themes.detail(themeId)}/validate-images/`)
+    }, 'themes.validateImages')
 }
 
 export default themesApi

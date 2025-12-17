@@ -257,6 +257,13 @@ const PageWidgetFactory = ({
     // Get the widget component (supports EASY widgets and overrides)
     const CoreWidgetComponent = getWidgetComponent(widget.type)
 
+    // Get custom actions from widget component metadata if available
+    const customActions = CoreWidgetComponent?.customActions?.(widget, {
+        pageId: pageId || webpageData?.id,
+        themeId: webpageData?.theme,
+        layoutRenderer
+    })
+
     if (!CoreWidgetComponent) {
         // Fallback for unsupported widgets
         return (
@@ -487,6 +494,8 @@ const PageWidgetFactory = ({
                     parseWidgetPath={parseWidgetPath}
                     // Active/Inactive toggle
                     onConfigChange={stableConfigChangeHandler}
+                    // Custom actions from widget
+                    customActions={customActions}
                 />
 
                 {/* Paste Mode Markers - only show if this widget is the currently hovered one */}

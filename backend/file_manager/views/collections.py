@@ -328,62 +328,76 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def files(self, request, pk=None):
         """Get files in this collection."""
-        collection = self.get_object()
+        try:
+            collection = self.get_object()
 
-        # Get files in this collection with proper permissions
-        files = (
-            MediaFile.objects.filter(
-                collections=collection, namespace=collection.namespace
-            )
-            .select_related("namespace", "created_by", "last_modified_by")
-            .prefetch_related("tags", "collections")
-        )
-
-        # Apply user permissions (same logic as MediaFileViewSet)
-        user = request.user
-        if not user.is_staff:
-            from content.models import Namespace
-
-            # Get namespaces the user can access
-            accessible_namespaces = Namespace.objects.filter(
-                models.Q(created_by=user) | models.Q(is_active=True)
-            )
-            files = files.filter(namespace__in=accessible_namespaces)
-
-            # Further filter by access level
-            from django.db.models import Q
-
-            files = files.filter(
-                Q(access_level="public")
-                | Q(access_level="members")
-                | Q(access_level="private", created_by=user)
+            # Get files in this collection with proper permissions
+            files = (
+                MediaFile.objects.filter(
+                    collections=collection, namespace=collection.namespace
+                )
+                .select_related("namespace", "created_by", "last_modified_by")
+                .prefetch_related("tags", "collections")
             )
 
-        # Apply search if provided
-        search = request.query_params.get("search")
-        if search:
-            files = files.filter(
-                models.Q(title__icontains=search)
-                | models.Q(description__icontains=search)
-                | models.Q(original_filename__icontains=search)
-            )
+            # Apply user permissions (same logic as MediaFileViewSet)
+            user = request.user
+            if not user.is_staff:
+                from content.models import Namespace
 
-        # Apply ordering
-        ordering = request.query_params.get("ordering", "-created_at")
-        files = files.order_by(ordering)
+                # Get namespaces the user can access
+                accessible_namespaces = Namespace.objects.filter(
+                    models.Q(created_by=user) | models.Q(is_active=True)
+                )
+                files = files.filter(namespace__in=accessible_namespaces)
 
-        # Paginate
-        page = self.paginate_queryset(files)
-        if page is not None:
+                # Further filter by access level
+                from django.db.models import Q
+
+                files = files.filter(
+                    Q(access_level="public")
+                    | Q(access_level="members")
+                    | Q(access_level="private", created_by=user)
+                )
+
+            # Apply search if provided
+            search = request.query_params.get("search")
+            if search:
+                files = files.filter(
+                    models.Q(title__icontains=search)
+                    | models.Q(description__icontains=search)
+                    | models.Q(original_filename__icontains=search)
+                )
+
+            # Apply ordering
+            ordering = request.query_params.get("ordering", "-created_at")
+            files = files.order_by(ordering)
+
+            # Paginate
+            page = self.paginate_queryset(files)
+            if page is not None:
+                # #region agent log
+                import json
+                try:
+                    with open('/Users/jmfk/code/eceee_v4/.cursor/debug.log', 'a') as f:
+                        f.write(json.dumps({"location":"collections.py:376","message":"Before serialization","data":{"file_count":len(page)},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"H3"}) + '\n')
+                except: pass
+                # #endregion
+                serializer = MediaFileListSerializer(
+                    page, many=True, context={"request": request}
+                )
+                return self.get_paginated_response(serializer.data)
+
             serializer = MediaFileListSerializer(
-                page, many=True, context={"request": request}
+                files, many=True, context={"request": request}
             )
-            return self.get_paginated_response(serializer.data)
-
-        serializer = MediaFileListSerializer(
-            files, many=True, context={"request": request}
-        )
-        return Response(serializer.data)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error fetching collection files: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to fetch collection files: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=["post"])
     def add_files(self, request, pk=None):

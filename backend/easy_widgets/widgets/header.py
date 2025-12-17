@@ -24,9 +24,7 @@ class HeaderWidget(BaseWidget):
     """Simple header widget with image"""
 
     name = "Header"
-    description = (
-        "Simple header widget with responsive image that scales to fill header height"
-    )
+    description = "Header widget - mobile shows full image (auto height), desktop uses fixed height with cropped image"
     mustache_template_name = "easy_widgets/widgets/header.mustache"
 
     layout_parts = {
@@ -40,10 +38,7 @@ class HeaderWidget(BaseWidget):
                 "padding",
                 "margin",
                 "backgroundColor",
-                "backgroundImage",
-                "backgroundPosition",
-                "backgroundSize",
-                "backgroundRepeat",
+                "backgroundImage",  # Composite property includes size, position, repeat, and aspect-ratio
             ],
         },
     }
@@ -51,37 +46,37 @@ class HeaderWidget(BaseWidget):
     widget_css = """
         .widget-type-header {
             width: 100%;
+            /* Mobile: auto height to show full image */
             height: auto;
-            background-size: cover;
+            background-size: contain;
             background-repeat: no-repeat;
             background-position: top left;
         }
 
+        /* Desktop: fixed height with clipped/cropped image */
         @media (min-width: 640px) {
             .widget-type-header {
-                width: auto;
-                height: var(--header-height-md, 112px);
+                height: var(--header-height-sm, 120px);
+                aspect-ratio: auto;
+                background-size: cover;
             }
         }
 
         @media (min-width: 768px) {
             .widget-type-header {
-                width: auto;
-                height: var(--header-height-md, 112px);
+                height: var(--header-height-md, 120px);
             }
         }
 
         @media (min-width: 1024px) {
             .widget-type-header {
-                width: auto;
-                height: var(--header-height-lg, 112px);
+                height: var(--header-height-lg, 120px);
             }
         }
 
         @media (min-width: 1280px) {
             .widget-type-header {
-                width: auto;
-                height: var(--header-height-xl, 112px);
+                height: var(--header-height-xl, 120px);
             }
         }
     """
