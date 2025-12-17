@@ -44,6 +44,8 @@ class FooterWidget(BaseWidget):
                 "height",
                 "backgroundColor",
                 "backgroundImage",
+                "padding",
+                "margin",
             ],
         },
     }

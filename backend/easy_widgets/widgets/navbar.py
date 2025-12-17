@@ -120,6 +120,7 @@ class NavbarWidget(BaseWidget):
                 "padding",
                 "margin",
                 "backgroundColor",
+                "backgroundImage",  # Composite property includes size, position, repeat, and aspect-ratio
                 "color",
             ],
         },
@@ -128,7 +129,6 @@ class NavbarWidget(BaseWidget):
     widget_css = """
         /* Navbar Widget - Styling from design groups */
         .widget-type-navbar {
-            background-image: var(--navbar-widget-background-xs, none);
             background-color: var(--navbar-bg-color-xs, #3b82f6);
             color: var(--navbar-text-color-xs, #ffffff);
             background-size: cover;
@@ -138,7 +138,6 @@ class NavbarWidget(BaseWidget):
 
         @media (min-width: 640px) {
             .widget-type-navbar {
-                background-image: var(--navbar-widget-background-sm, var(--navbar-widget-background-xs, none));
                 background-color: var(--navbar-bg-color-sm, var(--navbar-bg-color-xs, #3b82f6));
                 color: var(--navbar-text-color-sm, var(--navbar-text-color-xs, #ffffff));
             }
@@ -146,7 +145,6 @@ class NavbarWidget(BaseWidget):
 
         @media (min-width: 768px) {
             .widget-type-navbar {
-                background-image: var(--navbar-widget-background-md, var(--navbar-widget-background-sm, none));
                 background-color: var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6));
                 color: var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff));
             }
@@ -154,7 +152,6 @@ class NavbarWidget(BaseWidget):
 
         @media (min-width: 1024px) {
             .widget-type-navbar {
-                background-image: var(--navbar-widget-background-lg, none);
                 background-color: var(--navbar-bg-color-lg, #3b82f6);
                 color: var(--navbar-text-color-lg, #ffffff);
             }
@@ -162,7 +159,6 @@ class NavbarWidget(BaseWidget):
 
         @media (min-width: 1280px) {
             .widget-type-navbar {
-                background-image: var(--navbar-widget-background-xl, none);
                 background-color: var(--navbar-bg-color-xl, #3b82f6);
                 color: var(--navbar-text-color-xl, #ffffff);
             }
