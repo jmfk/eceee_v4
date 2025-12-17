@@ -21,8 +21,6 @@ import ColorSelector from './form-fields/ColorSelector';
 import FontSelector from './form-fields/FontSelector';
 import NumericInput from './form-fields/NumericInput';
 import CopyButton from './CopyButton';
-import SelectorDisplay from './design-groups/SelectorDisplay';
-import SelectorPopup from './design-groups/modals/SelectorPopup';
 import CalculatedSelectorsSection from './design-groups/CalculatedSelectorsSection';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import { useWidgets } from '../../hooks/useWidgets';
@@ -636,7 +634,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
   const elementDebounceTimerRef = useRef({});
   const [groupNameValues, setGroupNameValues] = useState({}); // Local state for group name inputs
   const groupNameDebounceTimerRef = useRef({});
-  const [selectorPopup, setSelectorPopup] = useState(null); // { type: 'tag' | 'breakpoint', selectors: [], position: {x, y} }
   const { addNotification } = useGlobalNotifications();
   const selectorsCalculatedRef = useRef(new Set()); // Track which groups have had selectors calculated
 
@@ -2803,17 +2800,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                           </span>
                                         )}
                                       </button>
-                                      {partSelectors.length > 1 && (
-                                        <SelectorDisplay
-                                          selectors={partSelectors}
-                                          type="breakpoint"
-                                          onOpenPopup={(selectors, position) => setSelectorPopup({
-                                            type: 'breakpoint',
-                                            selectors,
-                                            position
-                                          })}
-                                        />
-                                      )}
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -2907,29 +2893,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                                           </div>
                                                         </div>
                                                       </button>
-                                                      {(() => {
-                                                        const partSelectors = group.calculatedSelectors?.layoutPartSelectors?.[part];
-
-                                                        if (!partSelectors || partSelectors.length === 0) {
-                                                          return null;
-                                                        }
-
-                                                        return (
-                                                          <div className="mx-2">
-                                                            <SelectorDisplay
-                                                              selectors={partSelectors}
-                                                              type="breakpoint"
-                                                              onOpenPopup={(selectors, position) => {
-                                                                setSelectorPopup({
-                                                                  type: 'breakpoint',
-                                                                  selectors,
-                                                                  position
-                                                                });
-                                                              }}
-                                                            />
-                                                          </div>
-                                                        );
-                                                      })()}
                                                       <div className="flex gap-1">
                                                         {/* Copy/Paste Buttons */}
                                                         <button
@@ -3342,32 +3305,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                       {tagGroup.hasGroup && (
                                         <div className="text-xs text-gray-500 font-mono">{tagGroup.variants.join(', ')}</div>
                                       )}
-                                      {/* Tag Selectors Display */}
-                                      {group.calculatedSelectors?.baseSelectors && group.calculatedSelectors.baseSelectors.length > 0 && (
-                                        <div className="mt-1">
-                                          {group.calculatedSelectors.baseSelectors.length === 1 ? (
-                                            <div className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs font-mono rounded">
-                                              {group.calculatedSelectors.baseSelectors[0] || '(global)'}
-                                            </div>
-                                          ) : (
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectorPopup({
-                                                  type: 'tag',
-                                                  selectors: group.calculatedSelectors.baseSelectors,
-                                                  position: { x: e.clientX, y: e.clientY }
-                                                });
-                                              }}
-                                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs font-mono rounded hover:bg-blue-100 transition-colors"
-                                            >
-                                              {group.calculatedSelectors.baseSelectors.length} selectors
-                                              <ChevronDown className="w-3 h-3" />
-                                            </button>
-                                          )}
-                                        </div>
-                                      )}
                                     </div>
 
                                     <div className="flex gap-1">
@@ -3764,15 +3701,6 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
         confirmButtonStyle="danger"
       />
 
-      {/* Selector Popup */}
-      {selectorPopup && (
-        <SelectorPopup
-          selectors={selectorPopup.selectors}
-          position={selectorPopup.position}
-          type={selectorPopup.type}
-          onClose={() => setSelectorPopup(null)}
-        />
-      )}
     </div>
   );
 };

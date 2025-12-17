@@ -14,7 +14,6 @@ import ColorSelector from '../../form-fields/ColorSelector';
 import FontSelector from '../../form-fields/FontSelector';
 import NumericInput from '../../form-fields/NumericInput';
 import { cssPropertyToKebab } from '../utils/cssConversion';
-import SelectorDisplay from '../SelectorDisplay';
 
 const BreakpointPropertyEditor = ({
     groupIndex,
@@ -41,7 +40,6 @@ const BreakpointPropertyEditor = ({
     onUpdateProperty,
     onPropertyBlur,
     onAddProperty,
-    onOpenSelectorPopup,
     onDirty,
 }) => {
     const cssTextareaRef = useRef(null);
@@ -79,9 +77,6 @@ const BreakpointPropertyEditor = ({
         }
     };
 
-    // Get part-specific selectors for display
-    const partSelectors = group.calculatedSelectors?.layoutPartSelectors?.[part];
-
     const usedProperties = Object.keys(breakpointProps);
     const unusedProperties = Object.entries(availableProperties)
         .filter(([prop]) => !usedProperties.includes(prop));
@@ -106,15 +101,6 @@ const BreakpointPropertyEditor = ({
                         </div>
                     </div>
                 </button>
-                {partSelectors && partSelectors.length > 0 && (
-                    <div className="mx-2">
-                        <SelectorDisplay
-                            selectors={partSelectors}
-                            type="breakpoint"
-                            onOpenPopup={(selectors, position) => onOpenSelectorPopup('breakpoint', selectors, position)}
-                        />
-                    </div>
-                )}
                 <div className="flex gap-1">
                     {/* Copy/Paste Buttons */}
                     <button

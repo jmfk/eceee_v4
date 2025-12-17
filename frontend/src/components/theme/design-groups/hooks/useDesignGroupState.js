@@ -6,7 +6,6 @@
  * - Clipboard for copy/paste
  * - Edit modes (form vs CSS)
  * - Import modal state
- * - Selector popup state
  */
 
 import { useState } from 'react';
@@ -24,7 +23,6 @@ export const useDesignGroupState = () => {
     const [groupEditMode, setGroupEditMode] = useState({});
     const [layoutEditMode, setLayoutEditMode] = useState({});
     const [importModal, setImportModal] = useState(null);
-    const [selectorPopup, setSelectorPopup] = useState(null);
 
     // Toggle functions
     const toggleContent = (index) => {
@@ -132,15 +130,6 @@ export const useDesignGroupState = () => {
         setImportModal(null);
     };
 
-    // Selector popup functions
-    const openSelectorPopup = (type, selectors, position) => {
-        setSelectorPopup({ type, selectors, position });
-    };
-
-    const closeSelectorPopup = () => {
-        setSelectorPopup(null);
-    };
-
     // Initialize expanded states for groups with content
     const initializeExpandedStates = (groups) => {
         const initialExpandedLayoutProps = {};
@@ -197,7 +186,6 @@ export const useDesignGroupState = () => {
         groupEditMode,
         layoutEditMode,
         importModal,
-        selectorPopup,
 
         // Setters for direct access
         setExpandedContent,
@@ -212,7 +200,6 @@ export const useDesignGroupState = () => {
         setGroupEditMode,
         setLayoutEditMode,
         setImportModal,
-        setSelectorPopup,
 
         // Toggle functions
         toggleContent,
@@ -235,10 +222,6 @@ export const useDesignGroupState = () => {
         // Import modal functions
         openImportModal,
         closeImportModal,
-
-        // Selector popup functions
-        openSelectorPopup,
-        closeSelectorPopup,
 
         // Initialization
         initializeExpandedStates,
