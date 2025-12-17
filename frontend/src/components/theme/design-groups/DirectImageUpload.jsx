@@ -61,9 +61,6 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                 imageData.height = result.height;
                 // Default to 2x DPR (retina) - user can change this later
                 imageData.dpr = 2;
-                console.log('✅ DirectImageUpload: Saving image WITH dimensions:', imageData);
-            } else {
-                console.warn('⚠️ DirectImageUpload: Saving image WITHOUT dimensions (backend did not return width/height):', imageData);
             }
             
             
@@ -126,14 +123,6 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
     };
 
     const handleLibrarySelect = (image) => {
-        console.log('🟣 DirectImageUpload: Library image selected', { 
-            image,
-            hasWidth: !!image.width,
-            hasHeight: !!image.height,
-            width: image.width,
-            height: image.height
-        });
-        
         const imageData = {
             url: image.url,
             filename: image.filename,
@@ -146,12 +135,8 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
             imageData.height = image.height;
             // Default to 2x DPR (retina) - user can change this later
             imageData.dpr = 2;
-            console.log('🟢 DirectImageUpload: Image WITH dimensions', imageData);
-        } else {
-            console.log('🔴 DirectImageUpload: Image WITHOUT dimensions', imageData);
         }
         
-        console.log('🟣 DirectImageUpload: Calling onChange with imageData', imageData);
         onChange(imageData);
         setShowLibraryPicker(false);
     };
