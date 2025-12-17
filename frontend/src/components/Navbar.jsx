@@ -1,12 +1,15 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Menu, X, Code, Settings, Grid3X3, ChevronDown, FolderOpen, Database, Hash, User as UserIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const location = useLocation()
   const { logout, user } = useAuth()
+  const navRef = useRef(null)
+  const desktopNavRef = useRef(null)
 
   const navigation = [
     { name: 'Pages', href: '/pages', icon: Grid3X3 },
@@ -59,8 +62,40 @@ const Navbar = () => {
     return ''
   }
 
+  // Overflow detection effect
+  useEffect(() => {
+    const updateNavMode = () => {
+      if (!navRef.current || !desktopNavRef.current) return
+      const isOverflowing = desktopNavRef.current.scrollWidth > desktopNavRef.current.clientWidth
+      setIsCollapsed(isOverflowing)
+    }
+
+    const ro = new ResizeObserver(updateNavMode)
+    if (navRef.current) {
+      ro.observe(navRef.current)
+    }
+
+    updateNavMode() // Initial check
+
+    return () => ro.disconnect()
+  }, [navigation])
+
+  // Click outside handler for mobile menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (navRef.current && !navRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav ref={navRef} className={`bg-white shadow-sm border-b border-gray-200 ${isCollapsed ? 'nav-collapsed' : ''}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between h-16">
           {/* Logo and brand */}
@@ -75,7 +110,7 @@ const Navbar = () => {
             </Link>
 
             {/* Context Indicator */}
-            {getCurrentContext() && (
+            {getCurrentContext() && !isCollapsed && (
               <div className="ml-4 flex items-center text-sm text-gray-500">
                 <span className="mx-2">›</span>
                 <span className="font-medium">{getCurrentContext()}</span>
@@ -84,7 +119,7 @@ const Navbar = () => {
           </div>
 
           {/* Desktop navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div ref={desktopNavRef} className={`items-center space-x-8 ${isCollapsed ? 'hidden' : 'flex'}`}>
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -110,8 +145,8 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          {/* Mobile/Collapsed menu button */}
+          <div className={`flex items-center ${isCollapsed ? 'flex' : 'hidden'}`}>
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -125,9 +160,9 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Mobile navigation */}
-        {isOpen && (
-          <div className="md:hidden py-4 border-t border-gray-200">
+        {/* Mobile/Collapsed navigation */}
+        {isOpen && isCollapsed && (
+          <div className="py-4 border-t border-gray-200">
             <div className="space-y-2">
               {navigation.map((item) => (
                 <Link

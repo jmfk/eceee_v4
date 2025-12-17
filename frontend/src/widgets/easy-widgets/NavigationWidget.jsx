@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { usePageChildren } from '../../hooks/usePageStructure'
 import { Menu, X, ChevronDown } from 'lucide-react'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
@@ -60,6 +60,11 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     // State for owner page data (for inherited widgets)
     const [ownerPageData, setOwnerPageData] = useState(null)
     const [loadingOwnerPage, setLoadingOwnerPage] = useState(false)
+    
+    // State for overflow detection
+    const [isCollapsed, setIsCollapsed] = useState(false)
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const navRef = useRef(null)
 
     // Fetch owner page data if this widget is inherited
     useEffect(() => {
@@ -135,15 +140,63 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
         dynamicMenuItems = [...dynamicMenuItems, ...localMenu]
     }
 
+    // Overflow detection effect
+    useEffect(() => {
+        if (mode === 'editor') {
+            setIsCollapsed(false)
+            return
+        }
 
-    const renderMenuItems = (items) => {
+        const updateNavMode = () => {
+            if (!navRef.current) return
+            const isOverflowing = navRef.current.scrollWidth > navRef.current.clientWidth
+            setIsCollapsed(isOverflowing)
+        }
+
+        const ro = new ResizeObserver(updateNavMode)
+        if (navRef.current) {
+            ro.observe(navRef.current)
+        }
+
+        updateNavMode() // Initial check
+
+        return () => ro.disconnect()
+    }, [allItems, mode])
+
+    // Click outside handler for mobile menu
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (navRef.current && !navRef.current.contains(event.target)) {
+                setIsMobileMenuOpen(false)
+            }
+        }
+
+        if (isMobileMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+            return () => document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [isMobileMenuOpen])
+
+    const renderMenuItems = (items, isInDropdown = false) => {
+        const linkClasses = isInDropdown
+            ? "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
+            : "hover:opacity-70 transition-opacity"
+
         return items.map((item, index) => (
             <li key={index}>
                 <a 
-                    href={item.url} 
+                    href={mode === 'editor' ? '#' : item.url}
                     target={item.targetBlank || item.target_blank ? "_blank" : undefined}
                     rel={item.targetBlank || item.target_blank ? "noopener noreferrer" : undefined}
-                    className="hover:opacity-70 transition-opacity"
+                    className={linkClasses}
+                    onClick={(e) => {
+                        if (mode === 'editor') {
+                            e.preventDefault()
+                        }
+                        if (isInDropdown) {
+                            setIsMobileMenuOpen(false)
+                        }
+                    }}
                 >
                     {item.label}
                 </a>
@@ -201,8 +254,35 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
         )
     }
 
+    // Collapsed mode with hamburger menu
+    if (isCollapsed) {
+        return (
+            <nav ref={navRef} className="navigation-widget nav-collapsed relative">
+                <div className="flex items-center justify-between h-full">
+                    <button
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="p-2 hover:opacity-70 transition-opacity"
+                        aria-label="Toggle menu"
+                    >
+                        {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
+                </div>
+
+                {/* Dropdown menu */}
+                {isMobileMenuOpen && hasItems && (
+                    <div className="absolute top-full left-0 w-64 bg-white shadow-lg z-50 border border-gray-200 rounded-md mt-1">
+                        <ul className="list-none m-0 p-0 py-2">
+                            {renderMenuItems(allItems, true)}
+                        </ul>
+                    </div>
+                )}
+            </nav>
+        )
+    }
+
+    // Expanded mode
     return (
-        <nav className="navigation-widget">
+        <nav ref={navRef} className="navigation-widget">
             <ul className="nav-container list-none m-0 p-0 flex gap-4 items-center">
                 {hasItems ? renderMenuItems(allItems) : null}
             </ul>
