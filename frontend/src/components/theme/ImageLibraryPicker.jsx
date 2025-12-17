@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Image as ImageIcon, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Search, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Filter } from 'lucide-react';
 import { themesApi } from '../../api/themes';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 
@@ -8,6 +8,11 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedImage, setSelectedImage] = useState(currentSelection);
+    const [minWidth, setMinWidth] = useState('');
+    const [maxWidth, setMaxWidth] = useState('');
+    const [minHeight, setMinHeight] = useState('');
+    const [maxHeight, setMaxHeight] = useState('');
+    const [use2x, setUse2x] = useState(false);
     const { addNotification } = useGlobalNotifications();
 
     useEffect(() => {
@@ -34,9 +39,28 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
         }
     };
 
-    const filteredImages = images.filter(image =>
-        image.filename.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredImages = images.filter(image => {
+        // Text search
+        if (!image.filename.toLowerCase().includes(searchTerm.toLowerCase())) {
+            return false;
+        }
+
+        // Dimension filters (only apply if dimensions are available)
+        if (image.width && image.height) {
+            const multiplier = use2x ? 2 : 1;
+            const minW = minWidth ? parseInt(minWidth, 10) * multiplier : null;
+            const maxW = maxWidth ? parseInt(maxWidth, 10) * multiplier : null;
+            const minH = minHeight ? parseInt(minHeight, 10) * multiplier : null;
+            const maxH = maxHeight ? parseInt(maxHeight, 10) * multiplier : null;
+
+            if (minW && image.width < minW) return false;
+            if (maxW && image.width > maxW) return false;
+            if (minH && image.height < minH) return false;
+            if (maxH && image.height > maxH) return false;
+        }
+
+        return true;
+    });
 
     const handleSelect = (image) => {
         setSelectedImage(image);
@@ -51,6 +75,17 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
             });
         }
     };
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setMinWidth('');
+        setMaxWidth('');
+        setMinHeight('');
+        setMaxHeight('');
+        setUse2x(false);
+    };
+
+    const hasActiveFilters = searchTerm || minWidth || maxWidth || minHeight || maxHeight;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10010]">
@@ -70,7 +105,7 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
                     </div>
                     
                     {/* Search */}
-                    <div className="relative">
+                    <div className="relative mb-3">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <input
                             type="text"
@@ -79,6 +114,73 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         />
+                    </div>
+
+                    {/* Dimension Filters */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <Filter className="h-4 w-4" />
+                            <span className="font-medium">Filter by Dimensions</span>
+                            <label className="ml-auto flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={use2x}
+                                    onChange={(e) => setUse2x(e.target.checked)}
+                                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                />
+                                <span className="text-xs font-medium">×2 (Retina)</span>
+                            </label>
+                            {hasActiveFilters && (
+                                <button
+                                    onClick={clearFilters}
+                                    className="text-xs text-purple-600 hover:text-purple-700 underline"
+                                >
+                                    Clear all filters
+                                </button>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">Min Width (px)</label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g. 800"
+                                    value={minWidth}
+                                    onChange={(e) => setMinWidth(e.target.value)}
+                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">Max Width (px)</label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g. 1920"
+                                    value={maxWidth}
+                                    onChange={(e) => setMaxWidth(e.target.value)}
+                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">Min Height (px)</label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g. 600"
+                                    value={minHeight}
+                                    onChange={(e) => setMinHeight(e.target.value)}
+                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">Max Height (px)</label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g. 1080"
+                                    value={maxHeight}
+                                    onChange={(e) => setMaxHeight(e.target.value)}
+                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -145,6 +247,9 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
                                                         {image.filename}
                                                     </div>
                                                     <div className="flex items-center gap-3 text-xs text-gray-600">
+                                                        {image.width && image.height && (
+                                                            <span className="font-medium text-gray-700">{image.width} × {image.height}</span>
+                                                        )}
                                                         <span>{(image.size / 1024).toFixed(1)} KB</span>
                                                         {image.uploadedAt && (
                                                             <span>{new Date(image.uploadedAt).toLocaleDateString()}</span>

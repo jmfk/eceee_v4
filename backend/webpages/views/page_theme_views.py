@@ -507,12 +507,29 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         # Get usage information
                         used_in = theme.get_image_usage(filename)
 
+                        # Extract image dimensions
+                        width = None
+                        height = None
+                        try:
+                            file_content = storage.get_file_content(full_path)
+                            # Detect content type from filename extension
+                            import mimetypes
+                            content_type, _ = mimetypes.guess_type(filename)
+                            if content_type and content_type.startswith("image/"):
+                                metadata = storage.extract_metadata(file_content, content_type)
+                                width = metadata.get("width")
+                                height = metadata.get("height")
+                        except Exception as dim_error:
+                            logger.warning(f"Failed to extract dimensions for {filename}: {str(dim_error)}")
+
                         images.append(
                             {
                                 "filename": filename,
                                 "url": url,
                                 "publicUrl": public_url,
                                 "size": size,
+                                "width": width,
+                                "height": height,
                                 "uploadedAt": (
                                     modified.isoformat()
                                     if hasattr(modified, "isoformat")
