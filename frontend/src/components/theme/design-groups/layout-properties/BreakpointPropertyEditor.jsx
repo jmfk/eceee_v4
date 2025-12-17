@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, Copy, Check, Clipboard, Trash2, FileText, Co
 import ColorSelector from '../../form-fields/ColorSelector';
 import FontSelector from '../../form-fields/FontSelector';
 import NumericInput from '../../form-fields/NumericInput';
+import ImagePropertyField from '../ImagePropertyField';
 import { cssPropertyToKebab } from '../utils/cssConversion';
 
 const BreakpointPropertyEditor = ({
@@ -77,7 +78,7 @@ const BreakpointPropertyEditor = ({
         }
     };
 
-    const usedProperties = Object.keys(breakpointProps);
+    const usedProperties = Object.keys(breakpointProps).filter(prop => prop in availableProperties);
     const unusedProperties = Object.entries(availableProperties)
         .filter(([prop]) => !usedProperties.includes(prop));
 
@@ -209,6 +210,14 @@ const BreakpointPropertyEditor = ({
                                                         fonts={fonts}
                                                         className="w-full"
                                                     />
+                                                ) : config.type === 'image' ? (
+                                                    <ImagePropertyField
+                                                        themeId={group?.themeId}
+                                                        value={value}
+                                                        onChange={(newValue) => onUpdateProperty(groupIndex, part, breakpoint, prop, newValue || null, true)}
+                                                        breakpoint={breakpoint}
+                                                        part={part}
+                                                    />
                                                 ) : config.type === 'numeric' ? (
                                                     <NumericInput
                                                         value={value}
@@ -255,7 +264,7 @@ const BreakpointPropertyEditor = ({
 
                     {/* Add Property Pills */}
                     {unusedProperties.length > 0 && (
-                        <div className="flex flex-wrap gap-2 px-4 pb-4">
+                        <div className="flex flex-wrap gap-2 px-4 py-4">
                             {unusedProperties.map(([prop, config]) => (
                                 <button
                                     key={prop}

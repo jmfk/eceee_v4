@@ -40,6 +40,7 @@ class HeaderWidget(BaseWidget):
                 "padding",
                 "margin",
                 "backgroundColor",
+                "backgroundImage",
                 "backgroundPosition",
                 "backgroundSize",
                 "backgroundRepeat",

@@ -33,6 +33,7 @@ export const LAYOUT_PROPERTIES = {
 
   // Colors & Backgrounds
   backgroundColor: { type: 'color', label: 'Background Color', placeholder: '#ffffff' },
+  backgroundImage: { type: 'image', label: 'Background Image' },
   color: { type: 'color', label: 'Text Color', placeholder: '#000000' },
   opacity: { type: 'text', label: 'Opacity', placeholder: '0.0 to 1.0' },
 
