@@ -165,21 +165,27 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
     const handleDeleteImage = async (image) => {
         // Check if image is in use
         if (image.usedIn && image.usedIn.length > 0) {
-            showConfirm(
-                'Delete Image',
-                `This image is used in: ${image.usedIn.join(', ')}. Are you sure you want to delete it?`,
-                async () => {
-                    await deleteImage(image, true);
-                }
-            );
+            const confirmed = await showConfirm({
+                title: 'Delete Image',
+                message: `This image is used in: ${image.usedIn.join(', ')}. Are you sure you want to delete it?`,
+                confirmText: 'Delete',
+                confirmButtonStyle: 'danger'
+            });
+            
+            if (confirmed) {
+                await deleteImage(image, true);
+            }
         } else {
-            showConfirm(
-                'Delete Image',
-                `Are you sure you want to delete "${image.filename}"?`,
-                async () => {
-                    await deleteImage(image, false);
-                }
-            );
+            const confirmed = await showConfirm({
+                title: 'Delete Image',
+                message: `Are you sure you want to delete "${image.filename}"?`,
+                confirmText: 'Delete',
+                confirmButtonStyle: 'danger'
+            });
+            
+            if (confirmed) {
+                await deleteImage(image, false);
+            }
         }
     };
 
@@ -204,7 +210,7 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
         }
     };
 
-    const handleBulkDelete = () => {
+    const handleBulkDelete = async () => {
         if (selectedImages.length === 0) return;
 
         // Check if any selected images are in use
@@ -217,13 +223,16 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
             ? `${inUseImages.length} of ${selectedImages.length} selected images are in use. Delete anyway?`
             : `Delete ${selectedImages.length} selected ${selectedImages.length === 1 ? 'image' : 'images'}?`;
 
-        showConfirm(
-            'Delete Images',
-            message,
-            async () => {
-                await bulkDeleteImages();
-            }
-        );
+        const confirmed = await showConfirm({
+            title: 'Delete Images',
+            message: message,
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        });
+
+        if (confirmed) {
+            await bulkDeleteImages();
+        }
     };
 
     const bulkDeleteImages = async () => {
