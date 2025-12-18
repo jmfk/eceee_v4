@@ -203,6 +203,25 @@ services:
       retries: 3
       start_period: 10s
 
+  # RabbitMQ for message buffering in statistics system
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: eceee_v4_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Theme Sync Service
   theme-sync:
     build:
@@ -229,6 +248,7 @@ volumes:
   backend_static:
   frontend_node_modules:
   redis_data:
+  rabbitmq_data:
   mcp_logs:
 
 networks:
