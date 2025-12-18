@@ -71,6 +71,9 @@ themes/**/*.conflict
 .AppleDouble
 .LSOverride
 
+.cursor
+.claude
+
 # Docker
 docker-compose.override.yml
 
