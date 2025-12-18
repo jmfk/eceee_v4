@@ -712,7 +712,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                                     'width': str(width),
                                     'height': str(height)
                                 },
-                                MetadataDirective='REPLACE'
+                                MetadataDirective='REPLACE',
+                                ACL='public-read'  # Ensure file remains publicly readable
                             )
                             logger.info(f"Stored dimensions in S3 metadata: {width}x{height}")
                         except Exception as e:

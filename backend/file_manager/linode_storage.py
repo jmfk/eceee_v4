@@ -2,6 +2,7 @@
 Custom storage backend for Linode Object Storage.
 
 Configured for boto3 1.26.137 (before flexible checksums) with s3:// URLs for imgproxy.
+Files are uploaded with public-read ACL to allow direct browser access.
 """
 
 from storages.backends.s3boto3 import S3Boto3Storage
@@ -14,8 +15,16 @@ class LinodeObjectStorage(S3Boto3Storage):
 
     - Works with boto3 1.26.137 (before flexible checksums)
     - Returns s3:// protocol URLs for imgproxy to process
+    - Files are uploaded with public-read ACL for direct browser access
     - imgproxy uses its own S3 credentials to fetch files
     """
+    
+    def __init__(self, *args, **kwargs):
+        """Initialize storage with public-read ACL for theme images."""
+        super().__init__(*args, **kwargs)
+        # Override default ACL to public-read for theme images
+        # This allows direct browser access without authentication
+        self.default_acl = getattr(settings, "AWS_DEFAULT_ACL", "public-read")
 
     def url(self, name, parameters=None, expire=None, http_method=None):
         """
@@ -70,6 +79,33 @@ class LinodeObjectStorage(S3Boto3Storage):
 
         # Priority 3: Standard AWS S3 URL format
         return f"https://{bucket}.s3.{region}.amazonaws.com/{name}"
+    
+    def make_public(self, name):
+        """
+        Set an existing file to public-read ACL.
+        
+        This is useful for fixing files that were uploaded before
+        public-read ACL was configured.
+        
+        Args:
+            name: File name or path
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            name = name.lstrip("/")
+            self.connection.meta.client.put_object_acl(
+                Bucket=self.bucket_name,
+                Key=name,
+                ACL='public-read'
+            )
+            return True
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to set public-read ACL for {name}: {e}")
+            return False
     
     def listdir(self, path):
         """
