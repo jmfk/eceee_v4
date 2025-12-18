@@ -9,9 +9,10 @@ Section Widget Template
 - Accordion mode: only one section open at a time (except initial state)
 {% endcomment %}
 
+<div class="widget-type-{{ widget_type.css_class_name }}">
 {% if config.enable_collapse %}
     {# Collapsible section with header #}
-    <div class="section-widget widget-type-{{ widget_type.css_class_name }}{% if config.show_border %} border-enabled{% endif %} {% if not config.start_expanded %}section-collapsed{% endif %}" 
+    <div class="section-widget {% if config.show_border %} border-enabled{% endif %} {% if not config.start_expanded %}section-collapsed{% endif %}" 
          {% if config.anchor %}id="{{ config.anchor }}"{% endif %}
          data-section-id="{{ config.anchor|default:'' }}"
          {% if config.accordion_mode %}data-accordion-mode="true"{% endif %}>
@@ -44,13 +45,13 @@ Section Widget Template
     </div>
 {% else %}
     {# Non-collapsible: just render content directly with anchor #}
-    <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only-widget widget-type-{{ widget_type.css_class_name }}{% if config.show_border %} border-enabled{% endif %}">
+    <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only-widget {% if config.show_border %} border-enabled{% endif %}">
         {% for widget in config.rendered_slots.content %}
             {{ widget.html|safe }}
         {% endfor %}
     </div>
 {% endif %}
-
+</div>
 {% if config.enable_collapse %}
 <script>
 (function() {

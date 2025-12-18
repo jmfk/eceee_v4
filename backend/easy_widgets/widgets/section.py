@@ -94,7 +94,7 @@ class SectionConfig(BaseModel):
         },
     )
 
-    showBorder: bool = Field(
+    show_border: bool = Field(
         False,
         description="Show widget border",
         json_schema_extra={
@@ -138,6 +138,15 @@ class SectionWidget(BaseWidget):
     name = "Section"
     description = "Collapsible section with anchor support and internal content slot"
     template_name = "easy_widgets/widgets/section.html"
+
+    variants = [
+        {
+            "id": "border-enabled",
+            "label": "Border Enabled",
+            "config_field": "show_border",
+            "type": "class",
+        },
+    ]
 
     layout_parts = {
         "section-widget": {
