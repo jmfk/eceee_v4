@@ -200,6 +200,7 @@ LOCAL_APPS = [
     "object_storage",  # Non-hierarchical object storage system
     "utils",  # Utility features like value lists and schema system
     "ai_tracking",  # AI usage and cost tracking
+    "statistics",  # Integrated statistics and analytics system
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -567,6 +568,14 @@ CELERY_BEAT_SCHEDULE = {
     },
     "check-budget-alerts-hourly": {
         "task": "ai_tracking.tasks.check_budget_alerts",
+        "schedule": 3600.0,  # Every hour
+    },
+    "aggregate-statistics-daily": {
+        "task": "statistics.tasks.aggregate_daily_stats",
+        "schedule": 86400.0,  # Every 24 hours
+    },
+    "update-experiment-metrics-hourly": {
+        "task": "statistics.tasks.update_experiment_metrics",
         "schedule": 3600.0,  # Every hour
     },
 }

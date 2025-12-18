@@ -37,6 +37,8 @@ import SimpleFormDemo from '@components/demos/SimpleFormDemo'
 import SettingsTabs from '@components/SettingsTabs'
 import ImageStyleEditPage from '@pages/theme-styles/ImageStyleEditPage'
 import ComponentStyleEditPage from '@pages/theme-styles/ComponentStyleEditPage'
+import StatisticsDashboard from '@components/statistics/StatisticsDashboard'
+import ExperimentManager from '@components/statistics/ExperimentManager'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
@@ -445,6 +447,32 @@ const AppRoutes = () => {
                 </div>
               </main>
               <StatusBar customStatusContent={<span>Settings - Namespaces</span>} />
+            </div>
+          </PrivateRoute>
+        } />
+        <Route path="/statistics" element={
+          <PrivateRoute>
+            <div className="fixed inset-0 bg-gray-50 flex flex-col">
+              <Navbar />
+              <main className="flex-1 overflow-hidden">
+                <div className="h-full overflow-y-auto">
+                  <StatisticsDashboard tenantId="default" />
+                </div>
+              </main>
+              <StatusBar customStatusContent={<span>Statistics - Dashboard</span>} />
+            </div>
+          </PrivateRoute>
+        } />
+        <Route path="/experiments" element={
+          <PrivateRoute>
+            <div className="fixed inset-0 bg-gray-50 flex flex-col">
+              <Navbar />
+              <main className="flex-1 overflow-hidden">
+                <div className="h-full overflow-y-auto">
+                  <ExperimentManager tenantId="default" />
+                </div>
+              </main>
+              <StatusBar customStatusContent={<span>Statistics - A/B Testing</span>} />
             </div>
           </PrivateRoute>
         } />
