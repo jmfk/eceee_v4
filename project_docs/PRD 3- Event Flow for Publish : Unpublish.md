@@ -12,6 +12,7 @@ Define a decoupled event-driven lifecycle for content publishing. Publishing mus
 
 - Publishing is a metadata transition, not a content mutation.
 - Embeddings are generated before publish.
+- Publication state in eceee_v4 is **date-based** (`effective_date` / `expiry_date`) on `webpages_pageversion`.
 
 ## 3. Events (Logical)
 
@@ -28,9 +29,9 @@ Define a decoupled event-driven lifecycle for content publishing. Publishing mus
 ### Step-by-step
 1. Editor publishes a version.
 2. System:
-   - Sets previous `is_current = false`.
-   - Sets new version `is_current = true`.
-   - Updates `status = 'published'`.
+   - Sets `webpages_pageversion.effective_date = now()` (or schedules it in the future).
+   - Optionally clears/sets `webpages_pageversion.expiry_date`.
+   - Updates the cached pointer on `webpages_webpage.current_published_version_id` (denormalized, not authoritative).
 3. Commit transaction.
 4. Emit `content.published` event.
 
@@ -40,13 +41,11 @@ Define a decoupled event-driven lifecycle for content publishing. Publishing mus
 
 1. Editor unpublishes.
 2. System:
-   - Sets `status = 'archived'`.
-   - Sets `is_current = false`.
+   - Removes public visibility via dates:\n     - Option A: set `expiry_date = now()` on the currently published version.\n     - Option B: clear `effective_date` on a version to make it a draft (not publicly visible).
 3. Commit transaction.
 4. Emit `content.unpublished` event.
 
-**Clarification**: this PRD assumes unpublish leaves **no public version** for the document (canonical URL returns 404/not found for public users) until another version is published.
-If rollback-to-previous-published is desired instead, update step (2) to set the previous published version to `is_current = true` and emit a `content.published` event for that version.
+**Clarification (eceee_v4 behavior)**: if an older published version exists (date-visible), public resolution may fall back to that older version after unpublishing a newer one. If no other published versions exist, the page becomes non-public.
 
 ## 6. Event Payload (Example)
 
@@ -54,9 +53,9 @@ If rollback-to-previous-published is desired instead, update step (2) to set the
 {
   "event": "content.published",
   "tenant_id": "...",
-  "document_id": "...",
-  "version_id": "...",
-  "internal_url": "/docs/intro",
+  "page_id": "...",
+  "page_version_id": "...",
+  "cached_path": "/docs/intro/",
   "timestamp": "..."
 }
 ```
@@ -105,7 +104,7 @@ WHERE processed_at IS NULL;
 ```
 
 **Emission**: write outbox rows in the same transaction as the publish/unpublish change, and publish to RabbitMQ on `transaction.on_commit`.
-**Idempotency**: consumers must treat `(event_type, tenant_id, version_id)` as idempotent keys; replays may occur.
+**Idempotency**: consumers must treat `(event_type, tenant_id, page_version_id)` as idempotent keys; replays may occur.
 
 ## 10. Design Insight
 

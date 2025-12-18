@@ -115,11 +115,19 @@ Assuming 256 dimensions, int8 quantization, and one embedding per document:
 
 ## 12. Rollout Plan
 
-1. Implement FTS-only baseline.
-2. Add vector search with 256-dim embeddings.
-3. Enable hybrid merging.
-4. Introduce reranker.
+1. Implement FTS-only baseline on **pages** (`webpages_webpage` + `webpages_pageversion`).
+2. Add vector recall (256-dim quantized embeddings) for **page versions**.
+3. Enable hybrid merging (lexical + vector candidates) for pages.
+4. Introduce reranker for page candidates.
 5. A/B test (FTS vs Hybrid, Hybrid vs Hybrid + Rerank).
+
+### Phase 1 indexing target (pages)
+- **Identity**: `webpages_webpage`\n  - Tenant: `tenant_id`\n  - Canonical internal URL: `cached_path` (path-only; host resolved at request time)\n  - Soft delete: `is_deleted`
+- **Version snapshot**: `webpages_pageversion`\n  - Publication window: `effective_date`, `expiry_date`\n  - Public visibility is date-derived (no `status` / `is_current` fields)
+- **Visibility filter (public search)**:\n  - `p.is_deleted = false`\n  - `pv.effective_date IS NOT NULL AND pv.effective_date <= now()`\n  - `(pv.expiry_date IS NULL OR pv.expiry_date > now())`
+
+### Later indexing targets (deferred)
+- `object_storage`:\n  - `ObjectInstance` / `ObjectVersion`\n  - Deferred because there is no canonical internal URL strategy for objects yet; revisit after page search is working end-to-end.
 
 ## 13. Success Metrics
 
@@ -145,12 +153,12 @@ The search system must return results that link to internal URLs. Each result mu
 - **URL Stability**: Support stable URLs and metadata-only updates without full reindexing.
 
 ## 3. Data Model (Required Fields)
-- `document_id` (UUID)
-- `title` (text)
-- `body` (text)
-- `internal_url` (text)
-- `language` (optional)
-- `tenant_id` (UUID)
+- `page_id` (BIGINT)
+- `page_version_id` (BIGINT)
+- `tenant_id` (UUID) (from `webpages_webpage.tenant_id`)
+- `cached_path` (text) (from `webpages_webpage.cached_path`)
+- `page_data` (jsonb) (from `webpages_pageversion.page_data`)
+- `widgets` (jsonb) (from `webpages_pageversion.widgets`)
 
 ---
 
@@ -160,30 +168,27 @@ The search system must return results that link to internal URLs. Each result mu
 The system must index content stored under version control while ensuring only published versions are visible to public queries.
 
 ## 2. Content Versioning Model
-- **Logical Document**: Stable identity (e.g., “About page”).
-- **Version**: Immutable snapshot of content.
+- **WebPage**: Stable identity (row in `webpages_webpage`).
+- **PageVersion**: Immutable snapshot (row in `webpages_pageversion`).
 
 ## 3. Required Version Metadata
-- `document_id` (UUID)
-- `version_id` (UUID)
-- `status` (draft, published, archived, deleted)
-- `is_current` (boolean)
-- `publish_from`, `publish_until` (timestamps)
-- `internal_url` (text)
+- `page_id` (BIGINT)
+- `page_version_id` (BIGINT)
+- `effective_date`, `expiry_date` (timestamps)
+- `cached_path` (text)
 
 ## 4. Indexing Strategy
 - **All versions are indexed** in FTS and vector recall structures to allow instant rollback and preview search.
-- **Embeddings** are generated per version from `title + body`.
+- **Embeddings** are generated per version from extracted text (e.g. `page_data` + extracted widget text).
 
 ## 5. Public Search Visibility Rules
 A document version is publicly visible if:
 ```
-status = 'published'
-AND is_current = true
-AND publish_from IS NOT NULL
-AND publish_from <= now()
-AND (publish_until IS NULL OR publish_until > now())
+webpages_webpage.is_deleted = false
+AND webpages_pageversion.effective_date IS NOT NULL
+AND webpages_pageversion.effective_date <= now()
+AND (webpages_pageversion.expiry_date IS NULL OR webpages_pageversion.expiry_date > now())
 ```
 
 ## 6. Internal URLs Across Versions
-All versions of a logical document share the same `internal_url`. The URL always resolves to the current published version.
+All versions of a logical page share the same `cached_path` (path-only). The URL resolves to the most recent published version by effective date; the cached pointer `webpages_webpage.current_published_version_id` may be used as an optimization.

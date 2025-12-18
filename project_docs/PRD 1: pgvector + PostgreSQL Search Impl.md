@@ -21,108 +21,107 @@ PostgreSQL is the source of truth for both content metadata and search indexes.
 
 ## 3. Core Tables
 
-### 3.1 documents
-Represents the logical document identity.
+### 3.1 webpages_webpage (WebPage)
+Represents the logical page identity (Phase 1 indexing target).
 
 ```sql
-CREATE TABLE documents (
-  document_id     UUID PRIMARY KEY,
-  tenant_id       UUID NOT NULL,
-  internal_url    TEXT NOT NULL,
-  created_at      TIMESTAMPTZ NOT NULL,
-  UNIQUE (tenant_id, internal_url)
+-- Django model: webpages.models.WebPage
+-- Canonical internal URL (path only): cached_path
+-- Tenant: tenant_id
+-- Soft delete: is_deleted
+CREATE TABLE webpages_webpage (
+  id                          BIGSERIAL PRIMARY KEY,
+  tenant_id                   UUID NOT NULL,
+  cached_path                 TEXT NOT NULL,
+  is_deleted                  BOOLEAN NOT NULL DEFAULT false,
+  current_published_version_id BIGINT NULL,
+  latest_version_id           BIGINT NULL,
+  created_at                  TIMESTAMPTZ NOT NULL,
+  updated_at                  TIMESTAMPTZ NOT NULL
+  -- ... additional WebPage fields omitted ...
 );
 ```
 
-### 3.2 document_versions
-Immutable content snapshots.
+### 3.2 webpages_pageversion (PageVersion)
+Immutable content snapshots for a page. Publication is **date-based**.
 
 ```sql
-CREATE TABLE document_versions (
-  version_id       UUID PRIMARY KEY,
-  document_id      UUID NOT NULL REFERENCES documents(document_id),
+-- Django model: webpages.models.PageVersion
+-- NOTE: this table does NOT carry tenant_id in the current schema.
+CREATE TABLE webpages_pageversion (
+  id             BIGSERIAL PRIMARY KEY,
+  page_id        BIGINT NOT NULL REFERENCES webpages_webpage(id) ON DELETE CASCADE,
+  version_number INT NOT NULL,
+  version_title  TEXT NOT NULL DEFAULT '',
+  page_data      JSONB NOT NULL,
+  widgets        JSONB NOT NULL DEFAULT '{}'::jsonb,
+  effective_date TIMESTAMPTZ NULL,
+  expiry_date    TIMESTAMPTZ NULL,
+  created_at     TIMESTAMPTZ NOT NULL,
+  updated_at     TIMESTAMPTZ NOT NULL,
+  UNIQUE (page_id, version_number)
+  -- ... additional PageVersion fields omitted ...
+);
+```
+
+**Note**: “current published version” is cached on `webpages_webpage.current_published_version_id`
+and derived from date-based visibility (latest version with `effective_date <= now()` and not expired).
+
+### 3.3 search_pageversion_index (new)
+Search-optimized table keyed by `webpages_pageversion.id`. This is a **new table we will add** for
+pgvector + FTS. We denormalize `tenant_id` and `cached_path` to make RLS and result linking fast.
+
+```sql
+CREATE TABLE search_pageversion_index (
+  page_version_id  BIGINT PRIMARY KEY REFERENCES webpages_pageversion(id) ON DELETE CASCADE,
   tenant_id        UUID NOT NULL,
-  title            TEXT NOT NULL,
-  body             TEXT NOT NULL,
-  status           TEXT CHECK (status IN ('draft', 'published', 'archived', 'deleted')),
-  is_current       BOOLEAN NOT NULL,
-  publish_from     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  publish_until    TIMESTAMPTZ NULL,
-  created_at       TIMESTAMPTZ NOT NULL
-);
-```
-
-**Note**: enforcing “only one current version per document” is done via a partial unique index:
-
-```sql
-CREATE UNIQUE INDEX uniq_document_current_version
-ON document_versions (document_id)
-WHERE is_current = true;
-```
-
-### 3.3 document_search_index
-Search-optimized table.
-
-```sql
-CREATE TABLE document_search_index (
-  version_id      UUID PRIMARY KEY REFERENCES document_versions(version_id),
-  tenant_id       UUID NOT NULL,
-  tsv             TSVECTOR NOT NULL,
+  page_id          BIGINT NOT NULL,
+  cached_path      TEXT NOT NULL,
+  tsv              TSVECTOR NOT NULL,
   -- Canonical embedding storage: int8 quantized vector (256 bytes).
-  embedding_int8  BYTEA NOT NULL,
+  embedding_int8   BYTEA NOT NULL,
   -- Quantization metadata (per-vector). Defaults depend on quantizer.
-  embedding_scale REAL NOT NULL,
-  embedding_zp    SMALLINT NOT NULL DEFAULT 0,
+  embedding_scale  REAL NOT NULL,
+  embedding_zp     SMALLINT NOT NULL DEFAULT 0,
   -- Optional: derived float vector for pgvector ANN (storage can be dropped if unacceptable).
-  embedding_vec   VECTOR(256)
+  embedding_vec    VECTOR(256)
 );
 ```
 
 ### 3.4 Integrity & consistency notes (recommended)
 
-`tenant_id` is duplicated to allow tenant-local indexing and RLS. It must be consistent across tables:
-- `document_versions.tenant_id` must equal `documents.tenant_id` for the referenced `document_id`.
-- `document_search_index.tenant_id` must equal `document_versions.tenant_id` for the referenced `version_id`.
+For Phase 1 (pages), tenant ownership is on `webpages_webpage.tenant_id`. Since
+`webpages_pageversion` does not carry `tenant_id`, enforce tenant-scoped access by joining via `page_id`.
+The new `search_pageversion_index.tenant_id` is denormalized from `webpages_webpage.tenant_id`.
 
-One way to enforce this in SQL is to use composite foreign keys:
+One way to enforce this in SQL is to use constraints at write time:
 
 ```sql
-ALTER TABLE documents
-  ADD CONSTRAINT uniq_documents_document_id_tenant_id UNIQUE (document_id, tenant_id);
-
-ALTER TABLE document_versions
-  ADD CONSTRAINT fk_versions_document_tenant
-  FOREIGN KEY (document_id, tenant_id)
-  REFERENCES documents (document_id, tenant_id);
-
-ALTER TABLE document_versions
-  ADD CONSTRAINT uniq_versions_version_id_tenant_id UNIQUE (version_id, tenant_id);
-
-ALTER TABLE document_search_index
-  ADD CONSTRAINT fk_search_index_version_tenant
-  FOREIGN KEY (version_id, tenant_id)
-  REFERENCES document_versions (version_id, tenant_id);
+-- Ensure page_id + cached_path stay consistent (cached_path is authoritative on WebPage)
+ALTER TABLE search_pageversion_index
+  ADD CONSTRAINT fk_search_page
+  FOREIGN KEY (page_id) REFERENCES webpages_webpage(id) ON DELETE CASCADE;
 ```
 
 ## 4. Indexing Strategy
 
 ### Lexical (PostgreSQL Full-Text Search)
 ```sql
-CREATE INDEX idx_search_tsv ON document_search_index USING GIN (tsv);
+CREATE INDEX idx_search_tsv ON search_pageversion_index USING GIN (tsv);
 ```
 
 ### Vector Search (ANN over derived float vector)
 ```sql
-CREATE INDEX idx_search_embedding_vec ON document_search_index
+CREATE INDEX idx_search_embedding_vec ON search_pageversion_index
 USING ivfflat (embedding_vec vector_cosine_ops)
 WITH (lists = 100);
 ```
 
-### Index maintenance (when to write `document_search_index`)
-- `document_search_index` rows are written/updated **per version** (not per document).
-- `tsv` is computed from version content (e.g., `title || ' ' || body`) and updated when a version is created/updated.
-- `embedding_int8` is generated from version content (same input as `tsv`) and stored alongside quantization metadata.
-- `embedding_vec` is derived from `embedding_int8` (dequantized to float) for pgvector operators/indexing.
+### Index maintenance (when to write `search_pageversion_index`)
+- `search_pageversion_index` rows are written/updated **per page version**.
+- `tsv` and embeddings are computed from version content (e.g. `page_data` + extracted widget text).
+- `embedding_int8` is generated from the same input as `tsv` and stored alongside quantization metadata.
+- `embedding_vec` is derived from `embedding_int8` (dequantized to float) for pgvector ops/indexing.
 
 **Indexing policy**: all versions may be indexed to support preview/rollback; public search visibility remains a query-time filter.
 
@@ -134,24 +133,24 @@ Public search is a two-stage retrieval process:
 2) rerank candidates (recommended) and apply final ordering
 
 ```sql
-WITH visible_versions AS (
-  SELECT v.version_id
-  FROM document_versions v
+WITH visible_page_versions AS (
+  SELECT pv.id AS page_version_id
+  FROM webpages_pageversion pv
+  JOIN webpages_webpage p ON p.id = pv.page_id
   WHERE
-    v.tenant_id = :tenant_id
-    AND v.status = 'published'
-    AND v.is_current = true
-    AND v.publish_from <= now()
-    AND (v.publish_until IS NULL OR v.publish_until > now())
+    p.tenant_id = :tenant_id
+    AND p.is_deleted = false
+    AND pv.effective_date IS NOT NULL
+    AND pv.effective_date <= now()
+    AND (pv.expiry_date IS NULL OR pv.expiry_date > now())
 )
 SELECT
-  v.document_id,
-  d.internal_url,
-  v.title
-FROM visible_versions vv
-JOIN document_search_index s ON s.version_id = vv.version_id
-JOIN document_versions v ON v.version_id = vv.version_id
-JOIN documents d ON d.document_id = v.document_id
+  p.id AS page_id,
+  p.cached_path
+FROM visible_page_versions vv
+JOIN search_pageversion_index s ON s.page_version_id = vv.page_version_id
+JOIN webpages_pageversion pv ON pv.id = vv.page_version_id
+JOIN webpages_webpage p ON p.id = pv.page_id
 ORDER BY ts_rank_cd(s.tsv, plainto_tsquery(:query)) DESC
 LIMIT 20;
 ```
@@ -159,19 +158,20 @@ LIMIT 20;
 **Vector recall** is executed as a separate candidate query (example), then merged/deduped with lexical candidates before reranking:
 
 ```sql
-WITH visible_versions AS (
-  SELECT v.version_id
-  FROM document_versions v
+WITH visible_page_versions AS (
+  SELECT pv.id AS page_version_id
+  FROM webpages_pageversion pv
+  JOIN webpages_webpage p ON p.id = pv.page_id
   WHERE
-    v.tenant_id = :tenant_id
-    AND v.status = 'published'
-    AND v.is_current = true
-    AND v.publish_from <= now()
-    AND (v.publish_until IS NULL OR v.publish_until > now())
+    p.tenant_id = :tenant_id
+    AND p.is_deleted = false
+    AND pv.effective_date IS NOT NULL
+    AND pv.effective_date <= now()
+    AND (pv.expiry_date IS NULL OR pv.expiry_date > now())
 )
-SELECT vv.version_id
-FROM visible_versions vv
-JOIN document_search_index s ON s.version_id = vv.version_id
+SELECT vv.page_version_id
+FROM visible_page_versions vv
+JOIN search_pageversion_index s ON s.page_version_id = vv.page_version_id
 ORDER BY s.embedding_vec <=> :query_embedding_vec
 LIMIT 100;
 ```
@@ -188,3 +188,6 @@ LIMIT 100;
 - Cross-tenant search.
 - Real-time embedding updates.
 - Vector-only ranking.
+
+## 8. Phase 1 indexing target
+- Index **pages only**:\n  - `webpages_webpage` + `webpages_pageversion`\n  - `search_pageversion_index` (new)\n+- Defer indexing `object_storage` (`ObjectInstance` / `ObjectVersion`) until we have a canonical internal URL strategy for objects.
