@@ -104,7 +104,7 @@ export const themesApi = {
         const formData = new FormData()
         formData.append('image', imageFile)
 
-        return api.post(`${endpoints.themes.detail(themeId)}/upload_design_group_image/`, formData, {
+        return api.post(`${endpoints.themes.detail(themeId)}upload_design_group_image/`, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
@@ -128,7 +128,7 @@ export const themesApi = {
      */
     getCss: wrapApiCall(async (themeId, scope = '.theme-content') => {
         const queryString = buildQueryParams({ scope })
-        return api.get(`${endpoints.themes.detail(themeId)}/css/${queryString}`)
+        return api.get(`${endpoints.themes.detail(themeId)}css/${queryString}`)
     }, 'themes.getCss'),
 
     /**
@@ -137,7 +137,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Preview data with theme, CSS, and sample HTML
      */
     getPreview: wrapApiCall(async (themeId) => {
-        return api.get(`${endpoints.themes.detail(themeId)}/preview/`)
+        return api.get(`${endpoints.themes.detail(themeId)}preview/`)
     }, 'themes.getPreview'),
 
     /**
@@ -170,7 +170,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Updated theme data
      */
     setDefault: wrapApiCall(async (themeId) => {
-        return api.post(`${endpoints.themes.detail(themeId)}/set_default/`)
+        return api.post(`${endpoints.themes.detail(themeId)}set_default/`)
     }, 'themes.setDefault'),
 
     /**
@@ -196,7 +196,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Cloned theme data
      */
     clone: wrapApiCall(async (themeId, data = {}) => {
-        return api.post(`${endpoints.themes.detail(themeId)}/clone/`, data)
+        return api.post(`${endpoints.themes.detail(themeId)}clone/`, data)
     }, 'themes.clone'),
 
     /**
@@ -205,7 +205,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Success response
      */
     clearCache: wrapApiCall(async (themeId) => {
-        return api.post(`${endpoints.themes.detail(themeId)}/clear_cache/`)
+        return api.post(`${endpoints.themes.detail(themeId)}clear_cache/`)
     }, 'themes.clearCache'),
 
     /**
@@ -214,7 +214,7 @@ export const themesApi = {
      * @returns {Promise<Blob>} Zip file blob
      */
     exportTheme: wrapApiCall(async (themeId) => {
-        return api.get(`${endpoints.themes.detail(themeId)}/export_theme/`, {
+        return api.get(`${endpoints.themes.detail(themeId)}export_theme/`, {
             responseType: 'blob'
         })
     }, 'themes.exportTheme'),
@@ -240,7 +240,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Library images list
      */
     listLibraryImages: wrapApiCall(async (themeId) => {
-        return api.get(`${endpoints.themes.detail(themeId)}/library_images/`)
+        return api.get(`${endpoints.themes.detail(themeId)}library_images/`)
     }, 'themes.listLibraryImages'),
 
     /**
@@ -257,7 +257,7 @@ export const themesApi = {
             formData.append(`image_${index}`, file)
         })
 
-        return api.post(`${endpoints.themes.detail(themeId)}/library_images/`, formData, {
+        return api.post(`${endpoints.themes.detail(themeId)}library_images/`, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
@@ -273,7 +273,7 @@ export const themesApi = {
      */
     deleteLibraryImage: wrapApiCall(async (themeId, filename, force = false) => {
         const queryString = force ? '?force=true' : ''
-        return api.delete(`${endpoints.themes.detail(themeId)}/library_images/${filename}/${queryString}`)
+        return api.delete(`${endpoints.themes.detail(themeId)}library_images/${filename}/${queryString}`)
     }, 'themes.deleteLibraryImage'),
 
     /**
@@ -284,7 +284,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Bulk deletion results
      */
     bulkDeleteLibraryImages: wrapApiCall(async (themeId, filenames, force = false) => {
-        return api.post(`${endpoints.themes.detail(themeId)}/library_images/bulk_delete/`, {
+        return api.post(`${endpoints.themes.detail(themeId)}library_images/bulk_delete/`, {
             filenames,
             force
         })
@@ -297,7 +297,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Usage information
      */
     getImageUsage: wrapApiCall(async (themeId, filename) => {
-        return api.get(`${endpoints.themes.detail(themeId)}/library_images/${filename}/usage/`)
+        return api.get(`${endpoints.themes.detail(themeId)}library_images/${filename}/usage/`)
     }, 'themes.getImageUsage'),
 
     /**
@@ -308,7 +308,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Rename result
      */
     renameLibraryImage: wrapApiCall(async (themeId, oldFilename, newFilename) => {
-        return api.post(`${endpoints.themes.detail(themeId)}/library_images/${oldFilename}/rename/`, {
+        return api.post(`${endpoints.themes.detail(themeId)}library_images/${oldFilename}/rename/`, {
             new_filename: newFilename
         })
     }, 'themes.renameLibraryImage'),
@@ -324,7 +324,7 @@ export const themesApi = {
         const formData = new FormData()
         formData.append('image', file)
 
-        return api.post(`${endpoints.themes.detail(themeId)}/library_images/${filename}/replace/`, formData, {
+        return api.post(`${endpoints.themes.detail(themeId)}library_images/${filename}/replace/`, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
