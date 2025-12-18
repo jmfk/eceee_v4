@@ -123,10 +123,24 @@ export function calculateSelectorsForGroup(group, scope = '', frontendScoped = f
         const layoutProperties = group.layoutProperties || {};
         if (layoutProperties && Object.keys(layoutProperties).length > 0) {
             for (const part of Object.keys(layoutProperties)) {
+                // Determine relationship based on heuristic (mirrors themeUtils.js)
+                const isRootElement = (part.endsWith('-widget') || part === 'container') && part !== 'content-widget';
+
                 // Part selectors combine base with part class AND variants
-                layoutPartSelectors[part] = baseSelectors.map(base =>
-                    base ? `${base} .${part}${variantsSelector}`.trim() : `.${part}${variantsSelector}`
-                );
+                layoutPartSelectors[part] = baseSelectors.map(base => {
+                    if (base) {
+                        if (isRootElement) {
+                            // Same element: .widget-type-x.part-widget.variant
+                            return `${base}.${part}${variantsSelector}`.trim();
+                        } else {
+                            // Descendant: .widget-type-x .part.variant
+                            return `${base} .${part}${variantsSelector}`.trim();
+                        }
+                    } else {
+                        // Fallback for global layout parts
+                        return `.${part}${variantsSelector}`.trim();
+                    }
+                });
             }
         }
 

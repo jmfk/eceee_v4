@@ -313,18 +313,70 @@ class PageTheme(models.Model):
 
         # Calculate layout part selectors
         layout_part_selectors = {}
-        layout_properties = group.get("layoutProperties", {})
+        layout_properties = group.get("layoutProperties", {}) or group.get(
+            "layout_properties", {}
+        )
         if layout_properties:
+            # Get widget type metadata to look up selectors and relationships for layout parts
+            part_metadata_map = {}
+            if widget_types:
+                from webpages.widget_registry import widget_type_registry
+
+                for wt_type in widget_types:
+                    wt_class = widget_type_registry.get_widget_type_by_type(wt_type)
+                    if wt_class and hasattr(wt_class, "layout_parts"):
+                        for part_id, part_config in wt_class.layout_parts.items():
+                            if isinstance(part_config, dict):
+                                part_metadata_map[part_id] = {
+                                    "selector": part_config.get("selector"),
+                                    "relationship": part_config.get(
+                                        "relationship", "auto"
+                                    ),
+                                }
+
             for part in layout_properties.keys():
-                # Part selectors combine base with part class AND variants
-                part_selectors = [
-                    (
-                        f"{base} .{part}{variants_selector}".strip()
-                        if base
-                        else f".{part}{variants_selector}"
-                    )
-                    for base in base_selectors
-                ]
+                part_metadata = part_metadata_map.get(part, {})
+                custom_selector = part_metadata.get("selector")
+                relationship = part_metadata.get("relationship", "auto")
+
+                if custom_selector:
+                    part_selectors = []
+                    for base in base_selectors:
+                        if base:
+                            part_selectors.append(
+                                f"{base} {custom_selector}{variants_selector}".strip()
+                            )
+                        else:
+                            part_selectors.append(
+                                f"{custom_selector}{variants_selector}"
+                            )
+                else:
+                    # Default behavior logic
+                    if relationship == "auto":
+                        relationship = (
+                            "same-element"
+                            if (part.endswith("-widget") or part == "container")
+                            else "descendant"
+                        )
+
+                    part_selectors = []
+                    for base in base_selectors:
+                        if base:
+                            if relationship == "same-element":
+                                part_selectors.append(
+                                    f"{base}.{part}{variants_selector}".strip()
+                                )
+                            elif relationship == "direct-child":
+                                part_selectors.append(
+                                    f"{base}>.{part}{variants_selector}".strip()
+                                )
+                            else:  # descendant
+                                part_selectors.append(
+                                    f"{base} .{part}{variants_selector}".strip()
+                                )
+                        else:
+                            part_selectors.append(f".{part}{variants_selector}")
+
                 layout_part_selectors[part] = part_selectors
 
         # Calculate element selectors
@@ -1578,36 +1630,17 @@ class PageTheme(models.Model):
                     sel = f".slot-{normalize_for_css(slot)}"
                     if scope:
                         sel = f"{scope}{sel}"
-
-                    # Add variants to slot selectors if present
-                    if variants:
-                        for v in variants:
-                            v_sel = self._get_variant_selector(v, widget_types)
-                            base_selectors.append(f"{sel}{v_sel}")
-                    else:
-                        base_selectors.append(sel)
+                    base_selectors.append(sel)
             elif widget_types and not slots:
                 # Widget type targeting only
                 for wt in widget_types:
                     sel = f".widget-type-{normalize_for_css(wt)}"
                     if scope:
                         sel = f"{scope}{sel}"
-
-                    # Add variants to widget selectors if present
-                    if variants:
-                        for v in variants:
-                            v_sel = self._get_variant_selector(v, [wt])
-                            base_selectors.append(f"{sel}{v_sel}")
-                    else:
-                        base_selectors.append(sel)
+                    base_selectors.append(sel)
             elif not widget_types and not slots and variants:
                 # Variant targeting only (global variants)
-                for v in variants:
-                    v_sel = self._get_variant_selector(v, [])
-                    if scope:
-                        base_selectors.append(f"{scope}{v_sel}")
-                    else:
-                        base_selectors.append(v_sel)
+                base_selectors.append(scope if scope else "")
             else:
                 # Both widget type and slot targeting (all combinations)
                 # Use child combinator (>) to prevent cascading to nested widgets
@@ -1618,14 +1651,14 @@ class PageTheme(models.Model):
                         sel = f".slot-{slot_normalized}>.widget-type-{wt_normalized}"
                         if scope:
                             sel = f"{scope}{sel}"
+                        base_selectors.append(sel)
 
-                        # Add variants to combined selectors if present
-                        if variants:
-                            for v in variants:
-                                v_sel = self._get_variant_selector(v, [wt])
-                                base_selectors.append(f"{sel}{v_sel}")
-                        else:
-                            base_selectors.append(sel)
+            # Calculate variants selector string to be applied to parts and elements
+            variants_selector = ""
+            if variants:
+                for v in variants:
+                    # For combined variants, we join them (e.g., .v1.v2)
+                    variants_selector += self._get_variant_selector(v, widget_types)
 
             # Apply frontend scoping if requested
             if frontend_scoped:
@@ -1640,11 +1673,21 @@ class PageTheme(models.Model):
                     continue
 
                 # Generate element rules for all base selectors
-                # If base is empty (global styles), use element directly without space
-                element_selectors = [
-                    f"{base} {element}".strip() if base else element
-                    for base in base_selectors
-                ]
+                # If variants exist, scope the element by the variant as a descendant of base
+                if variants_selector:
+                    element_selectors = [
+                        (
+                            f"{base} {variants_selector} {element}".strip()
+                            if base
+                            else f"{variants_selector} {element}"
+                        )
+                        for base in base_selectors
+                    ]
+                else:
+                    element_selectors = [
+                        f"{base} {element}".strip() if base else element
+                        for base in base_selectors
+                    ]
                 selector = ",\n".join(element_selectors)
                 css_rule = f"{selector} {{\n"
                 # Convert camelCase (or snake_case) to kebab-case for CSS properties
@@ -1836,13 +1879,15 @@ class PageTheme(models.Model):
                             part_selectors = []
                             for base in base_selectors:
                                 if base:
-                                    # Append custom selector as descendant
+                                    # Append custom selector as descendant with variants
                                     part_selectors.append(
-                                        f"{base} {custom_selector}".strip()
+                                        f"{base} {custom_selector}{variants_selector}".strip()
                                     )
                                 else:
-                                    # Global - use custom selector as-is
-                                    part_selectors.append(custom_selector)
+                                    # Global - use custom selector as-is with variants
+                                    part_selectors.append(
+                                        f"{custom_selector}{variants_selector}"
+                                    )
                         else:
                             # Default behavior: use part id as class name
                             # base_selectors contain widget-type classes like:
@@ -1864,19 +1909,25 @@ class PageTheme(models.Model):
                                 if base:
                                     if relationship == "same-element":
                                         # Same element: both classes on same element
-                                        # .slot-main>.widget-type-{type}.{part}
-                                        part_selectors.append(f"{base}.{part}".strip())
+                                        # .slot-main>.widget-type-{type}.{part}.variants
+                                        part_selectors.append(
+                                            f"{base}.{part}{variants_selector}".strip()
+                                        )
                                     elif relationship == "direct-child":
                                         # Direct child: immediate child selector
-                                        # .slot-main>.widget-type-{type}>.{part}
-                                        part_selectors.append(f"{base}>.{part}".strip())
+                                        # .slot-main>.widget-type-{type}>.{part}.variants
+                                        part_selectors.append(
+                                            f"{base}>.{part}{variants_selector}".strip()
+                                        )
                                     else:  # "descendant"
                                         # Descendant: any nested child
-                                        # .slot-main>.widget-type-{type} .{part}
-                                        part_selectors.append(f"{base} .{part}".strip())
+                                        # .slot-main>.widget-type-{type} .{part}.variants
+                                        part_selectors.append(
+                                            f"{base} .{part}{variants_selector}".strip()
+                                        )
                                 else:
                                     # Fallback for global layout parts
-                                    part_selectors.append(f".{part}")
+                                    part_selectors.append(f".{part}{variants_selector}")
 
                         selector = ",\n".join(part_selectors)
 
