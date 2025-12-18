@@ -4,6 +4,7 @@ import { themesApi } from '../../api/themes';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import { useNotificationContext } from '../NotificationManager';
 import BulkImageUpload from './BulkImageUpload';
+import OptimizedImage from '../media/OptimizedImage';
 
 // Empty state drop zone component
 const EmptyStateDropZone = ({ onUpload, onFilesDropped }) => {
@@ -507,15 +508,16 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                                 {viewMode !== 'compact' && (
                                     <div className={`w-full bg-gray-100 flex items-center justify-center overflow-hidden ${viewMode === 'grid' ? 'aspect-video' : 'max-h-96'
                                         }`}>
-                                        <img
-                                            key={`${image.filename}-${image.uploadedAt || 'initial'}-${image.pageLoadTime}`}
-                                            src={`${image.publicUrl || image.url}?v=${image.uploadedAt ? new Date(image.uploadedAt).getTime() : image.pageLoadTime}`}
+                                        <OptimizedImage
+                                            src={image.imgproxyBaseUrl || image.publicUrl || image.url}
                                             alt={image.filename}
+                                            width={viewMode === 'grid' ? undefined : image.width}
+                                            height={viewMode === 'grid' ? undefined : image.height}
+                                            actualWidth={image.width}
+                                            actualHeight={image.height}
                                             className={viewMode === 'grid' ? 'w-full h-full object-contain' : 'w-full h-auto max-h-96 object-contain'}
-                                            onError={(e) => {
-                                                e.target.style.display = 'none';
-                                                e.target.parentElement.innerHTML = '<div class="text-gray-400 py-12"><svg class="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>';
-                                            }}
+                                            resizeType="fit"
+                                            quality={85}
                                         />
                                     </div>
                                 )}

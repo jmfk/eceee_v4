@@ -582,10 +582,22 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         # Get usage information
                         used_in = theme.get_image_usage(filename)
 
+                        # Generate imgproxy base URL for the image
+                        imgproxy_base_url = None
+                        try:
+                            from file_manager.imgproxy import imgproxy_service
+                            # Use the S3 URL (s3:// protocol) for imgproxy
+                            s3_url = storage.url(full_path)
+                            if s3_url:
+                                imgproxy_base_url = s3_url
+                        except Exception as e:
+                            logger.debug(f"Failed to generate imgproxy base URL for {filename}: {e}")
+
                         image_data = {
                             "filename": filename,
                             "url": url,
                             "publicUrl": public_url,
+                            "imgproxyBaseUrl": imgproxy_base_url or public_url or url,
                             "size": size,
                             "uploadedAt": (
                                 modified.isoformat()
