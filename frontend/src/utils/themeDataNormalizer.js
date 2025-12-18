@@ -42,7 +42,18 @@ export function normalizeThemeData(themeData) {
     // Step 5: Update normalized data
     normalized.imageStyles = imageStyles;
     
-    // Step 6: Remove deprecated fields (don't send them back to API)
+    // Step 6: Strip isNew flag from design groups (internal UI state only)
+    if (normalized.designGroups && Array.isArray(normalized.designGroups.groups)) {
+        normalized.designGroups.groups = normalized.designGroups.groups.map(group => {
+            if (group.isNew) {
+                const { isNew, ...rest } = group;
+                return rest;
+            }
+            return group;
+        });
+    }
+
+    // Step 7: Remove deprecated fields (don't send them back to API)
     delete normalized.galleryStyles;
     delete normalized.carouselStyles;
     

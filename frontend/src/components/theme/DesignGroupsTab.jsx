@@ -763,12 +763,21 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
     const groupName = groups.length === 0 ? 'Default' : `Group ${groups.length + 1}`;
     // First group is default
     const isDefault = groups.length === 0;
-    const newGroup = createDesignGroup(groupName, `${baseFont}, sans-serif`, isDefault);
+    const newGroup = {
+      ...createDesignGroup(groupName, `${baseFont}, sans-serif`, isDefault),
+      isNew: true
+    };
     const updatedDesignGroups = {
       ...(designGroups || {}),
       groups: [...groups, newGroup],
     };
     onChange(updatedDesignGroups);
+    
+    // Auto-expand the new group
+    setExpandedContent({
+      ...expandedContent,
+      [groups.length]: true,
+    });
   };
 
   const handleRemoveGroup = (index) => {
@@ -1543,6 +1552,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
           widgetType: null,
           slot: null,
           elements,
+          isNew: true,
         };
 
         onChange({ ...(designGroups || {}), groups: [...groups, newGroup] });
@@ -1658,6 +1668,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
               layoutProperties: group.layoutProperties || group.layout_properties || {},
               // Preserve calculatedSelectors if present, otherwise it will be recalculated
               ...(group.calculatedSelectors && { calculatedSelectors: group.calculatedSelectors }),
+              isNew: true,
             };
             return newGroup;
           });
@@ -1678,6 +1689,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
             layoutProperties: parsedData.layoutProperties || parsedData.layout_properties || {},
             // Preserve calculatedSelectors if present
             ...(parsedData.calculatedSelectors && { calculatedSelectors: parsedData.calculatedSelectors }),
+            isNew: true,
           };
           groupsToAdd = [newGroup];
         } else {
@@ -2232,6 +2244,9 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
 
   // Filter groups based on selected filter (OR logic - match ANY criteria)
   const filteredGroups = filterValue ? groups.filter((group, index) => {
+    // Always show new (unsaved) groups even if they don't match the filter
+    if (group.isNew) return true;
+
     const { filterType, filterValue: fValue } = filterValue;
 
     if (filterType === 'widgetType') {
@@ -2402,6 +2417,12 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Group name"
                       />
+
+                      {group.isNew && (
+                        <div className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded border border-orange-200 animate-pulse">
+                          New
+                        </div>
+                      )}
 
                       {/* Targeting Badge */}
                       {group.targetingMode === 'css-classes' && group.targetCssClasses ? (
