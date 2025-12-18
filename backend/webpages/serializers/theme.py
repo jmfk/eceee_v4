@@ -143,20 +143,24 @@ class PageThemeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Breakpoints must be a JSON object")
 
         # Validate that values are positive integers
-        valid_keys = {"sm", "md", "lg", "xl"}
+        valid_keys = {"xs", "sm", "md", "lg", "xl"}
         for key, val in value.items():
             if key not in valid_keys:
                 raise serializers.ValidationError(
                     f"Invalid breakpoint key '{key}'. Must be one of: {', '.join(valid_keys)}"
                 )
-            if not isinstance(val, int) or val <= 0:
-                raise serializers.ValidationError(
-                    f"Breakpoint '{key}' must be a positive integer (pixels)"
-                )
+            
+            # xs can be 0, others must be positive
+            min_val = 0 if key == "xs" else 1
+            if not isinstance(val, int) or val < min_val:
+                if key == "xs":
+                    raise serializers.ValidationError(f"Breakpoint '{key}' must be a non-negative integer (pixels)")
+                else:
+                    raise serializers.ValidationError(f"Breakpoint '{key}' must be a positive integer (pixels)")
 
         # Validate ascending order if multiple breakpoints provided
         if len(value) > 1:
-            breakpoint_order = ["sm", "md", "lg", "xl"]
+            breakpoint_order = ["xs", "sm", "md", "lg", "xl"]
             provided_values = [(k, value[k]) for k in breakpoint_order if k in value]
 
             for i in range(len(provided_values) - 1):

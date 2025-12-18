@@ -66,20 +66,26 @@ class WebPageRenderer:
         # If it's a dict, convert to CSS with media queries
         if isinstance(css_content, dict):
             # Get breakpoints from theme or use defaults
-            breakpoints = {"sm": 640, "md": 768, "lg": 1024, "xl": 1280}
+            breakpoints = {"xs": 0, "sm": 640, "md": 768, "lg": 1024, "xl": 1280}
             if theme and hasattr(theme, "get_breakpoints"):
                 breakpoints = theme.get_breakpoints()
 
             css_parts = []
 
-            # Base styles (sm - no media query for mobile-first)
-            base_css = css_content.get("sm") or css_content.get("default")
+            # Base styles (xs or sm or default - no media query for mobile-first)
+            base_css = css_content.get("xs") or css_content.get("sm") or css_content.get("default")
             if base_css:
                 # Ensure base CSS has proper formatting
                 css_parts.append(base_css.strip())
 
             # Generate media queries for larger breakpoints (mobile-first)
-            for bp_key in ["md", "lg", "xl"]:
+            # Filter out the key that was used as base styles to avoid duplicate CSS
+            base_key = next((k for k in ["xs", "sm", "default"] if css_content.get(k)), None)
+            
+            for bp_key in ["sm", "md", "lg", "xl"]:
+                if bp_key == base_key:
+                    continue
+                    
                 bp_css = css_content.get(bp_key)
                 if bp_css and bp_css.strip():
                     bp_value = breakpoints.get(bp_key)

@@ -16,6 +16,7 @@ class ThemeImageValidator:
 
     # Default breakpoints (Tailwind-based)
     DEFAULT_BREAKPOINTS = {
+        "xs": 0,
         "sm": 640,
         "md": 768,
         "lg": 1024,
