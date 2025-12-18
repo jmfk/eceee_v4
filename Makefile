@@ -24,6 +24,15 @@ help: ## Show this help message
 	@echo "  migrate           Run Django migrations"
 	@echo "  requirements      Install backend requirements in container"
 	@echo ""
+	@echo "Multi-Database Management (Branch-based):"
+	@echo "  db-info           Show current active database and branch database name"
+	@echo "  db-list           List all databases in the container"
+	@echo "  db-copy-to-branch Create a copy of the current database for the current branch"
+	@echo "  db-switch-branch  Switch the active database to the current branch database"
+	@echo "  db-switch-default Switch back to the default eceee_v4 database"
+	@echo "  db-remove         Remove a database (interactive)"
+	@echo "  db-rename         Rename a database (interactive)"
+	@echo ""
 	@echo "User Management:"
 	@echo "  createsuperuser   Create Django superuser"
 	@echo "  changepassword    Change admin password"
@@ -420,6 +429,67 @@ clear-layout-cache: ## Clear layout-related caches to force refresh
 clear-layout-cache-all: ## Clear all caches (nuclear option)
 	@echo "🧹 Clearing ALL caches..."
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache --all
+
+# Multi-Database Management
+DB_CONTAINER=eceee_v4_db
+POSTGRES_USER=postgres
+DEFAULT_DB=eceee_v4
+# Get current branch name and sanitize it for Postgres database naming
+CUR_BRANCH=$(shell git rev-parse --abbrev-ref HEAD | sed 's/[^a-zA-Z0-9]/_/g')
+BRANCH_DB=eceee_v4_$(CUR_BRANCH)
+ACTIVE_DB_VAL=$(shell grep POSTGRES_DB .env 2>/dev/null | cut -d= -f2)
+ACTIVE_DB=$(if $(ACTIVE_DB_VAL),$(ACTIVE_DB_VAL),$(DEFAULT_DB))
+
+db-info: ## Show active DB from .env and current branch DB name
+	@echo "Current active database: $(ACTIVE_DB)"
+	@echo "Current branch database: $(BRANCH_DB)"
+
+db-list: ## List all databases in Postgres container
+	@echo "Listing all databases starting with eceee_v4..."
+	@docker exec -t $(DB_CONTAINER) psql -U $(POSTGRES_USER) -c "\l" | grep eceee_v4 || echo "No eceee_v4 databases found."
+
+db-copy-to-branch: ## Copy current active database to branch-specific database
+	@if [ "$(ACTIVE_DB)" = "$(BRANCH_DB)" ]; then \
+		echo "Error: Current active database is already the branch database."; \
+		exit 1; \
+	fi
+	@echo "Copying $(ACTIVE_DB) to $(BRANCH_DB)..."
+	@echo "Terminating existing connections to $(ACTIVE_DB)..."
+	@docker exec -t $(DB_CONTAINER) psql -U $(POSTGRES_USER) -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$(ACTIVE_DB)';" > /dev/null
+	@docker exec -t $(DB_CONTAINER) createdb -U $(POSTGRES_USER) -T $(ACTIVE_DB) $(BRANCH_DB)
+	@echo "Done."
+
+db-switch-branch: ## Switch active database in .env to branch-specific one
+	@echo "Switching active database to $(BRANCH_DB)..."
+	@if [ ! -f .env ]; then touch .env; fi
+	@sed -i '' '/POSTGRES_DB=/d' .env 2>/dev/null || sed -i '/POSTGRES_DB=/d' .env 2>/dev/null
+	@echo "POSTGRES_DB=$(BRANCH_DB)" >> .env
+	@echo "Updated .env. Restarting backend to apply changes..."
+	@docker-compose -f docker-compose.dev.yml restart backend
+	@echo "Switched to $(BRANCH_DB)."
+
+db-switch-default: ## Switch active database in .env back to default eceee_v4
+	@echo "Switching active database back to $(DEFAULT_DB)..."
+	@if [ -f .env ]; then \
+		sed -i '' '/POSTGRES_DB=/d' .env 2>/dev/null || sed -i '/POSTGRES_DB=/d' .env 2>/dev/null; \
+		echo "POSTGRES_DB=$(DEFAULT_DB)" >> .env; \
+	fi
+	@echo "Updated .env. Restarting backend to apply changes..."
+	@docker-compose -f docker-compose.dev.yml restart backend
+	@echo "Switched to $(DEFAULT_DB)."
+
+db-remove: ## Remove a database (interactive)
+	@read -p "Enter database name to remove: " dbname; \
+	if [ "$$dbname" = "$(DEFAULT_DB)" ]; then \
+		echo "Error: Cannot remove the default database."; \
+		exit 1; \
+	fi; \
+	docker exec -t $(DB_CONTAINER) dropdb -U $(POSTGRES_USER) $$dbname
+
+db-rename: ## Rename a database (interactive)
+	@read -p "Enter current database name: " oldname; \
+	read -p "Enter new database name: " newname; \
+	docker exec -t $(DB_CONTAINER) psql -U $(POSTGRES_USER) -c "ALTER DATABASE \"$$oldname\" RENAME TO \"$$newname\";"
 
 # Tailwind CSS build commands
 tailwind-build: ## Build Tailwind CSS for backend templates
