@@ -10,6 +10,11 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import analytics from './utils/analytics'
+
+// Initialize analytics with default tenant
+// In production, this would come from a global config or the server
+analytics.init('default');
 
 createRoot(document.getElementById('root')).render(
   <App />,
