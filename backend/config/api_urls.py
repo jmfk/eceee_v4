@@ -48,4 +48,5 @@ urlpatterns = [
     path("content-migration/", include("content_migration.urls")),
     path("utils/", include("utils.urls")),
     path("ai-tracking/", include("ai_tracking.urls")),
+    path("statistics/", include("statistics.urls")),
 ]
