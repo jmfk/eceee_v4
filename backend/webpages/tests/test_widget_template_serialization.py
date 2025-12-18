@@ -389,6 +389,13 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
     def setUp(self):
         self.client = Client()
         cache.clear()
+
+        # Create and authenticate a user
+        self.user = User.objects.create_user(
+            username="testuser", email="test@example.com", password="password123"
+        )
+        self.client.login(username="testuser", password="password123")
+
         # Ensure widget registry is populated
         if not widget_type_registry._widgets:
             autodiscover_widgets()
@@ -403,8 +410,9 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
 
         if data:  # If we have widgets
             first_widget = data[0]
-            self.assertIn("template_json", first_widget)
-            self.assertIsInstance(first_widget["template_json"], dict)
+            # Key is camelCase in API response
+            self.assertIn("templateJson", first_widget)
+            self.assertIsInstance(first_widget["templateJson"], dict)
 
     def test_widget_types_list_excludes_template_json_when_requested(self):
         """Test that widget types list can exclude template JSON"""
@@ -418,7 +426,8 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
 
         if data:  # If we have widgets
             first_widget = data[0]
-            self.assertNotIn("template_json", first_widget)
+            # Key is camelCase in API response
+            self.assertNotIn("templateJson", first_widget)
 
     def test_widget_type_detail_includes_template_json_by_default(self):
         """Test that widget type detail includes template JSON by default"""
@@ -432,8 +441,9 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
-        self.assertIn("template_json", data)
-        self.assertIsInstance(data["template_json"], dict)
+        # Key is camelCase in API response
+        self.assertIn("templateJson", data)
+        self.assertIsInstance(data["templateJson"], dict)
 
     def test_widget_type_detail_excludes_template_json_when_requested(self):
         """Test that widget type detail can exclude template JSON"""
@@ -449,7 +459,8 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
-        self.assertNotIn("template_json", data)
+        # Key is camelCase in API response
+        self.assertNotIn("templateJson", data)
 
     def test_widget_types_active_includes_template_json_by_default(self):
         """Test that active widget types include template JSON by default"""
@@ -461,7 +472,8 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
 
         if data:  # If we have widgets
             first_widget = data[0]
-            self.assertIn("template_json", first_widget)
+            # Key is camelCase in API response
+            self.assertIn("templateJson", first_widget)
 
     def test_widget_types_active_excludes_template_json_when_requested(self):
         """Test that active widget types can exclude template JSON"""
@@ -475,7 +487,8 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
 
         if data:  # If we have widgets
             first_widget = data[0]
-            self.assertNotIn("template_json", first_widget)
+            # Key is camelCase in API response
+            self.assertNotIn("templateJson", first_widget)
 
     def test_template_json_structure_validation(self):
         """Test that template JSON has expected structure"""
@@ -489,19 +502,20 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
-        template_json = data.get("template_json")
+        template_json = data.get("templateJson")
 
         if template_json:  # Only validate if template JSON exists
             self.assertIn("structure", template_json)
-            self.assertIn("template_variables", template_json)
-            self.assertIn("template_tags", template_json)
-            self.assertIn("has_inline_css", template_json)
+            # template_variables becomes templateVariables in camelCase
+            self.assertIn("templateVariables", template_json)
+            self.assertIn("templateTags", template_json)
+            self.assertIn("hasInlineCss", template_json)
 
             # Validate types
             self.assertIsInstance(template_json["structure"], dict)
-            self.assertIsInstance(template_json["template_variables"], list)
-            self.assertIsInstance(template_json["template_tags"], list)
-            self.assertIsInstance(template_json["has_inline_css"], bool)
+            self.assertIsInstance(template_json["templateVariables"], list)
+            self.assertIsInstance(template_json["templateTags"], list)
+            self.assertIsInstance(template_json["hasInlineCss"], bool)
 
 
 class WidgetRegistryTemplateJSONTest(TestCase):
@@ -553,7 +567,15 @@ class TemplateJSONPerformanceTest(TestCase):
     """Test performance aspects of template JSON generation"""
 
     def setUp(self):
+        self.client = Client()
         cache.clear()
+
+        # Create and authenticate a user
+        self.user = User.objects.create_user(
+            username="perfuser", email="perf@example.com", password="password123"
+        )
+        self.client.login(username="perfuser", password="password123")
+
         # Ensure widget registry is populated
         if not widget_type_registry._widgets:
             autodiscover_widgets()
@@ -616,7 +638,83 @@ class TemplateJSONPerformanceTest(TestCase):
         self.assertEqual(response_with_json.status_code, 200)
         self.assertEqual(response_without_json.status_code, 200)
 
-        # Without template JSON should generally be faster (though we won't assert this due to variability)
-        # Just verify that the functionality works
-        self.assertGreater(time_with_json, 0)
-        self.assertGreater(time_without_json, 0)
+        # Keys are camelCase in API response
+        self.assertIn("templateJson", response_with_json.json()[0])
+        self.assertNotIn("templateJson", response_without_json.json()[0])
+
+
+class TemplateParserFixesTest(TestCase):
+    """Test cases for template parser bug fixes and refinements"""
+
+    def setUp(self):
+        self.parser = WidgetTemplateParser()
+        self.serializer = WidgetSerializer()
+        cache.clear()
+
+    def test_refined_inline_conditional_regex(self):
+        """Test that refined inline conditional regex correctly distinguishes attribute vs block"""
+        # 1. Valid inline conditional (attribute)
+        attr_template = "{% if config.disabled %}disabled{% endif %}"
+        processed_attr = self.parser._preprocess_django_template(attr_template)
+        self.assertIn("data-conditional-attrs", processed_attr)
+        self.assertNotIn("<template-conditional", processed_attr)
+
+        # 2. Block conditional (should NOT be treated as inline)
+        # Even if short, if it contains < > it should be a block conditional
+        block_template = (
+            "{% if config.show_title %}<h3>{{ config.title }}</h3>{% endif %}"
+        )
+        processed_block = self.parser._preprocess_django_template(block_template)
+        self.assertNotIn("data-conditional-attrs", processed_block)
+        self.assertIn("<template-conditional", processed_block)
+
+        # 3. Short block conditional with other tags
+        short_block = "{% if c %}<div></div>{% endif %}"
+        processed_short = self.parser._preprocess_django_template(short_block)
+        self.assertIn("<template-conditional", processed_short)
+        self.assertNotIn("data-conditional-attrs", processed_short)
+
+    def test_mustache_only_widget_serialization(self):
+        """Test that WidgetSerializer handles widgets with only mustache_template_name"""
+
+        # Mock a Mustache-only widget
+        class MustacheOnlyWidget:
+            name = "MustacheWidget"
+            template_name = None
+            mustache_template_name = "path/to/template.mustache"
+
+        widget = MustacheOnlyWidget()
+        result = self.serializer.serialize_widget_template(widget)
+
+        # Verify it returns the minimal mustache structure
+        self.assertEqual(result["widget"]["name"], "MustacheWidget")
+        self.assertIsNone(result["widget"]["template_name"])
+        self.assertTrue(result["template_json"]["is_mustache_only"])
+        self.assertEqual(
+            result["template_json"]["structure"]["attributes"]["class"],
+            "mustache-only-widget",
+        )
+
+    def test_widget_without_any_template(self):
+        """Test handling of widgets that have no template at all"""
+
+        class NoTemplateWidget:
+            name = "BrokenWidget"
+            template_name = None
+            mustache_template_name = None
+
+        widget = NoTemplateWidget()
+        result = self.serializer.serialize_widget_template(widget)
+
+        self.assertEqual(result["widget"]["name"], "BrokenWidget")
+        self.assertEqual(
+            result["template_json"]["structure"]["content"], "No template available"
+        )
+
+    def test_parse_widget_template_with_none(self):
+        """Test that parse_widget_template handles None input gracefully"""
+        result = self.parser.parse_widget_template(None)
+        self.assertEqual(result["structure"]["content"], "Template name not provided")
+
+        result = self.parser.parse_widget_template("")
+        self.assertEqual(result["structure"]["content"], "Template name not provided")

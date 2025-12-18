@@ -41,7 +41,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend,testserver
       - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - SECRET_KEY=dev-secret-key-change-in-production
       - AWS_ACCESS_KEY_ID=minioadmin

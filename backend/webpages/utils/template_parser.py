@@ -433,8 +433,9 @@ class WidgetTemplateParser:
         )
         # Pattern for inline conditionals within HTML tags (e.g., {% if condition %}attribute="value"{% endif %})
         # Made more secure to prevent ReDoS attacks with atomic grouping and length limits
+        # Refined to exclude content with HTML tags (< >) to avoid false positives with short block conditionals
         self.inline_conditional_pattern = re.compile(
-            r"\{\%\s*if\s+([^%]{1,100}?)\s*\%\}([^{]{1,200}?)\{\%\s*endif\s*\%\}",
+            r"\{\%\s*if\s+([^%]{1,100}?)\s*\%\}([^{<>]{1,200}?)\{\%\s*endif\s*\%\}",
             re.MULTILINE,
         )
 
@@ -705,8 +706,17 @@ class WidgetTemplateParser:
             Dict containing the JSON template structure
         """
         # Input validation
-        if not template_name or not isinstance(template_name, str):
-            raise ValueError("template_name must be a non-empty string")
+        if not template_name:
+            # Instead of ValueError, return a minimal error structure for UI
+            return {
+                "structure": {"type": "text", "content": "Template name not provided"},
+                "template_variables": [],
+                "template_tags": [],
+                "has_inline_css": False,
+            }
+
+        if not isinstance(template_name, str):
+            raise ValueError("template_name must be a string")
 
         if len(template_name) > 500:  # Reasonable path length limit
             raise ValueError("template_name is too long")
@@ -1114,8 +1124,36 @@ class WidgetSerializer:
             Dict containing the JSON template structure
         """
         try:
-            template_name = widget_instance.template_name
-            template_json = self.parser.parse_widget_template(template_name)
+            template_name = getattr(widget_instance, "template_name", None)
+            mustache_template_name = getattr(widget_instance, "mustache_template_name", None)
+
+            # If we only have a Mustache template, return minimal structure immediately
+            if not template_name and mustache_template_name:
+                template_json = {
+                    "structure": {
+                        "type": "element",
+                        "tag": "div",
+                        "attributes": {"class": "mustache-only-widget"},
+                        "children": [],
+                    },
+                    "template_variables": [],
+                    "template_tags": [],
+                    "has_inline_css": False,
+                    "is_mustache_only": True,
+                }
+            elif not template_name:
+                # Still no template name, and no mustache either
+                logger.warning(
+                    f"Widget {widget_instance.name} has no template_name or mustache_template_name"
+                )
+                template_json = {
+                    "structure": {"type": "text", "content": "No template available"},
+                    "template_variables": [],
+                    "template_tags": [],
+                    "has_inline_css": False,
+                }
+            else:
+                template_json = self.parser.parse_widget_template(template_name)
 
             # Add widget metadata
             result = {
