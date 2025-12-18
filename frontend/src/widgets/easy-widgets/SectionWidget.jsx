@@ -460,7 +460,7 @@ const SectionWidget = ({
                 data-section-id={config.anchor || ''}
                 data-accordion-mode={config.accordionMode ? 'true' : 'false'}>
 
-                <div className="section-content px-4 pb-4">
+                <div className="slot-section-content px-4 pb-4">
                     {hasContent ? (
                         <>
                             {/* First widget - always visible */}

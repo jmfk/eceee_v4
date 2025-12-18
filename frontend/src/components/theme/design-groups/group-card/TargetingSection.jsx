@@ -13,6 +13,7 @@ import React from 'react';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import WidgetTypeAutocomplete from '../autocomplete/WidgetTypeAutocomplete';
 import SlotAutocomplete from '../autocomplete/SlotAutocomplete';
+import CSSModifierAutocomplete from '../autocomplete/CSSModifierAutocomplete';
 
 const TargetingSection = ({
     group,
@@ -31,6 +32,7 @@ const TargetingSection = ({
     onAddSlot,
     onRemoveSlot,
     onUpdateTargetCssClasses,
+    onUpdateCssModifier,
     onAddVariant,
     onRemoveVariant,
 }) => {
@@ -198,42 +200,66 @@ const TargetingSection = ({
                                 </div>
                             </div>
 
-                            {/* Variants */}
-                            {availableVariants.length > 0 && (
-                                <div>
-                                    <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Variants:</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {availableVariants.map(variant => {
-                                            const isSelected = selectedVariants.includes(variant.id);
-                                            return (
-                                                <button
-                                                    key={variant.id}
-                                                    type="button"
-                                                    onClick={() => isSelected ? onRemoveVariant(groupIndex, variant.id) : onAddVariant(groupIndex, variant.id)}
-                                                    className={`px-2 py-1 text-xs rounded border transition-colors ${isSelected
+                            {/* Variants & Modifiers */}
+                            <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
+                                {availableVariants.length > 0 && (
+                                    <div>
+                                        <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Variants:</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {availableVariants.map(variant => {
+                                                const isSelected = selectedVariants.includes(variant.id);
+                                                return (
+                                                    <button
+                                                        key={variant.id}
+                                                        type="button"
+                                                        onClick={() => isSelected ? onRemoveVariant(groupIndex, variant.id) : onAddVariant(groupIndex, variant.id)}
+                                                        className={`px-2 py-1 text-xs rounded border transition-colors ${isSelected
                                                             ? 'bg-amber-100 text-amber-700 border-amber-300'
                                                             : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    {variant.label}
-                                                </button>
-                                            );
-                                        })}
+                                                            }`}
+                                                    >
+                                                        {variant.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">Select style variants to apply this design group. Empty = all variants</div>
                                     </div>
-                                    <div className="text-xs text-gray-500 mt-1">Select style variants to apply this design group. Empty = all variants</div>
+                                )}
+
+                                <div>
+                                    <label className="block text-xs text-gray-700 font-medium mb-1">CSS Modifiers:</label>
+                                    <CSSModifierAutocomplete
+                                        value={group.cssModifier || ''}
+                                        onChange={(value) => onUpdateCssModifier(groupIndex, value)}
+                                        placeholder=":first-child, :last-child, .special"
+                                    />
+                                    <div className="text-xs text-gray-500 mt-1">Append pseudo-classes or classes to the target (e.g., :first-child).</div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     ) : (
-                        <div>
-                            <label className="block text-xs text-gray-700 font-medium mb-1">Target CSS Selectors:</label>
-                            <textarea
-                                value={group.targetCssClasses || ''}
-                                onChange={(e) => onUpdateTargetCssClasses(groupIndex, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-                                placeholder=".my-custom-class, .another-class&#10;.complex > .selector&#10;#specific-id"
-                            />
-                            <div className="text-xs text-gray-500 mt-1">Enter CSS selectors (one per line or comma-separated). Used exactly as entered.</div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs text-gray-700 font-medium mb-1">Target CSS Selectors:</label>
+                                <textarea
+                                    value={group.targetCssClasses || ''}
+                                    onChange={(e) => onUpdateTargetCssClasses(groupIndex, e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                                    placeholder=".my-custom-class, .another-class&#10;.complex > .selector&#10;#specific-id"
+                                />
+                                <div className="text-xs text-gray-500 mt-1">Enter CSS selectors (one per line or comma-separated). Used exactly as entered.</div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-gray-700 font-medium mb-1">CSS Modifiers:</label>
+                                <CSSModifierAutocomplete
+                                    value={group.cssModifier || ''}
+                                    onChange={(value) => onUpdateCssModifier(groupIndex, value)}
+                                    placeholder=":first-child, :last-child, .special"
+                                />
+                                <div className="text-xs text-gray-500 mt-1">Append pseudo-classes or classes to each selector above.</div>
+                            </div>
                         </div>
                     )}
 

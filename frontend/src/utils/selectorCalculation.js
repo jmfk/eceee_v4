@@ -28,6 +28,7 @@ function normalizeForCSS(name) {
 export function calculateSelectorsForGroup(group, scope = '', frontendScoped = false) {
     // Check targeting mode
     const targetingMode = group.targetingMode || 'widget-slot';
+    const cssModifier = group.cssModifier || group.css_modifier || '';
 
     // Calculate base selectors
     let baseSelectors = [];
@@ -102,76 +103,71 @@ export function calculateSelectorsForGroup(group, scope = '', frontendScoped = f
                 }
             }
         }
-
-        // Calculate variants selector string
-        let variantsSelector = '';
-        if (variants.length) {
-            // Default to class selector (.) for all variants in frontend preview
-            // TODO: In the future, we could look up the variant type from widget types metadata
-            variantsSelector = variants.map(v => `.${v}`).join('');
-        }
-
-        // Apply frontend scoping if requested
-        if (frontendScoped) {
-            baseSelectors = baseSelectors.map(sel =>
-                sel ? `.cms-content ${sel}`.trim() : '.cms-content'
-            );
-        }
-
-        // Calculate layout part selectors
-        const layoutPartSelectors = {};
-        const layoutProperties = group.layoutProperties || {};
-        if (layoutProperties && Object.keys(layoutProperties).length > 0) {
-            for (const part of Object.keys(layoutProperties)) {
-                // Determine relationship based on heuristic (mirrors themeUtils.js)
-                const isRootElement = (part.endsWith('-widget') || part === 'container') && part !== 'content-widget';
-
-                // Part selectors combine base with part class AND variants
-                layoutPartSelectors[part] = baseSelectors.map(base => {
-                    if (base) {
-                        if (isRootElement) {
-                            // Same element: .widget-type-x.part-widget.variant
-                            return `${base}.${part}${variantsSelector}`.trim();
-                        } else {
-                            // Descendant: .widget-type-x .part.variant
-                            return `${base} .${part}${variantsSelector}`.trim();
-                        }
-                    } else {
-                        // Fallback for global layout parts
-                        return `.${part}${variantsSelector}`.trim();
-                    }
-                });
-            }
-        }
-
-        // Calculate element selectors
-        const elementSelectors = {};
-        const elements = group.elements || {};
-        if (elements && Object.keys(elements).length > 0) {
-            for (const element of Object.keys(elements)) {
-                // Element selectors combine base with element tag AND variants
-                if (variantsSelector) {
-                    elementSelectors[element] = baseSelectors.map(base =>
-                        base ? `${base} ${variantsSelector} ${element}`.trim() : `${variantsSelector} ${element}`
-                    );
-                } else {
-                    elementSelectors[element] = baseSelectors.map(base =>
-                        base ? `${base} ${element}`.trim() : element
-                    );
-                }
-            }
-        }
-
-        return {
-            baseSelectors: baseSelectors,
-            layoutPartSelectors: layoutPartSelectors,
-            elementSelectors: elementSelectors
-        };
     }
+
+    // Calculate variants selector string
+    let variantsSelector = '';
+    if (group.variants || group.variant) {
+        const variants = group.variants || [group.variant];
+        // Default to class selector (.) for all variants in frontend preview
+        // TODO: In the future, we could look up the variant type from widget types metadata
+        variantsSelector = variants.map(v => `.${v}`).join('');
+    }
+
+    // Apply frontend scoping if requested
+    if (frontendScoped) {
+        baseSelectors = baseSelectors.map(sel =>
+            sel ? `.cms-content ${sel}`.trim() : '.cms-content'
+        );
+    }
+
+    // Calculate layout part selectors
+    const layoutPartSelectors = {};
+    const layoutProperties = group.layoutProperties || {};
+    if (layoutProperties && Object.keys(layoutProperties).length > 0) {
+        for (const part of Object.keys(layoutProperties)) {
+            // Determine relationship based on heuristic (mirrors themeUtils.js)
+            const isRootElement = (part.endsWith('-widget') || part === 'container') && part !== 'content-widget';
+
+            // Part selectors combine base with part class AND variants AND modifier at the end
+            layoutPartSelectors[part] = baseSelectors.map(base => {
+                if (base) {
+                    if (isRootElement) {
+                        // Same element: .widget-type-x.part-widget.variant:modifier
+                        return `${base}.${part}${variantsSelector}${cssModifier}`.trim();
+                    } else {
+                        // Descendant: .widget-type-x .part.variant:modifier
+                        return `${base} .${part}${variantsSelector}${cssModifier}`.trim();
+                    }
+                } else {
+                    // Fallback for global layout parts
+                    return `.${part}${variantsSelector}${cssModifier}`.trim();
+                }
+            });
+        }
+    }
+
+    // Calculate element selectors
+    const elementSelectors = {};
+    const elements = group.elements || {};
+    if (elements && Object.keys(elements).length > 0) {
+        for (const element of Object.keys(elements)) {
+            // Element selectors combine base with element tag AND variants AND modifier at the end
+            if (variantsSelector) {
+                elementSelectors[element] = baseSelectors.map(base =>
+                    base ? `${base} ${variantsSelector} ${element}${cssModifier}`.trim() : `${variantsSelector} ${element}${cssModifier}`
+                );
+            } else {
+                elementSelectors[element] = baseSelectors.map(base =>
+                    base ? `${base} ${element}${cssModifier}`.trim() : `${element}${cssModifier}`
+                );
+            }
+        }
+    }
+
+    return {
+        baseSelectors: baseSelectors.map(sel => `${sel}${cssModifier}`), // Return base with modifier for display
+        layoutPartSelectors: layoutPartSelectors,
+        elementSelectors: elementSelectors
+    };
 }
-
-
-
-
-
-

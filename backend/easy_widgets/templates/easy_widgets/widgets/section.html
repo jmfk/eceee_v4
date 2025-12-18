@@ -19,7 +19,7 @@ Section Widget Template
          {% if config.anchor %}
             <a name="{{ config.anchor }}" class="section-anchor"></a>      
          {% endif %}
-        <div class="section-content">
+        <div class="slot-section-content">
             {# First widget - always visible #}
             {% if config.rendered_slots.content %}
                 {{ config.rendered_slots.content.0.html|safe }}

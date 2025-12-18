@@ -30,6 +30,7 @@ import layoutsApi from '../../api/layouts';
 import ImagePropertyField from './design-groups/ImagePropertyField';
 import LayoutPartEditor from './design-groups/layout-properties/LayoutPartEditor';
 import { useImageValidation } from './design-groups/hooks/useImageValidation';
+import CSSModifierAutocomplete from './design-groups/autocomplete/CSSModifierAutocomplete';
 
 // Autocomplete Component for Widget Types
 const WidgetTypeAutocomplete = ({ availableWidgets, onSelect, disabled }) => {
@@ -1077,6 +1078,17 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
     updatedGroups[index] = {
       ...updatedGroups[index],
       targetCssClasses: cssClasses,
+    };
+    // Recalculate selectors immediately
+    updatedGroups[index].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[index]);
+    onChange({ ...(designGroups || {}), groups: updatedGroups });
+  };
+
+  const handleUpdateCssModifier = (index, modifier) => {
+    const updatedGroups = [...groups];
+    updatedGroups[index] = {
+      ...updatedGroups[index],
+      cssModifier: modifier,
     };
     // Recalculate selectors immediately
     updatedGroups[index].calculatedSelectors = calculateSelectorsForGroup(updatedGroups[index]);
@@ -2512,6 +2524,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                           <Code className="w-3 h-3" />
                           <span className="font-mono max-w-[200px] truncate" title={group.targetCssClasses}>
                             {group.targetCssClasses.split(/[\n,]/).filter(Boolean).length} selector{group.targetCssClasses.split(/[\n,]/).filter(Boolean).length !== 1 ? 's' : ''}
+                            {group.cssModifier ? ` (${group.cssModifier})` : ''}
                           </span>
                         </div>
                       ) : (group.widgetTypes?.length > 0 || group.widgetType || group.slots?.length > 0 || group.slot) ? (
@@ -2530,6 +2543,10 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                 text += ` > ${slots.join(', ')}`;
                               }
 
+                              if (group.cssModifier) {
+                                text += ` (${group.cssModifier})`;
+                              }
+
                               return text;
                             })()}
                           </span>
@@ -2537,7 +2554,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                       ) : (
                         <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-600 text-xs rounded-md border border-gray-200">
                           <Globe className="w-3 h-3" />
-                          <span>Global</span>
+                          <span>Global{group.cssModifier ? ` (${group.cssModifier})` : ''}</span>
                         </div>
                       )}
 
@@ -2791,44 +2808,68 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
                                 }
                               });
 
-                              if (availableVariants.size === 0) return null;
-
                               return (
-                                <div className="mt-4 pt-4 border-t border-gray-100">
-                                  <label className="block text-xs text-gray-700 font-medium mb-2">Apply to Variants:</label>
-                                  <div className="flex flex-wrap gap-2">
-                                    {Array.from(availableVariants.entries()).map(([id, label]) => {
-                                      const isSelected = selectedVariants.includes(id);
-                                      return (
-                                        <button
-                                          key={id}
-                                          type="button"
-                                          onClick={() => isSelected ? handleRemoveVariant(originalGroupIndex, id) : handleAddVariant(originalGroupIndex, id)}
-                                          className={`px-2 py-1 text-xs rounded border transition-colors ${isSelected
-                                            ? 'bg-amber-100 text-amber-700 border-amber-300'
-                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                            }`}
-                                        >
-                                          {label}
-                                        </button>
-                                      );
-                                    })}
+                                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
+                                  {availableVariants.size > 0 && (
+                                    <div>
+                                      <label className="block text-xs text-gray-700 font-medium mb-2">Apply to Variants:</label>
+                                      <div className="flex flex-wrap gap-2">
+                                        {Array.from(availableVariants.entries()).map(([id, label]) => {
+                                          const isSelected = selectedVariants.includes(id);
+                                          return (
+                                            <button
+                                              key={id}
+                                              type="button"
+                                              onClick={() => isSelected ? handleRemoveVariant(originalGroupIndex, id) : handleAddVariant(originalGroupIndex, id)}
+                                              className={`px-2 py-1 text-xs rounded border transition-colors ${isSelected
+                                                ? 'bg-amber-100 text-amber-700 border-amber-300'
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                              {label}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">Select style variants to apply this design group. Empty = all variants</div>
+                                    </div>
+                                  )}
+
+                                  <div>
+                                    <label className="block text-xs text-gray-700 font-medium mb-1">CSS Modifiers:</label>
+                                    <CSSModifierAutocomplete
+                                      value={group.cssModifier || ''}
+                                      onChange={(value) => handleUpdateCssModifier(originalGroupIndex, value)}
+                                      placeholder=":first-child, :last-child, .special"
+                                    />
+                                    <div className="text-xs text-gray-500 mt-1">Append pseudo-classes or classes to the target (e.g., :first-child). One modifier or combo per group.</div>
                                   </div>
-                                  <div className="text-xs text-gray-500 mt-1">Select style variants to apply this design group. Empty = all variants</div>
                                 </div>
                               );
                             })()}
                           </div>
                         ) : (
-                          <div>
-                            <label className="block text-xs text-gray-700 font-medium mb-1">Target CSS Selectors:</label>
-                            <textarea
-                              value={group.targetCssClasses || ''}
-                              onChange={(e) => handleUpdateTargetCssClasses(originalGroupIndex, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-                              placeholder=".my-custom-class, .another-class&#10;.complex > .selector&#10;#specific-id"
-                            />
-                            <div className="text-xs text-gray-500 mt-1">Enter CSS selectors (one per line or comma-separated). Used exactly as entered.</div>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-xs text-gray-700 font-medium mb-1">Target CSS Selectors:</label>
+                              <textarea
+                                value={group.targetCssClasses || ''}
+                                onChange={(e) => handleUpdateTargetCssClasses(originalGroupIndex, e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                                placeholder=".my-custom-class, .another-class&#10;.complex > .selector&#10;#specific-id"
+                              />
+                              <div className="text-xs text-gray-500 mt-1">Enter CSS selectors (one per line or comma-separated). Used exactly as entered.</div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-gray-700 font-medium mb-1">CSS Modifiers:</label>
+                              <CSSModifierAutocomplete
+                                value={group.cssModifier || ''}
+                                onChange={(value) => handleUpdateCssModifier(originalGroupIndex, value)}
+                                placeholder=":first-child, :last-child, .special"
+                              />
+                              <div className="text-xs text-gray-500 mt-1">Append pseudo-classes or classes to each selector above.</div>
+                            </div>
                           </div>
                         )}
 

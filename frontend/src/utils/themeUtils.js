@@ -91,6 +91,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
     for (const group of applicableGroups) {
         // Build all selector combinations using CSS classes
         let baseSelectors = [];
+        const cssModifier = group.cssModifier || group.css_modifier || '';
 
         // Check targeting mode
         if (group.targetingMode === 'css-classes' && group.targetCssClasses) {
@@ -162,9 +163,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
         // Calculate variants selector string
         let variantsSelector = '';
         if (group.variant || group.variants?.length > 0) {
-            const variants = group.variants?.length > 0
-                ? group.variants
-                : [group.variant];
+            const variants = group.variants || [group.variant];
             // In themeUtils, we use class selector for all variants in preview
             variantsSelector = variants.map(v => `.${v}`).join('');
         }
@@ -178,13 +177,16 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
             // Generate element rules for all base selectors
             // If variants exist, scope the element by the variant as a descendant of base
+            // Apply cssModifier to the end of each selector
             let elementSelectors;
             if (variantsSelector) {
                 elementSelectors = baseSelectors.map(base =>
-                    base ? `${base} ${variantsSelector} ${element}` : `${variantsSelector} ${element}`
+                    base ? `${base} ${variantsSelector} ${element}${cssModifier}` : `${variantsSelector} ${element}${cssModifier}`
                 ).join(',\n');
             } else {
-                elementSelectors = baseSelectors.map(base => `${base} ${element}`).join(',\n');
+                elementSelectors = baseSelectors.map(base =>
+                    base ? `${base} ${element}${cssModifier}` : `${element}${cssModifier}`
+                ).join(',\n');
             }
             let cssRule = `${elementSelectors} {\n`;
 
@@ -314,16 +316,16 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         if (base) {
                             if (isRootElement) {
                                 // Root element: both classes on same div
-                                // .slot-main .widget-type-{type}.{part}.variants
-                                return `${base}.${part}${variantsSelector}`;
+                                // .slot-main .widget-type-{type}.{part}.variants:modifier
+                                return `${base}.${part}${variantsSelector}${cssModifier}`;
                             } else {
                                 // Child element: descendant selector
-                                // .slot-main .widget-type-{type} .{part}.variants
-                                return `${base} .${part}${variantsSelector}`;
+                                // .slot-main .widget-type-{type} .{part}.variants:modifier
+                                return `${base} .${part}${variantsSelector}${cssModifier}`;
                             }
                         } else {
                             // Fallback for global layout parts
-                            return `.${part}${variantsSelector}`;
+                            return `.${part}${variantsSelector}${cssModifier}`;
                         }
                     }).join(',\n');
 
@@ -643,4 +645,3 @@ export function createEmptyComponentStyle(name = 'new-style') {
         css: '',
     };
 }
-
