@@ -2,10 +2,12 @@ import re
 from typing import Dict, List, Any
 from ..widget_registry import widget_type_registry
 
+
 def snake_to_camel_case(name: str) -> str:
     """Convert snake_case to camelCase"""
     components = name.split("_")
     return components[0] + "".join(word.capitalize() for word in components[1:])
+
 
 def convert_snake_to_camel(obj: Any) -> Any:
     """Convert snake_case keys to camelCase recursively"""
@@ -20,6 +22,7 @@ def convert_snake_to_camel(obj: Any) -> Any:
     else:
         return obj
 
+
 def serialize_widget_instance(widget: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process a widget instance for the frontend:
@@ -30,11 +33,11 @@ def serialize_widget_instance(widget: Dict[str, Any]) -> Dict[str, Any]:
         return widget
 
     processed_widget = widget.copy()
-    
+
     # Look up widget type to get active variants
     widget_type_id = widget.get("type") or widget.get("widget_type")
     widget_type = widget_type_registry.get_widget_type_flexible(widget_type_id)
-    
+
     if "config" in widget:
         # Inject active variants before converting config to camelCase
         if widget_type:
@@ -48,10 +51,13 @@ def serialize_widget_instance(widget: Dict[str, Any]) -> Dict[str, Any]:
     for key, value in processed_widget.items():
         camel_key = snake_to_camel_case(key)
         final_widget[camel_key] = value
-    
+
     return final_widget
 
-def serialize_widget_slots(widgets_data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, List[Dict[str, Any]]]:
+
+def serialize_widget_slots(
+    widgets_data: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List[Dict[str, Any]]]:
     """Process all widget slots for the frontend"""
     if not isinstance(widgets_data, dict):
         return widgets_data
@@ -65,4 +71,3 @@ def serialize_widget_slots(widgets_data: Dict[str, List[Dict[str, Any]]]) -> Dic
         serialized_slots[slot_name] = [serialize_widget_instance(w) for w in widgets]
 
     return serialized_slots
-

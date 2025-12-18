@@ -80,16 +80,16 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
                             </option>
                         ))}
                     </select>
-                    
+
                     {/* Show targeting info for selected group */}
                     {groups[selectedGroupIndex] && (
                         <div className="mt-2 text-xs text-gray-600">
                             {groups[selectedGroupIndex].targetingMode === 'css-classes' && groups[selectedGroupIndex].targetCssClasses ? (
                                 <div className="flex items-start gap-2">
                                     <span className="font-medium">CSS Targeting:</span>
-                                    <span className="flex-1 bg-gray-100 px-2 py-1 rounded font-mono text-xs">
+                                    <code className="flex-1 bg-gray-100 px-2 py-1 rounded font-mono text-xs">
                                         {groups[selectedGroupIndex].targetCssClasses.split(/[\n,]/).filter(Boolean).join(', ')}
-                                    </span>
+                                    </code>
                                 </div>
                             ) : (
                                 <div>

@@ -165,6 +165,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         # Convert widget configurations from snake_case to camelCase and inject active variants
         if "widgets" in data and isinstance(data["widgets"], dict):
             from ..utils.widget_serialization import serialize_widget_slots
+
             data["widgets"] = serialize_widget_slots(data["widgets"])
 
         return data
@@ -172,16 +173,19 @@ class PageVersionSerializer(serializers.ModelSerializer):
     def _convert_widgets_to_camel_case(self, widgets_data):
         """DEPRECATED: Use webpages.utils.widget_serialization.serialize_widget_slots instead"""
         from ..utils.widget_serialization import serialize_widget_slots
+
         return serialize_widget_slots(widgets_data)
 
     def _convert_snake_to_camel(self, obj):
         """DEPRECATED: Use webpages.utils.widget_serialization.convert_snake_to_camel instead"""
         from ..utils.widget_serialization import convert_snake_to_camel
+
         return convert_snake_to_camel(obj)
 
     def _snake_to_camel_case(self, name):
         """DEPRECATED: Use webpages.utils.widget_serialization.snake_to_camel_case instead"""
         from ..utils.widget_serialization import snake_to_camel_case
+
         return snake_to_camel_case(name)
 
     def update(self, instance, validated_data):

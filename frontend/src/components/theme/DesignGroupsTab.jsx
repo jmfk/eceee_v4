@@ -819,7 +819,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
       groups: [...groups, newGroup],
     };
     onChange(updatedDesignGroups);
-    
+
     // Auto-expand the new group
     setExpandedContent({
       ...expandedContent,

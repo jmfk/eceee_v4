@@ -1,4 +1,4 @@
-<div class="widget widget-{{ widget.widget_type.css_class_name }} widget-type-{{ widget.widget_type.css_class_name }} {% if slot_name %}slot-{{ slot_name|lower }}{% endif %} default" 
+<div class="widget widget-{{ widget.widget_type.css_class_name }} widget-type-{{ widget.widget_type.css_class_name }} {% if slot_name %}slot-{{ slot_name|lower }}{% endif %} {{ variant_classes }} default" 
      data-widget-id="{{ widget.id }}" 
      data-widget-type="{{ widget.widget_type.type }}"
      data-slot-name="{{ slot_name|default:'' }}"

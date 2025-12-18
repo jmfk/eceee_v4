@@ -218,6 +218,10 @@ class BaseWidget(ABC):
         template_config = config.copy() if config else {}
         context = context if context else {}
 
+        # Calculate active variants and add as a space-separated string for template classes
+        active_variants = self.get_active_variants(template_config)
+        template_config["variant_classes"] = " ".join(active_variants)
+
         # Add context data access for widgets that need it
         if context:
             # Provide access to page hierarchy and inheritance

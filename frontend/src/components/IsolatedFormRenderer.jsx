@@ -5,7 +5,7 @@ import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
 import { useFormDataBuffer } from '../hooks/useFormDataBuffer.js'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
-import { lookupWidget, hasWidgetContentChanged } from '../utils/widgetUtils'
+import { lookupWidget, hasWidgetContentChanged, calculateActiveVariants } from '../utils/widgetUtils'
 
 /**
  * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
@@ -368,10 +368,9 @@ const IsolatedFormRenderer = React.memo(({
         // Get updated config for real-time updates
         const currentData = formBuffer.getCurrentData()
 
-        // Don't update widgetData state here - fields manage their own state
-        // and only need widgetData for initial values. Updating state here causes
-        // unnecessary rerenders of all fields. State is only updated when external
-        // changes come in (see useExternalChanges above).
+        // Recalculate active variants based on new config and schema metadata
+        const activeSchema = schemaRef.current || schema;
+        const newActiveVariants = calculateActiveVariants(currentData, activeSchema);
 
         // Extract widgetPath from context for nested widget support
         const widgetPath = context?.widgetPath
@@ -385,9 +384,10 @@ const IsolatedFormRenderer = React.memo(({
             slotName: slotName,
             contextType: contextType,
             config: { [fieldName]: value }, // Only publish the changed field
+            widgetUpdates: { activeVariants: newActiveVariants }, // Also publish updated variants
             widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
         })
-    }, [formBuffer, context, componentId, widgetId, slotName, contextType, publishUpdate])
+    }, [formBuffer, context, componentId, widgetId, slotName, contextType, publishUpdate, schema])
 
     const activeSchema = schemaRef.current || schema
 

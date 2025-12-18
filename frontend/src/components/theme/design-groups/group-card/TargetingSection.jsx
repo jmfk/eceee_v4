@@ -52,6 +52,12 @@ const TargetingSection = ({
         return Array.from(variants.entries()).map(([id, label]) => ({ id, label }));
     }, [selectedTypes, widgetTypes]);
 
+    // Calculate variant selector string for display
+    const variantsSelector = React.useMemo(() => {
+        if (selectedVariants.length === 0) return '';
+        return selectedVariants.map(v => `.${v}`).join('');
+    }, [selectedVariants]);
+
     return (
         <div className="border-t border-gray-200">
             <button

@@ -125,12 +125,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     const slotNormalized = normalizeForCSS(slot);
                     let sel = `.slot-${slotNormalized}`;
                     if (scope) sel = `${scope}${sel}`;
-                    
-                    if (variants.length > 0) {
-                        variants.forEach(v => baseSelectors.push(`${sel}.${v}`));
-                    } else {
-                        baseSelectors.push(sel);
-                    }
+                    baseSelectors.push(sel);
                 });
             } else if (widgetTypes.length > 0 && slots.length === 0) {
                 // Widget type targeting only
@@ -138,34 +133,20 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     const typeNormalized = normalizeForCSS(type);
                     let sel = `.widget-type-${typeNormalized}`;
                     if (scope) sel = `${scope}${sel}`;
-                    
-                    if (variants.length > 0) {
-                        variants.forEach(v => baseSelectors.push(`${sel}.${v}`));
-                    } else {
-                        baseSelectors.push(sel);
-                    }
+                    baseSelectors.push(sel);
                 });
             } else if (widgetTypes.length === 0 && slots.length === 0 && variants.length > 0) {
-                // Variant targeting only (global variants)
-                variants.forEach(v => {
-                    if (scope) baseSelectors.push(`${scope}.${v}`);
-                    else baseSelectors.push(`.${v}`);
-                });
+                // Variant targeting only
+                baseSelectors.push(scope || '');
             } else {
-                // Both widget type and slot targeting (all combinations)
-                // Use child combinator (>) to prevent cascading to nested widgets
+                // Both widget type and slot targeting
                 widgetTypes.forEach(type => {
                     slots.forEach(slot => {
                         const typeNormalized = normalizeForCSS(type);
                         const slotNormalized = normalizeForCSS(slot);
                         let sel = `.slot-${slotNormalized} > .widget-type-${typeNormalized}`;
                         if (scope) sel = `${scope}${sel}`;
-                        
-                        if (variants.length > 0) {
-                            variants.forEach(v => baseSelectors.push(`${sel}.${v}`));
-                        } else {
-                            baseSelectors.push(sel);
-                        }
+                        baseSelectors.push(sel);
                     });
                 });
             }
@@ -178,6 +159,16 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             );
         }
 
+        // Calculate variants selector string
+        let variantsSelector = '';
+        if (group.variant || group.variants?.length > 0) {
+            const variants = group.variants?.length > 0
+                ? group.variants
+                : [group.variant];
+            // In themeUtils, we use class selector for all variants in preview
+            variantsSelector = variants.map(v => `.${v}`).join('');
+        }
+
         const elements = group.elements || {};
 
         for (const [element, styles] of Object.entries(elements)) {
@@ -186,7 +177,15 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             }
 
             // Generate element rules for all base selectors
-            const elementSelectors = baseSelectors.map(base => `${base} ${element}`).join(',\n');
+            // If variants exist, scope the element by the variant as a descendant of base
+            let elementSelectors;
+            if (variantsSelector) {
+                elementSelectors = baseSelectors.map(base =>
+                    base ? `${base} ${variantsSelector} ${element}` : `${variantsSelector} ${element}`
+                ).join(',\n');
+            } else {
+                elementSelectors = baseSelectors.map(base => `${base} ${element}`).join(',\n');
+            }
             let cssRule = `${elementSelectors} {\n`;
 
             // Convert camelCase to kebab-case and handle special properties
@@ -307,23 +306,24 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     // For widget root elements (parts ending in '-widget' or named 'container'),
                     // the widget-type class and part class are on the SAME element,
                     // so we use a same-element selector (no space).
+                    // Exception: 'content-widget' is a descendant in our current template structure.
                     // For child elements, we use descendant selectors (with space).
-                    const isRootElement = part.endsWith('-widget') || part === 'container';
+                    const isRootElement = (part.endsWith('-widget') || part === 'container') && part !== 'content-widget';
 
                     const partSelectors = baseSelectors.map(base => {
                         if (base) {
                             if (isRootElement) {
                                 // Root element: both classes on same div
-                                // .slot-main .widget-type-{type}.{part}
-                                return `${base}.${part}`;
+                                // .slot-main .widget-type-{type}.{part}.variants
+                                return `${base}.${part}${variantsSelector}`;
                             } else {
                                 // Child element: descendant selector
-                                // .slot-main .widget-type-{type} .{part}
-                                return `${base} .${part}`;
+                                // .slot-main .widget-type-{type} .{part}.variants
+                                return `${base} .${part}${variantsSelector}`;
                             }
                         } else {
                             // Fallback for global layout parts
-                            return `.${part}`;
+                            return `.${part}${variantsSelector}`;
                         }
                     }).join(',\n');
 

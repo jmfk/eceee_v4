@@ -153,11 +153,11 @@ class PageTheme(models.Model):
             dict: Breakpoint configuration with keys 'xs', 'sm', 'md', 'lg', 'xl'
         """
         DEFAULT_BREAKPOINTS = {
-            "xs": 0,    # Extra small - mobile (base, no media query)
+            "xs": 0,  # Extra small - mobile (base, no media query)
             "sm": 640,  # Small - large mobile / small tablet
             "md": 768,  # Medium - tablet
-            "lg": 1024, # Large - laptop
-            "xl": 1280, # Extra large - desktop
+            "lg": 1024,  # Large - laptop
+            "xl": 1280,  # Extra large - desktop
         }
 
         if self.breakpoints and isinstance(self.breakpoints, dict):
@@ -195,7 +195,7 @@ class PageTheme(models.Model):
             return f"[{variant_id}]"
         elif variant_type == "pseudo-class":
             return f":{variant_id}"
-        
+
         return f".{variant_id}"
 
     def calculate_selectors_for_group(self, group, scope="", frontend_scoped=False):
@@ -276,38 +276,19 @@ class PageTheme(models.Model):
                     sel = f".slot-{normalize_for_css(slot)}"
                     if scope:
                         sel = f"{scope}{sel}"
-                    
-                    # Add variants to slot selectors if present
-                    if variants:
-                        for v in variants:
-                            v_sel = self._get_variant_selector(v, widget_types)
-                            base_selectors.append(f"{sel}{v_sel}")
-                    else:
-                        base_selectors.append(sel)
+                    base_selectors.append(sel)
             elif widget_types and not slots:
                 # Widget type targeting only
                 for wt in widget_types:
                     sel = f".widget-type-{normalize_for_css(wt)}"
                     if scope:
                         sel = f"{scope}{sel}"
-                    
-                    # Add variants to widget selectors if present
-                    if variants:
-                        for v in variants:
-                            v_sel = self._get_variant_selector(v, [wt])
-                            base_selectors.append(f"{sel}{v_sel}")
-                    else:
-                        base_selectors.append(sel)
+                    base_selectors.append(sel)
             elif not widget_types and not slots and variants:
                 # Variant targeting only (global variants)
-                for v in variants:
-                    v_sel = self._get_variant_selector(v, [])
-                    if scope:
-                        base_selectors.append(f"{scope}{v_sel}")
-                    else:
-                        base_selectors.append(v_sel)
+                base_selectors.append(scope if scope else "")
             else:
-                # Both widget type and slot targeting (and potentially variants)
+                # Both widget type and slot targeting
                 for wt in widget_types:
                     for slot in slots:
                         wt_normalized = normalize_for_css(wt)
@@ -315,14 +296,7 @@ class PageTheme(models.Model):
                         sel = f".slot-{slot_normalized} > .widget-type-{wt_normalized}"
                         if scope:
                             sel = f"{scope}{sel}"
-                        
-                        # Add variants to combined selectors if present
-                        if variants:
-                            for v in variants:
-                                v_sel = self._get_variant_selector(v, [wt])
-                                base_selectors.append(f"{sel}{v_sel}")
-                        else:
-                            base_selectors.append(sel)
+                        base_selectors.append(sel)
 
         # Apply frontend scoping if requested
         if frontend_scoped:
@@ -331,14 +305,24 @@ class PageTheme(models.Model):
                 for sel in base_selectors
             ]
 
+        # Calculate variants selector string
+        variants_selector = ""
+        if variants:
+            for v in variants:
+                variants_selector += self._get_variant_selector(v, widget_types)
+
         # Calculate layout part selectors
         layout_part_selectors = {}
         layout_properties = group.get("layoutProperties", {})
         if layout_properties:
             for part in layout_properties.keys():
-                # Part selectors combine base with part class
+                # Part selectors combine base with part class AND variants
                 part_selectors = [
-                    f"{base} .{part}".strip() if base else f".{part}"
+                    (
+                        f"{base} .{part}{variants_selector}".strip()
+                        if base
+                        else f".{part}{variants_selector}"
+                    )
                     for base in base_selectors
                 ]
                 layout_part_selectors[part] = part_selectors
@@ -347,11 +331,21 @@ class PageTheme(models.Model):
         element_selectors = {}
         elements = group.get("elements", {})
         for element in elements.keys():
-            # Element selectors combine base with element tag
-            elem_selectors = [
-                f"{base} {element}".strip() if base else element
-                for base in base_selectors
-            ]
+            # Element selectors combine base with element tag AND variants
+            if variants_selector:
+                elem_selectors = [
+                    (
+                        f"{base} {variants_selector} {element}".strip()
+                        if base
+                        else f"{variants_selector} {element}"
+                    )
+                    for base in base_selectors
+                ]
+            else:
+                elem_selectors = [
+                    f"{base} {element}".strip() if base else element
+                    for base in base_selectors
+                ]
             element_selectors[element] = elem_selectors
 
         return {
@@ -1584,7 +1578,7 @@ class PageTheme(models.Model):
                     sel = f".slot-{normalize_for_css(slot)}"
                     if scope:
                         sel = f"{scope}{sel}"
-                    
+
                     # Add variants to slot selectors if present
                     if variants:
                         for v in variants:
@@ -1598,7 +1592,7 @@ class PageTheme(models.Model):
                     sel = f".widget-type-{normalize_for_css(wt)}"
                     if scope:
                         sel = f"{scope}{sel}"
-                    
+
                     # Add variants to widget selectors if present
                     if variants:
                         for v in variants:
@@ -1624,7 +1618,7 @@ class PageTheme(models.Model):
                         sel = f".slot-{slot_normalized}>.widget-type-{wt_normalized}"
                         if scope:
                             sel = f"{scope}{sel}"
-                        
+
                         # Add variants to combined selectors if present
                         if variants:
                             for v in variants:
@@ -1801,9 +1795,7 @@ class PageTheme(models.Model):
                             bp_props = {}
                             if part_breakpoints.get("default"):  # Legacy: default -> xs
                                 bp_props.update(part_breakpoints["default"])
-                            if part_breakpoints.get(
-                                "mobile"
-                            ):  # Legacy: mobile -> xs
+                            if part_breakpoints.get("mobile"):  # Legacy: mobile -> xs
                                 bp_props.update(part_breakpoints["mobile"])
                             if part_breakpoints.get(
                                 "xs"
@@ -1907,28 +1899,51 @@ class PageTheme(models.Model):
                                         )
                                         if image_css:
                                             css_rules.extend(image_css)
-                                        
+
                                         # Handle composite background properties (only if set)
-                                        bg_size = prop_value.get("background_size") or prop_value.get("backgroundSize")
+                                        bg_size = prop_value.get(
+                                            "background_size"
+                                        ) or prop_value.get("backgroundSize")
                                         if bg_size and bg_size.strip():
-                                            css_rules.append(f"  background-size: {bg_size};")
-                                        
-                                        bg_position = prop_value.get("background_position") or prop_value.get("backgroundPosition")
+                                            css_rules.append(
+                                                f"  background-size: {bg_size};"
+                                            )
+
+                                        bg_position = prop_value.get(
+                                            "background_position"
+                                        ) or prop_value.get("backgroundPosition")
                                         if bg_position and bg_position.strip():
-                                            css_rules.append(f"  background-position: {bg_position};")
-                                        
-                                        bg_repeat = prop_value.get("background_repeat") or prop_value.get("backgroundRepeat")
+                                            css_rules.append(
+                                                f"  background-position: {bg_position};"
+                                            )
+
+                                        bg_repeat = prop_value.get(
+                                            "background_repeat"
+                                        ) or prop_value.get("backgroundRepeat")
                                         if bg_repeat and bg_repeat.strip():
-                                            css_rules.append(f"  background-repeat: {bg_repeat};")
-                                        
+                                            css_rules.append(
+                                                f"  background-repeat: {bg_repeat};"
+                                            )
+
                                         # Handle aspect-ratio (only if explicitly enabled)
-                                        use_aspect_ratio = prop_value.get("use_aspect_ratio") or prop_value.get("useAspectRatio")
-                                        aspect_ratio = prop_value.get("aspect_ratio") or prop_value.get("aspectRatio")
-                                        if use_aspect_ratio is True and aspect_ratio and str(aspect_ratio).strip():
-                                            css_rules.append(f"  aspect-ratio: {aspect_ratio};")
+                                        use_aspect_ratio = prop_value.get(
+                                            "use_aspect_ratio"
+                                        ) or prop_value.get("useAspectRatio")
+                                        aspect_ratio = prop_value.get(
+                                            "aspect_ratio"
+                                        ) or prop_value.get("aspectRatio")
+                                        if (
+                                            use_aspect_ratio is True
+                                            and aspect_ratio
+                                            and str(aspect_ratio).strip()
+                                        ):
+                                            css_rules.append(
+                                                f"  aspect-ratio: {aspect_ratio};"
+                                            )
                                 elif isinstance(prop_value, str):
                                     # String format: just a URL - route through imgproxy for caching/headers
                                     from file_manager.imgproxy import imgproxy_service
+
                                     try:
                                         # Generate imgproxy URL without resize (original size for caching)
                                         imgproxy_url = imgproxy_service.generate_url(
@@ -1941,7 +1956,9 @@ class PageTheme(models.Model):
                                             f"  background-image: url('{imgproxy_url}');"
                                         )
                                     except Exception as e:
-                                        logger.warning(f"Failed to generate imgproxy URL for legacy string: {e}")
+                                        logger.warning(
+                                            f"Failed to generate imgproxy URL for legacy string: {e}"
+                                        )
                                         # Fallback to original URL if imgproxy fails
                                         css_rules.append(
                                             f"  background-image: url('{prop_value}');"
@@ -2095,7 +2112,9 @@ class PageTheme(models.Model):
         else:
             # No dimensions available or dpr=1 - route through imgproxy for caching
             if not width or not height:
-                logger.debug(f"No dimensions available for image, routing through imgproxy for caching")
+                logger.debug(
+                    f"No dimensions available for image, routing through imgproxy for caching"
+                )
             try:
                 # Generate imgproxy URL without resize (original size for caching)
                 imgproxy_url = imgproxy_service.generate_url(

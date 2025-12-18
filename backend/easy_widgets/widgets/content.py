@@ -143,6 +143,7 @@ class ContentWidget(BaseWidget):
         "content-widget": {
             "label": "Content widget container",
             "selector": ".content-widget",
+            "relationship": "descendant",
             "properties": [
                 "width",
                 "height",

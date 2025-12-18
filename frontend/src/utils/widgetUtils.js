@@ -142,6 +142,38 @@ export const hasWidgetContentChanged = (currentContent, newContent) => {
 };
 
 /**
+ * Convert snake_case to camelCase
+ * @param {string} name - The snake_case name
+ * @returns {string} - The camelCase name
+ */
+const snakeToCamelCase = (name) => {
+    if (!name || typeof name !== 'string') return name;
+    return name.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+};
+
+/**
+ * Recalculates active variants for a widget based on its configuration and metadata
+ * 
+ * @param {Object} widget - The widget object
+ * @param {Object} widgetMeta - The widget type metadata (with variants list)
+ * @returns {Array<string>} - Array of active variant IDs
+ */
+export const calculateActiveVariants = (widget, widgetMeta) => {
+    if (!widgetMeta?.variants || !widget?.config) return widget?.activeVariants || [];
+
+    return widgetMeta.variants
+        .filter(v => {
+            const configField = v.config_field || v.configField;
+            if (!configField) return false;
+
+            // Check both snake_case and camelCase field names
+            const camelField = snakeToCamelCase(configField);
+            return !!(widget.config[configField] || widget.config[camelField]);
+        })
+        .map(v => v.id);
+};
+
+/**
  * Cleans up nested config objects by removing extra levels of nesting
  * @param {Object} config - The config object to clean
  * @param {string} source - Source context for logging (optional)
