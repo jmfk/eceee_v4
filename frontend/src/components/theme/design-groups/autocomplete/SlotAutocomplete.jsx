@@ -21,9 +21,13 @@ const SlotAutocomplete = ({ availableSlots, onSelect, disabled }) => {
     const filteredSlots = searchTerm
         ? availableSlots.filter(slot =>
             slot.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (slot.layouts && slot.layouts.some(l => l.toLowerCase().includes(searchTerm.toLowerCase())))
+            (slot.layouts && slot.layouts.some(l => l.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+            (slot.widgets && slot.widgets.some(w => w.toLowerCase().includes(searchTerm.toLowerCase())))
         )
         : availableSlots;
+
+    // Check if current search term exactly matches a slot name
+    const exactMatch = availableSlots.find(s => s.name.toLowerCase() === searchTerm.toLowerCase());
 
     // Handle selection
     const handleSelect = (slot) => {
@@ -34,9 +38,23 @@ const SlotAutocomplete = ({ availableSlots, onSelect, disabled }) => {
         inputRef.current?.blur();
     };
 
+    // Handle custom slot creation
+    const handleAddCustom = () => {
+        if (searchTerm && !exactMatch) {
+            onSelect(searchTerm.trim());
+            setSearchTerm('');
+            setIsOpen(false);
+            setHighlightedIndex(0);
+            inputRef.current?.blur();
+        }
+    };
+
     // Handle keyboard navigation
     const handleKeyDown = (e) => {
-        if (!isOpen && filteredSlots.length > 0 && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+        const canAddCustom = searchTerm && !exactMatch;
+        const totalItems = filteredSlots.length + (canAddCustom ? 1 : 0);
+
+        if (!isOpen && totalItems > 0 && (e.key === 'ArrowDown' || e.key === 'Enter')) {
             setIsOpen(true);
             e.preventDefault();
             return;
@@ -48,7 +66,7 @@ const SlotAutocomplete = ({ availableSlots, onSelect, disabled }) => {
             case 'ArrowDown':
                 e.preventDefault();
                 setHighlightedIndex((prev) =>
-                    prev < filteredSlots.length - 1 ? prev + 1 : prev
+                    prev < totalItems - 1 ? prev + 1 : prev
                 );
                 break;
             case 'ArrowUp':
@@ -57,8 +75,10 @@ const SlotAutocomplete = ({ availableSlots, onSelect, disabled }) => {
                 break;
             case 'Enter':
                 e.preventDefault();
-                if (filteredSlots[highlightedIndex]) {
+                if (highlightedIndex < filteredSlots.length) {
                     handleSelect(filteredSlots[highlightedIndex]);
+                } else if (canAddCustom) {
+                    handleAddCustom();
                 }
                 break;
             case 'Escape':
@@ -112,7 +132,7 @@ const SlotAutocomplete = ({ availableSlots, onSelect, disabled }) => {
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             </div>
 
-            {isOpen && filteredSlots.length > 0 && (
+            {isOpen && (filteredSlots.length > 0 || (searchTerm && !exactMatch)) && (
                 <div
                     ref={dropdownRef}
                     className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto"
@@ -126,24 +146,51 @@ const SlotAutocomplete = ({ availableSlots, onSelect, disabled }) => {
                                 }`}
                             onMouseEnter={() => setHighlightedIndex(index)}
                         >
-                            <div className="font-medium text-gray-900">{slot.name}</div>
+                            <div className="flex items-center justify-between">
+                                <div className="font-medium text-gray-900">{slot.name}</div>
+                                {slot.source_type && (
+                                    <div className={`px-1 rounded text-[10px] uppercase font-bold ${slot.source_type === 'layout' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                                        }`}>
+                                        {slot.source_type}
+                                    </div>
+                                )}
+                            </div>
                             {slot.layouts && slot.layouts.length > 0 && (
-                                <div className="text-gray-500 text-xs">
-                                    {slot.layouts.length} layout{slot.layouts.length !== 1 ? 's' : ''}
+                                <div className="text-gray-500 text-[10px] mt-0.5">
+                                    Layouts: {slot.layouts.join(', ')}
+                                </div>
+                            )}
+                            {slot.widgets && slot.widgets.length > 0 && (
+                                <div className="text-gray-500 text-[10px] mt-0.5">
+                                    Widgets: {slot.widgets.map(w => w.split('.').pop()).join(', ')}
                                 </div>
                             )}
                         </button>
                     ))}
+
+                    {searchTerm && !exactMatch && (
+                        <button
+                            type="button"
+                            onClick={handleAddCustom}
+                            className={`w-full px-3 py-2 text-left text-xs hover:bg-blue-50 transition-colors border-t border-gray-100 ${highlightedIndex === filteredSlots.length ? 'bg-blue-50' : ''
+                                }`}
+                            onMouseEnter={() => setHighlightedIndex(filteredSlots.length)}
+                        >
+                            <div className="flex items-center text-blue-600 font-medium">
+                                <span className="mr-1">+</span> Add custom slot: <span className="ml-1 font-bold">"{searchTerm}"</span>
+                            </div>
+                        </button>
+                    )}
                 </div>
             )}
 
-            {isOpen && searchTerm && filteredSlots.length === 0 && (
+            {isOpen && searchTerm && filteredSlots.length === 0 && exactMatch === undefined && (
                 <div
                     ref={dropdownRef}
                     className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg"
                 >
-                    <div className="px-3 py-2 text-xs text-gray-500">
-                        No slots found matching "{searchTerm}"
+                    <div className="px-3 py-2 text-xs text-gray-500 italic">
+                        No standard slots found...
                     </div>
                 </div>
             )}

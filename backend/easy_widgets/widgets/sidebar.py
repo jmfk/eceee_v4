@@ -207,6 +207,17 @@ class SidebarWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return SidebarConfig
 
+    @classmethod
+    def get_slot_definitions(cls):
+        """Define slots for Sidebar widget"""
+        return {
+            "content": {
+                "name": "content",
+                "title": "Sidebar Content",
+                "description": "Main content slot for the sidebar",
+            }
+        }
+
     def render_with_style(self, config, theme):
         """
         Render sidebar with custom component style from theme.

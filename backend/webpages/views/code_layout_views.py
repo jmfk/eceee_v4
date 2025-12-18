@@ -301,21 +301,24 @@ class CodeLayoutViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def all_slots(self, request):
         """
-        Get all unique slot names from all registered layouts.
+        Get all unique slot names from all registered layouts and widgets.
         
-        Returns a list of all slots with metadata about which layouts define them.
+        Returns a list of all slots with metadata about which layouts or widgets define them.
         """
         from ..layout_registry import layout_registry
+        from ..widget_registry import widget_type_registry
 
         # Log metrics
         self._log_metrics(request, "all_slots")
 
         active_only = request.query_params.get("active_only", "true").lower() == "true"
         layouts = layout_registry.list_layouts(active_only=active_only)
+        widget_types = widget_type_registry.list_widget_types(active_only=active_only)
 
         # Collect all slots with metadata
-        slot_map = {}  # {slot_name: {layouts: [layout_names], metadata: {...}}}
+        slot_map = {}  # {slot_name: {layouts: [], widgets: [], metadata: {...}}}
 
+        # 1. Process layout slots
         for layout in layouts:
             layout_name = layout.name
             slot_config = layout.slot_configuration
@@ -330,26 +333,62 @@ class CodeLayoutViewSet(viewsets.ViewSet):
                     slot_map[slot_name] = {
                         "name": slot_name,
                         "layouts": [],
+                        "widgets": [],
+                        "source_type": "layout",
                         "metadata": {
                             "title": slot.get("title", slot_name),
                             "description": slot.get("description", ""),
                             "max_widgets": slot.get("max_widgets"),
                             "css_classes": slot.get("css_classes", ""),
-                            "dimensions": slot.get("dimensions"),  # Include width/height info
-                            "order": slot.get("order", 999),  # Default to 999 if not specified (sorts last)
+                            "dimensions": slot.get("dimensions"),
+                            "order": slot.get("order", 999),
                         },
                     }
                 else:
                     # If slot already exists, merge dimensions and order if not present
                     if not slot_map[slot_name]["metadata"].get("dimensions") and slot.get("dimensions"):
                         slot_map[slot_name]["metadata"]["dimensions"] = slot.get("dimensions")
-                    # Use the lowest order value if multiple layouts define the same slot
+                    # Use the lowest order value
                     existing_order = slot_map[slot_name]["metadata"].get("order", 999)
                     new_order = slot.get("order", 999)
                     if new_order < existing_order:
                         slot_map[slot_name]["metadata"]["order"] = new_order
 
                 slot_map[slot_name]["layouts"].append(layout_name)
+
+        # 2. Process widget slots
+        for widget_type in widget_types:
+            widget_name = widget_type.type
+            widget_slots = widget_type.get_slot_definitions()
+            if not widget_slots:
+                continue
+
+            for slot_name, slot in widget_slots.items():
+                if slot_name not in slot_map:
+                    slot_map[slot_name] = {
+                        "name": slot_name,
+                        "layouts": [],
+                        "widgets": [],
+                        "source_type": "widget",
+                        "metadata": {
+                            "title": slot.get("title", slot_name),
+                            "description": slot.get("description", ""),
+                            "max_widgets": slot.get("max_widgets"),
+                            "css_classes": slot.get("css_classes", ""),
+                            "dimensions": slot.get("dimensions"),
+                            "order": slot.get("order", 1000),  # Widget slots default to lower priority
+                        },
+                    }
+                else:
+                    # If it already exists (e.g. from a layout), we mark it as also coming from a widget
+                    # but layouts keep the source_type if they were first.
+                    # We also don't overwrite layout metadata with widget metadata unless it's missing.
+                    if slot_map[slot_name]["source_type"] == "widget":
+                        # If already a widget slot, maybe merge dimensions
+                        if not slot_map[slot_name]["metadata"].get("dimensions") and slot.get("dimensions"):
+                            slot_map[slot_name]["metadata"]["dimensions"] = slot.get("dimensions")
+
+                slot_map[slot_name]["widgets"].append(widget_name)
 
         # Convert to list and sort by order (then by name if order is the same)
         slots_list = sorted(

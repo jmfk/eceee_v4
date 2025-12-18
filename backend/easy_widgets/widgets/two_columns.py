@@ -149,6 +149,32 @@ class TwoColumnsWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return TwoColumnsConfig
 
+    @classmethod
+    def get_slot_definitions(cls):
+        """Define slots for Two Columns widget"""
+        return {
+            "left": {
+                "name": "left",
+                "title": "Left Column",
+                "description": "Left column content",
+                "dimensions": {
+                    "mobile": {"width": 1.0, "height": None},
+                    "tablet": {"width": 0.5, "height": None},
+                    "desktop": {"width": 0.5, "height": None},
+                },
+            },
+            "right": {
+                "name": "right",
+                "title": "Right Column",
+                "description": "Right column content",
+                "dimensions": {
+                    "mobile": {"width": 1.0, "height": None},
+                    "tablet": {"width": 0.5, "height": None},
+                    "desktop": {"width": 0.5, "height": None},
+                },
+            },
+        }
+
     def render_with_style(self, config, theme):
         """
         Render two-column widget with custom component style from theme.

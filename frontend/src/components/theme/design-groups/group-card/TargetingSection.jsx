@@ -31,9 +31,26 @@ const TargetingSection = ({
     onAddSlot,
     onRemoveSlot,
     onUpdateTargetCssClasses,
+    onAddVariant,
+    onRemoveVariant,
 }) => {
     const selectedTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);
     const selectedSlots = group.slots || (group.slot ? [group.slot] : []);
+    const selectedVariants = group.variants || (group.variant ? [group.variant] : []);
+
+    // Get available variants from selected widget types
+    const availableVariants = React.useMemo(() => {
+        const variants = new Map();
+        selectedTypes.forEach(wtType => {
+            const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+            if (widgetMeta?.variants) {
+                widgetMeta.variants.forEach(v => {
+                    variants.set(v.id, v.label);
+                });
+            }
+        });
+        return Array.from(variants.entries()).map(([id, label]) => ({ id, label }));
+    }, [selectedTypes, widgetTypes]);
 
     return (
         <div className="border-t border-gray-200">
@@ -79,77 +96,127 @@ const TargetingSection = ({
                     </div>
 
                     {(group.targetingMode || 'widget-slot') === 'widget-slot' ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* Widget Types */}
-                            <div>
-                                <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Widget Types */}
+                                <div>
+                                    <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Widget Types:</label>
 
-                                <WidgetTypeAutocomplete
-                                    availableWidgets={widgetTypes.filter(wt => !selectedTypes.includes(wt.type))}
-                                    onSelect={(widgetType) => onAddWidgetType(groupIndex, widgetType)}
-                                    disabled={isLoadingTypes}
-                                />
-                                <div className="text-xs text-gray-500 mt-1">Search and select widget types to apply this design group. Empty = all widgets</div>
+                                    <WidgetTypeAutocomplete
+                                        availableWidgets={widgetTypes.filter(wt => !selectedTypes.includes(wt.type))}
+                                        onSelect={(widgetType) => onAddWidgetType(groupIndex, widgetType)}
+                                        disabled={isLoadingTypes}
+                                    />
+                                    <div className="text-xs text-gray-500 mt-1">Search and select widget types to apply this design group. Empty = all widgets</div>
 
-                                {/* Selected widget types as pills */}
-                                {selectedTypes.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                        {selectedTypes.map(wtType => {
-                                            const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
-                                            return (
-                                                <div
-                                                    key={wtType}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded border border-blue-200"
-                                                >
-                                                    <span>{widgetMeta?.name || wtType}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onRemoveWidgetType(groupIndex, wtType)}
-                                                        className="hover:bg-blue-200 rounded-sm p-0.5 transition-colors"
-                                                        title="Remove widget type"
+                                    {/* Selected widget types as pills */}
+                                    {selectedTypes.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {selectedTypes.map(wtType => {
+                                                const widgetMeta = widgetTypes.find(wt => wt.type === wtType);
+                                                return (
+                                                    <div
+                                                        key={wtType}
+                                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded border border-blue-200"
                                                     >
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                </div>
+                                                        <span>{widgetMeta?.name || wtType}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onRemoveWidgetType(groupIndex, wtType)}
+                                                            className="hover:bg-blue-200 rounded-sm p-0.5 transition-colors"
+                                                            title="Remove widget type"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Slots */}
+                                <div>
+                                    <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
+
+                                    <SlotAutocomplete
+                                        availableSlots={availableSlots.filter(slot => !selectedSlots.includes(slot.name))}
+                                        onSelect={(slotName) => onAddSlot(groupIndex, slotName)}
+                                        disabled={isLoadingSlots}
+                                    />
+                                    <div className="text-xs text-gray-500 mt-1">Search and select slots to apply this design group. Empty = all slots</div>
+
+                                    {/* Selected slots as pills */}
+                                    {selectedSlots.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {selectedSlots.map(slotName => {
+                                                const slotMeta = availableSlots.find(s => s.name === slotName);
+                                                const isCustom = !slotMeta;
+                                                const sourceType = slotMeta?.source_type || 'custom';
+
+                                                let bgColor = 'bg-green-100';
+                                                let textColor = 'text-green-700';
+                                                let borderColor = 'border-green-200';
+
+                                                if (sourceType === 'widget') {
+                                                    bgColor = 'bg-purple-100';
+                                                    textColor = 'text-purple-700';
+                                                    borderColor = 'border-purple-200';
+                                                } else if (isCustom) {
+                                                    bgColor = 'bg-gray-100';
+                                                    textColor = 'text-gray-700';
+                                                    borderColor = 'border-gray-200';
+                                                }
+
+                                                return (
+                                                    <div
+                                                        key={slotName}
+                                                        className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded border ${bgColor} ${textColor} ${borderColor}`}
+                                                        title={isCustom ? 'Custom slot (not defined in layouts/widgets)' : `Source: ${sourceType}`}
+                                                    >
+                                                        <span>{slotName}</span>
+                                                        {isCustom && <span className="text-[8px] opacity-60 ml-0.5">(custom)</span>}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onRemoveSlot(groupIndex, slotName)}
+                                                            className="hover:opacity-70 rounded-sm p-0.5 transition-colors"
+                                                            title="Remove slot"
+                                                        >
+                                                            <X className="w-2.5 h-2.5" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Variants */}
+                            {availableVariants.length > 0 && (
+                                <div>
+                                    <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Variants:</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {availableVariants.map(variant => {
+                                            const isSelected = selectedVariants.includes(variant.id);
+                                            return (
+                                                <button
+                                                    key={variant.id}
+                                                    type="button"
+                                                    onClick={() => isSelected ? onRemoveVariant(groupIndex, variant.id) : onAddVariant(groupIndex, variant.id)}
+                                                    className={`px-2 py-1 text-xs rounded border transition-colors ${isSelected
+                                                            ? 'bg-amber-100 text-amber-700 border-amber-300'
+                                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    {variant.label}
+                                                </button>
                                             );
                                         })}
                                     </div>
-                                )}
-                            </div>
-
-                            {/* Slots */}
-                            <div>
-                                <label className="block text-xs text-gray-700 font-medium mb-1">Apply to Slots:</label>
-
-                                <SlotAutocomplete
-                                    availableSlots={availableSlots.filter(slot => !selectedSlots.includes(slot.name))}
-                                    onSelect={(slotName) => onAddSlot(groupIndex, slotName)}
-                                    disabled={isLoadingSlots}
-                                />
-                                <div className="text-xs text-gray-500 mt-1">Search and select slots to apply this design group. Empty = all slots</div>
-
-                                {/* Selected slots as pills */}
-                                {selectedSlots.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                        {selectedSlots.map(slotName => (
-                                            <div
-                                                key={slotName}
-                                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded border border-green-200"
-                                            >
-                                                <span>{slotName}</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onRemoveSlot(groupIndex, slotName)}
-                                                    className="hover:bg-green-200 rounded-sm p-0.5 transition-colors"
-                                                    title="Remove slot"
-                                                >
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                                    <div className="text-xs text-gray-500 mt-1">Select style variants to apply this design group. Empty = all variants</div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div>

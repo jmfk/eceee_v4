@@ -272,6 +272,17 @@ class SectionWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return SectionConfig
 
+    @classmethod
+    def get_slot_definitions(cls):
+        """Define slots for Section widget"""
+        return {
+            "content": {
+                "name": "content",
+                "title": "Section Content",
+                "description": "Main content slot for the section",
+            }
+        }
+
     def render_with_style(self, config, theme):
         """
         Render section widget with custom component style from theme.

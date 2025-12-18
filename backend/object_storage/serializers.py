@@ -704,7 +704,13 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 
         # Add data and widgets from current version
         data["data"] = instance.data
-        data["widgets"] = instance.widgets
+        
+        # Convert widget configurations from snake_case to camelCase and inject active variants
+        if instance.widgets and isinstance(instance.widgets, dict):
+            from webpages.utils.widget_serialization import serialize_widget_slots
+            data["widgets"] = serialize_widget_slots(instance.widgets)
+        else:
+            data["widgets"] = instance.widgets
 
         return data
 

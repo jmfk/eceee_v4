@@ -112,29 +112,44 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             const slots = group.slots?.length > 0
                 ? group.slots
                 : (group.slot ? [group.slot] : []);
+            const variants = group.variants?.length > 0
+                ? group.variants
+                : (group.variant ? [group.variant] : []);
 
-            if (widgetTypes.length === 0 && slots.length === 0) {
+            if (widgetTypes.length === 0 && slots.length === 0 && variants.length === 0) {
                 // Global - no targeting
                 baseSelectors.push(scope || '');
             } else if (widgetTypes.length === 0 && slots.length > 0) {
                 // Slot targeting only
                 slots.forEach(slot => {
                     const slotNormalized = normalizeForCSS(slot);
-                    if (scope) {
-                        baseSelectors.push(`${scope}.slot-${slotNormalized}`);
+                    let sel = `.slot-${slotNormalized}`;
+                    if (scope) sel = `${scope}${sel}`;
+                    
+                    if (variants.length > 0) {
+                        variants.forEach(v => baseSelectors.push(`${sel}.${v}`));
                     } else {
-                        baseSelectors.push(`.slot-${slotNormalized}`);
+                        baseSelectors.push(sel);
                     }
                 });
             } else if (widgetTypes.length > 0 && slots.length === 0) {
                 // Widget type targeting only
                 widgetTypes.forEach(type => {
                     const typeNormalized = normalizeForCSS(type);
-                    if (scope) {
-                        baseSelectors.push(`${scope}.widget-type-${typeNormalized}`);
+                    let sel = `.widget-type-${typeNormalized}`;
+                    if (scope) sel = `${scope}${sel}`;
+                    
+                    if (variants.length > 0) {
+                        variants.forEach(v => baseSelectors.push(`${sel}.${v}`));
                     } else {
-                        baseSelectors.push(`.widget-type-${typeNormalized}`);
+                        baseSelectors.push(sel);
                     }
+                });
+            } else if (widgetTypes.length === 0 && slots.length === 0 && variants.length > 0) {
+                // Variant targeting only (global variants)
+                variants.forEach(v => {
+                    if (scope) baseSelectors.push(`${scope}.${v}`);
+                    else baseSelectors.push(`.${v}`);
                 });
             } else {
                 // Both widget type and slot targeting (all combinations)
@@ -143,10 +158,13 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     slots.forEach(slot => {
                         const typeNormalized = normalizeForCSS(type);
                         const slotNormalized = normalizeForCSS(slot);
-                        if (scope) {
-                            baseSelectors.push(`${scope}.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
+                        let sel = `.slot-${slotNormalized} > .widget-type-${typeNormalized}`;
+                        if (scope) sel = `${scope}${sel}`;
+                        
+                        if (variants.length > 0) {
+                            variants.forEach(v => baseSelectors.push(`${sel}.${v}`));
                         } else {
-                            baseSelectors.push(`.slot-${slotNormalized} > .widget-type-${typeNormalized}`);
+                            baseSelectors.push(sel);
                         }
                     });
                 });

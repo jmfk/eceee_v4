@@ -162,60 +162,27 @@ class PageVersionSerializer(serializers.ModelSerializer):
         """Convert widget configuration fields from snake_case to camelCase for frontend"""
         data = super().to_representation(instance)
 
-        # Convert widget configurations from snake_case to camelCase
+        # Convert widget configurations from snake_case to camelCase and inject active variants
         if "widgets" in data and isinstance(data["widgets"], dict):
-            data["widgets"] = self._convert_widgets_to_camel_case(data["widgets"])
+            from ..utils.widget_serialization import serialize_widget_slots
+            data["widgets"] = serialize_widget_slots(data["widgets"])
 
         return data
 
     def _convert_widgets_to_camel_case(self, widgets_data):
-        """Convert widget configurations from snake_case to camelCase"""
-        if not isinstance(widgets_data, dict):
-            return widgets_data
-
-        converted_widgets = {}
-
-        for slot_name, widgets in widgets_data.items():
-            if not isinstance(widgets, list):
-                converted_widgets[slot_name] = widgets
-                continue
-
-            converted_widgets[slot_name] = []
-
-            for widget in widgets:
-                if not isinstance(widget, dict):
-                    converted_widgets[slot_name].append(widget)
-                    continue
-
-                converted_widget = widget.copy()
-                if "config" in widget:
-                    converted_widget["config"] = self._convert_snake_to_camel(
-                        widget["config"]
-                    )
-
-                converted_widgets[slot_name].append(converted_widget)
-
-        return converted_widgets
+        """DEPRECATED: Use webpages.utils.widget_serialization.serialize_widget_slots instead"""
+        from ..utils.widget_serialization import serialize_widget_slots
+        return serialize_widget_slots(widgets_data)
 
     def _convert_snake_to_camel(self, obj):
-        """Convert snake_case keys to camelCase recursively"""
-        if isinstance(obj, dict):
-            converted = {}
-            for key, value in obj.items():
-                # Convert snake_case key to camelCase
-                camel_key = self._snake_to_camel_case(key)
-                # Recursively convert nested objects
-                converted[camel_key] = self._convert_snake_to_camel(value)
-            return converted
-        elif isinstance(obj, list):
-            return [self._convert_snake_to_camel(item) for item in obj]
-        else:
-            return obj
+        """DEPRECATED: Use webpages.utils.widget_serialization.convert_snake_to_camel instead"""
+        from ..utils.widget_serialization import convert_snake_to_camel
+        return convert_snake_to_camel(obj)
 
     def _snake_to_camel_case(self, name):
-        """Convert snake_case to camelCase"""
-        components = name.split("_")
-        return components[0] + "".join(word.capitalize() for word in components[1:])
+        """DEPRECATED: Use webpages.utils.widget_serialization.snake_to_camel_case instead"""
+        from ..utils.widget_serialization import snake_to_camel_case
+        return snake_to_camel_case(name)
 
     def update(self, instance, validated_data):
         """Update with timestamp-based conflict detection"""

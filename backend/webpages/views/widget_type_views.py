@@ -296,6 +296,7 @@ class WidgetTypeViewSet(viewsets.ViewSet):
             "fields": fields_metadata,
             "defaults": defaults,
             "required": base_schema.get("required", []),
+            "variants": widget_type.variants,
         }
 
         # Add flag if form fields should be hidden

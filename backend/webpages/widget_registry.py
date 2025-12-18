@@ -56,6 +56,9 @@ class BaseWidget(ABC):
     css_scope: str = "global"  # CSS scoping: 'global', 'widget', 'slot'
     enable_css_injection: bool = True  # Whether this widget type supports CSS injection
 
+    # Style variants
+    variants: List[Dict[str, Any]] = []  # List of {"id": "class-name", "label": "Human Label", "config_field": "field_name", "type": "class"}
+
     def __init__(self):
         if self.name is None:
             raise ImproperlyConfigured(
@@ -134,6 +137,18 @@ class BaseWidget(ABC):
             return defaults
         except Exception:
             return {}
+
+    def get_active_variants(self, config: Dict[str, Any]) -> List[str]:
+        """
+        Determine active style variants based on widget configuration.
+        By default, looks for 'config_field' mapping in self.variants.
+        """
+        active = []
+        for variant in self.variants:
+            config_field = variant.get("config_field")
+            if config_field and config.get(config_field):
+                active.append(variant["id"])
+        return active
 
     @classmethod
     def get_slot_definitions(cls) -> Optional[Dict[str, Dict[str, Any]]]:
@@ -264,6 +279,7 @@ class BaseWidget(ABC):
             "mustache_template_name": self.mustache_template_name,  # Mustache template path
             "widget_class": self.__class__.__name__,
             "is_active": self.is_active,
+            "variants": self.variants,
             "configuration_schema": self.configuration_model.model_json_schema(),
         }
 

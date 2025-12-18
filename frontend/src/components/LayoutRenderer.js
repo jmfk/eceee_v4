@@ -2256,6 +2256,13 @@ class LayoutRenderer {
     // Create main widget container
     const widget = this.createWidgetContainer(id, type);
 
+    // Apply active style variants if present from backend serialization
+    if (widgetInstance.activeVariants && Array.isArray(widgetInstance.activeVariants)) {
+      widgetInstance.activeVariants.forEach(variantId => {
+        widget.classList.add(variantId);
+      });
+    }
+
     // Add slot class if widget is in a slot
     if (slotName) {
       const normalizedSlotName = slotName.toLowerCase().replace(/[^a-z0-9-]/g, '-');

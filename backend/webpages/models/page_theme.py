@@ -166,6 +166,38 @@ class PageTheme(models.Model):
 
         return DEFAULT_BREAKPOINTS
 
+    def _get_variant_selector(self, variant_id, widget_types):
+        """
+        Determine the CSS selector for a variant based on its type defined in widget metadata.
+        Returns the selector part (e.g. '.classname' or '[attr]').
+        """
+        from webpages.widget_registry import widget_type_registry
+
+        # Default to class selector
+        variant_type = "class"
+
+        # Try to find the variant type in selected widget types
+        if widget_types:
+            for wt_type in widget_types:
+                wt_instance = widget_type_registry.get_widget_type_flexible(wt_type)
+                if wt_instance and hasattr(wt_instance, "variants"):
+                    for v in wt_instance.variants:
+                        if v.get("id") == variant_id:
+                            variant_type = v.get("type", "class")
+                            break
+                    else:
+                        continue
+                    break
+
+        if variant_type == "class":
+            return f".{variant_id}"
+        elif variant_type == "attribute":
+            return f"[{variant_id}]"
+        elif variant_type == "pseudo-class":
+            return f":{variant_id}"
+        
+        return f".{variant_id}"
+
     def calculate_selectors_for_group(self, group, scope="", frontend_scoped=False):
         """
         Calculate the actual CSS selectors that would be generated for a design group.
@@ -231,44 +263,66 @@ class PageTheme(models.Model):
             if not slots and group.get("slot"):
                 slots = [group["slot"]]
 
-            if not widget_types and not slots:
+            variants = group.get("variants", [])
+            if not variants and group.get("variant"):
+                variants = [group["variant"]]
+
+            if not widget_types and not slots and not variants:
                 # Global - no targeting
                 base_selectors.append(scope if scope else "")
             elif not widget_types and slots:
                 # Slot targeting only
-                if scope:
-                    base_selectors = [
-                        f"{scope}.slot-{normalize_for_css(slot)}" for slot in slots
-                    ]
-                else:
-                    base_selectors = [
-                        f".slot-{normalize_for_css(slot)}" for slot in slots
-                    ]
+                for slot in slots:
+                    sel = f".slot-{normalize_for_css(slot)}"
+                    if scope:
+                        sel = f"{scope}{sel}"
+                    
+                    # Add variants to slot selectors if present
+                    if variants:
+                        for v in variants:
+                            v_sel = self._get_variant_selector(v, widget_types)
+                            base_selectors.append(f"{sel}{v_sel}")
+                    else:
+                        base_selectors.append(sel)
             elif widget_types and not slots:
                 # Widget type targeting only
-                if scope:
-                    base_selectors = [
-                        f"{scope}.widget-type-{normalize_for_css(wt)}"
-                        for wt in widget_types
-                    ]
-                else:
-                    base_selectors = [
-                        f".widget-type-{normalize_for_css(wt)}" for wt in widget_types
-                    ]
+                for wt in widget_types:
+                    sel = f".widget-type-{normalize_for_css(wt)}"
+                    if scope:
+                        sel = f"{scope}{sel}"
+                    
+                    # Add variants to widget selectors if present
+                    if variants:
+                        for v in variants:
+                            v_sel = self._get_variant_selector(v, [wt])
+                            base_selectors.append(f"{sel}{v_sel}")
+                    else:
+                        base_selectors.append(sel)
+            elif not widget_types and not slots and variants:
+                # Variant targeting only (global variants)
+                for v in variants:
+                    v_sel = self._get_variant_selector(v, [])
+                    if scope:
+                        base_selectors.append(f"{scope}{v_sel}")
+                    else:
+                        base_selectors.append(v_sel)
             else:
-                # Both widget type and slot targeting
+                # Both widget type and slot targeting (and potentially variants)
                 for wt in widget_types:
                     for slot in slots:
                         wt_normalized = normalize_for_css(wt)
                         slot_normalized = normalize_for_css(slot)
+                        sel = f".slot-{slot_normalized} > .widget-type-{wt_normalized}"
                         if scope:
-                            base_selectors.append(
-                                f"{scope}.slot-{slot_normalized} > .widget-type-{wt_normalized}"
-                            )
+                            sel = f"{scope}{sel}"
+                        
+                        # Add variants to combined selectors if present
+                        if variants:
+                            for v in variants:
+                                v_sel = self._get_variant_selector(v, [wt])
+                                base_selectors.append(f"{sel}{v_sel}")
                         else:
-                            base_selectors.append(
-                                f".slot-{slot_normalized} > .widget-type-{wt_normalized}"
-                            )
+                            base_selectors.append(sel)
 
         # Apply frontend scoping if requested
         if frontend_scoped:
@@ -1508,6 +1562,10 @@ class PageTheme(models.Model):
             if not slots and group.get("slot"):
                 slots = [group["slot"]]
 
+            variants = group.get("variants", [])
+            if not variants and group.get("variant"):
+                variants = [group["variant"]]
+
             # Build all selector combinations using CSS classes
             base_selectors = []
 
@@ -1517,30 +1575,45 @@ class PageTheme(models.Model):
 
                 return re.sub(r"[^a-z0-9-]", "-", name.lower())
 
-            if not widget_types and not slots:
+            if not widget_types and not slots and not variants:
                 # Global - no targeting, no class prefix (applies to all elements globally)
                 base_selectors.append(scope if scope else "")
             elif not widget_types and slots:
                 # Slot targeting only
-                if scope:
-                    base_selectors = [
-                        f"{scope}.slot-{normalize_for_css(slot)}" for slot in slots
-                    ]
-                else:
-                    base_selectors = [
-                        f".slot-{normalize_for_css(slot)}" for slot in slots
-                    ]
+                for slot in slots:
+                    sel = f".slot-{normalize_for_css(slot)}"
+                    if scope:
+                        sel = f"{scope}{sel}"
+                    
+                    # Add variants to slot selectors if present
+                    if variants:
+                        for v in variants:
+                            v_sel = self._get_variant_selector(v, widget_types)
+                            base_selectors.append(f"{sel}{v_sel}")
+                    else:
+                        base_selectors.append(sel)
             elif widget_types and not slots:
                 # Widget type targeting only
-                if scope:
-                    base_selectors = [
-                        f"{scope}.widget-type-{normalize_for_css(wt)}"
-                        for wt in widget_types
-                    ]
-                else:
-                    base_selectors = [
-                        f".widget-type-{normalize_for_css(wt)}" for wt in widget_types
-                    ]
+                for wt in widget_types:
+                    sel = f".widget-type-{normalize_for_css(wt)}"
+                    if scope:
+                        sel = f"{scope}{sel}"
+                    
+                    # Add variants to widget selectors if present
+                    if variants:
+                        for v in variants:
+                            v_sel = self._get_variant_selector(v, [wt])
+                            base_selectors.append(f"{sel}{v_sel}")
+                    else:
+                        base_selectors.append(sel)
+            elif not widget_types and not slots and variants:
+                # Variant targeting only (global variants)
+                for v in variants:
+                    v_sel = self._get_variant_selector(v, [])
+                    if scope:
+                        base_selectors.append(f"{scope}{v_sel}")
+                    else:
+                        base_selectors.append(v_sel)
             else:
                 # Both widget type and slot targeting (all combinations)
                 # Use child combinator (>) to prevent cascading to nested widgets
@@ -1548,14 +1621,17 @@ class PageTheme(models.Model):
                     for slot in slots:
                         wt_normalized = normalize_for_css(wt)
                         slot_normalized = normalize_for_css(slot)
+                        sel = f".slot-{slot_normalized}>.widget-type-{wt_normalized}"
                         if scope:
-                            base_selectors.append(
-                                f"{scope}.slot-{slot_normalized}>.widget-type-{wt_normalized}"
-                            )
+                            sel = f"{scope}{sel}"
+                        
+                        # Add variants to combined selectors if present
+                        if variants:
+                            for v in variants:
+                                v_sel = self._get_variant_selector(v, [wt])
+                                base_selectors.append(f"{sel}{v_sel}")
                         else:
-                            base_selectors.append(
-                                f".slot-{slot_normalized}>.widget-type-{wt_normalized}"
-                            )
+                            base_selectors.append(sel)
 
             # Apply frontend scoping if requested
             if frontend_scoped:

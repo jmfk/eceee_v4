@@ -54,7 +54,7 @@ class ContentConfig(BaseModel):
             "component": "ComponentStyleSelector",
         },
     )
-    showBorder: bool = Field(
+    show_border: bool = Field(
         False,
         description="Show widget border",
         json_schema_extra={
@@ -63,7 +63,7 @@ class ContentConfig(BaseModel):
             "group": "Styling",
         },
     )
-    useContentMargins: bool = Field(
+    use_content_margins: bool = Field(
         True,
         description="Use content margins (extra left/right padding on larger screens)",
         json_schema_extra={
@@ -72,7 +72,7 @@ class ContentConfig(BaseModel):
             "group": "Styling",
         },
     )
-    enableLightbox: bool = Field(
+    enable_lightbox: bool = Field(
         False,
         description="Enable lightbox on images inside content",
         json_schema_extra={
@@ -81,7 +81,7 @@ class ContentConfig(BaseModel):
             "group": "Display Options",
         },
     )
-    lightboxStyle: str = Field(
+    lightbox_style: str = Field(
         "default",
         description="Lightbox style key",
         json_schema_extra={
@@ -90,7 +90,7 @@ class ContentConfig(BaseModel):
             "placeholder": "Default",
         },
     )
-    lightboxGroup: str = Field(
+    lightbox_group: str = Field(
         "",
         description="Group key for images in lightbox",
         json_schema_extra={
@@ -129,6 +129,15 @@ class ContentWidget(BaseWidget):
     name = "Content"
     description = "Content widget that contains HTML"
     template_name = "easy_widgets/widgets/content.html"
+
+    variants = [
+        {
+            "id": "border-enabled",
+            "label": "Border Enabled",
+            "config_field": "show_border",
+            "type": "class",
+        },
+    ]
 
     layout_parts = {
         "content-widget": {
@@ -332,6 +341,7 @@ class ContentWidget(BaseWidget):
 
         # Resolve link objects in HTML content
         from webpages.services.link_resolver import resolve_links_in_html
+
         content_str = str(soup)
         resolved_content = resolve_links_in_html(content_str, context.get("request"))
         if resolved_content != content_str:
