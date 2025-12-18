@@ -337,7 +337,7 @@ export const themesApi = {
      * @returns {Promise<Object>} Validation warnings
      */
     validateImages: wrapApiCall(async (themeId) => {
-        return api.get(`${endpoints.themes.detail(themeId)}/validate-images/`)
+        return api.get(`${endpoints.themes.detail(themeId)}validate-images/`)
     }, 'themes.validateImages')
 }
 
