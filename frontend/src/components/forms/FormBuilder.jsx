@@ -26,7 +26,7 @@ const FormBuilder = ({ form = null, onClose }) => {
         actions: [],
         conditionalLogic: { rules: [] }
     })
-    const [activeTab, setActiveTab] = useState('fields') // fields, actions, settings
+    const [activeTab, setActiveTab] = useState('fields') // fields, logic, actions, settings
     const [selectedFieldId, setSelectedFieldId] = useState(null)
     
     const [selectedActionIndex, setSelectedActionIndex] = useState(null)
@@ -148,6 +148,41 @@ const FormBuilder = ({ form = null, onClose }) => {
         setFormData({ ...formData, actions: newActions })
     }
 
+    const addLogicRule = () => {
+        const newRule = {
+            id: crypto.randomUUID(),
+            if: { type: 'and', conditions: [{ field: '', operator: '==', value: '' }] },
+            then: { action: 'show', field: '' }
+        }
+        setFormData({
+            ...formData,
+            conditionalLogic: {
+                ...formData.conditionalLogic,
+                rules: [...(formData.conditionalLogic?.rules || []), newRule]
+            }
+        })
+    }
+
+    const removeLogicRule = (id) => {
+        setFormData({
+            ...formData,
+            conditionalLogic: {
+                ...formData.conditionalLogic,
+                rules: formData.conditionalLogic.rules.filter(r => r.id !== id)
+            }
+        })
+    }
+
+    const updateLogicRule = (id, updates) => {
+        setFormData({
+            ...formData,
+            conditionalLogic: {
+                ...formData.conditionalLogic,
+                rules: formData.conditionalLogic.rules.map(r => r.id === id ? { ...r, ...updates } : r)
+            }
+        })
+    }
+
     const selectedAction = selectedActionIndex !== null ? formData.actions[selectedActionIndex] : null
 
     return (
@@ -189,7 +224,7 @@ const FormBuilder = ({ form = null, onClose }) => {
             {/* Tabs */}
             <div className="bg-white border-b border-gray-200 px-6 flex-shrink-0">
                 <nav className="flex space-x-8">
-                    {['fields', 'actions', 'settings'].map((tab) => (
+                    {['fields', 'logic', 'actions', 'settings'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -310,20 +345,100 @@ const FormBuilder = ({ form = null, onClose }) => {
                                                 onChange={(e) => updateField(selectedField.id, { name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
                                             />
                                         </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Default Value</label>
+                                            <input 
+                                                type="text" 
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                value={selectedField.defaultValue || ''}
+                                                onChange={(e) => updateField(selectedField.id, { defaultValue: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">UI / Display</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 font-medium mb-1">Placeholder</label>
+                                                    <input 
+                                                        type="text" 
+                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm"
+                                                        value={selectedField.ui?.placeholder || ''}
+                                                        onChange={(e) => updateField(selectedField.id, { 
+                                                            ui: { ...selectedField.ui, placeholder: e.target.value } 
+                                                        })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 font-medium mb-1">Help Text</label>
+                                                    <textarea 
+                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm"
+                                                        rows={2}
+                                                        value={selectedField.description || ''}
+                                                        onChange={(e) => updateField(selectedField.id, { description: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
                                         
                                         <div className="pt-4 border-t border-gray-100">
                                             <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Validation</h4>
-                                            <div className="flex items-center">
-                                                <input 
-                                                    type="checkbox" 
-                                                    id="field-required"
-                                                    className="w-4 h-4 text-blue-600 rounded"
-                                                    checked={selectedField.validation.required}
-                                                    onChange={(e) => updateField(selectedField.id, { 
-                                                        validation: { ...selectedField.validation, required: e.target.checked } 
-                                                    })}
-                                                />
-                                                <label htmlFor="field-required" className="ml-2 text-sm text-gray-700">Required Field</label>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        id="field-required"
+                                                        className="w-4 h-4 text-blue-600 rounded"
+                                                        checked={selectedField.validation?.required || false}
+                                                        onChange={(e) => updateField(selectedField.id, { 
+                                                            validation: { ...selectedField.validation, required: e.target.checked } 
+                                                        })}
+                                                    />
+                                                    <label htmlFor="field-required" className="ml-2 text-sm text-gray-700">Required Field</label>
+                                                </div>
+
+                                                {selectedField.type === 'number' && (
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="block text-[10px] text-gray-400 font-bold uppercase">Min</label>
+                                                            <input 
+                                                                type="number" 
+                                                                className="w-full px-2 py-1 border border-gray-200 rounded text-sm"
+                                                                value={selectedField.validation?.min || ''}
+                                                                onChange={(e) => updateField(selectedField.id, { 
+                                                                    validation: { ...selectedField.validation, min: e.target.value } 
+                                                                })}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] text-gray-400 font-bold uppercase">Max</label>
+                                                            <input 
+                                                                type="number" 
+                                                                className="w-full px-2 py-1 border border-gray-200 rounded text-sm"
+                                                                value={selectedField.validation?.max || ''}
+                                                                onChange={(e) => updateField(selectedField.id, { 
+                                                                    validation: { ...selectedField.validation, max: e.target.value } 
+                                                                })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {(selectedField.type === 'text' || selectedField.type === 'textarea') && (
+                                                    <div>
+                                                        <label className="block text-[10px] text-gray-400 font-bold uppercase">Regex Pattern</label>
+                                                        <input 
+                                                            type="text" 
+                                                            className="w-full px-2 py-1 border border-gray-200 rounded text-sm font-mono"
+                                                            placeholder="^[A-Z]+$"
+                                                            value={selectedField.validation?.pattern || ''}
+                                                            onChange={(e) => updateField(selectedField.id, { 
+                                                                validation: { ...selectedField.validation, pattern: e.target.value } 
+                                                            })}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -365,6 +480,150 @@ const FormBuilder = ({ form = null, onClose }) => {
                             )}
                         </div>
                     </>
+                )}
+
+                {activeTab === 'logic' && (
+                    <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-gray-900 text-center">Conditional Logic Rules</h3>
+                                <button 
+                                    onClick={addLogicRule}
+                                    className="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
+                                >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Add Rule
+                                </button>
+                            </div>
+
+                            {(!formData.conditionalLogic?.rules || formData.conditionalLogic.rules.length === 0) ? (
+                                <div className="text-center py-12 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
+                                    <Zap className="w-10 h-10 mx-auto mb-3" />
+                                    <p>No logic rules defined yet. Rules allow you to show/hide fields based on user input.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {formData.conditionalLogic.rules.map((rule) => (
+                                        <div key={rule.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm relative group">
+                                            <button 
+                                                onClick={() => removeLogicRule(rule.id)}
+                                                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+
+                                            <div className="space-y-4">
+                                                <div className="flex items-center space-x-3">
+                                                    <span className="text-sm font-bold text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-1 rounded">IF</span>
+                                                    <select 
+                                                        className="text-sm border-none bg-gray-50 rounded px-2 py-1 focus:ring-0"
+                                                        value={rule.if.type}
+                                                        onChange={(e) => updateLogicRule(rule.id, { if: { ...rule.if, type: e.target.value } })}
+                                                    >
+                                                        <option value="and">ALL of these are true</option>
+                                                        <option value="or">ANY of these are true</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="space-y-2 ml-10">
+                                                    {rule.if.conditions.map((condition, cIndex) => (
+                                                        <div key={cIndex} className="flex items-center space-x-2">
+                                                            <select 
+                                                                className="flex-1 text-sm border border-gray-200 rounded px-2 py-1.5"
+                                                                value={condition.field}
+                                                                onChange={(e) => {
+                                                                    const newConditions = [...rule.if.conditions]
+                                                                    newConditions[cIndex].field = e.target.value
+                                                                    updateLogicRule(rule.id, { if: { ...rule.if, conditions: newConditions } })
+                                                                }}
+                                                            >
+                                                                <option value="">Select Field...</option>
+                                                                {formData.fields.map(f => (
+                                                                    <option key={f.id} value={f.name}>{f.label}</option>
+                                                                ))}
+                                                            </select>
+
+                                                            <select 
+                                                                className="w-32 text-sm border border-gray-200 rounded px-2 py-1.5"
+                                                                value={condition.operator}
+                                                                onChange={(e) => {
+                                                                    const newConditions = [...rule.if.conditions]
+                                                                    newConditions[cIndex].operator = e.target.value
+                                                                    updateLogicRule(rule.id, { if: { ...rule.if, conditions: newConditions } })
+                                                                }}
+                                                            >
+                                                                <option value="==">equals</option>
+                                                                <option value="!=">not equals</option>
+                                                                <option value="contains">contains</option>
+                                                                <option value=">">greater than</option>
+                                                                <option value="<">less than</option>
+                                                            </select>
+
+                                                            <input 
+                                                                type="text"
+                                                                className="flex-1 text-sm border border-gray-200 rounded px-2 py-1.5"
+                                                                placeholder="value"
+                                                                value={condition.value}
+                                                                onChange={(e) => {
+                                                                    const newConditions = [...rule.if.conditions]
+                                                                    newConditions[cIndex].value = e.target.value
+                                                                    updateLogicRule(rule.id, { if: { ...rule.if, conditions: newConditions } })
+                                                                }}
+                                                            />
+
+                                                            {rule.if.conditions.length > 1 && (
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        const newConditions = rule.if.conditions.filter((_, i) => i !== cIndex)
+                                                                        updateLogicRule(rule.id, { if: { ...rule.if, conditions: newConditions } })
+                                                                    }}
+                                                                    className="text-gray-300 hover:text-red-400"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    <button 
+                                                        onClick={() => {
+                                                            const newConditions = [...rule.if.conditions, { field: '', operator: '==', value: '' }]
+                                                            updateLogicRule(rule.id, { if: { ...rule.if, conditions: newConditions } })
+                                                        }}
+                                                        className="text-xs text-blue-600 font-medium hover:underline"
+                                                    >
+                                                        + Add condition
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex items-center space-x-3 pt-2 border-t border-gray-50">
+                                                    <span className="text-sm font-bold text-purple-600 uppercase tracking-wider bg-purple-50 px-2 py-1 rounded">THEN</span>
+                                                    <select 
+                                                        className="text-sm border-none bg-gray-50 rounded px-2 py-1 focus:ring-0"
+                                                        value={rule.then.action}
+                                                        onChange={(e) => updateLogicRule(rule.id, { then: { ...rule.then, action: e.target.value } })}
+                                                    >
+                                                        <option value="show">SHOW</option>
+                                                        <option value="hide">HIDE</option>
+                                                    </select>
+                                                    <span className="text-sm text-gray-500">field</span>
+                                                    <select 
+                                                        className="flex-1 text-sm border border-gray-200 rounded px-2 py-1.5"
+                                                        value={rule.then.field}
+                                                        onChange={(e) => updateLogicRule(rule.id, { then: { ...rule.then, field: e.target.value } })}
+                                                    >
+                                                        <option value="">Select Field...</option>
+                                                        {formData.fields.map(f => (
+                                                            <option key={f.id} value={f.name}>{f.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )}
 
                 {activeTab === 'actions' && (

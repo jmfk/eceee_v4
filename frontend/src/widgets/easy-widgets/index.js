@@ -23,6 +23,7 @@ import NavbarWidget from './NavbarWidget';
 import NavigationWidget from './NavigationWidget';
 import SidebarWidget from './SidebarWidget';
 import FormsWidget from './FormsWidget';
+import DynamicFormWidget from './DynamicFormWidget';
 import TwoColumnsWidget from './TwoColumnsWidget';
 import ThreeColumnsWidget from './ThreeColumnsWidget';
 import PathDebugWidget from './PathDebugWidget';
@@ -61,6 +62,7 @@ const initializeRegistry = () => {
         'easy_widgets.NavigationWidget': registerWidget(NavigationWidget, 'easy_widgets.NavigationWidget'),
         'easy_widgets.SidebarWidget': registerWidget(SidebarWidget, 'easy_widgets.SidebarWidget'),
         'easy_widgets.FormsWidget': registerWidget(FormsWidget, 'easy_widgets.FormsWidget'),
+        'easy_widgets.DynamicFormWidget': registerWidget(DynamicFormWidget, 'easy_widgets.DynamicFormWidget'),
         'easy_widgets.TwoColumnsWidget': registerWidget(TwoColumnsWidget, 'easy_widgets.TwoColumnsWidget'),
         'easy_widgets.ThreeColumnsWidget': registerWidget(ThreeColumnsWidget, 'easy_widgets.ThreeColumnsWidget'),
         'easy_widgets.PathDebugWidget': registerWidget(PathDebugWidget, 'easy_widgets.PathDebugWidget'),
@@ -151,6 +153,7 @@ export { default as NavbarWidget } from './NavbarWidget';
 export { default as NavigationWidget } from './NavigationWidget';
 export { default as SidebarWidget } from './SidebarWidget';
 export { default as FormsWidget } from './FormsWidget';
+export { default as DynamicFormWidget } from './DynamicFormWidget';
 export { default as TwoColumnsWidget } from './TwoColumnsWidget';
 export { default as ThreeColumnsWidget } from './ThreeColumnsWidget';
 export { default as NewsListWidget } from './NewsListWidget';

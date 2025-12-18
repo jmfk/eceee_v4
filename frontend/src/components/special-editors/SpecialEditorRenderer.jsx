@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo } from 'react'
 import TableSpecialEditor from './TableSpecialEditor'
 import NavbarWidgetEditor from '../../widgets/easy-widgets/NavbarWidgetEditor'
 import NavigationWidgetEditor from '../../widgets/easy-widgets/NavigationWidgetEditor'
+import FormSpecialEditor from './FormSpecialEditor'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -19,6 +20,7 @@ const SPECIAL_EDITOR_COMPONENTS = {
     'TableSpecialEditor': TableSpecialEditor,
     'NavbarWidgetEditor': NavbarWidgetEditor,
     'NavigationWidgetEditor': NavigationWidgetEditor,
+    'FormSpecialEditor': FormSpecialEditor,
 }
 
 // Legacy registry for backward compatibility (deprecated - use widget metadata instead)

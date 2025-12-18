@@ -8,6 +8,8 @@ const DynamicFormRenderer = ({ formName, fields: initialFields = [], onSuccess }
     const [errors, setErrors] = useState({})
     const [isSubmitted, setIsSubmitted] = useState(false)
     const [fields, setFields] = useState(initialFields)
+    const [conditionalLogic, setConditionalLogic] = useState({ rules: [] })
+    const [dataSourceOptions, setDataSourceOptions] = useState({})
 
     // Fetch form definition if fields are not provided
     const { data: formDef, isLoading: formLoading } = useQuery({
@@ -20,8 +22,9 @@ const DynamicFormRenderer = ({ formName, fields: initialFields = [], onSuccess }
     })
 
     useEffect(() => {
-        if (formDef?.fields) {
-            setFields(formDef.fields)
+        if (formDef) {
+            if (formDef.fields) setFields(formDef.fields)
+            if (formDef.conditionalLogic) setConditionalLogic(formDef.conditionalLogic)
         }
     }, [formDef])
     
@@ -31,6 +34,85 @@ const DynamicFormRenderer = ({ formName, fields: initialFields = [], onSuccess }
             setFields(initialFields)
         }
     }, [initialFields])
+
+    // Fetch data source options
+    useEffect(() => {
+        const fetchDataSourceOptions = async () => {
+            const newOptions = { ...dataSourceOptions }
+            let changed = false
+
+            for (const field of fields) {
+                if (field.dataSourceType === 'valueList' && field.valueListId && !newOptions[field.name]) {
+                    try {
+                        const response = await api.get(`/api/v1/utils/value-lists/${field.valueListId}/`)
+                        newOptions[field.name] = (response.data.items || []).map(item => item.label || item.value)
+                        changed = true
+                    } catch (e) {
+                        console.error(`Error fetching value list ${field.valueListId}:`, e)
+                    }
+                } else if (field.dataSourceType === 'objectStorage' && field.objectType && !newOptions[field.name]) {
+                    try {
+                        const response = await api.get(`/api/v1/objects/instances/?type=${field.objectType}`)
+                        newOptions[field.name] = (response.data.results || []).map(obj => obj.title)
+                        changed = true
+                    } catch (e) {
+                        console.error(`Error fetching object types ${field.objectType}:`, e)
+                    }
+                }
+            }
+
+            if (changed) {
+                setDataSourceOptions(newOptions)
+            }
+        }
+
+        if (fields.length > 0) {
+            fetchDataSourceOptions()
+        }
+    }, [fields])
+
+    // Conditional logic evaluation
+    const evaluateCondition = (condition, data) => {
+        const { field, operator, value } = condition
+        const actualValue = data[field]
+        
+        switch (operator) {
+            case '==': return String(actualValue) === String(value)
+            case '!=': return String(actualValue) !== String(value)
+            case '>': return Number(actualValue) > Number(value)
+            case '<': return Number(actualValue) < Number(value)
+            case 'contains': return String(actualValue || '').includes(String(value))
+            default: return false
+        }
+    }
+
+    const evaluateRule = (rule, data) => {
+        const { if: conditionGroup } = rule
+        const results = conditionGroup.conditions.map(c => evaluateCondition(c, data))
+        
+        if (conditionGroup.type === 'or') {
+            return results.some(r => r)
+        }
+        return results.every(r => r)
+    }
+
+    const visibleFields = fields.filter(field => {
+        // Find rules that target this field
+        const rules = (conditionalLogic?.rules || []).filter(r => r.then?.field === field.name)
+        
+        if (rules.length === 0) return true
+        
+        // If any rule says "show" and evaluates to true, OR if any rule says "hide" and evaluates to false
+        // For simplicity: default visible, hide if any "hide" rule is true, or hide if any "show" rule exists but none are true
+        
+        const showRules = rules.filter(r => r.then.action === 'show')
+        const hideRules = rules.filter(r => r.then.action === 'hide')
+        
+        if (hideRules.some(r => evaluateRule(r, formData))) return false
+        if (showRules.length > 0 && !showRules.some(r => evaluateRule(r, formData))) return false
+        
+        return true
+    })
 
     const submissionMutation = useMutation({
         mutationFn: async (data) => {
@@ -106,7 +188,7 @@ const DynamicFormRenderer = ({ formName, fields: initialFields = [], onSuccess }
             )}
 
             <div className="grid grid-cols-1 gap-6">
-                {fields.map((field) => {
+                {visibleFields.map((field) => {
                     const error = errors[field.name]
                     
                     return (
@@ -135,8 +217,8 @@ const DynamicFormRenderer = ({ formName, fields: initialFields = [], onSuccess }
                                     onChange={(e) => handleChange(field.name, e.target.value)}
                                 >
                                     <option value="">Select an option...</option>
-                                    {(field.options || []).map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
+                                    {(dataSourceOptions[field.name] || field.options || []).map((opt, idx) => (
+                                        <option key={idx} value={opt}>{opt}</option>
                                     ))}
                                 </select>
                             ) : (

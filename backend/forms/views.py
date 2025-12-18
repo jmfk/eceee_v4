@@ -141,13 +141,32 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
                 
                 if field_type == "number":
                     try:
-                        float(val)
+                        num_val = float(val)
+                        min_val = validation.get("min")
+                        max_val = validation.get("max")
+                        if min_val is not None and num_val < float(min_val):
+                            errors[name] = f"{label} must be at least {min_val}."
+                        if max_val is not None and num_val > float(max_val):
+                            errors[name] = f"{label} must be at most {max_val}."
                     except (ValueError, TypeError):
                         errors[name] = f"{label} must be a number."
                 elif field_type == "email":
                     import re
                     if not re.match(r"[^@]+@[^@]+\.[^@]+", str(val)):
                         errors[name] = f"{label} must be a valid email address."
+                elif field_type in ["select", "radio"]:
+                    options = field.get("options", [])
+                    if options and val not in options:
+                        errors[name] = f"{label} has an invalid selection."
+                elif field_type == "multiselect":
+                    if not isinstance(val, list):
+                        errors[name] = f"{label} must be a list of values."
+                    else:
+                        options = field.get("options", [])
+                        if options:
+                            invalid = [v for v in val if v not in options]
+                            if invalid:
+                                errors[name] = f"{label} contains invalid selections."
                 
                 # Regex validation
                 pattern = validation.get("pattern")
