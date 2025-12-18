@@ -6,12 +6,14 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { createRoot } from 'react-dom/client';
 import LayoutRenderer from './LayoutRenderer';
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import { useNotificationContext } from './NotificationManager';
 import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
 import ImportDialog from './ImportDialog';
 import { useTheme } from '../hooks/useTheme';
+import DynamicFormRenderer from './forms/DynamicFormRenderer';
 
 const ContentEditor = forwardRef(({
   layoutJson,
@@ -36,6 +38,7 @@ const ContentEditor = forwardRef(({
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
   const eventListenersRef = useRef(new Map()); // Track event listeners for cleanup
+  const reactRootsRef = useRef(new Map()); // Track React roots for cleanup
   const slotInteractivitySetupRef = useRef(false); // Track if interactivity is already set up
 
   const [isLoading, setIsLoading] = useState(false);
@@ -98,6 +101,27 @@ const ContentEditor = forwardRef(({
         setImportSlotName(slotName);
         setIsImportDialogOpen(true);
       };
+
+      // Set up React widget mounting callback
+      rendererRef.current.setUICallbacks({
+        mount_react_widget: ({ type, config, element }) => {
+          if (type === 'dynamic_form') {
+            // Clean up existing root if any
+            if (reactRootsRef.current.has(element)) {
+              reactRootsRef.current.get(element).unmount();
+            }
+            
+            const root = createRoot(element);
+            root.render(
+              <DynamicFormRenderer 
+                formName={config.formName} 
+                fields={config.fields || []}
+              />
+            );
+            reactRootsRef.current.set(element, root);
+          }
+        }
+      });
     }
     return rendererRef.current;
   }, [createWidgetElement, editable, onOpenWidgetEditor]);
@@ -166,6 +190,23 @@ const ContentEditor = forwardRef(({
         // Propagate dirty state up to PageEditor
         if (onDirtyChange) {
           onDirtyChange(isDirty, reason);
+        }
+      },
+      mount_react_widget: ({ type, config, element }) => {
+        if (type === 'dynamic_form') {
+          // Clean up existing root if any
+          if (reactRootsRef.current.has(element)) {
+            reactRootsRef.current.get(element).unmount();
+          }
+          
+          const root = createRoot(element);
+          root.render(
+            <DynamicFormRenderer 
+              formName={config.formName} 
+              fields={config.fields || []}
+            />
+          );
+          reactRootsRef.current.set(element, root);
         }
       }
     });

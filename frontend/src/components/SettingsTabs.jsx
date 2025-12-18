@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash, Database, Package, Menu, List, Users } from 'lucide-react'
+import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash, Database, Package, Menu, List, Users, FileText } from 'lucide-react'
 import { themesApi } from '../api'
 import { objectTypesApi } from '../api/objectStorage'
 import { layoutsApi } from '../api/layouts'
@@ -118,6 +118,7 @@ export default function SettingsTabs() {
     const navigationStructure = {
         core: [
             ...(user?.isSuperuser ? [{ id: 'users', label: 'Users', icon: Users, href: '/settings/users', description: 'User management' }] : []),
+            { id: 'forms', label: 'Forms', icon: FileText, href: '/settings/forms', description: 'Dynamic form system' },
             { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions', description: 'Version history' },
             { id: 'publishing', label: 'Publishing', icon: Calendar, href: '/settings/publishing', description: 'Publishing workflow' },
             { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings/namespaces', description: 'Content namespaces' },

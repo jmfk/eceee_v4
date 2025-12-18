@@ -27,6 +27,7 @@ export { default as MultiSelectInput } from './MultiSelectInput'
 export { default as RadioInput } from './RadioInput'
 export { default as CheckboxInput } from './CheckboxInput'
 export { default as TagInput } from './TagInput'
+export { default as FormSelector } from './FormSelector'
 
 // Advanced Components
 export { default as ColorInput } from './ColorInput'
@@ -126,6 +127,7 @@ export const FIELD_COMPONENTS = {
     ThreeColumnRatioSelector: () => import('./ThreeColumnRatioSelector'),
     ImageSizeSelector: () => import('./ImageSizeSelector'),
     BannerModeSelector: () => import('./BannerModeSelector'),
+    FormSelector: () => import('./FormSelector'),
     // Media Components
     ImageInput: () => import('./ImageInput'),
     ImageField: () => import('./ImageInput'), // Alias for ImageInput

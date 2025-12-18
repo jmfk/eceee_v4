@@ -200,6 +200,7 @@ LOCAL_APPS = [
     "object_storage",  # Non-hierarchical object storage system
     "utils",  # Utility features like value lists and schema system
     "ai_tracking",  # AI usage and cost tracking
+    "forms",  # Dynamic form system
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

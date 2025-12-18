@@ -44,6 +44,7 @@ import NamespaceManager from '../components/NamespaceManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
 import WidgetManager from '../components/WidgetManager'
 import ValueListEditor from '../components/ValueListEditor'
+import FormManager from '../components/forms/FormManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
@@ -60,6 +61,7 @@ const SettingsManager = () => {
         if (path === '/settings/widgets') return 'widgets'
         if (path === '/settings/value-lists') return 'value-lists'
         if (path === '/settings/object-types') return 'object-types'
+        if (path === '/settings/forms') return 'forms'
         if (path === '/settings/versions') return 'versions'
         if (path === '/settings/publishing') return 'publishing'
         if (path === '/settings/namespaces') return 'namespaces'
@@ -75,6 +77,7 @@ const SettingsManager = () => {
         'widgets': 'Settings - Widgets',
         'value-lists': 'Settings - Value Lists',
         'object-types': 'Settings - Object Types',
+        'forms': 'Settings - Forms',
         'versions': 'Settings - Versions',
         'publishing': 'Settings - Publishing',
         'namespaces': 'Settings - Namespaces'
@@ -396,6 +399,8 @@ const SettingsManager = () => {
                 return <ValueListEditor />
             case 'object-types':
                 return <ObjectTypeManager />
+            case 'forms':
+                return <FormManager />
 
             case 'versions':
                 return renderVersionManagement()

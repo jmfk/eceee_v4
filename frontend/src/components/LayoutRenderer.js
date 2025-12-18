@@ -2698,6 +2698,9 @@ class LayoutRenderer {
       case 'video':
         return this.renderVideoWidget(config);
 
+      case 'dynamic_form':
+        return this.renderDynamicFormWidget(config);
+
       default:
         return this.renderDefaultWidget(type, config);
     }
@@ -2886,6 +2889,46 @@ class LayoutRenderer {
     `;
 
     return divider;
+  }
+
+  /**
+   * Render dynamic form widget (mount point for React component)
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Mount point element
+   */
+  renderDynamicFormWidget(config) {
+    const container = document.createElement('div');
+    container.className = 'dynamic-form-container';
+    
+    if (config.formName) {
+      container.id = `form-mount-${config.formName}-${this.generateWidgetId()}`;
+      container.setAttribute('data-dynamic-form', config.formName);
+      container.innerHTML = `
+        <div class="animate-pulse space-y-4 p-4">
+          <div class="h-8 bg-gray-100 rounded w-1/3"></div>
+          <div class="h-10 bg-gray-100 rounded"></div>
+          <div class="h-10 bg-gray-100 rounded"></div>
+          <div class="h-32 bg-gray-100 rounded"></div>
+        </div>
+      `;
+      
+      // Notify through callback that a React component needs to be mounted
+      setTimeout(() => {
+        this.executeUICallback('mount_react_widget', {
+          type: 'dynamic_form',
+          config: config,
+          element: container
+        });
+      }, 0);
+    } else {
+      container.innerHTML = `
+        <div class="p-6 border-2 border-dashed border-gray-300 rounded text-center text-gray-400">
+          No form selected.
+        </div>
+      `;
+    }
+    
+    return container;
   }
 
   /**

@@ -1,218 +1,180 @@
-import React, { useState, useEffect, Suspense } from 'react'
-import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
-import { getFieldComponent } from '../form-fields'
-import { Loader2 } from 'lucide-react'
-import useLocalFormState from '../../hooks/useLocalFormState'
-import LocalStateFieldWrapper from './LocalStateFieldWrapper'
-import { formatFieldLabel } from '../../utils/labelFormatting'
+import React, { useState, useEffect } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { api } from '../../api/client'
+import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
-/**
- * DynamicFormRenderer Component
- * 
- * Renders forms dynamically based on field type definitions from the backend.
- * Uses the field type registry to determine which components to render for each field.
- * 
- * Refactored to use local state management and prevent unnecessary re-renders.
- */
-const DynamicFormRenderer = React.memo(({
-    schema,
-    data = {},
-    onChange,
-    validation = {},
-    isValidating = {},
-    onSubmit,
-    submitLabel = 'Submit',
-    disabled = false,
-    className = '',
-    namespace = null,
-}) => {
-    const [fieldComponents, setFieldComponents] = useState({})
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(null)
+const DynamicFormRenderer = ({ formName, fields: initialFields = [], onSuccess }) => {
+    const [formData, setFormData] = useState({})
+    const [errors, setErrors] = useState({})
+    const [isSubmitted, setIsSubmitted] = useState(false)
+    const [fields, setFields] = useState(initialFields)
 
-    // Use local form state management
-    const {
-        handleFieldChange,
-        handleSubmit,
-        updateFormData,
-        getFormData
-    } = useLocalFormState(data, {
-        onChange,
-        onSubmit,
-        validateOnSubmit: true
+    // Fetch form definition if fields are not provided
+    const { data: formDef, isLoading: formLoading } = useQuery({
+        queryKey: ['form-definition', formName],
+        queryFn: async () => {
+            const response = await api.get(`/api/v1/forms/forms/${formName}/`)
+            return response.data
+        },
+        enabled: !!formName && (!initialFields || initialFields.length === 0)
     })
 
-    // Initialize form data when data prop changes
     useEffect(() => {
-        updateFormData(data)
-    }, [data, updateFormData])
-
-    // Load field types and components on mount
+        if (formDef?.fields) {
+            setFields(formDef.fields)
+        }
+    }, [formDef])
+    
+    // Update fields if initialFields changes (e.g. from editor)
     useEffect(() => {
-        const loadComponents = async () => {
-            try {
-                setLoading(true)
+        if (initialFields && initialFields.length > 0) {
+            setFields(initialFields)
+        }
+    }, [initialFields])
 
-                // Ensure field types are loaded from backend
-                await fieldTypeRegistry.ensureLoaded()
-
-                // Get all field types that are used in the schema
-                const usedFieldTypes = new Set()
-                if (schema?.properties) {
-                    Object.values(schema.properties).forEach(fieldDef => {
-                        if (fieldDef.fieldType) {
-                            usedFieldTypes.add(fieldDef.fieldType)
-                        }
-                    })
-                }
-
-                // Load components for used field types
-                const componentPromises = {}
-                for (const fieldType of usedFieldTypes) {
-                    const fieldTypeDef = fieldTypeRegistry.getFieldType(fieldType)
-                    if (fieldTypeDef?.component) {
-                        componentPromises[fieldType] = getFieldComponent(fieldTypeDef.component)
-                    }
-                }
-
-                const resolvedComponents = {}
-                for (const [fieldType, promise] of Object.entries(componentPromises)) {
-                    try {
-                        resolvedComponents[fieldType] = await promise
-                    } catch (err) {
-                        console.error(`Failed to load component for field type ${fieldType}:`, err)
-                        // Fallback will be handled by getFieldComponent
-                        resolvedComponents[fieldType] = await getFieldComponent('TextInput')
-                    }
-                }
-
-                setFieldComponents(resolvedComponents)
-                setError(null)
-            } catch (err) {
-                console.error('Failed to load form components:', err)
-                setError(err.message)
-            } finally {
-                setLoading(false)
+    const submissionMutation = useMutation({
+        mutationFn: async (data) => {
+            const response = await api.post('/api/v1/forms/submissions/', {
+                form_name: formName,
+                data: data
+            })
+            return response.data
+        },
+        onSuccess: (data) => {
+            setIsSubmitted(true)
+            if (onSuccess) onSuccess(data)
+        },
+        onError: (error) => {
+            if (error.response?.data?.errors) {
+                setErrors(error.response.data.errors)
+            } else {
+                setErrors({ _global: 'An unexpected error occurred. Please try again.' })
             }
         }
+    })
 
-        loadComponents()
-    }, [schema])
-
-    const renderField = (fieldName, fieldDef) => {
-        const fieldType = fieldDef.fieldType
-        const FieldComponent = fieldComponents[fieldType]
-
-        if (!FieldComponent) {
-            return (
-                <div key={fieldName} className="p-3 border border-yellow-200 rounded bg-yellow-50">
-                    <div className="text-sm text-yellow-700">
-                        Loading component for field type: {fieldType}
-                    </div>
-                </div>
-            )
+    const handleChange = (name, value) => {
+        setFormData(prev => ({ ...prev, [name]: value }))
+        // Clear error when field changes
+        if (errors[name]) {
+            const newErrors = { ...errors }
+            delete newErrors[name]
+            setErrors(newErrors)
         }
+    }
 
-        const fieldValue = data[fieldName]
-        const fieldValidation = validation[fieldName]
-        const fieldIsValidating = isValidating[fieldName]
+    const handleSubmit = (e) => {
+        e.preventDefault()
+        setErrors({})
+        submissionMutation.mutate(formData)
+    }
 
-        // Get field type definition for additional props
-        const fieldTypeDef = fieldTypeRegistry.getFieldType(fieldType)
-        const uiProps = fieldTypeDef?.uiProps || {}
-
-        const fieldProps = {
-            label: fieldDef.title || formatFieldLabel(fieldName),
-            description: fieldDef.description,
-            required: schema?.required?.includes(fieldName),
-            disabled,
-            validation: fieldValidation,
-            isValidating: fieldIsValidating,
-            namespace: namespace,
-            fieldName: fieldName, // Pass fieldName for UDC integration
-            // Pass through field type specific UI props
-            ...uiProps,
-            // Pass through field definition props
-            ...fieldDef
-        }
+    if (formLoading && (!fields || fields.length === 0)) {
         return (
-            <div key={fieldName} className="space-y-1">
-                <Suspense fallback={
-                    <div className="flex items-center space-x-2 p-3 border border-gray-200 rounded">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm text-gray-500">Loading field...</span>
-                    </div>
-                }>
-                    <LocalStateFieldWrapper
-                        fieldName={fieldName}
-                        initialValue={fieldValue}
-                        FieldComponent={FieldComponent}
-                        fieldProps={fieldProps}
-                        onFieldChange={handleFieldChange}
-                        debounceMs={200}
-                        validateOnChange={true}
-                    />
-                </Suspense>
+            <div className="animate-pulse space-y-4 p-4">
+                <div className="h-8 bg-gray-100 rounded w-1/3"></div>
+                <div className="h-10 bg-gray-100 rounded"></div>
+                <div className="h-10 bg-gray-100 rounded"></div>
+                <div className="h-32 bg-gray-100 rounded"></div>
             </div>
         )
     }
 
-    if (loading) {
+    if (isSubmitted) {
         return (
-            <div className="flex items-center justify-center p-8">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                <span>Loading form...</span>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-green-900 mb-2">Thank you!</h3>
+                <p className="text-green-700">Your submission has been received successfully.</p>
+                <button 
+                    onClick={() => { setIsSubmitted(false); setFormData({}); }}
+                    className="mt-6 text-green-600 font-medium hover:underline"
+                >
+                    Submit another response
+                </button>
             </div>
         )
     }
-
-    if (error) {
-        return (
-            <div className="p-4 border border-red-200 rounded bg-red-50">
-                <div className="text-red-700">Failed to load form: {error}</div>
-            </div>
-        )
-    }
-
-    if (!schema?.properties) {
-        return (
-            <div className="p-4 border border-gray-200 rounded bg-gray-50">
-                <div className="text-gray-600">No form schema provided</div>
-            </div>
-        )
-    }
-
-    // Get ordered property keys
-    const propertyOrder = schema.propertyOrder || Object.keys(schema.properties)
-    const orderedFields = propertyOrder.filter(key => schema.properties[key])
 
     return (
-        <form onSubmit={handleSubmit} className={`space-y-6 ${className}`}>
-            {orderedFields.map(fieldName => {
-                const fieldDef = schema.properties[fieldName]
-                return renderField(fieldName, fieldDef)
-            })}
-
-            {onSubmit && (
-                <div className="flex justify-end">
-                    <button
-                        type="submit"
-                        disabled={disabled}
-                        className={`
-                            px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 
-                            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            transition-colors duration-200
-                        `}
-                    >
-                        {submitLabel}
-                    </button>
+        <form onSubmit={handleSubmit} className="space-y-6">
+            {errors._global && (
+                <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center">
+                    <AlertCircle className="w-5 h-5 mr-2" />
+                    {errors._global}
                 </div>
             )}
+
+            <div className="grid grid-cols-1 gap-6">
+                {fields.map((field) => {
+                    const error = errors[field.name]
+                    
+                    return (
+                        <div key={field.id} className="form-group">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {field.label}
+                                {field.validation?.required && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            
+                            {field.type === 'textarea' ? (
+                                <textarea
+                                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
+                                        error ? 'border-red-500' : 'border-gray-300'
+                                    }`}
+                                    rows={field.ui?.rows || 4}
+                                    value={formData[field.name] || ''}
+                                    onChange={(e) => handleChange(field.name, e.target.value)}
+                                    placeholder={field.ui?.placeholder}
+                                />
+                            ) : field.type === 'select' ? (
+                                <select
+                                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
+                                        error ? 'border-red-500' : 'border-gray-300'
+                                    }`}
+                                    value={formData[field.name] || ''}
+                                    onChange={(e) => handleChange(field.name, e.target.value)}
+                                >
+                                    <option value="">Select an option...</option>
+                                    {(field.options || []).map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    type={field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
+                                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
+                                        error ? 'border-red-500' : 'border-gray-300'
+                                    }`}
+                                    value={formData[field.name] || ''}
+                                    onChange={(e) => handleChange(field.name, e.target.value)}
+                                    placeholder={field.ui?.placeholder}
+                                />
+                            )}
+                            
+                            {error && (
+                                <p className="mt-1 text-sm text-red-600">{error}</p>
+                            )}
+                            
+                            {field.description && (
+                                <p className="mt-1 text-xs text-gray-500">{field.description}</p>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
+
+            <div className="pt-4">
+                <button
+                    type="submit"
+                    disabled={submissionMutation.isPending}
+                    className="w-full md:w-auto px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                    {submissionMutation.isPending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+                    Submit
+                </button>
+            </div>
         </form>
     )
-})
-
-DynamicFormRenderer.displayName = 'DynamicFormRenderer'
+}
 
 export default DynamicFormRenderer
