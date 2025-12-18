@@ -230,3 +230,4 @@ class ThemeImageValidator:
 
         return (min_width, None)
 
+

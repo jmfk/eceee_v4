@@ -107,8 +107,5 @@ class Command(BaseCommand):
                 )
 
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Failed to list files: {e}")
-            )
+            self.stdout.write(self.style.ERROR(f"Failed to list files: {e}"))
             logger.error(f"Failed to list files: {e}")
-
