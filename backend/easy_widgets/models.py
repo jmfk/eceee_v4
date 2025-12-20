@@ -27,15 +27,18 @@ class LinkData(BaseModel):
         populate_by_name=True,
     )
     
-    type: Literal["internal", "external", "email", "phone", "anchor"]
+    type: Literal["internal", "external", "email", "phone", "anchor", "media"]
     page_id: Optional[int] = None
     page_title: Optional[str] = None
     page_short_title: Optional[str] = None
+    media_id: Optional[str] = None
     url: Optional[str] = None
     address: Optional[str] = None
     number: Optional[str] = None
     anchor: Optional[str] = None
     label: str = ""
+    title: Optional[str] = None
+    mime_type: Optional[str] = None
     is_active: bool = True
     target_blank: bool = False
 

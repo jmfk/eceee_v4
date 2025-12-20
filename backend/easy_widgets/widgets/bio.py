@@ -237,11 +237,22 @@ class BioWidget(BaseWidget):
         """
         Prepare template context with processed media and text.
         """
+        from webpages.services.link_resolver import resolve_links_in_html
+        
         template_config = super().prepare_template_context(config, context)
         context = context if context else {}
 
+        # Resolve links in bio text
+        bio_text = config.get("bio_text", config.get("bioText", ""))
+        if bio_text:
+            template_config["bio_text"] = resolve_links_in_html(
+                bio_text, 
+                context.get("request")
+            )
+        else:
+            template_config["bio_text"] = ""
+
         # Get snake_case fields for template
-        template_config["bio_text"] = config.get("bio_text", "")
         template_config["text_layout"] = config.get("text_layout", "column")
         template_config["use_content_margins"] = config.get(
             "use_content_margins", False

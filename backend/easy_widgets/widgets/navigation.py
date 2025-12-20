@@ -493,6 +493,18 @@ class NavigationWidget(BaseWidget):
             elif link_data.type == "anchor":
                 processed["url"] = f"#{link_data.anchor or ''}"
                 processed_items.append(processed)
+            elif link_data.type == "media":
+                from webpages.services.link_resolver import resolve_link
+                # Create a link object for the resolver
+                link_obj = {
+                    "type": "media",
+                    "mediaId": link_data.media_id,
+                    "url": link_data.url,
+                    "title": link_data.title,
+                    "mimeType": link_data.mime_type
+                }
+                processed["url"] = resolve_link(link_obj, context.get("request"))
+                processed_items.append(processed)
 
         # Batch lookup for internal pages
         valid_indices = set()

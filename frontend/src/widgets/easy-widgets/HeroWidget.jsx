@@ -218,7 +218,10 @@ const HeroWidget = ({
                     mode: 'text-only',
                     onChange: handleHeaderChange,
                     placeholder: 'Enter hero header...',
-                    element: 'h1'
+                    element: 'h1',
+                    pageId: context?.pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
                 })
                 headerEditorRef.current.render()
             }
@@ -230,7 +233,10 @@ const HeroWidget = ({
                     mode: 'text-only',
                     onChange: handleBeforeTextChange,
                     placeholder: 'Enter text before header...',
-                    element: 'h5'
+                    element: 'h5',
+                    pageId: context?.pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
                 })
                 beforeTextEditorRef.current.render()
             }
@@ -242,7 +248,10 @@ const HeroWidget = ({
                     mode: 'text-only',
                     onChange: handleAfterTextChange,
                     placeholder: 'Enter text after header...',
-                    element: 'h6'
+                    element: 'h6',
+                    pageId: context?.pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
                 })
                 afterTextEditorRef.current.render()
             }
@@ -264,20 +273,35 @@ const HeroWidget = ({
         }
     }, [mode])
 
-    // Update onChange callbacks when handlers change
+    // Update onChange callbacks and context when handlers change
     useEffect(() => {
         if (mode === 'editor') {
             if (headerEditorRef.current) {
-                headerEditorRef.current.updateConfig({ onChange: handleHeaderChange })
+                headerEditorRef.current.updateConfig({
+                    onChange: handleHeaderChange,
+                    pageId: context?.pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
+                })
             }
             if (beforeTextEditorRef.current) {
-                beforeTextEditorRef.current.updateConfig({ onChange: handleBeforeTextChange })
+                beforeTextEditorRef.current.updateConfig({
+                    onChange: handleBeforeTextChange,
+                    pageId: context?.pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
+                })
             }
             if (afterTextEditorRef.current) {
-                afterTextEditorRef.current.updateConfig({ onChange: handleAfterTextChange })
+                afterTextEditorRef.current.updateConfig({
+                    onChange: handleAfterTextChange,
+                    pageId: context?.pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
+                })
             }
         }
-    }, [handleHeaderChange, handleBeforeTextChange, handleAfterTextChange, mode])
+    }, [handleHeaderChange, handleBeforeTextChange, handleAfterTextChange, context?.pageId, context?.siteRootId, mode])
 
     // Update editor content when config changes externally (from UDC/widget form)
     useEffect(() => {

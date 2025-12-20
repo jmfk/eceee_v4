@@ -54,7 +54,7 @@ const ContentCardWidget = ({
     // State for optimized image URLs
     const [image1Url, setImage1Url] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
-    
+
     // State for image edit modal
     const [showImageModal, setShowImageModal] = useState(false)
     const [editingField, setEditingField] = useState(null)
@@ -208,7 +208,10 @@ const ContentCardWidget = ({
                     placeholder: 'Enter card header...',
                     element: 'h2',
                     allowedButtons: undefined,
-                    allowedFormats: undefined
+                    allowedFormats: undefined,
+                    pageId: pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
                 })
                 headerEditorRef.current.render()
             }
@@ -223,7 +226,9 @@ const ContentCardWidget = ({
                     element: 'div',
                     allowedButtons: ['format', 'bold', 'italic', 'link'],
                     allowedFormats: ['<p>', '<h2>', '<h3>'],
-                    pageId: pageId
+                    pageId: pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
                 })
                 contentEditorRef.current.render()
             }
@@ -241,17 +246,27 @@ const ContentCardWidget = ({
         }
     }, [mode])
 
-    // Update onChange callbacks when handlers change
+    // Update onChange callbacks and context when handlers change
     useEffect(() => {
         if (mode === 'editor') {
             if (headerEditorRef.current) {
-                headerEditorRef.current.updateConfig({ onChange: handleHeaderChange })
+                headerEditorRef.current.updateConfig({
+                    onChange: handleHeaderChange,
+                    pageId: pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
+                })
             }
             if (contentEditorRef.current) {
-                contentEditorRef.current.updateConfig({ onChange: handleContentChange })
+                contentEditorRef.current.updateConfig({
+                    onChange: handleContentChange,
+                    pageId: pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
+                })
             }
         }
-    }, [handleHeaderChange, handleContentChange, mode])
+    }, [handleHeaderChange, handleContentChange, pageId, context?.siteRootId, context?.namespace, mode])
 
     // Update editor content when config changes externally
     useEffect(() => {

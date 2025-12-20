@@ -205,9 +205,9 @@ const SchemaFieldRenderer = ({
 
                 if (hasDuplicate) {
                     return {
-                        isValid: true, // Still valid, just a warning
-                        errors: [],
-                        warnings: ['This anchor already exists on this page']
+                        isValid: false, // Prevents saving
+                        errors: ['This anchor already exists on this page'],
+                        warnings: []
                     }
                 }
 

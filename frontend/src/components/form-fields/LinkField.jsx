@@ -12,7 +12,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, ExternalLink, Loader2, Mail, Phone, Hash, FileText, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Link, ExternalLink, Loader2, Mail, Phone, Hash, FileText, ToggleLeft, ToggleRight, Image } from 'lucide-react'
 import { api } from '../../api/client'
 import { endpoints } from '../../api/endpoints'
 import LinkPicker from '../LinkPicker'
@@ -161,6 +161,13 @@ const LinkDisplay = ({ url, onEdit, currentSiteId, disabled }) => {
                         #{linkObj.anchor || ''}
                     </span>
                 )
+            case 'media':
+                return (
+                    <span className="flex items-center gap-1 truncate">
+                        <Image size={12} className="text-gray-400 flex-shrink-0" />
+                        {linkObj.title || 'Media file'}
+                    </span>
+                )
             default:
                 // Unknown type - check if we have a label to show
                 if (linkObj.label && typeof linkObj.label === 'string' && linkObj.label.trim()) {
@@ -194,6 +201,7 @@ const LinkDisplay = ({ url, onEdit, currentSiteId, disabled }) => {
             case 'email': return Mail
             case 'phone': return Phone
             case 'anchor': return Hash
+            case 'media': return Image
             default: return Link
         }
     }
@@ -308,6 +316,7 @@ const LinkField = ({
     const pageId = currentPageId || context?.pageId || null
     const siteRootId = currentSiteRootId || context?.siteRootId || context?.webpageData?.cachedRootId || null
     const siteId = currentSiteId || context?.siteId || context?.webpageData?.cachedRootId || null
+    const namespace = context?.namespace || 'default'
 
     // Update the full link object
     const updateValue = useCallback((updates) => {
@@ -473,6 +482,7 @@ const LinkField = ({
                 initialText=""
                 currentPageId={pageId}
                 currentSiteRootId={siteRootId}
+                namespace={namespace}
                 showRemoveButton={!!hasLink}
             />
         </div>

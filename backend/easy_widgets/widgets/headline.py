@@ -208,7 +208,16 @@ class HeadlineWidget(BaseWidget):
         """
         Prepare template context with snake_case field conversions.
         """
+        from webpages.services.link_resolver import resolve_links_in_html
+        
         template_config = config.copy() if config else {}
+
+        # Resolve links in content
+        if template_config.get("content"):
+            template_config["content"] = resolve_links_in_html(
+                template_config["content"], 
+                context.get("request") if context else None
+            )
 
         # Ensure snake_case fields for template
         template_config["component_style"] = config.get("component_style", "default")

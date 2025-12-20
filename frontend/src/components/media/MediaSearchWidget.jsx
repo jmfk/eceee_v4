@@ -132,12 +132,12 @@ const MediaSearchWidget = ({
     const triggerTextSearch = (text) => {
         // Get current tag terms (exclude text type)
         const tagTerms = searchTerms.filter(term => term.type === 'tag')
-        
+
         // Create new search terms array with tags plus new text (if any)
-        const newSearchTerms = text.trim() 
+        const newSearchTerms = text.trim()
             ? [...tagTerms, { value: text.trim(), type: 'text' }]
             : tagTerms
-        
+
         onChange(newSearchTerms)
     }
 
@@ -204,9 +204,9 @@ const MediaSearchWidget = ({
             { value: normalizedValue, type: 'tag' },
             ...textTerms
         ]
-        
+
         onChange(newSearchTerms)
-        
+
         // Don't clear input - keep text search active
         setShowSuggestions(false)
         setSelectedIndex(-1)

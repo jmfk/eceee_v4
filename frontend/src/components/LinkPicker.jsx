@@ -29,17 +29,20 @@ import {
     Loader2,
     ExternalLink,
     FileText,
-    Trash2
+    Trash2,
+    Image
 } from 'lucide-react'
 import { pagesApi } from '../api'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import FloatingDialog from './FloatingDialog'
 import { getBreadcrumbs } from '../utils/pageStructure'
+import MediaBrowser from './media/MediaBrowser'
 
 // Link type definitions
 const LINK_TYPES = {
     internal: { label: 'Internal Page', icon: FileText },
+    media: { label: 'Media File', icon: Image },
     external: { label: 'External URL', icon: Globe },
     email: { label: 'Email', icon: Mail },
     phone: { label: 'Phone', icon: Phone },
@@ -85,6 +88,18 @@ const parseLink = (linkValue) => {
 
     // Already an object
     if (typeof linkValue === 'object' && linkValue.type) {
+        // Special handling for media links to ensure all data is present
+        if (linkValue.type === 'media') {
+            return {
+                type: 'media',
+                data: {
+                    mediaId: linkValue.mediaId,
+                    url: linkValue.url,
+                    title: linkValue.title,
+                    mimeType: linkValue.mimeType
+                }
+            }
+        }
         return { type: linkValue.type, data: linkValue }
     }
 
@@ -102,6 +117,14 @@ const buildLinkObject = (type, data) => {
                 type: 'internal',
                 pageId: data.pageId,
                 ...(data.anchor && { anchor: data.anchor })
+            }
+        case 'media':
+            return {
+                type: 'media',
+                mediaId: data.mediaId,
+                url: data.url,
+                title: data.title,
+                mimeType: data.mimeType
             }
         case 'external':
             return {
@@ -350,8 +373,17 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
         staleTime: 30000
     })
 
-    // Ensure anchors is always an array
-    const anchors = Array.isArray(anchorsData) ? anchorsData : []
+    // Ensure anchors is always an array and filter out duplicates
+    const anchors = useMemo(() => {
+        const rawAnchors = Array.isArray(anchorsData) ? anchorsData : []
+        const seen = new Set()
+        return rawAnchors.filter(item => {
+            const anchorValue = (item.anchor || item)?.toString().toLowerCase()
+            if (!anchorValue || seen.has(anchorValue)) return false
+            seen.add(anchorValue)
+            return true
+        })
+    }, [anchorsData])
 
     if (!pageId) {
         return (
@@ -411,6 +443,56 @@ const AnchorSelector = ({ pageId, selectedAnchor, onSelectAnchor }) => {
                     )}
                 </button>
             ))}
+        </div>
+    )
+}
+
+/**
+ * Media Tab Content
+ */
+const MediaTab = ({ data, onChange, namespace }) => {
+    const handleFileSelect = (file) => {
+        onChange({
+            ...data,
+            mediaId: file.id,
+            url: file.imgproxyBaseUrl || file.fileUrl || file.url,
+            title: file.title || file.original_filename || 'Media file',
+            mimeType: file.contentType || file.content_type
+        })
+    }
+
+    return (
+        <div className="flex flex-col border border-gray-200 rounded-md overflow-hidden bg-white" style={{ height: '400px' }}>
+            {data.mediaId && (
+                <div className="p-3 border-b border-gray-200 bg-blue-50 flex items-center justify-between">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <span className="text-sm font-medium text-blue-900 truncate">
+                            Selected: {data.title}
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => onChange({})}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                        Clear
+                    </button>
+                </div>
+            )}
+            <div className="flex-1 overflow-auto">
+                <MediaBrowser
+                    onFileSelect={handleFileSelect}
+                    selectionMode="single"
+                    fileTypes={['image', 'video', 'audio', 'document']}
+                    namespace={namespace}
+                    showUploader={true}
+                    hideShowDeleted={true}
+                    hideTypeFilter={false}
+                    hideActions={true}
+                    compact={true}
+                    defaultViewMode="list"
+                />
+            </div>
         </div>
     )
 }
@@ -513,17 +595,19 @@ const InternalPageTab = ({
                 {/* Current Page quick select */}
                 {currentPageId && (
                     <div className="p-2 border-b border-gray-200 bg-blue-50">
+                        <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1 px-1">
+                            Current Page
+                        </div>
                         <button
                             onClick={handleSelectCurrentPage}
-                            className={`w-full px-3 py-2 text-sm rounded-md transition-colors ${
-                                data.pageId === currentPageId
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200'
-                            }`}
+                            className={`w-full px-3 py-2 text-sm rounded-md transition-colors ${data.pageId === currentPageId
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200'
+                                }`}
                         >
                             <div className="flex items-center justify-center gap-2">
                                 <FileText className="w-4 h-4" />
-                                <span className="font-medium">Current Page</span>
+                                <span className="font-medium">Select Current Page</span>
                             </div>
                         </button>
                     </div>
@@ -710,6 +794,7 @@ const LinkPicker = ({
     initialText = '',
     currentPageId = null,
     currentSiteRootId = null,
+    namespace = 'default',
     showRemoveButton = false,
     onSave
 }) => {
@@ -745,6 +830,7 @@ const LinkPicker = ({
             }
             return linkData.pageShortTitle || linkData.pageTitle || ''
         }
+        if (activeTab === 'media') return linkData.title || ''
         if (activeTab === 'external') return linkData.url || ''
         if (activeTab === 'email') return linkData.address || ''
         if (activeTab === 'phone') return linkData.number || ''
@@ -786,6 +872,8 @@ const LinkPicker = ({
         switch (activeTab) {
             case 'internal':
                 return !!linkData.pageId
+            case 'media':
+                return !!linkData.mediaId
             case 'external':
                 return !!linkData.url
             case 'email':
@@ -877,6 +965,13 @@ const LinkPicker = ({
                         onChange={setLinkData}
                         currentPageId={currentPageId}
                         currentSiteRootId={currentSiteRootId}
+                    />
+                )}
+                {activeTab === 'media' && (
+                    <MediaTab
+                        data={linkData}
+                        onChange={setLinkData}
+                        namespace={namespace}
                     />
                 )}
                 {activeTab === 'external' && (

@@ -8,6 +8,7 @@
 import { createRoot } from 'react-dom/client'
 import { createElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
 import LinkPicker from '../LinkPicker'
 
 // Shared query client for link picker
@@ -41,6 +42,7 @@ export class LinkPickerModal {
      * @param {HTMLElement} linkData.linkElement - Existing link element (for edit mode)
      * @param {number} linkData.currentPageId - Current page ID for context
      * @param {number} linkData.currentSiteRootId - Site root page ID
+     * @param {string} linkData.namespace - Namespace slug
      * @returns {Promise} Resolves with link result or rejects on cancel
      */
     show(linkData = {}) {
@@ -54,7 +56,8 @@ export class LinkPickerModal {
                 openInNewTab = false,
                 linkElement = null,
                 currentPageId = null,
-                currentSiteRootId = null
+                currentSiteRootId = null,
+                namespace = 'default'
             } = linkData
 
             // Create container
@@ -68,7 +71,7 @@ export class LinkPickerModal {
             // Handle save
             const handleSave = (result) => {
                 this.close()
-                
+
                 // Convert link object to URL string for backward compatibility
                 let urlValue = ''
                 if (result.link) {
@@ -96,16 +99,19 @@ export class LinkPickerModal {
             // Render LinkPicker
             this.root.render(
                 createElement(QueryClientProvider, { client: queryClient },
-                    createElement(LinkPicker, {
-                        isOpen: true,
-                        onClose: handleClose,
-                        onSave: handleSave,
-                        initialLink: url,
-                        initialText: text,
-                        currentPageId: currentPageId,
-                        currentSiteRootId: currentSiteRootId,
-                        showRemoveButton: !!linkElement
-                    })
+                    createElement(GlobalNotificationProvider, {},
+                        createElement(LinkPicker, {
+                            isOpen: true,
+                            onClose: handleClose,
+                            onSave: handleSave,
+                            initialLink: url,
+                            initialText: text,
+                            currentPageId: currentPageId,
+                            currentSiteRootId: currentSiteRootId,
+                            namespace: namespace,
+                            showRemoveButton: !!linkElement
+                        })
+                    )
                 )
             )
         })

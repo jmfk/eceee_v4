@@ -493,6 +493,7 @@ export class SimpleTextEditorRenderer {
         // Get current page context from options
         const currentPageId = this.options?.pageId || null
         const currentSiteRootId = this.options?.siteRootId || null
+        const namespace = this.options?.namespace || null
 
         // Show the link picker
         this.linkPickerModal.show({
@@ -501,7 +502,8 @@ export class SimpleTextEditorRenderer {
             openInNewTab: linkElement && linkElement.getAttribute('target') === '_blank',
             linkElement: linkElement,
             currentPageId: currentPageId,
-            currentSiteRootId: currentSiteRootId
+            currentSiteRootId: currentSiteRootId,
+            namespace: namespace
         }).then(result => {
             if (result.action === 'remove') {
                 // Remove link
@@ -692,6 +694,12 @@ export class SimpleTextEditorRenderer {
         }
         if (newOptions.allowedFormats !== undefined) {
             this.options.allowedFormats = newOptions.allowedFormats
+        }
+        if (newOptions.siteRootId !== undefined) {
+            this.options.siteRootId = newOptions.siteRootId
+        }
+        if (newOptions.pageId !== undefined) {
+            this.options.pageId = newOptions.pageId
         }
 
         // Update content if it changed and is different from current editor content

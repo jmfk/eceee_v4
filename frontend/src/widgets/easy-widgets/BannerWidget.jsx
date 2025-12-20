@@ -294,7 +294,8 @@ const BannerWidget = ({
                     allowedButtons: allowedButtons,
                     allowedFormats: allowedFormatsForMode,
                     maxBreaks: bannerMode === 'header' ? 1 : undefined,
-                    pageId: pageId
+                    pageId: pageId,
+                    siteRootId: context?.siteRootId
                 })
                 contentEditorRef.current.render()
             }
@@ -308,14 +309,17 @@ const BannerWidget = ({
         }
     }, [mode, bannerMode])
 
-    // Update onChange callback when handler changes
+    // Separate effect for onChange, className, namespace, slotDimensions, and pageId updates
     useEffect(() => {
-        if (mode === 'editor') {
-            if (contentEditorRef.current) {
-                contentEditorRef.current.updateConfig({ onChange: handleContentChange })
-            }
+        if (mode === 'editor' && contentEditorRef.current) {
+            contentEditorRef.current.updateConfig({
+                onChange: handleContentChange,
+                pageId: pageId,
+                siteRootId: context?.siteRootId,
+                namespace: namespace || context?.namespace
+            })
         }
-    }, [handleContentChange, mode])
+    }, [handleContentChange, pageId, context?.siteRootId, namespace, context?.namespace, mode])
 
     // Handle bannerMode changes from widget form - reinitialize editor with new element
     useEffect(() => {
@@ -509,21 +513,21 @@ const BannerWidget = ({
                             }}
                             onSelect={(selectedItems) => {
                                 if (selectedItems === null) {
-                                        // Handle remove - set to null
-                                        handleImageChange(editingField, null)
-                                    } else if (selectedItems && selectedItems.length > 0) {
-                                        handleImageChange(editingField, selectedItems[0])
-                                    }
-                                    setShowImageModal(false)
-                                    setEditingField(null)
-                                }}
-                                mediaTypes={['image']}
-                                allowCollections={false}
-                                currentSelection={editingField === 'backgroundImage' ? backgroundImage : image1}
-                                namespace={namespace || context?.namespace}
-                                pageId={pageId}
-                                customTitle={editingField === 'backgroundImage' ? 'Edit Banner Background Image' : 'Edit Banner Image'}
-                            />
+                                    // Handle remove - set to null
+                                    handleImageChange(editingField, null)
+                                } else if (selectedItems && selectedItems.length > 0) {
+                                    handleImageChange(editingField, selectedItems[0])
+                                }
+                                setShowImageModal(false)
+                                setEditingField(null)
+                            }}
+                            mediaTypes={['image']}
+                            allowCollections={false}
+                            currentSelection={editingField === 'backgroundImage' ? backgroundImage : image1}
+                            namespace={namespace || context?.namespace}
+                            pageId={pageId}
+                            customTitle={editingField === 'backgroundImage' ? 'Edit Banner Background Image' : 'Edit Banner Image'}
+                        />
                     )}
                 </div>
             )

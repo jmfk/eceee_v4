@@ -1489,9 +1489,10 @@ class ContentWidgetEditorRenderer {
             this.linkPickerModal = new LinkPickerModal()
         }
 
-        // Get current page context from options
-        const currentPageId = this.options?.pageId || null
-        const currentSiteRootId = this.options?.siteRootId || null
+        // Get current page context from instance properties
+        const currentPageId = this.pageId || null
+        const currentSiteRootId = this.siteRootId || null
+        const namespace = this.namespace || null
 
         // Show the link picker
         this.linkPickerModal.show({
@@ -1500,7 +1501,8 @@ class ContentWidgetEditorRenderer {
             openInNewTab: linkElement && linkElement.getAttribute('target') === '_blank',
             linkElement: linkElement,
             currentPageId: currentPageId,
-            currentSiteRootId: currentSiteRootId
+            currentSiteRootId: currentSiteRootId,
+            namespace: namespace
         }).then(result => {
             if (result.action === 'remove') {
                 this.removeLink(linkElement)

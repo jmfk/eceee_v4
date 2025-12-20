@@ -80,9 +80,16 @@ const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimen
     // Separate effect for other config updates
     useEffect(() => {
         if (rendererRef.current) {
-            rendererRef.current.updateConfig({ onChange, className, namespace, slotDimensions, pageId })
+            rendererRef.current.updateConfig({
+                onChange,
+                className,
+                namespace,
+                slotDimensions,
+                pageId,
+                siteRootId
+            })
         }
-    }, [onChange, className, namespace, slotDimensions, pageId])
+    }, [onChange, className, namespace, slotDimensions, pageId, siteRootId])
 
     useEffect(() => {
         return () => {

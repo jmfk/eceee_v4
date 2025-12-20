@@ -58,11 +58,14 @@ const MediaBrowser = ({
     hideTypeFilter = false, // Hide the type filter dropdown
     onPendingApprovalChange, // Callback when pending approval state changes
     hideInlineApprovalForm = false, // Hide the inline approval form (when using external pending tab)
-    onPendingFilesCreated // Callback when files are uploaded to pending state
+    onPendingFilesCreated, // Callback when files are uploaded to pending state
+    hideActions = false, // Hide the actions column/buttons
+    compact = false, // Compact view for modals
+    defaultViewMode = 'grid' // grid or list
 }) => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [viewMode, setViewMode] = useState('grid'); // 'grid', 'list'
+    const [viewMode, setViewMode] = useState(defaultViewMode); // 'grid', 'list'
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [searchTerms, setSearchTerms] = useState([]);
     const [filters, setFilters] = useState({
@@ -99,14 +102,12 @@ const MediaBrowser = ({
         }
     }, [showApprovalForm, pendingApprovalFiles, onPendingApprovalChange]);
 
-    // Scroll to approval form when it appears
+    // Auto-switch to list view when document filter is selected
     useEffect(() => {
-        if (showApprovalForm && pendingApprovalFiles.length > 0 && approvalFormRef.current) {
-            setTimeout(() => {
-                approvalFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
+        if (filters.fileType === 'document') {
+            setViewMode('list');
         }
-    }, [showApprovalForm, pendingApprovalFiles]);
+    }, [filters.fileType]);
 
     const { addNotification } = useGlobalNotifications();
 
@@ -704,7 +705,7 @@ const MediaBrowser = ({
 
     // Render grid view with dynamic sizing for wide images
     const renderGridView = () => (
-        <div className="grid grid-cols-6 md:grid-cols-9 lg:grid-cols-12 gap-4 p-4" style={{ gridAutoRows: 'auto' }}>
+        <div className={`grid ${compact ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 p-2' : 'grid-cols-6 md:grid-cols-9 lg:grid-cols-12 gap-4 p-4'}`} style={{ gridAutoRows: 'auto' }}>
             {files.map((file) => {
                 const aspectRatio = getImageAspectRatio(file);
                 const { colSpan, orientation } = getGridSpan(aspectRatio);
@@ -712,17 +713,17 @@ const MediaBrowser = ({
                 const isImage = file.fileType === 'image' || file.file_type === 'image';
                 const isTall = aspectRatio && aspectRatio < 0.7; // Tall images have aspect ratio < 0.7
 
-                // Use dynamic column span from getGridSpan
+                // Use dynamic column span from getGridSpan, or auto for compact mode
                 const gridStyle = {
-                    gridColumn: `span ${colSpan}`
+                    gridColumn: compact ? 'auto' : `span ${colSpan}`
                 };
 
                 // Calculate proper image size for retina displays (@2x)
                 // Base cell width is ~150px per 4-column span on a 12-column grid
                 // For a 1200px container: 12 cols = 1200px, 4 cols = 400px
                 // With retina (@2x) we need 800px for 4-col, 1600px for 8-col, 2400px for 12-col
-                const baseCellWidth = 400; // Approximate width of 4-column cell
-                const imageWidth = Math.floor((colSpan / 4) * baseCellWidth * 2); // 2x for retina
+                const baseCellWidth = compact ? 200 : 400; // Smaller base width for compact mode
+                const imageWidth = Math.floor((compact ? 1 : colSpan / 4) * baseCellWidth * 2); // 2x for retina
 
                 // Always use 'contain' to prevent upscaling and maintain aspect ratio
                 // This ensures images never display larger than their actual dimensions
@@ -743,7 +744,7 @@ const MediaBrowser = ({
                         title={`${orientation}${aspectRatio ? ` - AR: ${aspectRatio.toFixed(2)}` : ''}`}
                     >
                         {/* Quick View Button (for extended images only) */}
-                        {isExtended && isImage && !file.is_deleted && (
+                        {isExtended && isImage && !file.is_deleted && !compact && (
                             <button
                                 onClick={(e) => handleQuickViewClick(file, e)}
                                 className="absolute top-2 left-2 z-10 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-full shadow-md transition-all duration-200 opacity-0 group-hover:opacity-100"
@@ -754,60 +755,64 @@ const MediaBrowser = ({
                         )}
 
                         {/* Action Buttons */}
-                        <div className="absolute top-2 right-2 z-10 flex gap-1">
-                            {file.is_deleted ? (
-                                <>
+                        {!hideActions && !compact && (
+                            <div className="absolute top-2 right-2 z-10 flex gap-1">
+                                {file.is_deleted ? (
+                                    <>
+                                        <button
+                                            onClick={(e) => handleRestoreClick(file, e)}
+                                            className="p-1.5 bg-green-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-green-600"
+                                            title="Restore file"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleForceDeleteClick(file, e)}
+                                            className="p-1.5 bg-red-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-red-600"
+                                            title="Permanently delete file"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </>
+                                ) : (
                                     <button
-                                        onClick={(e) => handleRestoreClick(file, e)}
-                                        className="p-1.5 bg-green-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-green-600"
-                                        title="Restore file"
+                                        onClick={(e) => handleEditClick(file, e)}
+                                        className="p-1.5 bg-white rounded-full shadow-md transition-opacity duration-200 hover:bg-gray-50"
+                                        title="Edit file"
                                     >
-                                        <RefreshCw className="w-3.5 h-3.5" />
+                                        <Edit3 className="w-3.5 h-3.5 text-gray-600" />
                                     </button>
-                                    <button
-                                        onClick={(e) => handleForceDeleteClick(file, e)}
-                                        className="p-1.5 bg-red-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-red-600"
-                                        title="Permanently delete file"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                </>
-                            ) : (
-                                <button
-                                    onClick={(e) => handleEditClick(file, e)}
-                                    className="p-1.5 bg-white rounded-full shadow-md transition-opacity duration-200 hover:bg-gray-50"
-                                    title="Edit file"
-                                >
-                                    <Edit3 className="w-3.5 h-3.5 text-gray-600" />
-                                </button>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Deleted Status Badge */}
                         {file.is_deleted && (
-                            <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-md">
+                            <div className={`absolute top-2 left-2 z-10 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-md ${compact ? 'scale-75' : ''}`}>
                                 Deleted
                             </div>
                         )}
 
-                        <div className={`w-full flex-1 p-2 flex items-center justify-center bg-gray-50 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}>
+                        <div className={`w-full flex-1 flex items-center justify-center bg-gray-50 ${compact ? 'p-1 h-[120px] max-h-[120px]' : `p-2 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}`}>
                             {renderThumbnail(file, imageWidth, objectFit)}
                         </div>
-                        <div className="p-3 border-t border-gray-100 flex-shrink-0">
+                        <div className={`${compact ? 'p-1.5' : 'p-3'} border-t border-gray-100 flex-shrink-0`}>
                             <div
-                                className="text-sm font-medium text-gray-900 truncate mb-1"
+                                className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-900 truncate mb-0.5`}
                                 title={file.title}
-                             role="heading" aria-level="4">
+                                role="heading" aria-level="4">
                                 {file.title}
                             </div>
-                            <div className="text-xs text-gray-500 mb-1">
-                                {file.fileType || file.file_type} • {formatFileSize(file.fileSize || file.file_size)}
-                            </div>
-                            {(file.width && file.height) && (
+                            {!compact && (
+                                <div className="text-xs text-gray-500 mb-1">
+                                    {file.fileType || file.file_type} • {formatFileSize(file.fileSize || file.file_size)}
+                                </div>
+                            )}
+                            {(file.width && file.height && !compact) && (
                                 <div className="text-xs text-gray-400">{file.width}x{file.height}</div>
                             )}
                             {/* Tags */}
-                            {file.tags && file.tags.length > 0 && (
+                            {file.tags && file.tags.length > 0 && !compact && (
                                 <div className="flex gap-1 mt-1.5 flex-wrap">
                                     {file.tags.slice(0, 4).map(tag => (
                                         <span
@@ -834,19 +839,19 @@ const MediaBrowser = ({
     // Render list view
     const renderListView = () => (
         <div className="overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+            <div className={`grid ${hideActions || compact ? 'grid-cols-11' : 'grid-cols-12'} gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700`}>
                 <div className="col-span-1">Preview</div>
                 <div className="col-span-3">Title</div>
                 <div className="col-span-2">Type</div>
                 <div className="col-span-2">Size</div>
                 <div className="col-span-3">Created</div>
-                <div className="col-span-1">Actions</div>
+                {!(hideActions || compact) && <div className="col-span-1">Actions</div>}
             </div>
             {files.map((file) => (
                 <div
                     key={file.id}
                     className={`
-                        group grid grid-cols-12 gap-4 p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 items-center
+                        group grid ${hideActions || compact ? 'grid-cols-11' : 'grid-cols-12'} gap-4 p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 items-center
                         ${isFileSelected(file) ? 'bg-blue-50 border-blue-200' : ''}
                     `}
                     onClick={() => handleFileClick(file)}
@@ -883,34 +888,36 @@ const MediaBrowser = ({
                     <div className="col-span-2 text-sm text-gray-600 capitalize flex items-center">{file.fileType || file.file_type}</div>
                     <div className="col-span-2 text-sm text-gray-600 flex items-center">{formatFileSize(file.fileSize || file.file_size)}</div>
                     <div className="col-span-3 text-sm text-gray-600 flex items-center">{formatDate(file.createdAt || file.created_at)}</div>
-                    <div className="col-span-1 flex justify-center items-center gap-1">
-                        {file.is_deleted ? (
-                            <>
+                    {!(hideActions || compact) && (
+                        <div className="col-span-1 flex justify-center items-center gap-1">
+                            {file.is_deleted ? (
+                                <>
+                                    <button
+                                        onClick={(e) => handleRestoreClick(file, e)}
+                                        className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                        title="Restore file"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleForceDeleteClick(file, e)}
+                                        className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                        title="Permanently delete file"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </>
+                            ) : (
                                 <button
-                                    onClick={(e) => handleRestoreClick(file, e)}
-                                    className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
-                                    title="Restore file"
+                                    onClick={(e) => handleEditClick(file, e)}
+                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                    title="Edit file"
                                 >
-                                    <RefreshCw className="w-4 h-4" />
+                                    <Edit3 className="w-4 h-4" />
                                 </button>
-                                <button
-                                    onClick={(e) => handleForceDeleteClick(file, e)}
-                                    className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                    title="Permanently delete file"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </>
-                        ) : (
-                            <button
-                                onClick={(e) => handleEditClick(file, e)}
-                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                title="Edit file"
-                            >
-                                <Edit3 className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
                     {file.is_deleted && (
                         <div className="absolute right-full mr-2 px-2 py-0.5 bg-red-500 text-white text-xs font-medium rounded-full">
                             Deleted

@@ -381,8 +381,19 @@ class BannerWidget(BaseWidget):
         Prepare template context with snake_case field conversions and layout properties.
         """
         from webpages.utils.color_utils import resolve_color_value
+        from webpages.services.link_resolver import resolve_links_in_html
 
         template_config = config.copy() if config else {}
+        request = context.get("request") if context else None
+
+        # Resolve links in rich text fields
+        header_content = config.get("header_content", "")
+        if header_content:
+            template_config["header_content"] = resolve_links_in_html(header_content, request)
+        
+        text_content = config.get("text_content", "")
+        if text_content:
+            template_config["text_content"] = resolve_links_in_html(text_content, request)
 
         # Get theme colors for CSS variable conversion
         theme = context.get("theme") if context else None

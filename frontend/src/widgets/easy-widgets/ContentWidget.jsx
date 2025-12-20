@@ -118,9 +118,16 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
     // Separate effect for onChange, className, namespace, slotDimensions, and pageId updates
     useEffect(() => {
         if (rendererRef.current) {
-            rendererRef.current.updateConfig({ onChange, className, namespace, slotDimensions, pageId })
+            rendererRef.current.updateConfig({
+                onChange,
+                className,
+                namespace,
+                slotDimensions,
+                pageId,
+                siteRootId
+            })
         }
-    }, [onChange, className, namespace, slotDimensions, pageId])
+    }, [onChange, className, namespace, slotDimensions, pageId, siteRootId])
 
     useEffect(() => {
         return () => {

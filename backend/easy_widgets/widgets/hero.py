@@ -328,8 +328,18 @@ class HeroWidget(BaseWidget):
         """
         from file_manager.imgproxy import imgproxy_service
         from webpages.utils.color_utils import resolve_color_value
+        from webpages.services.link_resolver import resolve_links_in_html
 
         template_config = config.copy() if config else {}
+
+        # Resolve links in rich text fields
+        request = context.get("request") if context else None
+        if template_config.get("header"):
+            template_config["header"] = resolve_links_in_html(template_config["header"], request)
+        if template_config.get("before_text"):
+            template_config["before_text"] = resolve_links_in_html(template_config["before_text"], request)
+        if template_config.get("after_text"):
+            template_config["after_text"] = resolve_links_in_html(template_config["after_text"], request)
 
         # Get theme colors for CSS variable conversion
         theme = context.get("theme") if context else None

@@ -160,7 +160,9 @@ const HeadlineWidget = ({
                     placeholder: 'Enter headline...',
                     element: configRef.current.headerLevel || 'h1',
                     allowedButtons: ['bold', 'italic', 'link'],
-                    pageId: pageId
+                    pageId: pageId,
+                    siteRootId: context?.siteRootId,
+                    namespace: context?.namespace
                 })
                 contentEditorRef.current.render()
             }
@@ -174,14 +176,17 @@ const HeadlineWidget = ({
         }
     }, [mode])
 
-    // Update onChange callback when handler changes
+    // Separate effect for onChange, pageId, and siteRootId updates
     useEffect(() => {
-        if (mode === 'editor') {
-            if (contentEditorRef.current) {
-                contentEditorRef.current.updateConfig({ onChange: handleContentChange })
-            }
+        if (mode === 'editor' && contentEditorRef.current) {
+            contentEditorRef.current.updateConfig({
+                onChange: handleContentChange,
+                pageId: pageId,
+                siteRootId: context?.siteRootId,
+                namespace: context?.namespace
+            })
         }
-    }, [handleContentChange, mode])
+    }, [handleContentChange, pageId, context?.siteRootId, mode])
 
     // Update editor content when config changes externally (from UDC/widget form)
     useEffect(() => {
