@@ -5,7 +5,7 @@ Utility views for media file management.
 import logging
 import re
 from django.utils import timezone
-from django.http import Http404
+from django.http import Http404, FileResponse
 from django.shortcuts import redirect
 from rest_framework import status, permissions
 from rest_framework.views import APIView
@@ -13,7 +13,7 @@ from rest_framework.response import Response
 
 from ..models import MediaFile, MediaTag, MediaCollection
 from ..serializers import BulkOperationSerializer
-from ..storage import storage
+from ..storage import storage, S3MediaStorage
 
 logger = logging.getLogger(__name__)
 
@@ -323,6 +323,66 @@ class MediaFileBySlugView(APIView):
                 # Fallback to public URL
                 public_url = storage.get_public_url(media_file.file_path)
                 return redirect(public_url)
+
+        except (Namespace.DoesNotExist, MediaFile.DoesNotExist):
+            raise Http404("Media file not found")
+
+
+class MediaFileProxyView(APIView):
+    """Stream media files through Django with proper headers."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, namespace_slug, file_slug):
+        """Get media file by namespace and file slug and stream it."""
+        try:
+            from content.models import Namespace
+
+            # Remove extension if present in the slug (cosmetic only)
+            if "." in file_slug:
+                file_slug = file_slug.rsplit(".", 1)[0]
+
+            namespace = Namespace.objects.get(slug=namespace_slug)
+            media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
+
+            # Resolve replacements
+            current = media_file
+            seen = set()
+            for _ in range(10):
+                if not current.replaced_by_id:
+                    break
+                if current.id in seen:
+                    break
+                seen.add(current.id)
+                current = current.replaced_by
+            media_file = current
+
+            # Update access tracking
+            media_file.download_count += 1
+            media_file.last_accessed = timezone.now()
+            media_file.save(update_fields=["download_count", "last_accessed"])
+
+            # Use storage to open the file
+            # storage._open returns a streaming body from S3
+            try:
+                file_body = storage._open(media_file.file_path)
+            except Exception as e:
+                logger.error(f"Failed to open media file {media_file.id} from storage: {e}")
+                raise Http404("Media file not available in storage")
+
+            # Create FileResponse for efficient streaming
+            # It handles Content-Length and Range requests (if used correctly)
+            response = FileResponse(file_body, content_type=media_file.content_type)
+            
+            # Set Content-Disposition
+            disposition = "attachment" if request.GET.get("download") == "1" else "inline"
+            filename = media_file.original_filename
+            response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
+            
+            # Add cache headers for better performance
+            response["Cache-Control"] = "public, max-age=3600"
+            
+            return response
 
         except (Namespace.DoesNotExist, MediaFile.DoesNotExist):
             raise Http404("Media file not found")

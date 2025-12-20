@@ -455,7 +455,7 @@ const MediaTab = ({ data, onChange, namespace }) => {
         onChange({
             ...data,
             mediaId: file.id,
-            url: file.imgproxyBaseUrl || file.fileUrl || file.url,
+            url: file.absoluteUrl || file.downloadUrl || file.fileUrl || file.url,
             title: file.title || file.original_filename || 'Media file',
             mimeType: file.contentType || file.content_type
         })

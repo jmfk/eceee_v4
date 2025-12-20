@@ -510,9 +510,11 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_file_url(self, obj):
-        """Get file URL."""
-        # This will be implemented with the storage service
-        return f"/api/media/files/{obj.id}/download/"
+        """Get file URL (proxy URL)."""
+        try:
+            return obj.get_absolute_url()
+        except:
+            return f"/api/media/files/{obj.id}/download/"
 
     def validate_slug(self, value):
         """Validate slug format and uniqueness within namespace."""

@@ -14,6 +14,7 @@ from .views import (
     MediaFileBySlugView,
     MediaFileByUUIDView,
     MediaFileDownloadView,
+    MediaFileProxyView,
     PendingMediaFileViewSet,
     MediaSlugValidationView,
     BulkMediaOperationsView,
@@ -56,6 +57,12 @@ urlpatterns = [
         "download/<slug:namespace_slug>/<slug:file_slug>/",
         MediaFileDownloadView.as_view(),
         name="media-file-download",
+    ),
+    # File proxy URL pattern (clean access)
+    path(
+        "proxy/<slug:namespace_slug>/<path:file_slug>",
+        MediaFileProxyView.as_view(),
+        name="media-file-proxy",
     ),
     # imgproxy URL signing endpoints (secure server-side signing)
     path(

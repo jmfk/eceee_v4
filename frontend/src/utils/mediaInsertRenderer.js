@@ -102,7 +102,7 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
     if (config.enableLightbox) {
         const lbStyle = config.lightboxStyle || 'default';
         const lbGroup = config.lightboxGroup || '';
-        const fullSrc = mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl || imageUrl;
+        const fullSrc = mediaData.absoluteUrl || mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl || imageUrl;
         const caption = config.caption || mediaData.title || '';
         return `<a data-lightbox data-lightbox-style="${escapeHtml(lbStyle)}"${lbGroup ? ` data-lightbox-group="${escapeHtml(lbGroup)}"` : ''} data-lightbox-src="${escapeHtml(fullSrc)}" data-lightbox-caption="${escapeHtml(caption)}">${imgEl}</a>`;
     }
@@ -312,7 +312,7 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
     if (mediaData && config.mediaType === 'image') {
         const a = element.querySelector('[data-lightbox]');
         if (config.enableLightbox) {
-            const fullSrc = mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl;
+            const fullSrc = mediaData.absoluteUrl || mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl;
             if (a) {
                 a.setAttribute('data-lightbox', '');
                 a.setAttribute('data-lightbox-style', config.lightboxStyle || 'default');

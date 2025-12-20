@@ -26,6 +26,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 # Import hostname-aware views for multi-site functionality
 from webpages.public_views import HostnamePageView
 from webpages.views.lightbox import lightbox_item_view, lightbox_group_view
+from file_manager.views.utils import MediaFileProxyView
 
 
 def health_check(request):
@@ -73,6 +74,12 @@ urlpatterns = [
     path("metrics/", include("django_prometheus.urls")),
     # CSRF token endpoint for frontend
     path("csrf-token/", csrf_token_view, name="csrf-token"),
+    # Media file proxy (clean root URLs)
+    path(
+        "files/<slug:namespace_slug>/<path:file_slug>",
+        MediaFileProxyView.as_view(),
+        name="media-file-proxy-root",
+    ),
     # Multi-site hostname-aware routing - MUST be last for catch-all functionality
     path("", HostnamePageView.as_view(), name="hostname-root"),
     path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),

@@ -16,6 +16,7 @@ from .utils import (
     MediaFileBySlugView,
     MediaFileByUUIDView,
     MediaFileDownloadView,
+    MediaFileProxyView,
 )
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "MediaFileBySlugView",
     "MediaFileByUUIDView",
     "MediaFileDownloadView",
+    "MediaFileProxyView",
 ]

@@ -915,14 +915,24 @@ class MediaFile(models.Model):
         """Calculate SHA-256 hash of file content."""
         return hashlib.sha256(file_content).hexdigest()
 
-    def get_absolute_url(self):
-        """Get the canonical URL for this media file using slug."""
-        from django.urls import reverse
+    def get_file_extension(self):
+        """Get file extension from original filename or derive from content_type."""
+        import mimetypes
+        import os
+        # Try from original filename first
+        if self.original_filename:
+            ext = os.path.splitext(self.original_filename)[1]
+            if ext:
+                return ext.lower()
+        # Fallback to mime type
+        ext = mimetypes.guess_extension(self.content_type)
+        return ext.lower() if ext else ''
 
-        return reverse(
-            "file_manager:media-file-by-slug",
-            kwargs={"namespace_slug": self.namespace.slug, "file_slug": self.slug},
-        )
+    def get_absolute_url(self):
+        """Get the canonical URL for this media file using slug and extension."""
+        ext = self.get_file_extension()
+        # Return clean /files/namespace/slug.ext URL
+        return f"/files/{self.namespace.slug}/{self.slug}{ext}"
 
     def get_uuid_url(self):
         """Get the UUID-based URL for this media file."""
