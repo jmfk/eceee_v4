@@ -241,7 +241,7 @@ class WebPage(models.Model):
         return self.is_root_page() and bool(self.hostnames)
 
     @classmethod
-    def normalize_hostname(cls, hostname):
+    def normalize_hostname(cls, hostname, strip_port=True):
         """
         Normalize hostname with support for IPv6, IDN, and proper port handling.
 
@@ -249,8 +249,8 @@ class WebPage(models.Model):
 
         Examples:
         - "http://example.com/path" -> "example.com"
-        - "https://localhost:8000" -> "localhost:8000"
-        - "[::1]:8080" -> "[::1]:8080"
+        - "https://localhost:8000" -> "localhost" (if strip_port=True)
+        - "[::1]:8080" -> "[::1]" (if strip_port=True)
         - "2001:db8::1" -> "[2001:db8::1]"
         - "münchen.de" -> "xn--mnchen-3ya.de"
         """
@@ -266,8 +266,8 @@ class WebPage(models.Model):
         # Security: Basic character validation to prevent injection
         import re
 
-        # Allow protocol prefixes, alphanumeric chars, dots, dashes, brackets, colons, slashes, query params
-        if not re.match(r"^[a-zA-Z0-9\[\]:._\-/\?#%]+$", hostname):
+        # Allow protocol prefixes, alphanumeric chars, dots, dashes, brackets, colons, slashes, query params, and wildcards
+        if not re.match(r"^[a-zA-Z0-9\[\]:._\-/\?#%\*]+$", hostname):
             return ""
 
         # Convert to lowercase for protocol detection
@@ -310,6 +310,8 @@ class WebPage(models.Model):
                         port = int(port_part)
                         if not (1 <= port <= 65535):
                             raise ValueError(f"Invalid port: {port}")
+                        if strip_port:
+                            return f"[{ipv6_part}]"
                         return f"[{ipv6_part}]:{port}"  # Preserve original case
                     else:
                         # Just brackets with colon but no port
@@ -361,6 +363,8 @@ class WebPage(models.Model):
                         port = int(port_part)
                         if not (1 <= port <= 65535):
                             raise ValueError(f"Invalid port: {port}")
+                        if strip_port:
+                            return host_part
                         return f"{host_part}:{port}"
                     except ValueError:
                         # Port part is not a valid number, treat as part of hostname
@@ -493,26 +497,36 @@ class WebPage(models.Model):
 
     @classmethod
     def get_root_page_for_hostname(cls, hostname):
-        """Get the root page that serves the given hostname"""
+        """
+        Get the root page that serves the given hostname.
+        Ignores port numbers during matching.
+        """
         normalized_hostname = cls.normalize_hostname(hostname)
 
-        # Look for exact hostname match in array field
+        # 1. Try exact match in the array field (fast path)
         pages = cls.objects.filter(
             parent__isnull=True,
             hostnames__contains=[normalized_hostname],
             is_deleted=False,
-        )
+        ).select_related("parent")
 
         if pages.exists():
-            return pages.select_related("parent").first()
+            return pages.first()
 
-        # Fallback: look for wildcard or default patterns using array overlap
+        # 2. Fallback: Iterate through root pages and match normalized versions
+        # This ensures we match 'hostname:8000' even if we're accessing 'hostname:8001'
+        # and vice-versa, as the user wants to ignore ports globally.
+        for page in cls.objects.filter(parent__isnull=True, is_deleted=False).select_related("parent"):
+            if any(cls.normalize_hostname(h) == normalized_hostname for h in page.hostnames):
+                return page
+
+        # 3. Last fallback: look for wildcard or default patterns
         wildcard_pages = cls.objects.filter(
             parent__isnull=True, hostnames__overlap=["*", "default"], is_deleted=False
-        )
+        ).select_related("parent")
 
         if wildcard_pages.exists():
-            return wildcard_pages.select_related("parent").first()
+            return wildcard_pages.first()
 
         return None
 
@@ -2189,6 +2203,10 @@ class WebPage(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to clear hostname cache when hostnames change."""
+        # Ensure all hostnames are normalized (strips ports by default)
+        if self.hostnames:
+            self.hostnames = [self.normalize_hostname(h) for h in self.hostnames if h]
+
         # Check if hostnames are being changed (for cache invalidation)
         hostname_changed = False
         if self.pk:  # Only check for existing objects
