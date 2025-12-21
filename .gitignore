@@ -54,6 +54,13 @@ themes/**/*.conflict
 # Testing
 /coverage
 .nyc_output
+.coverage
+.coverage.*
+htmlcov/
+backend/.coverage
+backend/htmlcov/
+.pytest_cache/
+backend/.pytest_cache/
 
 # Production builds
 /build
@@ -86,3 +93,6 @@ storage/
 
 # Separate Repositories
 easy3e-serverless/
+
+
+themes

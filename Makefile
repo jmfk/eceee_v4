@@ -92,9 +92,14 @@ install:
 	cd backend && pip install -r requirements.txt
 	cd frontend && npm install
 
-# Run Django backend server
-servers:
-	docker-compose -f docker-compose.dev.yml up db redis minio imgproxy -d
+# Run infrastructure services
+infra-up:
+	docker-compose -f docker-compose.infra.yml up -d
+
+infra-down:
+	docker-compose -f docker-compose.infra.yml down
+
+servers: infra-up
 
 backend:
 	docker-compose -f docker-compose.dev.yml up backend
@@ -377,16 +382,18 @@ lint:
 	cd frontend && npm run lint
 
 # Start all services with Docker Compose
-docker-up:
+docker-up: infra-up
 	docker-compose -f docker-compose.dev.yml up --build
 
 # Stop all Docker Compose services
 docker-down:
 	docker-compose -f docker-compose.dev.yml down
+	docker-compose -f docker-compose.infra.yml down
 
 # Restart all Docker Compose services
 restart:
 	docker-compose -f docker-compose.dev.yml restart
+	docker-compose -f docker-compose.infra.yml restart
 
 # Stop Playwright service
 playwright-down:
@@ -402,6 +409,7 @@ clean:
 	rm -rf backend/*.pyc backend/*.pyo backend/.pytest_cache
 	rm -rf frontend/node_modules frontend/dist
 	docker-compose -f docker-compose.dev.yml down -v
+	docker-compose -f docker-compose.infra.yml down -v
 	cd playwright-service && docker-compose down -v
 
 # ECEEE Components Sync Commands
