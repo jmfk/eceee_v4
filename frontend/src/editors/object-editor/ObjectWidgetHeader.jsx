@@ -29,7 +29,10 @@ const ObjectWidgetHeader = ({
     isRequired = false,
     maxWidgets = null,
     currentIndex = 0,
-    className = ''
+    className = '',
+    // Selection props
+    isWidgetSelected = false,
+    onToggleWidgetSelection
 }) => {
     const [showMenu, setShowMenu] = useState(false)
     const menuRef = useRef(null)
@@ -59,7 +62,21 @@ const ObjectWidgetHeader = ({
     return (
         <div className={`widget-header object-editor-header bg-gray-100 border border-gray-200 rounded-t px-3 py-2 flex items-center justify-between ${className}`}>
             {/* Left side - Widget info and constraints */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
+                {/* Selection checkbox */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleWidgetSelection?.()
+                    }}
+                    className={`flex items-center justify-center w-4 h-4 rounded border transition-colors ${isWidgetSelected
+                            ? 'bg-blue-500 border-blue-500 text-white'
+                            : 'bg-white border-gray-300 hover:border-blue-400'
+                        }`}
+                >
+                    {isWidgetSelected && <Check className="h-3 w-3" />}
+                </button>
+
                 <div className="flex items-center space-x-2">
                     <span className="text-xs font-medium text-gray-700">
                         {widgetType}

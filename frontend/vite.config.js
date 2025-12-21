@@ -26,29 +26,29 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,
         secure: false,
         timeout: 300000, // 5 minutes for large uploads
         proxyTimeout: 300000,
       },
       '/admin': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,
         secure: false,
       },
       '/static': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,
         secure: false,
       },
       '/health': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,
         secure: false,
       },
       '/csrf-token': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,
         secure: false,
       },
