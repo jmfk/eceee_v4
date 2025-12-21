@@ -82,7 +82,7 @@ services:
       IMGPROXY_ENFORCE_AVIF: false
       IMGPROXY_USE_S3: false
       IMGPROXY_SET_CANONICAL_HEADER: true
-      IMGPROXY_ALLOWED_SOURCES: s3://eceee-media/,local://,http://minio:9000/eceee-media/,http://minio:9000/,http://minio:9000/eceee-media/media/,http://localhost:8080/
+      IMGPROXY_ALLOWED_SOURCES: s3://eceee-media/,local://,http://minio:9000/eceee-media/,http://minio:9000/,http://minio:9000/eceee-media/media/,http://localhost:8080/,http://backend:8000/
       IMGPROXY_LOG_LEVEL: info
       IMGPROXY_ENABLE_DEBUG_HEADERS: "true"
       IMGPROXY_IGNORE_SSL_VERIFICATION: "true"

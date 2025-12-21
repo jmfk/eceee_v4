@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, ChevronDown, Layout } from 'lucide-react'
 import OptimizedImage from './media/OptimizedImage'
@@ -14,7 +14,7 @@ const ObjectTypeSelector = ({
     const buttonRef = useRef(null)
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
 
-    const updateCoords = () => {
+    const updateCoords = useCallback(() => {
         if (buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect()
             setCoords({
@@ -23,7 +23,7 @@ const ObjectTypeSelector = ({
                 width: rect.width
             })
         }
-    }
+    }, [])
 
     const handleToggle = () => {
         if (!isOpen) {
@@ -47,15 +47,14 @@ const ObjectTypeSelector = ({
     // Update coordinates on scroll or resize to keep menu attached to button
     useEffect(() => {
         if (isOpen) {
-            const handleUpdate = () => updateCoords()
-            window.addEventListener('scroll', handleUpdate, true)
-            window.addEventListener('resize', handleUpdate)
+            window.addEventListener('scroll', updateCoords, true)
+            window.addEventListener('resize', updateCoords)
             return () => {
-                window.removeEventListener('scroll', handleUpdate, true)
-                window.removeEventListener('resize', handleUpdate)
+                window.removeEventListener('scroll', updateCoords, true)
+                window.removeEventListener('resize', updateCoords)
             }
         }
-    }, [isOpen])
+    }, [isOpen, updateCoords])
 
     if (allowedChildTypes.length === 0) {
         return null

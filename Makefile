@@ -26,7 +26,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports replicate-db list-dbs switch-db
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports replicate-db list-dbs switch-db
 
 # Dummy targets for help flags
 --help:
@@ -122,6 +122,9 @@ help: ## Show this help message (use: make help [target])
 		echo "  sync-to           Sync components FROM eceee_v4 TO eceee-components"; \
 		echo ""; \
 		echo "Environment & Health Checks:"; \
+		echo "  infra-up               Run infrastructure services"; \
+		echo "  infra-down             Stop infrastructure services"; \
+		echo "  infra-restart          Restart infrastructure services"; \
 		echo "  clear-layout-cache     Clear layout-related caches to force refresh"; \
 		echo "  clear-layout-cache-all Clear ALL caches (nuclear option)"; \
 		echo "  check-servers          Check if backend and frontend servers are up"; \
@@ -142,13 +145,6 @@ help: ## Show this help message (use: make help [target])
 install:
 	cd backend && pip install -r requirements.txt
 	cd frontend && npm install
-
-# Run infrastructure services
-infra-up:
-	docker-compose -f docker-compose.infra.yml up -d
-
-infra-down:
-	docker-compose -f docker-compose.infra.yml down
 
 servers: infra-up
 
@@ -479,6 +475,16 @@ clean:
 # sync-to: ## Sync components FROM eceee_v4 TO eceee-components
 # 	@echo "🔄 Syncing components FROM eceee_v4 TO eceee-components..."
 # 	@./sync-to-eceee-components.sh
+
+# Environment & Health Checks
+infra-up: ## Run infrastructure services
+	docker-compose -f docker-compose.infra.yml up -d
+
+infra-down: ## Stop infrastructure services
+	docker-compose -f docker-compose.infra.yml down
+
+infra-restart: ## Restart infrastructure services
+	docker-compose -f docker-compose.infra.yml restart
 
 clear-layout-cache: ## Clear layout-related caches to force refresh
 	@echo "🧹 Clearing layout caches..."
