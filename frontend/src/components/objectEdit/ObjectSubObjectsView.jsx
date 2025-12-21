@@ -216,19 +216,6 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
     return (
         <>
             <div className="h-full flex flex-col relative">
-                {/* Content Header */}
-                <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3">
-                    <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="1">
-                        <Users className="h-5 w-5 mr-2" />
-                        Sub-objects & Hierarchy
-                        {objectType && (
-                            <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                {objectType.label}
-                            </span>
-                        )}
-                    </div>
-                </div>
-
                 {/* Scrollable Content Area */}
                 <div className="flex-1 min-h-0 overflow-y-auto bg-white">
                     <div className="p-6">

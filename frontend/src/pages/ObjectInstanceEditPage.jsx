@@ -11,6 +11,7 @@ import { OperationTypes } from '../contexts/unified-data/types/operations'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import StatusBar from '../components/StatusBar'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import Breadcrumbs from '../components/common/Breadcrumbs'
 
 // Import individual tab components
 import ObjectContentView from '../components/objectEdit/ObjectContentView'
@@ -152,8 +153,32 @@ const ObjectInstanceEditPage = () => {
         enabled: !!instanceId && !isNewInstance
     })
 
+    // Load parent metadata for new instances with parent
+    const { data: parentResponse } = useQuery({
+        queryKey: ['objectInstance', parentIdFromUrl, 'metadata'],
+        queryFn: () => objectInstancesApi.get(parentIdFromUrl),
+        enabled: isNewInstance && !!parentIdFromUrl
+    })
+    const parentMetadata = parentResponse?.data
+
+    // Fetch path to root for breadcrumbs
+    const { data: pathToRootResponse, isLoading: pathLoading } = useQuery({
+        queryKey: ['objectInstance', instanceId, 'pathToRoot'],
+        queryFn: () => objectInstancesApi.getPathToRoot(instanceId),
+        enabled: !!instanceId && !isNewInstance
+    })
+
+    // Fetch path to root for the parent if creating a sub-object
+    const { data: parentPathToRootResponse } = useQuery({
+        queryKey: ['objectInstance', parentIdFromUrl, 'pathToRoot'],
+        queryFn: () => objectInstancesApi.getPathToRoot(parentIdFromUrl),
+        enabled: isNewInstance && !!parentIdFromUrl
+    })
+    const parentPathToRoot = parentPathToRootResponse?.data || []
+
     const objectType = objectTypeResponse?.data
     const instance = instanceResponse?.data
+    const pathToRoot = pathToRootResponse?.data || []
 
     // Set document title
     const documentTitle = isNewInstance 
@@ -319,19 +344,24 @@ const ObjectInstanceEditPage = () => {
 
 
     const handleBack = () => {
-        // If this object has a parent (either from URL param or instance data), 
-        // navigate back to parent's sub-objects view
-        const actualParentId = parentIdFromUrl || instance?.parent?.id || instance?.parent
-        if (actualParentId) {
-            navigate(`/objects/${actualParentId}/edit/subobjects`)
+        // If this object has a parent from the path to root, navigate to it
+        if (parentObject) {
+            navigate(`/objects/${parentObject.id}/edit/subobjects`)
+            return
+        }
+
+        // Fallback to parentIdFromUrl if available
+        if (parentIdFromUrl) {
+            navigate(`/objects/${parentIdFromUrl}/edit/subobjects`)
+            return
+        }
+
+        // If no parent, go to the list view filtered by this object's type
+        const objectTypeName = objectType?.name || instance?.objectTypeName
+        if (objectTypeName) {
+            navigate(`/objects/${objectTypeName}`)
         } else {
-            // If no parent, go to the list view filtered by this object's type
-            const objectTypeName = objectType?.name
-            if (objectTypeName) {
-                navigate(`/objects/${objectTypeName}`)
-            } else {
-                navigate('/objects')
-            }
+            navigate('/objects')
         }
     }
 
@@ -340,6 +370,58 @@ const ObjectInstanceEditPage = () => {
             ? `/objects/new/${objectTypeId}/${tabId}`
             : `/objects/${instanceId}/edit/${tabId}`
     }
+
+    // Construct breadcrumbs
+    const breadcrumbItems = useMemo(() => {
+        const items = [
+            { label: 'Objects', path: '/objects', icon: Layout }
+        ]
+
+        if (isNewInstance) {
+            if (parentPathToRoot.length > 0) {
+                parentPathToRoot.forEach((node) => {
+                    items.push({ 
+                        label: node.title, 
+                        path: `/objects/${node.id}/edit/content` 
+                    })
+                })
+                // Add link back to parent's subobjects tab
+                const parentNode = parentPathToRoot[parentPathToRoot.length - 1]
+                items[items.length - 1].path = `/objects/${parentNode.id}/edit/subobjects`
+            } else if (objectType) {
+                items.push({ 
+                    label: objectType.pluralLabel || objectType.label, 
+                    path: `/objects/${objectType.name}` 
+                })
+            }
+            items.push({ label: `New ${objectType?.label || 'Object'}` })
+        } else if (pathToRoot.length > 0) {
+            pathToRoot.forEach((node, index) => {
+                const isCurrent = index === pathToRoot.length - 1
+                if (isCurrent) {
+                    items.push({ label: node.title })
+                } else {
+                    items.push({ 
+                        label: node.title, 
+                        path: `/objects/${node.id}/edit/content` 
+                    })
+                }
+            })
+        }
+
+        return items
+    }, [objectType, instance, pathToRoot, parentPathToRoot, isNewInstance])
+
+    const parentObject = useMemo(() => {
+        if (!isNewInstance) {
+            if (pathToRoot.length > 1) {
+                return pathToRoot[pathToRoot.length - 2]
+            }
+        } else if (parentIdFromUrl && parentMetadata) {
+            return parentMetadata
+        }
+        return null
+    }, [pathToRoot, isNewInstance, parentIdFromUrl, parentMetadata])
 
     // Render current tab content
     const renderTabContent = () => {
@@ -411,14 +493,16 @@ const ObjectInstanceEditPage = () => {
                             <button
                                 onClick={handleBack}
                                 className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                title={parentObject ? `Back to ${parentObject.title}` : 'Back to Objects'}
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
-                                Back to Objects
+                                {parentObject ? `Back to ${parentObject.title}` : 'Back to Objects'}
                             </button>
 
                             <div className="h-6 w-px bg-gray-300"></div>
 
-                            <div>
+                            <div className="min-w-0">
+                                <Breadcrumbs items={breadcrumbItems} className="mb-0.5" />
                                 <div className="text-lg font-semibold text-gray-900 truncate flex items-center" role="heading" aria-level="1">
                                     {objectType?.iconImage ? (
                                         <img
