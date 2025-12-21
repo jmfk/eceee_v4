@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from unittest.mock import patch, Mock
 
 from webpages.models import WebPage
+from core.models import Tenant
 from webpages.middleware import (
     DynamicHostValidationMiddleware,
     get_dynamic_allowed_hosts,
@@ -29,6 +30,11 @@ class DynamicHostValidationTest(TestCase):
             username="testuser", email="test@example.com", password="testpass123"
         )
 
+        # Create a test tenant
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant", identifier="test", created_by=self.user
+        )
+
         # Clear cache before each test
         cache.clear()
 
@@ -38,7 +44,7 @@ class DynamicHostValidationTest(TestCase):
 
     def test_static_allowed_hosts_validation(self):
         """Test validation against static ALLOWED_HOSTS."""
-        with override_settings(ALLOWED_HOSTS=["example.com", "localhost"]):
+        with override_settings(STATIC_ALLOWED_HOSTS=["example.com", "localhost"]):
             # Should allow static hosts
             self.assertTrue(self.middleware.is_host_allowed("example.com"))
             self.assertTrue(self.middleware.is_host_allowed("localhost"))
@@ -55,6 +61,7 @@ class DynamicHostValidationTest(TestCase):
             hostnames=["test.example.com", "app.example.com"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Should allow database hostnames
@@ -64,6 +71,7 @@ class DynamicHostValidationTest(TestCase):
         # Should reject unknown hostnames
         self.assertFalse(self.middleware.is_host_allowed("unknown.com"))
 
+    @override_settings(ALLOW_WILDCARD_HOSTNAMES=True)
     def test_wildcard_hostname(self):
         """Test wildcard hostname functionality."""
         # Create page with wildcard
@@ -72,6 +80,8 @@ class DynamicHostValidationTest(TestCase):
             slug="wildcard",
             hostnames=["*"],
             created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Should allow any hostname
@@ -85,6 +95,8 @@ class DynamicHostValidationTest(TestCase):
             slug="norm",
             hostnames=["example.com"],
             created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Should normalize and match various formats
@@ -99,13 +111,15 @@ class DynamicHostValidationTest(TestCase):
             slug="cache",
             hostnames=["cache.example.com"],
             created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # First call should hit database and cache result
         self.assertTrue(self.middleware.is_host_allowed("cache.example.com"))
 
         # Verify cache was populated
-        cache_key = DynamicHostValidationMiddleware.CACHE_KEY
+        cache_key = DynamicHostValidationMiddleware.get_cache_key()
         cached_hostnames = cache.get(cache_key)
         self.assertIsNotNone(cached_hostnames)
         self.assertIn("cache.example.com", cached_hostnames)
@@ -119,11 +133,12 @@ class DynamicHostValidationTest(TestCase):
             hostnames=["old.example.com"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Populate cache
-        self.middleware._load_database_hostnames()
-        cache_key = DynamicHostValidationMiddleware.CACHE_KEY
+        self.middleware.is_host_allowed("old.example.com")
+        cache_key = DynamicHostValidationMiddleware.get_cache_key()
         self.assertIsNotNone(cache.get(cache_key))
 
         # Update hostnames
@@ -142,6 +157,8 @@ class DynamicHostValidationTest(TestCase):
                 slug="combined",
                 hostnames=["db1.com", "db2.com"],
                 created_by=self.user,
+                last_modified_by=self.user,
+                tenant=self.tenant,
             )
 
             all_hosts = get_dynamic_allowed_hosts()
@@ -238,7 +255,7 @@ class DynamicHostValidationTest(TestCase):
     def test_secure_cache_key_generation(self):
         """Test that cache keys are secure and unpredictable."""
         # Get cache key from middleware instance
-        cache_key = self.middleware.CACHE_KEY
+        cache_key = self.middleware.get_cache_key()
 
         # Should be prefixed with 'dhv_'
         self.assertTrue(cache_key.startswith("dhv_"))
@@ -248,29 +265,29 @@ class DynamicHostValidationTest(TestCase):
         self.assertNotIn("hostnames", cache_key.lower())
 
         # Should be consistent for same SECRET_KEY
-        cache_key2 = self.middleware.CACHE_KEY
+        cache_key2 = self.middleware.get_cache_key()
         self.assertEqual(cache_key, cache_key2)
 
     @override_settings(HOSTNAME_CACHE_KEY_PREFIX="custom_prefix")
     def test_configurable_cache_key_prefix(self):
         """Test that cache key prefix is configurable."""
-        cache_key = self.middleware.CACHE_KEY
+        cache_key = self.middleware.get_cache_key()
 
         # Should still be secure format
         self.assertTrue(cache_key.startswith("dhv_"))
 
         # Changing prefix should change the key
         with override_settings(HOSTNAME_CACHE_KEY_PREFIX="different_prefix"):
-            different_key = self.middleware.CACHE_KEY
+            different_key = self.middleware.get_cache_key()
             self.assertNotEqual(cache_key, different_key)
 
     def test_cache_key_uses_secret_key(self):
         """Test that cache key changes with SECRET_KEY for security."""
-        original_cache_key = self.middleware.CACHE_KEY
+        original_cache_key = self.middleware.get_cache_key()
 
         # Mock a different SECRET_KEY
         with override_settings(SECRET_KEY="different-secret-key-for-testing"):
-            different_cache_key = self.middleware.CACHE_KEY
+            different_cache_key = self.middleware.get_cache_key()
 
         # Keys should be different with different SECRET_KEY
         self.assertNotEqual(original_cache_key, different_cache_key)
@@ -278,7 +295,7 @@ class DynamicHostValidationTest(TestCase):
     def test_clear_hostname_cache_with_secure_key(self):
         """Test that clear_hostname_cache works with the new secure cache key."""
         # Populate cache manually
-        cache_key = self.middleware.CACHE_KEY
+        cache_key = self.middleware.get_cache_key()
         test_hostnames = ["test.com", "example.com"]
         cache.set(cache_key, test_hostnames, 300)
 
@@ -295,19 +312,25 @@ class DynamicHostValidationTest(TestCase):
         """Test that non-root pages cannot have hostnames."""
         # Create root page
         root = WebPage.objects.create(
-            title="Root", slug="root", created_by=self.user, last_modified_by=self.user
+            title="Root",
+            slug="root",
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Create child page with hostnames (should fail validation)
+        child = WebPage(
+            title="Child",
+            slug="child",
+            parent=root,
+            hostnames=["child.example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
         with self.assertRaises(Exception):  # ValidationError
-            child = WebPage.objects.create(
-                title="Child",
-                slug="child",
-                parent=root,
-                hostnames=["child.example.com"],
-                created_by=self.user,
-                last_modified_by=self.user,
-            )
+            child.full_clean()
 
     def test_get_host_from_request(self):
         """Test the _get_host_from_request method."""
@@ -340,17 +363,16 @@ class DynamicHostValidationTest(TestCase):
         page = WebPage.objects.create(
             title="Port Test",
             slug="port-test",
-            hostnames=["example.com:8000", "localhost:3000"],
+            hostnames=["example.com", "localhost"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
-        # Should allow hostnames with ports
+        # Should allow hostnames even with different ports
         self.assertTrue(self.middleware.is_host_allowed("example.com:8000"))
         self.assertTrue(self.middleware.is_host_allowed("localhost:3000"))
-
-        # Should reject different ports
-        self.assertFalse(self.middleware.is_host_allowed("example.com:9000"))
+        self.assertTrue(self.middleware.is_host_allowed("example.com:9000"))
 
 
 class HostnameUtilsTest(TestCase):
@@ -362,6 +384,9 @@ class HostnameUtilsTest(TestCase):
         self.user = User.objects.create_user(
             username="testuser2", email="test2@example.com", password="testpass123"
         )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant 2", identifier="test2", created_by=self.user
+        )
 
     def test_hostname_normalization(self):
         """Test WebPage.normalize_hostname method."""
@@ -369,8 +394,9 @@ class HostnameUtilsTest(TestCase):
             ("http://example.com", "example.com"),
             ("https://example.com/path", "example.com"),
             ("EXAMPLE.COM", "example.com"),
-            ("localhost:8000", "localhost:8000"),
-            ("sub.domain.com:443", "sub.domain.com:443"),
+            ("localhost:8000", "localhost"),  # Port should be stripped
+            ("sub.domain.com:443", "sub.domain.com"),  # Port should be stripped
+            ("[::1]:8080", "[::1]"),  # IPv6 port should be stripped
             ("", ""),
             (None, ""),
         ]
@@ -400,6 +426,7 @@ class HostnameUtilsTest(TestCase):
                     hostnames=[hostname],
                     created_by=self.user,
                     last_modified_by=self.user,
+                    tenant=self.tenant,
                 )
                 page.full_clean()  # Should not raise ValidationError
                 page.delete()  # Clean up
@@ -414,10 +441,17 @@ class HostnameUtilsTest(TestCase):
             slug="page1",
             hostnames=["site1.com", "www.site1.com"],
             created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         page2 = WebPage.objects.create(
-            title="Page 2", slug="page2", hostnames=["site2.com"], created_by=self.user
+            title="Page 2",
+            slug="page2",
+            hostnames=["site2.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Create child page (should not contribute hostnames)
@@ -427,6 +461,7 @@ class HostnameUtilsTest(TestCase):
             parent=page1,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         all_hostnames = WebPage.get_all_hostnames()
