@@ -31,7 +31,6 @@ import { useNotificationContext } from '../components/NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import LayoutEditor from '../components/LayoutEditor'
-import SettingsTabs from '../components/SettingsTabs'
 import ThemeEditor from '../components/ThemeEditor'
 import StatusBar from '../components/StatusBar'
 
@@ -44,6 +43,7 @@ import NamespaceManager from '../components/NamespaceManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
 import WidgetManager from '../components/WidgetManager'
 import ValueListEditor from '../components/ValueListEditor'
+import SettingsDashboard from '../components/SettingsDashboard'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
@@ -53,7 +53,7 @@ const SettingsManager = () => {
     const location = useLocation()
     const [searchParams, setSearchParams] = useSearchParams()
 
-    // Get tab from URL path, default to 'layouts'
+    // Get tab from URL path, default to 'dashboard'
     const getActiveTabFromPath = () => {
         const path = location.pathname
         if (path.startsWith('/settings/themes')) return 'themes'
@@ -63,7 +63,8 @@ const SettingsManager = () => {
         if (path === '/settings/versions') return 'versions'
         if (path === '/settings/publishing') return 'publishing'
         if (path === '/settings/namespaces') return 'namespaces'
-        return 'layouts' // default for /settings/layouts or fallback
+        if (path === '/settings/layouts') return 'layouts'
+        return 'dashboard' // default for /settings or fallback
     }
 
     const activeTab = getActiveTabFromPath()
@@ -386,6 +387,8 @@ const SettingsManager = () => {
 
     const renderTabContent = () => {
         switch (activeTab) {
+            case 'dashboard':
+                return <SettingsDashboard />
             case 'layouts':
                 return <LayoutEditor />
             case 'themes':
@@ -412,10 +415,7 @@ const SettingsManager = () => {
     // Note: Schema management is handled by dedicated routes /schemas/*
 
     return (
-        <div className="space-y-6">
-            {/* Navigation Dropdown */}
-            <SettingsTabs />
-
+        <div className="space-y-6 max-w-7xl mx-auto pb-12">
             {/* Tab Content */}
             <div className="bg-white rounded-lg shadow">
                 <div>

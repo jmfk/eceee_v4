@@ -344,7 +344,7 @@ const UserManagementPage = () => {
     }
 
     return (
-        <div className="max-w-6xl mx-auto py-8 px-4">
+        <div className="space-y-8 max-w-7xl mx-auto pb-12">
             <div className="mb-8">
                 <div className="flex items-center justify-between">
                     <div>
