@@ -1,0 +1,110 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    platform: linux/arm64
+    container_name: eceee-v4-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eceee_v4
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432" # Exposed for shared access by other repositories
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Django Channels WebSocket support (required)
+  redis:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: eceee-v4-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379" # Exposed for shared access by other repositories
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # MinIO for S3-compatible object storage
+  minio:
+    image: minio/minio:latest
+    platform: linux/arm64
+    container_name: eceee-v4-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"    # MinIO API - Exposed for shared access
+      - "9001:9001"    # MinIO Console - Exposed for shared access
+    volumes:
+      - ./storage/minio:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # imgproxy for on-the-fly image resizing
+  imgproxy:
+    image: darthsim/imgproxy:latest
+    platform: linux/arm64
+    container_name: eceee-v4-imgproxy
+    restart: unless-stopped
+    environment:
+      IMGPROXY_ALLOW_UNSAFE_URL: true
+      IMGPROXY_MAX_SRC_RESOLUTION: 50.0
+      IMGPROXY_MAX_SRC_FILE_SIZE: 52428800
+      IMGPROXY_WORKERS: 4
+      IMGPROXY_MAX_CLIENTS: 2048
+      IMGPROXY_TTL: 31536000
+      IMGPROXY_QUALITY: 85
+      IMGPROXY_FORMAT_QUALITY: "jpeg=85,webp=85,avif=85"
+      IMGPROXY_AUTO_ROTATE: true
+      IMGPROXY_STRIP_METADATA: true
+      IMGPROXY_STRIP_COLOR_PROFILE: false
+      IMGPROXY_AUTO_WEBP: true
+      IMGPROXY_AUTO_AVIF: true
+      IMGPROXY_ENFORCE_WEBP: false
+      IMGPROXY_ENFORCE_AVIF: false
+      IMGPROXY_USE_S3: false
+      IMGPROXY_SET_CANONICAL_HEADER: true
+      IMGPROXY_ALLOWED_SOURCES: s3://eceee-media/,local://,http://minio:9000/eceee-media/,http://minio:9000/,http://minio:9000/eceee-media/media/,http://localhost:8080/
+      IMGPROXY_LOG_LEVEL: info
+      IMGPROXY_ENABLE_DEBUG_HEADERS: "true"
+      IMGPROXY_IGNORE_SSL_VERIFICATION: "true"
+      IMGPROXY_DEVELOPMENT_ERRORS_MODE: "true"
+      IMGPROXY_ALLOW_SECURITY_OPTIONS: "true"
+      IMGPROXY_PRESETS: "thumbnail=resize:fill:150:150/gravity:sm,small=resize:fit:300:300,medium=resize:fit:600:600,large=resize:fit:1200:1200,hero=resize:fill:1920:1080/gravity:sm,avatar=resize:fill:128:128/gravity:sm/format:webp"
+    ports:
+      - "8080:8080" # Exposed for shared access by other repositories
+    depends_on:
+      - minio
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: eceee_shared_network
+

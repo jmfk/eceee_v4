@@ -1,57 +1,32 @@
 services:
-  # PostgreSQL Database
-  db:
-    image: postgres:15-alpine
-    platform: linux/arm64
-    container_name: eceee_v4_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: eceee_v4
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_HOST_AUTH_METHOD: trust
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   # Django Backend
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: eceee_v4_backend
+    image: ${BACKEND_IMAGE:-eceee-v4-backend}:latest
+    container_name: ${BACKEND_CONTAINER_NAME:-eceee-v4-backend}
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
     environment:
       - DEBUG=1
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/eceee_v4
-      - POSTGRES_DB=eceee_v4
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@eceee-v4-db:5432/eceee_v4}
+      - POSTGRES_DB=${POSTGRES_DB:-eceee_v4}
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=${POSTGRES_HOST:-eceee-v4-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend,testserver
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001
+      - CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001
       - SECRET_KEY=dev-secret-key-change-in-production
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
       - AWS_STORAGE_BUCKET_NAME=eceee-media
-      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://eceee-v4-minio:9000}
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False
-      - REDIS_URL=redis://redis:6379/0
-      - IMGPROXY_URL=http://imgproxy:8080
+      - REDIS_URL=${REDIS_URL:-redis://eceee-v4-redis:6379/0}
+      - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
       - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
       - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -59,12 +34,18 @@ services:
       - FM_PASSWORD=${FM_PASSWORD}
       - POSTMARK_API_KEY=${POSTMARK_API_KEY}
       - THEME_SYNC_ENABLED=True
+    networks:
+      - default
+      - eceee_shared
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
+      - ./.env:/app/.env
       - backend_static:/app/staticfiles
       - ./backend/media:/app/media
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     command: >
       sh -c "python manage.py migrate &&
              uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload --reload-include '*.html'"
@@ -80,138 +61,43 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: development
-    container_name: eceee_v4_frontend
+    image: ${FRONTEND_IMAGE:-eceee-v4-frontend}:latest
+    container_name: ${FRONTEND_CONTAINER_NAME:-eceee-v4-frontend}
     restart: unless-stopped
-    depends_on:
-      - backend
     environment:
-      - REACT_APP_API_URL=http://localhost:8000/api
-      - REACT_APP_BACKEND_URL=http://localhost:8000
-      - VITE_WS_URL=ws://localhost:8000
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000/api}
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-http://localhost:8000}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000}
+      - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://backend:8000}
       - VITE_IMGPROXY_URL=http://imgproxy:8080
       - VITE_ENABLE_CONTEXT_MENU_TOGGLE=true
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
+    networks:
+      - default
+      - eceee_shared
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     command: npm run dev -- --host 0.0.0.0
     stdin_open: true
     tty: true
-
-  # Redis for Django Channels WebSocket support (required)
-  redis:
-    image: redis:7-alpine
-    platform: linux/arm64
-    container_name: eceee_v4_redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  # MinIO for S3-compatible object storage
-  minio:
-    image: minio/minio:latest
-    platform: linux/arm64
-    container_name: eceee_v4_minio
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"    # API
-      - "9001:9001"    # Console
-    volumes:
-      - ./storage/minio:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
-  # imgproxy for on-the-fly image resizing
-  imgproxy:
-    image: darthsim/imgproxy:latest
-    platform: linux/arm64
-    container_name: eceee_v4_imgproxy
-    restart: unless-stopped
-    environment:
-      # Security settings - TEMPORARILY DISABLED FOR DEBUGGING
-      # IMGPROXY_KEY: 943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
-      # IMGPROXY_SALT: 520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
-      # IMGPROXY_SIGNATURE_SIZE: 32
-      IMGPROXY_ALLOW_UNSAFE_URL: true  # Temporarily enabled for testing
-      
-      # Performance settings
-      IMGPROXY_MAX_SRC_RESOLUTION: 50.0  # 50 megapixels max
-      IMGPROXY_MAX_SRC_FILE_SIZE: 52428800  # 50MB max file size
-      IMGPROXY_WORKERS: 4
-      IMGPROXY_MAX_CLIENTS: 2048
-      IMGPROXY_TTL: 31536000  # 1 year cache
-      
-      # Quality and format settings
-      IMGPROXY_QUALITY: 85
-      IMGPROXY_FORMAT_QUALITY: "jpeg=85,webp=85,avif=85"
-      IMGPROXY_AUTO_ROTATE: true
-      IMGPROXY_STRIP_METADATA: true
-      IMGPROXY_STRIP_COLOR_PROFILE: false
-      
-      # Enable modern formats (updated syntax)
-      IMGPROXY_AUTO_WEBP: true
-      IMGPROXY_AUTO_AVIF: true
-      IMGPROXY_ENFORCE_WEBP: false
-      IMGPROXY_ENFORCE_AVIF: false
-      
-      # Source settings for S3/MinIO
-      IMGPROXY_USE_S3: false
-      #IMGPROXY_S3_ENDPOINT: http://minio:9000/eceee-media/
-      #IMGPROXY_S3_REGION: us-east-1
-      #IMGPROXY_AWS_ACCESS_KEY_ID: minioadmin
-      #IMGPROXY_AWS_SECRET_ACCESS_KEY: minioadmin
-      
-      # Security headers
-      IMGPROXY_SET_CANONICAL_HEADER: true
-      IMGPROXY_ALLOWED_SOURCES: s3://eceee-media/,local://,http://minio:9000/eceee-media/,http://minio:9000/,http://minio:9000/eceee-media/media/,http://localhost:8080/
-
-      # Logging
-      IMGPROXY_LOG_LEVEL: info
-      IMGPROXY_ENABLE_DEBUG_HEADERS: "true"
-      
-      IMGPROXY_IGNORE_SSL_VERIFICATION: "true"
-      IMGPROXY_DEVELOPMENT_ERRORS_MODE: "true"
-      IMGPROXY_ALLOW_SECURITY_OPTIONS: "true" 
-      
-      # Presets for common sizes (corrected format)
-      IMGPROXY_PRESETS: "thumbnail=resize:fill:150:150/gravity:sm,small=resize:fit:300:300,medium=resize:fit:600:600,large=resize:fit:1200:1200,hero=resize:fill:1920:1080/gravity:sm,avatar=resize:fill:128:128/gravity:sm/format:webp"
-    ports:
-      - "8080:8080"
-    depends_on:
-      - minio
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # Theme Sync Service
   theme-sync:
     build:
       context: ./theme-sync
       dockerfile: Dockerfile
-    container_name: eceee_v4_theme_sync
+    image: ${THEME_SYNC_IMAGE:-eceee-v4-theme-sync}:latest
+    container_name: ${THEME_SYNC_CONTAINER_NAME:-eceee-v4-theme-sync}
     restart: unless-stopped
-    depends_on:
-      - backend
+    networks:
+      - default
+      - eceee_shared
     environment:
       - BACKEND_URL=http://backend:8000
       - TENANT_ID=default  # Tenant identifier (required) - change to your tenant identifier
@@ -225,12 +111,12 @@ services:
     command: python sync_service.py
 
 volumes:
-  postgres_data:
   backend_static:
   frontend_node_modules:
-  redis_data:
   mcp_logs:
 
 networks:
   default:
-    driver: bridge
+  eceee_shared:
+    external: true
+    name: eceee_shared_network

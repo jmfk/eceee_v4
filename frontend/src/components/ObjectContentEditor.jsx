@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal } from 'lucide-react'
+import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal, Clipboard, Scissors, ChevronDown, ChevronUp } from 'lucide-react'
 import { ObjectWidgetFactory, createObjectEditorEventSystem } from '../editors/object-editor'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
@@ -9,10 +9,37 @@ import WidgetSelectionModal from './WidgetSelectionModal'
 import SlotIconMenu from './SlotIconMenu'
 import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { useEditorContext } from '../contexts/unified-data/hooks'
+import { useClipboard } from '../contexts/ClipboardContext'
+import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../utils/clipboardService'
+import ImportDialog from './ImportDialog'
 
 
 const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidgetEditorStateChange, context }) => {
-    const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
+    // Widget selection state: Set<widgetPath> where widgetPath = "slotName/widgetId"
+    const [selectedWidgets, setSelectedWidgets] = useState(() => new Set())
+
+    // Cut widgets state: tracks widgets that have been cut (waiting for paste)
+    const [cutWidgets, setCutWidgets] = useState(() => new Set())
+
+    // Toolbar collapse state
+    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false)
+
+    // Get global clipboard state
+    const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard()
+
+    // Helper: Build widget path string from slotName and widgetId
+    const buildWidgetPath = useCallback((slotName, widgetId) => {
+        return `${slotName}/${widgetId}`
+    }, [])
+
+    // Helper: Parse widget path to extract components
+    const parseWidgetPath = useCallback((widgetPath) => {
+        const parts = widgetPath.split('/')
+        if (parts.length === 2) {
+            return { slotName: parts[0], widgetId: parts[1] }
+        }
+        return null
+    }, [])
 
     // Get update lock and UnifiedData context
     const { useExternalChanges, publishUpdate } = useUnifiedData();
@@ -30,6 +57,10 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
     // Widget selection modal state
     const [widgetModalOpen, setWidgetModalOpen] = useState(false)
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null)
+
+    // Import dialog state
+    const [importDialogOpen, setImportDialogOpen] = useState(false)
+    const [importSlotName, setImportSlotName] = useState(null)
 
     const contextType = useEditorContext()
 
@@ -107,6 +138,101 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
 
     // Use the shared widget hook to get widget types
     const { widgetTypes } = useWidgets(normalizedWidgets)
+
+    // Selection handlers
+    const toggleWidgetSelection = useCallback((slotName, widgetId) => {
+        const widgetPath = buildWidgetPath(slotName, widgetId)
+        setSelectedWidgets(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(widgetPath)) {
+                newSet.delete(widgetPath)
+            } else {
+                newSet.add(widgetPath)
+            }
+            return newSet
+        })
+    }, [buildWidgetPath])
+
+    const selectAllInSlot = useCallback((slotName) => {
+        const slotWidgets = normalizedWidgets[slotName] || []
+        if (slotWidgets.length === 0) return
+
+        setSelectedWidgets(prev => {
+            const newSet = new Set(prev)
+            slotWidgets.forEach(widget => {
+                const widgetPath = buildWidgetPath(slotName, widget.id)
+                newSet.add(widgetPath)
+            })
+            return newSet
+        })
+    }, [normalizedWidgets, buildWidgetPath])
+
+    const clearSelection = useCallback(() => {
+        setSelectedWidgets(new Set())
+        setCutWidgets(new Set())
+    }, [])
+
+    const isWidgetSelected = useCallback((slotName, widgetId) => {
+        const widgetPath = buildWidgetPath(slotName, widgetId)
+        return selectedWidgets.has(widgetPath)
+    }, [selectedWidgets, buildWidgetPath])
+
+    const isWidgetCut = useCallback((slotName, widgetId) => {
+        const widgetPath = buildWidgetPath(slotName, widgetId)
+        return cutWidgets.has(widgetPath)
+    }, [cutWidgets, buildWidgetPath])
+
+    const getSelectedCount = useCallback(() => {
+        return selectedWidgets.size
+    }, [selectedWidgets])
+
+    const getSelectedWidgets = useCallback(() => {
+        const selected = []
+        selectedWidgets.forEach(widgetPath => {
+            const parsed = parseWidgetPath(widgetPath)
+            if (!parsed) return
+
+            const slotWidgets = normalizedWidgets[parsed.slotName] || []
+            const widget = slotWidgets.find(w => w.id === parsed.widgetId)
+            if (widget) {
+                selected.push({ widget, slotName: parsed.slotName, widgetPath })
+            }
+        })
+        return selected
+    }, [selectedWidgets, normalizedWidgets, parseWidgetPath])
+
+    // Bulk action handlers
+    const handleCopySelected = useCallback(async () => {
+        const selected = getSelectedWidgets()
+        if (selected.length === 0) return
+
+        const widgetsToCopy = selected.map(item => item.widget)
+        await copyWidgetsToClipboard(widgetsToCopy)
+        await refreshClipboard()
+    }, [getSelectedWidgets, refreshClipboard])
+
+    const handleCutSelected = useCallback(async () => {
+        const selected = getSelectedWidgets()
+        if (selected.length === 0) return
+
+        const widgetsToCut = selected.map(item => item.widget)
+        const cutMetadata = {
+            instanceId: instanceId,
+            widgetPaths: selected.map(item => item.widgetPath),
+            widgets: {}
+        }
+
+        selected.forEach(({ widget, slotName }) => {
+            if (!cutMetadata.widgets[slotName]) {
+                cutMetadata.widgets[slotName] = []
+            }
+            cutMetadata.widgets[slotName].push(widget.id)
+        })
+
+        setCutWidgets(new Set(selected.map(item => item.widgetPath)))
+        await cutWidgetsToClipboard(widgetsToCut, cutMetadata)
+        await refreshClipboard()
+    }, [getSelectedWidgets, instanceId, refreshClipboard])
 
     // State for filtered widget types
     const [filteredWidgetTypes, setFilteredWidgetTypes] = useState([])
@@ -332,15 +458,106 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
         }
 
         // Remove from selection if selected
-        const widgetKey = `${slotName}-${widgetIndex}`
-        if (selectedWidgets[widgetKey]) {
+        const widgetPath = buildWidgetPath(slotName, widget.id)
+        if (selectedWidgets.has(widgetPath)) {
             setSelectedWidgets(prev => {
-                const newSelection = { ...prev }
-                delete newSelection[widgetKey]
-                return newSelection
+                const newSet = new Set(prev)
+                newSet.delete(widgetPath)
+                return newSet
             })
         }
     }
+
+    const handleDeleteCutWidgets = useCallback(async (cutMetadata) => {
+        const sourceInstanceId = cutMetadata.instanceId
+        const isCrossObject = sourceInstanceId && instanceId && sourceInstanceId !== instanceId
+
+        if (isCrossObject) {
+            if (cutMetadata.widgetPaths) {
+                for (const widgetPath of cutMetadata.widgetPaths) {
+                    const parsed = parseWidgetPath(widgetPath)
+                    if (!parsed) continue
+                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                        id: parsed.widgetId,
+                        contextType: contextType,
+                        instanceId: sourceInstanceId
+                    })
+                }
+            }
+            return
+        }
+
+        const updatedWidgets = { ...normalizedWidgets }
+        let hasChanges = false
+
+        if (cutMetadata.widgetPaths) {
+            for (const widgetPath of cutMetadata.widgetPaths) {
+                const parsed = parseWidgetPath(widgetPath)
+                if (!parsed) continue
+
+                if (updatedWidgets[parsed.slotName]) {
+                    const originalLength = updatedWidgets[parsed.slotName].length
+                    updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(
+                        w => w.id !== parsed.widgetId
+                    )
+                    if (updatedWidgets[parsed.slotName].length !== originalLength) {
+                        hasChanges = true
+                        await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                            id: parsed.widgetId,
+                            contextType: contextType
+                        })
+                    }
+                }
+            }
+        }
+
+        if (hasChanges) {
+            setInternalWidgets(updatedWidgets)
+        }
+        setCutWidgets(new Set())
+        setSelectedWidgets(new Set())
+    }, [normalizedWidgets, instanceId, publishUpdate, componentId, contextType, parseWidgetPath])
+
+    const handlePasteAtPosition = useCallback(async (slotName, position, keepClipboard = false) => {
+        if (!clipboardData || !clipboardData.data || clipboardData.data.length === 0) return
+
+        const widgetsToPaste = clipboardData.data
+        const isCut = clipboardData.operation === 'cut'
+
+        const pastedWidgets = widgetsToPaste.map(w => ({
+            ...w,
+            id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }))
+
+        const slotWidgets = [...(normalizedWidgets[slotName] || [])]
+        slotWidgets.splice(position, 0, ...pastedWidgets)
+
+        const updatedWidgets = {
+            ...normalizedWidgets,
+            [slotName]: slotWidgets
+        }
+        setInternalWidgets(updatedWidgets)
+
+        for (let i = 0; i < pastedWidgets.length; i++) {
+            const widget = pastedWidgets[i]
+            await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                id: widget.id,
+                type: widget.type,
+                config: widget.config,
+                slot: slotName,
+                contextType: contextType,
+                order: position + i
+            })
+        }
+
+        if (isCut && clipboardData.metadata) {
+            await handleDeleteCutWidgets(clipboardData.metadata)
+        }
+
+        if (!keepClipboard || isCut) {
+            await clearClipboardState()
+        }
+    }, [clipboardData, normalizedWidgets, publishUpdate, componentId, contextType, handleDeleteCutWidgets, clearClipboardState])
 
     // Move widget up in the slot
     const handleMoveWidgetUp = async (slotName, widgetIndex, widget) => {
@@ -410,6 +627,41 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
         }
     }
 
+    // Import content handlers
+    const handleImportContent = useCallback((slotName) => {
+        setImportSlotName(slotName)
+        setImportDialogOpen(true)
+    }, [])
+
+    const handleImportComplete = useCallback(async (importedWidgets, metadata = {}) => {
+        if (!importSlotName || !importedWidgets || importedWidgets.length === 0) return
+
+        const currentSlotWidgets = normalizedWidgets[importSlotName] || []
+        const updatedWidgets = {
+            ...normalizedWidgets,
+            [importSlotName]: [...currentSlotWidgets, ...importedWidgets]
+        }
+        setInternalWidgets(updatedWidgets)
+
+        for (const widget of importedWidgets) {
+            await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                id: widget.id,
+                type: widget.type,
+                config: widget.config,
+                slot: importSlotName,
+                contextType: contextType,
+                order: currentSlotWidgets.length + importedWidgets.indexOf(widget)
+            })
+        }
+
+        if (metadata.pageWasUpdated) {
+            await publishUpdate(componentId, OperationTypes.RELOAD_DATA, {
+                reason: 'Object metadata updated during import',
+                updatedFields: ['title', 'tags'],
+            })
+        }
+    }, [importSlotName, normalizedWidgets, publishUpdate, componentId, contextType])
+
     // Clear all widgets in a slot
     const handleClearSlot = async (slotName) => {
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
@@ -431,13 +683,11 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
 
         // Clear any selections for this slot
         setSelectedWidgets(prev => {
-            const newSelection = { ...prev }
-            Object.keys(newSelection).forEach(key => {
-                if (key.startsWith(`${slotName}-`)) {
-                    delete newSelection[key]
-                }
+            const newSet = new Set(prev)
+            existingWidgetsInSlot.forEach(w => {
+                newSet.delete(buildWidgetPath(slotName, w.id))
             })
-            return newSelection
+            return newSet
         })
     }
 
@@ -517,8 +767,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
     }, [normalizedWidgets, editingWidget]);
 
     const renderWidget = (widget, slotName, index) => {
-        const widgetKey = `${slotName}-${index}`
-        const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
@@ -548,8 +796,12 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                     maxWidgets={slot?.maxWidgets}
                     // Pass widget identity for event system
                     widgetId={widget.id}
-                    className={`mb-2 ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+                    className="mb-2"
                     context={{ ...context, componentId }}
+                    // Selection props
+                    isWidgetSelected={isWidgetSelected(slotName, widget.id)}
+                    isWidgetCut={isWidgetCut(slotName, widget.id)}
+                    onToggleWidgetSelection={toggleWidgetSelection}
                 />
             </div>
         )
@@ -557,8 +809,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
 
     const renderSlot = (slot) => {
         const slotWidgets = normalizedWidgets[slot.name] || []
-        const slotSelections = Object.keys(selectedWidgets).filter(key => key.startsWith(`${slot.name}-`))
-        const hasSelections = slotSelections.length > 0
 
         return (
             <div
@@ -576,7 +826,11 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                     onAddWidget={handleAddWidget}
                     onClearSlot={handleClearSlot}
                     onShowWidgetModal={handleShowWidgetModal}
+                    onImportContent={handleImportContent}
                     context={context}
+                    // Paste mode props
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={handlePasteAtPosition}
                 />
 
                 {/* Slot Header */}
@@ -625,7 +879,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
         )
     }
 
-    const totalSelections = Object.keys(selectedWidgets).length
+    const totalSelections = getSelectedCount()
 
     // Only count widgets in slots that are configured for this object type
     const totalWidgets = useMemo(() => {
@@ -637,9 +891,96 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
         }, 0)
     }, [normalizedWidgets, objectType?.slotConfiguration?.slots])
 
+    // ESC and right-click handlers to pause paste mode
+    useEffect(() => {
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && pasteModeActive && !pasteModePaused) {
+                togglePasteMode()
+            }
+        }
+
+        const handleContextMenu = (e) => {
+            if (pasteModeActive && !pasteModePaused) {
+                e.preventDefault()
+                togglePasteMode()
+            }
+        }
+
+        document.addEventListener('keydown', handleEscape)
+        document.addEventListener('contextmenu', handleContextMenu)
+
+        return () => {
+            document.removeEventListener('keydown', handleEscape)
+            document.removeEventListener('contextmenu', handleContextMenu)
+        }
+    }, [pasteModeActive, pasteModePaused, togglePasteMode])
+
+    // Reset toolbar collapse when selection changes
+    useEffect(() => {
+        if (totalSelections === 0) {
+            setIsToolbarCollapsed(false)
+        }
+    }, [totalSelections])
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 relative">
+            {/* Bulk Action Toolbar - Floating */}
+            {totalSelections > 0 && (
+                <>
+                    {isToolbarCollapsed ? (
+                        <button
+                            onClick={() => setIsToolbarCollapsed(false)}
+                            className="fixed top-4 right-4 z-[10010] bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all hover:scale-110 flex items-center justify-center"
+                            title={`${totalSelections} widget${totalSelections !== 1 ? 's' : ''} selected - Click to expand`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold">{totalSelections}</span>
+                                <ChevronUp className="h-4 w-4" />
+                            </div>
+                        </button>
+                    ) : (
+                        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10010] bg-white border border-gray-300 rounded-lg shadow-xl px-4 py-2 flex items-center gap-3">
+                            <span className="text-sm font-medium text-gray-700">
+                                {totalSelections} widget{totalSelections !== 1 ? 's' : ''} selected
+                            </span>
+                            <div className="h-4 w-px bg-gray-300"></div>
+                            <button
+                                onClick={handleCopySelected}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded transition-colors"
+                                title="Copy selected widgets"
+                            >
+                                <Clipboard className="h-4 w-4" />
+                                Copy
+                            </button>
+                            <button
+                                onClick={handleCutSelected}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded transition-colors"
+                                title="Cut selected widgets"
+                            >
+                                <Scissors className="h-4 w-4" />
+                                Cut
+                            </button>
+                            <button
+                                onClick={clearSelection}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded transition-colors"
+                                title="Clear selection"
+                            >
+                                <X className="h-4 w-4" />
+                                Clear
+                            </button>
+                            <div className="h-4 w-px bg-gray-300"></div>
+                            <button
+                                onClick={() => setIsToolbarCollapsed(true)}
+                                className="flex items-center gap-1.5 px-2 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                                title="Collapse toolbar"
+                            >
+                                <ChevronDown className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+
             {/* Slots */}
             <div className="space-y-4">
                 {objectType.slotConfiguration.slots.map(renderSlot)}
@@ -662,6 +1003,18 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                 availableWidgetTypes={availableWidgetTypes}
                 isFilteringTypes={isFilteringTypes}
                 context={context}
+            />
+
+            <ImportDialog
+                isOpen={importDialogOpen}
+                onClose={() => {
+                    setImportDialogOpen(false)
+                    setImportSlotName(null)
+                }}
+                slotName={importSlotName}
+                // For objects, we don't have pageId, but we might have instanceId
+                // ImportDialog might need to be adapted or passed null
+                onImportComplete={handleImportComplete}
             />
         </div>
     )
