@@ -113,7 +113,7 @@ const WidgetManager = () => {
             {/* Simplified Header */}
             <div className="mb-6">
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">{filteredWidgets.length} widget types</span>
+                    <span className="text-sm text-gray-500">{filteredWidgetTypes.length} widget types</span>
                 </div>
             </div>
 
