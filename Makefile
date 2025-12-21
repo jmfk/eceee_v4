@@ -81,9 +81,14 @@ help: ## Show this help message
 	@echo "ECEEE Components Sync:"
 	@echo "  sync-to           Sync components FROM eceee_v4 TO eceee-components"
 	@echo ""
-	@echo "Cache Management:"
+	@echo "Environment & Cache Management:"
 	@echo "  clear-layout-cache     Clear layout-related caches to force refresh"
 	@echo "  clear-layout-cache-all Clear ALL caches (nuclear option)"
+	@echo "  check-servers          Check if backend and frontend servers are up"
+	@echo "  check-conf             Check database and server configuration"
+	@echo "  use-external-infra     Setup .env to use shared infrastructure"
+	@echo "  change-ports           Change backend and frontend ports"
+	@echo "  replicate-db           Clone current DB to branch-specific DB"
 	@echo ""
 	@echo "Usage: make <target>"
 
@@ -101,12 +106,17 @@ infra-down:
 
 servers: infra-up
 
+# Run Django backend server
 backend:
-	docker-compose -f docker-compose.dev.yml up backend
+	@BP=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 echo "🚀 Starting Backend on http://localhost:$$BP (internal: 8000)"; \
+	 docker-compose -f docker-compose.dev.yml up backend
 
 # Run React frontend dev server
 frontend:
-	docker-compose -f docker-compose.dev.yml up frontend
+	@FP=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 echo "🚀 Starting Frontend on http://localhost:$$FP (internal: 3000)"; \
+	 docker-compose -f docker-compose.dev.yml up frontend
 
 # Run Playwright website rendering service
 playwright-service:
@@ -428,6 +438,239 @@ clear-layout-cache: ## Clear layout-related caches to force refresh
 clear-layout-cache-all: ## Clear all caches (nuclear option)
 	@echo "🧹 Clearing ALL caches..."
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache --all
+
+check-servers: ## Check if backend and frontend servers are up
+	@echo "🔍 Checking status of services..."
+	@echo ""
+	@# Load ports from .env if it exists
+	@BP=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 FP=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 check_http() { \
+		name=$$1; url=$$2; \
+		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 $$url 2>/dev/null); \
+		if [ "$$status" = "200" ]; then \
+			printf "%-25s [\033[0;32mUP\033[0m] at $$url\n" "$$name"; \
+		elif [ "$$status" = "000" ] || [ -z "$$status" ]; then \
+			printf "%-25s [\033[0;33mNOT STARTED\033[0m] at $$url\n" "$$name"; \
+		else \
+			printf "%-25s [\033[0;31mBROKEN (HTTP $$status)\033[0m] at $$url\n" "$$name"; \
+		fi; \
+	 }; \
+	 echo "--- Local Apps (this repo) ---"; \
+	 check_http "Backend (Django)" "http://localhost:$$BP/health/"; \
+	 check_http "Frontend (Vite)" "http://localhost:$$FP/"; \
+	 echo ""; \
+	 echo "--- External Infra (main repo) ---"; \
+	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:9000/minio/health/live 2>/dev/null); \
+	 if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "MinIO"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "MinIO"; fi; \
+	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/health 2>/dev/null); \
+	 if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "ImgProxy"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "ImgProxy"; fi; \
+	 if nc -z localhost 6379 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Redis"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Redis"; fi; \
+	 if nc -z localhost 5432 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Postgres"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Postgres"; fi; \
+	 echo ""
+
+# Port validation helper
+define check_port
+	@if [ -n "$(1)" ]; then \
+		if nc -z localhost $(1) 2>/dev/null; then \
+			echo "❌ Error: Port $(1) is already in use."; \
+			exit 1; \
+		fi \
+	fi
+endef
+
+use-external-infra: ## Update .env to use the shared infrastructure from the other repo (use: make use-external-infra [BP=8001] [FP=3001])
+	@echo "🔄 Preparing .env file..."
+	@if [ ! -f .env ]; then \
+		if [ -f .env.template ]; then \
+			cp .env.template .env; \
+			echo "✅ Created .env from .env.template"; \
+		else \
+			echo "POSTGRES_DB=eceee_v4" > .env; \
+			echo "POSTGRES_HOST=db" >> .env; \
+			echo "DATABASE_URL=postgresql://postgres:postgres@db:5432/eceee_v4" >> .env; \
+			echo "REDIS_URL=redis://redis:6379/0" >> .env; \
+			echo "✅ Created minimal .env"; \
+		fi \
+	fi
+	@# Validate requested ports if provided
+	$(call check_port,$(BP))
+	$(call check_port,$(FP))
+	@echo "🔄 Configuring unique container names and ports for this instance..."
+	@BP_VAL=$${BP:-8001}; \
+	 FP_VAL=$${FP:-3001}; \
+	 if ! grep -q "BACKEND_CONTAINER_NAME" .env; then \
+		echo "\n# Multi-instance Configuration" >> .env; \
+		echo "BACKEND_CONTAINER_NAME=eceee-v4-backend-editor" >> .env; \
+		echo "FRONTEND_CONTAINER_NAME=eceee-v4-frontend-editor" >> .env; \
+		echo "THEME_SYNC_CONTAINER_NAME=eceee-v4-theme-sync-editor" >> .env; \
+		echo "BACKEND_IMAGE=eceee-v4-backend-editor" >> .env; \
+		echo "FRONTEND_IMAGE=eceee-v4-frontend-editor" >> .env; \
+		echo "THEME_SYNC_IMAGE=eceee-v4-theme-sync-editor" >> .env; \
+		echo "BACKEND_PORT=$$BP_VAL" >> .env; \
+		echo "FRONTEND_PORT=$$FP_VAL" >> .env; \
+	 else \
+		if [ -n "$(BP)" ]; then sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$(BP)/" .env 2>/dev/null || sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$(BP)/" .env; fi; \
+		if [ -n "$(FP)" ]; then sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$(FP)/" .env 2>/dev/null || sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$(FP)/" .env; fi; \
+	 fi
+	@BP_OLD=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 FP_OLD=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 BP_NEW=$${BP:-$$BP_OLD}; \
+	 FP_NEW=$${FP:-$$FP_OLD}; \
+	 if [ "$$BP_NEW" != "$$BP_OLD" ]; then \
+		echo "🔄 Updating Backend port: $$BP_OLD -> $$BP_NEW"; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+			sed -i '' "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+		else \
+			sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+			sed -i "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+		fi \
+	 fi; \
+	 if [ "$$FP_NEW" != "$$FP_OLD" ]; then \
+		echo "🔄 Updating Frontend port: $$FP_OLD -> $$FP_NEW"; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+			sed -i '' "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+		else \
+			sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+			sed -i "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+		fi \
+	 fi
+	@# Update shared infra names
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sed -i '' 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
+		sed -i '' 's/@db:5432/@eceee-v4-db:5432/' .env; \
+		sed -i '' 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
+		sed -i '' 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
+		sed -i '' 's/eceee_v4_db/eceee-v4-db/g' .env; \
+		sed -i '' 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
+		sed -i '' 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
+		sed -i '' 's/AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
+	else \
+		sed -i 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
+		sed -i 's/@db:5432/@eceee-v4-db:5432/' .env; \
+		sed -i 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
+		sed -i 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
+		sed -i 's/eceee_v4_db/eceee-v4-db/g' .env; \
+		sed -i 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
+		sed -i 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
+		sed -i 's/AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
+	fi
+	@# Check if summerstudy is in /etc/hosts and update if so
+	@if grep -q "summerstudy" /etc/hosts; then \
+		echo "🔄 Detected 'summerstudy' in hosts, ensuring URLs use it..."; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			sed -i '' 's/localhost:/summerstudy:/g' .env; \
+		else \
+			sed -i 's/localhost:/summerstudy:/g' .env; \
+		fi \
+	fi
+	@echo "✅ .env updated. Checking configuration..."
+	@make check-conf
+	@echo "🔄 Normalizing database hostnames (stripping ports)..."
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from webpages.models import WebPage; [p.save() for p in WebPage.objects.filter(parent__isnull=True)]"
+
+change-ports: ## Change backend and frontend ports (use: make change-ports BP=8002 FP=3002)
+	@if [ ! -f .env ]; then echo "❌ Error: .env file not found. Run make use-external-infra first."; exit 1; fi
+	$(call check_port,$(BP))
+	$(call check_port,$(FP))
+	@BP_OLD=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 FP_OLD=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 BP_NEW=$${BP:-$$BP_OLD}; \
+	 FP_NEW=$${FP:-$$FP_OLD}; \
+	 if [ "$$BP_NEW" = "$$BP_OLD" ] && [ "$$FP_NEW" = "$$FP_OLD" ]; then \
+		echo "ℹ️  No port changes requested."; \
+	 else \
+		echo "🔄 Changing ports in .env..."; \
+		if [ "$$BP_NEW" != "$$BP_OLD" ]; then \
+			echo "  Backend: $$BP_OLD -> $$BP_NEW"; \
+			if [ "$$(uname)" = "Darwin" ]; then \
+				sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+				sed -i '' "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+			else \
+				sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+				sed -i "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+			fi \
+		fi; \
+		if [ "$$FP_NEW" != "$$FP_OLD" ]; then \
+			echo "  Frontend: $$FP_OLD -> $$FP_NEW"; \
+			if [ "$$(uname)" = "Darwin" ]; then \
+				sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+				sed -i '' "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+			else \
+				sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+				sed -i "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+			fi \
+		fi; \
+		echo "✅ Ports updated. Please restart your containers:"; \
+		echo "   docker-compose -f docker-compose.dev.yml up -d backend frontend"; \
+	 fi
+
+check-conf: ## Check current database and server configuration
+	@echo "🔍 Checking configuration..."
+	@echo ""
+	@echo "--- Database Configuration ---"
+	@if [ -f .env ]; then \
+		DB_ENV=$$(grep '^POSTGRES_DB=' .env | cut -d= -f2); \
+		if [ -n "$$DB_ENV" ]; then \
+			printf "%-25s \033[0;34m$$DB_ENV\033[0m\n" ".env POSTGRES_DB:"; \
+		else \
+			printf "%-25s \033[0;33mDEFAULT (eceee_v4)\033[0m\n" ".env POSTGRES_DB:"; \
+		fi; \
+		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
+		printf "%-25s \033[0;34m$${DB_HOST:-eceee_v4_db}\033[0m\n" "Postgres Host:"; \
+	else \
+		printf "%-25s \033[0;33mNONE (using defaults)\033[0m\n" ".env configuration:"; \
+	fi
+	@printf "%-25s " "Backend actual DB:"
+	@docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py shell -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])" 2>/dev/null || echo "\033[0;31mERROR: Could not query backend\033[0m"
+	@if [ -f .env ]; then \
+		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
+		if [ "$$DB_HOST" = "db" ]; then \
+			echo ""; \
+			echo "\033[0;33m⚠️  Warning: POSTGRES_HOST is still set to 'db' in .env.\033[0m"; \
+			echo "Run \033[0;36mmake use-external-infra\033[0m to fix this."; \
+		fi; \
+	fi
+	@echo ""
+	@echo "--- Service Connectivity (from Backend) ---"
+	@check_conn() { \
+		name=$$1; host=$$2; port=$$3; \
+		if docker-compose -f docker-compose.dev.yml run --rm -T backend python -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('$$host', int('$$port'))); s.close()" >/dev/null 2>&1; then \
+			printf "%-25s [\033[0;32mCONNECTED\033[0m] to $$host:$$port\n" "$$name:"; \
+		else \
+			printf "%-25s [\033[0;31mFAILED\033[0m] to $$host:$$port\n" "$$name:"; \
+		fi; \
+	}; \
+	DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2 || echo "eceee_v4_db"); \
+	REDIS_URL=$$(grep '^REDIS_URL=' .env | cut -d= -f2 || echo "redis://eceee_v4_redis:6379/0"); \
+	REDIS_HOST=$$(echo $$REDIS_URL | sed -e 's/redis:\/\///' -e 's/[:\/].*//'); \
+	REDIS_PORT=$$(echo $$REDIS_URL | sed -e 's/.*://' -e 's/\/.*//' | grep -E '^[0-9]+$$' || echo "6379"); \
+	check_conn "Postgres" "$$DB_HOST" "5432"; \
+	check_conn "Redis" "$$REDIS_HOST" "$$REDIS_PORT"; \
+	check_conn "MinIO" "eceee-v4-minio" "9000"; \
+	check_conn "ImgProxy" "eceee-v4-imgproxy" "8080"; \
+	echo ""
+	@echo "--- Server Network Configuration ---"
+	@if docker network inspect eceee_shared_network >/dev/null 2>&1; then \
+		printf "%-25s [\033[0;32mCONNECTED\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
+	else \
+		printf "%-25s [\033[0;31mMISSING\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
+	fi
+	@echo ""
+
+check-db: check-conf ## Alias for check-conf
+
+replicate-db: ## Clone current DB to branch-specific DB and update .env
+	@echo "🔄 Ensuring backend image is built (to include new dependencies)..."
+	docker-compose -f docker-compose.dev.yml build backend
+	@echo "🔄 Replicating database to branch-specific version..."
+	docker-compose -f docker-compose.dev.yml run --rm backend python manage.py replicate_db
+	@echo ""
+	@echo "✅ Database replicated. Please start the backend to apply changes:"
+	@echo "   make backend"
+	@echo ""
 
 # Tailwind CSS build commands
 tailwind-build: ## Build Tailwind CSS for backend templates

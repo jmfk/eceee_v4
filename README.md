@@ -65,6 +65,7 @@ We've achieved **100% frontend test success rate** - transforming from 31 failin
 - **[🏆 Frontend Testing Success](docs/FRONTEND_TESTING_SUCCESS.md)** - Complete transformation story
 - **[🧪 Testing Best Practices](docs/TESTING_BEST_PRACTICES.md)** - Standards for reliable testing
 - **[📝 Publishing Workflow](docs/PHASE_8_PUBLISHING_WORKFLOW_SUMMARY.md)** - Professional CMS features
+- **[🔄 Multi-Repo Development](docs/MULTI_REPO_DEVELOPMENT.md)** - Working with shared infra and branch DBs
 - **[🔧 Frontend Refactoring Guide](docs/FRONTEND_REFACTORING_GUIDE.md)** - Component patterns
 
 **📊 Quality Metrics:**

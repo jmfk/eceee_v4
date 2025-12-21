@@ -743,11 +743,14 @@ class HostnamePageView(View):
         """Add layout, theme, widgets, hostname info, and object content to context"""
         context = super().get_context_data(**kwargs)
         page = self.object
-        hostname = self.request.get_host().lower()
+        full_host = self.request.get_host().lower()
+        hostname = WebPage.normalize_hostname(full_host)
 
         # Add hostname and multi-site context
         context["current_hostname"] = hostname
+        context["full_hostname"] = full_host
         context["is_root_page"] = page.is_root_page()
+        context["site_root_page"] = self._get_site_root_page(page)
         context["site_root_page"] = self._get_site_root_page(page)
 
         # Get effective layout and theme
@@ -807,7 +810,8 @@ class HostnamePageView(View):
         """
 
         page = self.object
-        hostname = self.request.get_host().lower()
+        full_host = self.request.get_host().lower()
+        hostname = WebPage.normalize_hostname(full_host)
         template_names = []
 
         # Try hostname + layout specific template
