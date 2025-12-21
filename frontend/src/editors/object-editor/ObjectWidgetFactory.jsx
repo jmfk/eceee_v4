@@ -229,61 +229,9 @@ const ObjectWidgetFactory = ({
     // Get the core widget component
     const CoreWidgetComponent = getWidgetComponent(widget.type)
 
-    if (!CoreWidgetComponent) {
-        // Fallback for unsupported widgets
-        return (
-            <div className={`widget-item unsupported ${className}`}>
-                <div className="bg-red-50 border border-red-200 rounded p-4">
-                    <div className="flex items-center space-x-3">
-                        <div className="bg-red-100 rounded-lg w-10 h-10 flex items-center justify-center text-red-600 border">
-                            <Layout className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-red-900" role="heading" aria-level="4">
-                                Unsupported Widget
-                            </div>
-                            <div className="text-xs text-red-600">
-                                Widget type "{widget.type}" is not supported in this object type
-                            </div>
-                            {allowedWidgetTypes.length > 0 && (
-                                <div className="text-xs text-gray-600 mt-1">
-                                    Allowed types: {allowedWidgetTypes.join(', ')}
-                                </div>
-                            )}
-                            {onDelete && (
-                                <div className="mt-3">
-                                    <button
-                                        onClick={handleDelete}
-                                        className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 text-xs rounded-md hover:bg-red-200 transition-colors"
-                                    >
-                                        <Trash2 className="w-3 h-3 mr-1" />
-                                        Delete Broken Widget
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Delete Confirmation Modal */}
-                <DeleteConfirmationModal
-                    isOpen={showDeleteConfirm}
-                    onClose={handleCancelDelete}
-                    onConfirm={handleConfirmDelete}
-                    title="Delete Unsupported Widget"
-                    message={`Are you sure you want to delete this unsupported widget of type "${widget.type}"?${slotConfig?.required ? ' This is a required slot and deleting this widget may cause validation errors.' : ' This action cannot be undone.'}`}
-                    itemName={`Unsupported Widget (${widget.type})`}
-                    isDeleting={isDeleting}
-                    deleteButtonText="Delete Broken Widget"
-                    warningText={slotConfig?.required ? "This widget is in a required slot" : null}
-                />
-            </div>
-        )
-    }
-
     // Widget wrapper with ObjectEditor-specific controls
     if (mode === 'editor' && showControls) {
-        return (
+        return CoreWidgetComponent ? (
             <div
                 ref={widgetRef}
                 className={`widget-item object-editor-widget relative ${className} ${isWidgetSelected ? 'ring-2 ring-blue-500' : ''} ${isWidgetCut ? 'opacity-50' : ''} ${pasteModeActive ? 'paste-mode-active cursor-pointer' : ''}`}
@@ -441,11 +389,58 @@ const ObjectWidgetFactory = ({
                     warningText={slotConfig?.required ? "This widget is in a required slot" : null}
                 />
             </div>
+        ) : (
+            <div className={`widget-item unsupported ${className}`}>
+                <div className="bg-red-50 border border-red-200 rounded p-4">
+                    <div className="flex items-center space-x-3">
+                        <div className="bg-red-100 rounded-lg w-10 h-10 flex items-center justify-center text-red-600 border">
+                            <Layout className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-red-900" role="heading" aria-level="4">
+                                Unsupported Widget
+                            </div>
+                            <div className="text-xs text-red-600">
+                                Widget type "{widget.type}" is not supported in this object type
+                            </div>
+                            {allowedWidgetTypes.length > 0 && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                    Allowed types: {allowedWidgetTypes.join(', ')}
+                                </div>
+                            )}
+                            {onDelete && (
+                                <div className="mt-3">
+                                    <button
+                                        onClick={handleDelete}
+                                        className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 text-xs rounded-md hover:bg-red-200 transition-colors"
+                                    >
+                                        <Trash2 className="w-3 h-3 mr-1" />
+                                        Delete Broken Widget
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Delete Confirmation Modal */}
+                <DeleteConfirmationModal
+                    isOpen={showDeleteConfirm}
+                    onClose={handleCancelDelete}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete Unsupported Widget"
+                    message={`Are you sure you want to delete this unsupported widget of type "${widget.type}"?${slotConfig?.required ? ' This is a required slot and deleting this widget may cause validation errors.' : ' This action cannot be undone.'}`}
+                    itemName={`Unsupported Widget (${widget.type})`}
+                    isDeleting={isDeleting}
+                    deleteButtonText="Delete Broken Widget"
+                    warningText={slotConfig?.required ? "This widget is in a required slot" : null}
+                />
+            </div>
         )
     }
 
     // Simple widget renderer without controls (for display mode)
-    return (
+    return CoreWidgetComponent ? (
         <div
             className={`widget-item object-editor-display ${className}`}
             data-widget-type={widget.type}
@@ -472,7 +467,7 @@ const ObjectWidgetFactory = ({
                 />
             </div>
         </div>
-    )
+    ) : null
 }
 
 export default ObjectWidgetFactory
