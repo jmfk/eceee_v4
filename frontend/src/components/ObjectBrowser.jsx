@@ -6,6 +6,7 @@ import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import OptimizedImage from './media/OptimizedImage'
 
 const ObjectBrowser = () => {
     // Set document title
@@ -237,17 +238,21 @@ const ObjectBrowser = () => {
                                         className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
                                     >
                                         <div className="flex flex-col items-center text-center">
-                                            {objectType.iconImage ? (
-                                                <img
-                                                    src={objectType.iconImage}
-                                                    alt={objectType.label}
-                                                    className="w-16 h-16 object-cover rounded-lg mb-3"
-                                                />
-                                            ) : (
-                                                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                                                    <Image className="h-8 w-8 text-gray-400" />
-                                                </div>
-                                            )}
+                                            <div className="w-16 h-16 flex-shrink-0 mb-3">
+                                                {objectType.iconImage ? (
+                                                    <OptimizedImage
+                                                        src={objectType.iconImage}
+                                                        alt={objectType.label}
+                                                        width={64}
+                                                        height={64}
+                                                        className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                                                        <Image className="h-8 w-8 text-gray-400" />
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="text-lg font-medium text-gray-900 mb-1" role="heading" aria-level="3">
                                                 {objectType.label}
                                             </div>
@@ -303,17 +308,21 @@ const ObjectBrowser = () => {
                                                 <ArrowLeft className="h-4 w-4" />
                                             </button>
                                             <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
-                                                {selectedObjectType.iconImage ? (
-                                                    <img
-                                                        src={selectedObjectType.iconImage}
-                                                        alt={selectedObjectType.label}
-                                                        className="w-8 h-8 object-cover rounded mr-3"
-                                                    />
-                                                ) : (
-                                                    <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center mr-3">
-                                                        <Image className="h-5 w-5 text-gray-400" />
-                                                    </div>
-                                                )}
+                                                <div className="w-8 h-8 flex-shrink-0 mr-3">
+                                                    {selectedObjectType.iconImage ? (
+                                                        <OptimizedImage
+                                                            src={selectedObjectType.iconImage}
+                                                            alt={selectedObjectType.label}
+                                                            width={32}
+                                                            height={32}
+                                                            className="w-full h-full object-cover rounded shadow-sm border border-gray-100"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center">
+                                                            <Image className="h-5 w-5 text-gray-400" />
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 {selectedObjectType.pluralLabel}
                                             </div>
                                         </div>
@@ -437,17 +446,21 @@ const ObjectBrowser = () => {
                                         className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
                                     >
                                         <div className="flex flex-col items-center text-center">
-                                            {objectType.iconImage ? (
-                                                <img
-                                                    src={objectType.iconImage}
-                                                    alt={objectType.label}
-                                                    className="w-16 h-16 object-cover rounded-lg mb-3"
-                                                />
-                                            ) : (
-                                                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                                                    <Image className="h-8 w-8 text-gray-400" />
-                                                </div>
-                                            )}
+                                            <div className="w-16 h-16 flex-shrink-0 mb-3">
+                                                {objectType.iconImage ? (
+                                                    <OptimizedImage
+                                                        src={objectType.iconImage}
+                                                        alt={objectType.label}
+                                                        width={64}
+                                                        height={64}
+                                                        className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                                                        <Image className="h-8 w-8 text-gray-400" />
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="text-lg font-medium text-gray-900 mb-1" role="heading" aria-level="3">
                                                 {objectType.label}
                                             </div>
@@ -481,15 +494,19 @@ const ObjectBrowser = () => {
                                     </button>
                                     <div>
                                         <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
-                                            {selectedObjectType?.iconImage ? (
-                                                <img
-                                                    src={selectedObjectType.iconImage}
-                                                    alt={selectedObjectType.label}
-                                                    className="w-8 h-8 object-cover rounded mr-3"
-                                                />
-                                            ) : (
-                                                <FolderOpen className="h-8 w-8 mr-3 text-gray-400" />
-                                            )}
+                                            <div className="w-8 h-8 flex-shrink-0 mr-3">
+                                                {selectedObjectType?.iconImage ? (
+                                                    <OptimizedImage
+                                                        src={selectedObjectType.iconImage}
+                                                        alt={selectedObjectType.label}
+                                                        width={32}
+                                                        height={32}
+                                                        className="w-full h-full object-cover rounded shadow-sm border border-gray-100"
+                                                    />
+                                                ) : (
+                                                    <FolderOpen className="h-8 w-8 text-gray-400" />
+                                                )}
+                                            </div>
                                             {selectedObjectType?.pluralLabel}
                                         </div>
                                         <div className="text-gray-600 mt-1">

@@ -129,6 +129,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     slots_count = serializers.SerializerMethodField()
     child_types_count = serializers.SerializerMethodField()
     instance_count = serializers.SerializerMethodField()
+    icon_image = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectTypeDefinition
@@ -174,6 +175,26 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         """Return count of object instances of this type"""
         return obj.objectinstance_set.count()
 
+    def _get_absolute_url(self, url):
+        """Helper to ensure URL is absolute for imgproxy"""
+        if not url:
+            return None
+        if url.startswith("http"):
+            return url
+        
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_icon_image(self, obj):
+        """Return icon image URL with cache busting version"""
+        if not obj.icon_image:
+            return None
+        url = obj.icon_image.url
+        absolute_url = self._get_absolute_url(url)
+        return f"{absolute_url}?v={int(obj.updated_at.timestamp())}"
+
     def to_representation(self, instance):
         """Convert representation to camelCase for frontend"""
         data = super().to_representation(instance)
@@ -192,7 +213,9 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                 "id": ct.id,
                 "name": ct.name,
                 "label": ct.label,
-                "iconImage": ct.icon_image.url if ct.icon_image else None,
+                "iconImage": f"{self._get_absolute_url(ct.icon_image.url)}?v={int(ct.updated_at.timestamp())}"
+                if ct.icon_image
+                else None,
                 "description": ct.description,
             }
             for ct in child_types
@@ -563,6 +586,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
     )
     instance_count = serializers.SerializerMethodField()
     allowed_child_types = serializers.SerializerMethodField()
+    icon_image = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectTypeDefinition
@@ -587,6 +611,26 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
         """Return count of object instances of this type"""
         return obj.objectinstance_set.count()
 
+    def _get_absolute_url(self, url):
+        """Helper to ensure URL is absolute for imgproxy"""
+        if not url:
+            return None
+        if url.startswith("http"):
+            return url
+        
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_icon_image(self, obj):
+        """Return icon image URL with cache busting version"""
+        if not obj.icon_image:
+            return None
+        url = obj.icon_image.url
+        absolute_url = self._get_absolute_url(url)
+        return f"{absolute_url}?v={int(obj.updated_at.timestamp())}"
+
     def get_allowed_child_types(self, obj):
         """Return full object data for allowed child types"""
         child_types = obj.allowed_child_types.filter(is_active=True)
@@ -595,7 +639,9 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
                 "id": ct.id,
                 "name": ct.name,
                 "label": ct.label,
-                "iconImage": ct.icon_image.url if ct.icon_image else None,
+                "iconImage": f"{self._get_absolute_url(ct.icon_image.url)}?v={int(ct.updated_at.timestamp())}"
+                if ct.icon_image
+                else None,
                 "description": ct.description,
             }
             for ct in child_types

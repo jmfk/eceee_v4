@@ -1058,7 +1058,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                         </label>
                         {objectType?.id ? (
                             <InlineImageUpload
-                                currentImageUrl={objectType?.iconImage}
+                                currentImageUrl={formData.iconImage || objectType?.iconImage}
+                                onImageChange={(url) => handleInputChange('iconImage', url)}
                                 objectTypeId={objectType?.id}
                                 placeholder="Upload icon image"
                                 disabled={isSubmitting}

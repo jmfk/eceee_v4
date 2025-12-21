@@ -308,6 +308,8 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
     )
 }
 
+import OptimizedImage from './media/OptimizedImage'
+
 // Object Type Card Component
 const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
     const statusColor = objectType.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -320,17 +322,21 @@ const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
             <div className="flex-grow">
                 <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center">
-                        {objectType.iconImage ? (
-                            <img
-                                src={objectType.iconImage}
-                                alt={objectType.label}
-                                className="h-8 w-8 rounded mr-3"
-                            />
-                        ) : (
-                            <div className="h-8 w-8 bg-blue-100 rounded flex items-center justify-center mr-3">
-                                <Hash className="h-4 w-4 text-blue-600" />
-                            </div>
-                        )}
+                        <div className="w-10 h-10 flex-shrink-0 mr-3">
+                            {objectType.iconImage ? (
+                                <OptimizedImage
+                                    src={objectType.iconImage}
+                                    alt={objectType.label}
+                                    width={40}
+                                    height={40}
+                                    className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-blue-100 rounded-lg flex items-center justify-center border border-blue-200">
+                                    <Hash className="h-5 w-5 text-blue-600" />
+                                </div>
+                            )}
+                        </div>
                         <div>
                             <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">{objectType.label}</div>
                             <div className="text-sm text-gray-500">{objectType.name}</div>

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { Upload, X, Image, Loader } from 'lucide-react'
 import { api } from '../api/client'
+import OptimizedImage from './media/OptimizedImage'
 
 /**
  * InlineImageUpload Component
@@ -72,16 +73,15 @@ const InlineImageUpload = ({
             })
 
             // Update preview and notify parent
+            // The backend now returns an absolute URL
             const imageUrl = response.data.url
-            setPreviewUrl(imageUrl)
+            
+            // Add cache-busting version parameter for immediate visual update
+            const timestampedUrl = `${imageUrl}${imageUrl.includes('?') ? '&' : '?'}v=${Date.now()}`
+            setPreviewUrl(timestampedUrl)
 
-            // If object type was updated, we don't need to pass the URL to parent
-            // since it's already saved to the object
-            if (response.data.object_type_updated) {
-                onImageChange && onImageChange(imageUrl)
-            } else {
-                onImageChange && onImageChange(imageUrl)
-            }
+            // Notify parent with the actual URL (not the timestamped one)
+            onImageChange && onImageChange(imageUrl)
 
         } catch (error) {
             console.error('Image upload failed:', error)
@@ -128,9 +128,11 @@ const InlineImageUpload = ({
                 <div className="flex-shrink-0">
                     {previewUrl ? (
                         <div className="relative group">
-                            <img
+                            <OptimizedImage
                                 src={previewUrl}
                                 alt="Preview"
+                                width={80}
+                                height={80}
                                 className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200 group-hover:border-gray-300 transition-colors"
                             />
                             {!disabled && (

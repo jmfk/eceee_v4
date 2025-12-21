@@ -1,5 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, ChevronDown, Layout } from 'lucide-react'
+import OptimizedImage from './media/OptimizedImage'
 
 const ObjectTypeSelector = ({
     allowedChildTypes = [],
@@ -9,92 +11,138 @@ const ObjectTypeSelector = ({
     parentId = null
 }) => {
     const [isOpen, setIsOpen] = useState(false)
+    const buttonRef = useRef(null)
+    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
+
+    const updateCoords = () => {
+        if (buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect()
+            setCoords({
+                top: rect.bottom,
+                left: rect.left,
+                width: rect.width
+            })
+        }
+    }
+
+    const handleToggle = () => {
+        if (!isOpen) {
+            updateCoords()
+        }
+        setIsOpen(!isOpen)
+    }
 
     const handleSelect = (childType) => {
         onSelect(childType, parentId)
         setIsOpen(false)
     }
 
+    const buttonLabel = useMemo(() => {
+        if (allowedChildTypes.length === 1) {
+            return `Add ${allowedChildTypes[0].label}`
+        }
+        return "Add..."
+    }, [allowedChildTypes])
+
+    // Update coordinates on scroll or resize to keep menu attached to button
+    useEffect(() => {
+        if (isOpen) {
+            const handleUpdate = () => updateCoords()
+            window.addEventListener('scroll', handleUpdate, true)
+            window.addEventListener('resize', handleUpdate)
+            return () => {
+                window.removeEventListener('scroll', handleUpdate, true)
+                window.removeEventListener('resize', handleUpdate)
+            }
+        }
+    }, [isOpen])
+
     if (allowedChildTypes.length === 0) {
-        return (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                <Layout className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <div className="text-gray-600 text-sm">
-                    No child object types configured
-                </div>
-                <div className="text-gray-500 text-xs mt-1">
-                    Configure allowed child types in the object type settings
-                </div>
-            </div>
-        )
+        return null
     }
 
-    return (
-        <div className="relative">
-            <button
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                disabled={disabled}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+    const dropdownMenu = (
+        <>
+            {/* Backdrop */}
+            <div 
+                className="fixed inset-0 z-[10009] bg-transparent" 
+                onClick={() => setIsOpen(false)}
+            />
+            {/* Menu - aligned to the button, opening downwards */}
+            <div 
+                className="fixed z-[10010] mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden animate-scale-in origin-top-right"
+                style={{ 
+                    top: `${coords.top}px`, 
+                    left: `${Math.max(10, Math.min(window.innerWidth - 330, coords.left + coords.width - 320))}px` // Aligned to right, but safe-guarded
+                }}
             >
-                <Plus className="w-4 h-4 mr-2" />
-                {placeholder}
-                <ChevronDown className={`w-4 h-4 ml-2 transform transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Dropdown Menu */}
-            {isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                    <div className="p-2">
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide px-3 py-2">
-                            Choose object type to create
-                        </div>
-                        <div className="space-y-1">
-                            {allowedChildTypes.map((childType) => (
-                                <button
-                                    key={childType.id}
-                                    type="button"
-                                    onClick={() => handleSelect(childType)}
-                                    className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-md transition-colors group"
-                                >
-                                    <div className="flex items-center space-x-3 flex-1">
+                <div className="p-2">
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 py-2 border-b border-gray-50 mb-1">
+                        Choose type to create
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                        {allowedChildTypes.map((childType) => (
+                            <button
+                                key={childType.id}
+                                type="button"
+                                onClick={() => handleSelect(childType)}
+                                className="w-full flex items-center p-3 text-left hover:bg-blue-50 rounded-md transition-colors group"
+                            >
+                                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                    <div className="w-10 h-10 flex-shrink-0">
                                         {childType.iconImage ? (
-                                            <img
+                                            <OptimizedImage
                                                 src={childType.iconImage}
                                                 alt={childType.label}
-                                                className="w-8 h-8 object-cover rounded"
+                                                width={40}
+                                                height={40}
+                                                className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
                                             />
                                         ) : (
-                                            <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                                <span className="text-blue-600 font-medium text-sm">
+                                            <div className="w-full h-full bg-blue-100 rounded-lg flex items-center justify-center border border-blue-200">
+                                                <span className="text-blue-600 font-bold text-lg">
                                                     {childType.label?.charAt(0) || 'O'}
                                                 </span>
                                             </div>
                                         )}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors" role="heading" aria-level="4">
-                                                {childType.label}
-                                            </div>
-                                            <div className="text-sm text-gray-500 truncate">
-                                                {childType.description || `Create a new ${childType.label.toLowerCase()}`}
-                                            </div>
-                                        </div>
-                                        <Plus className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                                     </div>
-                                </button>
-                            ))}
-                        </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
+                                            {childType.label}
+                                        </div>
+                                        <div className="text-xs text-gray-500 line-clamp-2">
+                                            {childType.description || `Create a new ${childType.label.toLowerCase()}`}
+                                        </div>
+                                    </div>
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Plus className="w-4 h-4 text-blue-600" />
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
                     </div>
                 </div>
-            )}
+            </div>
+        </>
+    )
 
-            {/* Click outside to close */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsOpen(false)}
-                />
-            )}
+    return (
+        <div className="relative">
+            <button
+                ref={buttonRef}
+                type="button"
+                onClick={handleToggle}
+                disabled={disabled}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm whitespace-nowrap"
+            >
+                <Plus className="w-4 h-4 mr-2" />
+                {buttonLabel}
+                {allowedChildTypes.length > 1 && (
+                    <ChevronDown className={`w-4 h-4 ml-2 transform transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                )}
+            </button>
+
+            {isOpen && createPortal(dropdownMenu, document.body)}
         </div>
     )
 }
