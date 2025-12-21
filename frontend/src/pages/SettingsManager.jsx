@@ -71,7 +71,7 @@ const SettingsManager = () => {
 
     // Set document title based on active tab
     const tabTitles = {
-        'layouts': 'Settings - Layouts',
+        'layouts': 'Settings - Layout Overview',
         'themes': 'Settings - Themes',
         'widgets': 'Settings - Widgets',
         'value-lists': 'Settings - Value Lists',

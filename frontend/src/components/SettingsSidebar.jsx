@@ -26,7 +26,6 @@ export default function SettingsSidebar() {
     const location = useLocation()
     const { user } = useAuth()
     const [expandedSections, setExpandedSections] = useState({
-        layouts: true,
         themes: true,
         system: true,
         data: true,
@@ -39,21 +38,6 @@ export default function SettingsSidebar() {
             [sectionId]: !prev[sectionId]
         }))
     }
-
-    // Fetching data for sub-items (ported from SettingsTabs)
-    const { data: layouts = [] } = useQuery({
-        queryKey: ['layouts'],
-        queryFn: async () => {
-            try {
-                const response = await layoutsApi.list()
-                return Array.isArray(response) ? response : response?.data || response?.results || []
-            } catch (error) {
-                console.error('Error fetching layouts:', error)
-                return []
-            }
-        },
-        staleTime: 5 * 60 * 1000,
-    })
 
     const { data: themes = [] } = useQuery({
         queryKey: ['themes'],
@@ -141,25 +125,12 @@ export default function SettingsSidebar() {
             ]
         },
         {
-            id: 'layouts',
-            label: 'Layouts',
-            icon: Grid3X3,
-            items: [
-                { id: 'layouts-overview', label: 'All Layouts', icon: Grid3X3, href: '/settings/layouts' },
-                ...layouts.slice(0, 10).map(layout => ({
-                    id: `layout-${layout.name}`,
-                    label: layout.displayName || layout.name,
-                    icon: Grid3X3,
-                    href: `/settings/layouts?edit=${layout.name}`
-                }))
-            ]
-        },
-        {
             id: 'themes',
             label: 'Themes',
             icon: Palette,
             items: [
                 { id: 'themes-overview', label: 'All Themes', icon: Palette, href: '/settings/themes' },
+                { id: 'layouts-overview', label: 'Layout Overview', icon: Grid3X3, href: '/settings/layouts' },
                 ...themes.map(theme => ({
                     id: `theme-${theme.id}`,
                     label: theme.name,
