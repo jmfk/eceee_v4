@@ -26,7 +26,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports replicate-db
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports replicate-db list-dbs switch-db
 
 # Dummy targets for help flags
 --help:
@@ -128,6 +128,8 @@ help: ## Show this help message (use: make help [target])
 		echo "  check-conf             Check database and server configuration"; \
 		echo "  use-external-infra     Setup .env to use shared infrastructure"; \
 		echo "  change-ports           Change backend and frontend ports"; \
+		echo "  list-dbs               List all database clones"; \
+		echo "  switch-db DB=name      Switch current database in .env"; \
 		echo "  replicate-db           Clone current DB to branch-specific DB"; \
 		echo ""; \
 		echo "Usage:"; \
@@ -707,14 +709,37 @@ check-conf: ## Check current database and server configuration
 check-db: check-conf ## Alias for check-conf
 
 replicate-db: ## Clone current DB to branch-specific DB and update .env
-	@echo "🔄 Ensuring backend image is built (to include new dependencies)..."
-	docker-compose -f docker-compose.dev.yml build backend
+	$(call check_help,replicate-db)
 	@echo "🔄 Replicating database to branch-specific version..."
-	docker-compose -f docker-compose.dev.yml run --rm backend python manage.py replicate_db
+	docker-compose -f docker-compose.dev.yml run --rm -e GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD) backend python manage.py replicate_db
 	@echo ""
 	@echo "✅ Database replicated. Please start the backend to apply changes:"
 	@echo "   make backend"
-	@echo ""
+	@	 echo ""
+
+list-dbs: ## List all database clones
+	$(call check_help,list-dbs)
+	docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py list_dbs
+
+switch-db: ## Switch current database in .env (use: make switch-db DB=dbname)
+	$(call check_help,switch-db)
+	@if [ -z "$(DB)" ]; then \
+		echo "❌ Error: DB name is required"; \
+		$(call print_help,switch-db); \
+		exit 1; \
+	fi
+	@# Check if DB exists first
+	@docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py shell -c "import psycopg2; from django.conf import settings; s=settings.DATABASES['default']; conn=psycopg2.connect(dbname='postgres', user=s['USER'], password=s['PASSWORD'], host=s['HOST'], port=s['PORT']); cur=conn.cursor(); cur.execute('SELECT 1 FROM pg_database WHERE datname = %s', ('$(DB)',)); exists=cur.fetchone(); conn.close(); exit(0 if exists else 1)" >/dev/null 2>&1 || (echo "❌ Error: Database '$(DB)' does not exist."; exit 1)
+	@echo "🔄 Switching database to '$(DB)' in .env..."
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sed -i '' "s/^POSTGRES_DB=.*/POSTGRES_DB=$(DB)/" .env; \
+		sed -i '' "s|DATABASE_URL=\(.*\)/[^/]*$$|DATABASE_URL=\1/$(DB)|" .env; \
+	else \
+		sed -i "s/^POSTGRES_DB=.*/POSTGRES_DB=$(DB)/" .env; \
+		sed -i "s|DATABASE_URL=\(.*\)/[^/]*$$|DATABASE_URL=\1/$(DB)|" .env; \
+	fi
+	@echo "✅ Successfully switched to database '$(DB)'."
+	@echo "Restart your docker containers to apply changes: make restart"
 
 # Tailwind CSS build commands
 tailwind-build: ## Build Tailwind CSS for backend templates
