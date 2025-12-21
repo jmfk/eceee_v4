@@ -19,8 +19,11 @@ class ImgProxyService:
     """
 
     def __init__(self):
-        self.base_url = getattr(
-            settings, "IMGPROXY_URL", "https://imgproxy.eceee.fred.nu"
+        self.internal_url = getattr(
+            settings, "IMGPROXY_URL", "http://imgproxy:8080"
+        )
+        self.public_url = getattr(
+            settings, "IMGPROXY_PUBLIC_URL", self.internal_url
         )
         self.key = getattr(settings, "IMGPROXY_KEY", "")
         self.salt = getattr(settings, "IMGPROXY_SALT", "")
@@ -114,7 +117,7 @@ class ImgProxyService:
                     "Using unsigned imgproxy URLs - not recommended for production"
                 )
 
-            return f"{self.base_url}{signed_path}"
+            return f"{self.public_url}{signed_path}"
 
         except Exception as e:
             logger.error(f"Failed to generate imgproxy URL: {e}")
@@ -370,7 +373,7 @@ class ImgProxyService:
         try:
             import requests
 
-            response = requests.get(f"{self.base_url}/health", timeout=5)
+            response = requests.get(f"{self.internal_url}/health", timeout=5)
             return response.status_code == 200
         except Exception as e:
             logger.error(f"imgproxy health check failed: {e}")
@@ -504,10 +507,10 @@ def validate_imgproxy_config() -> Dict[str, any]:
         Dictionary with validation results
     """
     results = {
-        "configured": bool(imgproxy_service.base_url),
+        "configured": bool(imgproxy_service.internal_url),
         "signed": bool(imgproxy_service.key_bytes and imgproxy_service.salt_bytes),
         "healthy": False,
-        "url": imgproxy_service.base_url,
+        "url": imgproxy_service.public_url,
         "errors": [],
     }
 

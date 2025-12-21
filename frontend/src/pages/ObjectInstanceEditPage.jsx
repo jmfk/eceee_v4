@@ -21,7 +21,7 @@ import ObjectSubObjectsView from '../components/objectEdit/ObjectSubObjectsView'
 import ObjectVersionsView from '../components/objectEdit/ObjectVersionsView'
 
 const ObjectInstanceEditPage = () => {
-    // --- 1. ALL HOOKS AT THE TOP (Never conditional, never after returns) ---
+    // --- 1. ALL HOOKS AT THE TOP ---
     const { instanceId, objectTypeId, tab = 'content' } = useParams()
     const navigate = useNavigate()
     const location = useLocation()
@@ -138,10 +138,10 @@ const ObjectInstanceEditPage = () => {
         }
     })
 
-    // Other hooks
-    const documentTitle = isNewInstance 
-        ? `New ${objectType?.label || 'Object'}` 
-        : (instance?.title || 'Loading...')
+    const documentTitle = useMemo(() => {
+        if (isNewInstance) return `New ${objectType?.label || 'Object'}`
+        return instance?.title || 'Loading...'
+    }, [isNewInstance, objectType, instance])
     useDocumentTitle(documentTitle)
 
     useEffect(() => {
@@ -208,31 +208,45 @@ const ObjectInstanceEditPage = () => {
     const breadcrumbItems = useMemo(() => {
         const items = [{ label: 'Objects', path: '/objects', icon: Layout }]
         
-        // Helper to get type list breadcrumb
+        // Helper to pluralize type labels
+        const pluralize = (label) => {
+            if (!label) return ''
+            return label.endsWith('s') ? label : `${label}s`
+        }
+
+        // Helper to add type list crumb
         const addTypeListCrumb = (typeName, typeLabel) => {
             items.push({ 
-                label: typeLabel + 's', // Simple pluralization fallback
+                label: pluralize(typeLabel),
                 path: `/objects/${typeName}`
             })
         }
 
         if (isNewInstance) {
             // New sub-object flow
+            // parentPathToRoot from backend is [Self, Parent, ..., Root]
             const pathFromRoot = [...parentPathToRoot].reverse()
             
             if (pathFromRoot.length > 0) {
-                pathFromRoot.forEach((node) => {
-                    addTypeListCrumb(node.objectTypeName, node.objectTypeLabel)
+                // Add the type list of the root object
+                const rootNode = pathFromRoot[0]
+                addTypeListCrumb(rootNode.objectTypeName, rootNode.objectTypeLabel)
+
+                // Add all ancestors and their sub-object collections
+                pathFromRoot.forEach((node, index) => {
+                    // Item content link
                     items.push({ 
                         label: node.title, 
                         path: `/objects/${node.id}/edit/content` 
                     })
+
+                    // Always show sub-objects link for ancestors in new-instance path
+                    // Label it based on the node's configured allowed types if possible
+                    items.push({
+                        label: 'Sub-objects',
+                        path: `/objects/${node.id}/edit/subobjects`
+                    })
                 })
-                // Link last parent crumb to its sub-objects tab
-                const lastCrumb = items[items.length - 1]
-                if (lastCrumb && lastCrumb.path) {
-                    lastCrumb.path = lastCrumb.path.replace('/edit/content', '/edit/subobjects')
-                }
             } else if (objectType) {
                 // New root object flow
                 addTypeListCrumb(objectType.name, objectType.label)
@@ -240,29 +254,44 @@ const ObjectInstanceEditPage = () => {
             items.push({ label: `New ${objectType?.label || 'Object'}` })
         } else if (pathToRoot.length > 0) {
             // Edit flow
-            // pathToRoot is returned as [Self, Parent, Root] from backend due to .reverse() in models.py
+            // pathToRoot from backend is [Self, Parent, ..., Root]
             const pathFromRoot = [...pathToRoot].reverse()
+            const rootNode = pathFromRoot[0]
+            
+            // 1. Add root type list
+            addTypeListCrumb(rootNode.objectTypeName, rootNode.objectTypeLabel)
 
+            // 2. Iterate through path nodes
             pathFromRoot.forEach((node, index) => {
-                const isCurrent = index === pathFromRoot.length - 1
-                
-                // Add type crumb
-                addTypeListCrumb(node.objectTypeName, node.objectTypeLabel)
+                const isCurrentItem = index === pathFromRoot.length - 1
+                const nextNode = pathFromRoot[index + 1]
 
-                if (isCurrent) {
-                    // Current objectcrumb
+                // Add item crumb
+                if (isCurrentItem) {
                     items.push({ label: node.title })
                     
-                    // If we are on sub-objects tab, add the type being listed
-                    if (tab === 'subobjects' && objectType?.allowedChildTypes?.length === 1) {
-                        const childType = objectType.allowedChildTypes[0]
-                        items.push({ label: childType.pluralLabel || (childType.label + 's') })
+                    // If on sub-objects tab, add the collection crumb
+                    if (tab === 'subobjects') {
+                        const childLabel = (objectType?.allowedChildTypes?.length === 1)
+                            ? pluralize(objectType.allowedChildTypes[0].label)
+                            : "Sub-objects"
+                        items.push({ label: childLabel })
                     }
                 } else {
-                    // Ancestor crumb
+                    // Ancestor item
                     items.push({ 
                         label: node.title, 
                         path: `/objects/${node.id}/edit/content` 
+                    })
+
+                    // Collection level leading to next node
+                    const collectionLabel = nextNode 
+                        ? pluralize(nextNode.objectTypeLabel) 
+                        : "Sub-objects"
+                    
+                    items.push({
+                        label: collectionLabel,
+                        path: `/objects/${node.id}/edit/subobjects`
                     })
                 }
             })
@@ -271,9 +300,9 @@ const ObjectInstanceEditPage = () => {
     }, [objectType, pathToRoot, parentPathToRoot, isNewInstance, tab])
 
     const parentObject = useMemo(() => {
-        // pathToRoot is [Self, Parent, Root]
+        // pathToRoot is [Self, Parent, ..., Root]
         if (!isNewInstance) {
-            if (pathToRoot.length > 1) return pathToRoot[1] // Parent
+            if (pathToRoot.length > 1) return pathToRoot[1]
         } else if (parentIdFromUrl && parentMetadata) {
             return parentMetadata
         }
@@ -282,11 +311,9 @@ const ObjectInstanceEditPage = () => {
 
     const handleBack = useCallback(() => {
         if (parentObject) {
-            // If sub-object, go to parent's sub-objects view
             navigate(`/objects/${parentObject.id || parentObject.instanceId}/edit/subobjects`)
             return
         }
-        // If root object, go to its type list
         const objectTypeName = objectType?.name || instance?.objectTypeName
         if (objectTypeName) navigate(`/objects/${objectTypeName}`)
         else navigate('/objects')
@@ -319,35 +346,7 @@ const ObjectInstanceEditPage = () => {
         createNewObjectMutation.mutate(essentialFields)
     }, [createNewObjectMutation])
 
-    const getSubObjectsLabel = useCallback(() => {
-        const allowedChildTypes = objectType?.allowedChildTypes || []
-        if (allowedChildTypes.length === 1) return allowedChildTypes[0].label
-        if (allowedChildTypes.length <= 3) return allowedChildTypes.map(t => t.label).join(', ')
-        return `${allowedChildTypes.length} types`
-    }, [objectType])
-
-    const tabs = useMemo(() => {
-        if (!objectType) return []
-        return [
-            { id: 'content', label: 'Content', icon: Layout },
-            ...((objectType?.allowedChildTypes || []).length > 0 ? [{ id: 'subobjects', label: getSubObjectsLabel(), icon: Users }] : []),
-            { id: 'settings', label: 'Settings', icon: Settings },
-            { id: 'publishing', label: 'Publishing', icon: Calendar },
-            ...(isEditingInstance ? [{ id: 'versions', label: 'Versions', icon: History }] : [])
-        ]
-    }, [objectType, isEditingInstance, getSubObjectsLabel])
-
-    const commonTabProps = useMemo(() => ({
-        objectType, instance,
-        parentId: parentIdFromUrl || instance?.parent?.id || instance?.parent,
-        isNewInstance, onUnsavedChanges: setHasUnsavedChanges,
-        onSave: () => {}, onCancel: handleBack, context: { contextType: 'object' }
-    }), [objectType, instance, parentIdFromUrl, isNewInstance, handleBack])
-
-    const getTabPath = useCallback((tabId) => isNewInstance ? `/objects/new/${objectTypeId}/${tabId}` : `/objects/${instanceId}/edit/${tabId}`, [isNewInstance, objectTypeId, instanceId])
-
-    // --- 2. LOGIC-BASED RETURNS (After all hooks) ---
-    
+    // --- 2. EARLY RETURNS ---
     if (!isNewInstance && !isEditingInstance) return <Navigate to="/objects" replace />
     
     if (instanceLoading || typeLoading || pathLoading) return (
@@ -366,14 +365,34 @@ const ObjectInstanceEditPage = () => {
         </div>
     )
 
+    // --- 3. LOGIC FOR TABS ---
+    const tabs = [
+        { id: 'content', label: 'Content', icon: Layout },
+        ...((objectType?.allowedChildTypes || []).length > 0 ? [{ id: 'subobjects', label: 'Sub-objects', icon: Users }] : []),
+        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'publishing', label: 'Publishing', icon: Calendar },
+        ...(isEditingInstance ? [{ id: 'versions', label: 'Versions', icon: History }] : [])
+    ]
+
     if (!tabs.find(t => t.id === tab)) {
-        return <Navigate to={getTabPath('content')} replace />
+        return <Navigate to={isNewInstance ? `/objects/new/${objectTypeId}/content` : `/objects/${instanceId}/edit/content`} replace />
     }
 
-    // Determine Back button label
+    const commonTabProps = {
+        objectType, instance,
+        parentId: parentIdFromUrl || instance?.parent?.id || instance?.parent,
+        isNewInstance, onUnsavedChanges: setHasUnsavedChanges,
+        onSave: () => {}, onCancel: handleBack, context: { contextType: 'object' }
+    }
+
     const backButtonLabel = parentObject 
         ? `Back to ${parentObject.title}` 
-        : `Back to ${objectType?.pluralLabel || (objectType?.label + 's') || 'Objects'}`
+        : `Back to ${pluralize(objectType?.label) || 'Objects'}`
+
+    function pluralize(label) {
+        if (!label) return ''
+        return label.endsWith('s') ? label : `${label}s`
+    }
 
     return (
         <div className="h-screen bg-gray-50 flex flex-col">
@@ -401,7 +420,7 @@ const ObjectInstanceEditPage = () => {
                                     const Icon = tabDef.icon
                                     const isActive = tab === tabDef.id
                                     return (
-                                        <Link key={tabDef.id} to={getTabPath(tabDef.id)} className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}>
+                                        <Link key={tabDef.id} to={isNewInstance ? `/objects/new/${objectTypeId}/${tabDef.id}` : `/objects/${instanceId}/edit/${tabDef.id}`} className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}>
                                             <Icon className="w-4 h-4 mr-2" />
                                             {tabDef.label}
                                         </Link>
@@ -434,7 +453,7 @@ const ObjectInstanceEditPage = () => {
                 isDirty={hasUnsavedChanges} currentVersion={currentVersion} availableVersions={availableVersions}
                 onVersionChange={switchToVersion} onSaveClick={() => handleSave()}
                 isSaving={saveMutation.isPending} isNewPage={isNewInstance}
-                customStatusContent={<div className="text-sm text-gray-600">{isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.label === tab)?.label}</div>}
+                customStatusContent={<div className="text-sm text-gray-600">{isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.id === tab)?.label}</div>}
             />
             {showEssentialFieldsModal && (
                 <ObjectEssentialFieldsModal

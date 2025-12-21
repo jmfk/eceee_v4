@@ -27,6 +27,7 @@ services:
       - AWS_S3_USE_SSL=False
       - REDIS_URL=${REDIS_URL:-redis://eceee-v4-redis:6379/0}
       - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
+      - IMGPROXY_PUBLIC_URL=${IMGPROXY_PUBLIC_URL:-http://localhost:8080}
       - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
       - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
       - OPENAI_API_KEY=${OPENAI_API_KEY}

@@ -648,6 +648,7 @@ ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default=None)
 
 # imgproxy Configuration
 IMGPROXY_URL = config("IMGPROXY_URL", default="http://imgproxy:8080")
+IMGPROXY_PUBLIC_URL = config("IMGPROXY_PUBLIC_URL", default=IMGPROXY_URL)
 IMGPROXY_KEY = config("IMGPROXY_KEY", default="")
 IMGPROXY_SALT = config("IMGPROXY_SALT", default="")
 IMGPROXY_SIGNATURE_SIZE = config("IMGPROXY_SIGNATURE_SIZE", default=32, cast=int)
