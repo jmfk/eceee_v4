@@ -84,6 +84,10 @@ help: ## Show this help message
 	@echo "Cache Management:"
 	@echo "  clear-layout-cache     Clear layout-related caches to force refresh"
 	@echo "  clear-layout-cache-all Clear ALL caches (nuclear option)"
+	@echo "  check-servers     Check if backend and frontend servers are up"
+	@echo "  check-conf        Check database and server configuration"
+	@echo "  use-external-infra Setup .env to use shared infrastructure"
+	@echo "  replicate-db      Clone current DB to branch-specific DB and update .env"
 	@echo ""
 	@echo "Usage: make <target>"
 
@@ -428,6 +432,145 @@ clear-layout-cache: ## Clear layout-related caches to force refresh
 clear-layout-cache-all: ## Clear all caches (nuclear option)
 	@echo "🧹 Clearing ALL caches..."
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache --all
+
+check-servers: ## Check if backend and frontend servers are up
+	@echo "🔍 Checking status of services..."
+	@echo ""
+	@check_http() { \
+		name=$$1; url=$$2; \
+		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 $$url 2>/dev/null); \
+		if [ "$$status" = "200" ]; then \
+			printf "%-25s [\033[0;32mUP\033[0m]\n" "$$name"; \
+		elif [ "$$status" = "000" ] || [ -z "$$status" ]; then \
+			printf "%-25s [\033[0;33mNOT STARTED\033[0m]\n" "$$name"; \
+		else \
+			printf "%-25s [\033[0;31mBROKEN (HTTP $$status)\033[0m]\n" "$$name"; \
+		fi; \
+	}; \
+	echo "--- Local Apps (this repo) ---"; \
+	check_http "Backend (Django)" "http://localhost:8000/health/"; \
+	check_http "Frontend (Vite)" "http://localhost:3000/"; \
+	echo ""; \
+	echo "--- External Infra (main repo) ---"; \
+	status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:9000/minio/health/live 2>/dev/null); \
+	if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "MinIO"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "MinIO"; fi; \
+	status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/health 2>/dev/null); \
+	if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "ImgProxy"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "ImgProxy"; fi; \
+	if nc -z localhost 6379 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Redis"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Redis"; fi; \
+	if nc -z localhost 5432 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Postgres"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Postgres"; fi; \
+	echo ""
+
+use-external-infra: ## Update .env to use the shared infrastructure from the other repo
+	@echo "🔄 Preparing .env file..."
+	@if [ ! -f .env ]; then \
+		if [ -f .env.template ]; then \
+			cp .env.template .env; \
+			echo "✅ Created .env from .env.template"; \
+		else \
+			echo "POSTGRES_DB=eceee_v4" > .env; \
+			echo "POSTGRES_HOST=db" >> .env; \
+			echo "DATABASE_URL=postgresql://postgres:postgres@db:5432/eceee_v4" >> .env; \
+			echo "REDIS_URL=redis://redis:6379/0" >> .env; \
+			echo "✅ Created minimal .env"; \
+		fi \
+	fi
+	@echo "🔄 Configuring unique container names for this instance..."
+	@if ! grep -q "BACKEND_CONTAINER_NAME" .env; then \
+		echo "\n# Multi-instance Configuration" >> .env; \
+		echo "BACKEND_CONTAINER_NAME=eceee-v4-backend-editor" >> .env; \
+		echo "FRONTEND_CONTAINER_NAME=eceee-v4-frontend-editor" >> .env; \
+		echo "THEME_SYNC_CONTAINER_NAME=eceee-v4-theme-sync-editor" >> .env; \
+		echo "BACKEND_IMAGE=eceee-v4-backend-editor" >> .env; \
+		echo "FRONTEND_IMAGE=eceee-v4-frontend-editor" >> .env; \
+		echo "THEME_SYNC_IMAGE=eceee-v4-theme-sync-editor" >> .env; \
+		echo "BACKEND_PORT=8001" >> .env; \
+		echo "FRONTEND_PORT=3001" >> .env; \
+	fi
+	@echo "🔄 Updating .env to use hyphenated shared infrastructure names..."
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sed -i '' 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
+		sed -i '' 's/@db:5432/@eceee-v4-db:5432/' .env; \
+		sed -i '' 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
+		sed -i '' 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
+		sed -i '' 's/eceee_v4_db/eceee-v4-db/g' .env; \
+		sed -i '' 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
+		sed -i '' 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
+	else \
+		sed -i 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
+		sed -i 's/@db:5432/@eceee-v4-db:5432/' .env; \
+		sed -i 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
+		sed -i 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
+		sed -i 's/eceee_v4_db/eceee-v4-db/g' .env; \
+		sed -i 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
+		sed -i 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
+	fi
+	@echo "✅ .env updated. Checking configuration..."
+	@make check-conf
+
+check-conf: ## Check current database and server configuration
+	@echo "🔍 Checking configuration..."
+	@echo ""
+	@echo "--- Database Configuration ---"
+	@if [ -f .env ]; then \
+		DB_ENV=$$(grep '^POSTGRES_DB=' .env | cut -d= -f2); \
+		if [ -n "$$DB_ENV" ]; then \
+			printf "%-25s \033[0;34m$$DB_ENV\033[0m\n" ".env POSTGRES_DB:"; \
+		else \
+			printf "%-25s \033[0;33mDEFAULT (eceee_v4)\033[0m\n" ".env POSTGRES_DB:"; \
+		fi; \
+		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
+		printf "%-25s \033[0;34m$${DB_HOST:-eceee_v4_db}\033[0m\n" "Postgres Host:"; \
+	else \
+		printf "%-25s \033[0;33mNONE (using defaults)\033[0m\n" ".env configuration:"; \
+	fi
+	@printf "%-25s " "Backend actual DB:"
+	@docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py shell -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])" 2>/dev/null || echo "\033[0;31mERROR: Could not query backend\033[0m"
+	@if [ -f .env ]; then \
+		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
+		if [ "$$DB_HOST" = "db" ]; then \
+			echo ""; \
+			echo "\033[0;33m⚠️  Warning: POSTGRES_HOST is still set to 'db' in .env.\033[0m"; \
+			echo "Run \033[0;36mmake use-external-infra\033[0m to fix this."; \
+		fi; \
+	fi
+	@echo ""
+	@echo "--- Service Connectivity (from Backend) ---"
+	@check_conn() { \
+		name=$$1; host=$$2; port=$$3; \
+		if docker-compose -f docker-compose.dev.yml run --rm -T backend python -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('$$host', int('$$port'))); s.close()" >/dev/null 2>&1; then \
+			printf "%-25s [\033[0;32mCONNECTED\033[0m] to $$host:$$port\n" "$$name:"; \
+		else \
+			printf "%-25s [\033[0;31mFAILED\033[0m] to $$host:$$port\n" "$$name:"; \
+		fi; \
+	}; \
+	DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2 || echo "eceee_v4_db"); \
+	REDIS_URL=$$(grep '^REDIS_URL=' .env | cut -d= -f2 || echo "redis://eceee_v4_redis:6379/0"); \
+	REDIS_HOST=$$(echo $$REDIS_URL | sed -e 's/redis:\/\///' -e 's/[:\/].*//'); \
+	REDIS_PORT=$$(echo $$REDIS_URL | sed -e 's/.*://' -e 's/\/.*//' | grep -E '^[0-9]+$$' || echo "6379"); \
+	check_conn "Postgres" "$$DB_HOST" "5432"; \
+	check_conn "Redis" "$$REDIS_HOST" "$$REDIS_PORT"; \
+	check_conn "MinIO" "eceee_v4_minio" "9000"; \
+	check_conn "ImgProxy" "eceee_v4_imgproxy" "8080"; \
+	echo ""
+	@echo "--- Server Network Configuration ---"
+	@if docker network inspect eceee_shared_network >/dev/null 2>&1; then \
+		printf "%-25s [\033[0;32mCONNECTED\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
+	else \
+		printf "%-25s [\033[0;31mMISSING\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
+	fi
+	@echo ""
+
+check-db: check-conf ## Alias for check-conf
+
+replicate-db: ## Clone current DB to branch-specific DB and update .env
+	@echo "🔄 Ensuring backend image is built (to include new dependencies)..."
+	docker-compose -f docker-compose.dev.yml build backend
+	@echo "🔄 Replicating database to branch-specific version..."
+	docker-compose -f docker-compose.dev.yml run --rm backend python manage.py replicate_db
+	@echo ""
+	@echo "✅ Database replicated. Please start the backend to apply changes:"
+	@echo "   make backend"
+	@echo ""
 
 # Tailwind CSS build commands
 tailwind-build: ## Build Tailwind CSS for backend templates

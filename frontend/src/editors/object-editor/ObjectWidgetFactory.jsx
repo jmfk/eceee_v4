@@ -40,7 +40,11 @@ const ObjectWidgetFactory = ({
     allowedWidgetTypes = [],
     maxWidgets = null,
     context,
-    slotType = 'content' // 'content' or 'inherited' - determines default preview mode
+    slotType = 'content', // 'content' or 'inherited' - determines default preview mode
+    // Selection props
+    isWidgetSelected = false,
+    isWidgetCut = false,
+    onToggleWidgetSelection
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -216,7 +220,7 @@ const ObjectWidgetFactory = ({
     if (mode === 'editor' && showControls) {
         return (
             <div
-                className={`widget-item object-editor-widget relative ${className}`}
+                className={`widget-item object-editor-widget relative ${className} ${isWidgetSelected ? 'ring-2 ring-blue-500' : ''} ${isWidgetCut ? 'opacity-50' : ''}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-object-type={objectType?.name}
@@ -239,6 +243,9 @@ const ObjectWidgetFactory = ({
                     isRequired={slotConfig?.required && index === 0}
                     maxWidgets={maxWidgets}
                     currentIndex={index}
+                    // Selection props
+                    isWidgetSelected={isWidgetSelected}
+                    onToggleWidgetSelection={() => onToggleWidgetSelection?.(actualSlotName, widget.id)}
                 />
 
                 {/* Slot requirement indicator */}
