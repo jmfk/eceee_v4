@@ -27,6 +27,22 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
     // Get global clipboard state
     const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard()
 
+    // Sync cut widgets from clipboard data
+    useEffect(() => {
+        if (clipboardData?.operation === 'cut' && clipboardData.metadata?.widgetPaths) {
+            setCutWidgets(new Set(clipboardData.metadata.widgetPaths))
+        } else if (clipboardData?.operation === 'cut' && clipboardData.metadata?.widgets) {
+            // Handle backward compatibility
+            const paths = []
+            Object.entries(clipboardData.metadata.widgets).forEach(([slot, ids]) => {
+                ids.forEach(id => paths.push(`${slot}/${id}`))
+            })
+            setCutWidgets(new Set(paths))
+        } else {
+            setCutWidgets(new Set())
+        }
+    }, [clipboardData])
+
     // Helper: Build widget path string from slotName and widgetId
     const buildWidgetPath = useCallback((slotName, widgetId) => {
         return `${slotName}/${widgetId}`
@@ -802,6 +818,9 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                     isWidgetSelected={isWidgetSelected(slotName, widget.id)}
                     isWidgetCut={isWidgetCut(slotName, widget.id)}
                     onToggleWidgetSelection={toggleWidgetSelection}
+                    // Paste mode props
+                    pasteModeActive={pasteModeActive}
+                    onPasteAtPosition={handlePasteAtPosition}
                 />
             </div>
         )
