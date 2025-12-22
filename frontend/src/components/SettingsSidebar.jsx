@@ -148,6 +148,7 @@ export default function SettingsSidebar() {
                 { id: 'value-lists', label: 'Value Lists', icon: List, href: '/settings/value-lists' },
                 { id: 'widgets', label: 'Widgets', icon: Package, href: '/settings/widgets' },
                 { id: 'data-connections', label: 'Data Connections', icon: Database, href: '/settings/data-connections' },
+                { id: 'content-migration', label: 'Content Migration', icon: Database, href: '/settings/content-migration' },
             ]
         },
         {

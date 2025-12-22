@@ -379,6 +379,13 @@ const AppRoutes = () => {
             </SettingsLayout>
           </PrivateRoute>
         } />
+        <Route path="/settings/content-migration" element={
+          <PrivateRoute>
+            <SettingsLayout>
+              <SettingsManager />
+            </SettingsLayout>
+          </PrivateRoute>
+        } />
         <Route path="/objects" element={
           <PrivateRoute>
             <div className="fixed inset-0 bg-gray-50 flex flex-col">
