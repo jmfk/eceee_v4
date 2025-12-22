@@ -41,6 +41,8 @@ import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
+import DataConnectionsManager from '../components/DataConnectionsManager'
+import MigrationManager from '../components/contentMigration/MigrationManager'
 import WidgetManager from '../components/WidgetManager'
 import ValueListEditor from '../components/ValueListEditor'
 import SettingsDashboard from '../components/SettingsDashboard'
@@ -63,7 +65,9 @@ const SettingsManager = () => {
         if (path === '/settings/versions') return 'versions'
         if (path === '/settings/publishing') return 'publishing'
         if (path === '/settings/namespaces') return 'namespaces'
-        if (path === '/settings/layouts') return 'layouts'
+        if (path.startsWith('/settings/data-connections')) return 'data-connections'
+        if (path.startsWith('/settings/content-migration')) return 'content-migration'
+        if (path.startsWith('/settings/layouts')) return 'layouts'
         return 'dashboard' // default for /settings or fallback
     }
 
@@ -78,7 +82,9 @@ const SettingsManager = () => {
         'object-types': 'Settings - Object Types',
         'versions': 'Settings - Versions',
         'publishing': 'Settings - Publishing',
-        'namespaces': 'Settings - Namespaces'
+        'namespaces': 'Settings - Namespaces',
+        'data-connections': 'Settings - Data Connections',
+        'content-migration': 'Settings - Content Migration'
     }
     useDocumentTitle(tabTitles[activeTab] || 'Settings')
     const [selectedPage, setSelectedPage] = useState(null)
@@ -407,6 +413,10 @@ const SettingsManager = () => {
                 return renderPublishingWorkflow()
             case 'namespaces':
                 return renderNamespaceManagement()
+            case 'data-connections':
+                return <DataConnectionsManager />
+            case 'content-migration':
+                return <MigrationManager />
             default:
                 return null
         }

@@ -147,6 +147,7 @@ export default function SettingsSidebar() {
                 { id: 'object-types', label: 'Object Types', icon: Database, href: '/settings/object-types' },
                 { id: 'value-lists', label: 'Value Lists', icon: List, href: '/settings/value-lists' },
                 { id: 'widgets', label: 'Widgets', icon: Package, href: '/settings/widgets' },
+                { id: 'data-connections', label: 'Data Connections', icon: Database, href: '/settings/data-connections' },
             ]
         },
         {

@@ -195,6 +195,7 @@ const ComboboxInput = ({
     }
 
     const handleOptionSelect = (option) => {
+        if (option.disabled) return
         onChange(option.value)
         setIsOpen(false)
         setSearchTerm('')
@@ -297,9 +298,10 @@ const ComboboxInput = ({
                                             key={option.id}
                                             type="button"
                                             onClick={() => handleOptionSelect(option)}
+                                            disabled={option.disabled}
                                             className={`
                                                 w-full px-3 py-2 text-left flex items-center space-x-3 transition-colors
-                                                ${index === selectedIndex ? 'bg-blue-50 text-blue-900' : 'hover:bg-gray-50'}
+                                                ${option.disabled ? 'opacity-50 cursor-not-allowed bg-gray-50' : (index === selectedIndex ? 'bg-blue-50 text-blue-900' : 'hover:bg-gray-50')}
                                             `}
                                             style={{ height: `${itemHeight}px` }}
                                         >

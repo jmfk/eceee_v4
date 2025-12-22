@@ -198,6 +198,8 @@ LOCAL_APPS = [
     "easy_widgets",  # Easy widget definitions
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system
+    "data_connections",  # Data connection and transformation system
+    "content_migration",  # Background content migration system
     "utils",  # Utility features like value lists and schema system
     "ai_tracking",  # AI usage and cost tracking
 ]

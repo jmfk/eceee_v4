@@ -172,6 +172,10 @@ const SettingsDashboard = () => {
                             <h4 className="font-semibold text-gray-900">Publishing Workflow</h4>
                             <p className="text-xs text-gray-500 mt-1">Check scheduled content tasks</p>
                         </Link>
+                        <Link to="/settings/content-migration" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
+                            <h4 className="font-semibold text-gray-900">Content Migration</h4>
+                            <p className="text-xs text-gray-500 mt-1">Batch import external content</p>
+                        </Link>
                         <Link to="/schemas/system" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">System Schemas</h4>
                             <p className="text-xs text-gray-500 mt-1">Configure core data fields</p>

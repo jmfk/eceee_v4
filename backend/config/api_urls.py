@@ -44,6 +44,8 @@ urlpatterns = [
     path("content-import/", include("content_import.urls")),
     path("media/", include("file_manager.urls")),
     path("objects/", include("object_storage.urls")),
+    path("data-connections/", include("data_connections.urls")),
+    path("content-migration/", include("content_migration.urls")),
     path("utils/", include("utils.urls")),
     path("ai-tracking/", include("ai_tracking.urls")),
 ]
