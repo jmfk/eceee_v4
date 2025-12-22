@@ -186,6 +186,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=False, methods=["get"])
+    def hostnames(self, request):
+        """Get all unique hostnames across all root pages"""
+        hostnames = WebPage.get_all_hostnames()
+        return Response(hostnames)
+
+    @action(detail=False, methods=["get"])
     def tree(self, request):
         """Get page hierarchy as a tree structure"""
         root_pages = self.get_queryset().filter(parent__isnull=True)

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { api } from '../../api/client'
 import WorkflowActionEditor from './WorkflowActionEditor'
+import FilterRow from './FilterRow'
 import ComboboxInput from '../form-fields/ComboboxInput'
 import MultiSelectInput from '../form-fields/MultiSelectInput'
 import SelectInput from '../form-fields/SelectInput'
@@ -157,9 +158,34 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
     const [selectedVersion, setSelectedModelVersion] = useState(initialVersion)
     const [selectedFields, setSelectedFields] = useState(initialFields)
     const [selectedFilters, setSelectedFilters] = useState([]) // Array of { field, operator, value }
+    const [selectedObjectTypes, setSelectedObjectTypes] = useState([]) // Dedicted state for relation
+    const [selectedSites, setSelectedSites] = useState([]) // Dedicated state for sites
     const [showAdvancedDsl, setShowAdvancedDsl] = useState(false)
     const [previewData, setPreviewData] = useState(null)
     const [isPreviewLoading, setIsPreviewLoading] = useState(false)
+    const [objectTypeOptions, setObjectTypeOptions] = useState([])
+    const [siteOptions, setSiteOptions] = useState([])
+
+    // Fetch Object Types and Sites for filters
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // Fetch separately so one failing doesn't block the other
+                api.get('/api/v1/objects/object-types/active/')
+                    .then(res => setObjectTypeOptions(res.data.map(t => ({ value: t.id.toString(), label: t.label, name: t.name }))))
+                    .catch(err => console.error('Failed to fetch object types:', err))
+
+                api.get('/api/v1/webpages/pages/hostnames/')
+                    .then(res => setSiteOptions(res.data.map(s => ({ value: s, label: s }))))
+                    .catch(err => console.error('Failed to fetch sites:', err))
+            } catch (err) {
+                console.error('Failed to initiate metadata fetch:', err)
+            }
+        }
+        if (connectionType === 'INTERNAL') {
+            fetchData()
+        }
+    }, [connectionType])
 
     // Parse filters from initial DSL if available
     useEffect(() => {
@@ -167,7 +193,23 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
             try {
                 const parsed = JSON.parse(initialDsl)
                 if (parsed.filters && typeof parsed.filters === 'object') {
-                    const filterList = Object.entries(parsed.filters).map(([key, val]) => {
+                    const filterList = []
+                    const otIds = []
+                    const sites = []
+
+                    Object.entries(parsed.filters).forEach(([key, val]) => {
+                        // Extract dedicated relational filters
+                        if (key === 'object_type__id__in' || key === 'object_type__in') {
+                            const ids = Array.isArray(val) ? val.map(v => v.toString()) : (typeof val === 'string' ? val.split(',') : [val.toString()])
+                            otIds.push(...ids)
+                            return
+                        }
+                        if (key === 'hostnames__overlap' || key === 'hostnames__contains' || key === 'hostnames') {
+                            const s = Array.isArray(val) ? val : (typeof val === 'string' ? val.split(',') : [val])
+                            sites.push(...s)
+                            return
+                        }
+
                         let field = key
                         let operator = 'exact'
                         
@@ -178,9 +220,11 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
                             operator = parts[1]
                         }
                         
-                        return { field, operator, value: val }
+                        filterList.push({ field, operator, value: val })
                     })
                     setSelectedFilters(filterList)
+                    setSelectedObjectTypes(otIds)
+                    setSelectedSites(sites)
                 }
             } catch(e) {}
         }
@@ -188,6 +232,16 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
 
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
+    }
+
+    const handleConfigChange = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            config: {
+                ...prev.config,
+                [field]: value
+            }
+        }))
     }
 
     const handleAddFilter = () => {
@@ -202,6 +256,11 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
         setSelectedFilters(prev => {
             const newList = [...prev]
             newList[index] = { ...newList[index], [field]: value }
+            // If field changes, reset operator and value if needed
+            if (field === 'field') {
+                newList[index].operator = 'exact'
+                newList[index].value = ''
+            }
             return newList
         })
     }
@@ -239,6 +298,15 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
 
                 // Construct Django-style filters from the UI list
                 const filters = {}
+                
+                // Add dedicated relational filters
+                if (selectedModel === 'ObjectInstance' && selectedObjectTypes.length > 0) {
+                    filters['object_type__in'] = selectedObjectTypes.join(',')
+                }
+                if (selectedModel === 'WebPage' && selectedSites.length > 0) {
+                    filters['hostnames__overlap'] = selectedSites.join(',')
+                }
+
                 selectedFilters.forEach(f => {
                     if (f.field) {
                         const key = f.operator === 'exact' ? f.field : `${f.field}__${f.operator}`
@@ -262,7 +330,7 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
                 console.error('Error syncing UI to DSL:', e)
             }
         }
-    }, [selectedModel, selectedVersion, selectedFields, selectedFilters, connectionType, showAdvancedDsl])
+    }, [selectedModel, selectedVersion, selectedFields, selectedFilters, selectedObjectTypes, selectedSites, connectionType, showAdvancedDsl])
 
     // 2. Sync from queryDsl back to UI states (only if IN advanced mode)
     // This ensures simple UI stays updated as user types in DSL box
@@ -396,66 +464,77 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
 
                                 <MultiSelectInput 
                                     label="Attributes / Fields"
-                                    description="Select specific fields to include in the output (empty for all)"
+                                    description="Select specific fields to retrieve (leave empty for all)"
                                     value={selectedFields}
                                     onChange={setSelectedFields}
                                     options={MODEL_FIELDS[selectedModel] || []}
-                                    placeholder="All fields"
+                                    placeholder="All Fields"
                                 />
 
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <label className="block text-sm font-medium text-gray-700">Filter Conditions</label>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700">Filter Conditions</label>
+                                            <p className="text-[10px] text-gray-500">Apply granular field-level conditions</p>
+                                        </div>
                                         <button 
                                             onClick={handleAddFilter}
-                                            className="text-xs flex items-center text-blue-600 hover:text-blue-800 font-medium"
+                                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
                                         >
                                             <Plus className="w-3 h-3 mr-1" />
-                                            Add Filter
+                                            Add Condition
                                         </button>
                                     </div>
-                                    <div className="space-y-2">
-                                        {selectedFilters.length === 0 ? (
-                                            <p className="text-xs text-gray-500 italic bg-white p-3 rounded border border-dashed text-center">No filters applied. Retrieving all items.</p>
+                                    
+                                    <div className="space-y-3">
+                                        {/* Core Relational Filter - Object Types (always present for ObjectInstance) */}
+                                        {selectedModel === 'ObjectInstance' && (
+                                            <FilterRow 
+                                                filter={{ field: 'object_type', operator: 'in', value: selectedObjectTypes.join(',') }}
+                                                isCore={true}
+                                                fieldOptions={[{ value: 'object_type', label: 'Object Types' }]}
+                                                lookupOperators={[{ value: 'in', label: 'Includes' }]}
+                                                objectTypeOptions={objectTypeOptions}
+                                                siteOptions={siteOptions}
+                                                onValueChange={(val) => setSelectedObjectTypes(val.split(',').filter(Boolean))}
+                                                onRemove={() => setSelectedObjectTypes([])}
+                                            />
+                                        )}
+
+                                        {/* Core Relational Filter - Sites (always present for WebPage) */}
+                                        {selectedModel === 'WebPage' && (
+                                            <FilterRow 
+                                                filter={{ field: 'hostnames', operator: 'overlap', value: selectedSites.join(',') }}
+                                                isCore={true}
+                                                fieldOptions={[{ value: 'hostnames', label: 'Sites' }]}
+                                                lookupOperators={[{ value: 'overlap', label: 'Includes' }]}
+                                                objectTypeOptions={objectTypeOptions}
+                                                siteOptions={siteOptions}
+                                                onValueChange={(val) => setSelectedSites(val.split(',').filter(Boolean))}
+                                                onRemove={() => setSelectedSites([])}
+                                            />
+                                        )}
+
+                                        {selectedFilters.length === 0 && !selectedObjectTypes.length && !selectedSites.length ? (
+                                            <div className="flex flex-col items-center justify-center py-6 px-4 bg-white border border-dashed border-gray-300 rounded-lg">
+                                                <AlertCircle className="w-5 h-5 text-gray-300 mb-1" />
+                                                <p className="text-xs text-gray-400">No filters defined. Retrieving all items.</p>
+                                            </div>
                                         ) : (
                                             selectedFilters.map((filter, index) => (
-                                                <div key={index} className="flex items-center space-x-2 bg-white p-2 rounded border group">
-                                                    <div className="flex-1 grid grid-cols-3 gap-2">
-                                                        <select 
-                                                            value={filter.field}
-                                                            onChange={(e) => handleFilterChange(index, 'field', e.target.value)}
-                                                            className="text-xs border-gray-300 rounded p-1"
-                                                        >
-                                                            <option value="">Select Field...</option>
-                                                            {FILTERABLE_FIELDS[selectedModel]?.map(f => (
-                                                                <option key={f.value} value={f.value}>{f.label}</option>
-                                                            ))}
-                                                        </select>
-                                                        <select 
-                                                            value={filter.operator}
-                                                            onChange={(e) => handleFilterChange(index, 'operator', e.target.value)}
-                                                            className="text-xs border-gray-300 rounded p-1"
-                                                        >
-                                                            {LOOKUP_OPERATORS.map(op => (
-                                                                <option key={op.value} value={op.value}>{op.label}</option>
-                                                            ))}
-                                                        </select>
-                                                        <input 
-                                                            type="text"
-                                                            value={filter.value}
-                                                            onChange={(e) => handleFilterChange(index, 'value', e.target.value)}
-                                                            className="text-xs border-gray-300 rounded p-1"
-                                                            placeholder="Value..."
-                                                            disabled={filter.operator === 'isnull'}
-                                                        />
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => handleRemoveFilter(index)}
-                                                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
+                                                <FilterRow 
+                                                    key={index}
+                                                    filter={filter}
+                                                    index={index}
+                                                    fieldOptions={FILTERABLE_FIELDS[selectedModel]}
+                                                    lookupOperators={LOOKUP_OPERATORS}
+                                                    objectTypeOptions={objectTypeOptions}
+                                                    siteOptions={siteOptions}
+                                                    onFieldChange={(val) => handleFilterChange(index, 'field', val)}
+                                                    onOperatorChange={(val) => handleFilterChange(index, 'operator', val)}
+                                                    onValueChange={(val) => handleFilterChange(index, 'value', val)}
+                                                    onRemove={() => handleRemoveFilter(index)}
+                                                />
                                             ))
                                         )}
                                     </div>

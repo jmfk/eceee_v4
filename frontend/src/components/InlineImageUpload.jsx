@@ -66,7 +66,7 @@ const InlineImageUpload = ({
             }
 
             // Upload the image
-            const response = await api.post('/api/v1/objects/api/upload-image/', formData, {
+            const response = await api.post('/api/v1/objects/upload-image/', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 }
