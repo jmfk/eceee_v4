@@ -201,7 +201,25 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
         })
     }
 
-    // ... handlePreview and handleConfigChange ...
+    const handlePreview = async () => {
+        const id = connectionId || stream?.connection
+        if (!id) {
+            console.warn('Cannot preview without a connection ID')
+            return
+        }
+        
+        setIsPreviewLoading(true)
+        setPreviewData(null)
+        try {
+            const response = await api.post(`/api/v1/data-connections/connections/${id}/preview_stream/`, formData)
+            setPreviewData(response.data)
+        } catch (error) {
+            console.error('Preview failed:', error)
+            setPreviewData({ error: 'Failed to retrieve preview data' })
+        } finally {
+            setIsPreviewLoading(false)
+        }
+    }
 
     // 1. Sync from UI states to queryDsl (only if NOT in advanced mode)
     useEffect(() => {
