@@ -40,6 +40,17 @@ class InternalQueryEngine(BaseQueryEngine):
         version = query.get('version', 'latest')
         fields = query.get('fields', [])
 
+        # Preprocess filters (e.g., handle __in for comma-separated strings)
+        processed_filters = {}
+        for k, v in filters.items():
+            if k.endswith('__in') and isinstance(v, str):
+                processed_filters[k] = [x.strip() for x in v.split(',') if x.strip()]
+            elif (k.endswith('__contains') or k.endswith('__overlap')) and isinstance(v, str):
+                # Support array field filtering from comma-separated strings
+                processed_filters[k] = [x.strip() for x in v.split(',') if x.strip()]
+            else:
+                processed_filters[k] = v
+
         if model_name == 'ObjectInstance':
             if version == 'published':
                 from django.utils import timezone
@@ -52,7 +63,7 @@ class InternalQueryEngine(BaseQueryEngine):
             # If these are requested, we must fetch objects and extract them
             has_properties = any(f in ['data', 'widgets'] for f in fields)
             
-            queryset = queryset.filter(**filters)
+            queryset = queryset.filter(**processed_filters)
             if order_by:
                 queryset = queryset.order_by(order_by)
             
@@ -94,7 +105,7 @@ class InternalQueryEngine(BaseQueryEngine):
             return output
 
         elif model_name == 'WebPage':
-            queryset = WebPage.objects.filter(**filters)
+            queryset = WebPage.objects.filter(**processed_filters)
             if version == 'published':
                 queryset = queryset.filter(is_currently_published=True)
             
@@ -126,6 +137,7 @@ class InternalQueryEngine(BaseQueryEngine):
                         'title': obj.title,
                         'slug': obj.slug,
                         'path': obj.cached_path,
+                        'hostnames': obj.hostnames,
                         'content': v.page_data if v else {},
                         'is_published': obj.is_currently_published,
                         'created_at': obj.created_at,
@@ -135,11 +147,11 @@ class InternalQueryEngine(BaseQueryEngine):
             return output
 
         elif model_name == 'Tag':
-            queryset = Tag.objects.filter(**filters)
+            queryset = Tag.objects.filter(**processed_filters)
         elif model_name == 'MediaFile':
-            queryset = MediaFile.objects.filter(**filters)
+            queryset = MediaFile.objects.filter(**processed_filters)
         elif model_name == 'ObjectTypeDefinition':
-            queryset = ObjectTypeDefinition.objects.filter(**filters)
+            queryset = ObjectTypeDefinition.objects.filter(**processed_filters)
         else:
             return []
 

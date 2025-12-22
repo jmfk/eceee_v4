@@ -82,6 +82,7 @@ const FILTERABLE_FIELDS = {
         { value: 'title', label: 'Title' },
         { value: 'slug', label: 'Slug' },
         { value: 'status', label: 'Status' },
+        { value: 'object_type', label: 'Object Type (ID)' },
         { value: 'object_type__name', label: 'Object Type Name' },
         { value: 'publish_date', label: 'Publish Date' },
         { value: 'created_at', label: 'Created At' },
@@ -90,6 +91,8 @@ const FILTERABLE_FIELDS = {
         { value: 'id', label: 'ID' },
         { value: 'title', label: 'Title' },
         { value: 'slug', label: 'Slug' },
+        { value: 'hostnames', label: 'Site (Hostname)' },
+        { value: 'cached_path', label: 'Path' },
         { value: 'publication_status', label: 'Publication Status' },
         { value: 'is_currently_published', label: 'Is Published' },
     ],
@@ -113,11 +116,13 @@ const FILTERABLE_FIELDS = {
 const LOOKUP_OPERATORS = [
     { value: 'exact', label: 'Equals (==)' },
     { value: 'icontains', label: 'Contains (Ignore Case)' },
+    { value: 'regex', label: 'Regex Match' },
     { value: 'gt', label: 'Greater Than (>)' },
     { value: 'lt', label: 'Less Than (<)' },
     { value: 'gte', label: 'Greater/Equal (>=)' },
     { value: 'lte', label: 'Less/Equal (<=)' },
     { value: 'in', label: 'In (Comma Separated)' },
+    { value: 'contains', label: 'Array Contains' },
     { value: 'isnull', label: 'Is Null' },
 ]
 
