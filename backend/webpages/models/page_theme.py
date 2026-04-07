@@ -492,6 +492,7 @@ class PageTheme(models.Model):
     def _ensure_default_theme_exists(cls):
         """Ensure a default theme exists, create one if necessary"""
         from django.contrib.auth.models import User
+        from .web_page import WebPage
 
         # Check if any active themes exist
         active_themes = cls.objects.filter(is_active=True)
@@ -516,6 +517,7 @@ class PageTheme(models.Model):
             default_theme = cls.objects.create(
                 name="System Default",
                 description="Automatically created default theme for object content editors",
+                tenant=getattr(admin_user, 'tenant', None) or getattr(WebPage.objects.first(), 'tenant', None),
                 fonts={
                     "google_fonts": [
                         {
@@ -534,7 +536,7 @@ class PageTheme(models.Model):
                     "background": "#ffffff",
                     "border": "#e5e7eb",
                 },
-                typography={
+                design_groups={
                     "groups": [
                         {
                             "name": "Default Typography",

@@ -622,19 +622,24 @@ class WebPage(models.Model):
 
         # Check current published version theme
         current_version = self.get_current_published_version()
-        if current_version and current_version.theme:
+        if current_version and current_version.theme_id:
             return current_version.theme
 
         # Check parent theme (recursive)
-        if self.parent:
+        if self.parent_id:
             parent_theme = self.parent.get_effective_theme()
             if parent_theme:
                 return parent_theme
 
         # Fall back to default theme
-        default_theme = PageTheme.get_default_theme()
-        if default_theme:
-            return default_theme
+        try:
+            default_theme = PageTheme.get_default_theme()
+            if default_theme:
+                return default_theme
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting default theme: {e}")
 
         return None
 

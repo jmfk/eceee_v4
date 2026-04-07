@@ -76,7 +76,7 @@ def track_parent_changes(sender, instance, **kwargs):
     root_page = (
         instance.get_root_page()
         if instance.pk
-        else (instance if not instance.parent else None)
+        else (instance if not instance.parent else instance.parent.get_root_page())
     )
     if root_page:
         instance.cached_root_id = root_page.id if root_page.pk else None
