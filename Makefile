@@ -26,7 +26,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports replicate-db list-dbs switch-db
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -118,8 +118,14 @@ help: ## Show this help message (use: make help [target])
 		echo "  playwright-logs   View Playwright service logs"; \
 		echo "  clean             Clean Python, Node, and Docker artifacts"; \
 		echo ""; \
-		echo "ECEEE Components Sync:"; \
-		echo "  sync-to           Sync components FROM eceee_v4 TO eceee-components"; \
+		echo "Production Deployment:"; \
+		echo "  prod-deploy       Deploy to production (TAG=v0.x.x optional)"; \
+		echo "  prod-rollback     Rollback to previous deployment"; \
+		echo "  prod-backup       Run ad-hoc production DB backup"; \
+		echo "  prod-logs         Tail production logs (SERVICE=backend optional)"; \
+		echo "  prod-status       Show production container status"; \
+		echo "  prod-ssh          SSH into production server"; \
+		echo "  prod-shell        Open Django shell in production"; \
 		echo ""; \
 		echo "Environment & Health Checks:"; \
 		echo "  infra-up               Run infrastructure services"; \
@@ -751,3 +757,32 @@ tailwind-build: ## Build Tailwind CSS for backend templates
 tailwind-watch: ## Watch and rebuild Tailwind CSS on changes
 	@echo "👀 Watching Tailwind CSS for changes..."
 	cd backend && npx tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --watch
+
+# ============================================================
+# Production Deployment (runs on remote VPS via SSH)
+# Set PROD_HOST in your shell: export PROD_HOST=root@YOUR_VPS_IP
+# ============================================================
+PROD_HOST ?= root@eceee-vps
+PROD_DIR  ?= /opt/eceee/app
+TAG       ?=
+
+prod-deploy: ## Deploy to production (use: make prod-deploy [TAG=v0.x.x])
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch --tags --quiet && bash deploy/scripts/deploy.sh $(TAG)"
+
+prod-rollback: ## Rollback to previous deployment
+	ssh $(PROD_HOST) "bash $(PROD_DIR)/deploy/scripts/rollback.sh"
+
+prod-backup: ## Run ad-hoc production DB backup
+	ssh $(PROD_HOST) "bash $(PROD_DIR)/deploy/scripts/backup.sh"
+
+prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
+	ssh -t $(PROD_HOST) "docker compose -f $(PROD_DIR)/deploy/docker-compose.prod.yml --env-file /opt/eceee/.env logs -f --tail=100 $(SERVICE)"
+
+prod-status: ## Show production container status
+	ssh $(PROD_HOST) "docker compose -f $(PROD_DIR)/deploy/docker-compose.prod.yml --env-file /opt/eceee/.env ps"
+
+prod-ssh: ## SSH into production server
+	ssh $(PROD_HOST)
+
+prod-shell: ## Open Django shell in production
+	ssh -t $(PROD_HOST) "docker compose -f $(PROD_DIR)/deploy/docker-compose.prod.yml --env-file /opt/eceee/.env exec backend python manage.py shell"

@@ -1,0 +1,153 @@
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: eceee-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --workers 2
+    env_file: /opt/eceee/.env
+    environment:
+      - DEBUG=0
+    volumes:
+      - backend_static:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_URL: https://eceee.fred.nu/api
+        VITE_IMGPROXY_URL: https://imgproxy.eceee.fred.nu
+    image: eceee-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file: /opt/eceee/.env
+    volumes:
+      - /mnt/data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - /mnt/data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  imgproxy:
+    image: darthsim/imgproxy:latest
+    restart: unless-stopped
+    env_file: /opt/eceee/.env
+    environment:
+      IMGPROXY_USE_S3: "true"
+      IMGPROXY_S3_ENDPOINT: "https://eu-central-1.linodeobjects.com"
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  playwright:
+    build:
+      context: ../playwright-service
+      dockerfile: Dockerfile
+    image: eceee-playwright:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  celery-worker:
+    image: eceee-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: >
+      celery -A config.celery worker
+      --loglevel=info
+      -Q default,ai_agents,ai_analysis,thumbnails,maintenance
+      --concurrency=2
+    env_file: /opt/eceee/.env
+    environment:
+      - DEBUG=0
+    depends_on:
+      - backend
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  celery-beat:
+    image: eceee-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: >
+      celery -A config.celery beat
+      --loglevel=info
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: /opt/eceee/.env
+    environment:
+      - DEBUG=0
+    depends_on:
+      - backend
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+volumes:
+  caddy_data:
+  caddy_config:
+  backend_static:
+
+networks:
+  eceee_prod:
+    driver: bridge
