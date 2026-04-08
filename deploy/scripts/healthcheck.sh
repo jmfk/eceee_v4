@@ -5,9 +5,11 @@
 
 set -euo pipefail
 
-URL="https://eceee.fred.nu/health/"
-TIMEOUT=60   # total seconds to wait
-INTERVAL=5   # seconds between attempts
+REPO=$(pwd)
+COMPOSE_FILE="$REPO/docker-compose.production.yml"
+URL="${HEALTH_CHECK_URL:-http://localhost:8000/health/}"
+TIMEOUT=90
+INTERVAL=5
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -22,16 +24,16 @@ info "Polling $URL (timeout: ${TIMEOUT}s)..."
 
 elapsed=0
 while [ "$elapsed" -lt "$TIMEOUT" ]; do
-    if curl -sf --max-time 5 "$URL" > /dev/null 2>&1; then
-        success "Health check passed after ${elapsed}s."
+    STATUS=$(docker compose -f "$COMPOSE_FILE" exec -T backend curl -sf --max-time 5 -o /dev/null -w '%{http_code}' http://localhost:8000/health/ 2>/dev/null || echo "000")
+    if [ "$STATUS" = "200" ] || [ "$STATUS" = "301" ]; then
+        success "Health check passed after ${elapsed}s (HTTP $STATUS)."
         exit 0
     fi
     sleep "$INTERVAL"
     elapsed=$((elapsed + INTERVAL))
-    info "  ...waiting (${elapsed}s elapsed)"
+    info "  ...waiting (${elapsed}s elapsed, last status: $STATUS)"
 done
 
 error "Health check timed out after ${TIMEOUT}s."
-error "The app may still be starting — check logs:"
-error "  docker compose -f /opt/eceee/app/deploy/docker-compose.prod.yml logs --tail=50 backend"
+error "Check logs: docker compose -f $COMPOSE_FILE logs --tail=50 backend"
 exit 1
