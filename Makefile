@@ -1,5 +1,9 @@
 # Makefile for eceee_v4
 
+# Load environment variables from .env if it exists
+-include .env
+export
+
 # Global help request check
 HELP_REQUESTED := $(filter --help -h help,$(MAKECMDGOALS))
 
@@ -763,26 +767,26 @@ tailwind-watch: ## Watch and rebuild Tailwind CSS on changes
 # Set PROD_HOST in your shell: export PROD_HOST=root@YOUR_VPS_IP
 # ============================================================
 PROD_HOST ?= root@eceee-vps
-PROD_DIR  ?= /opt/eceee/app
+PROD_DIR  ?= /srv/eceee_v4
 TAG       ?=
 
 prod-deploy: ## Deploy to production (use: make prod-deploy [TAG=v0.x.x])
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch --tags --quiet && bash deploy/scripts/deploy.sh $(TAG)"
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch --tags --quiet && bash scripts/deploy.sh $(TAG)"
 
 prod-rollback: ## Rollback to previous deployment
-	ssh $(PROD_HOST) "bash $(PROD_DIR)/deploy/scripts/rollback.sh"
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash scripts/rollback.sh"
 
 prod-backup: ## Run ad-hoc production DB backup
-	ssh $(PROD_HOST) "bash $(PROD_DIR)/deploy/scripts/backup.sh"
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash scripts/backup.sh"
 
 prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
-	ssh -t $(PROD_HOST) "docker compose -f $(PROD_DIR)/deploy/docker-compose.prod.yml --env-file /opt/eceee/.env logs -f --tail=100 $(SERVICE)"
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f docker-compose.production.yml --env-file /opt/eceee/.env logs -f --tail=100 $(SERVICE)"
 
 prod-status: ## Show production container status
-	ssh $(PROD_HOST) "docker compose -f $(PROD_DIR)/deploy/docker-compose.prod.yml --env-file /opt/eceee/.env ps"
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f docker-compose.production.yml --env-file /opt/eceee/.env ps"
 
 prod-ssh: ## SSH into production server
 	ssh $(PROD_HOST)
 
 prod-shell: ## Open Django shell in production
-	ssh -t $(PROD_HOST) "docker compose -f $(PROD_DIR)/deploy/docker-compose.prod.yml --env-file /opt/eceee/.env exec backend python manage.py shell"
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f docker-compose.production.yml --env-file /opt/eceee/.env exec backend python manage.py shell"
