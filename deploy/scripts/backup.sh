@@ -11,7 +11,7 @@ set -euo pipefail
 
 REPO=$(pwd)
 ENV_FILE="$REPO/.env"
-COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
+COMPOSE_FILE="$REPO/docker-compose.production.yml"
 COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
 BACKUP_DIR=/mnt/data/backups
 

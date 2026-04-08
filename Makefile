@@ -780,13 +780,13 @@ prod-backup: ## Run ad-hoc production DB backup
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backup.sh"
 
 prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
-	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml logs -f --tail=100 $(SERVICE)"
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f docker-compose.production.yml logs -f --tail=100 $(SERVICE)"
 
 prod-status: ## Show production container status
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml ps"
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f docker-compose.production.yml ps"
 
 prod-ssh: ## SSH into production server
 	ssh $(PROD_HOST)
 
 prod-shell: ## Open Django shell in production
-	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml exec backend python manage.py shell"
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f docker-compose.production.yml exec backend python manage.py shell"
