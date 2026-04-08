@@ -8,11 +8,11 @@
 
 set -euo pipefail
 
-REPO=/opt/eceee/app
-ENV_FILE=/opt/eceee/.env
+REPO=$(pwd)
+ENV_FILE="$REPO/.env"
 COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
 COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
-DEPLOY_LOG=/opt/eceee/deploy.log
+DEPLOY_LOG="$REPO/deploy.log"
 SCRIPT_DIR="$REPO/deploy/scripts"
 
 # ── Colors ────────────────────────────────────────────────────────────────────

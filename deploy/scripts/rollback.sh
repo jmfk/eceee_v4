@@ -11,8 +11,9 @@
 
 set -euo pipefail
 
-DEPLOY_LOG=/opt/eceee/deploy.log
-SCRIPT_DIR=/opt/eceee/app/deploy/scripts
+REPO=$(pwd)
+DEPLOY_LOG="$REPO/deploy.log"
+SCRIPT_DIR="$REPO/deploy/scripts"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'

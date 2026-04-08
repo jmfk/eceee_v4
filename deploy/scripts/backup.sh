@@ -9,8 +9,8 @@
 
 set -euo pipefail
 
-REPO=/opt/eceee/app
-ENV_FILE=/opt/eceee/.env
+REPO=$(pwd)
+ENV_FILE="$REPO/.env"
 COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
 COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
 BACKUP_DIR=/mnt/data/backups
