@@ -9,10 +9,11 @@
 
 set -euo pipefail
 
-REPO=$(pwd)
-ENV_FILE="$REPO/deploy/.env"
-COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
-COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=deploy/scripts/env.sh
+source "$SCRIPT_DIR/env.sh"
+cd "$DEPLOY_DIR" || exit 1
+
 BACKUP_DIR=/mnt/data/backups
 
 GREEN='\033[0;32m'
@@ -34,17 +35,17 @@ if [ "${1:-}" = "restore" ]; then
 
     info "Restoring from $BACKUP_FILE..."
     info "Stopping backend and celery workers..."
-    $COMPOSE stop backend celery-worker celery-beat
+    docker_compose stop backend celery-worker celery-beat
 
     info "Dropping and recreating database..."
-    $COMPOSE exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS eceee_v4;"
-    $COMPOSE exec -T db psql -U postgres -c "CREATE DATABASE eceee_v4;"
+    docker_compose exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS eceee_v4;"
+    docker_compose exec -T db psql -U postgres -c "CREATE DATABASE eceee_v4;"
 
     info "Restoring data..."
-    gunzip -c "$BACKUP_FILE" | $COMPOSE exec -T db psql -U postgres eceee_v4
+    gunzip -c "$BACKUP_FILE" | docker_compose exec -T db psql -U postgres eceee_v4
 
     info "Restarting services..."
-    $COMPOSE up -d backend celery-worker celery-beat
+    docker_compose up -d backend celery-worker celery-beat
 
     success "Restore complete from $BACKUP_FILE"
     exit 0
@@ -57,7 +58,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTFILE="$BACKUP_DIR/eceee_v4_${TIMESTAMP}.sql.gz"
 
 info "Backing up database to $OUTFILE..."
-$COMPOSE exec -T db pg_dump -U postgres eceee_v4 | gzip > "$OUTFILE"
+docker_compose exec -T db pg_dump -U postgres eceee_v4 | gzip > "$OUTFILE"
 
 BACKUP_SIZE=$(du -sh "$OUTFILE" | cut -f1)
 success "Backup complete: $OUTFILE ($BACKUP_SIZE)"

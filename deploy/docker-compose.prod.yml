@@ -28,7 +28,10 @@ services:
     command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --workers 2
     env_file: .env
     environment:
-      - DEBUG=0
+      # Override stale dev hostnames in deploy/.env (eceee-v4-db / eceee-v4-redis).
+      DEBUG: "0"
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - backend_static:/app/staticfiles
     depends_on:
@@ -121,7 +124,9 @@ services:
       --concurrency=2
     env_file: .env
     environment:
-      - DEBUG=0
+      DEBUG: "0"
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       - backend
     networks: [eceee_prod]
@@ -138,7 +143,9 @@ services:
       --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file: .env
     environment:
-      - DEBUG=0
+      DEBUG: "0"
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       - backend
     networks: [eceee_prod]

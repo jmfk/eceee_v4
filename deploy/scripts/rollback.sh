@@ -11,9 +11,10 @@
 
 set -euo pipefail
 
-REPO=$(pwd)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO="$(cd "$DEPLOY_DIR/.." && pwd)"
 DEPLOY_LOG="$REPO/deploy.log"
-SCRIPT_DIR="$REPO/deploy/scripts"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
