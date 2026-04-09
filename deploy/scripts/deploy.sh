@@ -126,6 +126,11 @@ if ! bash "$SCRIPT_DIR/healthcheck.sh"; then
     exit 1
 fi
 
-# ── 11. Record deployment ─────────────────────────────────────────────────────
+# ── 11. Cleanup old Docker artifacts ─────────────────────────────────────────
+info "Pruning old images and build cache..."
+docker image prune -af --filter "until=24h" 2>/dev/null || true
+docker builder prune -af --filter "until=24h" 2>/dev/null || true
+
+# ── 12. Record deployment ─────────────────────────────────────────────────────
 echo "$REF ($IMAGE_TAG) $(date '+%Y-%m-%d %H:%M:%S')" >> "$DEPLOY_LOG"
 success "Deployed $REF ($IMAGE_TAG) successfully."
