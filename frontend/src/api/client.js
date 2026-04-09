@@ -28,17 +28,24 @@ let csrfToken = null
 
 // Function to get CSRF token from Django
 export const getCsrfToken = async () => {
+    const url = `${API_BASE_URL}/csrf-token/`
     try {
-        const response = await fetch(`${API_BASE_URL}/csrf-token/`, {
-            credentials: 'include', // Include cookies for session
+        const response = await fetch(url, {
+            credentials: 'include',
         })
         if (response.ok) {
+            const contentType = response.headers.get('content-type') || ''
+            if (!contentType.includes('application/json')) {
+                console.error(`CSRF token endpoint returned non-JSON (${contentType}) from ${response.url}`)
+                return null
+            }
             const data = await response.json()
             csrfToken = data.csrfToken
             return csrfToken
         }
+        console.error(`CSRF token request failed: ${response.status} ${response.statusText} from ${response.url}`)
     } catch (error) {
-        console.error('Failed to get CSRF token:', error)
+        console.error(`Failed to get CSRF token from ${url}:`, error)
     }
 
     // Fallback: try to get from cookie
