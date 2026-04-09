@@ -31,7 +31,7 @@ info "Polling backend health (timeout: ${TIMEOUT}s, host: $DOMAIN)..."
 
 elapsed=0
 while [ "$elapsed" -lt "$TIMEOUT" ]; do
-    STATUS=$($COMPOSE exec -T backend curl -sf --max-time 5 -H "Host: $DOMAIN" -o /dev/null -w '%{http_code}' http://localhost:8000/health/ 2>/dev/null || echo "000")
+    STATUS=$($COMPOSE exec -T backend curl -s --max-time 5 -H "Host: $DOMAIN" -o /dev/null -w '%{http_code}' http://localhost:8000/health/ 2>/dev/null || echo "000")
     if [ "$STATUS" = "200" ]; then
         success "Health check passed after ${elapsed}s (HTTP $STATUS)."
         exit 0

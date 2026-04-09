@@ -24,11 +24,16 @@ class TenantContextMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
     
+    EXEMPT_PATHS = ("/health/",)
+
     def __call__(self, request):
+        if any(request.path.startswith(p) for p in self.EXEMPT_PATHS):
+            request.tenant = None
+            return self.get_response(request)
+
         tenant = self.get_tenant(request)
         
         if tenant is None:
-            # No tenant found - check if we should allow or deny
             default_tenant_id = getattr(settings, 'DEFAULT_TENANT_ID', None)
             require_tenant = getattr(settings, 'REQUIRE_TENANT', not settings.DEBUG)
             
