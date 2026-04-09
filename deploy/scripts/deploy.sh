@@ -60,7 +60,7 @@ bash "$SCRIPT_DIR/backup.sh" || {
 # ── 4. Git pull + checkout ────────────────────────────────────────────────────
 info "Fetching tags and checking out $TAG..."
 git -C "$REPO" fetch --tags --quiet
-git -C "$REPO" checkout "$TAG" --quiet
+git -C "$REPO" checkout --force "$TAG" --quiet
 
 # ── 5. Build images ───────────────────────────────────────────────────────────
 info "Building images for tag $TAG..."
