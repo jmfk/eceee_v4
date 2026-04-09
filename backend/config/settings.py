@@ -476,6 +476,24 @@ if DEBUG:
 
 
 # Logging Configuration
+_log_handlers = {
+    "console": {
+        "level": "DEBUG" if DEBUG else "INFO",
+        "class": "logging.StreamHandler",
+        "formatter": "verbose" if not DEBUG else "simple",
+    },
+}
+
+if DEBUG:
+    _log_handlers["file"] = {
+        "level": "INFO",
+        "class": "logging.FileHandler",
+        "filename": BASE_DIR / "logs" / "django.log",
+        "formatter": "verbose",
+    }
+
+_default_handlers = ["file", "console"] if DEBUG else ["console"]
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -489,36 +507,24 @@ LOGGING = {
             "style": "{",
         },
     },
-    "handlers": {
-        "file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "django.log",
-            "formatter": "verbose",
-        },
-        "console": {
-            "level": "DEBUG" if DEBUG else "WARNING",
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
-    },
+    "handlers": _log_handlers,
     "root": {
         "handlers": ["console"],
         "level": "INFO" if DEBUG else "WARNING",
     },
     "loggers": {
         "django": {
-            "handlers": ["file", "console"],
+            "handlers": _default_handlers,
             "level": "INFO",
             "propagate": False,
         },
         "django.request": {
-            "handlers": ["file"],
+            "handlers": _default_handlers,
             "level": "ERROR",
             "propagate": False,
         },
         "webpages": {
-            "handlers": ["file", "console"],
+            "handlers": _default_handlers,
             "level": "INFO" if DEBUG else "WARNING",
             "propagate": False,
         },

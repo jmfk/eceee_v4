@@ -85,6 +85,10 @@ IMAGE_TAG="$TAG" $COMPOSE run --rm backend python manage.py collectstatic --noin
 info "Bringing up containers..."
 IMAGE_TAG="$TAG" $COMPOSE up -d --remove-orphans
 
+# ── 9b. Reload Caddy config (zero-downtime TLS + routing refresh) ────────────
+info "Reloading Caddy configuration..."
+$COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile --force 2>/dev/null || warn "Caddy reload failed — may need manual restart."
+
 # ── 10. Health check ──────────────────────────────────────────────────────────
 info "Waiting for health check..."
 if ! bash "$SCRIPT_DIR/healthcheck.sh"; then
