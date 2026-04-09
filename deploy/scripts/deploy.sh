@@ -43,7 +43,10 @@ fi
 # ── 2. Determine TAG ──────────────────────────────────────────────────────────
 TAG="${1:-}"
 if [ -z "$TAG" ]; then
-    TAG=$(git -C "$REPO" describe --tags --abbrev=0 2>/dev/null || true)
+    # Fetch all tags first to ensure we have the latest
+    git -C "$REPO" fetch --tags --quiet
+    # Get the latest tag globally, not just reachable from HEAD
+    TAG=$(git -C "$REPO" tag --sort=-v:refname | head -n 1)
 fi
 if [ -z "$TAG" ]; then
     error "No TAG provided and no git tags found. Usage: bash deploy/scripts/deploy.sh v0.1.0"
