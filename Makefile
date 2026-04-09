@@ -771,7 +771,7 @@ PROD_DIR  ?= /srv/eceee_v4
 TAG       ?=
 
 prod-deploy: ## Deploy to production (use: make prod-deploy [TAG=v0.x.x])
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch --tags --quiet && bash deploy/scripts/deploy.sh $(TAG)"
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $(TAG)"
 
 prod-rollback: ## Rollback to previous deployment
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/rollback.sh"
