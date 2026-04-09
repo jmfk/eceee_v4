@@ -85,8 +85,10 @@ info "Collecting static files..."
 IMAGE_TAG="$TAG" $COMPOSE run --rm backend python manage.py collectstatic --noinput --clear
 
 # ── 9. Start/restart containers ───────────────────────────────────────────────
+info "Stopping existing containers..."
+$COMPOSE down --timeout 30 2>/dev/null || true
 info "Bringing up containers..."
-IMAGE_TAG="$TAG" $COMPOSE up -d --force-recreate --remove-orphans
+IMAGE_TAG="$TAG" $COMPOSE up -d --remove-orphans
 
 # ── 10. Health check ──────────────────────────────────────────────────────────
 info "Waiting for health check..."

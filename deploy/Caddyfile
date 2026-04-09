@@ -6,8 +6,8 @@
     email {$EMAIL:noreply@eceee.org}
 }
 
-# Public Content Site - Django backend serving public pages
-{$DOMAIN} {
+# Public Content Sites - Django backend serving public pages
+summerstudy.{$DOMAIN}, industry.{$DOMAIN} {
     encode gzip
 
     handle /admin* {
