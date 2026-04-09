@@ -87,6 +87,8 @@ IMAGE_TAG="$TAG" $COMPOSE run --rm backend python manage.py collectstatic --noin
 # ── 9. Start/restart containers ───────────────────────────────────────────────
 info "Stopping existing containers..."
 $COMPOSE down --timeout 30 2>/dev/null || true
+# Remove any stale containers not managed by compose (e.g. from manual runs)
+docker rm -f $(docker ps -aq --filter "name=deploy-" 2>/dev/null) 2>/dev/null || true
 info "Bringing up containers..."
 IMAGE_TAG="$TAG" $COMPOSE up -d --remove-orphans
 
