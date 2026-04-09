@@ -41,7 +41,7 @@ Create encryption utility using Django's cryptography:
 - Key generation helper for initial setup
 - Fallback to Django SECRET_KEY if CREDENTIAL_ENCRYPTION_KEY not set (with warning)
 
-**Environment**: Add to `.env` and `deploy/env.production.example`:
+**Environment**: Add to `deploy/.env` and document in `deploy/.env.production.example`:
 
 ```
 CREDENTIAL_ENCRYPTION_KEY=<base64-encoded-32-byte-key>

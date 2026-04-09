@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO=$(pwd)
-ENV_FILE="$REPO/.env"
+ENV_FILE="$REPO/deploy/.env"
 COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
 COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
 DEPLOY_LOG="$REPO/deploy.log"
@@ -31,7 +31,7 @@ error()   { echo -e "${RED}[deploy]${NC} $*" >&2; }
 info "Starting deployment..."
 
 if [ ! -f "$ENV_FILE" ]; then
-    error "Missing $ENV_FILE — copy deploy/env.production.example to /opt/eceee/.env and fill it in."
+    error "Missing $ENV_FILE — copy deploy/.env.production.example to deploy/.env and fill it in."
     exit 1
 fi
 

@@ -6,15 +6,16 @@ Simple production deployment for eceee_v4 on a Linode VPS.
 
 ```
 deploy/
-├── docker-compose.prod.yml   9 services: caddy, backend, frontend, db, redis,
-│                             imgproxy, playwright, celery-worker, celery-beat
-├── Caddyfile                 Reverse proxy config (HTTPS handled automatically)
-├── env.production.example    Copy this to /opt/eceee/.env on the server
+├── docker-compose.prod.yml    9 services: caddy, backend, frontend, db, redis,
+│                              imgproxy, playwright, celery-worker, celery-beat
+├── Caddyfile                  Reverse proxy config (HTTPS handled automatically)
+├── .env.production.example    Template → copy to deploy/.env on server (gitignored)
+├── .env                       Secrets only — create on server, never commit
 └── scripts/
-    ├── deploy.sh             backup → pull → build → migrate → up → healthcheck
-    ├── rollback.sh           re-deploy previous tag
-    ├── backup.sh             pg_dump to /mnt/data/backups/
-    └── healthcheck.sh        polls https://eceee.fred.nu/health/
+    ├── deploy.sh              backup → pull → build → migrate → up → healthcheck
+    ├── rollback.sh            re-deploy previous tag
+    ├── backup.sh              pg_dump to /mnt/data/backups/
+    └── healthcheck.sh         polls backend /health/ (Host from DOMAIN in deploy/.env)
 ```
 
 ## One-Time Server Setup
@@ -50,21 +51,30 @@ mkdir -p /mnt/data/backups /mnt/data/postgres /mnt/data/redis
 git clone https://github.com/YOUR_ORG/eceee_v4.git /opt/eceee/app
 ```
 
-### 4. Create the .env file
+### 4. Create deploy/.env (secrets — not in git)
+
+`deploy.sh` and Compose use **`/opt/eceee/app/deploy/.env`** (next to `docker-compose.prod.yml`). That file is gitignored; never commit it.
 
 ```bash
-cp /opt/eceee/app/deploy/env.production.example /opt/eceee/.env
-nano /opt/eceee/.env
+cp /opt/eceee/app/deploy/.env.production.example /opt/eceee/app/deploy/.env
+nano /opt/eceee/app/deploy/.env
 ```
 
-Fill in all values — especially `DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD`, and your Linode Object Storage keys.
+Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. The full variable set is documented in `deploy/.env.production.example`.
+
+### Secrets
+
+- Keep real secrets **only** in `deploy/.env` on the server (not in git, not in tickets or chat). Copy from `deploy/.env.production.example` and replace every placeholder.
+- `IMGPROXY_KEY` and `IMGPROXY_SALT` must **match** between the Django backend and the `imgproxy` container; both load the same `deploy/.env` via Compose. Generate with `openssl rand -hex 32` (two independent values).
+- Rotating imgproxy key/salt invalidates **existing signed image URLs** (bookmarks, cached HTML); originals in object storage are unchanged. Plan downtime or cache bust if you rotate.
 
 ### 5. Point DNS
 
-Add these A records pointing to your VPS IP:
-- `eceee.fred.nu`
-- `admin.eceee.fred.nu`
-- `app.eceee.fred.nu`
+Add these A records pointing to your VPS IP (match `DOMAIN` and `deploy/Caddyfile`):
+- `eceee.org`
+- `admin.eceee.org`
+- `app.eceee.org`
+- `imgproxy.eceee.org`
 
 ### 6. First deploy
 
@@ -159,11 +169,11 @@ make prod-deploy PROD_HOST=root@1.2.3.4
 
 ### Changing domains
 
-Update `deploy/Caddyfile` and `ALLOWED_HOSTS` / `CORS_ALLOWED_ORIGINS` in `/opt/eceee/.env`, then redeploy.
+Update `deploy/Caddyfile` and `ALLOWED_HOSTS` / `CORS_ALLOWED_ORIGINS` in `deploy/.env`, then redeploy.
 
 ### Adding environment variables
 
-Edit `/opt/eceee/.env` on the server, then run `make prod-deploy` (the containers will restart with the new env).
+Edit `deploy/.env` on the server, then run `make prod-deploy` (the containers will restart with the new env).
 
 ---
 
@@ -171,7 +181,7 @@ Edit `/opt/eceee/.env` on the server, then run `make prod-deploy` (the container
 
 `deploy.sh` runs these steps in order:
 
-1. Pre-flight check (`/opt/eceee/.env` exists, repo is present)
+1. Pre-flight check (`deploy/.env` exists, repo is present)
 2. Backup (`pg_dump` → `/mnt/data/backups/`)
 3. `git fetch --tags && git checkout TAG`
 4. `docker compose build backend frontend playwright`
@@ -179,6 +189,6 @@ Edit `/opt/eceee/.env` on the server, then run `make prod-deploy` (the container
 6. `python manage.py collectstatic`
 7. `docker compose up -d --remove-orphans`
 8. Health check (polls `/health/` for up to 60s)
-9. Log the deploy to `/opt/eceee/deploy.log`
+9. Log the deploy to `/opt/eceee/app/deploy.log`
 
 There is ~30-60s of downtime during step 7. That is acceptable for this deployment.

@@ -9,7 +9,7 @@ services:
       - "443:443/udp"
     environment:
       DOMAIN: ${DOMAIN}
-      EMAIL: ${EMAIL:-noreply@eceee.org}
+      EMAIL: ${EMAIL:-noreply@example.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -26,7 +26,7 @@ services:
     image: eceee-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --workers 2
-    env_file: ../.env
+    env_file: .env
     environment:
       - DEBUG=0
     volumes:
@@ -59,7 +59,7 @@ services:
   db:
     image: postgres:15-alpine
     restart: unless-stopped
-    env_file: ../.env
+    env_file: .env
     volumes:
       - /mnt/data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -91,7 +91,7 @@ services:
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: unless-stopped
-    env_file: ../.env
+    env_file: .env
     environment:
       IMGPROXY_USE_S3: "true"
       IMGPROXY_S3_ENDPOINT: "https://eu-central-1.linodeobjects.com"
@@ -119,7 +119,7 @@ services:
       --loglevel=info
       -Q default,ai_agents,ai_analysis,thumbnails,maintenance
       --concurrency=2
-    env_file: ../.env
+    env_file: .env
     environment:
       - DEBUG=0
     depends_on:
@@ -136,7 +136,7 @@ services:
       celery -A config.celery beat
       --loglevel=info
       --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    env_file: ../.env
+    env_file: .env
     environment:
       - DEBUG=0
     depends_on:

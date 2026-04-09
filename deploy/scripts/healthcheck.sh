@@ -6,7 +6,7 @@
 set -euo pipefail
 
 REPO=$(pwd)
-ENV_FILE="$REPO/.env"
+ENV_FILE="$REPO/deploy/.env"
 COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
 COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
 TIMEOUT=90

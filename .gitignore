@@ -35,12 +35,17 @@ backend/staticfiles/
 backend/media/*
 !backend/media/.gitkeep
 
-# Environment variables
+# Environment variables — never commit real secrets
+# Local dev: repo-root .env (Makefile, docker-compose.dev).
+# Production: deploy/.env (deploy.sh, deploy/docker-compose.prod.yml) — keep only on server.
 .env
+deploy/.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.*.local
 
 # Node.js
 node_modules/

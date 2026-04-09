@@ -453,14 +453,17 @@ EMAIL_BACKEND = config(
     ),  # Postmark in production
 )
 POSTMARK_API_KEY = config("POSTMARK_API_KEY", default="")
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@eceee.fred.nu")
-SERVER_EMAIL = config("SERVER_EMAIL", default="server@eceee.fred.nu")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
+SERVER_EMAIL = config("SERVER_EMAIL", default="server@example.com")
 
 # Admin notifications for server errors
 ADMINS = [
-    ("EASY Admin", config("ADMIN_EMAIL", default="admin@eceee.fred.nu")),
+    ("Admin", config("ADMIN_EMAIL", default="admin@example.com")),
 ]
 MANAGERS = ADMINS
+
+POSTMARK_TEST_MODE = config("POSTMARK_TEST_MODE", default=False, cast=bool)
+POSTMARK_TRACK_OPENS = config("POSTMARK_TRACK_OPENS", default=True, cast=bool)
 
 # Development Tools Configuration
 if DEBUG:
@@ -643,7 +646,7 @@ AI_TRACKING = {
     "PRICE_STALE_DAYS": config("AI_PRICE_STALE_DAYS", default=30, cast=int),
     "ADMIN_EMAIL": config(
         "AI_TRACKING_ADMIN_EMAIL",
-        default=config("DEFAULT_FROM_EMAIL", default="admin@example.com"),
+        default="admin@example.com",
     ),
     "BUDGET_CHECK_ENABLED": config("AI_BUDGET_CHECK_ENABLED", default=True, cast=bool),
 }
@@ -656,22 +659,16 @@ ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default=None)
 
 # imgproxy Configuration
 IMGPROXY_URL = config("IMGPROXY_URL", default="http://imgproxy:8080")
-IMGPROXY_PUBLIC_URL = config("IMGPROXY_PUBLIC_URL", default=IMGPROXY_URL)
+IMGPROXY_PUBLIC_URL = config("IMGPROXY_PUBLIC_URL", default=None)
+if IMGPROXY_PUBLIC_URL is None:
+    IMGPROXY_PUBLIC_URL = IMGPROXY_URL
 IMGPROXY_KEY = config("IMGPROXY_KEY", default="")
 IMGPROXY_SALT = config("IMGPROXY_SALT", default="")
 IMGPROXY_SIGNATURE_SIZE = config("IMGPROXY_SIGNATURE_SIZE", default=32, cast=int)
 
-FM_SERVER_URL = "https://fms.eceee.org"
-FM_USERNAME = "CWPAccount"
+FM_SERVER_URL = config("FM_SERVER_URL", default="")
+FM_USERNAME = config("FM_USERNAME", default="")
 FM_PASSWORD = config("FM_PASSWORD", default="")
-
-POSTMARK_API_KEY = config("POSTMARK_API_KEY", default="")
-POSTMARK_SENDER = "eceee@eceee.org"
-POSTMARK_TEST_MODE = False
-POSTMARK_TRACK_OPENS = True
-EMAIL_BACKEND = "postmark.django_backend.EmailBackend"
-DEFAULT_FROM_EMAIL = "eceee@eceee.org"
-EMAIL_HOST_USER = "eceee@eceee.org"
 
 # EMAIL_BACKEND = "email_log.backends.EmailBackend"
 # EMAIL_LOG_BACKEND = "postmark.django_backend.EmailBackend"
