@@ -773,6 +773,9 @@ TAG       ?=
 prod-deploy: ## Deploy to production (use: make prod-deploy [TAG=v0.x.x])
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $(TAG)"
 
+prod-env: ## Securely push local deploy/.env to production
+	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
+
 prod-rollback: ## Rollback to previous deployment
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/rollback.sh"
 
