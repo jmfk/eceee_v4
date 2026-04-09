@@ -416,13 +416,6 @@ def get_thumbnail_url(source_url: str, size: int = 150, version: Optional[str] =
     Returns:
         Thumbnail imgproxy URL
     """
-    # #region agent log
-    import json
-    try:
-        with open('/Users/jmfk/code/eceee_v4/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"location":"imgproxy.py:404","message":"get_thumbnail_url called","data":{"source_url":source_url,"size":size,"version":version},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","runId":"post-fix","hypothesisId":"H1"}) + '\n')
-    except: pass
-    # #endregion
     kwargs = {}
     if version:
         kwargs['version'] = version
