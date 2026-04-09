@@ -15,10 +15,12 @@ REMOTE_ENV="$PROD_DIR/deploy/.env"
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 info()    { echo -e "${BLUE}[env]${NC} $*"; }
 success() { echo -e "${GREEN}[env]${NC} $*"; }
+warn()    { echo -e "${YELLOW}[env]${NC} $*"; }
 error()   { echo -e "${RED}[env]${NC} $*" >&2; }
 
 # ── 1. Check local .env ───────────────────────────────────────────────────────

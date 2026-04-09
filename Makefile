@@ -123,7 +123,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  clean             Clean Python, Node, and Docker artifacts"; \
 		echo ""; \
 		echo "Production Deployment:"; \
-		echo "  prod-deploy       Deploy to production (TAG=v0.x.x optional)"; \
+		echo "  prod-deploy       Push deploy/.env then deploy (TAG=v0.x.x optional)"; \
 		echo "  prod-rollback     Rollback to previous deployment"; \
 		echo "  prod-backup       Run ad-hoc production DB backup"; \
 		echo "  prod-logs         Tail production logs (SERVICE=backend optional)"; \
@@ -770,7 +770,8 @@ PROD_HOST ?= root@eceee-vps
 PROD_DIR  ?= /srv/eceee_v4
 TAG       ?=
 
-prod-deploy: ## Deploy to production (use: make prod-deploy [TAG=v0.x.x])
+prod-deploy: ## Deploy to production (pushes deploy/.env then runs deploy; use: make prod-deploy [TAG=v0.x.x])
+	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)"
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $(TAG)"
 
 prod-env: ## Securely push local deploy/.env to production
