@@ -10,7 +10,7 @@ set -euo pipefail
 
 REPO=$(pwd)
 ENV_FILE="$REPO/.env"
-COMPOSE_FILE="$REPO/docker-compose.production.yml"
+COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
 COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
 DEPLOY_LOG="$REPO/deploy.log"
 SCRIPT_DIR="$REPO/deploy/scripts"
