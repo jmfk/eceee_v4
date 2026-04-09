@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # deploy.sh - Deploy eceee_v4 to production
-# Usage: bash deploy/scripts/deploy.sh [TAG]
-#   TAG: git tag to deploy (default: latest tag on current branch)
+# Usage: bash deploy/scripts/deploy.sh [TAG|BRANCH]
+#   TAG/BRANCH: git ref to deploy (default: origin/main)
 #
 # Runs entirely on the production server.
 # Called by: make prod-deploy (via SSH)
@@ -40,19 +40,13 @@ if [ ! -d "$REPO/.git" ]; then
     exit 1
 fi
 
-# ── 2. Determine TAG ──────────────────────────────────────────────────────────
+# ── 2. Determine REF ─────────────────────────────────────────────────────────
 TAG="${1:-}"
 if [ -z "$TAG" ]; then
-    # Fetch all tags first to ensure we have the latest
-    git -C "$REPO" fetch --tags --quiet
-    # Get the latest tag globally (--count=1 avoids SIGPIPE with pipefail)
-    TAG=$(git -C "$REPO" for-each-ref --sort=-v:refname --format='%(refname:short)' refs/tags/ --count=1)
+    git -C "$REPO" fetch origin --quiet
+    TAG="origin/main"
 fi
-if [ -z "$TAG" ]; then
-    error "No TAG provided and no git tags found. Usage: bash deploy/scripts/deploy.sh v0.1.0"
-    exit 1
-fi
-info "Deploying tag: $TAG"
+info "Deploying: $TAG"
 
 # ── 3. Backup ─────────────────────────────────────────────────────────────────
 info "Running pre-deploy backup..."
@@ -61,8 +55,7 @@ bash "$SCRIPT_DIR/backup.sh" || {
 }
 
 # ── 4. Git pull + checkout ────────────────────────────────────────────────────
-info "Fetching tags and checking out $TAG..."
-git -C "$REPO" fetch --tags --quiet
+info "Checking out $TAG..."
 git -C "$REPO" checkout --force "$TAG" --quiet
 
 # ── 5. Build images ───────────────────────────────────────────────────────────
