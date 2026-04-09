@@ -41,12 +41,14 @@ if [ ! -d "$REPO/.git" ]; then
 fi
 
 # ── 2. Determine REF ─────────────────────────────────────────────────────────
-TAG="${1:-}"
-if [ -z "$TAG" ]; then
+REF="${1:-}"
+if [ -z "$REF" ]; then
     git -C "$REPO" fetch origin --quiet
-    TAG="origin/main"
+    REF="origin/main"
 fi
-info "Deploying: $TAG"
+# Resolve short SHA for Docker image tag (slashes are invalid in image tags)
+IMAGE_TAG=$(git -C "$REPO" rev-parse --short "$REF")
+info "Deploying: $REF (image tag: $IMAGE_TAG)"
 
 # ── 3. Backup ─────────────────────────────────────────────────────────────────
 info "Running pre-deploy backup..."
@@ -55,27 +57,26 @@ bash "$SCRIPT_DIR/backup.sh" || {
 }
 
 # ── 4. Git pull + checkout ────────────────────────────────────────────────────
-info "Checking out $TAG..."
-git -C "$REPO" checkout --force "$TAG" --quiet
+info "Checking out $REF..."
+git -C "$REPO" checkout --force "$REF" --quiet
 
 # ── 5. Build images ───────────────────────────────────────────────────────────
-info "Building images for tag $TAG..."
-IMAGE_TAG="$TAG" $COMPOSE build backend frontend playwright
+info "Building images ($IMAGE_TAG)..."
+IMAGE_TAG="$IMAGE_TAG" $COMPOSE build backend frontend playwright
 
 # ── 6. Migration check ────────────────────────────────────────────────────────
 info "Checking for unapplied migrations..."
-# --check exits with code 1 if there are pending migrations
-if ! IMAGE_TAG="$TAG" $COMPOSE run --rm backend python manage.py migrate --check 2>/dev/null; then
+if ! IMAGE_TAG="$IMAGE_TAG" $COMPOSE run --rm backend python manage.py migrate --check 2>/dev/null; then
     info "Pending migrations found — will apply after health check of current instance."
 fi
 
 # ── 7. Apply migrations ───────────────────────────────────────────────────────
 info "Running migrations..."
-IMAGE_TAG="$TAG" $COMPOSE run --rm backend python manage.py migrate --noinput
+IMAGE_TAG="$IMAGE_TAG" $COMPOSE run --rm backend python manage.py migrate --noinput
 
 # ── 8. Collect static files ───────────────────────────────────────────────────
 info "Collecting static files..."
-IMAGE_TAG="$TAG" $COMPOSE run --rm backend python manage.py collectstatic --noinput --clear
+IMAGE_TAG="$IMAGE_TAG" $COMPOSE run --rm backend python manage.py collectstatic --noinput --clear
 
 # ── 9. Start/restart containers ───────────────────────────────────────────────
 info "Stopping existing containers..."
@@ -83,7 +84,7 @@ $COMPOSE down --timeout 30 2>/dev/null || true
 # Remove any stale containers not managed by compose (e.g. from manual runs)
 docker rm -f $(docker ps -aq --filter "name=deploy-" 2>/dev/null) 2>/dev/null || true
 info "Bringing up containers..."
-IMAGE_TAG="$TAG" $COMPOSE up -d --remove-orphans
+IMAGE_TAG="$IMAGE_TAG" $COMPOSE up -d --remove-orphans
 
 # ── 10. Health check ──────────────────────────────────────────────────────────
 info "Waiting for health check..."
@@ -95,5 +96,5 @@ if ! bash "$SCRIPT_DIR/healthcheck.sh"; then
 fi
 
 # ── 11. Record deployment ─────────────────────────────────────────────────────
-echo "$TAG $(date '+%Y-%m-%d %H:%M:%S')" >> "$DEPLOY_LOG"
-success "Deployed $TAG successfully."
+echo "$REF ($IMAGE_TAG) $(date '+%Y-%m-%d %H:%M:%S')" >> "$DEPLOY_LOG"
+success "Deployed $REF ($IMAGE_TAG) successfully."
