@@ -6,7 +6,7 @@
 set -euo pipefail
 
 REPO=$(pwd)
-COMPOSE_FILE="$REPO/docker-compose.production.yml"
+COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
 URL="${HEALTH_CHECK_URL:-http://localhost:8000/health/}"
 TIMEOUT=90
 INTERVAL=5

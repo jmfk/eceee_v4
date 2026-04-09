@@ -44,8 +44,8 @@ services:
       dockerfile: Dockerfile
       target: production
       args:
-        VITE_API_URL: https://eceee.fred.nu/api
-        VITE_IMGPROXY_URL: https://imgproxy.eceee.fred.nu
+        VITE_API_URL: https://${DOMAIN}/api
+        VITE_IMGPROXY_URL: https://imgproxy.${DOMAIN}
     image: eceee-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     networks: [eceee_prod]
