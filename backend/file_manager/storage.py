@@ -273,7 +273,7 @@ class S3MediaStorage(Storage):
             extra_args["ContentType"] = "image/jpeg"
 
             # Only set ACL if explicitly configured
-            if self.default_acl and self.default_acl != "None" and "linode" not in self.endpoint_url:
+            if self.default_acl and self.default_acl != "None":
                 extra_args["ACL"] = self.default_acl
 
             # Upload thumbnail to S3
@@ -344,8 +344,8 @@ class S3MediaStorage(Storage):
         if content_type:
             extra_args["ContentType"] = content_type
 
-        # Only set ACL if explicitly configured (Linode often fails with ACLs)
-        if self.default_acl and self.default_acl != "None" and "linode" not in self.endpoint_url:
+        # Only set ACL if explicitly configured
+        if self.default_acl and self.default_acl != "None":
             extra_args["ACL"] = self.default_acl
 
         try:
