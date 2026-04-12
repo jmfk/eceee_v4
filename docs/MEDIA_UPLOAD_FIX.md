@@ -167,7 +167,7 @@ The imgproxy service is configured and running with the following settings:
 ## Additional Notes
 
 ### Dependencies:
-- **MinIO**: Running on port 9000 (console: 9001)
+- **MinIO**: Running on port 9000 (console: 9002)
 - **ImgProxy**: Running on port 8080
 - **Backend**: Running on port 8000
 - **Frontend**: Running on port 3000
@@ -195,7 +195,7 @@ The imgproxy service is configured and running with the following settings:
    ```
 
 2. **Verify MinIO is accessible**:
-   - Open http://localhost:9001 in browser
+   - Open http://localhost:9002 in browser
    - Login with minioadmin/minioadmin
    - Check that `eceee-media` bucket exists
 
