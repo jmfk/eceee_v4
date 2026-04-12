@@ -223,6 +223,3 @@ export function logChanges(currentState, originalState, context = 'Editor') {
 
     console.groupEnd()
 }
-
-return changes
-}

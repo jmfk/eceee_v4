@@ -2326,7 +2326,6 @@ class LayoutRenderer {
     contentWrapper.className = 'widget-content cms-content';
 
     // Hide content if widget is hidden or inactive (only in editable mode)
-    const isVisible = widgetInstance.isVisible !== false;
     const isActive = widgetInstance.config?.isActive !== false;
 
     if (this.editable && (!isVisible || !isActive)) {

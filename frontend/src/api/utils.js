@@ -127,7 +127,7 @@ export const wrapApiCall = (apiCall, operationName) => {
             throw handleApiError(error, `${operationName} failed`, {
                 operation: operationName,
                 arguments: args,
-                data: error.response.data,
+                data: error.response?.data,
             });
         }
     }

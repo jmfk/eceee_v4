@@ -13,8 +13,6 @@ export const endpoints = {
     // Core paths
     base: BASE_PATH,
     webpages: `${BASE_PATH}/webpages`,
-    content: `${BASE_PATH}/content`,
-    namespaces: `${BASE_PATH}/namespaces`,
     objects: `${BASE_PATH}/objects`,
 
     // Authentication & System
@@ -142,7 +140,7 @@ export const endpoints = {
     // Namespaces endpoints
     namespaces: {
         base: `${BASE_PATH}/namespaces`,
-        list: `${BASE_PATH}/namespaces/`,
+        list: `${BASE_PATH}/namespaces//`,
         detail: (id) => `${BASE_PATH}/namespaces/${id}/`,
         setDefault: (id) => `${BASE_PATH}/namespaces/${id}/set_as_default/`,
         contentSummary: (id) => `${BASE_PATH}/namespaces/${id}/get_content_summary/`
