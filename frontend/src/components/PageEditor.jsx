@@ -35,6 +35,7 @@ import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
+import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data'
@@ -1462,12 +1463,7 @@ const PageEditor = () => {
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {
-        try {
-            await handleActualSave(saveOptions);
-        } catch (error) {
-            // Error handling is already done in handleActualSave
-            throw error;
-        }
+        await handleActualSave(saveOptions);
     }, [handleActualSave]);
 
     // Simple save handlers - no modal confirmation

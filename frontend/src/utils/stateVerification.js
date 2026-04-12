@@ -193,7 +193,7 @@ export const debugStateComparison = (currentState, expectedState, context = 'unk
     if (differences.length > 0) {
         console.warn('Differences found:', differences)
     } else {
-
+        // No differences found
     }
 
     console.groupEnd()

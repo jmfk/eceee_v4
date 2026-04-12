@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { Save, AlertCircle } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi } from '../../api/objectStorage'
@@ -22,11 +22,40 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
         queryKey: ['objectTypes'],
-        queryFn: () => objectTypesApi.getActive(),
+        queryFn: async () => await objectTypesApi.getActive(),
         enabled: Boolean(isNewInstance)
     })
 
     const availableTypes = typesResponse?.data || []
+
+    // Helper function to convert object type schema to ObjectSchemaForm format
+    const getSchemaFromObjectType = useCallback((objectType) => {
+        if (!objectType?.schema?.properties) {
+            return { fields: [] }
+        }
+
+        const properties = objectType.schema.properties
+        const required = objectType.schema.required || []
+        const propertyOrder = objectType.schema.propertyOrder || []
+
+        // Use propertyOrder if available, otherwise use object keys
+        const keysToProcess = propertyOrder.length > 0 ? propertyOrder : Object.keys(properties)
+
+        const fields = keysToProcess.map(key => {
+            const prop = properties[key]
+            if (!prop) return null
+
+            return {
+                name: key,
+                label: prop.title || key,
+                component: prop.component || 'TextInput',
+                required: required.includes(key),
+                ...prop
+            }
+        }).filter(Boolean)
+
+        return { fields }
+    }, [])
 
     useEffect(() => {
         if (instance) {
@@ -42,7 +71,7 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
 
     // Save mutation
     const saveMutation = useMutation({
-        mutationFn: (data) => {
+        mutationFn: async (data) => {
             if (isNewInstance) {
                 return objectInstancesApi.create(data)
             } else {

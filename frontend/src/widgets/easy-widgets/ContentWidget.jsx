@@ -32,7 +32,7 @@ const cleanHTML = (html) => {
     const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_ELEMENT)
     const elements = []
     let node
-    while (node = walker.nextNode()) {
+    while ((node = walker.nextNode())) {
         elements.push(node)
     }
 

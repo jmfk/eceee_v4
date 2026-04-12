@@ -188,7 +188,7 @@ const TreePageManager = () => {
         refetch
     } = useQuery({
         queryKey: ['pages', 'root', { search: debouncedSearchTerm, status: statusFilter }],
-        queryFn: () => {
+        queryFn: async () => {
             const filters = {}
             if (debouncedSearchTerm) filters.search = debouncedSearchTerm
             if (statusFilter !== 'all') filters.publicationStatus = statusFilter
@@ -206,7 +206,7 @@ const TreePageManager = () => {
         error: searchError
     } = useQuery({
         queryKey: ['pages', 'search', { search: debouncedSearchTerm, status: statusFilter }],
-        queryFn: () => {
+        queryFn: async () => {
             const filters = {}
             if (statusFilter !== 'all') filters.publicationStatus = statusFilter
             return searchAllPages(debouncedSearchTerm, filters)
@@ -262,8 +262,7 @@ const TreePageManager = () => {
 
     // Move page mutation (for cut/paste)
     const movePageMutation = useMutation({
-        mutationFn: ({ pageId, parentId, sortOrder }) =>
-            pagesApi.update(pageId, { parentId: parentId, sortOrder: sortOrder }),
+        mutationFn: async ({ pageId, parentId, sortOrder }) => await pagesApi.update(pageId, { parentId: parentId, sortOrder: sortOrder }),
         onMutate: () => {
             addNotification('Moving page...', 'info', 'page-move')
         },
@@ -374,8 +373,8 @@ const TreePageManager = () => {
         // Update server
         try {
             addNotification('Moving page up...', 'info', 'page-move-up')
-            const updatePromises = newPages.map(page =>
-                pagesApi.update(page.id, { sortOrder: page.sortOrder })
+            const updatePromises = newPages.map(async (page) =>
+                await pagesApi.update(page.id, { sortOrder: page.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})
@@ -414,8 +413,8 @@ const TreePageManager = () => {
         // Update server
         try {
             addNotification('Moving page down...', 'info', 'page-move-down')
-            const updatePromises = newPages.map(page =>
-                pagesApi.update(page.id, { sortOrder: page.sortOrder })
+            const updatePromises = newPages.map(async (page) =>
+                await pagesApi.update(page.id, { sortOrder: page.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})

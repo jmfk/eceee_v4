@@ -67,7 +67,9 @@ const GalleryStylesTab = forwardRef(({ galleryStyles, onChange, onDirty, themeId
             if (udcState.metadata.currentThemeId !== String(themeId)) {
                 switchTheme(String(themeId));
             }
-        } catch (_) {}
+            } catch (_) {
+                // Ignore errors if UDC is not available
+            }
 
         // Save via UDC and then navigate to edit view
         try {

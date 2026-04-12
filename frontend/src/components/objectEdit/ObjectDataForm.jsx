@@ -46,7 +46,7 @@ const ObjectDataForm = forwardRef(({
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
         queryKey: ['objectTypes'],
-        queryFn: () => objectTypesApi.getActive(),
+        queryFn: async () => await objectTypesApi.getActive(),
         enabled: Boolean(isNewInstance)
     })
 

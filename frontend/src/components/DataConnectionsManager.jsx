@@ -141,7 +141,7 @@ const DataConnectionsManager = () => {
     })
 
     const deleteConnectionMutation = useMutation({
-        mutationFn: (id) => api.delete(`/api/v1/data-connections/connections/${id}/`),
+        mutationFn: async (id) => await api.delete(`/api/v1/data-connections/connections/${id}/`),
         onSuccess: () => {
             queryClient.invalidateQueries(['data-connections'])
             addNotification('Connection deleted successfully', 'success')
@@ -373,7 +373,9 @@ const DataConnectionsManager = () => {
                                                     ...prev, 
                                                     config: { ...prev.config, headers } 
                                                 }))
-                                            } catch(err) {}
+                                            } catch(err) {
+                                                // Ignore invalid JSON while typing
+                                            }
                                         }}
                                         className="font-mono text-sm"
                                         placeholder='{ "Accept": "application/json" }'

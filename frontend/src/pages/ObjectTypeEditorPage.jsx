@@ -23,7 +23,7 @@ const ObjectTypeEditorPage = () => {
     // Fetch object type data if editing
     const { data: objectTypeResponse, isLoading } = useQuery({
         queryKey: ['objectType', objectTypeId],
-        queryFn: () => objectTypesApi.get(objectTypeId),
+        queryFn: async () => await objectTypesApi.get(objectTypeId),
         enabled: !!objectTypeId
     })
 

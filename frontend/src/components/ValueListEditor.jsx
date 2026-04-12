@@ -109,7 +109,7 @@ const ValueListEditor = () => {
     })
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => valueListsApi.update(id, data),
+        mutationFn: async ({ id, data }) => await valueListsApi.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['value-lists'])
             addNotification('Value list updated successfully', 'success')

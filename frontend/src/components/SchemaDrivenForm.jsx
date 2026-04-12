@@ -510,7 +510,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                         </span>
                     </div>
                     {/* Group-level error summary */}
-                    {false && groupHasErrors !== 0 && groupHasErrors && (
+                    {groupHasErrors !== 0 && groupHasErrors && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                             <div className="text-sm font-medium text-red-800 mb-1" role="heading" aria-level="4">Group Validation Errors:</div>
                             <div className="text-sm text-red-700 space-y-1" role="list">

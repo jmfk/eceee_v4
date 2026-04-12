@@ -48,6 +48,7 @@ const MediaInsertModal = ({
     const [showOverrideSettings, setShowOverrideSettings] = useState(false);
     const [mediaSelectionType, setMediaSelectionType] = useState('image');
     const [collections, setCollections] = useState([]);
+    const [loadingCollections, setLoadingCollections] = useState(false);
     const [pendingFiles, setPendingFiles] = useState([]);
     const [loadingPendingFiles, setLoadingPendingFiles] = useState(false);
 
@@ -204,7 +205,7 @@ const MediaInsertModal = ({
                 namespace,
                 page_size: 100,
                 ordering: '-created_at'
-            })();
+            });
             setCollections(result.results || result || []);
         } catch (error) {
             console.error('Failed to load collections:', error);

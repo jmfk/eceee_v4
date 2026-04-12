@@ -106,7 +106,7 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
                         </div>
                     )}
 
-                    {message.stack && process.env.NODE_ENV === 'development' && (
+                    {message.stack && import.meta.env.DEV && (
                         <details className="mt-2">
                             <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">
                                 Show technical details

@@ -66,7 +66,7 @@ const ObjectBrowser = () => {
 
     // Delete mutation
     const deleteMutation = useMutation({
-        mutationFn: (instanceId) => objectInstancesApi.delete(instanceId),
+        mutationFn: async (instanceId) => await objectInstancesApi.delete(instanceId),
         onSuccess: () => {
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance'])
@@ -84,14 +84,14 @@ const ObjectBrowser = () => {
     // Fetch object types for grid view
     const { data: objectTypesResponse, isLoading: typesLoading, error: typesError } = useQuery({
         queryKey: ['objectTypes', 'mainBrowser'],
-        queryFn: () => objectTypesApi.getMainBrowserTypes(),
+        queryFn: async () => await objectTypesApi.getMainBrowserTypes(),
         enabled: currentView === 'grid'
     })
 
     // Fetch filtered instances for list view
     const { data: instancesResponse, isLoading: instancesLoading, error: instancesError } = useQuery({
         queryKey: ['objectInstances', 'filtered', selectedObjectType?.id, searchTerm, statusFilter],
-        queryFn: () => {
+        queryFn: async () => {
             const params = {}
             if (selectedObjectType) params.type = selectedObjectType.name
             if (searchTerm) params.search = searchTerm

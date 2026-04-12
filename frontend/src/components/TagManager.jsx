@@ -17,7 +17,7 @@ const TagManager = () => {
     // Fetch tags with filtering
     const { data: tagsResponse, isLoading, error } = useQuery({
         queryKey: ['tags', searchTerm],
-        queryFn: () => {
+        queryFn: async () => {
             const params = {}
             if (searchTerm) params.search = searchTerm
             return tagsApi.list(params)
@@ -43,7 +43,7 @@ const TagManager = () => {
 
     // Update tag mutation
     const updateTagMutation = useMutation({
-        mutationFn: ({ id, ...data }) => tagsApi.update(id, data),
+        mutationFn: async ({ id, ...data }) => await tagsApi.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['tags'])
             setEditingTag(null)

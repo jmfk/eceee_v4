@@ -49,7 +49,7 @@ const MigrationManager = () => {
     })
 
     const runPlanMutation = useMutation({
-        mutationFn: (planId) => api.post(`/api/v1/content-migration/plans/${planId}/run/`),
+        mutationFn: async (planId) => await api.post(`/api/v1/content-migration/plans/${planId}/run/`),
         onSuccess: (data) => {
             addNotification('Migration job started', 'success')
             setSelectedJob(data.data)
@@ -58,7 +58,7 @@ const MigrationManager = () => {
     })
 
     const deletePlanMutation = useMutation({
-        mutationFn: (id) => api.delete(`/api/v1/content-migration/plans/${id}/`),
+        mutationFn: async (id) => await api.delete(`/api/v1/content-migration/plans/${id}/`),
         onSuccess: () => {
             queryClient.invalidateQueries(['migration-plans'])
             addNotification('Plan deleted', 'success')

@@ -6,10 +6,10 @@
  * Uses ThemeCSSManager for reference counting to prevent CSS removal conflicts.
  */
 
-import { useEffect, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useCallback, useMemo, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pagesApi } from '../api'
-import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
+import UnifiedDataContext from '../contexts/unified-data/context/UnifiedDataContext'
 import { themeCSSManager } from '../utils/themeCSSManager'
 
 /**
@@ -47,10 +47,11 @@ export const useTheme = ({
     const pageTheme = pageData?.effectiveTheme;
 
     // Try to get theme from UDC as fallback
+    const udcContext = useContext(UnifiedDataContext)
     let udcTheme = null
-    try {
-        const { state } = useUnifiedData()
-
+    
+    if (udcContext) {
+        const { state } = udcContext
         const currentVersionId = state.metadata.currentVersionId
 
         if (currentVersionId) {
@@ -67,8 +68,6 @@ export const useTheme = ({
                 udcTheme = state.themes[pageThemeId]
             }
         }
-    } catch (e) {
-        // UDC not available (outside of provider context), continue without it
     }
 
     // PRIORITY 1: Page's effectiveTheme (from page API - includes inheritance)

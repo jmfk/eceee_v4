@@ -115,7 +115,7 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
         // This handles cases where the tag exists but wasn't in search results
         try {
             console.log('[CompactTagInput] handleCreateTag: searching for tag with namespace:', namespace, 'search term:', normalizedTagName);
-            const searchResult = await mediaTagsApi.list({
+            const searchResult = await await await await await await await await await await await mediaTagsApi.list({
                 namespace,
                 search: normalizedTagName,
                 page_size: 50 // Get enough results to find exact match
@@ -161,7 +161,7 @@ const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availab
             };
             console.log('[CompactTagInput] handleCreateTag: creating tag with data:', tagData);
 
-            const newTag = await mediaTagsApi.create(tagData)();
+            const newTag = await await await await await await await await await await await mediaTagsApi.create(tagData)();
             console.log('[CompactTagInput] handleCreateTag: tag created successfully:', newTag);
 
             // Notify parent to update available tags list
@@ -367,7 +367,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
         const loadTags = async () => {
             if (!namespace) return;
             try {
-                const result = await mediaTagsApi.list({ namespace })();
+                const result = await mediaTagsApi.list({ namespace });
                 const tagsData = result.results || result || [];
                 setAvailableTags(Array.isArray(tagsData) ? tagsData : []);
             } catch (error) {
@@ -387,7 +387,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
             setExistingError(null);
 
             const params = { page_size: 100 };
-            const result = await mediaCollectionsApi.getFiles(collection.id, params)();
+            const result = await await await await await await await await await await await mediaCollectionsApi.getFiles(collection.id, params)();
             const existingFilesData = result.results || result || [];
             setExistingFiles(Array.isArray(existingFilesData) ? existingFilesData : []);
         } catch (error) {
@@ -420,7 +420,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                 tag_ids: formData.tagIds
             };
 
-            await mediaCollectionsApi.update(collection.id, updateData)();
+            await await await await await await await await await await await mediaCollectionsApi.update(collection.id, updateData)();
             addNotification('Collection updated successfully', 'success');
             if (onSave) onSave();
         } catch (error) {
@@ -434,7 +434,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
     // Handle removing a file from collection
     const handleRemoveFile = async (fileId) => {
         try {
-            await mediaCollectionsApi.removeFiles(collection.id, [fileId])();
+            await await await await await await await await await await await mediaCollectionsApi.removeFiles(collection.id, [fileId])();
             addNotification('File removed from collection', 'success');
             await loadExistingFiles();
         } catch (error) {
@@ -754,7 +754,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                     page_size: 100
                 };
 
-                const result = await mediaCollectionsApi.getFiles(collection.id, params)();
+                const result = await await await await await await await await await await await mediaCollectionsApi.getFiles(collection.id, params)();
                 const existingFilesData = result.results || result || [];
                 setExistingFiles(Array.isArray(existingFilesData) ? existingFilesData : []);
             } catch (error) {
@@ -802,7 +802,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
     const handleRemoveFile = async (fileId) => {
         try {
             // Remove file from collection using the collection API
-            await mediaCollectionsApi.removeFiles(collection.id, [fileId])();
+            await await await await await await await await await await await mediaCollectionsApi.removeFiles(collection.id, [fileId])();
             addNotification('File removed from collection', 'success');
 
             // Reload both columns to show updated results
@@ -817,7 +817,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
     const handleAddFile = async (fileId) => {
         try {
             // Add file to collection using the collection API
-            await mediaCollectionsApi.addFiles(collection.id, [fileId])();
+            await await await await await await await await await await await mediaCollectionsApi.addFiles(collection.id, [fileId])();
             addNotification('File added to collection', 'success');
 
             // Reload both columns to show updated results
@@ -856,7 +856,7 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
             const existingParams = {
                 page_size: 100
             };
-            const existingResult = await mediaCollectionsApi.getFiles(collection.id, existingParams)();
+            const existingResult = await await await await await await await await await await await mediaCollectionsApi.getFiles(collection.id, existingParams)();
             const existingFilesData = existingResult.results || existingResult || [];
             setExistingFiles(Array.isArray(existingFilesData) ? existingFilesData : []);
         } catch (error) {
@@ -1336,7 +1336,7 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
         const loadTags = async () => {
             if (!namespace) return;
             try {
-                const result = await mediaTagsApi.list({ namespace })();
+                const result = await mediaTagsApi.list({ namespace });
                 const tagsData = result.results || result || [];
                 setAvailableTags(Array.isArray(tagsData) ? tagsData : []);
             } catch (error) {
@@ -1362,7 +1362,7 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
                 tag_ids: formData.tagIds
             };
 
-            await mediaCollectionsApi.update(collection.id, updateData)();
+            await await await await await await await await await await await mediaCollectionsApi.update(collection.id, updateData)();
             addNotification('Collection updated successfully', 'success');
             onSave();
         } catch (error) {
@@ -1548,7 +1548,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                 }
             });
 
-            const result = await mediaCollectionsApi.list(params)();
+            const result = await mediaCollectionsApi.list(params);
             const collectionsData = result.results || result || [];
             setCollections(Array.isArray(collectionsData) ? collectionsData : []);
         } catch (error) {
@@ -1566,7 +1566,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         if (!namespace) return;
 
         try {
-            const result = await mediaTagsApi.list({ namespace })();
+            const result = await mediaTagsApi.list({ namespace });
             setAvailableTags(result.results || result);
         } catch (error) {
             console.error('Failed to load tags:', error);
@@ -1653,7 +1653,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
     // Handle download collection as ZIP
     const handleDownloadZip = async (collection) => {
         try {
-            const blob = await mediaCollectionsApi.downloadZip(collection.id)();
+            const blob = await await await await await await await await await await await mediaCollectionsApi.downloadZip(collection.id)();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1717,10 +1717,10 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
 
             let result;
             if (isEdit) {
-                result = await mediaCollectionsApi.update(selectedCollection.id, collectionData)();
+                result = await await await await await await await await await await await mediaCollectionsApi.update(selectedCollection.id, collectionData)();
                 addNotification('Collection updated successfully', 'success');
             } else {
-                result = await mediaCollectionsApi.create(collectionData)();
+                result = await await await await await await await await await await await mediaCollectionsApi.create(collectionData)();
                 addNotification('Collection created successfully', 'success');
             }
 
@@ -1748,7 +1748,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
     // Confirm delete
     const confirmDelete = async () => {
         try {
-            await mediaCollectionsApi.delete(selectedCollection.id)();
+            await await await await await await await await await await await mediaCollectionsApi.delete(selectedCollection.id)();
             addNotification('Collection deleted successfully', 'success');
 
             // Refresh collections

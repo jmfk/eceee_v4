@@ -81,7 +81,7 @@ describe('Enhanced Error Handling', () => {
         it('should provide detailed error information for text failures', () => {
             const structure = {
                 type: 'template_text',
-                content: 'Hello {{user.name|default:\"Guest\"}} welcome to our site!'
+                content: 'Hello {{user.name|default:"Guest"}} welcome to our site!'
             };
             const config = { user: null };
             const error = new Error('Cannot access property of null');
@@ -92,7 +92,7 @@ describe('Enhanced Error Handling', () => {
             expect(result.classList.contains('template-error-text-fallback')).toBe(true);
             expect(result.textContent).toContain('Text Processing Error');
             expect(result.textContent).toContain('Cannot access property of null');
-            expect(result.textContent).toContain('Hello {{user.name|default:\"Guest\"}} welcome to our...');
+            expect(result.textContent).toContain('Hello {{user.name|default:"Guest"}} welcome to our...');
         });
 
         it('should truncate long content in error messages', () => {

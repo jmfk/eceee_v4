@@ -374,6 +374,7 @@ const AllSlotsEditor = ({
                                     onShowWidgetModal={handleShowWidgetModal}
                                     onClearSlot={handleClearSlot}
                                     pageContext={pageContext}
+                                    namespace={namespace}
                                     editable={editable}
                                     inheritedWidgets={inheritedWidgets}
                                     slotInheritanceRules={slotInheritanceRules}
@@ -430,6 +431,7 @@ const SlotAccordionItem = ({
     onShowWidgetModal,
     onClearSlot,
     pageContext,
+    namespace,
     editable,
     inheritedWidgets,
     slotInheritanceRules,

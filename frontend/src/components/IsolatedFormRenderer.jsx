@@ -91,10 +91,6 @@ const IsolatedFieldWrapper = React.memo(({
     const hiddenFields = {
     }
 
-    if (hiddenFields[widgetType]?.includes(fieldName)) {
-        return null
-    }
-
     // Custom validation function for this field
     const handleFieldValidation = useCallback(async (fieldName, value) => {
         if (!widgetData?.type) return null
@@ -137,6 +133,10 @@ const IsolatedFieldWrapper = React.memo(({
             })
         }
     }, [fieldName, onFieldChange])
+
+    if (hiddenFields[widgetType]?.includes(fieldName)) {
+        return null
+    }
 
     // Use SchemaFieldRenderer for custom components or fallback to basic rendering
     if (fieldSchema.component) {

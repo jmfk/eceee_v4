@@ -143,7 +143,11 @@ const ActionConfigEditor = ({ type, config, onChange }) => {
                         rows={2}
                         value={JSON.stringify(config.mapping || {}, null, 2)}
                         onChange={(e) => {
-                            try { handleFieldChange('mapping', JSON.parse(e.target.value)) } catch(err) {}
+                            try { 
+                                handleFieldChange('mapping', JSON.parse(e.target.value)) 
+                            } catch(err) {
+                                // Ignore invalid JSON while typing
+                            }
                         }}
                     />
                 </div>

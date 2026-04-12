@@ -14,7 +14,7 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
     // Fetch version history
     const { data: versionsResponse, isLoading: versionsLoading } = useQuery({
         queryKey: ['objectInstance', instance?.id, 'versions'],
-        queryFn: () => objectInstancesApi.getVersions(instance.id),
+        queryFn: async () => await objectInstancesApi.getVersions(instance.id),
         enabled: !!instance?.id
     })
 

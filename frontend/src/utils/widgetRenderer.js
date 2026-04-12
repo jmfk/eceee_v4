@@ -65,15 +65,16 @@ export const renderWidgetToHTML = (widget) => {
   }
 
   switch (widget.type) {
-    case 'easy_widgetsContentWidget':
+    case 'easy_widgetsContentWidget': {
       const content = config.content || '<div class="text-gray-500 italic">Content will appear here...</div>'
       return `
         <div class="content-widget theme-content widget-content">
           ${content}
         </div>
       `
+    }
 
-    case 'easy_widgetsImageWidget':
+    case 'easy_widgetsImageWidget': {
       // Note: This HTML fallback renderer only shows the first image in a simplified format
       // Full gallery/carousel functionality requires the React component
       const imgSrc = config.image_url || config.imageUrl || (config.mediaItems && config.mediaItems[0] ? config.mediaItems[0].url : '')
@@ -88,6 +89,7 @@ export const renderWidgetToHTML = (widget) => {
           ${caption ? `<p class="text-sm text-gray-600 mt-2">${escapeHtml(caption)}</p>` : ''}
         </div>
       `
+    }
 
     case 'easy_widgetsTableWidget':
       return `
@@ -134,7 +136,7 @@ export const renderWidgetToHTML = (widget) => {
         </div>
       `
 
-    default:
+    default: {
       // Generic widget renderer for unknown types
       const widgetTypeName = widget.name || widget.type || 'Unknown Widget'
       return `
@@ -145,6 +147,7 @@ export const renderWidgetToHTML = (widget) => {
           </div>
         </div>
       `
+    }
   }
 }
 

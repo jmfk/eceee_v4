@@ -213,7 +213,7 @@ const MediaEditForm = ({
 
         setReplacingFile(true);
         try {
-            const result = await mediaApi.files.replaceFile(file.id, selectedFile)();
+            const result = await mediaApi.files.replaceFile(file.id, selectedFile);
             
             addNotification('File replaced successfully', 'success');
             
@@ -279,7 +279,7 @@ const MediaEditForm = ({
                                 .replace(/[^a-z0-9]+/g, '-')
                                 .replace(/^-+|-+$/g, '');
 
-                            tag = await mediaTagsApi.create({
+                            tag = await await await await await await await await await await await mediaTagsApi.create({
                                 name: tagName,
                                 slug: tagSlug,
                                 namespace: namespace

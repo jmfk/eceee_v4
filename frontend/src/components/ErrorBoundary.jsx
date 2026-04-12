@@ -13,7 +13,7 @@ export default class ErrorBoundary extends React.Component {
     componentDidCatch(error, errorInfo) {
         // Optional: log to monitoring here
         if (import.meta.env.DEV) {
-            // eslint-disable-next-line no-console
+             
             console.error('ErrorBoundary caught error', error, errorInfo)
         }
     }

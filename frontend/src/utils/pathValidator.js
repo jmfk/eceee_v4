@@ -124,7 +124,7 @@ export const validatePathFormat = (path) => {
 
     // Warn about unusual characters (but don't block - backend will validate)
     // Most path patterns expect alphanumeric, hyphens, underscores, and slashes
-    const hasUnusualChars = /[^a-zA-Z0-9\-_\/.]/.test(path);
+    const hasUnusualChars = /[^a-zA-Z0-9-_/.]/.test(path);
     if (hasUnusualChars) {
         // This is just a warning - we'll let it through
         console.debug('Path contains unusual characters:', path);

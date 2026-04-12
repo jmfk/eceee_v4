@@ -53,6 +53,7 @@ export const WidgetEventProvider = ({ children }) => {
         }
 
         if (DEBUG_ENABLED) {
+            // Debug logging disabled
         }
 
         const listeners = listenersRef.current.get(eventType) || []
@@ -84,6 +85,7 @@ export const WidgetEventProvider = ({ children }) => {
         listeners.push(callback)
 
         if (DEBUG_ENABLED) {
+            // Debug logging disabled
         }
 
         // Return unsubscribe function

@@ -464,6 +464,7 @@ const SettingsManager = () => {
 
 // Add the PageForm component at the end of the file, before the export
 const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
+    const { addNotification } = useGlobalNotifications()
     const [formData, setFormData] = useState({
         title: page?.title || '',
         slug: page?.slug || '',

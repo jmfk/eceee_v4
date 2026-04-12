@@ -337,7 +337,7 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             }
 
         } else {
-
+            // No version changes to save
         }
 
         return results;

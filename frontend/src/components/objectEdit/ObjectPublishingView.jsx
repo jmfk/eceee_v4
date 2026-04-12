@@ -56,7 +56,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
 
     // Publishing mutations
     const publishMutation = useMutation({
-        mutationFn: ({ versionId, isFeatured }) => objectVersionsApi.publish(versionId, { is_featured: isFeatured }),
+        mutationFn: async ({ versionId, isFeatured }) => await objectVersionsApi.publish(versionId, { is_featured: isFeatured }),
         onSuccess: () => {
             addNotification('Version published successfully', 'success')
             loadVersions()
@@ -82,7 +82,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     })
 
     const unpublishMutation = useMutation({
-        mutationFn: (versionId) => objectVersionsApi.unpublish(versionId),
+        mutationFn: async (versionId) => await objectVersionsApi.unpublish(versionId),
         onSuccess: () => {
             addNotification('Version unpublished successfully', 'success')
             loadVersions()
@@ -109,8 +109,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     })
 
     const scheduleMutation = useMutation({
-        mutationFn: ({ versionId, effectiveDate, expiryDate, isFeatured }) =>
-            objectVersionsApi.schedule(versionId, {
+        mutationFn: async ({ versionId, effectiveDate, expiryDate, isFeatured }) => await objectVersionsApi.schedule(versionId, {
                 effective_date: effectiveDate,
                 expiry_date: expiryDate,
                 is_featured: isFeatured
@@ -140,8 +139,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     })
 
     const toggleFeaturedMutation = useMutation({
-        mutationFn: ({ versionId, isFeatured }) =>
-            objectVersionsApi.update(versionId, { is_featured: isFeatured }),
+        mutationFn: async ({ versionId, isFeatured }) => await objectVersionsApi.update(versionId, { is_featured: isFeatured }),
         onSuccess: (data, variables) => {
             const action = variables.isFeatured ? 'marked as featured' : 'unmarked as featured'
             addNotification(`Version ${action}`, 'success')

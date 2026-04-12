@@ -54,7 +54,7 @@ const ThemeSelector = ({
     // Fetch selected theme details
     const { data: selectedTheme } = useQuery({
         queryKey: ['theme', selectedThemeId],
-        queryFn: () => themesApi.get(selectedThemeId),
+        queryFn: async () => await themesApi.get(selectedThemeId),
         enabled: !!selectedThemeId,
         staleTime: 5 * 60 * 1000,
     })
@@ -62,7 +62,7 @@ const ThemeSelector = ({
     // Fetch preview theme details
     const { data: previewTheme } = useQuery({
         queryKey: ['theme', previewThemeId],
-        queryFn: () => themesApi.get(previewThemeId),
+        queryFn: async () => await themesApi.get(previewThemeId),
         enabled: !!previewThemeId && showPreview,
         staleTime: 5 * 60 * 1000,
     })

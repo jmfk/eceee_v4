@@ -41,6 +41,7 @@ const OptimizedImage = ({
     const [optimizedSrc, setOptimizedSrc] = useState('');
     const [srcSet, setSrcSet] = useState('');
     const [sizesAttr, setSizesAttr] = useState('');
+    const [placeholderSrc, setPlaceholderSrc] = useState('');
 
     // Load optimized image URL(s)
     useEffect(() => {
@@ -108,6 +109,33 @@ const OptimizedImage = ({
     }, [src, responsive, width, height, resizeType, gravity, quality, format, 
         JSON.stringify(breakpoints), JSON.stringify(slotDimensions), 
         widthMultiplier, JSON.stringify(densities), sizes]);
+
+    // Load placeholder if requested
+    useEffect(() => {
+        if (!placeholder || !src) {
+            setPlaceholderSrc('');
+            setShowPlaceholder(false);
+            return;
+        }
+
+        const loadPlaceholder = async () => {
+            try {
+                const url = await getImgproxyUrl(src, {
+                    width: placeholderSize,
+                    height: placeholderSize,
+                    resize_type: 'fill',
+                    blur: 10,
+                    quality: 20
+                });
+                setPlaceholderSrc(url);
+                setShowPlaceholder(true);
+            } catch (error) {
+                console.error('Error loading image placeholder:', error);
+            }
+        };
+
+        loadPlaceholder();
+    }, [src, placeholder, placeholderSize]);
 
     const handleLoad = useCallback((event) => {
         setImageLoaded(true);

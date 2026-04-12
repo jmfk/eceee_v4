@@ -68,7 +68,7 @@ const MediaTagManager = ({ namespace, onTagSelect }) => {
                 params.search = searchQuery.trim();
             }
 
-            const response = await mediaTagsApi.getUsageStats(params)();
+            const response = await await await await await await await await await await await mediaTagsApi.getUsageStats(params)();
             const results = response.results || response || [];
 
             setTags(results);
@@ -160,7 +160,7 @@ const MediaTagManager = ({ namespace, onTagSelect }) => {
         }
 
         try {
-            await mediaTagsApi.delete(tagId)();
+            await await await await await await await await await await await mediaTagsApi.delete(tagId)();
             addNotification('Tag deleted successfully', 'success');
             loadTags();
             setSelectedTags(new Set());
@@ -179,7 +179,7 @@ const MediaTagManager = ({ namespace, onTagSelect }) => {
         }
 
         try {
-            await mediaTagsApi.bulkDelete(Array.from(selectedTags))();
+            await await await await await await await await await await await mediaTagsApi.bulkDelete(Array.from(selectedTags))();
             addNotification(`Successfully deleted ${selectedTags.size} tag(s)`, 'success');
             loadTags();
             setSelectedTags(new Set());
@@ -548,11 +548,11 @@ const CreateTagModal = ({ tag, namespace, onClose, onSuccess }) => {
 
             if (tag) {
                 // Update existing tag
-                await mediaTagsApi.update(tag.id, data)();
+                await await await await await await await await await await await mediaTagsApi.update(tag.id, data)();
                 addNotification('Tag updated successfully', 'success');
             } else {
                 // Create new tag
-                await mediaTagsApi.create(data)();
+                await await await await await await await await await await await mediaTagsApi.create(data)();
                 addNotification('Tag created successfully', 'success');
             }
 
@@ -698,7 +698,7 @@ const MergeTagsModal = ({ selectedTagIds, tags, onClose, onSuccess }) => {
 
         setMerging(true);
         try {
-            const result = await mediaTagsApi.mergeTags(targetTagId, sourceTagIds)();
+            const result = await await await await await await await await await await await mediaTagsApi.mergeTags(targetTagId, sourceTagIds)();
             addNotification(
                 `Successfully merged ${result.tagsDeleted} tags. ${result.filesTransferred} files transferred.`,
                 'success'

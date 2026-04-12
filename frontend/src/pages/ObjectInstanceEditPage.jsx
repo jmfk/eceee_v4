@@ -53,7 +53,7 @@ const ObjectInstanceEditPage = () => {
     // Query hooks
     const { data: instanceResponse, isLoading: instanceLoading } = useQuery({
         queryKey: ['objectInstance', instanceId],
-        queryFn: () => objectInstancesApi.get(instanceId),
+        queryFn: async () => await objectInstancesApi.get(instanceId),
         enabled: !!instanceId
     })
 
@@ -61,31 +61,31 @@ const ObjectInstanceEditPage = () => {
 
     const { data: objectTypeResponse, isLoading: typeLoading } = useQuery({
         queryKey: ['objectType', actualObjectTypeId],
-        queryFn: () => objectTypesApi.get(actualObjectTypeId),
+        queryFn: async () => await objectTypesApi.get(actualObjectTypeId),
         enabled: !!actualObjectTypeId
     })
 
     const { data: versionsResponse, isLoading: versionsLoading } = useQuery({
         queryKey: ['objectInstance', instanceId, 'versions'],
-        queryFn: () => objectInstancesApi.getVersions(instanceId),
+        queryFn: async () => await objectInstancesApi.getVersions(instanceId),
         enabled: !!instanceId && !isNewInstance
     })
 
     const { data: parentResponse } = useQuery({
         queryKey: ['objectInstance', parentIdFromUrl, 'metadata'],
-        queryFn: () => objectInstancesApi.get(parentIdFromUrl),
+        queryFn: async () => await objectInstancesApi.get(parentIdFromUrl),
         enabled: isNewInstance && !!parentIdFromUrl
     })
 
     const { data: pathToRootResponse, isLoading: pathLoading } = useQuery({
         queryKey: ['objectInstance', instanceId, 'pathToRoot'],
-        queryFn: () => objectInstancesApi.getPathToRoot(instanceId),
+        queryFn: async () => await objectInstancesApi.getPathToRoot(instanceId),
         enabled: !!instanceId && !isNewInstance
     })
 
     const { data: parentPathToRootResponse } = useQuery({
         queryKey: ['objectInstance', parentIdFromUrl, 'pathToRoot'],
-        queryFn: () => objectInstancesApi.getPathToRoot(parentIdFromUrl),
+        queryFn: async () => await objectInstancesApi.getPathToRoot(parentIdFromUrl),
         enabled: isNewInstance && !!parentIdFromUrl
     })
 
@@ -121,7 +121,7 @@ const ObjectInstanceEditPage = () => {
     })
 
     const saveMutation = useMutation({
-        mutationFn: (saveData) => {
+        mutationFn: async (saveData) => {
             if (saveData.createNew) return objectInstancesApi.createVersion(instanceId, saveData)
             else return objectInstancesApi.update(instanceId, saveData)
         },

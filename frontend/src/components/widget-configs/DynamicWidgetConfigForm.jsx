@@ -202,7 +202,7 @@ export default function DynamicWidgetConfigForm({
                     </div>
                 )
 
-            case 'SelectInput':
+            case 'SelectInput': {
                 const selectOptions = enumValues || ui.options || []
                 return (
                     <div key={fieldName}>
@@ -233,6 +233,7 @@ export default function DynamicWidgetConfigForm({
                         )}
                     </div>
                 )
+            }
 
             case 'SliderInput':
                 return (

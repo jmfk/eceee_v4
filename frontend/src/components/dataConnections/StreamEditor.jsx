@@ -146,7 +146,9 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
             initialModel = parsed.model || 'ObjectInstance'
             initialVersion = parsed.version || 'latest'
             initialFields = parsed.fields || []
-        } catch(e) {}
+        } catch(e) {
+            // Ignore invalid JSON
+        }
     }
 
     const [formData, setFormData] = useState({
@@ -230,7 +232,9 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
                     setSelectedObjectTypes(otIds)
                     setSelectedSites(sites)
                 }
-            } catch(e) {}
+            } catch(e) {
+            // Ignore invalid JSON
+        }
         }
     }, [initialDsl, connectionType])
 
@@ -645,7 +649,9 @@ const StreamEditor = ({ stream, onSave, onCancel, connectionType, connectionId, 
                             onChange={(val) => {
                                 try {
                                     handleConfigChange('mappings', JSON.parse(val))
-                                } catch(err) {}
+                                } catch(err) {
+                                    // Ignore invalid JSON while typing
+                                }
                             }}
                             className="font-mono text-xs"
                             placeholder='{ "target": "source" }'

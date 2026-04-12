@@ -19,7 +19,7 @@ const ObjectTypeManager = () => {
     // Fetch object types with filtering
     const { data: typesResponse, isLoading, error } = useQuery({
         queryKey: ['objectTypes', searchTerm],
-        queryFn: () => {
+        queryFn: async () => {
             const params = {}
             if (searchTerm) params.search = searchTerm
             return objectTypesApi.list(params)
@@ -32,7 +32,7 @@ const ObjectTypeManager = () => {
 
     // Delete object type mutation
     const deleteTypeMutation = useMutation({
-        mutationFn: ({ id, forceDelete }) => objectTypesApi.delete(id, forceDelete),
+        mutationFn: async ({ id, forceDelete }) => await objectTypesApi.delete(id, forceDelete),
         onSuccess: (response) => {
             queryClient.invalidateQueries(['objectTypes'])
             setShowDeleteConfirm(null)

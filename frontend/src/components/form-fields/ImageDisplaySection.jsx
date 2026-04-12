@@ -17,9 +17,53 @@ const ImageDisplaySection = ({
     onImageTagsChanged = null
 }) => {
     const [editingTagsForImage, setEditingTagsForImage] = useState(null)
-    if (!images || images.length === 0) return null
+    const [collectionData, setCollectionData] = useState(null)
+    const [collectionFiles, setCollectionFiles] = useState([])
+    const [loadingCollection, setLoadingCollection] = useState(false)
 
-    const displayImages = Array.isArray(images) ? images : [images]
+    const displayImages = Array.isArray(images) ? images : (images ? [images] : [])
+    const image = displayImages[0]
+    const isCollection = image?.type === "collection"
+
+    // Fetch collection data and files when it's a collection
+    useEffect(() => {
+        if (isCollection && image?.id) {
+            const loadCollection = async () => {
+                setLoadingCollection(true)
+                try {
+                    const [collection, filesResult] = await Promise.all([
+                        mediaCollectionsApi.get(image.id)(),
+                        mediaCollectionsApi.getFiles(image.id, { page_size: 9 })()
+                    ])
+                    setCollectionData(collection)
+                    const files = filesResult.results || filesResult || []
+                    setCollectionFiles(files.slice(0, 9)) // Get first 9 images
+                } catch (error) {
+                    // Handle 404 errors silently (collection doesn't exist or was deleted)
+                    // Other errors are logged for debugging
+                    const isNotFound = error?.response?.status === 404 ||
+                        error?.originalError?.response?.status === 404 ||
+                        error?.message?.includes('No MediaCollection matches')
+
+                    if (!isNotFound) {
+                        console.error('Failed to load collection:', error)
+                    }
+
+                    // If collection doesn't exist, treat as regular image
+                    setCollectionData(null)
+                    setCollectionFiles([])
+                } finally {
+                    setLoadingCollection(false)
+                }
+            }
+            loadCollection()
+        } else {
+            setCollectionData(null)
+            setCollectionFiles([])
+        }
+    }, [isCollection, image?.id])
+
+    if (!images || images.length === 0) return null
 
     if (multiple && displayImages.length > 1) {
         // Multiple images - show header with count and first few thumbnails
@@ -165,53 +209,10 @@ const ImageDisplaySection = ({
     }
 
     // Single image or single image in multiple mode
-    const image = displayImages[0]
+    // const image = displayImages[0] // Already defined at top
     // Only treat as collection if explicitly marked as type "collection"
     // The previous check was too broad and could incorrectly identify images as collections
-    const isCollection = image?.type === "collection"
-
-    // State for collection data and files
-    const [collectionData, setCollectionData] = useState(null)
-    const [collectionFiles, setCollectionFiles] = useState([])
-    const [loadingCollection, setLoadingCollection] = useState(false)
-
-    // Fetch collection data and files when it's a collection
-    useEffect(() => {
-        if (isCollection && image?.id) {
-            const loadCollection = async () => {
-                setLoadingCollection(true)
-                try {
-                    const [collection, filesResult] = await Promise.all([
-                        mediaCollectionsApi.get(image.id)(),
-                        mediaCollectionsApi.getFiles(image.id, { page_size: 9 })()
-                    ])
-                    setCollectionData(collection)
-                    const files = filesResult.results || filesResult || []
-                    setCollectionFiles(files.slice(0, 9)) // Get first 9 images
-                } catch (error) {
-                    // Handle 404 errors silently (collection doesn't exist or was deleted)
-                    // Other errors are logged for debugging
-                    const isNotFound = error?.response?.status === 404 ||
-                        error?.originalError?.response?.status === 404 ||
-                        error?.message?.includes('No MediaCollection matches')
-
-                    if (!isNotFound) {
-                        console.error('Failed to load collection:', error)
-                    }
-
-                    // If collection doesn't exist, treat as regular image
-                    setCollectionData(null)
-                    setCollectionFiles([])
-                } finally {
-                    setLoadingCollection(false)
-                }
-            }
-            loadCollection()
-        } else {
-            setCollectionData(null)
-            setCollectionFiles([])
-        }
-    }, [isCollection, image?.id])
+    // const isCollection = image?.type === "collection" // Already defined at top
 
     // For collections, we'll show a collection preview with thumbnails (1-9 images in 3x3 grid)
     if (isCollection) {

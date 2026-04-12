@@ -107,7 +107,7 @@ const TreeImporterModalV2 = ({ isOpen, onClose, parentPage = null, onSuccess }) 
     // Fetch namespaces
     const { data: namespacesData } = useQuery({
         queryKey: ['namespaces'],
-        queryFn: () => namespacesApi.list(),
+        queryFn: async () => await namespacesApi.list(),
         enabled: isOpen,
     })
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Calendar, ArrowRight, RotateCcw } from 'lucide-react'
 import DateInput from './DateInput'
 
@@ -34,6 +34,7 @@ const DateRangeInput = ({
         start: null,
         end: null
     })
+    const containerRef = useRef(null)
 
     // Sync with prop value
     useEffect(() => {

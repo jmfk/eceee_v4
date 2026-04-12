@@ -25,7 +25,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
 
     // Delete mutation
     const deleteMutation = useMutation({
-        mutationFn: (instanceId) => objectInstancesApi.delete(instanceId),
+        mutationFn: async (instanceId) => await objectInstancesApi.delete(instanceId),
         onSuccess: () => {
             queryClient.invalidateQueries(['objectInstance', instance?.id, 'children'])
             queryClient.invalidateQueries(['objectInstances'])
@@ -43,7 +43,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
     // Fetch child objects if editing an existing instance
     const { data: childrenResponse, isLoading: childrenLoading, error: childrenError } = useQuery({
         queryKey: ['objectInstance', instance?.id, 'children'],
-        queryFn: () => objectInstancesApi.getChildren(instance.id),
+        queryFn: async () => await objectInstancesApi.getChildren(instance.id),
         enabled: !!instance?.id
     })
 

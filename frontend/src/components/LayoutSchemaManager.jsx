@@ -24,8 +24,8 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
         setLoading(true)
         try {
             const [schemasRes, layoutsRes] = await Promise.all([
-                pageDataSchemasApi.list({ ordering: '-updatedAt' }),
-                layoutsApi.list({ activeOnly: true }),
+                await pageDataSchemasApi.list({ ordering: '-updatedAt' }),
+                await layoutsApi.list({ activeOnly: true }),
             ])
             const allSchemas = Array.isArray(schemasRes) ? schemasRes : (schemasRes?.results || [])
             const allLayouts = Array.isArray(layoutsRes) ? layoutsRes : (layoutsRes?.results || [])

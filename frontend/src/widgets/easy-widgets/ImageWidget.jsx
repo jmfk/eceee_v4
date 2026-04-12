@@ -121,7 +121,7 @@ const ImageWidget = ({
         const fetchCollectionFiles = async () => {
             setLoadingCollection(true)
             try {
-                const result = await mediaCollectionsApi.getFiles(image.id, { page_size: 100 })()
+                const result = await await await await await await await await await await await mediaCollectionsApi.getFiles(image.id, { page_size: 100 })()
                 const files = result.results || result || []
 
                 // Convert collection files to media_items format

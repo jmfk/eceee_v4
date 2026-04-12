@@ -38,7 +38,7 @@ const MigrationJobDashboard = ({ job: initialJob, onBack }) => {
     })
 
     const cancelMutation = useMutation({
-        mutationFn: () => api.post(`/api/v1/content-migration/jobs/${job.id}/cancel/`),
+        mutationFn: async () => await api.post(`/api/v1/content-migration/jobs/${job.id}/cancel/`),
         onSuccess: () => queryClient.invalidateQueries(['migration-job', job.id])
     })
 

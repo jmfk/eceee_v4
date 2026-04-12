@@ -58,7 +58,7 @@ const ImageStyleEditPage = () => {
     // Fetch theme data
     const { data: themeData, isLoading } = useQuery({
         queryKey: ['theme', themeId],
-        queryFn: () => themesApi.get(themeId),
+        queryFn: async () => await themesApi.get(themeId),
         enabled: !!themeId,
     });
 
@@ -97,7 +97,9 @@ const ImageStyleEditPage = () => {
                 if (udcState.metadata.currentThemeId !== idStr) {
                     switchTheme(idStr);
                 }
-            } catch (_) { }
+            } catch (_) {
+                // Ignore errors if UDC is not available
+            }
 
             const styles = normalizedData.imageStyles || {};
             const style = styles[styleKey];

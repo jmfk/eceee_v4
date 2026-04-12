@@ -3698,7 +3698,7 @@ class LayoutRenderer {
         }
 
         // Only access own properties, not inherited ones
-        if (current && current.hasOwnProperty && current.hasOwnProperty(key)) {
+        if (current && Object.prototype.hasOwnProperty.call(current, key)) {
           return current[key];
         }
 
@@ -3748,24 +3748,6 @@ class LayoutRenderer {
       console.error('LayoutRenderer: Error applying template filters', error);
       return String(value || '');
     }
-  }
-
-  /**
-   * Process style elements with template variables (placeholder for Phase 5)
-   * @param {Object} styleData - Style element data
-   * @param {Object} config - Widget configuration
-   * @returns {HTMLStyleElement} Style element
-   */
-  processStyleElement(styleData, config) {
-    // Placeholder implementation - will be enhanced in Phase 5
-    const styleElement = document.createElement('style');
-
-    if (styleData.css) {
-      const processedCSS = this.templateRenderer.resolveTemplateVariables(styleData.css, config);
-      styleElement.textContent = processedCSS;
-    }
-
-    return styleElement;
   }
 
   /**
@@ -3979,13 +3961,14 @@ class LayoutRenderer {
           return this.templateRenderer.processTemplateText(structure, config);
 
         case 'conditionalBlock':
-        case 'conditional_block':
+        case 'conditional_block': {
           // Special type for conditional blocks (support both camelCase and snake_case)
           const shouldRender = this.templateRenderer.evaluateCondition(structure.condition, config);
           if (shouldRender && structure.content) {
             return this.templateRenderer.processTemplateStructureWithLogic(structure.content, config, templateTags);
           }
           return document.createTextNode('');
+        }
 
         default:
           // Fall back to regular processing
@@ -4458,7 +4441,7 @@ class LayoutRenderer {
         case 'template_text':
           return this.templateRenderer.createSafeTextFallback(structure, config, error);
 
-        case 'text':
+        case 'text': {
           const textError = document.createElement('span');
           textError.className = 'template-error-text';
           textError.style.color = '#dc2626';
@@ -4467,8 +4450,9 @@ class LayoutRenderer {
           textError.style.borderRadius = '2px';
           textError.textContent = `[LayoutRenderer Text Error: ${error.message}] Content: "${structure.content || 'undefined'}"`;
           return textError;
+        }
 
-        default:
+        default: {
           const unknownError = document.createElement('span');
           unknownError.className = 'template-error-unknown';
           unknownError.style.color = '#dc2626';
@@ -4478,6 +4462,7 @@ class LayoutRenderer {
           unknownError.style.borderRadius = '2px';
           unknownError.textContent = `[LayoutRenderer ${structure?.type || 'Unknown'} Error: ${error.message}]`;
           return unknownError;
+        }
       }
 
     } catch (fallbackError) {
@@ -5308,26 +5293,6 @@ class LayoutRenderer {
     } catch (error) {
       console.error('LayoutRenderer: Error creating default widget element', error);
       return this.createErrorWidgetElement('Failed to create widget placeholder');
-    }
-  }
-
-  /**
-   * Create an error widget element
-   * @param {string} message - Error message
-   * @returns {HTMLElement} DOM element
-   */
-  createErrorWidgetElement(message) {
-    try {
-      const element = document.createElement('div');
-      element.className = 'widget-error border border-red-300 bg-red-50 rounded p-3 mb-2';
-      element.innerHTML = `<div class="text-sm text-red-700">Widget Error: ${message}</div>`;
-      return element;
-    } catch (error) {
-      console.error('LayoutRenderer: Error creating error widget element', error);
-      const fallbackElement = document.createElement('div');
-      fallbackElement.textContent = 'Widget Error';
-      fallbackElement.className = 'widget-error';
-      return fallbackElement;
     }
   }
 

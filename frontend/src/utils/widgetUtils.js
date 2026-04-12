@@ -202,7 +202,7 @@ export const cleanNestedConfig = (config, source = 'unknown') => {
     // Check for widget properties that shouldn't be in config
     if (cleanConfig && typeof cleanConfig === 'object') {
         const widgetProperties = ['id', 'name', 'type', 'widget_type', 'order', 'created_at', 'updated_at', 'slotName'];
-        const foundWidgetProps = widgetProperties.filter(prop => cleanConfig.hasOwnProperty(prop));
+        const foundWidgetProps = widgetProperties.filter(prop => Object.prototype.hasOwnProperty.call(cleanConfig, prop));
 
         if (foundWidgetProps.length > 2) { // Allow some overlap but not full widget
             console.warn(`[${source}] Config contains widget properties: ${foundWidgetProps.join(', ')}`);

@@ -435,8 +435,8 @@ const PageTreeNode = memo(({
 
         try {
             // Update via API - skicka alla ändringar
-            const updatePromises = newChildren.map(child =>
-                pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            const updatePromises = newChildren.map(async (child) =>
+                await pagesApi.update(child.id, { sortOrder: child.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})
@@ -479,8 +479,8 @@ const PageTreeNode = memo(({
         // 2. SEN: Skicka alla uppdaterade sortOrder till backend
         try {
             // Update via API - skicka alla ändringar
-            const updatePromises = newChildren.map(child =>
-                pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            const updatePromises = newChildren.map(async (child) =>
+                await pagesApi.update(child.id, { sortOrder: child.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})

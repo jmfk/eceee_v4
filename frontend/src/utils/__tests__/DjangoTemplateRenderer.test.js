@@ -180,7 +180,6 @@ describe('DjangoTemplateRenderer', () => {
         describe('escapeHtml', () => {
             it('should escape HTML characters', () => {
                 global.document.createElement = vi.fn(() => ({
-                    textContent: '',
                     innerHTML: '',
                     set textContent(value) {
                         this._textContent = value;

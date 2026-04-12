@@ -209,7 +209,9 @@ const MigrationPlanEditor = ({ plan, onBack }) => {
                                         try {
                                             const cfg = JSON.parse(val)
                                             updateStepConfig(idx, cfg)
-                                        } catch(e) {}
+                                        } catch(e) {
+                                            // Ignore invalid JSON while typing
+                                        }
                                     }}
                                     className="font-mono text-xs"
                                     rows={4}
