@@ -436,7 +436,7 @@ shell:
 
 # Run backend tests
 backend-test:
-	docker-compose -f docker-compose.dev.yml exec backend python -m pytest
+	docker-compose -f docker-compose.dev.yml exec -e DJANGO_TESTING=1 -e DJANGO_SETTINGS_MODULE=config.settings_test backend python -m pytest
 
 # Run frontend tests
 frontend-test:

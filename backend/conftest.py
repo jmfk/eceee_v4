@@ -1,7 +1,23 @@
 import pytest
+import os
 from rest_framework.test import APIClient
 from django.contrib.auth import get_user_model
 from content.models import Namespace
+
+def pytest_configure():
+    """Override settings for tests."""
+    from django.conf import settings
+    
+    # Use SQLite for tests to avoid Postgres collation issues in Docker
+    settings.DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.path.join(settings.BASE_DIR, "db.sqlite3"),
+    }
+    
+    # Speed up tests with faster password hashing
+    settings.PASSWORD_HASHERS = [
+        "django.contrib.auth.hashers.MD5PasswordHasher",
+    ]
 
 User = get_user_model()
 

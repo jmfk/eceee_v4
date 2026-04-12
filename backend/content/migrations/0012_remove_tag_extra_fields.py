@@ -5,6 +5,9 @@ from django.db import migrations
 
 def remove_tag_fields(apps, schema_editor):
     """Remove extra fields from tag table using raw SQL"""
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+
     with schema_editor.connection.cursor() as cursor:
         # Check if columns exist before trying to drop them
         cursor.execute(
@@ -24,6 +27,9 @@ def remove_tag_fields(apps, schema_editor):
 
 def add_tag_fields(apps, schema_editor):
     """Reverse migration - add the fields back"""
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+
     with schema_editor.connection.cursor() as cursor:
         cursor.execute(
             """

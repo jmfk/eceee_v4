@@ -274,6 +274,17 @@ DATABASES = {
     }
 }
 
+# Use SQLite for tests to avoid Postgres collation issues in Docker
+if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DJANGO_TESTING") or "test" in sys.argv or "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv):
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+    # Speed up tests with faster password hashing
+    PASSWORD_HASHERS = [
+        "django.contrib.auth.hashers.MD5PasswordHasher",
+    ]
+
 # Cache Configuration (Redis)
 CACHES = {
     "default": {
