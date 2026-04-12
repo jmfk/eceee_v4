@@ -193,6 +193,11 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             pending_file.status = "approved"
             pending_file.save()
 
+            # Ensure existing file has the correct tenant if it's missing
+            if not existing_file.tenant_id:
+                existing_file.tenant = pending_file.namespace.tenant
+                existing_file.save(update_fields=["tenant"])
+
             media_serializer = MediaFileDetailSerializer(existing_file)
             return Response(
                 {
