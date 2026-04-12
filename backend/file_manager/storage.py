@@ -21,6 +21,7 @@ from django.core.files.storage import Storage
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.deconstruct import deconstructible
 from botocore.exceptions import ClientError
+from botocore.config import Config
 from PIL import Image, ExifTags
 import io
 
@@ -43,6 +44,8 @@ class S3MediaStorage(Storage):
         self.querystring_auth = getattr(settings, "AWS_QUERYSTRING_AUTH", True)
         self.file_overwrite = getattr(settings, "AWS_S3_FILE_OVERWRITE", False)
         self.object_parameters = getattr(settings, "AWS_S3_OBJECT_PARAMETERS", {})
+        self.signature_version = getattr(settings, "AWS_S3_SIGNATURE_VERSION", "s3v4")
+        self.addressing_style = getattr(settings, "AWS_S3_ADDRESSING_STYLE", "path")
         self.max_file_size = getattr(
             settings, "MAX_FILE_SIZE", 100 * 1024 * 1024
         )  # 100MB
@@ -61,13 +64,19 @@ class S3MediaStorage(Storage):
             },
         )
 
-        # Initialize S3 client
+        # Initialize S3 client with proper config for Linode/AWS compatibility
+        s3_config = Config(
+            signature_version=self.signature_version,
+            s3={"addressing_style": self.addressing_style},
+        )
+
         self.client = boto3.client(
             "s3",
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
             region_name=self.region_name,
             endpoint_url=self.endpoint_url,
+            config=s3_config,
         )
 
     def listdir(self, path):
@@ -259,13 +268,20 @@ class S3MediaStorage(Storage):
         thumbnail_path = f"{base_path}_thumb.jpg"
 
         try:
+            # Prepare extra args
+            extra_args = self.object_parameters.copy()
+            extra_args["ContentType"] = "image/jpeg"
+
+            # Only set ACL if explicitly configured
+            if self.default_acl and self.default_acl != "None":
+                extra_args["ACL"] = self.default_acl
+
             # Upload thumbnail to S3
             self.client.put_object(
                 Bucket=self.bucket_name,
                 Key=thumbnail_path,
                 Body=thumbnail_bytes,
-                ContentType="image/jpeg",
-                **self.object_parameters,
+                **extra_args,
             )
 
             logger.info(f"Uploaded thumbnail to S3: {thumbnail_path}")
@@ -328,7 +344,8 @@ class S3MediaStorage(Storage):
         if content_type:
             extra_args["ContentType"] = content_type
 
-        if self.default_acl:
+        # Only set ACL if explicitly configured (Linode often fails with ACLs)
+        if self.default_acl and self.default_acl != "None":
             extra_args["ACL"] = self.default_acl
 
         try:
