@@ -42,7 +42,8 @@ def csrf_token_view(request):
     """
     Endpoint to provide CSRF token for React frontend
     """
-    return JsonResponse({"csrfToken": request.META.get("CSRF_COOKIE")})
+    from django.middleware.csrf import get_token
+    return JsonResponse({"csrfToken": get_token(request)})
 
 
 urlpatterns = [
