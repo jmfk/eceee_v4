@@ -7,8 +7,8 @@ from unittest.mock import Mock, patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 
-from ...services import FileValidationService
-from ...security import FileUploadValidator
+from file_manager.services import FileValidationService
+from file_manager.security import FileUploadValidator
 
 User = get_user_model()
 

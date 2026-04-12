@@ -436,7 +436,14 @@ shell:
 
 # Run backend tests
 backend-test:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py test
+	docker-compose -f docker-compose.dev.yml exec backend python -m pytest
+
+# Run frontend tests
+frontend-test:
+	docker-compose -f docker-compose.dev.yml exec frontend npm run test:run
+
+# Run all tests
+test: backend-test frontend-test
 
 # Test Playwright service endpoints
 playwright-test:

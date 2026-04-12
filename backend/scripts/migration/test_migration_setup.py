@@ -54,6 +54,7 @@ def test_namespace():
         default_ns = Namespace.get_default()
 
         if default_ns:
+            logger.info(f"✅ Found default namespace: {default_ns.name}")
         else:
             logger.warning("⚠️  No default namespace found")
 
@@ -80,15 +81,19 @@ def test_tag_creation():
             # Test tag creation
             tag1, created1 = migrator.get_or_create_tag("Test Tag 1", namespace)
             if tag1 and created1:
+                logger.info(f"✅ Created tag: {tag1.name}")
             elif tag1:
+                logger.info(f"✅ Found existing tag: {tag1.name}")
 
             # Test duplicate detection
             tag2, created2 = migrator.get_or_create_tag("Test Tag 1", namespace)
             if tag2 and not created2:
+                logger.info("✅ Duplicate detection working")
 
             # Test normalization
             tag3, created3 = migrator.get_or_create_tag("  test tag 1  ", namespace)
             if tag3 and not created3:
+                logger.info("✅ Tag normalization working")
 
             # Rollback the transaction
             raise Exception("Intentional rollback for test")
@@ -111,6 +116,8 @@ def test_migration_user():
         migrator = BaseMigrator()
         user = migrator.get_migration_user()
 
+        if user:
+            logger.info(f"✅ Found migration user: {user.username}")
 
         return True
     except Exception as e:
@@ -161,15 +168,20 @@ def run_all_tests():
             results.append((test_name, False))
 
     # Summary
+    logger.info("\n" + "=" * 50)
+    logger.info("MIGRATION SETUP TEST SUMMARY")
+    logger.info("=" * 50)
 
     passed = sum(1 for _, result in results if result)
     total = len(results)
 
     for test_name, result in results:
         status = "✅ PASS" if result else "❌ FAIL"
+        logger.info(f"{test_name:20}: {status}")
 
-
+    logger.info("-" * 50)
     if passed == total:
+        logger.info(f"🎉 ALL TESTS PASSED ({passed}/{total})")
     else:
         logger.warning(f"\n⚠️  {total - passed} test(s) failed. Review errors above.")
 

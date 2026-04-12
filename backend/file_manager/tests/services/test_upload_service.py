@@ -8,8 +8,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from ...services import FileUploadService
-from ...models import PendingMediaFile
+from file_manager.services import FileUploadService
+from file_manager.models import PendingMediaFile
 from content.models import Namespace
 
 User = get_user_model()
@@ -63,11 +63,11 @@ class TestFileUploadService:
     """Test cases for FileUploadService."""
 
     def test_successful_upload(
-        self, user, namespace, upload_file, mock_storage, mock_ai_service
+        self, user, test_namespace, upload_file, mock_storage, mock_ai_service
     ):
         """Test successful file upload with all components working."""
         service = FileUploadService()
-        result = service.upload(upload_file, "test_folder", namespace, user)
+        result = service.upload(upload_file, "test_folder", test_namespace, user)
 
         assert len(result.files) == 1
         assert result.errors == []
@@ -83,26 +83,26 @@ class TestFileUploadService:
         assert pending_file.uploaded_by == user
 
     def test_upload_with_storage_error(
-        self, user, namespace, upload_file, mock_storage
+        self, user, test_namespace, upload_file, mock_storage
     ):
         """Test handling of storage service errors."""
         mock_storage.upload_file.side_effect = Exception("Storage error")
 
         service = FileUploadService()
-        result = service.upload(upload_file, "test_folder", namespace, user)
+        result = service.upload(upload_file, "test_folder", test_namespace, user)
 
         assert len(result.files) == 0
         assert len(result.errors) == 1
         assert "Storage error" in result.errors[0]["error"]
 
     def test_upload_with_ai_error(
-        self, user, namespace, upload_file, mock_storage, mock_ai_service
+        self, user, test_namespace, upload_file, mock_storage, mock_ai_service
     ):
         """Test handling of AI service errors."""
         mock_ai_service.analyze_media_file.side_effect = Exception("AI error")
 
         service = FileUploadService()
-        result = service.upload(upload_file, "test_folder", namespace, user)
+        result = service.upload(upload_file, "test_folder", test_namespace, user)
 
         # Upload should still succeed even if AI analysis fails
         assert len(result.files) == 1
@@ -125,12 +125,12 @@ class TestFileUploadService:
         assert service._determine_file_type("text/plain") == "other"
 
     def test_update_existing_pending_file(
-        self, user, namespace, upload_file, mock_storage, mock_ai_service
+        self, user, test_namespace, upload_file, mock_storage, mock_ai_service
     ):
         """Test updating an existing pending file."""
         # Create initial pending file
         service = FileUploadService()
-        first_result = service.upload(upload_file, "test_folder", namespace, user)
+        first_result = service.upload(upload_file, "test_folder", test_namespace, user)
 
         # Modify mock responses for second upload
         mock_storage.upload_file.return_value["file_size"] = 200
@@ -140,7 +140,7 @@ class TestFileUploadService:
         ]
 
         # Upload same file again (same hash)
-        second_result = service.upload(upload_file, "updated_folder", namespace, user)
+        second_result = service.upload(upload_file, "updated_folder", test_namespace, user)
 
         # Verify only one pending file exists but was updated
         assert PendingMediaFile.objects.count() == 1
