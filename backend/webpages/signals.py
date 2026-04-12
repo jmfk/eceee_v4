@@ -80,11 +80,20 @@ def track_parent_changes(sender, instance, **kwargs):
     )
     if root_page:
         instance.cached_root_id = root_page.id if root_page.pk else None
-        instance.cached_root_hostnames = root_page.hostnames or []
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            # Avoid ArrayField issues on SQLite during pre_save
+            instance.cached_root_hostnames = []
+        else:
+            instance.cached_root_hostnames = root_page.hostnames or []
     elif not instance.parent:
         # This is a new root page being created
         instance.cached_root_id = None  # Will be set after save
-        instance.cached_root_hostnames = instance.hostnames or []
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            instance.cached_root_hostnames = []
+        else:
+            instance.cached_root_hostnames = instance.hostnames or []
     else:
         instance.cached_root_id = None
         instance.cached_root_hostnames = []

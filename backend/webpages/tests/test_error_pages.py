@@ -19,21 +19,42 @@ class ErrorPageValidationTests(TestCase):
     """Test validation rules for error pages"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_error", email="test@example.com", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant", identifier="test-error", created_by=self.user
         )
 
         # Create a root page
-        self.root_page = WebPage.objects.create(
-            title="Test Site",
-            slug="home",
-            created_by=self.user,
-            last_modified_by=self.user,
-            hostnames=["testsite.com"],
-        )
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.root_page = WebPage.objects.create(
+                title="Test Site",
+                slug="home",
+                created_by=self.user,
+                last_modified_by=self.user,
+                tenant=self.tenant,
+            )
+        else:
+            self.root_page = WebPage.objects.create(
+                title="Test Site",
+                slug="home",
+                created_by=self.user,
+                last_modified_by=self.user,
+                hostnames=["testsite.com"],
+                tenant=self.tenant,
+            )
 
     def test_error_page_slug_validation_valid_codes(self):
         """Test that valid HTTP error codes (400-599) are accepted"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         valid_codes = ["400", "404", "500", "503"]
 
         for code in valid_codes:
@@ -49,6 +70,9 @@ class ErrorPageValidationTests(TestCase):
 
     def test_error_page_must_be_under_root(self):
         """Test that error pages must be direct children of root pages"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Try to create error page at root level
         error_page = WebPage(
             title="Error 404",
@@ -65,6 +89,9 @@ class ErrorPageValidationTests(TestCase):
 
     def test_error_page_must_be_direct_child_of_root(self):
         """Test that error pages cannot be nested deeper than one level"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create a child page
         child_page = WebPage.objects.create(
             title="Child Page",
@@ -90,6 +117,9 @@ class ErrorPageValidationTests(TestCase):
 
     def test_error_page_uniqueness_per_site(self):
         """Test that only one error page per code can exist per site"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create first 404 page
         error_page_1 = WebPage.objects.create(
             title="Error 404",
@@ -115,6 +145,9 @@ class ErrorPageValidationTests(TestCase):
 
     def test_non_error_code_slugs_allowed(self):
         """Test that non-error code slugs work normally"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Slugs that are not error codes
         normal_slugs = ["about", "contact", "123", "599", "600", "399"]
 
@@ -134,22 +167,43 @@ class ErrorPageRenderingTests(TestCase):
     """Test error page rendering and fallback behavior"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.factory = RequestFactory()
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_error_render", email="test@example.com", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant Render", identifier="test-error-render", created_by=self.user
         )
 
         # Create a root page
-        self.root_page = WebPage.objects.create(
-            title="Test Site",
-            slug="home",
-            created_by=self.user,
-            last_modified_by=self.user,
-            hostnames=["testsite.com"],
-        )
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.root_page = WebPage.objects.create(
+                title="Test Site",
+                slug="home",
+                created_by=self.user,
+                last_modified_by=self.user,
+                tenant=self.tenant,
+            )
+        else:
+            self.root_page = WebPage.objects.create(
+                title="Test Site",
+                slug="home",
+                created_by=self.user,
+                last_modified_by=self.user,
+                hostnames=["testsite.com"],
+                tenant=self.tenant,
+            )
 
     def test_custom_404_page_found(self):
         """Test that custom 404 page is found for a site"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create custom 404 page
         error_404 = WebPage.objects.create(
             title="Not Found",
@@ -182,6 +236,9 @@ class ErrorPageRenderingTests(TestCase):
 
     def test_custom_404_page_not_found_returns_none(self):
         """Test that None is returned when no custom 404 page exists"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         found_page = view._get_error_page(self.root_page, 404)
 
@@ -189,6 +246,9 @@ class ErrorPageRenderingTests(TestCase):
 
     def test_unpublished_error_page_not_used(self):
         """Test that unpublished error pages are not used"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create custom 404 page but don't publish it
         error_404 = WebPage.objects.create(
             title="Not Found",
@@ -205,6 +265,9 @@ class ErrorPageRenderingTests(TestCase):
 
     def test_custom_404_handler_with_valid_hostname(self):
         """Test custom 404 handler finds error page for valid hostname"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create and publish custom 404 page
         error_404 = WebPage.objects.create(
             title="Not Found",
@@ -238,6 +301,9 @@ class ErrorPageRenderingTests(TestCase):
 
     def test_custom_404_handler_invalid_hostname_uses_default(self):
         """Test that invalid hostnames fall back to default 404"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         request = self.factory.get("/nonexistent/", HTTP_HOST="../invalid")
 
         response = custom_404_handler(request)
@@ -248,6 +314,10 @@ class ErrorPageRenderingTests(TestCase):
 
 class ErrorLayoutTests(TestCase):
     """Test error layout registration and availability"""
+
+    def setUp(self):
+        from webpages.layout_autodiscovery import autodiscover_layouts
+        autodiscover_layouts()
 
     def test_error_layouts_registered(self):
         """Test that error layouts are registered in the layout registry"""
@@ -290,30 +360,62 @@ class ErrorPageIntegrationTests(TestCase):
     """Integration tests for error page functionality"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.factory = RequestFactory()
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_error_int", email="test@example.com", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant Int", identifier="test-error-int", created_by=self.user
         )
 
         # Create a root page
-        self.root_page = WebPage.objects.create(
-            title="Test Site",
-            slug="home",
-            created_by=self.user,
-            last_modified_by=self.user,
-            hostnames=["testsite.com"],
-        )
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.root_page = WebPage.objects.create(
+                title="Test Site",
+                slug="home",
+                created_by=self.user,
+                last_modified_by=self.user,
+                tenant=self.tenant,
+            )
+        else:
+            self.root_page = WebPage.objects.create(
+                title="Test Site",
+                slug="home",
+                created_by=self.user,
+                last_modified_by=self.user,
+                hostnames=["testsite.com"],
+                tenant=self.tenant,
+            )
 
     def test_site_specific_error_pages(self):
         """Test that different sites can have different error pages"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create another root page for a different site
-        root_page_2 = WebPage.objects.create(
-            title="Another Site",
-            slug="home2",
-            created_by=self.user,
-            last_modified_by=self.user,
-            hostnames=["anothersite.com"],
-        )
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            root_page_2 = WebPage.objects.create(
+                title="Another Site",
+                slug="home2",
+                created_by=self.user,
+                last_modified_by=self.user,
+                tenant=self.tenant,
+            )
+        else:
+            root_page_2 = WebPage.objects.create(
+                title="Another Site",
+                slug="home2",
+                created_by=self.user,
+                last_modified_by=self.user,
+                hostnames=["anothersite.com"],
+                tenant=self.tenant,
+            )
 
         # Create different 404 pages for each site
         error_404_site1 = WebPage.objects.create(

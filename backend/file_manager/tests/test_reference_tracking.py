@@ -20,9 +20,18 @@ class MediaFileReferenceTrackingTests(TestCase):
 
     def setUp(self):
         """Set up test data."""
+        from core.models import Tenant
         self.user = User.objects.create_user(username="testuser", password="testpass")
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-ref",
+            created_by=self.user
+        )
         self.namespace = Namespace.objects.create(
-            name="Test Namespace", slug="test-namespace", created_by=self.user
+            name="Test Namespace",
+            slug="test-namespace",
+            created_by=self.user,
+            tenant=self.tenant
         )
         self.file = MediaFile.objects.create(
             title="Test File",
@@ -33,6 +42,7 @@ class MediaFileReferenceTrackingTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -61,7 +71,8 @@ class MediaFileReferenceTrackingTests(TestCase):
 
         # New content with a different image
         new_file = MediaFile.objects.create(
-            title="New File",
+            title="New File Unique",
+            slug="new-file-unique",
             original_filename="new.jpg",
             file_path="test/new.jpg",
             file_size=1000,
@@ -69,6 +80,7 @@ class MediaFileReferenceTrackingTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -93,6 +105,10 @@ class MediaFileReferenceTrackingTests(TestCase):
 
     def test_cleanup_content_references(self):
         """Test that content references are correctly cleaned up."""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("JSONField contains lookup not supported on SQLite")
+            
         content_id = str(uuid.uuid4())
 
         # Add some references

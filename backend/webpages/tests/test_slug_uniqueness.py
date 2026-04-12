@@ -10,12 +10,21 @@ class SlugUniquenessTests(TestCase):
 
     def setUp(self):
         """Create test user and root page"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_slug", password="testpass123"
+        )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
         )
         self.root_page = WebPage.objects.create(
             title="Root Page",
             slug="root",
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -27,6 +36,7 @@ class SlugUniquenessTests(TestCase):
             title="About Us",
             slug="about",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -37,6 +47,7 @@ class SlugUniquenessTests(TestCase):
             title="About Company",
             slug="about",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -55,6 +66,7 @@ class SlugUniquenessTests(TestCase):
             title="Contact 1",
             slug="contact",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -64,6 +76,7 @@ class SlugUniquenessTests(TestCase):
             title="Contact 2",
             slug="contact",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -76,6 +89,7 @@ class SlugUniquenessTests(TestCase):
             title="Contact 3",
             slug="contact",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -88,6 +102,7 @@ class SlugUniquenessTests(TestCase):
             title="Contact 4",
             slug="contact",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -101,6 +116,7 @@ class SlugUniquenessTests(TestCase):
         root2 = WebPage.objects.create(
             title="Root 2",
             slug="root2",
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -110,6 +126,7 @@ class SlugUniquenessTests(TestCase):
             title="Services",
             slug="services",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -119,6 +136,7 @@ class SlugUniquenessTests(TestCase):
             title="Services",
             slug="services",
             parent=root2,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -134,6 +152,7 @@ class SlugUniquenessTests(TestCase):
             title="Products",
             slug="products",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -152,6 +171,7 @@ class SlugUniquenessTests(TestCase):
             title="Team",
             slug="team",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -160,6 +180,7 @@ class SlugUniquenessTests(TestCase):
             title="Staff",
             slug="staff",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -178,6 +199,7 @@ class SlugUniquenessTests(TestCase):
             title="No Slug",
             slug=None,
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -194,6 +216,7 @@ class SlugUniquenessTests(TestCase):
             title="Error 404",
             slug="404",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -203,6 +226,7 @@ class SlugUniquenessTests(TestCase):
             title="Another 404",
             slug="404",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -220,6 +244,7 @@ class SlugUniquenessTests(TestCase):
             title="Root 1",
             slug="index",
             hostnames=["site1.com"],
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -229,6 +254,7 @@ class SlugUniquenessTests(TestCase):
             title="Root 2",
             slug="index",
             hostnames=["site2.com"],
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -246,6 +272,7 @@ class SlugUniquenessTests(TestCase):
             title="Careers",
             slug="careers",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -257,6 +284,7 @@ class SlugUniquenessTests(TestCase):
             title="New Careers",
             slug="careers",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -272,12 +300,21 @@ class SlugUniquenessHelperMethodsTests(TestCase):
 
     def setUp(self):
         """Create test user and pages"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_helper", password="testpass123"
+        )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
         )
         self.root_page = WebPage.objects.create(
             title="Root",
             slug="root",
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -288,6 +325,7 @@ class SlugUniquenessHelperMethodsTests(TestCase):
             title="FAQ",
             slug="faq",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -297,6 +335,7 @@ class SlugUniquenessHelperMethodsTests(TestCase):
             title="New Page",
             slug="faq",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -312,6 +351,7 @@ class SlugUniquenessHelperMethodsTests(TestCase):
             title="News",
             slug="news",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -320,6 +360,7 @@ class SlugUniquenessHelperMethodsTests(TestCase):
             title="News 2",
             slug="news",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -336,6 +377,7 @@ class SlugUniquenessHelperMethodsTests(TestCase):
             title="Test",
             slug="test",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )

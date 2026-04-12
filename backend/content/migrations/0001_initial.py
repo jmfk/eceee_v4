@@ -105,8 +105,8 @@ class Migration(migrations.Migration):
                     "gallery_images",
                     models.JSONField(
                         blank=True,
-                        default=list,
                         help_text="List of image URLs for gallery",
+                        null=True,
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
@@ -217,8 +217,8 @@ class Migration(migrations.Migration):
                     "gallery_images",
                     models.JSONField(
                         blank=True,
-                        default=list,
                         help_text="List of image URLs for gallery",
+                        null=True,
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
@@ -245,8 +245,8 @@ class Migration(migrations.Migration):
                     "expertise_areas",
                     models.JSONField(
                         blank=True,
-                        default=list,
                         help_text="List of expertise areas or specializations",
+                        null=True,
                     ),
                 ),
                 ("qualifications", models.TextField(blank=True)),
@@ -352,8 +352,8 @@ class Migration(migrations.Migration):
                     "gallery_images",
                     models.JSONField(
                         blank=True,
-                        default=list,
                         help_text="List of image URLs for gallery",
+                        null=True,
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
@@ -399,8 +399,8 @@ class Migration(migrations.Migration):
                     "attachments",
                     models.JSONField(
                         blank=True,
-                        default=list,
                         help_text="List of additional file URLs with metadata",
+                        null=True,
                     ),
                 ),
                 (
@@ -509,8 +509,8 @@ class Migration(migrations.Migration):
                     "gallery_images",
                     models.JSONField(
                         blank=True,
-                        default=list,
                         help_text="List of image URLs for gallery",
+                        null=True,
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),

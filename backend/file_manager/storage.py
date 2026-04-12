@@ -485,7 +485,10 @@ class S3MediaStorage(Storage):
         Returns:
             Dictionary of metadata
         """
-        metadata = {}
+        metadata = {
+            "file_size": len(file_content),
+            "content_type": content_type,
+        }
 
         if content_type.startswith("image/"):
             try:

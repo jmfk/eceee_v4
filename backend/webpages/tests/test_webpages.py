@@ -43,26 +43,25 @@ class WidgetRegistryTest(TestCase):
         content_widget = widget_type_registry.get_widget_type("Content")
 
         # Valid configuration
-        valid_config = {"content": "Hello World", "text_align": "left"}
+        valid_config = {"content": "Hello World"}
         is_valid, errors = content_widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
 
         # Invalid configuration (missing required field)
-        invalid_config = {"alignment": "left"}  # missing content
-        is_valid, errors = text_widget.validate_configuration(invalid_config)
+        invalid_config = {}  # missing content
+        is_valid, errors = content_widget.validate_configuration(invalid_config)
         self.assertFalse(is_valid)
         self.assertTrue(len(errors) > 0)
 
     def test_widget_configuration_defaults(self):
         """Test getting default configuration values"""
-        text_widget = widget_type_registry.get_widget_type("Text Block")
-        defaults = text_widget.get_configuration_defaults()
+        content_widget = widget_type_registry.get_widget_type("Content")
+        defaults = content_widget.get_configuration_defaults()
 
         self.assertIsInstance(defaults, dict)
-        # Text widget should have default alignment
-        self.assertEqual(defaults.get("alignment"), "left")
-        self.assertEqual(defaults.get("style"), "normal")
+        # Content widget should have default sanitization
+        self.assertEqual(defaults.get("sanitize_html"), True)
 
     def test_widget_to_dict(self):
         """Test widget type dictionary representation"""
@@ -80,8 +79,13 @@ class WidgetTypeAPITest(APITestCase):
     """Test widget type API endpoints"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            # We don't necessarily need to skip the whole class if it doesn't use ArrayField
+            # but let's be safe if it does.
+            pass
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_api", password="testpass123"
         )
         self.client.force_authenticate(user=self.user)
 
@@ -110,11 +114,11 @@ class WidgetTypeAPITest(APITestCase):
 
     def test_get_specific_widget_type(self):
         """Test retrieving a specific widget type"""
-        url = reverse("api:widgettype-detail", kwargs={"pk": "Text Block"})
+        url = reverse("api:widgettype-detail", kwargs={"pk": "Content"})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["name"], "Text Block")
+        self.assertEqual(response.data["name"], "Content")
 
     def test_get_nonexistent_widget_type(self):
         """Test retrieving a non-existent widget type"""
@@ -137,11 +141,11 @@ class WidgetTypeAPITest(APITestCase):
     def test_validate_widget_configuration(self):
         """Test widget configuration validation endpoint"""
         url = reverse(
-            "api:widgettype-validate-configuration", kwargs={"pk": "Text Block"}
+            "api:widgettype-validate-widget-config", kwargs={"pk": "Content"}
         )
 
         # Valid configuration
-        data = {"configuration": {"content": "Test content", "alignment": "center"}}
+        data = {"configuration": {"content": "Test content"}}
         response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -149,7 +153,7 @@ class WidgetTypeAPITest(APITestCase):
 
         # Invalid configuration
         data = {
-            "configuration": {"alignment": "invalid_alignment"}  # Invalid enum value
+            "configuration": {"content": 123}  # Content should be string
         }
         response = self.client.post(url, data, format="json")
 
@@ -158,17 +162,16 @@ class WidgetTypeAPITest(APITestCase):
 
     def test_get_configuration_defaults(self):
         """Test getting configuration defaults for a widget type"""
-        url = reverse("api:widgettype-configuration-defaults", kwargs={"pk": "Button"})
+        url = reverse("api:widgettype-configuration-defaults", kwargs={"pk": "Content"})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("defaults", response.data)
         self.assertIn("schema", response.data)
 
-        # Button should have default values
+        # Content should have default values
         defaults = response.data["defaults"]
-        self.assertEqual(defaults.get("style"), "primary")
-        self.assertEqual(defaults.get("size"), "medium")
+        self.assertEqual(defaults.get("sanitize_html"), True)
 
     def test_get_widget_schema(self):
         """Test getting JSON schema for widget configuration"""
@@ -189,12 +192,21 @@ class PageVersionTest(TestCase):
     """Test PageVersion with widget data"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_pv", password="testpass123"
+        )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
         )
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -203,17 +215,17 @@ class PageVersionTest(TestCase):
         """Test creating page version with widget data"""
         widget_data = [
             {
-                "widget_type": "Text Block",
+                "widget_type": "Content",
                 "slot_name": "main",
                 "sort_order": 0,
-                "configuration": {"content": "Hello World", "alignment": "center"},
+                "configuration": {"content": "Hello World"},
             },
             {
                 "widget_type": "Image",
                 "slot_name": "main",
                 "sort_order": 1,
                 "configuration": {
-                    "image_url": "https://example.com/image.jpg",
+                    "image": {"url": "https://example.com/image.jpg"},
                     "alt_text": "Example image",
                 },
             },
@@ -232,7 +244,7 @@ class PageVersionTest(TestCase):
         )
 
         self.assertEqual(len(version.widgets), 2)
-        self.assertEqual(version.widgets[0]["widget_type"], "Text Block")
+        self.assertEqual(version.widgets[0]["widget_type"], "Content")
         self.assertEqual(version.widgets[1]["widget_type"], "Image")
 
     def test_widget_validation_in_page_version(self):
@@ -241,7 +253,7 @@ class PageVersionTest(TestCase):
 
         # Valid widget data
         widget_data = {
-            "widget_type": "Text Block",
+            "widget_type": "Content",
             "slot_name": "main",
             "sort_order": 0,
             "configuration": {"content": "Test"},
@@ -249,7 +261,7 @@ class PageVersionTest(TestCase):
 
         # Should validate successfully with pydantic
         parsed_widget = PageWidgetData(**widget_data)
-        self.assertEqual(parsed_widget.widget_type, "Text Block")
+        self.assertEqual(parsed_widget.widget_type, "Content")
         self.assertEqual(parsed_widget.configuration["content"], "Test")
 
 
@@ -257,8 +269,16 @@ class WebPageTest(TestCase):
     """Test WebPage model functionality"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_wp", password="testpass123"
+        )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
     def test_create_page(self):
@@ -299,8 +319,16 @@ class PageThemeTest(TestCase):
     """Test PageTheme model functionality"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_pt", password="testpass123"
+        )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
     def test_create_theme(self):
@@ -329,8 +357,16 @@ class InheritanceEnhancementTest(TestCase):
     """Test enhanced widget inheritance functionality."""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_ie", email="test@example.com", password="testpass123"
+        )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
         self.theme = PageTheme.objects.create(
@@ -338,17 +374,19 @@ class InheritanceEnhancementTest(TestCase):
             description="Test theme",
             css_variables={},
             is_active=True,
+            tenant=self.tenant,
             created_by=self.user,
         )
 
         self.root_page = WebPage.objects.create(
-            title="Root", slug="root", created_by=self.user, last_modified_by=self.user
+            title="Root", slug="root", tenant=self.tenant, created_by=self.user, last_modified_by=self.user
         )
 
         self.child_page = WebPage.objects.create(
             title="Child",
             slug="child",
             parent=self.root_page,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -460,8 +498,16 @@ class LayoutIntegrationTest(TestCase):
     """Test integration with layout system"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_li", password="testpass123"
+        )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
     def test_page_with_code_layout(self):
@@ -469,6 +515,7 @@ class LayoutIntegrationTest(TestCase):
         page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )

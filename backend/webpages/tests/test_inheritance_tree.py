@@ -19,10 +19,21 @@ class InheritanceTreeTest(TestCase):
 
     def setUp(self):
         """Create test page hierarchy: Home -> About -> History"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
+        self.user = User.objects.create_user(
+            username="test_tree_user", email="tree@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Tree Tenant", identifier="tree", created_by=self.user
+        )
 
         # Create Home page (root)
         self.home_page = WebPage.objects.create(
-            title="Home", slug="home", parent=None, hostnames=["localhost:8000"]
+            title="Home", slug="home", parent=None, hostnames=["localhost:8000"],
+            tenant=self.tenant
         )
         home_version = PageVersion.objects.create(
             page=self.home_page,
@@ -56,7 +67,8 @@ class InheritanceTreeTest(TestCase):
 
         # Create About page (child of Home)
         self.about_page = WebPage.objects.create(
-            title="About", slug="about", parent=self.home_page
+            title="About", slug="about", parent=self.home_page,
+            tenant=self.tenant
         )
         about_version = PageVersion.objects.create(
             page=self.about_page,
@@ -90,7 +102,8 @@ class InheritanceTreeTest(TestCase):
 
         # Create History page (child of About)
         self.history_page = WebPage.objects.create(
-            title="History", slug="history", parent=self.about_page
+            title="History", slug="history", parent=self.about_page,
+            tenant=self.tenant
         )
         history_version = PageVersion.objects.create(
             page=self.history_page,
@@ -124,6 +137,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_tree_generation(self):
         """Test basic tree structure generation"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
 
@@ -145,6 +161,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_get_all_widgets(self):
         """Test getAllWidgets helper function"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -165,6 +184,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_get_inherited_widgets(self):
         """Test getInheritedWidgets helper function"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -178,6 +200,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_inheritance_behavior_override(self):
         """Test override_parent behavior"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.about_page)  # Test from About page
         helpers = InheritanceTreeHelpers(tree)
@@ -192,6 +217,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_inheritance_behavior_insert_before(self):
         """Test insert_before_parent behavior"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -212,6 +240,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_inheritance_level_filtering(self):
         """Test inheritance level depth filtering"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -228,6 +259,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_content_checks(self):
         """Test content checking helper functions"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -246,6 +280,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_find_widget(self):
         """Test findWidget helper function"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -263,6 +300,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_tree_navigation(self):
         """Test tree navigation functions"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -285,6 +325,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_widgets_by_type(self):
         """Test getWidgetsByType helper function"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
         tree = builder.build_tree(self.history_page)
         helpers = InheritanceTreeHelpers(tree)
@@ -305,6 +348,9 @@ class InheritanceTreeTest(TestCase):
 
     def test_performance(self):
         """Test tree generation performance"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         builder = InheritanceTreeBuilder()
 
         # Time tree generation

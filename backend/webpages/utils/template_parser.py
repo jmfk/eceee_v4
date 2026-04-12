@@ -174,7 +174,66 @@ class TemplateParser:
         try:
             template = get_template(template_name)
             # Get the template source from the template object
-            template_source = template.template.source
+            # For Django templates, it's usually in template.template.source
+            # but some backends might be different.
+            template_source = ""
+            if hasattr(template, 'template') and hasattr(template.template, 'source'):
+                template_source = template.template.source
+            elif hasattr(template, 'origin') and hasattr(template.origin, 'name'):
+                # Fallback for different template backends
+                try:
+                    with open(template.origin.name, 'r') as f:
+                        template_source = f.read()
+                except Exception:
+                    template_source = ""
+            
+            # If we still don't have source, try to get it from the loader
+            if not template_source and hasattr(template, 'origin'):
+                try:
+                    template_source = template.origin.loader.get_contents(template.origin)
+                except Exception:
+                    pass
+            
+            # Last ditch effort: try to find the file manually
+            if not template_source:
+                import os
+                from django.conf import settings
+                # Try relative to backend/templates
+                base_dir = os.path.join(settings.BASE_DIR, 'templates')
+                full_path = os.path.join(base_dir, template_name)
+                if os.path.exists(full_path):
+                    with open(full_path, 'r') as f:
+                        template_source = f.read()
+                
+                if not template_source:
+                    # Try relative to each app's templates dir
+                    from django.apps import apps
+                    for app_config in apps.get_app_configs():
+                        app_template_dir = os.path.join(app_config.path, 'templates')
+                        full_path = os.path.join(app_template_dir, template_name)
+                        if os.path.exists(full_path):
+                            with open(full_path, 'r') as f:
+                                template_source = f.read()
+                            break
+
+                if not template_source:
+                    # Try relative to easy_layouts/templates
+                    easy_layouts_dir = os.path.join(settings.BASE_DIR, 'easy_layouts', 'templates')
+                    full_path = os.path.join(easy_layouts_dir, template_name)
+                    if os.path.exists(full_path):
+                        with open(full_path, 'r') as f:
+                            template_source = f.read()
+
+                if not template_source:
+                    # Try relative to easy_layouts/templates (again, with extra path)
+                    easy_layouts_dir = os.path.join(settings.BASE_DIR, 'easy_layouts', 'templates', 'easy_layouts', 'layouts')
+                    full_path = os.path.join(easy_layouts_dir, os.path.basename(template_name))
+                    if os.path.exists(full_path):
+                        with open(full_path, 'r') as f:
+                            template_source = f.read()
+
+            if not template_source:
+                raise ValueError(f"Could not get source for template {template_name}")
 
             # Extract the content block (between {% block content %} and {% endblock %})
             content_match = re.search(
@@ -184,9 +243,10 @@ class TemplateParser:
             )
 
             if not content_match:
-                raise ValueError(f"No content block found in template {template_name}")
-
-            content_html = content_match.group(1).strip()
+                # Fallback: if no content block, use the whole template
+                content_html = template_source
+            else:
+                content_html = content_match.group(1).strip()
 
             # Parse the HTML content
             soup = BeautifulSoup(content_html, "html.parser")
@@ -195,7 +255,9 @@ class TemplateParser:
             root_elements = [elem for elem in soup.children if elem.name]
 
             if not root_elements:
-                raise ValueError("No root HTML element found in template content")
+                # Fallback: if no root element, wrap everything in a div
+                soup = BeautifulSoup(f"<div>{content_html}</div>", "html.parser")
+                root_elements = [soup.div]
 
             root_element = root_elements[0]
 
@@ -214,9 +276,7 @@ class TemplateParser:
             from django.conf import settings
 
             if settings.DEBUG:
-                raise Exception(
-                    f"Template parsing failed for {template_name}: {str(e)}"
-                )
+                raise e
             else:
                 raise Exception(f"Template parsing failed")  # Generic error message
 
@@ -229,6 +289,19 @@ class TemplateParser:
 
             content = str(element).strip()
             if content:
+                # Check if it's a render_slot tag
+                slot_match = re.search(r'{%\s*render_slot\s+["\']([^"\'\s]+)["\']\s*%}', content)
+                if slot_match:
+                    slot_name = slot_match.group(1)
+                    return {
+                        "type": "slot",
+                        "slot": {
+                            "name": escape(slot_name),
+                            "title": escape(slot_name.replace("_", " ").title()),
+                            "description": "",
+                        }
+                    }
+                
                 return {
                     "type": "text",
                     "content": escape(content),  # Escape HTML content
@@ -1086,7 +1159,7 @@ class LayoutSerializer:
             # Add layout metadata
             result = {
                 "layout": {
-                    "id": layout.id,
+                    "id": getattr(layout, "id", layout.name),
                     "name": layout.name,
                     "description": layout.description,
                     "template_name": layout.template_name,

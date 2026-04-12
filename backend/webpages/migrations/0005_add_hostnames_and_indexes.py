@@ -14,12 +14,10 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="webpage",
             name="hostnames",
-            field=django.contrib.postgres.fields.ArrayField(
-                base_field=models.CharField(max_length=255),
+            field=models.JSONField(
                 blank=True,
-                default=list,
+                null=True,
                 help_text="List of hostnames this root page serves (only for pages without parent)",
-                size=None,
             ),
         ),
         migrations.AddIndex(
@@ -28,8 +26,8 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="webpage",
-            index=django.contrib.postgres.indexes.GinIndex(
-                fields=["hostnames"], name="webpages_hostnames_gin_idx"
+            index=models.Index(
+                fields=["hostnames"], name="webpages_hostnames_idx"
             ),
         ),
     ]

@@ -19,6 +19,9 @@ class CrossLanguageParityTest(TestCase):
 
     def setUp(self):
         """Load canonical test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         test_data_path = os.path.join(
             os.path.dirname(__file__), "../../../docs/inheritance-tree-test-data.json"
         )

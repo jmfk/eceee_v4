@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             model_name="objectinstance",
             name="relationships",
             field=models.JSONField(
-                default=list,
+                null=True,
                 blank=True,
                 help_text="Many-to-many relationships to other objects with relationship types",
             ),
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
             model_name="objectinstance",
             name="related_from",
             field=models.JSONField(
-                default=list,
+                null=True,
                 blank=True,
                 help_text="Reverse relationships (auto-maintained mirror of relationships field)",
             ),

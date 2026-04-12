@@ -292,9 +292,11 @@ class PendingMediaFile(models.Model):
                 ai_extracted_text=self.ai_extracted_text,
                 ai_confidence_score=self.ai_confidence_score,
                 namespace=self.namespace,
+                tenant=self.namespace.tenant,
                 access_level=access_level,
                 created_by=self.uploaded_by,
                 last_modified_by=self.uploaded_by,
+                uploaded_by=self.uploaded_by,
             )
 
             # Store annotation in metadata if provided
@@ -350,7 +352,7 @@ class PendingMediaFile(models.Model):
                 # Safe to delete from S3 - no other references to this file
                 try:
                     storage = S3MediaStorage()
-                    storage.delete_file(self.file_path)
+                    storage.delete(self.file_path)
                 except Exception as e:
                     logger.error(
                         f"Failed to delete rejected file {self.file_path}: {e}"
@@ -425,7 +427,7 @@ class PendingMediaFile(models.Model):
                         pass
                     else:
                         # Safe to delete from S3 - no other references to this file
-                        storage.delete_file(pending_file.file_path)
+                        storage.delete(pending_file.file_path)
 
                 # Mark as expired
                 pending_file.status = "expired"
@@ -794,7 +796,7 @@ class MediaFile(models.Model):
             if not other_media_files and not other_pending_files:
                 try:
                     storage = S3MediaStorage()
-                    storage.delete_file(self.file_path)
+                    storage.delete(self.file_path)
                 except Exception as e:
                     logger.error(f"Failed to delete S3 file {self.file_path}: {e}")
                     # Don't fail the database deletion if S3 cleanup fails

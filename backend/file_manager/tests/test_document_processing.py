@@ -36,8 +36,11 @@ class DocumentProcessorTestCase(TestCase):
 
     def create_test_pdf(self):
         """Create a simple test PDF file."""
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import letter
+        try:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+        except ImportError:
+            self.skipTest("reportlab not installed")
 
         pdf_path = os.path.join(self.test_dir, "test.pdf")
         c = canvas.Canvas(pdf_path, pagesize=letter)
@@ -75,7 +78,7 @@ class DocumentProcessorTestCase(TestCase):
         self.assertIn("test markdown document", text)
         self.assertGreater(len(text), 0)
 
-    @patch('file_manager.services.document_processor.convert_from_path')
+    @patch('pdf2image.convert_from_path')
     def test_generate_pdf_thumbnail(self, mock_convert):
         """Test PDF thumbnail generation."""
         # Mock PIL Image
@@ -116,15 +119,25 @@ class DocumentTasksTestCase(TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_tasks", email="test@example.com", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-tasks",
+            created_by=self.user
         )
         self.namespace = Namespace.objects.create(
-            name="Test Namespace", slug="test-namespace", is_active=True
+            name="Test Namespace", 
+            slug="test-namespace", 
+            is_active=True,
+            created_by=self.user,
+            tenant=self.tenant
         )
 
-    @patch('file_manager.tasks.S3MediaStorage')
-    @patch('file_manager.tasks.document_processor')
+    @patch('file_manager.storage.S3MediaStorage')
+    @patch('file_manager.services.document_processor.document_processor')
     def test_process_document_text_task(self, mock_processor, mock_storage):
         """Test document text extraction task."""
         # Create a pending document file
@@ -162,8 +175,8 @@ class DocumentTasksTestCase(TestCase):
         pending_file.refresh_from_db()
         self.assertIn("text_processing_status", pending_file.metadata)
 
-    @patch('file_manager.tasks.S3MediaStorage')
-    @patch('file_manager.tasks.document_processor')
+    @patch('file_manager.storage.S3MediaStorage')
+    @patch('file_manager.services.document_processor.document_processor')
     def test_generate_document_thumbnail_task(self, mock_processor, mock_storage):
         """Test document thumbnail generation task."""
         # Create a pending document file
@@ -258,11 +271,21 @@ class ModelHelpersTestCase(TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_helpers", email="test@example.com", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-helpers",
+            created_by=self.user
         )
         self.namespace = Namespace.objects.create(
-            name="Test Namespace", slug="test-namespace", is_active=True
+            name="Test Namespace", 
+            slug="test-namespace", 
+            is_active=True,
+            created_by=self.user,
+            tenant=self.tenant
         )
 
     def test_has_thumbnail_with_thumbnail(self):
@@ -312,7 +335,10 @@ class ModelHelpersTestCase(TestCase):
             file_hash="pqr678",
             file_type="document",
             namespace=self.namespace,
+            tenant=self.tenant,
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             metadata={"thumbnail_path": "uploads/test_thumb.jpg"},
         )
 
@@ -325,15 +351,25 @@ class UploadIntegrationTestCase(TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_upload", email="test@example.com", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-upload",
+            created_by=self.user
         )
         self.namespace = Namespace.objects.create(
-            name="Test Namespace", slug="test-namespace", is_active=True
+            name="Test Namespace", 
+            slug="test-namespace", 
+            is_active=True,
+            created_by=self.user,
+            tenant=self.tenant
         )
 
-    @patch('file_manager.services.upload_service.process_document_text')
-    @patch('file_manager.services.upload_service.generate_document_thumbnail')
+    @patch('file_manager.tasks.process_document_text')
+    @patch('file_manager.tasks.generate_document_thumbnail')
     @patch('file_manager.services.upload_service.storage')
     def test_document_upload_triggers_tasks(
         self, mock_storage, mock_thumb_task, mock_text_task
@@ -378,14 +414,24 @@ class SerializerTestCase(TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_serializer", email="test@example.com", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-serializer",
+            created_by=self.user
         )
         self.namespace = Namespace.objects.create(
-            name="Test Namespace", slug="test-namespace", is_active=True
+            name="Test Namespace", 
+            slug="test-namespace", 
+            is_active=True,
+            created_by=self.user,
+            tenant=self.tenant
         )
 
-    @patch('file_manager.serializers.S3MediaStorage')
+    @patch('file_manager.storage.S3MediaStorage')
     def test_serializer_includes_thumbnail_url(self, mock_storage_class):
         """Test that serializer includes thumbnail_url for documents with thumbnails."""
         from file_manager.serializers import PendingMediaFileDetailSerializer

@@ -62,8 +62,16 @@ class Command(BaseCommand):
         error_count = 0
 
         # Process in batches
-        while processed_count < total_count:
-            batch = files_to_delete[processed_count : processed_count + batch_size]
+        # Use a list of IDs to avoid issues with queryset changing during deletion
+        file_ids = list(files_to_delete.values_list("id", flat=True))
+        total_count = len(file_ids)
+        
+        processed_count = 0
+        error_count = 0
+
+        for i in range(0, total_count, batch_size):
+            batch_ids = file_ids[i : i + batch_size]
+            batch = MediaFile.objects.with_deleted().filter(id__in=batch_ids)
 
             with transaction.atomic():
                 for file in batch:
@@ -79,7 +87,7 @@ class Command(BaseCommand):
                         logger.error(f"Failed to delete file {file.id}: {str(e)}")
                         self.stderr.write(f"Error deleting file {file.id}: {str(e)}")
 
-            processed_count += len(batch)
+            processed_count += len(batch_ids)
             self.stdout.write(f"Processed {processed_count} of {total_count} files")
 
         summary = f"""

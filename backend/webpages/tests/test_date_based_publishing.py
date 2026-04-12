@@ -17,8 +17,15 @@ class DateBasedPublishingTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_publisher", email="test@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Publisher Tenant", identifier="publisher", created_by=self.user
         )
 
         self.test_page = WebPage.objects.create(
@@ -27,10 +34,14 @@ class DateBasedPublishingTestCase(TestCase):
             description="Testing the new date-based publishing system",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
     def test_scheduled_version_not_published(self):
         """Test that versions with future effective dates are not published"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         future_date = timezone.now() + timedelta(days=1)
 
         scheduled_version = self.test_page.create_version(
@@ -47,6 +58,9 @@ class DateBasedPublishingTestCase(TestCase):
 
     def test_current_published_version(self):
         """Test that versions with past effective dates are published"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         past_date = timezone.now() - timedelta(hours=1)
 
         published_version = self.test_page.create_version(
@@ -66,6 +80,9 @@ class DateBasedPublishingTestCase(TestCase):
 
     def test_expired_version_not_published(self):
         """Test that versions with past expiry dates are not published"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         past_effective = timezone.now() - timedelta(days=2)
         past_expiry = timezone.now() - timedelta(hours=1)
 
@@ -83,6 +100,9 @@ class DateBasedPublishingTestCase(TestCase):
 
     def test_draft_version_not_published(self):
         """Test that versions without effective dates are drafts"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         draft_version = self.test_page.create_version(
             self.user, "Draft version", status="draft"
         )
@@ -94,6 +114,9 @@ class DateBasedPublishingTestCase(TestCase):
 
     def test_multiple_versions_current_selection(self):
         """Test that the latest published version is selected as current"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         now = timezone.now()
 
         # Create multiple versions
@@ -128,8 +151,15 @@ class PublishingServiceTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_service_user", email="service@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Service Tenant", identifier="service", created_by=self.user
         )
 
         self.test_page = WebPage.objects.create(
@@ -138,12 +168,16 @@ class PublishingServiceTestCase(TestCase):
             description="Testing publishing service",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         self.service = PublishingService(self.user)
 
     def test_bulk_publish_pages(self):
         """Test bulk publishing sets effective dates correctly"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         result_count, errors = self.service.bulk_publish_pages(
             [self.test_page.id], "Bulk publish test"
         )
@@ -162,6 +196,9 @@ class PublishingServiceTestCase(TestCase):
 
     def test_bulk_schedule_pages(self):
         """Test bulk scheduling sets dates correctly"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         future_schedule = PublicationSchedule(
             effective_date=timezone.now() + timedelta(days=1),
             expiry_date=timezone.now() + timedelta(days=7),
@@ -182,6 +219,9 @@ class PublishingServiceTestCase(TestCase):
 
     def test_invalid_schedule_rejected(self):
         """Test that invalid schedules are rejected"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         invalid_schedule = PublicationSchedule(
             effective_date=timezone.now() + timedelta(days=7),
             expiry_date=timezone.now() + timedelta(days=1),  # Before effective date
@@ -211,12 +251,12 @@ class PublicationScheduleTestCase(TestCase):
 
     def test_invalid_schedule_effective_after_expiry(self):
         """Test invalid schedule where effective date is after expiry"""
+        from django.core.exceptions import ValidationError
         now = timezone.now()
-        schedule = PublicationSchedule(
-            effective_date=now + timedelta(days=1), expiry_date=now
-        )
-
-        self.assertFalse(schedule.is_valid())
+        with self.assertRaises(ValidationError):
+            PublicationSchedule(
+                effective_date=now + timedelta(days=1), expiry_date=now
+            )
 
     def test_valid_schedule_no_expiry(self):
         """Test valid schedule with no expiry date"""

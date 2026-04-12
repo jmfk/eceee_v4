@@ -23,6 +23,7 @@ class ZipDownloadTestCase(TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        from core.models import Tenant
         self.client = APIClient()
         self.user = User.objects.create_user(
             username='testuser',
@@ -31,12 +32,28 @@ class ZipDownloadTestCase(TestCase):
         )
         self.client.force_authenticate(user=self.user)
         
-        # Create namespace
-        self.namespace = Namespace.get_default()
+        # Create tenant
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant",
+            created_by=self.user
+        )
+        
+        # Create namespace with tenant
+        self.namespace, _ = Namespace.objects.get_or_create(
+            slug="test-namespace",
+            defaults={
+                "name": "Test Namespace",
+                "is_active": True,
+                "created_by": self.user,
+                "tenant": self.tenant,
+            },
+        )
         
         # Create collection with tag
         self.tag = MediaTag.objects.create(
             name='Test Tag',
+            slug='test-tag',
             namespace=self.namespace,
             created_by=self.user
         )
@@ -53,11 +70,14 @@ class ZipDownloadTestCase(TestCase):
         # Create test media files
         self.media_file1 = MediaFile.objects.create(
             title='Test Image 1',
+            slug='test-image-1',
             original_filename='test1.jpg',
             file_path='test/test1.jpg',
             file_type='image',
             file_size=1024,
             namespace=self.namespace,
+            tenant=self.tenant,
+            file_hash="hash1",
             created_by=self.user,
             last_modified_by=self.user
         )
@@ -65,11 +85,14 @@ class ZipDownloadTestCase(TestCase):
         
         self.media_file2 = MediaFile.objects.create(
             title='Test Image 2',
+            slug='test-image-2',
             original_filename='test2.png',
             file_path='test/test2.png',
             file_type='image',
             file_size=2048,
             namespace=self.namespace,
+            tenant=self.tenant,
+            file_hash="hash2",
             created_by=self.user,
             last_modified_by=self.user
         )
@@ -77,7 +100,9 @@ class ZipDownloadTestCase(TestCase):
     
     def test_download_collection_as_zip(self):
         """Test downloading a collection as a ZIP file."""
-        url = f'/api/v1/media/collections/{self.collection.id}/download_zip/'
+        from django.urls import reverse
+        url = reverse('api:file_manager:mediacollection-download-zip', kwargs={'pk': str(self.collection.id)})
+        url += f"?namespace={self.namespace.slug}"
         response = self.client.get(url)
         
         # Should return 200 (will fail due to storage issues in test, but structure is correct)
@@ -95,7 +120,9 @@ class ZipDownloadTestCase(TestCase):
             last_modified_by=self.user
         )
         
-        url = f'/api/v1/media/collections/{empty_collection.id}/download_zip/'
+        from django.urls import reverse
+        url = reverse('api:file_manager:mediacollection-download-zip', kwargs={'pk': str(empty_collection.id)})
+        url += f"?namespace={self.namespace.slug}"
         response = self.client.get(url)
         
         # Should return 400 for empty collection
@@ -108,12 +135,26 @@ class ZipExtractionServiceTestCase(TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username='testuser',
+            username='testuser_extract',
             email='test@example.com',
             password='testpass123'
         )
-        self.namespace = Namespace.get_default()
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-extract",
+            created_by=self.user
+        )
+        self.namespace, _ = Namespace.objects.get_or_create(
+            slug="test-namespace-extract",
+            defaults={
+                "name": "Test Namespace",
+                "is_active": True,
+                "created_by": self.user,
+                "tenant": self.tenant,
+            },
+        )
         self.service = ZipExtractionService()
     
     def create_test_zip(self, files_dict):
@@ -218,14 +259,28 @@ class ZipUploadEndpointTestCase(TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        from core.models import Tenant
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username='testuser',
+            username='testuser_upload',
             email='test@example.com',
             password='testpass123'
         )
         self.client.force_authenticate(user=self.user)
-        self.namespace = Namespace.get_default()
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-upload",
+            created_by=self.user
+        )
+        self.namespace, _ = Namespace.objects.get_or_create(
+            slug="test-namespace-upload",
+            defaults={
+                "name": "Test Namespace",
+                "is_active": True,
+                "created_by": self.user,
+                "tenant": self.tenant,
+            },
+        )
     
     def create_test_zip(self, files_dict):
         """Create a test ZIP file."""

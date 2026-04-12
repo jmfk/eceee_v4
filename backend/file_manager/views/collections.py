@@ -632,7 +632,7 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
                         file_path = media_file.file_path
                         
                         # Download file content from storage
-                        file_content = storage.download_file(file_path)
+                        file_content = storage.get_file_content(file_path)
                         
                         # Use original filename in the ZIP
                         # Add file type subdirectory to organize files

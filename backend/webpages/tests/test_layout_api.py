@@ -12,8 +12,12 @@ from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 import json
 from unittest.mock import patch, MagicMock
+from django.test import override_settings
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class LayoutAPIUnifiedEndpointTests(APITestCase):
     """Test that unified layout endpoints work correctly"""
 
@@ -76,6 +80,9 @@ class LayoutAPIUnifiedEndpointTests(APITestCase):
         self.assertIsInstance(response.data, list)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class LayoutAPIPhase13EnhancementsTests(APITestCase):
     """Test new Phase 1.3 features: template data, versioning, caching"""
 
@@ -131,6 +138,9 @@ class LayoutAPIPhase13EnhancementsTests(APITestCase):
             self.assertIn("Last-Modified", response)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class LayoutTemplateEndpointTests(APITestCase):
     """Test the new /api/layouts/{id}/template/ endpoint"""
 
@@ -235,6 +245,9 @@ class LayoutSerializerTests(TestCase):
         self.assertIn("slots", serializer.data["template_data"])
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class LayoutAPIPermissionsTests(APITestCase):
     """Test API permissions and authentication"""
 
@@ -294,6 +307,9 @@ class LayoutAPIPermissionsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class LayoutAPIConditionalRequestsTests(APITestCase):
     """Test conditional requests (ETags, Last-Modified) for Phase 1.3"""
 

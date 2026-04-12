@@ -105,7 +105,7 @@ class Migration(migrations.Migration):
             model_name="pageversion",
             name="widgets",
             field=models.JSONField(
-                default=list, help_text="Widget configuration data for this version"
+                null=True, help_text="Widget configuration data for this version"
             ),
         ),
         # Data migration: Move existing PageWidget data to PageVersion.widgets

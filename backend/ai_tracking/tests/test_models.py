@@ -60,7 +60,7 @@ class AIUsageLogTestCase(TestCase):
     def setUp(self):
         """Set up test data."""
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_models", password="testpass123"
         )
 
         self.log = AIUsageLog.objects.create(
@@ -107,7 +107,7 @@ class AIBudgetAlertTestCase(TestCase):
     def setUp(self):
         """Set up test data."""
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_models", password="testpass123"
         )
 
         self.alert = AIBudgetAlert.objects.create(

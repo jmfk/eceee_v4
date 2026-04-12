@@ -12,17 +12,25 @@ class PageVersionCoreTest(TestCase):
     """Core tests for PageVersion functionality"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_superuser(
             username="testuser", email="test@example.com", password="testpass123"
         )
         self.user2 = User.objects.create_user(
             username="testuser2", email="test2@example.com", password="testpass123"
         )
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
+        )
 
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            code_layout="single_column",  # Using code-based layout
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -99,16 +107,24 @@ class PageVersionAPISimpleTest(APITestCase):
     """Simplified API tests for PageVersion"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_api", email="test@example.com", password="testpass123"
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
+        )
 
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            code_layout="single_column",  # Using code-based layout
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -187,16 +203,24 @@ class PageVersionIntegrationSimpleTest(APITestCase):
     """Simple integration tests for version management"""
 
     def setUp(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_int", email="test@example.com", password="testpass123"
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
+        self.tenant, _ = Tenant.objects.get_or_create(
+            identifier="default",
+            defaults={"name": "Default Tenant", "created_by": self.user}
+        )
 
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            code_layout="single_column",  # Using code-based layout
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )

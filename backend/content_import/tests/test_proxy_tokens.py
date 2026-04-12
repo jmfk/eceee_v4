@@ -32,8 +32,18 @@ class ProxyTokenSigningTestCase(TestCase):
         token = sign_proxy_token(url)
 
         # Should verify successfully
-        is_valid = verify_proxy_token(url, token, max_age=3600)
-        self.assertTrue(is_valid)
+        # verify_proxy_token returns None for tokens without metadata
+        verify_proxy_token(url, token, max_age=3600)
+
+    def test_verify_valid_token_with_metadata(self):
+        """Test that a valid token with metadata is successfully verified."""
+        url = "https://example.com/image.jpg"
+        metadata = {"srcset": [{"url": "...", "descriptor": "2x"}]}
+        token = sign_proxy_token(url, metadata=metadata)
+
+        # Should verify successfully and return metadata
+        returned_metadata = verify_proxy_token(url, token, max_age=3600)
+        self.assertEqual(returned_metadata, metadata)
 
     def test_verify_expired_token(self):
         """Test that an expired token raises SignatureExpired."""
@@ -105,10 +115,9 @@ class ProxyTokenSigningTestCase(TestCase):
         token = sign_proxy_token(url)
 
         # Should verify successfully with the custom max_age
-        is_valid = verify_proxy_token(
+        verify_proxy_token(
             url, token, max_age=settings.CONTENT_IMPORT_PROXY_TOKEN_MAX_AGE
         )
-        self.assertTrue(is_valid)
 
 
 @override_settings(ALLOWED_HOSTS=["*"])
