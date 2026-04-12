@@ -197,6 +197,11 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             if not existing_file.tenant_id:
                 existing_file.tenant = pending_file.namespace.tenant
                 existing_file.save(update_fields=["tenant"])
+            
+            # Ensure existing file has uploaded_by if it's missing
+            if not existing_file.uploaded_by_id:
+                existing_file.uploaded_by = pending_file.uploaded_by
+                existing_file.save(update_fields=["uploaded_by"])
 
             media_serializer = MediaFileDetailSerializer(existing_file)
             return Response(
