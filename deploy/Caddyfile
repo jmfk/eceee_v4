@@ -47,7 +47,7 @@ app.{$DOMAIN} {
     }
 
     # CSRF token endpoint
-    handle /csrf-token/ {
+    handle /csrf-token* {
         reverse_proxy backend:8000
     }
 
