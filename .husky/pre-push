@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "Running lint and tests before pushing..."
+
+# Frontend
+echo "Linting frontend..."
+cd frontend && npm run lint || exit 1
+echo "Running frontend tests..."
+npm run test:run || exit 1
+cd ..
+
+# Backend
+echo "Linting backend..."
+cd backend && flake8 . || exit 1
+echo "Running backend tests..."
+python manage.py test || exit 1
+cd ..
+
+echo "All checks passed!"
