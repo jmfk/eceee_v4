@@ -781,6 +781,10 @@ prod-deploy: ## Deploy to production (pushes deploy/.env then runs deploy; use: 
 	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)"
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $(TAG)"
 
+prod-restart: ## Sync deploy/.env and restart production containers
+	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d"
+
 prod-env: ## Securely push local deploy/.env to production
 	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
 
