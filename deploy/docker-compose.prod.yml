@@ -97,8 +97,8 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      IMGPROXY_USE_S3: "true"
-      IMGPROXY_S3_ENDPOINT: "https://eu-central-1.linodeobjects.com"
+      IMGPROXY_USE_S3: "false"
+      IMGPROXY_ALLOWED_SOURCES: "local://,https://eu-central-1.linodeobjects.com/,s3://eceee-v4-media/"
     networks: [eceee_prod]
     logging:
       driver: json-file
