@@ -549,5 +549,18 @@ class S3MediaStorage(Storage):
             raise
 
 
-# Create a singleton instance
+@deconstructible
+class S3SystemStorage(S3MediaStorage):
+    """Storage for system-level images (themes, icons) that are NOT part of media manager."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize S3 system storage with public-read defaults."""
+        super().__init__(*args, **kwargs)
+        # Ensure these are always public-read for direct browser access if needed
+        self.default_acl = "public-read"
+        self.querystring_auth = False
+
+
+# Create singleton instances
 storage = S3MediaStorage()
+system_storage = S3SystemStorage()

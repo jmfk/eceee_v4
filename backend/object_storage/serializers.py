@@ -12,6 +12,7 @@ from content.models import Namespace
 from utils.schema_system import validate_schema
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from file_manager.imgproxy import imgproxy_service
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -188,12 +189,25 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         return url
 
     def get_icon_image(self, obj):
-        """Return icon image URL with cache busting version"""
+        """Return icon image URL with imgproxy optimization and cache busting"""
         if not obj.icon_image:
             return None
-        url = obj.icon_image.url
-        absolute_url = self._get_absolute_url(url)
-        return f"{absolute_url}?v={int(obj.updated_at.timestamp())}"
+        
+        # Use imgproxy for optimized icon delivery
+        source_url = obj.icon_image.url
+        
+        # Ensure URL is absolute for imgproxy
+        absolute_source_url = self._get_absolute_url(source_url)
+        
+        # Generate optimized URL using imgproxy (small square icon)
+        return imgproxy_service.generate_url(
+            source_url=absolute_source_url,
+            width=64,
+            height=64,
+            resize_type="fill",
+            gravity="ce",
+            version=int(obj.updated_at.timestamp())
+        )
 
     def to_representation(self, instance):
         """Convert representation to camelCase for frontend"""
@@ -624,12 +638,25 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
         return url
 
     def get_icon_image(self, obj):
-        """Return icon image URL with cache busting version"""
+        """Return icon image URL with imgproxy optimization and cache busting"""
         if not obj.icon_image:
             return None
-        url = obj.icon_image.url
-        absolute_url = self._get_absolute_url(url)
-        return f"{absolute_url}?v={int(obj.updated_at.timestamp())}"
+        
+        # Use imgproxy for optimized icon delivery
+        source_url = obj.icon_image.url
+        
+        # Ensure URL is absolute for imgproxy
+        absolute_source_url = self._get_absolute_url(source_url)
+        
+        # Generate optimized URL using imgproxy (small square icon)
+        return imgproxy_service.generate_url(
+            source_url=absolute_source_url,
+            width=64,
+            height=64,
+            resize_type="fill",
+            gravity="ce",
+            version=int(obj.updated_at.timestamp())
+        )
 
     def get_allowed_child_types(self, obj):
         """Return full object data for allowed child types"""
@@ -724,8 +751,6 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         # Check if there's a version scheduled for future
         latest_version = obj.get_latest_version()
         if latest_version and latest_version.effective_date:
-            from django.utils import timezone
-
             if latest_version.effective_date > timezone.now():
                 return "scheduled"
 

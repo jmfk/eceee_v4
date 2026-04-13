@@ -23,6 +23,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 import json
 from utils.schema_system import validate_schema, get_field_types_for_django_choices
 from content.models import Namespace
+from file_manager.storage import system_storage
 
 
 class ObjectTypeDefinition(models.Model):
@@ -51,6 +52,7 @@ class ObjectTypeDefinition(models.Model):
         blank=True, help_text="Description of what this object type represents"
     )
     icon_image = models.ImageField(
+        storage=system_storage,
         upload_to="object_types/icons/",
         blank=True,
         null=True,

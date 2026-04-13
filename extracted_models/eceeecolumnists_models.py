@@ -14,6 +14,7 @@ from mezzanine.core.fields import FileField
 from mezzanine.core.managers import DisplayableManager
 from mezzanine.core.models import Displayable, RichText
 from mezzanine.utils.models import upload_to
+from file_manager.storage import system_storage
 from multiselectfield import MultiSelectField
 
 
@@ -50,6 +51,7 @@ class EceeeColumnist(
         _("Horizontal Photo"),
         max_length=200,
         format="Image",
+        storage=system_storage,
         upload_to=upload_to("eceee.Image.file", "columnist"),
         blank=True,
         null=True,
@@ -58,6 +60,7 @@ class EceeeColumnist(
         _("Vertical Photo"),
         max_length=200,
         format="Image",
+        storage=system_storage,
         upload_to=upload_to("eceee.Image.file", "columnist"),
         blank=True,
         null=True,
@@ -66,6 +69,7 @@ class EceeeColumnist(
         _("Squared Photo"),
         max_length=200,
         format="Image",
+        storage=system_storage,
         upload_to=upload_to("eceee.Image.file", "columnist"),
         blank=True,
         null=True,

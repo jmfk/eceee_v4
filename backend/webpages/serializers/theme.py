@@ -10,6 +10,7 @@ Theme-related serializers for the Web Page Publishing System
 """
 
 from rest_framework import serializers
+from file_manager.imgproxy import imgproxy_service
 from ..models import PageTheme, PreviewSize
 from .base import UserSerializer
 
@@ -56,7 +57,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
         """Custom representation to return full image URL and computed breakpoints"""
         data = super().to_representation(instance)
 
-        # Convert image field to full URL
+        # Convert image field to full URL with imgproxy optimization
         if instance.image:
             # Get the URL from the ImageField
             image_url = instance.image.url
@@ -87,9 +88,17 @@ class PageThemeSerializer(serializers.ModelSerializer):
             # Build absolute URI if request is available
             request = self.context.get("request")
             if request and not image_url.startswith(("http://", "https://")):
-                data["image"] = request.build_absolute_uri(image_url)
-            else:
-                data["image"] = image_url
+                image_url = request.build_absolute_uri(image_url)
+            
+            # Generate optimized URL using imgproxy (medium preview)
+            data["image"] = imgproxy_service.generate_url(
+                source_url=image_url,
+                width=400,
+                height=300,
+                resize_type="fill",
+                gravity="ce",
+                version=int(instance.updated_at.timestamp())
+            )
         else:
             data["image"] = None
 

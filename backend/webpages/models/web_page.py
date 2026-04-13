@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
+from file_manager.storage import system_storage
 
 
 class WebPage(models.Model):
@@ -131,6 +132,7 @@ class WebPage(models.Model):
 
     # Site branding (for root pages)
     site_icon = models.ImageField(
+        storage=system_storage,
         upload_to="site_icons/",
         null=True,
         blank=True,

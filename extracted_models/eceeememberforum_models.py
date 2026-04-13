@@ -10,6 +10,7 @@ from mezzanine.core.fields import FileField, RichTextField
 from mezzanine.core.managers import CurrentSiteManager
 from mezzanine.core.models import Displayable, Orderable, Slugged
 from mezzanine.utils.models import upload_to
+from file_manager.storage import system_storage
 
 from eceeememberforum.value_lists import MEMBER_ACTIVITIES
 
@@ -167,7 +168,7 @@ class EceeeMemberOrganization(Displayable):
     homepage = models.URLField(
         _("Homepage"), null=False, blank=True, default="")
 
-    logo = FileField(_("Organisation Logo"), max_length=200, format="Image", upload_to=upload_to(
+    logo = FileField(_("Organisation Logo"), max_length=200, format="Image", storage=system_storage, upload_to=upload_to(
         "eceeelibrary.memberorganizations.image", "memberorganizations"), null=True, blank=True)
     affiliations = GenericCategoriesField('eceeememberforum.models.AssignedMemberAffiliation',
                                           'eceeememberforum.models.MemberAffiliation',

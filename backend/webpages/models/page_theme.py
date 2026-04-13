@@ -6,6 +6,7 @@ Theme configurations for page styling including colors, fonts, and CSS.
 
 from django.db import models
 from django.contrib.auth.models import User
+from file_manager.storage import system_storage
 
 
 class PageTheme(models.Model):
@@ -89,6 +90,7 @@ class PageTheme(models.Model):
         blank=True, help_text="Additional custom CSS for this theme"
     )
     image = models.ImageField(
+        storage=system_storage,
         upload_to="theme_images/",
         blank=True,
         null=True,
@@ -2355,11 +2357,11 @@ class PageTheme(models.Model):
         List all images in the theme's library folder.
         Returns list of filenames.
         """
-        from file_manager.storage import S3MediaStorage
+        from file_manager.storage import system_storage
         import logging
 
         logger = logging.getLogger(__name__)
-        storage = S3MediaStorage()
+        storage = system_storage
         library_path = f"theme_images/{self.id}/library/"
 
         try:
@@ -2495,14 +2497,14 @@ class PageTheme(models.Model):
     def delete(self, *args, **kwargs):
         """Delete theme and cleanup design group images from object storage"""
         import logging
-        from file_manager.storage import S3MediaStorage
+        from file_manager.storage import system_storage
 
         logger = logging.getLogger(__name__)
 
         # Delete design group images from object storage
         design_group_images = self.get_design_group_image_urls()
         if design_group_images:
-            storage = S3MediaStorage()
+            storage = system_storage
             for url, metadata in design_group_images:
                 try:
                     path = self._extract_path_from_url(url)
@@ -2559,10 +2561,10 @@ class PageTheme(models.Model):
         library_images = self.list_library_images()
         if library_images:
             import logging
-            from file_manager.storage import S3MediaStorage
+            from file_manager.storage import system_storage
 
             logger = logging.getLogger(__name__)
-            storage = S3MediaStorage()
+            storage = system_storage
             url_mapping = {}
 
             for filename in library_images:
@@ -2612,9 +2614,9 @@ class PageTheme(models.Model):
         # Check for old design_groups path and migrate during clone
         old_design_groups_path = f"theme_images/{self.id}/design_groups/"
         try:
-            from file_manager.storage import S3MediaStorage
+            from file_manager.storage import system_storage
 
-            storage = S3MediaStorage()
+            storage = system_storage
             if hasattr(storage, "listdir"):
                 try:
                     directories, files = storage.listdir(old_design_groups_path)

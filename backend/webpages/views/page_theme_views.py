@@ -9,6 +9,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
 from django.core.files.base import ContentFile
+from file_manager.storage import system_storage
 import json
 import zipfile
 import io
@@ -375,7 +376,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         Stores in: theme_images/{theme_id}/design_groups/{filename}
         Returns: { "url": "s3://bucket/path", "public_url": "https://...", "width": int, "height": int }
         """
-        from file_manager.storage import S3MediaStorage
         from PIL import Image
         import os
         import uuid
@@ -437,7 +437,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             unique_filename = f"{uuid.uuid4()}{file_extension}"
 
             # Upload to object storage
-            storage = S3MediaStorage()
+            storage = system_storage
             file_path = f"theme_images/{theme.id}/design_groups/{unique_filename}"
 
             # Save the file
@@ -513,7 +513,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         GET: List all images in theme library with metadata
         POST: Upload single or multiple images to library
         """
-        from file_manager.storage import S3MediaStorage
         import os
         import uuid
         import logging
@@ -521,7 +520,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
-        storage = S3MediaStorage()
+        storage = system_storage
 
         if request.method == "GET":
             # List all images in library
@@ -775,12 +774,11 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         """
         Delete a specific image from theme library
         """
-        from file_manager.storage import S3MediaStorage
         import logging
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
-        storage = S3MediaStorage()
+        storage = system_storage
 
         if not filename:
             return Response(
@@ -833,12 +831,11 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         """
         Delete multiple images from theme library
         """
-        from file_manager.storage import S3MediaStorage
         import logging
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
-        storage = S3MediaStorage()
+        storage = system_storage
 
         filenames = request.data.get("filenames", [])
         force = request.data.get("force", False)
