@@ -228,6 +228,7 @@ const PageEditor = () => {
 
     // Local widget state for fast UI operations
     const [localWidgets, setLocalWidgets] = useState({})
+    const [editorResetKey, setEditorResetKey] = useState(0)
 
     // Path pattern state for dynamic URL path simulation
     const [simulatedPath, setSimulatedPath] = useState('')
@@ -1498,6 +1499,29 @@ const PageEditor = () => {
         }
     }, [handleActualSave]);
 
+    const handleUndoChanges = useCallback(async () => {
+        if (!originalWebpageData || !originalPageVersionData) return;
+
+        setWebpageData(originalWebpageData);
+        setPageVersionData(originalPageVersionData);
+        if (originalPageVersionData.widgets) {
+            setLocalWidgets(originalPageVersionData.widgets);
+        }
+
+        const initId = `page-editor-${originalWebpageData.id}-undo`;
+        await publishUpdate(initId, OperationTypes.INIT_PAGE, {
+            id: originalWebpageData.id,
+            data: originalWebpageData
+        });
+        await publishUpdate(initId, OperationTypes.INIT_VERSION, {
+            id: originalPageVersionData.id || originalPageVersionData.versionId,
+            data: originalPageVersionData
+        });
+
+        setIsDirty(false);
+        setEditorResetKey(k => k + 1);
+    }, [originalWebpageData, originalPageVersionData, publishUpdate, setIsDirty]);
+
     // Conflict resolution handlers
     const handleConflictResolve = useCallback(async (resolutions) => {
         if (!conflictData) return;
@@ -1951,7 +1975,7 @@ const PageEditor = () => {
                                         ) : (
                                             <div className="flex-1 h-full">
                                                 <PageContentEditor
-                                                    key={`page-editor-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
+                                                    key={`page-editor-${webpageData?.id}-${pageVersionData?.versionId || 'current'}-${editorResetKey}`}
                                                     ref={contentEditorRef}
                                                     webpageData={webpageData}
                                                     pageVersionData={pageVersionData}
@@ -2023,7 +2047,7 @@ const PageEditor = () => {
                         )}
                         {activeTab === 'settings' && (
                             <SettingsEditor
-                                key={`settings-${pageVersionData?.versionId || 'new'}`}
+                                key={`settings-${pageVersionData?.versionId || 'new'}-${editorResetKey}`}
                                 ref={settingsEditorRef}
                                 componentId={`${componentId}-settings`}
                                 context={{
@@ -2118,6 +2142,7 @@ const PageEditor = () => {
                 onVersionChange={switchToVersion}
                 onSaveClick={handleSave}
                 onSaveNewClick={handleSaveNew}
+                onUndoChanges={handleUndoChanges}
                 isSaving={isSaving}
                 isNewPage={isNewPage}
                 webpageData={webpageData}
