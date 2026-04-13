@@ -98,8 +98,14 @@ class ImgProxyService:
                     processing_options.append(f"{key}:{value}")
 
             # Encode source URL
+            internal_source_url = source_url
+            if "localhost:9000" in source_url:
+                internal_source_url = source_url.replace("localhost:9000", "eceee-v4-minio:9000")
+            elif "127.0.0.1:9000" in source_url:
+                internal_source_url = source_url.replace("127.0.0.1:9000", "eceee-v4-minio:9000")
+
             encoded_source_url = (
-                base64.urlsafe_b64encode(source_url.encode()).decode().rstrip("=")
+                base64.urlsafe_b64encode(internal_source_url.encode()).decode().rstrip("=")
             )
 
             # Build path
