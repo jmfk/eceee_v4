@@ -259,14 +259,14 @@ const PageEditor = () => {
             sourceId.startsWith('widget-') ||
             /^[a-z-]+widget-\d+/.test(sourceId);
 
+        // Always sync dirty state regardless of source
+        setIsDirtyState(state.metadata.isDirty);
+
         if (isFromIsolatedComponent) {
             // Isolated components handle their own state and UDC subscriptions
-            // Don't update any state to prevent unnecessary rerenders
+            // Don't update other state to prevent unnecessary rerenders
             return;
         }
-
-        // Only update state for non-isolated sources
-        setIsDirtyState(state.metadata.isDirty);
 
         // Update local widgets from external UDC changes (other components/users)
         if (versionId && state.versions[versionId]?.widgets) {
@@ -435,10 +435,10 @@ const PageEditor = () => {
                         }
 
                         // Check if merged data matches server - if so, mark as clean
-                        const mergedMatchesServer = 
+                        const mergedMatchesServer =
                             JSON.stringify(conflictResult.mergedWebpage) === JSON.stringify(serverWebpage) &&
                             JSON.stringify(conflictResult.mergedVersion) === JSON.stringify(serverVersion);
-                        
+
                         if (mergedMatchesServer) {
                             // No local changes, or local changes exactly match what was saved - mark as clean
                             setIsDirty(false);
@@ -1791,7 +1791,7 @@ const PageEditor = () => {
                         <div className="flex items-center space-x-4">
                             <button
                                 onClick={handleClose}
-                                disabled={isSpecialEditorOpen}
+                                disabled={isSpecialEditorOpen || isDirty}
                                 className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
