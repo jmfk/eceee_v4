@@ -16,6 +16,7 @@ const StatusBar = ({
     // Save functionality props
     onSaveClick = null,
     onSaveNewClick = null,
+    onUndoChanges = null,
     isSaving = false,
     isNewPage = false,
     // Validation state props
@@ -292,6 +293,7 @@ const StatusBar = ({
                         onVersionChange={onVersionChange}
                         onSaveClick={onSaveClick}
                         onSaveNewClick={onSaveNewClick}
+                        onUndoChanges={onUndoChanges}
                         isSaving={isSaving}
                         isNewPage={isNewPage}
                         validationState={validationState}

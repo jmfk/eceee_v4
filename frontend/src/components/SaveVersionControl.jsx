@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Save, CheckCircle, FileText, Clock, AlertCircle, Plus } from 'lucide-react'
+import { ChevronDown, Save, CheckCircle, FileText, Clock, AlertCircle, Plus, Undo2 } from 'lucide-react'
 
 const SaveVersionControl = ({
     currentVersion,
@@ -7,6 +7,7 @@ const SaveVersionControl = ({
     onVersionChange,
     onSaveClick,
     onSaveNewClick,
+    onUndoChanges,
     isSaving = false,
     isNewPage = false,
     validationState = { isValid: true, hasErrors: false },
@@ -112,6 +113,13 @@ const SaveVersionControl = ({
         }
     }
 
+    const handleUndo = () => {
+        setIsOpen(false)
+        if (onUndoChanges) {
+            onUndoChanges()
+        }
+    }
+
     // Don't render if not dirty
     if (!isDirty) {
         return null
@@ -196,6 +204,25 @@ const SaveVersionControl = ({
                                 </div>
                                 <div className="text-xs text-gray-500">
                                     Create a new version
+                                </div>
+                            </div>
+                        </div>
+                    </button>
+
+                    {/* Undo Changes option */}
+                    <button
+                        onClick={handleUndo}
+                        disabled={isSaving}
+                        className="w-full px-3 py-2 text-left hover:bg-red-50 focus:outline-none focus:bg-red-50 border-b border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <div className="flex items-center space-x-3">
+                            <Undo2 className="w-4 h-4 flex-shrink-0 text-red-600" />
+                            <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-gray-900">
+                                    Undo Changes
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    Restore to last saved state
                                 </div>
                             </div>
                         </div>
