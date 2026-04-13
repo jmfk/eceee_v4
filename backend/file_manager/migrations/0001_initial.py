@@ -171,7 +171,7 @@ class Migration(migrations.Migration):
                     "ai_generated_tags",
                     models.JSONField(
                         blank=True,
-                        null=True,
+                        default=list,
                         help_text="AI-suggested tags based on content analysis",
                     ),
                 ),

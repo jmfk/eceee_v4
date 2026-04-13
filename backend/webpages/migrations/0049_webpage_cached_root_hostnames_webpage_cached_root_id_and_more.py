@@ -32,10 +32,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="webpage",
             name="cached_root_hostnames",
-            field=models.JSONField(
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=models.CharField(max_length=255),
                 blank=True,
-                null=True,
+                default=list,
                 help_text="Cached: Hostnames from root page (auto-maintained via signals)",
+                size=None,
             ),
         ),
         migrations.AddField(

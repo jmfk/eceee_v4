@@ -49,7 +49,7 @@ class Migration(migrations.Migration):
                 ('period', models.CharField(choices=[('daily', 'Daily'), ('weekly', 'Weekly'), ('monthly', 'Monthly')], help_text='Budget period', max_length=20)),
                 ('provider', models.CharField(blank=True, help_text='Optional: limit to specific provider', max_length=50)),
                 ('model_name', models.CharField(blank=True, help_text='Optional: limit to specific model', max_length=100)),
-                ('email_recipients', models.JSONField(help_text='List of email addresses to notify', null=True)),
+                ('email_recipients', models.JSONField(default=list, help_text='List of email addresses to notify')),
                 ('threshold_percentage', models.IntegerField(default=80, help_text='Alert when spending reaches this percentage of budget')),
                 ('is_active', models.BooleanField(default=True)),
                 ('last_triggered', models.DateTimeField(blank=True, null=True)),

@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='datastream',
             name='workflow',
-            field=models.JSONField(blank=True, null=True, help_text='List of workflow actions to apply to each item'),
+            field=models.JSONField(blank=True, default=list, help_text='List of workflow actions to apply to each item', null=True),
         ),
     ]

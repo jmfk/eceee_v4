@@ -63,7 +63,7 @@ class Migration(migrations.Migration):
                 ),
                 ("widgets_created", models.IntegerField(default=0)),
                 ("media_files_imported", models.IntegerField(default=0)),
-                ("errors", models.JSONField(blank=True, null=True)),
+                ("errors", models.JSONField(blank=True, default=list)),
                 (
                     "stats",
                     models.JSONField(

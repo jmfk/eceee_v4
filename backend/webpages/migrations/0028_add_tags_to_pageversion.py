@@ -14,10 +14,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="pageversion",
             name="tags",
-            field=models.JSONField(
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=models.CharField(max_length=50),
                 blank=True,
-                null=True,
+                default=list,
                 help_text="List of tag names for organizing and categorizing page versions",
+                size=None,
             ),
         ),
     ]
