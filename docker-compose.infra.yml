@@ -108,5 +108,5 @@ volumes:
 
 networks:
   default:
-    name: eceee_shared_network
+    # name: eceee_shared_network
 

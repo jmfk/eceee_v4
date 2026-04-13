@@ -83,7 +83,7 @@ urlpatterns = [
     ),
     # Multi-site hostname-aware routing - MUST be last for catch-all functionality
     path("", HostnamePageView.as_view(), name="hostname-root"),
-    path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),
+    path("<path:slug_path>", HostnamePageView.as_view(), name="hostname-page-detail"),
 ]
 
 # Development URLs

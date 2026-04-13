@@ -350,11 +350,8 @@ export function UnifiedDataProvider({
         // Import themesApi dynamically to avoid circular dependencies
         const { themesApi } = await import('../../../api/themes');
 
-        // Filter out image-related fields (uploaded separately)
-        const { image, imageFile, imagePreview, ...themeDataToSave } = themeData;
-        
         // Normalize theme data before saving (defensive - ensures clean data)
-        const normalizedData = normalizeThemeData(themeDataToSave);
+        const normalizedData = normalizeThemeData(themeData);
 
         // Save normalized theme data
         const result = await themesApi.update(currentThemeId, normalizedData);

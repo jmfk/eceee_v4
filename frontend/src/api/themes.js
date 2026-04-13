@@ -80,12 +80,19 @@ export const themesApi = {
     /**
      * Update only the image field of a theme
      * @param {number} themeId - Theme ID
-     * @param {File} imageFile - Image file to upload
+     * @param {File|null} imageFile - Image file to upload, or null to remove
      * @returns {Promise<Object>} Updated theme
      */
     updateImage: wrapApiCall(async (themeId, imageFile) => {
         const formData = new FormData()
-        formData.append('image', imageFile)
+        if (imageFile) {
+            formData.append('image', imageFile)
+        } else {
+            // To clear the image field in Django via PATCH/PUT with FormData, 
+            // we send an empty string or null depending on how the backend handles it.
+            // PageThemeSerializer/Model expects a file or null.
+            formData.append('image', '')
+        }
 
         return api.patch(endpoints.themes.detail(themeId), formData, {
             headers: {

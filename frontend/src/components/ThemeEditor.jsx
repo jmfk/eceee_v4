@@ -537,10 +537,8 @@ const ThemeEditor = ({ onSave }) => {
                 updateThemeField('imageFile', null);
             } else {
                 // For existing themes, send PATCH with image=null
-                const formData = new FormData();
-                formData.append('image', ''); // Empty string to clear
-
-                const result = await themesApi.update(themeId, { image: null });
+                // The backend handles image=null by clearing the field
+                await themesApi.updateImage(themeId, null);
 
                 // Update the image in UDC
                 updateThemeField('image', null);

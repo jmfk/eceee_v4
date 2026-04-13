@@ -39,6 +39,9 @@ class S3MediaStorage(Storage):
         self.access_key = settings.AWS_ACCESS_KEY_ID
         self.secret_key = settings.AWS_SECRET_ACCESS_KEY
         self.endpoint_url = getattr(settings, "AWS_S3_ENDPOINT_URL", None)
+        self.internal_endpoint_url = getattr(
+            settings, "AWS_S3_INTERNAL_ENDPOINT_URL", self.endpoint_url
+        )
         self.custom_domain = getattr(settings, "AWS_S3_CUSTOM_DOMAIN", None)
         self.default_acl = getattr(settings, "AWS_DEFAULT_ACL", "private")
         self.querystring_auth = getattr(settings, "AWS_QUERYSTRING_AUTH", True)
@@ -75,7 +78,7 @@ class S3MediaStorage(Storage):
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
             region_name=self.region_name,
-            endpoint_url=self.endpoint_url,
+            endpoint_url=self.internal_endpoint_url,
             config=s3_config,
         )
 
