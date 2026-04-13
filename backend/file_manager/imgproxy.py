@@ -19,12 +19,8 @@ class ImgProxyService:
     """
 
     def __init__(self):
-        self.internal_url = getattr(
-            settings, "IMGPROXY_URL", "http://imgproxy:8080"
-        )
-        self.public_url = getattr(
-            settings, "IMGPROXY_PUBLIC_URL", self.internal_url
-        )
+        self.internal_url = getattr(settings, "IMGPROXY_URL", "http://imgproxy:8080")
+        self.public_url = getattr(settings, "IMGPROXY_PUBLIC_URL", self.internal_url)
         self.key = getattr(settings, "IMGPROXY_KEY", "")
         self.salt = getattr(settings, "IMGPROXY_SALT", "")
         self.signature_size = getattr(settings, "IMGPROXY_SIGNATURE_SIZE", 32)
@@ -69,6 +65,37 @@ class ImgProxyService:
         Returns:
             Signed imgproxy URL
         """
+        # Encode source URL
+        internal_source_url = source_url
+        if "localhost:9002" in source_url:
+            internal_source_url = source_url.replace(
+                "localhost:9002", "eceee-v4-minio:9000"
+            )
+        elif "127.0.0.1:9002" in source_url:
+            internal_source_url = source_url.replace(
+                "127.0.0.1:9002", "eceee-v4-minio:9000"
+            )
+        elif "localhost:9000" in source_url:
+            internal_source_url = source_url.replace(
+                "localhost:9000", "eceee-v4-minio:9000"
+            )
+        elif "127.0.0.1:9000" in source_url:
+            internal_source_url = source_url.replace(
+                "127.0.0.1:9000", "eceee-v4-minio:9000"
+            )
+        elif source_url.startswith("/media/"):
+            # Handle relative media URLs by prepending the internal minio URL
+            # This is common in dev where storage.url() might return relative paths
+            internal_source_url = f"http://eceee-v4-minio:9000/eceee-media{source_url.replace('/media/', '/')}"
+        elif source_url.startswith("theme_images/"):
+            # Handle theme images explicitly from the theme_images bucket
+            internal_source_url = f"http://eceee-v4-minio:9000/theme-images/{source_url.replace('theme_images/', '')}"
+        elif not source_url.startswith(("http://", "https://")):
+            # Handle other relative paths
+            internal_source_url = (
+                f"http://eceee-v4-minio:9000/eceee-media/{source_url.lstrip('/')}"
+            )
+
         try:
             # Build processing options
             processing_options = []
@@ -95,17 +122,15 @@ class ImgProxyService:
             # Add additional options
             for key, value in kwargs.items():
                 if value is not None:
-                    processing_options.append(f"{key}:{value}")
+                    # Map 'version' to imgproxy's 'cb' (cachebuster) option
+                    option_key = "cb" if key == "version" else key
+                    processing_options.append(f"{option_key}:{value}")
 
             # Encode source URL
-            internal_source_url = source_url
-            if "localhost:9000" in source_url:
-                internal_source_url = source_url.replace("localhost:9000", "eceee-v4-minio:9000")
-            elif "127.0.0.1:9000" in source_url:
-                internal_source_url = source_url.replace("127.0.0.1:9000", "eceee-v4-minio:9000")
-
             encoded_source_url = (
-                base64.urlsafe_b64encode(internal_source_url.encode()).decode().rstrip("=")
+                base64.urlsafe_b64encode(internal_source_url.encode())
+                .decode()
+                .rstrip("=")
             )
 
             # Build path
@@ -410,7 +435,9 @@ def get_image_url(
     )
 
 
-def get_thumbnail_url(source_url: str, size: int = 150, version: Optional[str] = None) -> str:
+def get_thumbnail_url(
+    source_url: str, size: int = 150, version: Optional[str] = None
+) -> str:
     """
     Generate thumbnail URL.
 
@@ -424,9 +451,14 @@ def get_thumbnail_url(source_url: str, size: int = 150, version: Optional[str] =
     """
     kwargs = {}
     if version:
-        kwargs['version'] = version
+        kwargs["version"] = version
     return imgproxy_service.generate_url(
-        source_url=source_url, width=size, height=size, resize_type="fill", gravity="sm", **kwargs
+        source_url=source_url,
+        width=size,
+        height=size,
+        resize_type="fill",
+        gravity="sm",
+        **kwargs,
     )
 
 

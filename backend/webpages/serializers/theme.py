@@ -89,7 +89,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             request = self.context.get("request")
             if request and not image_url.startswith(("http://", "https://")):
                 image_url = request.build_absolute_uri(image_url)
-            
+
             # Generate optimized URL using imgproxy (medium preview)
             data["image"] = imgproxy_service.generate_url(
                 source_url=image_url,
@@ -97,7 +97,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
                 height=300,
                 resize_type="fill",
                 gravity="ce",
-                version=int(instance.updated_at.timestamp())
+                version=int(instance.updated_at.timestamp()),
             )
         else:
             data["image"] = None
@@ -158,14 +158,18 @@ class PageThemeSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     f"Invalid breakpoint key '{key}'. Must be one of: {', '.join(valid_keys)}"
                 )
-            
+
             # xs can be 0, others must be positive
             min_val = 0 if key == "xs" else 1
             if not isinstance(val, int) or val < min_val:
                 if key == "xs":
-                    raise serializers.ValidationError(f"Breakpoint '{key}' must be a non-negative integer (pixels)")
+                    raise serializers.ValidationError(
+                        f"Breakpoint '{key}' must be a non-negative integer (pixels)"
+                    )
                 else:
-                    raise serializers.ValidationError(f"Breakpoint '{key}' must be a positive integer (pixels)")
+                    raise serializers.ValidationError(
+                        f"Breakpoint '{key}' must be a positive integer (pixels)"
+                    )
 
         # Validate ascending order if multiple breakpoints provided
         if len(value) > 1:
@@ -270,10 +274,10 @@ class PageThemeSerializer(serializers.ModelSerializer):
             if "template" not in style_config:
                 style_config["template"] = (
                     '<div class="image-gallery">\n'
-                    '  {{#images}}\n'
+                    "  {{#images}}\n"
                     '    <img src="{{url}}" alt="{{alt}}" loading="lazy">\n'
-                    '  {{/images}}\n'
-                    '</div>'
+                    "  {{/images}}\n"
+                    "</div>"
                 )
 
             # Auto-fix: Add missing styleType with default value
@@ -397,4 +401,3 @@ class PageThemeSerializer(serializers.ModelSerializer):
                     )
 
         return value
-
