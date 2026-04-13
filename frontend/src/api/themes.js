@@ -88,9 +88,6 @@ export const themesApi = {
         if (imageFile) {
             formData.append('image', imageFile)
         } else {
-            // To clear the image field in Django via PATCH/PUT with FormData, 
-            // we send an empty string or null depending on how the backend handles it.
-            // PageThemeSerializer/Model expects a file or null.
             formData.append('image', '')
         }
 
@@ -100,6 +97,27 @@ export const themesApi = {
             }
         })
     }, 'themes.updateImage'),
+
+    /**
+     * Update only the site_icon field of a theme
+     * @param {number} themeId - Theme ID
+     * @param {File|null} iconFile - Icon file to upload, or null to remove
+     * @returns {Promise<Object>} Updated theme
+     */
+    updateSiteIcon: wrapApiCall(async (themeId, iconFile) => {
+        const formData = new FormData()
+        if (iconFile) {
+            formData.append('site_icon', iconFile)
+        } else {
+            formData.append('site_icon', '')
+        }
+
+        return api.patch(endpoints.themes.detail(themeId), formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.updateSiteIcon'),
 
     /**
      * Upload a design group image directly to object storage

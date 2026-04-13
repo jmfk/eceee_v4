@@ -61,8 +61,15 @@ export function normalizeThemeData(themeData) {
         carouselStyles: _cs,
         imageFile: _if,
         imagePreview: _ip,
+        siteIconFile: _sif,
+        siteIconPreview: _sip,
         ...cleanData
     } = normalized;
+
+    // Strip siteIcon if it's not a URL string (File objects can't be JSON-serialized)
+    if (cleanData.siteIcon && typeof cleanData.siteIcon !== 'string') {
+        delete cleanData.siteIcon;
+    }
     
     return cleanData;
 }

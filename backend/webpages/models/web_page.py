@@ -130,15 +130,6 @@ class WebPage(models.Model):
         help_text="List of hostnames this root page serves (only for pages without parent)",
     )
 
-    # Site branding (for root pages)
-    site_icon = models.ImageField(
-        storage=system_storage,
-        upload_to="site_icons/",
-        null=True,
-        blank=True,
-        help_text="Site icon/favicon for this root page. Will be resized to multiple sizes using imgproxy. Only available for root pages (pages without parent).",
-    )
-
     # Multi-tenancy support
     tenant = models.ForeignKey(
         "core.Tenant",

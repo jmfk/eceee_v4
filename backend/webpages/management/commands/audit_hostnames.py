@@ -150,8 +150,9 @@ class Command(BaseCommand):
 
             if verbose:
                 self.stdout.write(f"      Created: {page.created_at}")
-                if page.site_icon:
-                    self.stdout.write(f"      Site Icon: {page.site_icon}")
+                theme = page.get_effective_theme()
+                if theme and theme.site_icon:
+                    self.stdout.write(f"      Site Icon (from theme): {theme.site_icon}")
 
         # Summary
         self.stdout.write(f"\n   Summary:")

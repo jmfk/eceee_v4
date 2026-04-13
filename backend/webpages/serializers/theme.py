@@ -52,6 +52,13 @@ class PageThemeSerializer(serializers.ModelSerializer):
     """Serializer for page themes with new 5-part structure"""
 
     created_by = UserSerializer(read_only=True)
+    site_icon = serializers.ImageField(required=False, allow_empty_file=True, allow_null=True)
+
+    def validate_site_icon(self, value):
+        """Handle empty string as None for clearing the field"""
+        if value == '' or value is None:
+            return None
+        return value
 
     def to_representation(self, instance):
         """Custom representation to return full image URL and computed breakpoints"""
@@ -105,6 +112,40 @@ class PageThemeSerializer(serializers.ModelSerializer):
         # Always include computed breakpoints (with defaults if not set)
         data["breakpoints"] = instance.get_breakpoints()
 
+        # Convert site_icon field to full URL with imgproxy optimization
+        if instance.site_icon:
+            site_icon_url = instance.site_icon.url
+            if site_icon_url.startswith("s3://"):
+                try:
+                    from django.core.files.storage import default_storage
+                    parts = site_icon_url.replace("s3://", "").split("/", 1)
+                    if len(parts) == 2:
+                        file_path = parts[1]
+                        if hasattr(default_storage, "get_public_url"):
+                            site_icon_url = default_storage.get_public_url(file_path)
+                        else:
+                            site_icon_url = default_storage.url(instance.site_icon.name)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to convert site_icon s3:// URL to public URL: {e}")
+
+            request = self.context.get("request")
+            if request and not site_icon_url.startswith(("http://", "https://")):
+                site_icon_url = request.build_absolute_uri(site_icon_url)
+
+            # Preview size for editor UI (64x64)
+            data["site_icon"] = imgproxy_service.generate_url(
+                source_url=site_icon_url,
+                width=64,
+                height=64,
+                resize_type="fill",
+                gravity="ce",
+                version=int(instance.updated_at.timestamp()),
+            )
+        else:
+            data["site_icon"] = None
+
         # Add calculated selectors for each design group
         if data.get("design_groups") and isinstance(data["design_groups"], dict):
             groups = data["design_groups"].get("groups", [])
@@ -135,6 +176,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "html_elements",
             "custom_css",
             "image",
+            "site_icon",
             "is_active",
             "is_default",
             "created_at",

@@ -75,7 +75,6 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "parent_id",
             "sort_order",
             "hostnames",
-            "site_icon",
             "path_pattern_key",
             "cached_path",
             "cached_root_id",
@@ -477,25 +476,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         return scheduled
 
     def validate(self, attrs):
-        """Validate WebPage data including site_icon restrictions"""
-        # Validate site_icon is only used for root pages
-        if "site_icon" in attrs and attrs["site_icon"]:
-            # Check if this is an update or create
-            parent_id = attrs.get("parent_id")
-            if parent_id is not None:  # Has a parent, not a root page
-                raise serializers.ValidationError(
-                    {
-                        "site_icon": "Only root pages (pages without a parent) can have a site icon."
-                    }
-                )
-            # For updates, check if the instance has a parent
-            if self.instance and self.instance.parent_id is not None:
-                raise serializers.ValidationError(
-                    {
-                        "site_icon": "Only root pages (pages without a parent) can have a site icon."
-                    }
-                )
-
+        """Validate WebPage data"""
         return super().validate(attrs)
 
     def create(self, validated_data):

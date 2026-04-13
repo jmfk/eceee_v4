@@ -353,6 +353,10 @@ export function UnifiedDataProvider({
         // Normalize theme data before saving (defensive - ensures clean data)
         const normalizedData = normalizeThemeData(themeData);
 
+        // Strip ImageField values — they are managed via separate PATCH uploads
+        delete normalizedData.image;
+        delete normalizedData.siteIcon;
+
         // Save normalized theme data
         const result = await themesApi.update(currentThemeId, normalizedData);
 

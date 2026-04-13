@@ -144,8 +144,17 @@ class WebPageRenderer:
         # Collect CSS
         page_css = self._collect_page_css(page, effective_layout, widgets_by_slot)
 
+        # Generate site icons (favicons) from theme
+        site_icons = ""
+        effective_theme = render_context.get("theme")
+        if effective_theme and effective_theme.site_icon:
+            from .templatetags.webpages_tags import render_site_icons
+            site_icons = render_site_icons(render_context, root_page=page)
+
         # Generate meta tags
         meta_tags = self._generate_meta_tags(page, page_version)
+        if site_icons:
+            meta_tags = f"{site_icons}\n{meta_tags}"
 
         return {
             "html": page_html,
