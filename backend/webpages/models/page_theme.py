@@ -117,6 +117,15 @@ class PageTheme(models.Model):
         help_text="Tenant this theme belongs to",
     )
 
+    # Site branding
+    site_icon = models.ImageField(
+        storage=system_storage,
+        upload_to="site_icons/",
+        null=True,
+        blank=True,
+        help_text="Site icon/favicon for this theme. Will be resized to multiple sizes using imgproxy.",
+    )
+
     # Theme sync fields
     sync_version = models.IntegerField(
         default=1,
@@ -2531,6 +2540,7 @@ class PageTheme(models.Model):
                 new_name = f"{self.name} (Copy {counter})"
 
         cloned_theme = PageTheme.objects.create(
+            tenant=self.tenant,
             name=new_name,
             description=self.description,
             fonts=self.fonts.copy() if self.fonts else {},

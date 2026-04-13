@@ -48,6 +48,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
+            "site_icon",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
@@ -81,6 +82,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
+            "site_icon",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
@@ -1203,6 +1205,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "breakpoints": theme.breakpoints,
                 "css_variables": theme.css_variables,
                 "html_elements": theme.html_elements,
+                "site_icon": theme.site_icon.name if theme.site_icon else None,
                 "custom_css": theme.custom_css,
                 "is_active": theme.is_active,
             }
@@ -1356,6 +1359,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
                 # Create theme
                 new_theme = PageTheme.objects.create(
+                    tenant=request.tenant,
                     name=name,
                     description=metadata.get(
                         "description", "Imported from theme package"
@@ -1371,6 +1375,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     breakpoints=theme_data.get("breakpoints", {}),
                     css_variables=theme_data.get("css_variables", {}),
                     html_elements=theme_data.get("html_elements", {}),
+                    site_icon=theme_data.get("site_icon"),
                     custom_css=theme_data.get("custom_css", ""),
                     is_active=theme_data.get("is_active", True),
                     is_default=False,  # Imported themes are never default
