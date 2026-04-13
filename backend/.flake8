@@ -1,0 +1,16 @@
+[flake8]
+# Ignore Django migrations as they are auto-generated and shouldn't be linted
+exclude = 
+    .git,
+    __pycache__,
+    docs/source/conf.py,
+    old,
+    build,
+    dist,
+    */migrations/*,
+    venv,
+    .venv,
+    node_modules
+
+max-line-length = 120
+extend-ignore = E203, W503
