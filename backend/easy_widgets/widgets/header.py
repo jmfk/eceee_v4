@@ -25,7 +25,7 @@ class HeaderWidget(BaseWidget):
 
     name = "Header"
     description = "Header widget - xs breakpoint shows full image (auto height), sm+ uses fixed height with cropped image"
-    template_name = "easy_widgets/widgets/header.html"
+    template_name = None
     mustache_template_name = "easy_widgets/widgets/header.mustache"
 
     layout_parts = {
