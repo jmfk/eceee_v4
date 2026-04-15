@@ -431,6 +431,9 @@ import-schema: ## Import single schema file (use: make import-schema FILE=news.j
 		--file scripts/migration/schemas/$(FILE) \
 		--name $(NAME)
 
+fix-minio-permissions: ## Fix permissions on all MinIO assets
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py fix_minio_permissions --all-media
+
 shell:
 	docker-compose -f docker-compose.dev.yml exec backend bash
 

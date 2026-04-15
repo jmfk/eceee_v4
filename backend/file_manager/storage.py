@@ -82,6 +82,28 @@ class S3MediaStorage(Storage):
             config=s3_config,
         )
 
+    def make_public(self, name):
+        """
+        Set an existing file to public-read ACL.
+        
+        Args:
+            name: File name or path
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            name = name.lstrip("/")
+            self.client.put_object_acl(
+                Bucket=self.bucket_name,
+                Key=name,
+                ACL='public-read'
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set public-read ACL for {name}: {e}")
+            return False
+
     def listdir(self, path):
         """
         List the contents of the specified path.
