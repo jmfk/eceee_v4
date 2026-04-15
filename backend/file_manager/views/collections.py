@@ -376,13 +376,6 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
             # Paginate
             page = self.paginate_queryset(files)
             if page is not None:
-                # #region agent log
-                import json
-                try:
-                    with open('/Users/jmfk/code/eceee_v4/.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps({"location":"collections.py:376","message":"Before serialization","data":{"file_count":len(page)},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"H3"}) + '\n')
-                except: pass
-                # #endregion
                 serializer = MediaFileListSerializer(
                     page, many=True, context={"request": request}
                 )

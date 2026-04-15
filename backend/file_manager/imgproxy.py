@@ -66,34 +66,23 @@ class ImgProxyService:
             Signed imgproxy URL
         """
         # Encode source URL
+        public_endpoint = getattr(settings, "AWS_S3_ENDPOINT_URL", "").rstrip("/")
+        internal_endpoint = getattr(settings, "AWS_S3_INTERNAL_ENDPOINT_URL", public_endpoint).rstrip("/")
+
         internal_source_url = source_url
-        if "localhost:9002" in source_url:
-            internal_source_url = source_url.replace(
-                "localhost:9002", "eceee-v4-minio:9000"
-            )
-        elif "127.0.0.1:9002" in source_url:
-            internal_source_url = source_url.replace(
-                "127.0.0.1:9002", "eceee-v4-minio:9000"
-            )
-        elif "localhost:9000" in source_url:
-            internal_source_url = source_url.replace(
-                "localhost:9000", "eceee-v4-minio:9000"
-            )
-        elif "127.0.0.1:9000" in source_url:
-            internal_source_url = source_url.replace(
-                "127.0.0.1:9000", "eceee-v4-minio:9000"
-            )
+        if public_endpoint and source_url.startswith(public_endpoint):
+            internal_source_url = source_url.replace(public_endpoint, internal_endpoint)
         elif source_url.startswith("/media/"):
             # Handle relative media URLs by prepending the internal minio URL
             # This is common in dev where storage.url() might return relative paths
-            internal_source_url = f"http://eceee-v4-minio:9000/eceee-media{source_url.replace('/media/', '/')}"
+            internal_source_url = f"{internal_endpoint}/eceee-media{source_url.replace('/media/', '/')}"
         elif source_url.startswith("theme_images/"):
             # Handle theme images explicitly from the theme_images bucket
-            internal_source_url = f"http://eceee-v4-minio:9000/theme-images/{source_url.replace('theme_images/', '')}"
+            internal_source_url = f"{internal_endpoint}/theme-images/{source_url.replace('theme_images/', '')}"
         elif not source_url.startswith(("http://", "https://")):
             # Handle other relative paths
             internal_source_url = (
-                f"http://eceee-v4-minio:9000/eceee-media/{source_url.lstrip('/')}"
+                f"{internal_endpoint}/eceee-media/{source_url.lstrip('/')}"
             )
 
         try:

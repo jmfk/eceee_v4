@@ -2191,7 +2191,7 @@ class ContentWidgetEditorRenderer {
         const { updateMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js')
 
         try {
-            updateMediaInsertHTML(element, mediaData, config, slotDimensions)
+            await updateMediaInsertHTML(element, mediaData, config, slotDimensions)
 
             // Force content update - get fresh innerHTML after DOM modification
             if (this.editorElement) {
@@ -2532,20 +2532,42 @@ class ContentWidgetEditorRenderer {
             }
 
             // Setup listeners for any media inserts in the content
+            // and refresh their HTML to ensure correct signed URLs
             this.setupExistingMediaInserts();
         }, 0);
     }
 
     /**
      * Setup listeners for existing media inserts in the content
+     * and refresh their HTML to ensure correct signed URLs
      */
-    setupExistingMediaInserts() {
+    async setupExistingMediaInserts() {
         if (!this.editorElement) return;
 
+        const { extractMediaConfig, fetchMediaData, updateMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js');
+        
+        // Re-check editorElement after async import
+        if (!this.editorElement) return;
+        
         const mediaInserts = this.editorElement.querySelectorAll('[data-media-insert]');
-        mediaInserts.forEach(element => {
+        
+        for (const element of mediaInserts) {
             this.setupMediaInsertListeners(element);
-        });
+            
+            // Refresh the HTML to ensure signed imgproxy URLs are used
+            try {
+                const config = extractMediaConfig(element);
+                const mediaData = await fetchMediaData(config.mediaId, config.mediaType);
+                if (mediaData) {
+                    await updateMediaInsertHTML(element, mediaData, config, this.slotDimensions);
+                }
+            } catch (error) {
+                console.warn('Failed to refresh existing media insert:', error);
+            }
+        }
+        
+        // Trigger a content change after all inserts are refreshed
+        this.handleContentChange();
     }
 
     /**

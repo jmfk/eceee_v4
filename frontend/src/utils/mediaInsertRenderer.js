@@ -5,14 +5,13 @@
 
 import { mediaApi } from '../api';
 import { getImageAspectRatio, getGridSpan } from './imageGridLayout';
+import { getImgproxyUrl } from './imgproxySecure';
 
 export const DEFAULT_IMGPROXY_CONFIG = {
     resize_type: 'fit',
     quality: 85,
     format: 'webp',
 };
-
-const IMGPROXY_BASE_URL = import.meta.env.VITE_IMGPROXY_URL || 'http://localhost:8080';
 
 /**
  * Fetch media data by ID and type
@@ -36,52 +35,13 @@ export async function fetchMediaData(mediaId, mediaType) {
 }
 
 /**
- * Generate imgproxy URL for an image
- * @param {string} baseUrl - Base URL or imgproxy base URL
- * @param {number} width - Desired width
- * @param {number} height - Desired height (optional, will maintain aspect ratio if null/0)
- * @param {Object} imgproxyConfig - Optional imgproxy config from image style
- * @returns {string} Optimized image URL
- */
-export function generateImgproxyUrl(baseUrl, width, height = null, imgproxyConfig = null) {
-    if (!baseUrl) return '';
-
-    if (baseUrl.includes('/insecure/') || baseUrl.includes('/unsafe/')) {
-        return baseUrl;
-    }
-
-    const cfg = imgproxyConfig || {};
-    const resizeType = cfg.resize_type || cfg.resizeType || 'fit';
-    const w = cfg.max_width || cfg.maxWidth || cfg.width || width;
-    const h = cfg.max_height || cfg.maxHeight || cfg.height || height || 0;
-
-    const parts = [`resize:${resizeType}:${w}:${h}:0`];
-
-    const gravity = cfg.gravity;
-    if (gravity && gravity !== 'sm') {
-        parts.push(`gravity:${gravity}`);
-    }
-    const quality = cfg.quality;
-    if (quality) {
-        parts.push(`quality:${quality}`);
-    }
-    const format = cfg.format;
-    if (format) {
-        parts.push(`format:${format}`);
-    }
-
-    const encodedUrl = btoa(baseUrl).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    return `${IMGPROXY_BASE_URL}/insecure/${parts.join('/')}/${encodedUrl}`;
-}
-
-/**
  * Render a single image with imgproxy optimization
  * @param {Object} mediaData - Media file data
  * @param {Object} config - Configuration (width, align, caption, imgproxyConfig)
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} HTML string for image element
+ * @returns {Promise<string>} HTML string for image element
  */
-export function renderMediaImage(mediaData, config, slotDimensions = null) {
+export async function renderMediaImage(mediaData, config, slotDimensions = null) {
     const { width = 'full', align = 'center', altText = '' } = config;
     const imgproxyConfig = config.imgproxyConfig || DEFAULT_IMGPROXY_CONFIG;
 
@@ -104,12 +64,17 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
         : null;
 
     // Generate optimized image URL with calculated dimensions and optional style config
-    const imageUrl = generateImgproxyUrl(
-        mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url,
-        imgWidth,
-        imgHeight,
-        imgproxyConfig
-    );
+    // Use the secure backend API for URL signing to ensure production compatibility
+    const baseUrl = mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url;
+    
+    let imageUrl = '';
+    if (baseUrl) {
+        imageUrl = await getImgproxyUrl(baseUrl, {
+            width: imgWidth,
+            height: imgHeight,
+            ...imgproxyConfig
+        });
+    }
 
     // Use altText from config if provided, otherwise fallback to media data
     const alt = altText || mediaData.alt || mediaData.title || mediaData.original_filename || 'Image';
@@ -127,13 +92,16 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
     if (config.enableLightbox) {
         const lbStyle = config.lightboxStyle || 'default';
         const lbGroup = config.lightboxGroup || '';
-        const baseUrl = mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url;
-
         const lbImgproxyConfig = config.lightboxImgproxyConfig || DEFAULT_IMGPROXY_CONFIG;
         const lbWidth = lbImgproxyConfig.max_width || lbImgproxyConfig.maxWidth || lbImgproxyConfig.width || originalWidth || 1920;
         const lbHeight = lbImgproxyConfig.max_height || lbImgproxyConfig.maxHeight || lbImgproxyConfig.height || 0;
+        
         const fullSrc = baseUrl
-            ? generateImgproxyUrl(baseUrl, lbWidth, lbHeight, lbImgproxyConfig)
+            ? await getImgproxyUrl(baseUrl, {
+                width: lbWidth,
+                height: lbHeight,
+                ...lbImgproxyConfig
+            })
             : imageUrl;
 
         const caption = config.caption || mediaData.title || '';
@@ -148,9 +116,9 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
  * @param {Object} collectionData - Collection data with files
  * @param {Object} config - Configuration (width, align, caption)
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} HTML string for gallery
+ * @returns {Promise<string>} HTML string for gallery
  */
-export function renderMediaCollection(collectionData, config, slotDimensions = null) {
+export async function renderMediaCollection(collectionData, config, slotDimensions = null) {
     const files = collectionData.files || [];
 
     if (files.length === 0) {
@@ -163,7 +131,7 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
     const thumbnailWidth = Math.round(slotWidth * 0.33);
 
     // Render as a simple grid gallery with aspect ratio-based spanning
-    const imageElements = files.map(file => {
+    const imageElements = await Promise.all(files.map(async (file) => {
         // Calculate height based on original aspect ratio if available
         const originalWidth = file.width || file.originalWidth;
         const originalHeight = file.height || file.originalHeight;
@@ -171,12 +139,16 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
             ? Math.round((originalHeight / originalWidth) * thumbnailWidth)
             : null;
 
-        const imageUrl = generateImgproxyUrl(
-            file.imgproxyBaseUrl || file.fileUrl || file.file_url,
-            thumbnailWidth,
-            thumbnailHeight,
-            config.imgproxyConfig || DEFAULT_IMGPROXY_CONFIG
-        );
+        const baseUrl = file.imgproxyBaseUrl || file.fileUrl || file.file_url;
+        let imageUrl = '';
+        if (baseUrl) {
+            imageUrl = await getImgproxyUrl(baseUrl, {
+                width: thumbnailWidth,
+                height: thumbnailHeight,
+                ...(config.imgproxyConfig || DEFAULT_IMGPROXY_CONFIG)
+            });
+        }
+
         const alt = file.alt || file.title || file.original_filename || 'Image';
         
         // Calculate grid span based on aspect ratio
@@ -196,9 +168,9 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
         return `<div class="media-gallery-item"${styleAttr}>
             <img src="${imageUrl}" alt="${escapeHtml(alt)}" loading="lazy" style="object-fit: ${objectFit}" />
         </div>`;
-    }).join('');
+    }));
 
-    return `<div class="media-gallery" style="grid-auto-flow: dense">${imageElements}</div>`;
+    return `<div class="media-gallery" style="grid-auto-flow: dense">${imageElements.join('')}</div>`;
 }
 
 /**
@@ -206,7 +178,7 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
  * @param {Object} mediaData - Media or collection data
  * @param {Object} config - Configuration
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} Complete HTML string for media insert
+ * @returns {Promise<string>} Complete HTML string for media insert
  */
 export async function createMediaInsertHTML(mediaData, config, slotDimensions = null) {
     const {
@@ -225,9 +197,9 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
     // Generate inner content based on media type
     let innerContent;
     if (mediaType === 'collection') {
-        innerContent = renderMediaCollection(mediaData, config, slotDimensions);
+        innerContent = await renderMediaCollection(mediaData, config, slotDimensions);
     } else {
-        innerContent = renderMediaImage(mediaData, config, slotDimensions);
+        innerContent = await renderMediaImage(mediaData, config, slotDimensions);
     }
 
     // Build caption HTML if provided
@@ -276,9 +248,9 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
  * @param {Object} mediaData - Media or collection data
  * @param {Object} config - Updated configuration
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} Updated HTML string
+ * @returns {Promise<string>} Updated HTML string
  */
-export function updateMediaInsertHTML(element, mediaData, config, slotDimensions = null) {
+export async function updateMediaInsertHTML(element, mediaData, config, slotDimensions = null) {
     const {
         mediaType,
         width = 'full',
@@ -293,9 +265,9 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
     // Generate updated inner content
     let innerContent;
     if (mediaType === 'collection') {
-        innerContent = renderMediaCollection(mediaData, config, slotDimensions);
+        innerContent = await renderMediaCollection(mediaData, config, slotDimensions);
     } else {
-        innerContent = renderMediaImage(mediaData, config, slotDimensions);
+        innerContent = await renderMediaImage(mediaData, config, slotDimensions);
     }
 
     // Build caption HTML if provided
@@ -408,4 +380,3 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-
