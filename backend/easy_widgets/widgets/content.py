@@ -334,21 +334,6 @@ class ContentWidget(BaseWidget):
             width = media_insert.get("data-width", "full")
             align = media_insert.get("data-align", "center")
 
-            # Check if lightbox is enabled for this specific insert
-            # We check if there's an <a> tag with data-lightbox inside
-            has_lightbox = media_insert.find("a", {"data-lightbox": True}) is not None
-
-            with open("/Users/jmfk/code/eceee_v4/.cursor/debug-530273.log", "a") as f:
-                import json, time
-                log_entry = {
-                    "sessionId": "530273",
-                    "location": "content.py:338",
-                    "message": "Processing media insert in backend",
-                    "data": {"media_id": media_id, "has_lightbox": has_lightbox, "image_style": image_style},
-                    "timestamp": int(time.time() * 1000)
-                }
-                f.write(json.dumps(log_entry) + "\n")
-
             if not media_id:
                 continue
 
@@ -357,7 +342,6 @@ class ContentWidget(BaseWidget):
                 lightbox_image_style=lightbox_image_style,
                 width=width,
                 align=align,
-                enable_lightbox=has_lightbox,
             )
 
         if styled_html:
@@ -407,7 +391,6 @@ class ContentWidget(BaseWidget):
     def _render_media_insert_with_style(
         self, media_id, media_type, style_name, theme, caption="", title="",
         lightbox_image_style=None, width="full", align="center",
-        enable_lightbox=False,
     ):
         """
         Render a media insert with an image style from the theme.
@@ -425,7 +408,6 @@ class ContentWidget(BaseWidget):
                                   is used for lightbox full-size images
             width: Width setting ('full', 'half', 'third')
             align: Alignment setting ('left', 'center', 'right')
-            enable_lightbox: Whether lightbox is enabled for this insert
 
         Returns:
             HTML string with styled content, or None on error
@@ -584,23 +566,12 @@ class ContentWidget(BaseWidget):
                         except Exception:
                             pass
 
-                    if enable_lightbox:
+                    if lightbox_config:
                         img_tag = (
                             f'<a data-lightbox data-lightbox-src="{lb_url}"'
                             f' data-lightbox-caption="{caption}">'
                             f"{img_tag}</a>"
                         )
-
-                    with open("/Users/jmfk/code/eceee_v4/.cursor/debug-530273.log", "a") as f:
-                        import json, time
-                        log_entry = {
-                            "sessionId": "530273",
-                            "location": "content.py:575",
-                            "message": "Backend rendering image tag",
-                            "data": {"media_id": media_id, "enable_lightbox": enable_lightbox, "has_anchor": "data-lightbox" in img_tag},
-                            "timestamp": int(time.time() * 1000)
-                        }
-                        f.write(json.dumps(log_entry) + "\n")
 
                     return (
                         f'<figure class="media-insert {width_class} {align_class}">'
