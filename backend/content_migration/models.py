@@ -33,12 +33,14 @@ class MigrationPlan(models.Model):
     # E.g., [{"type": "extract_variables", "config": {...}}, {"type": "process_html", "config": {...}}]
     workflow = models.JSONField(
         default=list, 
+        blank=True,
         help_text="Sequence of steps to process each item"
     )
     
     # General configuration (batch size, concurrency, etc.)
     config = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Migration configuration (batch_size, skip_existing, etc.)"
     )
     
