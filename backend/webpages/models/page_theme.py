@@ -24,14 +24,17 @@ class PageTheme(models.Model):
     # New structure - 5 theme parts
     fonts = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Google Fonts configuration with family, variants, and display settings",
     )
     colors = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Named color palette (key-value pairs of color names and hex/rgb values)",
     )
     design_groups = models.JSONField(
         default=dict,
+        blank=True,
         help_text=(
             "Grouped HTML element styles with optional widget_type/slot targeting. "
             "Each group can have an 'isDefault' boolean field to mark it as the base/default group for style inheritance. "
@@ -44,10 +47,12 @@ class PageTheme(models.Model):
     )
     component_styles = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Named component styles with HTML templates and optional CSS",
     )
     image_styles = models.JSONField(
         default=dict,
+        blank=True,
         help_text=(
             "Unified image styles (gallery and carousel) with Mustache templates and CSS. "
             "Each style supports: template (required), styleType (gallery|carousel, required), "
@@ -60,17 +65,22 @@ class PageTheme(models.Model):
     )
     gallery_styles = models.JSONField(
         default=dict,
+        blank=True,
         help_text="DEPRECATED: Use 'image_styles' field instead",
     )
     carousel_styles = models.JSONField(
         default=dict,
+        blank=True,
         help_text="DEPRECATED: Use 'image_styles' field instead",
     )
     table_templates = models.JSONField(
-        default=dict, help_text="Predefined table templates for the Table widget"
+        default=dict,
+        blank=True,
+        help_text="Predefined table templates for the Table widget"
     )
     breakpoints = models.JSONField(
         default=dict,
+        blank=True,
         help_text=(
             "Responsive breakpoint configuration with pixel values for media queries. "
             "Format: {'sm': 640, 'md': 768, 'lg': 1024, 'xl': 1280}. "
@@ -80,10 +90,13 @@ class PageTheme(models.Model):
 
     # Deprecated fields (kept for migration compatibility)
     css_variables = models.JSONField(
-        default=dict, help_text="DEPRECATED: Use 'colors' field instead"
+        default=dict,
+        blank=True,
+        help_text="DEPRECATED: Use 'colors' field instead"
     )
     html_elements = models.JSONField(
         default=dict,
+        blank=True,
         help_text="DEPRECATED: Use 'design_groups' field instead",
     )
     custom_css = models.TextField(

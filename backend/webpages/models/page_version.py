@@ -41,11 +41,16 @@ class PageVersion(models.Model):
     )
 
     # Snapshot of page data at this version
-    page_data = models.JSONField(help_text="Serialized page data (excluding widgets)")
+    page_data = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text="Serialized page data (excluding widgets)"
+    )
 
     # Widget data for this version
     widgets = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Widget configuration data for this version (slot_name -> widgets array)",
     )
 
