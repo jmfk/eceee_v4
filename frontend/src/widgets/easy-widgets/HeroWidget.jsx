@@ -374,7 +374,9 @@ const HeroWidget = ({
     }
 
     // Preview mode
-    if (!header) {
+    const hasContent = header || beforeText || afterText || image
+
+    if (!hasContent) {
         return null
     }
 
@@ -386,7 +388,7 @@ const HeroWidget = ({
                         {beforeText}
                     </h5>
                 )}
-                <div><h1>{header}</h1></div>
+                {header && <div><h1>{header}</h1></div>}
                 {afterText && (
                     <h6 className="after-text">
                         {afterText}
