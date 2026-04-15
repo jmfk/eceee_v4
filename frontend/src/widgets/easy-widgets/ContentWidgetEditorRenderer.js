@@ -400,9 +400,6 @@ const injectMediaInsertStyles = () => {
         .media-insert {
             display: block;
             margin: 16px 0;
-            padding: 8px;
-            border: 2px solid transparent;
-            border-radius: 4px;
             transition: border-color 0.2s, box-shadow 0.2s;
             cursor: pointer;
             position: relative;
@@ -410,13 +407,12 @@ const injectMediaInsertStyles = () => {
         }
         
         .media-insert:hover {
-            border-color: #3b82f6;
+            outline: none;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
         
         .media-insert:focus {
             outline: none;
-            border-color: #3b82f6;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
         }
         
@@ -461,19 +457,16 @@ const injectMediaInsertStyles = () => {
             width: 100%;
             height: auto;
             display: block;
-            border-radius: 4px;
         }
         
         /* Media Caption */
         .media-caption {
-            margin-top: 8px;
             padding: 4px 8px;
             font-size: 14px;
             color: #6b7280;
             font-style: italic;
             text-align: center;
             background: #f9fafb;
-            border-radius: 4px;
         }
         
         /* Media Gallery */
@@ -2546,15 +2539,15 @@ class ContentWidgetEditorRenderer {
         if (!this.editorElement) return;
 
         const { extractMediaConfig, fetchMediaData, updateMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js');
-        
+
         // Re-check editorElement after async import
         if (!this.editorElement) return;
-        
+
         const mediaInserts = this.editorElement.querySelectorAll('[data-media-insert]');
-        
+
         for (const element of mediaInserts) {
             this.setupMediaInsertListeners(element);
-            
+
             // Refresh the HTML to ensure signed imgproxy URLs are used
             try {
                 const config = extractMediaConfig(element);
@@ -2566,7 +2559,7 @@ class ContentWidgetEditorRenderer {
                 console.warn('Failed to refresh existing media insert:', error);
             }
         }
-        
+
         // Trigger a content change after all inserts are refreshed
         this.handleContentChange();
     }
