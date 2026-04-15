@@ -152,16 +152,15 @@ const SaveVersionControl = ({
                 <button
                     onClick={onSaveClick}
                     disabled={isSaving || (!isDirty && !isNewPage)}
-                    className={`h-6 font-medium px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 ${
-                        isDirty || isNewPage ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
-                    }`}
+                    className={`h-6 font-medium px-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 ${isDirty || isNewPage ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                        }`}
                     title={
-                        isSaving 
-                            ? "Saving..." 
-                            : !isDirty && !isNewPage 
-                                ? "No changes to save" 
-                                : validationState.hasErrors 
-                                    ? "Save changes (validation errors will be handled)" 
+                        isSaving
+                            ? "Saving..."
+                            : !isDirty && !isNewPage
+                                ? "No changes to save"
+                                : validationState.hasErrors
+                                    ? "Save changes (validation errors will be handled)"
                                     : "Update current version"
                     }
                 >
@@ -173,7 +172,7 @@ const SaveVersionControl = ({
                     ) : (
                         <>
                             <Save className="w-3 h-3" />
-                            <span className="text-xs">
+                            <span className="text-xs leading-none">
                                 Save {currentVersion ? `v${currentVersion.versionNumber}` : ''}
                             </span>
                         </>
@@ -183,8 +182,10 @@ const SaveVersionControl = ({
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     disabled={isSaving}
-                    className={`h-6 font-medium px-2 py-1 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-r border-l border-blue-800 transition-colors flex items-center justify-center ${
-                        isOpen ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
+                    className={`h-6 font-medium px-2 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none rounded-r border-l transition-colors flex items-center justify-center ${
+                        isDirty || isNewPage 
+                            ? (isOpen ? 'bg-blue-700 border-blue-800' : 'bg-blue-600 hover:bg-blue-700 border-blue-800') 
+                            : 'bg-gray-400 border-gray-500'
                     }`}
                     title="More options (versions, undo, save new)"
                 >
@@ -217,13 +218,13 @@ const SaveVersionControl = ({
                     {/* Undo Changes option */}
                     <button
                         onClick={handleUndo}
-                        disabled={isSaving}
+                        disabled={isSaving || !isDirty}
                         className="w-full px-3 py-2 text-left hover:bg-red-50 focus:outline-none focus:bg-red-50 border-b border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <div className="flex items-center space-x-3">
-                            <Undo2 className="w-4 h-4 flex-shrink-0 text-red-600" />
+                            <Undo2 className={`w-4 h-4 flex-shrink-0 ${isDirty ? 'text-red-600' : 'text-gray-400'}`} />
                             <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className={`text-sm font-medium ${isDirty ? 'text-gray-900' : 'text-gray-400'}`}>
                                     Undo Changes
                                 </div>
                                 <div className="text-xs text-gray-500">
