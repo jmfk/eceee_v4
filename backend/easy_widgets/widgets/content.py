@@ -321,10 +321,7 @@ class ContentWidget(BaseWidget):
         media_inserts = soup.find_all("div", {"data-media-insert": "true"})
 
         for media_insert in media_inserts:
-            image_style = (
-                media_insert.get("data-image-style")
-                or media_insert.get("data-gallery-style")
-            )
+            image_style = media_insert.get("data-image-style") or media_insert.get("data-gallery-style")
             lightbox_image_style = media_insert.get("data-lightbox-image-style")
 
             media_type = media_insert.get("data-media-type", "image")
@@ -338,15 +335,20 @@ class ContentWidget(BaseWidget):
                 continue
 
             styled_html = self._render_media_insert_with_style(
-                media_id, media_type, image_style, theme, caption, title,
+                media_id,
+                media_type,
+                image_style,
+                theme,
+                caption,
+                title,
                 lightbox_image_style=lightbox_image_style,
                 width=width,
                 align=align,
             )
 
         if styled_html:
-                new_tag = BeautifulSoup(styled_html, "html.parser")
-                media_insert.replace_with(new_tag)
+            new_tag = BeautifulSoup(styled_html, "html.parser")
+            media_insert.replace_with(new_tag)
 
         # Resolve link objects in HTML content
         from webpages.services.link_resolver import resolve_links_in_html
@@ -368,10 +370,7 @@ class ContentWidget(BaseWidget):
                 if (
                     img
                     and href
-                    and any(
-                        href.lower().endswith(ext)
-                        for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]
-                    )
+                    and any(href.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"])
                 ):
                     a["data-lightbox"] = ""
                     if group_key:
@@ -389,8 +388,16 @@ class ContentWidget(BaseWidget):
         return template_config
 
     def _render_media_insert_with_style(
-        self, media_id, media_type, style_name, theme, caption="", title="",
-        lightbox_image_style=None, width="full", align="center",
+        self,
+        media_id,
+        media_type,
+        style_name,
+        theme,
+        caption="",
+        title="",
+        lightbox_image_style=None,
+        width="full",
+        align="center",
     ):
         """
         Render a media insert with an image style from the theme.
@@ -435,9 +442,7 @@ class ContentWidget(BaseWidget):
 
         imgproxy_config = DEFAULT_IMGPROXY_CONFIG.copy()
         if style:
-            style_cfg = (
-                style.get("imgproxy_config") or style.get("imgproxyConfig") or {}
-            )
+            style_cfg = style.get("imgproxy_config") or style.get("imgproxyConfig") or {}
             imgproxy_config.update(style_cfg)
 
         # Resolve lightbox config: prefer explicit lightbox image style, then
@@ -446,33 +451,21 @@ class ContentWidget(BaseWidget):
         if lightbox_image_style:
             lb_style = _resolve_style(lightbox_image_style)
             if lb_style:
-                lightbox_config = (
-                    lb_style.get("imgproxy_config")
-                    or lb_style.get("imgproxyConfig")
-                    or {}
-                )
+                lightbox_config = lb_style.get("imgproxy_config") or lb_style.get("imgproxyConfig") or {}
         if not lightbox_config and style:
-            lightbox_config = (
-                style.get("lightbox_config") or style.get("lightboxConfig") or {}
-            )
+            lightbox_config = style.get("lightbox_config") or style.get("lightboxConfig") or {}
 
         # Fetch media data
         items = []
         try:
             if media_type == "collection":
-                collection = MediaCollection.objects.prefetch_related("files").get(
-                    id=media_id
-                )
+                collection = MediaCollection.objects.prefetch_related("files").get(id=media_id)
                 files = collection.files.all()
                 for file in files:
                     items.append(
                         {
                             "id": str(file.id),
-                            "url": (
-                                file.get_file_url()
-                                if hasattr(file, "get_file_url")
-                                else file.file_url
-                            ),
+                            "url": (file.get_file_url() if hasattr(file, "get_file_url") else file.file_url),
                             "alt_text": title or file.title or "",
                             "caption": caption or file.description or "",
                             "title": title or file.title or "",
@@ -482,11 +475,7 @@ class ContentWidget(BaseWidget):
                     )
             else:
                 media_file = MediaFile.objects.get(id=media_id)
-                file_url = (
-                    media_file.get_file_url()
-                    if hasattr(media_file, "get_file_url")
-                    else media_file.file_url
-                )
+                file_url = media_file.get_file_url() if hasattr(media_file, "get_file_url") else media_file.file_url
 
                 has_template = style and style.get("template", "").strip()
                 if imgproxy_config and not has_template:
@@ -502,15 +491,8 @@ class ContentWidget(BaseWidget):
                     if media_file.width and target_width > media_file.width:
                         target_width = media_file.width
 
-                    max_width = (
-                        imgproxy_config.get("max_width")
-                        or imgproxy_config.get("width")
-                        or target_width
-                    )
-                    max_height = (
-                        imgproxy_config.get("max_height")
-                        or imgproxy_config.get("height")
-                    )
+                    max_width = imgproxy_config.get("max_width") or imgproxy_config.get("width") or target_width
+                    max_height = imgproxy_config.get("max_height") or imgproxy_config.get("height")
                     responsive = imgproxy_service.generate_responsive_urls(
                         source_url=file_url,
                         max_width=max_width,
@@ -525,9 +507,7 @@ class ContentWidget(BaseWidget):
                     img_url = responsive.get("1x", {}).get("url", file_url)
                     srcset = responsive.get("srcset", "")
                     alt = title or media_file.title or ""
-                    cap_html = (
-                        f'<figcaption>{caption}</figcaption>' if caption else ""
-                    )
+                    cap_html = f"<figcaption>{caption}</figcaption>" if caption else ""
                     srcset_attr = f' srcset="{srcset}"' if srcset else ""
 
                     # Use width and alignment classes for display
@@ -535,8 +515,7 @@ class ContentWidget(BaseWidget):
                     align_class = f"media-align-{align}"
 
                     img_tag = (
-                        f'<img src="{img_url}"{srcset_attr}'
-                        f' alt="{alt}" class="{width_class}" loading="lazy" />'
+                        f'<img src="{img_url}"{srcset_attr}' f' alt="{alt}" class="{width_class}" loading="lazy" />'
                     )
                     # Generate lightbox URL using lightbox_config
                     lb_url = file_url
@@ -573,10 +552,7 @@ class ContentWidget(BaseWidget):
                             f"{img_tag}</a>"
                         )
 
-                    return (
-                        f'<figure class="media-insert {width_class} {align_class}">'
-                        f"{img_tag}{cap_html}</figure>"
-                    )
+                    return f'<figure class="media-insert {width_class} {align_class}">' f"{img_tag}{cap_html}</figure>"
 
                 items.append(
                     {
@@ -623,5 +599,4 @@ class ContentWidget(BaseWidget):
             css = "\n".join(css_parts)
         if css:
             html = f"<style>{css}</style>\n{html}"
-
         return html

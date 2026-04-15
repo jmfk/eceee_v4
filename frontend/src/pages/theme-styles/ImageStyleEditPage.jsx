@@ -67,7 +67,7 @@ const ImageStyleEditPage = () => {
         if (themeData) {
             // Normalize theme data before using (handles legacy fields)
             const normalizedData = normalizeThemeData(themeData);
-            
+
             // Ensure theme exists in UDC and is current
             try {
                 const udcState = getState();
@@ -479,8 +479,8 @@ const ImageStyleEditPage = () => {
                                         <button
                                             onClick={() => setStyleType('gallery')}
                                             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition ${styleType === 'gallery'
-                                                    ? 'bg-blue-50 border-blue-600 text-blue-700'
-                                                    : 'border-gray-300 hover:bg-gray-50'
+                                                ? 'bg-blue-50 border-blue-600 text-blue-700'
+                                                : 'border-gray-300 hover:bg-gray-50'
                                                 }`}
                                         >
                                             <Grid3X3 className="h-4 w-4" />
@@ -489,8 +489,8 @@ const ImageStyleEditPage = () => {
                                         <button
                                             onClick={() => setStyleType('carousel')}
                                             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition ${styleType === 'carousel'
-                                                    ? 'bg-purple-50 border-purple-600 text-purple-700'
-                                                    : 'border-gray-300 hover:bg-gray-50'
+                                                ? 'bg-purple-50 border-purple-600 text-purple-700'
+                                                : 'border-gray-300 hover:bg-gray-50'
                                                 }`}
                                         >
                                             <Play className="h-4 w-4" />
@@ -758,8 +758,8 @@ const ImageStyleEditPage = () => {
                                         type="button"
                                         onClick={() => setActiveBreakpoint(bp)}
                                         className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${activeBreakpoint === bp
-                                                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                                             }`}
                                     >
                                         {getBreakpointLabel(bp, themeData)}
