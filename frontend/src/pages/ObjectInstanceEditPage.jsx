@@ -346,6 +346,30 @@ const ObjectInstanceEditPage = () => {
         createNewObjectMutation.mutate(essentialFields)
     }, [createNewObjectMutation])
 
+    const handleUndoChanges = useCallback(async () => {
+        if (!instance) return;
+        
+        // Re-initialize with original data from React Query
+        publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
+            id: String(instance.id),
+            data: {
+                ...instance,
+                id: String(instance.id),
+                type: instance?.objectType?.name || instance?.objectType?.id || 'unknown',
+                status: instance?.status || 'draft',
+                metadata: instance?.metadata || {},
+                created_at: instance?.createdAt || new Date().toISOString(),
+                updated_at: instance?.updatedAt || new Date().toISOString(),
+                parentId: instance?.parent?.id || instance?.parent || null,
+                currentVersionId: currentVersion ? String(currentVersion.id) : undefined,
+                availableVersions: availableVersions.map(v => String(v.id))
+            }
+        });
+        
+        setHasUnsavedChanges(false);
+        addNotification('Changes undone', 'success');
+    }, [instance, currentVersion, availableVersions, publishUpdate, componentId, addNotification]);
+
     // --- 2. EARLY RETURNS ---
     if (!isNewInstance && !isEditingInstance) return <Navigate to="/objects" replace />
     
@@ -452,6 +476,7 @@ const ObjectInstanceEditPage = () => {
             <StatusBar
                 isDirty={hasUnsavedChanges} currentVersion={currentVersion} availableVersions={availableVersions}
                 onVersionChange={switchToVersion} onSaveClick={() => handleSave()}
+                onUndoChanges={handleUndoChanges}
                 isSaving={saveMutation.isPending} isNewPage={isNewInstance}
                 customStatusContent={<div className="text-sm text-gray-600">{isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.id === tab)?.label}</div>}
             />

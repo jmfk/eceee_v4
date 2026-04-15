@@ -1520,7 +1520,9 @@ const PageEditor = () => {
 
         setIsDirty(false);
         setEditorResetKey(k => k + 1);
-    }, [originalWebpageData, originalPageVersionData, publishUpdate, setIsDirty]);
+
+        addNotification('Changes undone', 'success');
+    }, [originalWebpageData, originalPageVersionData, publishUpdate, setIsDirty, addNotification]);
 
     // Conflict resolution handlers
     const handleConflictResolve = useCallback(async (resolutions) => {
