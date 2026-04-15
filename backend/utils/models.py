@@ -269,7 +269,9 @@ class AIAgentTask(models.Model):
 
     # Task configuration
     task_config = models.JSONField(
-        default=dict, help_text="Configuration parameters for the AI agent task"
+        default=dict,
+        blank=True,
+        help_text="Configuration parameters for the AI agent task"
     )
 
     # Execution tracking
@@ -283,7 +285,9 @@ class AIAgentTask(models.Model):
 
     # Results and output
     result_data = models.JSONField(
-        default=dict, blank=True, help_text="Task results and generated content"
+        default=dict,
+        blank=True,
+        help_text="Task results and generated content"
     )
     error_message = models.TextField(
         blank=True, help_text="Error details if task failed"
@@ -390,7 +394,9 @@ class AIAgentTaskUpdate(models.Model):
 
     # Optional structured data
     data = models.JSONField(
-        default=dict, blank=True, help_text="Structured data for the update"
+        default=dict,
+        blank=True,
+        help_text="Structured data for the update"
     )
 
     # Progress tracking
@@ -429,12 +435,15 @@ class AIAgentTaskTemplate(models.Model):
     # Template configuration
     default_config = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Default configuration for tasks created from this template",
     )
 
     # UI configuration
     config_schema = models.JSONField(
-        default=dict, help_text="JSON schema for validating and generating UI forms"
+        default=dict,
+        blank=True,
+        help_text="JSON schema for validating and generating UI forms"
     )
 
     # Metadata
@@ -499,6 +508,7 @@ class ClipboardEntry(models.Model):
     )
     data = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Clipboard content data (widgets, pages, etc.)",
     )
     metadata = models.JSONField(
