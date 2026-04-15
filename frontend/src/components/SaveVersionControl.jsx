@@ -120,11 +120,6 @@ const SaveVersionControl = ({
         }
     }
 
-    // Don't render if not dirty
-    if (!isDirty) {
-        return null
-    }
-
     // Simple save button for new pages (no dropdown)
     if (isNewPage) {
         return (
@@ -156,9 +151,19 @@ const SaveVersionControl = ({
                 {/* Main save button */}
                 <button
                     onClick={onSaveClick}
-                    disabled={isSaving}
-                    className="h-6 font-medium px-2 py-1 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1"
-                    title={validationState.hasErrors ? "Save changes (validation errors will be handled)" : "Update current version"}
+                    disabled={isSaving || (!isDirty && !isNewPage)}
+                    className={`h-6 font-medium px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 ${
+                        isDirty || isNewPage ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                    }`}
+                    title={
+                        isSaving 
+                            ? "Saving..." 
+                            : !isDirty && !isNewPage 
+                                ? "No changes to save" 
+                                : validationState.hasErrors 
+                                    ? "Save changes (validation errors will be handled)" 
+                                    : "Update current version"
+                    }
                 >
                     {isSaving ? (
                         <>
@@ -175,13 +180,13 @@ const SaveVersionControl = ({
                     )}
                 </button>
 
-                {/* Dropdown button */}
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     disabled={isSaving}
-                    className={`h-6 font-medium px-2 py-1 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-r border-l border-blue-800 transition-colors flex items-center justify-center space-x-1 ${isOpen ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
-                    title="More save options"
+                    className={`h-6 font-medium px-2 py-1 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-r border-l border-blue-800 transition-colors flex items-center justify-center ${
+                        isOpen ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                    title="More options (versions, undo, save new)"
                 >
                     <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
                 </button>
