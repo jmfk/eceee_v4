@@ -59,10 +59,13 @@ class ObjectTypeDefinition(models.Model):
         help_text="Visual representation of this object type",
     )
     schema = models.JSONField(
-        default=dict, help_text="JSON schema defining the fields for this object type"
+        default=dict,
+        blank=True,
+        help_text="JSON schema defining the fields for this object type"
     )
     slot_configuration = models.JSONField(
         default=dict,
+        blank=True,
         help_text="JSON configuration defining widget slots and restrictions",
     )
     allowed_child_types = models.ManyToManyField(
@@ -98,7 +101,9 @@ class ObjectTypeDefinition(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     metadata = models.JSONField(
-        default=dict, help_text="Additional extensible properties for this object type"
+        default=dict,
+        blank=True,
+        help_text="Additional extensible properties for this object type"
     )
 
     class Meta:
@@ -601,7 +606,9 @@ class ObjectInstance(MPTTModel):
     )
     
     metadata = models.JSONField(
-        default=dict, help_text="Additional extensible properties for this object"
+        default=dict,
+        blank=True,
+        help_text="Additional extensible properties for this object"
     )
     relationships = models.JSONField(
         default=list,
@@ -1577,8 +1584,14 @@ class ObjectVersion(models.Model):
         ObjectInstance, on_delete=models.CASCADE, related_name="versions"
     )
     version_number = models.PositiveIntegerField()
-    data = models.JSONField(help_text="Snapshot of object data at this version")
+    data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Snapshot of object data at this version"
+    )
     widgets = models.JSONField(
+        default=dict,
+        blank=True,
         help_text="Snapshot of widget configurations at this version"
     )
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
