@@ -470,14 +470,7 @@ const ContentCardWidget = ({
 
     // Preview mode
     if (!hasContent) {
-        return (
-            <div className="content-card-widget">
-                <div className="bg-gray-200 h-48 flex items-center justify-center text-gray-500">
-                    <FileText className="h-8 w-8 mr-2" />
-                    No media
-                </div>
-            </div>
-        )
+        return null
     }
 
     return renderDefaultCard()

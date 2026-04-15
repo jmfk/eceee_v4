@@ -105,14 +105,7 @@ const TableWidget = memo(({
     }
 
     if (rows.length === 0) {
-        return (
-            <div className="table-widget">
-                <div className="bg-gray-200 h-24 rounded flex items-center justify-center text-gray-500">
-                    <Table className="h-8 w-8 mr-2" />
-                    No table data
-                </div>
-            </div>
-        )
+        return null
     }
 
     // Check if using component style with Mustache template

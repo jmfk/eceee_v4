@@ -318,18 +318,8 @@ const HeroWidget = ({
         }
     }, [header, beforeText, afterText, mode, handleHeaderChange, handleBeforeTextChange, handleAfterTextChange])
 
-    // Editor mode: show placeholder if no header
+    // Editor mode: show content
     if (mode === 'editor') {
-        if (!header) {
-            return (
-                <div className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center text-gray-400" style={{ minHeight: '300px' }}>
-                    <Sparkles className="w-12 h-12 mb-2" />
-                    <p className="text-sm">No hero header configured</p>
-                    <p className="text-xs mt-1">Configure this widget to add hero content</p>
-                </div>
-            )
-        }
-
         return (
             <div className="hero-widget widget-type-easy-widgets-herowidget relative group" style={heroStyle}>
                 {imageLoading && (

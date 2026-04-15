@@ -4,9 +4,9 @@
  * This is the PageEditor-specific widget factory that wraps shared widget
  * implementations with PageEditor-specific behaviors and integrations.
  */
-import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { getWidgetComponent, getWidgetDisplayName } from '../../widgets'
+import React, { useState, useEffect, useRef, useMemo, Component } from 'react'
+import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, AlertCircle, Edit3 } from 'lucide-react'
+import { getWidgetComponent, getWidgetDisplayName, getWidgetIcon } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import PageWidgetHeader from './PageWidgetHeader'
 import { useClipboard } from '../../contexts/ClipboardContext'
@@ -343,48 +343,54 @@ const PageWidgetFactory = ({
 
                     {/* Core Widget Content - render the actual widget in display mode */}
                     <div className="cms-content-isolated">
-                        <CoreWidgetComponent
-                            config={widget.config || {}}
-                            mode="display"
-                            widgetId={actualWidgetId}
-                            slotName={actualSlotName}
+                        <WidgetErrorBoundary
                             widgetType={widget.type}
-                            layoutRenderer={layoutRenderer}
-                            versionId={versionId}
-                            isPublished={isPublished}
-                            parentComponentId={parentComponentId}
-                            contextType={contextType}
-                            pageId={pageId}
-                            widgetPath={widgetPath}
-                            nestedParentWidgetId={nestedParentWidgetId}
-                            nestedParentSlotName={nestedParentSlotName}
-                            slotConfig={slotMetadata}
-                            context={{
-                                widgetId: actualWidgetId,
-                                slotName: actualSlotName,
-                                contextType,
-                                pageId,
-                                versionId,
-                                webpageData,
-                                pageVersionData,
-                                widgetPath,
-                                namespace,
-                                pathVariables: pathVariables || {},
-                                simulatedPath: simulatedPath,
-                                onSimulatedPathChange: onSimulatedPathChange
-                            }}
-                            // Paste mode props for container widgets
-                            pasteModeActive={pasteModeActive}
-                            onPasteAtPosition={onPasteAtPosition}
-                            // Selection props for container widgets
-                            selectedWidgets={selectedWidgets}
-                            cutWidgets={cutWidgets}
-                            onToggleWidgetSelection={onToggleWidgetSelection}
-                            isWidgetSelected={isWidgetSelected}
-                            isWidgetCut={isWidgetCut}
-                            buildWidgetPath={buildWidgetPath}
-                            parseWidgetPath={parseWidgetPath}
-                        />
+                            mode="display"
+                            onDelete={onDelete ? handleDelete : undefined}
+                        >
+                            <CoreWidgetComponent
+                                config={widget.config || {}}
+                                mode="display"
+                                widgetId={actualWidgetId}
+                                slotName={actualSlotName}
+                                widgetType={widget.type}
+                                layoutRenderer={layoutRenderer}
+                                versionId={versionId}
+                                isPublished={isPublished}
+                                parentComponentId={parentComponentId}
+                                contextType={contextType}
+                                pageId={pageId}
+                                widgetPath={widgetPath}
+                                nestedParentWidgetId={nestedParentWidgetId}
+                                nestedParentSlotName={nestedParentSlotName}
+                                slotConfig={slotMetadata}
+                                context={{
+                                    widgetId: actualWidgetId,
+                                    slotName: actualSlotName,
+                                    contextType,
+                                    pageId,
+                                    versionId,
+                                    webpageData,
+                                    pageVersionData,
+                                    widgetPath,
+                                    namespace,
+                                    pathVariables: pathVariables || {},
+                                    simulatedPath: simulatedPath,
+                                    onSimulatedPathChange: onSimulatedPathChange
+                                }}
+                                // Paste mode props for container widgets
+                                pasteModeActive={pasteModeActive}
+                                onPasteAtPosition={onPasteAtPosition}
+                                // Selection props for container widgets
+                                selectedWidgets={selectedWidgets}
+                                cutWidgets={cutWidgets}
+                                onToggleWidgetSelection={onToggleWidgetSelection}
+                                isWidgetSelected={isWidgetSelected}
+                                isWidgetCut={isWidgetCut}
+                                buildWidgetPath={buildWidgetPath}
+                                parseWidgetPath={parseWidgetPath}
+                            />
+                        </WidgetErrorBoundary>
                     </div>
                 </div>
             )
@@ -514,59 +520,83 @@ const PageWidgetFactory = ({
                     </div>
                 )}
 
-                {/* Core Widget Content */}
+                    {/* Core Widget Content */}
                 <div className="widget-content overflow-hidden border border-gray-200 border-t-0">
                     <div className="cms-content-isolated">
-                        <CoreWidgetComponent
-                            config={widget.config || {}}
-                            mode="editor"
-                            onConfigChange={stableConfigChangeHandler}
-                            widgetId={actualWidgetId}
-                            slotName={actualSlotName}
+                        <WidgetErrorBoundary
                             widgetType={widget.type}
-                            layoutRenderer={layoutRenderer}
-                            versionId={versionId}
-                            isPublished={isPublished}
-                            namespace={namespace}
-                            // Context props for container widgets
-                            parentComponentId={parentComponentId}
-                            contextType={contextType}
-                            pageId={pageId}
-                            onWidgetEdit={onEdit}
-                            onOpenWidgetEditor={onOpenWidgetEditor}
-                            // Widget path for infinite nesting
-                            widgetPath={widgetPath}
-                            // Legacy nested widget context (deprecated)
-                            nestedParentWidgetId={nestedParentWidgetId}
-                            nestedParentSlotName={nestedParentSlotName}
-                            slotConfig={slotMetadata}
-                            context={{
-                                widgetId: actualWidgetId,
-                                slotName: actualSlotName,
-                                contextType,
-                                pageId,
-                                versionId,
-                                webpageData,
-                                pageVersionData,
-                                widgetPath,
-                                namespace,
-                                pathVariables: pathVariables || {},
-                                simulatedPath: simulatedPath,
-                                onSimulatedPathChange: onSimulatedPathChange
+                            mode="editor"
+                            onDelete={onDelete ? handleDelete : undefined}
+                            onOpenEditor={() => {
+                                if (onOpenWidgetEditor) {
+                                    const widgetWithSlot = {
+                                        ...widget,
+                                        slotName: slotName,
+                                        widgetPath: widgetPath,
+                                        context: {
+                                            ...widget.context,
+                                            slotName: slotName,
+                                            widgetId: widget.id,
+                                            mode: 'edit',
+                                            contextType,
+                                            widgetPath: widgetPath
+                                        }
+                                    };
+                                    onOpenWidgetEditor(widgetWithSlot, true); // true = force open
+                                }
                             }}
-                            // Paste mode props for container widgets
-                            pasteModeActive={pasteModeActive}
-                            onPasteAtPosition={onPasteAtPosition}
-                            // Selection props for container widgets (TwoColumnsWidget, ThreeColumnsWidget, etc.)
-                            selectedWidgets={selectedWidgets}
-                            cutWidgets={cutWidgets}
-                            onToggleWidgetSelection={onToggleWidgetSelection}
-                            isWidgetSelected={isWidgetSelected}
-                            isWidgetCut={isWidgetCut}
-                            onDeleteCutWidgets={onDeleteCutWidgets}
-                            buildWidgetPath={buildWidgetPath}
-                            parseWidgetPath={parseWidgetPath}
-                        />
+                        >
+                            <CoreWidgetComponent
+                                config={widget.config || {}}
+                                mode="editor"
+                                onConfigChange={stableConfigChangeHandler}
+                                widgetId={actualWidgetId}
+                                slotName={actualSlotName}
+                                widgetType={widget.type}
+                                layoutRenderer={layoutRenderer}
+                                versionId={versionId}
+                                isPublished={isPublished}
+                                namespace={namespace}
+                                // Context props for container widgets
+                                parentComponentId={parentComponentId}
+                                contextType={contextType}
+                                pageId={pageId}
+                                onWidgetEdit={onEdit}
+                                onOpenWidgetEditor={onOpenWidgetEditor}
+                                // Widget path for infinite nesting
+                                widgetPath={widgetPath}
+                                // Legacy nested widget context (deprecated)
+                                nestedParentWidgetId={nestedParentWidgetId}
+                                nestedParentSlotName={nestedParentSlotName}
+                                slotConfig={slotMetadata}
+                                context={{
+                                    widgetId: actualWidgetId,
+                                    slotName: actualSlotName,
+                                    contextType,
+                                    pageId,
+                                    versionId,
+                                    webpageData,
+                                    pageVersionData,
+                                    widgetPath,
+                                    namespace,
+                                    pathVariables: pathVariables || {},
+                                    simulatedPath: simulatedPath,
+                                    onSimulatedPathChange: onSimulatedPathChange
+                                }}
+                                // Paste mode props for container widgets
+                                pasteModeActive={pasteModeActive}
+                                onPasteAtPosition={onPasteAtPosition}
+                                // Selection props for container widgets (TwoColumnsWidget, ThreeColumnsWidget, etc.)
+                                selectedWidgets={selectedWidgets}
+                                cutWidgets={cutWidgets}
+                                onToggleWidgetSelection={onToggleWidgetSelection}
+                                isWidgetSelected={isWidgetSelected}
+                                isWidgetCut={isWidgetCut}
+                                onDeleteCutWidgets={onDeleteCutWidgets}
+                                buildWidgetPath={buildWidgetPath}
+                                parseWidgetPath={parseWidgetPath}
+                            />
+                        </WidgetErrorBoundary>
                     </div>
                 </div>
 
@@ -636,58 +666,162 @@ const PageWidgetFactory = ({
             data-version-id={versionId}
         >
             <div className="cms-content-isolated">
-                <CoreWidgetComponent
-                    config={widget.config || {}}
-                    mode={mode}
-                    onConfigChange={stableConfigChangeHandler}
-                    widgetId={actualWidgetId}
-                    slotName={actualSlotName}
+                <WidgetErrorBoundary
                     widgetType={widget.type}
-                    // PageEditor-specific props
-                    layoutRenderer={layoutRenderer}
-                    versionId={versionId}
-                    isPublished={isPublished}
-                    // Context props for container widgets
-                    parentComponentId={parentComponentId}
-                    contextType={contextType}
-                    pageId={pageId}
-                    onWidgetEdit={onEdit}
-                    onOpenWidgetEditor={onOpenWidgetEditor}
-                    // Widget path for infinite nesting
-                    widgetPath={widgetPath}
-                    // Legacy nested widget context (deprecated)
-                    nestedParentWidgetId={nestedParentWidgetId}
-                    nestedParentSlotName={nestedParentSlotName}
-                    slotConfig={slotMetadata}
-                    context={{
-                        widgetId: actualWidgetId,
-                        slotName: actualSlotName,
-                        contextType,
-                        pageId,
-                        versionId,
-                        webpageData,
-                        pageVersionData,
-                        widgetPath,
-                        pathVariables: pathVariables || {},
-                        simulatedPath: simulatedPath,
-                        onSimulatedPathChange: onSimulatedPathChange
-                    }}
-                    // Paste mode props for container widgets
-                    pasteModeActive={pasteModeActive}
-                    onPasteAtPosition={onPasteAtPosition}
-                    // Selection props for container widgets
-                    selectedWidgets={selectedWidgets}
-                    cutWidgets={cutWidgets}
-                    onToggleWidgetSelection={onToggleWidgetSelection}
-                    isWidgetSelected={isWidgetSelected}
-                    isWidgetCut={isWidgetCut}
-                    onDeleteCutWidgets={onDeleteCutWidgets}
-                    buildWidgetPath={buildWidgetPath}
-                    parseWidgetPath={parseWidgetPath}
-                />
+                    mode={mode}
+                    onDelete={onDelete ? handleDelete : undefined}
+                >
+                    <CoreWidgetComponent
+                        config={widget.config || {}}
+                        mode={mode}
+                        onConfigChange={stableConfigChangeHandler}
+                        widgetId={actualWidgetId}
+                        slotName={actualSlotName}
+                        widgetType={widget.type}
+                        // PageEditor-specific props
+                        layoutRenderer={layoutRenderer}
+                        versionId={versionId}
+                        isPublished={isPublished}
+                        // Context props for container widgets
+                        parentComponentId={parentComponentId}
+                        contextType={contextType}
+                        pageId={pageId}
+                        onWidgetEdit={onEdit}
+                        onOpenWidgetEditor={onOpenWidgetEditor}
+                        // Widget path for infinite nesting
+                        widgetPath={widgetPath}
+                        // Legacy nested widget context (deprecated)
+                        nestedParentWidgetId={nestedParentWidgetId}
+                        nestedParentSlotName={nestedParentSlotName}
+                        slotConfig={slotMetadata}
+                        context={{
+                            widgetId: actualWidgetId,
+                            slotName: actualSlotName,
+                            contextType,
+                            pageId,
+                            versionId,
+                            webpageData,
+                            pageVersionData,
+                            widgetPath,
+                            pathVariables: pathVariables || {},
+                            simulatedPath: simulatedPath,
+                            onSimulatedPathChange: onSimulatedPathChange
+                        }}
+                        // Paste mode props for container widgets
+                        pasteModeActive={pasteModeActive}
+                        onPasteAtPosition={onPasteAtPosition}
+                        // Selection props for container widgets
+                        selectedWidgets={selectedWidgets}
+                        cutWidgets={cutWidgets}
+                        onToggleWidgetSelection={onToggleWidgetSelection}
+                        isWidgetSelected={isWidgetSelected}
+                        isWidgetCut={isWidgetCut}
+                        onDeleteCutWidgets={onDeleteCutWidgets}
+                        buildWidgetPath={buildWidgetPath}
+                        parseWidgetPath={parseWidgetPath}
+                    />
+                </WidgetErrorBoundary>
             </div>
         </div>
     )
 }
+
+/**
+ * Error Boundary for Widgets
+ */
+class WidgetErrorBoundary extends Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error(`Error rendering widget ${this.props.widgetType}:`, error, errorInfo);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            const { widgetType, mode, onDelete } = this.props;
+            const displayName = getWidgetDisplayName(widgetType);
+
+            if (mode === 'editor' || mode === 'edit') {
+                return (
+                    <div className="widget-error-placeholder p-6 border-2 border-dashed border-red-300 bg-red-50 rounded-lg text-center">
+                        <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+                        <div className="text-red-900 font-semibold mb-1">Rendering Error: {displayName}</div>
+                        <div className="text-red-600 text-xs mb-4 font-mono overflow-hidden text-ellipsis whitespace-nowrap">
+                            {this.state.error?.message || 'Unknown error'}
+                        </div>
+                        <div className="flex justify-center gap-2">
+                            {onDelete && (
+                                <button
+                                    onClick={onDelete}
+                                    className="px-3 py-1.5 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors flex items-center gap-1"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                    Delete Broken Widget
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            // In display mode, show nothing or a very subtle indicator
+            return null;
+        }
+
+        return <WidgetEmptyStateHandler {...this.props}>{this.props.children}</WidgetEmptyStateHandler>;
+    }
+}
+
+/**
+ * Handler for Empty Widget States
+ * Detects if a widget returns null and shows a placeholder in editor mode
+ */
+const WidgetEmptyStateHandler = ({ children, widgetType, mode, onOpenEditor }) => {
+    const [isEmpty, setIsEmpty] = useState(false);
+    const contentRef = useRef(null);
+
+    // Check if the rendered content is empty
+    useEffect(() => {
+        if (mode === 'editor' || mode === 'edit') {
+            const hasContent = contentRef.current && contentRef.current.childNodes.length > 0;
+            setIsEmpty(!hasContent);
+        }
+    }, [children, mode]);
+
+    if (isEmpty && (mode === 'editor' || mode === 'edit')) {
+        const displayName = getWidgetDisplayName(widgetType);
+        const Icon = getWidgetIcon(widgetType) || Layout;
+
+        return (
+            <div
+                className="widget-empty-placeholder p-8 border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                onClick={onOpenEditor}
+            >
+                <Icon className="w-10 h-10 text-gray-400 mx-auto mb-2 group-hover:text-blue-500 transition-colors" />
+                <div className="text-gray-600 font-medium mb-1">{displayName}</div>
+                <p className="text-gray-400 text-xs mb-4">This widget has no content to display</p>
+                <button
+                    className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-blue-600 hover:border-blue-300 transition-all shadow-sm"
+                >
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Configure Widget
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div ref={contentRef} className="widget-content-wrapper">
+            {children}
+        </div>
+    );
+};
 
 export default PageWidgetFactory

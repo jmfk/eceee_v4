@@ -522,10 +522,7 @@ const ImageWidget = ({
                                 (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
                             )
                         ) : (
-                            <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
-                                <Image className="h-8 w-8 mr-2" />
-                                Image placeholder
-                            </div>
+                            null
                         )}
                     </div>
                 </div>
@@ -533,14 +530,7 @@ const ImageWidget = ({
         }
 
         if (items.length === 0) {
-            return (
-                <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]}`}>
-                    <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
-                        <Image className="h-8 w-8 mr-2" />
-                        No media
-                    </div>
-                </div>
-            );
+            return null;
         }
 
         return (
