@@ -287,6 +287,8 @@ const MediaInsertModal = ({
     const handleInsert = () => {
         if (!selectedMedia) return;
 
+        fetch('http://127.0.0.1:7409/ingest/58533e3c-51e9-4935-a7d0-7bc3d15ac8e7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'530273'},body:JSON.stringify({sessionId:'530273',location:'MediaInsertModal.jsx:290',message:'handleInsert called',data:{enableLightbox:config.enableLightbox,mediaId:selectedMedia.id},timestamp:Date.now()})}).catch(()=>{});
+
         if (onInsert) {
             onInsert({
                 mediaData: selectedMedia,
@@ -306,6 +308,8 @@ const MediaInsertModal = ({
 
     const handleSave = () => {
         if (!selectedMedia) return;
+
+        fetch('http://127.0.0.1:7409/ingest/58533e3c-51e9-4935-a7d0-7bc3d15ac8e7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'530273'},body:JSON.stringify({sessionId:'530273',location:'MediaInsertModal.jsx:310',message:'handleSave called',data:{enableLightbox:config.enableLightbox,mediaId:selectedMedia.id},timestamp:Date.now()})}).catch(()=>{});
 
         if (onSave) {
             onSave({
