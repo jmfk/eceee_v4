@@ -331,6 +331,8 @@ class ContentWidget(BaseWidget):
             media_id = media_insert.get("data-media-id")
             caption = media_insert.get("data-caption", "")
             title = media_insert.get("data-title", "")
+            width = media_insert.get("data-width", "full")
+            align = media_insert.get("data-align", "center")
 
             if not media_id:
                 continue
@@ -338,9 +340,11 @@ class ContentWidget(BaseWidget):
             styled_html = self._render_media_insert_with_style(
                 media_id, media_type, image_style, theme, caption, title,
                 lightbox_image_style=lightbox_image_style,
+                width=width,
+                align=align,
             )
 
-            if styled_html:
+        if styled_html:
                 new_tag = BeautifulSoup(styled_html, "html.parser")
                 media_insert.replace_with(new_tag)
 
@@ -386,7 +390,7 @@ class ContentWidget(BaseWidget):
 
     def _render_media_insert_with_style(
         self, media_id, media_type, style_name, theme, caption="", title="",
-        lightbox_image_style=None,
+        lightbox_image_style=None, width="full", align="center",
     ):
         """
         Render a media insert with an image style from the theme.
@@ -402,6 +406,8 @@ class ContentWidget(BaseWidget):
             title: User-provided title from data-title attribute
             lightbox_image_style: Name of an image style whose imgproxy_config
                                   is used for lightbox full-size images
+            width: Width setting ('full', 'half', 'third')
+            align: Alignment setting ('left', 'center', 'right')
 
         Returns:
             HTML string with styled content, or None on error
@@ -484,10 +490,22 @@ class ContentWidget(BaseWidget):
 
                 has_template = style and style.get("template", "").strip()
                 if imgproxy_config and not has_template:
+                    # Default container width (matches frontend)
+                    slot_width = 896
+
+                    # Apply multipliers based on width setting
+                    multipliers = {"full": 1.0, "half": 0.5, "third": 0.33}
+                    multiplier = multipliers.get(width, 1.0)
+                    target_width = int(slot_width * multiplier)
+
+                    # Respect original image size (never upscale)
+                    if media_file.width and target_width > media_file.width:
+                        target_width = media_file.width
+
                     max_width = (
                         imgproxy_config.get("max_width")
                         or imgproxy_config.get("width")
-                        or media_file.width
+                        or target_width
                     )
                     max_height = (
                         imgproxy_config.get("max_height")
@@ -512,6 +530,14 @@ class ContentWidget(BaseWidget):
                     )
                     srcset_attr = f' srcset="{srcset}"' if srcset else ""
 
+                    # Use width and alignment classes for display
+                    width_class = f"img-width-{width}"
+                    align_class = f"media-align-{align}"
+
+                    img_tag = (
+                        f'<img src="{img_url}"{srcset_attr}'
+                        f' alt="{alt}" class="{width_class}" loading="lazy" />'
+                    )
                     # Generate lightbox URL using lightbox_config
                     lb_url = file_url
                     if lightbox_config:
@@ -540,10 +566,6 @@ class ContentWidget(BaseWidget):
                         except Exception:
                             pass
 
-                    img_tag = (
-                        f'<img src="{img_url}"{srcset_attr}'
-                        f' alt="{alt}" loading="lazy" />'
-                    )
                     if lightbox_config:
                         img_tag = (
                             f'<a data-lightbox data-lightbox-src="{lb_url}"'
@@ -552,7 +574,7 @@ class ContentWidget(BaseWidget):
                         )
 
                     return (
-                        f'<figure class="media-insert-styled">'
+                        f'<figure class="media-insert {width_class} {align_class}">'
                         f"{img_tag}{cap_html}</figure>"
                     )
 

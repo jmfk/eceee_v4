@@ -582,6 +582,8 @@ const MediaInsertModal = ({
                                                         alt={selectedMedia.title}
                                                         width={96}
                                                         height={96}
+                                                        actualWidth={selectedMedia.width || selectedMedia.originalWidth}
+                                                        actualHeight={selectedMedia.height || selectedMedia.originalHeight}
                                                         resizeType="fill"
                                                         className="rounded object-cover"
                                                     />
