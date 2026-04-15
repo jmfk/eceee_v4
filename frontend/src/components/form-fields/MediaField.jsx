@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Image, FolderOpen, X, Eye } from 'lucide-react'
 import MediaSelectModal from '../media/MediaSelectModal'
+import OptimizedImage from '../media/OptimizedImage'
 
 /**
  * MediaField - Form field component for media selection
@@ -123,14 +124,19 @@ const MediaField = ({
                             <div key={file.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
                                 {/* Media Preview */}
                                 <div className="flex-shrink-0">
-                                    {file.fileType?.startsWith('image/') ? (
-                                        <img
+                                    {file.fileType?.startsWith('image/') || file.file_type?.startsWith('image/') ? (
+                                        <OptimizedImage
                                             src={file.thumbnailUrl || file.imgproxyBaseUrl || file.fileUrl}
                                             alt={file.title}
-                                            className="w-12 h-12 object-cover rounded"
-                                            onError={(e) => {
-                                                e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="12">IMG</text></svg>'
-                                            }}
+                                            width={48}
+                                            height={48}
+                                            resizeType="fill"
+                                            className="w-12 h-12 rounded object-cover"
+                                            fallback={
+                                                <div className="w-12 h-12 bg-blue-100 rounded flex items-center justify-center">
+                                                    <Image className="w-6 h-6 text-blue-600" />
+                                                </div>
+                                            }
                                         />
                                     ) : (
                                         <div className="w-12 h-12 bg-blue-100 rounded flex items-center justify-center">

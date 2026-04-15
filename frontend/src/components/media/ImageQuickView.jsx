@@ -37,9 +37,12 @@ const ImageQuickView = ({ image, onClose }) => {
             className="fixed inset-0 z-[10010] flex items-center justify-center p-4 cursor-pointer"
             onClick={onClose}
         >
-            <img
+            <OptimizedImage
                 src={originalUrl}
                 alt={image.title || image.original_filename || 'Image'}
+                width={1920}
+                height={1080}
+                resizeType="fit"
                 className="max-w-full max-h-full object-contain"
             />
         </div>
