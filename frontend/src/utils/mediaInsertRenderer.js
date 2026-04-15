@@ -6,6 +6,14 @@
 import { mediaApi } from '../api';
 import { getImageAspectRatio, getGridSpan } from './imageGridLayout';
 
+export const DEFAULT_IMGPROXY_CONFIG = {
+    resize_type: 'fit',
+    quality: 85,
+    format: 'webp',
+};
+
+const IMGPROXY_BASE_URL = import.meta.env.VITE_IMGPROXY_URL || 'http://localhost:8080';
+
 /**
  * Fetch media data by ID and type
  * @param {string|number} mediaId - Media or collection ID
@@ -32,32 +40,50 @@ export async function fetchMediaData(mediaId, mediaType) {
  * @param {string} baseUrl - Base URL or imgproxy base URL
  * @param {number} width - Desired width
  * @param {number} height - Desired height (optional, will maintain aspect ratio if null/0)
+ * @param {Object} imgproxyConfig - Optional imgproxy config from image style
  * @returns {string} Optimized image URL
  */
-export function generateImgproxyUrl(baseUrl, width, height = null) {
+export function generateImgproxyUrl(baseUrl, width, height = null, imgproxyConfig = null) {
     if (!baseUrl) return '';
 
-    // If it's already an imgproxy URL or full URL, use it directly
-    if (baseUrl.includes('http://') || baseUrl.includes('https://')) {
+    if (baseUrl.includes('/insecure/') || baseUrl.includes('/unsafe/')) {
         return baseUrl;
     }
 
-    // Build imgproxy URL with width and optional height
-    // Format: /insecure/resize:fit:WIDTH:HEIGHT:0/plain/BASE_URL
-    const h = height || 0; // 0 means maintain aspect ratio
+    const cfg = imgproxyConfig || {};
+    const resizeType = cfg.resize_type || cfg.resizeType || 'fit';
+    const w = cfg.max_width || cfg.maxWidth || cfg.width || width;
+    const h = cfg.max_height || cfg.maxHeight || cfg.height || height || 0;
+
+    const parts = [`resize:${resizeType}:${w}:${h}:0`];
+
+    const gravity = cfg.gravity;
+    if (gravity && gravity !== 'sm') {
+        parts.push(`gravity:${gravity}`);
+    }
+    const quality = cfg.quality;
+    if (quality) {
+        parts.push(`quality:${quality}`);
+    }
+    const format = cfg.format;
+    if (format) {
+        parts.push(`format:${format}`);
+    }
+
     const encodedUrl = btoa(baseUrl).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    return `/imgproxy/insecure/resize:fit:${width}:${h}:0/plain/${encodedUrl}`;
+    return `${IMGPROXY_BASE_URL}/insecure/${parts.join('/')}/${encodedUrl}`;
 }
 
 /**
  * Render a single image with imgproxy optimization
  * @param {Object} mediaData - Media file data
- * @param {Object} config - Configuration (width, align, caption)
+ * @param {Object} config - Configuration (width, align, caption, imgproxyConfig)
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
  * @returns {string} HTML string for image element
  */
 export function renderMediaImage(mediaData, config, slotDimensions = null) {
     const { width = 'full', align = 'center', altText = '' } = config;
+    const imgproxyConfig = config.imgproxyConfig || DEFAULT_IMGPROXY_CONFIG;
 
     // Get desktop slot width (default to 896px if not available)
     const slotWidth = slotDimensions?.desktop?.width || 896;
@@ -75,20 +101,19 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
     const originalHeight = mediaData.height || mediaData.originalHeight;
     const imgHeight = (originalWidth && originalHeight)
         ? Math.round((originalHeight / originalWidth) * imgWidth)
-        : null; // Let imgproxy maintain aspect ratio if we don't know it
+        : null;
 
-    // Generate optimized image URL with calculated dimensions
+    // Generate optimized image URL with calculated dimensions and optional style config
     const imageUrl = generateImgproxyUrl(
         mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url,
         imgWidth,
-        imgHeight
+        imgHeight,
+        imgproxyConfig
     );
 
     // Use altText from config if provided, otherwise fallback to media data
     const alt = altText || mediaData.alt || mediaData.title || mediaData.original_filename || 'Image';
 
-    // Add CSS class for responsive width (full/half/third)
-    // These will be defined to use percentages: 100%, 50%, ~33%
     const widthClass = `img-width-${width}`;
 
     const imgEl = `<img 
@@ -102,7 +127,15 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
     if (config.enableLightbox) {
         const lbStyle = config.lightboxStyle || 'default';
         const lbGroup = config.lightboxGroup || '';
-        const fullSrc = mediaData.absoluteUrl || mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl || imageUrl;
+        const baseUrl = mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url;
+
+        const lbImgproxyConfig = config.lightboxImgproxyConfig || DEFAULT_IMGPROXY_CONFIG;
+        const lbWidth = lbImgproxyConfig.max_width || lbImgproxyConfig.maxWidth || lbImgproxyConfig.width || originalWidth || 1920;
+        const lbHeight = lbImgproxyConfig.max_height || lbImgproxyConfig.maxHeight || lbImgproxyConfig.height || 0;
+        const fullSrc = baseUrl
+            ? generateImgproxyUrl(baseUrl, lbWidth, lbHeight, lbImgproxyConfig)
+            : imageUrl;
+
         const caption = config.caption || mediaData.title || '';
         return `<a data-lightbox data-lightbox-style="${escapeHtml(lbStyle)}"${lbGroup ? ` data-lightbox-group="${escapeHtml(lbGroup)}"` : ''} data-lightbox-src="${escapeHtml(fullSrc)}" data-lightbox-caption="${escapeHtml(caption)}">${imgEl}</a>`;
     }
@@ -141,7 +174,8 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
         const imageUrl = generateImgproxyUrl(
             file.imgproxyBaseUrl || file.fileUrl || file.file_url,
             thumbnailWidth,
-            thumbnailHeight
+            thumbnailHeight,
+            config.imgproxyConfig || DEFAULT_IMGPROXY_CONFIG
         );
         const alt = file.alt || file.title || file.original_filename || 'Image';
         
@@ -182,7 +216,10 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         align = 'center',
         caption = '',
         altText = '',
-        galleryStyle = null
+        galleryStyle = null,
+        imageStyle = null,
+        lightboxImageStyle = null,
+        imgproxyConfig = null
     } = config;
 
     // Generate inner content based on media type
@@ -206,7 +243,10 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
     const mediaTitle = mediaData?.title || mediaData?.original_filename || '';
 
     // Create the complete media insert div
-    const galleryStyleAttr = galleryStyle ? `data-gallery-style="${galleryStyle}"` : '';
+    const resolvedStyle = imageStyle || galleryStyle;
+    const galleryStyleAttr = resolvedStyle ? `data-gallery-style="${resolvedStyle}"` : '';
+    const imageStyleAttr = resolvedStyle ? `data-image-style="${resolvedStyle}"` : '';
+    const lbImageStyleAttr = lightboxImageStyle ? `data-lightbox-image-style="${lightboxImageStyle}"` : '';
     const captionAttr = caption ? `data-caption="${escapeHtml(caption)}"` : '';
     const altTextAttr = altText ? `data-alt-text="${escapeHtml(altText)}"` : '';
     const titleAttr = mediaTitle ? `data-title="${escapeHtml(mediaTitle)}"` : '';
@@ -218,6 +258,8 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         data-width="${width}"
         data-align="${align}"
         ${galleryStyleAttr}
+        ${imageStyleAttr}
+        ${lbImageStyleAttr}
         ${captionAttr}
         ${altTextAttr}
         ${titleAttr}
@@ -243,7 +285,9 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
         align = 'center',
         caption = '',
         altText = '',
-        galleryStyle = null
+        galleryStyle = null,
+        imageStyle = null,
+        lightboxImageStyle = null
     } = config;
 
     // Generate updated inner content
@@ -278,11 +322,20 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
     element.setAttribute('data-media-id', mediaData.id);
     element.setAttribute('data-media-type', mediaType);
     
-    // Update gallery style attribute
-    if (galleryStyle) {
-        element.setAttribute('data-gallery-style', galleryStyle);
+    // Update gallery/image style attributes
+    const resolvedStyle = imageStyle || galleryStyle;
+    if (resolvedStyle) {
+        element.setAttribute('data-gallery-style', resolvedStyle);
+        element.setAttribute('data-image-style', resolvedStyle);
     } else {
         element.removeAttribute('data-gallery-style');
+        element.removeAttribute('data-image-style');
+    }
+
+    if (lightboxImageStyle) {
+        element.setAttribute('data-lightbox-image-style', lightboxImageStyle);
+    } else {
+        element.removeAttribute('data-lightbox-image-style');
     }
     
     // Update caption, altText and title attributes
@@ -308,35 +361,8 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
     // Update innerHTML
     element.innerHTML = innerContent + captionHtml;
     
-    // If single image with lightbox enabled, annotate the inner anchor
-    if (mediaData && config.mediaType === 'image') {
-        const a = element.querySelector('[data-lightbox]');
-        if (config.enableLightbox) {
-            const fullSrc = mediaData.absoluteUrl || mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl;
-            if (a) {
-                a.setAttribute('data-lightbox', '');
-                a.setAttribute('data-lightbox-style', config.lightboxStyle || 'default');
-                if (config.lightboxGroup) {
-                    a.setAttribute('data-lightbox-group', config.lightboxGroup);
-                } else {
-                    a.removeAttribute('data-lightbox-group');
-                }
-                a.setAttribute('data-lightbox-src', fullSrc || '');
-                if (config.caption) {
-                    a.setAttribute('data-lightbox-caption', config.caption);
-                } else {
-                    a.removeAttribute('data-lightbox-caption');
-                }
-            }
-        } else if (a) {
-            // Remove lightbox attributes if disabled
-            a.removeAttribute('data-lightbox');
-            a.removeAttribute('data-lightbox-style');
-            a.removeAttribute('data-lightbox-group');
-            a.removeAttribute('data-lightbox-src');
-            a.removeAttribute('data-lightbox-caption');
-        }
-    }
+    // renderMediaImage already handles lightbox anchor generation,
+    // so no additional annotation is needed here.
 
     return element.outerHTML;
 }
@@ -348,6 +374,13 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
  */
 export function extractMediaConfig(element) {
     const caption = element.querySelector('.media-caption')?.textContent || '';
+    const styleKey = element.getAttribute('data-image-style') || element.getAttribute('data-gallery-style') || null;
+
+    // Extract lightbox state from inner anchor element
+    const lbAnchor = element.querySelector('[data-lightbox]');
+    const enableLightbox = !!lbAnchor;
+    const lightboxStyle = lbAnchor?.getAttribute('data-lightbox-style') || 'default';
+    const lightboxGroup = lbAnchor?.getAttribute('data-lightbox-group') || '';
 
     return {
         mediaType: element.getAttribute('data-media-type') || 'image',
@@ -356,7 +389,12 @@ export function extractMediaConfig(element) {
         align: element.getAttribute('data-align') || 'center',
         caption: caption,
         altText: element.getAttribute('data-alt-text') || '',
-        galleryStyle: element.getAttribute('data-gallery-style') || null
+        galleryStyle: styleKey,
+        imageStyle: styleKey,
+        lightboxImageStyle: element.getAttribute('data-lightbox-image-style') || null,
+        enableLightbox,
+        lightboxStyle,
+        lightboxGroup
     };
 }
 

@@ -12,6 +12,12 @@ from webpages.widget_registry import BaseWidget, register_widget_type
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_IMGPROXY_CONFIG = {
+    "resize_type": "fit",
+    "quality": 85,
+    "format": "webp",
+}
+
 
 class ContentConfig(BaseModel):
     """Configuration for Content widget"""
@@ -310,35 +316,33 @@ class ContentWidget(BaseWidget):
 
         # Get theme from context (provided by the rendering system)
         theme = context.get("theme")
-        # Only process media inserts if theme is available
-        if theme:
-            # Find all media inserts with gallery style
-            media_inserts = soup.find_all("div", {"data-media-insert": "true"})
 
-            for media_insert in media_inserts:
-                gallery_style = media_insert.get("data-gallery-style")
+        # Process all media inserts (with or without theme)
+        media_inserts = soup.find_all("div", {"data-media-insert": "true"})
 
-                # Only process if gallery style is set and not default
-                if not gallery_style or gallery_style == "default":
-                    continue
+        for media_insert in media_inserts:
+            image_style = (
+                media_insert.get("data-image-style")
+                or media_insert.get("data-gallery-style")
+            )
+            lightbox_image_style = media_insert.get("data-lightbox-image-style")
 
-                media_type = media_insert.get("data-media-type", "image")
-                media_id = media_insert.get("data-media-id")
-                caption = media_insert.get("data-caption", "")
-                title = media_insert.get("data-title", "")
+            media_type = media_insert.get("data-media-type", "image")
+            media_id = media_insert.get("data-media-id")
+            caption = media_insert.get("data-caption", "")
+            title = media_insert.get("data-title", "")
 
-                if not media_id:
-                    continue
+            if not media_id:
+                continue
 
-                # Render with style
-                styled_html = self._render_media_insert_with_style(
-                    media_id, media_type, gallery_style, theme, caption, title
-                )
+            styled_html = self._render_media_insert_with_style(
+                media_id, media_type, image_style, theme, caption, title,
+                lightbox_image_style=lightbox_image_style,
+            )
 
-                if styled_html:
-                    # Replace the media insert with styled HTML
-                    new_tag = BeautifulSoup(styled_html, "html.parser")
-                    media_insert.replace_with(new_tag)
+            if styled_html:
+                new_tag = BeautifulSoup(styled_html, "html.parser")
+                media_insert.replace_with(new_tag)
 
         # Resolve link objects in HTML content
         from webpages.services.link_resolver import resolve_links_in_html
@@ -381,47 +385,79 @@ class ContentWidget(BaseWidget):
         return template_config
 
     def _render_media_insert_with_style(
-        self, media_id, media_type, style_name, theme, caption="", title=""
+        self, media_id, media_type, style_name, theme, caption="", title="",
+        lightbox_image_style=None,
     ):
         """
-        Render a media insert with a gallery style.
+        Render a media insert with an image style from the theme.
+
+        Uses DEFAULT_IMGPROXY_CONFIG when no style is specified or found.
 
         Args:
             media_id: ID of media file or collection
             media_type: 'image' or 'collection'
-            style_name: Name of the gallery style from theme
+            style_name: Name of the image style from theme (None for default)
             theme: PageTheme instance
             caption: User-provided caption from data-caption attribute
             title: User-provided title from data-title attribute
+            lightbox_image_style: Name of an image style whose imgproxy_config
+                                  is used for lightbox full-size images
 
         Returns:
-            HTML string with styled gallery, or None if style not found
+            HTML string with styled content, or None on error
         """
         from webpages.utils.mustache_renderer import (
             render_mustache,
             prepare_gallery_context,
         )
         from file_manager.models import MediaFile, MediaCollection
+        from file_manager.imgproxy import imgproxy_service
 
-        # Get gallery style from theme
-        gallery_styles = theme.gallery_styles or {}
-        style = gallery_styles.get(style_name)
+        def _resolve_style(key):
+            if not key or not theme:
+                return None
+            s = (theme.image_styles or {}).get(key)
+            if not s:
+                s = (theme.gallery_styles or {}).get(key)
+            return s
 
-        if not style:
-            logger.warning(f"Gallery style '{style_name}' not found in theme")
-            return None
+        style = None
+        if style_name:
+            style = _resolve_style(style_name)
+            if not style:
+                logger.warning(f"Image style '{style_name}' not found in theme")
+
+        imgproxy_config = DEFAULT_IMGPROXY_CONFIG.copy()
+        if style:
+            style_cfg = (
+                style.get("imgproxy_config") or style.get("imgproxyConfig") or {}
+            )
+            imgproxy_config.update(style_cfg)
+
+        # Resolve lightbox config: prefer explicit lightbox image style, then
+        # fall back to the style's own lightbox_config
+        lightbox_config = {}
+        if lightbox_image_style:
+            lb_style = _resolve_style(lightbox_image_style)
+            if lb_style:
+                lightbox_config = (
+                    lb_style.get("imgproxy_config")
+                    or lb_style.get("imgproxyConfig")
+                    or {}
+                )
+        if not lightbox_config and style:
+            lightbox_config = (
+                style.get("lightbox_config") or style.get("lightboxConfig") or {}
+            )
 
         # Fetch media data
         items = []
         try:
             if media_type == "collection":
-                # Fetch collection and its files
                 collection = MediaCollection.objects.prefetch_related("files").get(
                     id=media_id
                 )
                 files = collection.files.all()
-
-                # Convert to items list
                 for file in files:
                     items.append(
                         {
@@ -439,16 +475,91 @@ class ContentWidget(BaseWidget):
                         }
                     )
             else:
-                # Single image
                 media_file = MediaFile.objects.get(id=media_id)
+                file_url = (
+                    media_file.get_file_url()
+                    if hasattr(media_file, "get_file_url")
+                    else media_file.file_url
+                )
+
+                has_template = style and style.get("template", "").strip()
+                if imgproxy_config and not has_template:
+                    max_width = (
+                        imgproxy_config.get("max_width")
+                        or imgproxy_config.get("width")
+                        or media_file.width
+                    )
+                    max_height = (
+                        imgproxy_config.get("max_height")
+                        or imgproxy_config.get("height")
+                    )
+                    responsive = imgproxy_service.generate_responsive_urls(
+                        source_url=file_url,
+                        max_width=max_width,
+                        max_height=max_height,
+                        original_width=media_file.width,
+                        original_height=media_file.height,
+                        resize_type=imgproxy_config.get("resize_type", "fit"),
+                        gravity=imgproxy_config.get("gravity", "sm"),
+                        quality=imgproxy_config.get("quality"),
+                        format=imgproxy_config.get("format"),
+                    )
+                    img_url = responsive.get("1x", {}).get("url", file_url)
+                    srcset = responsive.get("srcset", "")
+                    alt = title or media_file.title or ""
+                    cap_html = (
+                        f'<figcaption>{caption}</figcaption>' if caption else ""
+                    )
+                    srcset_attr = f' srcset="{srcset}"' if srcset else ""
+
+                    # Generate lightbox URL using lightbox_config
+                    lb_url = file_url
+                    if lightbox_config:
+                        try:
+                            lb_w = lightbox_config.get(
+                                "max_width",
+                                lightbox_config.get("width", media_file.width),
+                            )
+                            lb_h = lightbox_config.get(
+                                "max_height",
+                                lightbox_config.get("height"),
+                            )
+                            lb_data = imgproxy_service.generate_responsive_urls(
+                                source_url=file_url,
+                                max_width=lb_w,
+                                max_height=lb_h,
+                                original_width=media_file.width,
+                                original_height=media_file.height,
+                                resize_type=lightbox_config.get("resize_type", "fit"),
+                                gravity=lightbox_config.get("gravity", "sm"),
+                                quality=lightbox_config.get("quality"),
+                                format=lightbox_config.get("format"),
+                            )
+                            if lb_data and "1x" in lb_data:
+                                lb_url = lb_data["1x"]["url"]
+                        except Exception:
+                            pass
+
+                    img_tag = (
+                        f'<img src="{img_url}"{srcset_attr}'
+                        f' alt="{alt}" loading="lazy" />'
+                    )
+                    if lightbox_config:
+                        img_tag = (
+                            f'<a data-lightbox data-lightbox-src="{lb_url}"'
+                            f' data-lightbox-caption="{caption}">'
+                            f"{img_tag}</a>"
+                        )
+
+                    return (
+                        f'<figure class="media-insert-styled">'
+                        f"{img_tag}{cap_html}</figure>"
+                    )
+
                 items.append(
                     {
                         "id": str(media_file.id),
-                        "url": (
-                            media_file.get_file_url()
-                            if hasattr(media_file, "get_file_url")
-                            else media_file.file_url
-                        ),
+                        "url": file_url,
                         "alt_text": title or media_file.title or "",
                         "caption": caption or media_file.description or "",
                         "title": title or media_file.title or "",
@@ -463,17 +574,14 @@ class ContentWidget(BaseWidget):
         if not items:
             return None
 
-        # Prepare config for gallery rendering
+        if not style or not style.get("template", "").strip():
+            return None
+
         gallery_config = {
-            "show_captions": True,
-            "enable_lightbox": True,
+            "show_captions": style.get("defaultShowCaptions", True),
+            "enable_lightbox": style.get("enableLightbox", True),
         }
 
-        # Get imgproxy config from style
-        imgproxy_config = style.get("imgproxy_config")
-        lightbox_config = style.get("lightbox_config")
-
-        # Prepare context for Mustache rendering
         context = prepare_gallery_context(
             items,
             gallery_config,
@@ -482,11 +590,15 @@ class ContentWidget(BaseWidget):
             lightbox_config,
         )
 
-        # Render template
         html = render_mustache(style.get("template", ""), context)
 
-        # Wrap with style CSS if present
         css = style.get("css", "")
+        if isinstance(css, dict):
+            css_parts = []
+            for bp, bp_css in css.items():
+                if bp_css:
+                    css_parts.append(bp_css)
+            css = "\n".join(css_parts)
         if css:
             html = f"<style>{css}</style>\n{html}"
 

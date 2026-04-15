@@ -17,7 +17,9 @@ import { useTheme } from '../../hooks/useTheme';
 import OverrideSettingsModal from './OverrideSettingsModal';
 import CollectionThumbnailGrid from './CollectionThumbnailGrid';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
+import OptimizedImage from './OptimizedImage';
 import { mediaCollectionsApi, mediaApi } from '../../api';
+import { DEFAULT_IMGPROXY_CONFIG } from '../../utils/mediaInsertRenderer';
 
 const MediaInsertModal = ({
     // Common props
@@ -73,6 +75,7 @@ const MediaInsertModal = ({
         enableLightbox: false,
         lightboxStyle: 'default',
         lightboxGroup: '',
+        lightboxImageStyle: null,
         // Override settings
         showCaptions: undefined,
         randomize: undefined,
@@ -135,6 +138,7 @@ const MediaInsertModal = ({
                     enableLightbox: initialConfig.enableLightbox !== undefined ? initialConfig.enableLightbox : false,
                     lightboxStyle: initialConfig.lightboxStyle || 'default',
                     lightboxGroup: initialConfig.lightboxGroup || '',
+                    lightboxImageStyle: initialConfig.lightboxImageStyle || null,
                     // Override settings (preserve undefined if not set)
                     showCaptions: initialConfig.showCaptions,
                     randomize: initialConfig.randomize,
@@ -172,6 +176,7 @@ const MediaInsertModal = ({
                     enableLightbox: false,
                     lightboxStyle: 'default',
                     lightboxGroup: '',
+                    lightboxImageStyle: null,
                     // Override settings
                     showCaptions: undefined,
                     randomize: undefined,
@@ -206,7 +211,8 @@ const MediaInsertModal = ({
                 page_size: 100,
                 ordering: '-created_at'
             });
-            setCollections(result.results || result || []);
+            const data = result.results || result || [];
+            setCollections(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to load collections:', error);
             setCollections([]);
@@ -223,7 +229,8 @@ const MediaInsertModal = ({
                 page_size: 100,
                 ordering: '-created_at'
             });
-            setPendingFiles(result.results || result || []);
+            const data = result.results || result || [];
+            setPendingFiles(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to load pending files:', error);
             setPendingFiles([]);
@@ -238,7 +245,12 @@ const MediaInsertModal = ({
         setSelectedMedia(media);
 
         // Determine media type based on selection
-        const type = media.files ? 'collection' : 'image';
+        const isCollection = media.files
+            || media.fileCount !== undefined
+            || media.file_count !== undefined
+            || media.sampleImages !== undefined
+            || media.sample_images !== undefined;
+        const type = isCollection ? 'collection' : 'image';
         setMediaType(type);
 
         // Set default caption and altText to media title (only in insert mode or if empty)
@@ -263,8 +275,16 @@ const MediaInsertModal = ({
         }));
     };
 
+    const resolveStyleImgproxyConfig = (styleKey) => {
+        if (styleKey && currentTheme?.imageStyles) {
+            const style = currentTheme.imageStyles[styleKey];
+            const cfg = style?.imgproxyConfig || style?.imgproxy_config;
+            if (cfg && Object.keys(cfg).length > 0) return cfg;
+        }
+        return DEFAULT_IMGPROXY_CONFIG;
+    };
+
     const handleInsert = () => {
-        // Insert mode
         if (!selectedMedia) return;
 
         if (onInsert) {
@@ -272,7 +292,12 @@ const MediaInsertModal = ({
                 mediaData: selectedMedia,
                 mediaType: mediaType,
                 mediaId: selectedMedia.id,
-                ...config
+                ...config,
+                imageStyle: config.galleryStyle || null,
+                imgproxyConfig: resolveStyleImgproxyConfig(config.galleryStyle),
+                lightboxImgproxyConfig: config.lightboxImageStyle
+                    ? resolveStyleImgproxyConfig(config.lightboxImageStyle)
+                    : null
             });
         }
 
@@ -287,7 +312,12 @@ const MediaInsertModal = ({
                 mediaData: selectedMedia,
                 mediaType: mediaType,
                 mediaId: selectedMedia.id,
-                ...config
+                ...config,
+                imageStyle: config.galleryStyle || null,
+                imgproxyConfig: resolveStyleImgproxyConfig(config.galleryStyle),
+                lightboxImgproxyConfig: config.lightboxImageStyle
+                    ? resolveStyleImgproxyConfig(config.lightboxImageStyle)
+                    : null
             });
         }
 
@@ -353,6 +383,7 @@ const MediaInsertModal = ({
     const handleChangeMedia = () => {
         setStep('select');
         setIsChangingMedia(true);
+        setMediaSelectionType('image');
     };
 
     if (!isOpen) return null;
@@ -546,10 +577,13 @@ const MediaInsertModal = ({
                                         ) : (
                                             <div className="flex items-center gap-4 p-4">
                                                 {selectedMedia.imgproxyBaseUrl || selectedMedia.fileUrl ? (
-                                                    <img
+                                                    <OptimizedImage
                                                         src={selectedMedia.imgproxyBaseUrl || selectedMedia.fileUrl}
                                                         alt={selectedMedia.title}
-                                                        className="w-24 h-24 object-cover rounded"
+                                                        width={96}
+                                                        height={96}
+                                                        resizeType="fill"
+                                                        className="rounded object-cover"
                                                     />
                                                 ) : (
                                                     <div className="w-24 h-24 bg-gray-200 rounded flex items-center justify-center">
@@ -569,42 +603,40 @@ const MediaInsertModal = ({
                             {/* Configuration Form */}
                             <div className="space-y-6">
                                 {/* Image Style (Gallery/Carousel) */}
-                                {availableImageStyles.length > 0 && (
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="block text-sm font-medium text-gray-900">
-                                                Image Style
-                                            </label>
-                                            {config.galleryStyle && selectedStyle && (
-                                                <button
-                                                    onClick={() => setShowOverrideSettings(true)}
-                                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-md transition-colors"
-                                                    title="Configure override settings"
-                                                >
-                                                    <Settings className="w-3.5 h-3.5" />
-                                                    Override Settings
-                                                </button>
-                                            )}
-                                        </div>
-                                        <select
-                                            value={config.galleryStyle || ''}
-                                            onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                            <option value="">Default</option>
-                                            {availableImageStyles.map(style => (
-                                                <option key={style.value} value={style.value}>
-                                                    {style.label}
-                                                    {style.styleType && ` (${style.styleType})`}
-                                                    {style.description ? ` - ${style.description}` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <div className="mt-1 text-xs text-gray-500">
-                                            Choose a custom image style from the theme (includes gallery and carousel styles)
-                                        </div>
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-medium text-gray-900">
+                                            Image Style
+                                        </label>
+                                        {config.galleryStyle && selectedStyle && (
+                                            <button
+                                                onClick={() => setShowOverrideSettings(true)}
+                                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-md transition-colors"
+                                                title="Configure override settings"
+                                            >
+                                                <Settings className="w-3.5 h-3.5" />
+                                                Override Settings
+                                            </button>
+                                        )}
                                     </div>
-                                )}
+                                    <select
+                                        value={config.galleryStyle || ''}
+                                        onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="">Default (fit, quality 85, webp)</option>
+                                        {availableImageStyles.map(style => (
+                                            <option key={style.value} value={style.value}>
+                                                {style.label}
+                                                {style.styleType && ` (${style.styleType})`}
+                                                {style.description ? ` - ${style.description}` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="mt-1 text-xs text-gray-500">
+                                        Controls how the image is processed by imgproxy (resize, quality, format)
+                                    </div>
+                                </div>
 
                                 {/* Alt Text */}
                                 <div>
@@ -641,7 +673,7 @@ const MediaInsertModal = ({
                                 </div>
 
                                 {/* Lightbox */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-4">
                                     <div>
                                         <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
                                             <input
@@ -654,27 +686,27 @@ const MediaInsertModal = ({
                                         </label>
                                         <div className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</div>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Style</label>
-                                        <input
-                                            type="text"
-                                            value={config.lightboxStyle}
-                                            onChange={(e) => handleConfigChange('lightboxStyle', e.target.value)}
-                                            placeholder="default"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Group</label>
-                                        <input
-                                            type="text"
-                                            value={config.lightboxGroup}
-                                            onChange={(e) => handleConfigChange('lightboxGroup', e.target.value)}
-                                            placeholder="optional group key"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                        <div className="mt-1 text-xs text-gray-500">Images sharing a group key can be navigated in the lightbox.</div>
-                                    </div>
+                                    {config.enableLightbox && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Image Style</label>
+                                            <select
+                                                value={config.lightboxImageStyle || ''}
+                                                onChange={(e) => handleConfigChange('lightboxImageStyle', e.target.value || null)}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            >
+                                                <option value="">Original (no processing)</option>
+                                                {availableImageStyles.map(style => (
+                                                    <option key={style.value} value={style.value}>
+                                                        {style.label}
+                                                        {style.description ? ` - ${style.description}` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className="mt-1 text-xs text-gray-500">
+                                                Image style applied to the full-size lightbox image (resize, quality, format)
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
