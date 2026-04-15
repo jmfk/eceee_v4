@@ -15,6 +15,7 @@ class DataConnection(models.Model):
     connection_type = models.CharField(max_length=20, choices=CONNECTION_TYPES)
     config = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Connection configuration (e.g., base URL, credentials, DB params)",
     )
     is_active = models.BooleanField(default=True)
@@ -30,6 +31,8 @@ class DataTransformer(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
     config = models.JSONField(
+        default=dict,
+        blank=True,
         help_text="Transformation mapping logic (mapping fields, aggregation rules)"
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -66,6 +69,7 @@ class DataStream(models.Model):
     )
     config = models.JSONField(
         default=dict,
+        blank=True,
         help_text="Stream specific configuration (e.g., paging rules, headers)",
     )
 
