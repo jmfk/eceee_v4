@@ -431,8 +431,14 @@ import-schema: ## Import single schema file (use: make import-schema FILE=news.j
 		--file scripts/migration/schemas/$(FILE) \
 		--name $(NAME)
 
-fix-minio-permissions: ## Fix permissions on all MinIO assets
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py fix_minio_permissions --all-media
+fix-minio-permissions: ## Fix permissions on all MinIO assets (local)
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py fix_minio_permissions
+
+prod-fix-image-permissions: ## Fix permissions on all MinIO assets (production)
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py fix_minio_permissions"
+
+prod-explain-image-problem: ## Debug imgproxy 403 for a URL (use: make prod-explain-image-problem URL="https://...")
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py explain_imgproxy_problem '$(URL)'"
 
 shell:
 	docker-compose -f docker-compose.dev.yml exec backend bash
@@ -803,8 +809,17 @@ prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
 prod-status: ## Show production container status
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env ps"
 
+prod-logs-caddy: ## Tail production Caddy logs
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs -f --tail=100 caddy"
+
+prod-shell-caddy: ## Open shell in production Caddy container
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec caddy sh"
+
 prod-ssh: ## SSH into production server
 	ssh $(PROD_HOST)
 
 prod-shell: ## Open Django shell in production
 	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py shell"
+
+prod-bash: ## Open bash shell in production backend container
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend bash"
