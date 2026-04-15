@@ -26,6 +26,7 @@ const cleanHTML = (html) => {
     const mediaInsertAttributes = [
         'class', 'data-media-insert', 'data-media-type', 'data-media-id',
         'data-width', 'data-align', 'data-gallery-style', 'data-image-style', 'data-lightbox-image-style', 'data-caption', 'data-alt-text', 'data-title',
+        'data-imgproxy-config',
         'data-lightbox', 'data-lightbox-style', 'data-lightbox-group', 'data-lightbox-src', 'data-lightbox-caption',
         'contenteditable', 'draggable',
         'src', 'alt', 'width', 'height', 'loading'

@@ -218,6 +218,7 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
     const resolvedStyle = imageStyle || galleryStyle;
     const galleryStyleAttr = resolvedStyle ? `data-gallery-style="${resolvedStyle}"` : '';
     const imageStyleAttr = resolvedStyle ? `data-image-style="${resolvedStyle}"` : '';
+    const imgproxyConfigAttr = imgproxyConfig ? `data-imgproxy-config='${JSON.stringify(imgproxyConfig)}'` : '';
     const lbImageStyleAttr = lightboxImageStyle ? `data-lightbox-image-style="${lightboxImageStyle}"` : '';
     const captionAttr = caption ? `data-caption="${escapeHtml(caption)}"` : '';
     const altTextAttr = altText ? `data-alt-text="${escapeHtml(altText)}"` : '';
@@ -231,6 +232,7 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         data-align="${align}"
         ${galleryStyleAttr}
         ${imageStyleAttr}
+        ${imgproxyConfigAttr}
         ${lbImageStyleAttr}
         ${captionAttr}
         ${altTextAttr}
@@ -299,9 +301,15 @@ export async function updateMediaInsertHTML(element, mediaData, config, slotDime
     if (resolvedStyle) {
         element.setAttribute('data-gallery-style', resolvedStyle);
         element.setAttribute('data-image-style', resolvedStyle);
+        
+        // Ensure imgproxyConfig is updated if it was provided in config
+        if (config.imgproxyConfig) {
+            element.setAttribute('data-imgproxy-config', JSON.stringify(config.imgproxyConfig));
+        }
     } else {
         element.removeAttribute('data-gallery-style');
         element.removeAttribute('data-image-style');
+        element.removeAttribute('data-imgproxy-config');
     }
 
     if (lightboxImageStyle) {
@@ -347,6 +355,17 @@ export async function updateMediaInsertHTML(element, mediaData, config, slotDime
 export function extractMediaConfig(element) {
     const caption = element.querySelector('.media-caption')?.textContent || '';
     const styleKey = element.getAttribute('data-image-style') || element.getAttribute('data-gallery-style') || null;
+    
+    // Extract imgproxyConfig if present
+    let imgproxyConfig = null;
+    const imgproxyConfigStr = element.getAttribute('data-imgproxy-config');
+    if (imgproxyConfigStr) {
+        try {
+            imgproxyConfig = JSON.parse(imgproxyConfigStr);
+        } catch (e) {
+            console.warn('Failed to parse imgproxyConfig from data-imgproxy-config', e);
+        }
+    }
 
     // Extract lightbox state from inner anchor element
     const lbAnchor = element.querySelector('[data-lightbox]');
@@ -363,6 +382,7 @@ export function extractMediaConfig(element) {
         altText: element.getAttribute('data-alt-text') || '',
         galleryStyle: styleKey,
         imageStyle: styleKey,
+        imgproxyConfig,
         lightboxImageStyle: element.getAttribute('data-lightbox-image-style') || null,
         enableLightbox,
         lightboxStyle,
