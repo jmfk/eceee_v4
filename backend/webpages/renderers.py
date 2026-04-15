@@ -284,7 +284,7 @@ class WebPageRenderer:
                     )
                     # Load and render Mustache template directly
                     template_str = load_mustache_template(widget_type.mustache_template_name)
-                    widget_html = render_mustache(template_str, template_config)
+                    widget_html = render_mustache(template_str, {**template_config, **enhanced_context})
                     
                     # Inject custom CSS in passthru mode
                     if custom_style_css:

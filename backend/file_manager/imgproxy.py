@@ -75,14 +75,14 @@ class ImgProxyService:
         elif source_url.startswith("/media/"):
             # Handle relative media URLs by prepending the internal minio URL
             # This is common in dev where storage.url() might return relative paths
-            internal_source_url = f"{internal_endpoint}/eceee-media{source_url.replace('/media/', '/')}"
+            internal_source_url = f"{internal_endpoint}/{settings.AWS_STORAGE_BUCKET_NAME}{source_url.replace('/media/', '/')}"
         elif source_url.startswith("theme_images/"):
             # Handle theme images explicitly from the theme_images bucket
             internal_source_url = f"{internal_endpoint}/theme-images/{source_url.replace('theme_images/', '')}"
         elif not source_url.startswith(("http://", "https://")):
             # Handle other relative paths
             internal_source_url = (
-                f"{internal_endpoint}/eceee-media/{source_url.lstrip('/')}"
+                f"{internal_endpoint}/{settings.AWS_STORAGE_BUCKET_NAME}/{source_url.lstrip('/')}"
             )
 
         try:
