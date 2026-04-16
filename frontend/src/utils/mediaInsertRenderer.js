@@ -66,7 +66,7 @@ export async function renderMediaImage(mediaData, config, slotDimensions = null)
     // Generate optimized image URL with calculated dimensions and optional style config
     // Use the secure backend API for URL signing to ensure production compatibility
     const baseUrl = mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url;
-    
+
     let imageUrl = '';
     if (baseUrl) {
         imageUrl = await getImgproxyUrl(baseUrl, {
@@ -95,7 +95,7 @@ export async function renderMediaImage(mediaData, config, slotDimensions = null)
         const lbImgproxyConfig = config.lightboxImgproxyConfig || DEFAULT_IMGPROXY_CONFIG;
         const lbWidth = lbImgproxyConfig.max_width || lbImgproxyConfig.maxWidth || lbImgproxyConfig.width || originalWidth || 1920;
         const lbHeight = lbImgproxyConfig.max_height || lbImgproxyConfig.maxHeight || lbImgproxyConfig.height || 0;
-        
+
         const fullSrc = baseUrl
             ? await getImgproxyUrl(baseUrl, {
                 width: lbWidth,
@@ -150,11 +150,11 @@ export async function renderMediaCollection(collectionData, config, slotDimensio
         }
 
         const alt = file.alt || file.title || file.original_filename || 'Image';
-        
+
         // Calculate grid span based on aspect ratio
         const aspectRatio = getImageAspectRatio(file);
         const { colSpan, rowSpan, objectFit } = getGridSpan(aspectRatio);
-        
+
         // Build inline styles for grid spanning
         const gridStyles = [];
         if (colSpan > 1) {
@@ -295,13 +295,13 @@ export async function updateMediaInsertHTML(element, mediaData, config, slotDime
     element.setAttribute('data-align', align);
     element.setAttribute('data-media-id', mediaData.id);
     element.setAttribute('data-media-type', mediaType);
-    
+
     // Update gallery/image style attributes
     const resolvedStyle = imageStyle || galleryStyle;
     if (resolvedStyle) {
         element.setAttribute('data-gallery-style', resolvedStyle);
         element.setAttribute('data-image-style', resolvedStyle);
-        
+
         // Ensure imgproxyConfig is updated if it was provided in config
         if (config.imgproxyConfig) {
             element.setAttribute('data-imgproxy-config', JSON.stringify(config.imgproxyConfig));
@@ -317,20 +317,20 @@ export async function updateMediaInsertHTML(element, mediaData, config, slotDime
     } else {
         element.removeAttribute('data-lightbox-image-style');
     }
-    
+
     // Update caption, altText and title attributes
     if (caption) {
         element.setAttribute('data-caption', caption);
     } else {
         element.removeAttribute('data-caption');
     }
-    
+
     if (altText) {
         element.setAttribute('data-alt-text', altText);
     } else {
         element.removeAttribute('data-alt-text');
     }
-    
+
     const mediaTitle = mediaData?.title || mediaData?.original_filename || '';
     if (mediaTitle) {
         element.setAttribute('data-title', mediaTitle);
@@ -340,7 +340,7 @@ export async function updateMediaInsertHTML(element, mediaData, config, slotDime
 
     // Update innerHTML
     element.innerHTML = innerContent + captionHtml;
-    
+
     // renderMediaImage already handles lightbox anchor generation,
     // so no additional annotation is needed here.
 
@@ -355,7 +355,7 @@ export async function updateMediaInsertHTML(element, mediaData, config, slotDime
 export function extractMediaConfig(element) {
     const caption = element.querySelector('.media-caption')?.textContent || '';
     const styleKey = element.getAttribute('data-image-style') || element.getAttribute('data-gallery-style') || null;
-    
+
     // Extract imgproxyConfig if present
     let imgproxyConfig = null;
     const imgproxyConfigStr = element.getAttribute('data-imgproxy-config');
