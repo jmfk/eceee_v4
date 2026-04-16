@@ -1,4 +1,4 @@
-# Makefile for eceee_v4
+# Help for eceee_v4
 
 # Load environment variables from .env if it exists
 -include .env
@@ -130,6 +130,8 @@ help: ## Show this help message (use: make help [target])
 		echo "  prod-status       Show production container status"; \
 		echo "  prod-ssh          SSH into production server"; \
 		echo "  prod-shell        Open Django shell in production"; \
+		echo "  prod-fix-image-permissions  Fix permissions on all MinIO assets"; \
+		echo "  prod-explain-image-problem  Debug imgproxy 403 for a URL"; \
 		echo ""; \
 		echo "Environment & Health Checks:"; \
 		echo "  infra-up               Run infrastructure services"; \
