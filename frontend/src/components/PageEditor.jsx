@@ -177,7 +177,7 @@ const PageEditor = () => {
     const location = useLocation()
 
     // Use global isDirty from UnifiedDataContext
-    const { useExternalChanges, setIsDirty, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
+    const { useExternalChanges, setIsDirty: setUdcIsDirty, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
 
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
@@ -244,7 +244,21 @@ const PageEditor = () => {
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
 
-    // Helper to recompute dirty state based on semantic comparison
+    // Wrapper that keeps the local React isDirty state and the UDC global
+    // metadata.isDirty in sync. All explicit dirty toggles in this component
+    // should go through this so the displayed state never drifts from UDC.
+    const setIsDirty = useCallback((value) => {
+        setIsDirtyState(value);
+        setUdcIsDirty(value);
+    }, [setUdcIsDirty]);
+
+    // Helper to recompute dirty state based on semantic comparison.
+    // This is the single source of truth for the local isDirty value used by
+    // the editor UI. We derive it from a semantic diff between the original
+    // load snapshot and the current editor state so that load-time
+    // normalization, widget hydration, or other UDC operations cannot mark
+    // the page dirty without a real user-visible change. The UDC global
+    // metadata.isDirty is updated as well so other consumers stay in sync.
     const recomputeDirtyState = useCallback(() => {
         if (!originalWebpageData || !originalPageVersionData) return;
 
@@ -276,8 +290,10 @@ const PageEditor = () => {
             sourceId.startsWith('widget-') ||
             /^[a-z-]+widget-\d+/.test(sourceId);
 
-        // Always sync dirty state regardless of source
-        setIsDirtyState(state.metadata.isDirty);
+        // Note: do NOT mirror state.metadata.isDirty here. The local
+        // isDirty value is derived from a semantic diff via
+        // recomputeDirtyState() so that load-time normalization or
+        // hydration cannot force the editor into a dirty state.
 
         if (isFromIsolatedComponent) {
             // Isolated components handle their own state and UDC subscriptions
@@ -498,7 +514,6 @@ const PageEditor = () => {
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
-    const [isSpecialEditorOpen, setIsSpecialEditorOpen] = useState(false)
     const widgetEditorRef = useRef(null)
 
     // Ref to track current editing widget for callbacks
@@ -896,7 +911,9 @@ const PageEditor = () => {
                     setCurrentVersion(targetVersion);
                     const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
                     const newPage = response.data || response;
-                    setPageVersionData(processLoadedVersionData(newPage));
+                    const processedDetail = processLoadedVersionData(newPage);
+                    setPageVersionData(processedDetail);
+                    setOriginalPageVersionData(processedDetail);
                     return; // Early return, we're done
                 }
             }
@@ -958,7 +975,9 @@ const PageEditor = () => {
                 if (!changes.hasPageChanges && !changes.hasVersionChanges) {
                     const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
                     const newPage = response.data || response;
-                    setPageVersionData(processLoadedVersionData(newPage));
+                    const processedDetail = processLoadedVersionData(newPage);
+                    setPageVersionData(processedDetail);
+                    setOriginalPageVersionData(processedDetail);
                 }
             }
         } catch (error) {
@@ -999,12 +1018,16 @@ const PageEditor = () => {
                 // Load the complete version data including widgets using raw API
                 const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, lastSavedVersion.id));
                 const newPage = response.data || response;
-                setPageVersionData(processLoadedVersionData(newPage));
+                const processedDetail = processLoadedVersionData(newPage);
+                setPageVersionData(processedDetail);
+                setOriginalPageVersionData(processedDetail);
             } else if (currentVersion) {
                 // If we have a current version, reload the page data with that version using raw API
                 const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, currentVersion.id));
                 const newPage = response.data || response;
-                setPageVersionData(processLoadedVersionData(newPage));
+                const processedDetail = processLoadedVersionData(newPage);
+                setPageVersionData(processedDetail);
+                setOriginalPageVersionData(processedDetail);
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
@@ -1838,8 +1861,7 @@ const PageEditor = () => {
                         <div className="flex items-center space-x-4">
                             <button
                                 onClick={handleClose}
-                                disabled={isSpecialEditorOpen}
-                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
                                 Back to {previousView === '/pages' ? 'Pages' :
@@ -2146,7 +2168,6 @@ const PageEditor = () => {
                         namespace={namespace}
                         webpageData={webpageData}
                         pageVersionData={pageVersionData}
-                        onSpecialEditorStateChange={setIsSpecialEditorOpen}
                         context={{
                             pageId: webpageData?.id,
                             versionId: pageVersionData?.versionId,
