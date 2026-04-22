@@ -323,7 +323,24 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
                     "hostnames",
                     "parent",
                     "sort_order",
-                )
+                ),
+                "description": mark_safe(
+                    '<div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin-bottom: 20px; color: #92400e; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">'
+                    '<h4 style="margin-top: 0; color: #b45309; font-size: 14px; display: flex; align-items: center;">'
+                    '<span style="font-size: 18px; margin-right: 8px;">ℹ️</span> Hostname Configuration Guidance'
+                    "</h4>"
+                    '<p style="margin-bottom: 10px;">Root pages (without a parent) require at least one hostname configured for the multi-site system to recognize them.</p>'
+                    '<ul style="margin-bottom: 10px; padding-left: 20px;">'
+                    "<li><strong>Development:</strong> Use <code>localhost:8000</code> or <code>127.0.0.1:8000</code></li>"
+                    "<li><strong>Production:</strong> Use your full domain, e.g., <code>example.com</code></li>"
+                    "<li><strong>Wildcard:</strong> Use <code>*</code> to match any host (development only)</li>"
+                    "</ul>"
+                    '<p style="margin-bottom: 0; font-size: 0.9em; opacity: 0.9;">'
+                    "<em>Note: Ports are preserved for development but ignored during matching if needed. "
+                    "Only root pages can serve hostnames.</em>"
+                    "</p>"
+                    "</div>"
+                ),
             },
         ),
         (

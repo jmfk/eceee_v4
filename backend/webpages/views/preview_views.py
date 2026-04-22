@@ -108,9 +108,21 @@ def render_version_preview(request, page_id, version_id):
         root_page = root_page.parent
 
     # Check if root page has hostnames configured
+    hostname = None
     if not root_page.hostnames or len(root_page.hostnames) == 0:
-        # Return misconfiguration error page
-        error_html = f"""<!DOCTYPE html>
+        # In development mode, we can fall back to the current request's host
+        # to allow previewing even without explicit hostname configuration.
+        if settings.DEBUG:
+            hostname = request.get_host()
+            # Determine protocol (use http for localhost, https for others)
+            if hostname.startswith("localhost") or hostname.startswith("127.0.0.1"):
+                protocol = "http"
+            else:
+                protocol = "https"
+            base_url = f"{protocol}://{hostname}/"
+        else:
+            # Return misconfiguration error page
+            error_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -174,9 +186,8 @@ def render_version_preview(request, page_id, version_id):
 </body>
 </html>
 """
-        return HttpResponse(error_html, content_type="text/html", status=200)
-
-    try:
+            return HttpResponse(error_html, content_type="text/html", status=200)
+    else:
         # Get the first hostname from the root page
         hostname = root_page.hostnames[0]
 
@@ -189,6 +200,7 @@ def render_version_preview(request, page_id, version_id):
         # Build base URL
         base_url = f"{protocol}://{hostname}/"
 
+    try:
         # Use the WebPageRenderer to render the complete page
         renderer = WebPageRenderer(request=request)
         result = renderer.render(page, version=version)

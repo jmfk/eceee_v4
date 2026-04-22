@@ -109,7 +109,10 @@ const PagePreview: React.FC<PagePreviewProps> = ({
 
     // Check if root page has hostnames
     const hasHostnames = rootPage?.hostnames && rootPage.hostnames.length > 0;
-    const hostname = hasHostnames ? rootPage.hostnames[0] : null;
+    
+    // In dev mode, fall back to current window host if no hostnames are configured
+    const fallbackHostname = import.meta.env.DEV ? window.location.host : null;
+    const hostname = hasHostnames ? rootPage.hostnames[0] : fallbackHostname;
 
     // Check for hostname configuration before building preview URL
     if (!hostname) {

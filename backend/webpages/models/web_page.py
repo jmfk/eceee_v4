@@ -234,18 +234,14 @@ class WebPage(models.Model):
         return self.is_root_page() and bool(self.hostnames)
 
     @classmethod
-    def normalize_hostname(cls, hostname, strip_port=True):
+    def normalize_hostname(cls, hostname, strip_port=False):
         """
         Normalize hostname with support for IPv6, IDN, and proper port handling.
 
         Security: Validates input length and format to prevent ReDoS attacks.
-
-        Examples:
-        - "http://example.com/path" -> "example.com"
-        - "https://localhost:8000" -> "localhost" (if strip_port=True)
-        - "[::1]:8080" -> "[::1]" (if strip_port=True)
-        - "2001:db8::1" -> "[2001:db8::1]"
-        - "münchen.de" -> "xn--mnchen-3ya.de"
+        
+        Default changed to strip_port=False to preserve ports (e.g. :8000) 
+        which are essential for development previews.
         """
         if not hostname or not isinstance(hostname, str):
             return ""
