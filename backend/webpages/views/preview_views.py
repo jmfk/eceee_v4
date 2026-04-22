@@ -5,12 +5,13 @@ Preview-related views for page editor
 import os
 
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.views.decorators.clickjacking import xframe_options_exempt
@@ -18,6 +19,34 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from ..models import PreviewSize, WebPage, PageVersion
 from ..serializers import PreviewSizeSerializer
 from ..renderers import WebPageRenderer
+
+
+class PreviewTokenAuthentication(JWTAuthentication):
+    """
+    Custom authentication class for webpage previews.
+    Allows JWT token to be provided via 'token' query parameter.
+    """
+
+    def authenticate(self, request):
+        # First try standard Authorization header via superclass
+        header = self.get_header(request)
+        if header is not None:
+            return super().authenticate(request)
+
+        # Fallback to 'token' query parameter
+        token = request.query_params.get("token")
+        if not token:
+            return None
+
+        # Create a mock request with the token in the header for JWTAuthentication to process
+        mock_request = HttpRequest()
+        mock_request.META = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+
+        try:
+            return super().authenticate(mock_request)
+        except (InvalidToken, TokenError):
+            # Let DRF handle the error
+            raise
 
 
 class PreviewSizeViewSet(viewsets.ModelViewSet):
@@ -38,6 +67,11 @@ class PreviewSizeViewSet(viewsets.ModelViewSet):
 
 
 @api_view(["GET"])
+@authentication_classes([
+    PreviewTokenAuthentication,
+    SessionAuthentication,
+    TokenAuthentication,
+])
 @permission_classes([permissions.IsAuthenticated])
 @xframe_options_exempt
 def render_version_preview(request, page_id, version_id):
@@ -60,27 +94,6 @@ def render_version_preview(request, page_id, version_id):
     Returns:
         HttpResponse with complete HTML page including CSS and meta tags
     """
-
-    # Handle JWT token authentication from query parameter (for iframe)
-    token = request.GET.get('token')
-    if token and not request.user.is_authenticated:
-        try:
-            # Validate the JWT token
-            jwt_auth = JWTAuthentication()
-            # Create a mock request with the token in the header
-            from django.http import HttpRequest
-            mock_request = HttpRequest()
-            mock_request.META = {'HTTP_AUTHORIZATION': f'Bearer {token}'}
-            
-            # Authenticate and get the user
-            validated = jwt_auth.authenticate(mock_request)
-            if validated is not None:
-                request.user, _ = validated
-        except (InvalidToken, TokenError) as e:
-            return HttpResponse(
-                f"<html><body><h1>Unauthorized</h1><p>Invalid authentication token: {str(e)}</p></body></html>",
-                status=401,
-            )
 
     # Check if user has permission to edit pages
     # For now, we'll allow any authenticated user. In production, you might
@@ -196,6 +209,14 @@ def render_version_preview(request, page_id, version_id):
             protocol = "http"
         else:
             protocol = "https"
+
+        # In development mode, if the hostname doesn't have a port, 
+        # use the port from the current request to ensure assets load correctly.
+        if settings.DEBUG and ":" not in hostname:
+            request_host = request.get_host()
+            if ":" in request_host:
+                port = request_host.split(":")[-1]
+                hostname = f"{hostname}:{port}"
 
         # Build base URL
         base_url = f"{protocol}://{hostname}/"

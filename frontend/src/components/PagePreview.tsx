@@ -159,6 +159,16 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     // Determine protocol based on environment
     const protocol = import.meta.env.DEV ? 'http' : 'https';
 
+    // In development mode, if the hostname doesn't have a port, 
+    // use the port from the current window to ensure the iframe can connect.
+    let effectiveHostname = hostname;
+    if (import.meta.env.DEV && hostname && !hostname.includes(':')) {
+        const currentPort = window.location.port;
+        if (currentPort) {
+            effectiveHostname = `${hostname}:${currentPort}`;
+        }
+    }
+
     // Build full preview URL with hostname
     const previewPath = previewSizesApi.getPreviewUrl(
         webpageData.id,
@@ -166,8 +176,8 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     );
 
     // Build preview URL with authentication token (if using JWT)
-    let previewUrl = hostname
-        ? `${protocol}://${hostname}${previewPath}`
+    let previewUrl = effectiveHostname
+        ? `${protocol}://${effectiveHostname}${previewPath}`
         : previewPath;
     
     // In production mode or when JWT tokens are available, append token as query parameter

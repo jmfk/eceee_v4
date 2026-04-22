@@ -24,6 +24,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Allow external connections for Docker
     port: 3000,
+    allowedHosts: true, // Allow all hosts (dev only) to support custom hostnames like 'summerstudy'
     proxy: {
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
