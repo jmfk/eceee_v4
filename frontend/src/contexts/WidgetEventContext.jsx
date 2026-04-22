@@ -106,7 +106,6 @@ export const WidgetEventProvider = ({ children }) => {
 
         const handleWidgetChanged = (payload) => {
             if (payload.changeType === 'config') {
-                setIsDirty(true)
                 // Ensure slot information is preserved
                 if (!payload.slotName) {
                     console.warn('Widget changed event missing slotName:', payload)

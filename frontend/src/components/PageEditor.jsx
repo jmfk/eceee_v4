@@ -243,6 +243,22 @@ const PageEditor = () => {
 
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
+
+    // Helper to recompute dirty state based on semantic comparison
+    const recomputeDirtyState = useCallback(() => {
+        if (!originalWebpageData || !originalPageVersionData) return;
+
+        const changes = analyzeChanges(
+            originalWebpageData,
+            webpageData,
+            originalPageVersionData,
+            pageVersionData
+        );
+
+        const hasChanges = changes.hasPageChanges || changes.hasVersionChanges;
+        setIsDirty(hasChanges);
+    }, [originalWebpageData, webpageData, originalPageVersionData, pageVersionData, setIsDirty]);
+
     useExternalChanges(componentId, (state, metadata) => {
         const sourceId = metadata?.sourceId || '';
 
@@ -333,9 +349,8 @@ const PageEditor = () => {
             ...(options.codeLayout && { codeLayout: options.codeLayout })
         }));
 
-        // 3. Mark as dirty for save indication
-        setIsDirty(true);
-    }, [componentId, setIsDirty]);
+        // 3. Dirty state will be recomputed by the effect
+    }, [componentId]);
 
     // UDC widget operation publisher (for external sync)
     const publishWidgetOperation = useCallback(async (operation, data) => {
@@ -1113,11 +1128,7 @@ const PageEditor = () => {
                 updates: versionUpdates
             });
         }
-        // Mark as dirty if any updates were made
-        if (Object.keys(webpageUpdates).length > 0 || Object.keys(versionUpdates).length > 0) {
-            setIsDirty(true);
-        }
-    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id, setIsDirty])
+    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id])
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback(async (validatedData) => {
@@ -1521,8 +1532,18 @@ const PageEditor = () => {
         setIsDirty(false);
         setEditorResetKey(k => k + 1);
 
+        // Recompute dirty state immediately after reset to ensure it's clean
+        setTimeout(() => {
+            recomputeDirtyState();
+        }, 0);
+
         addNotification('Changes undone', 'success');
     }, [originalWebpageData, originalPageVersionData, publishUpdate, setIsDirty, addNotification]);
+
+    // Recompute dirty state when data changes
+    useEffect(() => {
+        recomputeDirtyState();
+    }, [recomputeDirtyState]);
 
     // Conflict resolution handlers
     const handleConflictResolve = useCallback(async (resolutions) => {
@@ -1817,7 +1838,7 @@ const PageEditor = () => {
                         <div className="flex items-center space-x-4">
                             <button
                                 onClick={handleClose}
-                                disabled={isSpecialEditorOpen || isDirty}
+                                disabled={isSpecialEditorOpen}
                                 className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
