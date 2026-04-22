@@ -31,9 +31,15 @@ const ImageDisplaySection = ({
             const loadCollection = async () => {
                 setLoadingCollection(true)
                 try {
+                    // Backend MediaCollectionViewSet.get_queryset filters to the
+                    // default namespace unless an explicit namespace slug is
+                    // provided. Pass it through so non-default namespaces resolve.
+                    const ns = image.namespace || namespace || undefined
+                    const detailParams = ns ? { namespace: ns } : {}
+                    const filesParams = { page_size: 9, ...(ns ? { namespace: ns } : {}) }
                     const [collection, filesResult] = await Promise.all([
-                        mediaCollectionsApi.get(image.id)(),
-                        mediaCollectionsApi.getFiles(image.id, { page_size: 9 })()
+                        mediaCollectionsApi.get(image.id, detailParams)(),
+                        mediaCollectionsApi.getFiles(image.id, filesParams)()
                     ])
                     setCollectionData(collection)
                     const files = filesResult.results || filesResult || []
@@ -61,7 +67,7 @@ const ImageDisplaySection = ({
             setCollectionData(null)
             setCollectionFiles([])
         }
-    }, [isCollection, image?.id])
+    }, [isCollection, image?.id, image?.namespace, namespace])
 
     if (!images || images.length === 0) return null
 

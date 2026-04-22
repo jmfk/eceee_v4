@@ -442,11 +442,13 @@ export const mediaCollectionsApi = {
     /**
      * Get detailed information about a collection
      * @param {string} id - Collection ID
+     * @param {Object} params - Optional query parameters (e.g. namespace)
      * @returns {Promise} API response with collection details
      */
-    get: (id) => wrapApiCall(() =>
-        apiClient.get(endpoints.media.collection(id))
-    ),
+    get: (id, params = {}) => wrapApiCall(() => {
+        const queryString = buildQueryParams(params);
+        return apiClient.get(`${endpoints.media.collection(id)}${queryString}`);
+    }),
 
     /**
      * Create a new media collection
@@ -488,7 +490,7 @@ export const mediaCollectionsApi = {
      * @returns {Promise} API response
      */
     addFiles: (id, fileIds) => wrapApiCall(() =>
-        apiClient.post(`${endpoints.media.collection(id)}/add_files/`, {
+        apiClient.post(`${endpoints.media.collection(id)}add_files/`, {
             file_ids: fileIds
         })
     ),
@@ -508,15 +510,15 @@ export const mediaCollectionsApi = {
     /**
      * Get files in a collection
      * @param {string} id - Collection ID
-     * @param {Object} params - Query parameters (page, page_size, etc.)
+     * @param {Object} params - Query parameters (page, page_size, namespace, etc.)
      * @returns {Promise} API response with files in collection
      */
     getFiles: (id, params = {}) => wrapApiCall(() => {
         // Use our custom buildQueryParams to handle Django-style array parameters
         const queryString = buildQueryParams(params);
-        // Remove trailing slash from collection URL to avoid double slash
-        const collectionUrl = endpoints.media.collection(id).replace(/\/$/, '');
-        return apiClient.get(`${collectionUrl}/files${queryString}`);
+        // endpoints.media.collection(id) already ends with a slash; append `files/`
+        // to hit the DRF action route `/collections/:id/files/`.
+        return apiClient.get(`${endpoints.media.collection(id)}files/${queryString}`);
     }),
 
     /**
@@ -547,9 +549,8 @@ export const mediaCollectionsApi = {
         }
 
         return wrapApiCall(() => {
-            const collectionUrl = endpoints.media.collection(id).replace(/\/$/, '');
             return apiClient.post(
-                `${collectionUrl}/upload_to_collection/`,
+                `${endpoints.media.collection(id)}upload_to_collection/`,
                 formData,
                 config
             );
@@ -562,8 +563,7 @@ export const mediaCollectionsApi = {
      * @returns {Promise<Blob>} ZIP file blob
      */
     downloadZip: (id) => wrapApiCall(() => {
-        const collectionUrl = endpoints.media.collection(id).replace(/\/$/, '');
-        return apiClient.get(`${collectionUrl}/download_zip/`, {
+        return apiClient.get(`${endpoints.media.collection(id)}download_zip/`, {
             responseType: 'blob'
         });
     }),

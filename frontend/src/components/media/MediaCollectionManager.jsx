@@ -386,8 +386,11 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
             setExistingLoading(true);
             setExistingError(null);
 
-            const params = { page_size: 100 };
-            const result = await await await await await await await await await await await mediaCollectionsApi.getFiles(collection.id, params)();
+            // Pass the namespace slug so the backend's collection viewset
+            // (which scopes to the default namespace by default) can locate
+            // collections living in non-default namespaces.
+            const params = { page_size: 100, namespace };
+            const result = await mediaCollectionsApi.getFiles(collection.id, params)();
             const existingFilesData = result.results || result || [];
             setExistingFiles(Array.isArray(existingFilesData) ? existingFilesData : []);
         } catch (error) {
@@ -749,12 +752,15 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
                 setExistingLoading(true);
                 setExistingError(null);
 
-                // Use the dedicated endpoint to get files in this collection
+                // Use the dedicated endpoint to get files in this collection.
+                // Include the namespace slug so the backend resolves
+                // collections from non-default namespaces.
                 const params = {
-                    page_size: 100
+                    page_size: 100,
+                    namespace,
                 };
 
-                const result = await await await await await await await await await await await mediaCollectionsApi.getFiles(collection.id, params)();
+                const result = await mediaCollectionsApi.getFiles(collection.id, params)();
                 const existingFilesData = result.results || result || [];
                 setExistingFiles(Array.isArray(existingFilesData) ? existingFilesData : []);
             } catch (error) {
@@ -852,11 +858,14 @@ const CollectionFilesView_OLD = ({ collection, namespace, onBack }) => {
             const availableFilesData = availableResult.results || availableResult || [];
             setAvailableFiles(Array.isArray(availableFilesData) ? availableFilesData : []);
 
-            // Reload existing files using the dedicated endpoint
+            // Reload existing files using the dedicated endpoint.
+            // Pass namespace so the backend resolves collections in
+            // non-default namespaces.
             const existingParams = {
-                page_size: 100
+                page_size: 100,
+                namespace,
             };
-            const existingResult = await await await await await await await await await await await mediaCollectionsApi.getFiles(collection.id, existingParams)();
+            const existingResult = await mediaCollectionsApi.getFiles(collection.id, existingParams)();
             const existingFilesData = existingResult.results || existingResult || [];
             setExistingFiles(Array.isArray(existingFilesData) ? existingFilesData : []);
         } catch (error) {
