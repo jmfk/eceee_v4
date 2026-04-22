@@ -107,57 +107,19 @@ const PagePreview: React.FC<PagePreviewProps> = ({
 
     const rootPage = getRootPage(webpageData);
 
-    // Check if root page has hostnames
+    // Check if root page has hostnames.
+    // Note: webpageData.parent is typically just the parent's ID rather than
+    // a fully expanded object, so getRootPage() above can only resolve the
+    // root reliably when previewing the root page itself. For sub-pages we
+    // therefore always fall back to the current window host, which is a
+    // valid origin for serving the preview iframe in both dev and prod
+    // (frontend + backend share the same domain via the reverse proxy).
     const hasHostnames = rootPage?.hostnames && rootPage.hostnames.length > 0;
-    
-    // In dev mode, fall back to current window host if no hostnames are configured
-    const fallbackHostname = import.meta.env.DEV ? window.location.host : null;
-    const hostname = hasHostnames ? rootPage.hostnames[0] : fallbackHostname;
+    const hostname = hasHostnames ? rootPage.hostnames[0] : window.location.host;
 
-    // Check for hostname configuration before building preview URL
-    if (!hostname) {
-        return (
-            <div className="h-full flex items-center justify-center bg-gray-50">
-                <div className="max-w-2xl mx-auto p-6">
-                    <div className="bg-white border border-amber-300 rounded-lg shadow-sm p-6">
-                        <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0">
-                                <svg className="h-6 w-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <div className="flex-1">
-                                <div className="text-lg font-medium text-amber-900" role="heading" aria-level="3">Preview Configuration Required</div>
-                                <div className="mt-2 text-sm text-amber-800">
-                                    This page cannot be previewed because the root page does not have any hostnames configured.
-                                </div>
-                                <div className="mt-3 text-sm text-amber-800">
-                                    <div className="font-medium">Root Page: {rootPage?.title || rootPage?.slug || 'Unknown'}</div>
-                                    {rootPage?.id && <div className="text-xs text-amber-700 mt-1">ID: {rootPage.id}</div>}
-                                </div>
-                                <div className="mt-4 bg-amber-50 border border-amber-200 rounded p-3">
-                                    <div className="text-sm font-medium text-amber-900 mb-2">How to fix:</div>
-                                    <div className="text-sm text-amber-800 space-y-1 list-decimal list-inside" role="list">
-                                        <li>Go to the Django Admin panel</li>
-                                        <li>Navigate to Web Pages → Web Pages</li>
-                                        <li>Edit the root page: <span className="font-bold">{rootPage?.title || rootPage?.slug}</span></li>
-                                        <li>Add at least one hostname in the "Hostnames" field</li>
-                                        <li>Save and refresh this preview</li>
-                                    </div>
-                                    <div className="text-xs text-amber-700 mt-2">
-                                        Examples: <code className="bg-amber-100 px-1 rounded">localhost:8000</code>, <code className="bg-amber-100 px-1 rounded">example.com</code>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Determine protocol based on environment
-    const protocol = import.meta.env.DEV ? 'http' : 'https';
+    // Determine protocol based on the current window so production previews
+    // behind https stay on https and dev (http) stays on http.
+    const protocol = window.location.protocol.replace(':', '') || (import.meta.env.DEV ? 'http' : 'https');
 
     // In development mode, if the hostname doesn't have a port, 
     // use the port from the current window to ensure the iframe can connect.

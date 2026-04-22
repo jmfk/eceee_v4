@@ -120,86 +120,29 @@ def render_version_preview(request, page_id, version_id):
     while root_page.parent:
         root_page = root_page.parent
 
-    # Check if root page has hostnames configured
+    # Check if root page has hostnames configured.
+    # The hostname is only used to build the <base href> and asset URLs for
+    # the preview iframe. When the root page has no explicit hostnames we
+    # fall back to the current request's host, which is always a valid
+    # origin for serving the page's assets (the editor itself is being
+    # served from it). This avoids surfacing a misleading "configuration
+    # required" page in production for sub-pages whose root page simply
+    # has no hostnames configured yet.
     hostname = None
     if not root_page.hostnames or len(root_page.hostnames) == 0:
-        # In development mode, we can fall back to the current request's host
-        # to allow previewing even without explicit hostname configuration.
-        if settings.DEBUG:
-            hostname = request.get_host()
-            # Determine protocol (use http for localhost, https for others)
-            if hostname.startswith("localhost") or hostname.startswith("127.0.0.1"):
-                protocol = "http"
-            else:
-                protocol = "https"
-            base_url = f"{protocol}://{hostname}/"
+        hostname = request.get_host()
+        # Determine protocol: respect the proxied scheme when available so
+        # production previews behind a reverse proxy still use https.
+        forwarded_proto = request.META.get("HTTP_X_FORWARDED_PROTO")
+        if forwarded_proto:
+            protocol = forwarded_proto.split(",")[0].strip()
+        elif request.is_secure():
+            protocol = "https"
+        elif hostname.startswith("localhost") or hostname.startswith("127.0.0.1"):
+            protocol = "http"
         else:
-            # Return misconfiguration error page
-            error_html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuration Error</title>
-    <style>
-        body {{
-            font-family: system-ui, -apple-system, sans-serif;
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }}
-        .error-box {{
-            background: white;
-            border: 1px solid #e5e5e5;
-            border-left: 4px solid #f59e0b;
-            padding: 20px;
-            border-radius: 4px;
-        }}
-        h1 {{
-            margin-top: 0;
-            color: #f59e0b;
-        }}
-        code {{
-            background: #f9f9f9;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Monaco', 'Courier New', monospace;
-        }}
-        .help {{
-            margin-top: 20px;
-            padding: 15px;
-            background: #fef3c7;
-            border-radius: 4px;
-            font-size: 14px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="error-box">
-        <h1>⚠️ Preview Configuration Error</h1>
-        <p>This page cannot be previewed because the root page does not have any hostnames configured.</p>
-        <p><strong>Root Page:</strong> {root_page.title or root_page.slug}</p>
-        <p><strong>Root Page ID:</strong> {root_page.id}</p>
-        
-        <div class="help">
-            <strong>How to fix this:</strong>
-            <ol>
-                <li>Go to the Django Admin panel</li>
-                <li>Navigate to <code>Web Pages → Web Pages</code></li>
-                <li>Edit the root page: <strong>{root_page.title or root_page.slug}</strong></li>
-                <li>Add at least one hostname in the <code>Hostnames</code> field</li>
-                <li>Save the page and refresh this preview</li>
-            </ol>
-            <p style="margin-top: 10px; font-size: 13px; color: #92400e;">
-                Example hostnames: <code>example.com</code>, <code>localhost:8000</code>, <code>www.example.com</code>
-            </p>
-        </div>
-    </div>
-</body>
-</html>
-"""
-            return HttpResponse(error_html, content_type="text/html", status=200)
+            protocol = "https"
+        base_url = f"{protocol}://{hostname}/"
     else:
         # Get the first hostname from the root page
         hostname = root_page.hostnames[0]
