@@ -38,7 +38,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useUnifiedData } from '../contexts/unified-data'
+import { useUnifiedData, defaultEqualityFn } from '../contexts/unified-data'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import { useClipboard } from '../contexts/ClipboardContext'
@@ -243,11 +243,17 @@ const PageEditor = () => {
 
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
+    const isDirtyRef = useRef(false);
 
     // Wrapper that keeps the local React isDirty state and the UDC global
     // metadata.isDirty in sync. All explicit dirty toggles in this component
     // should go through this so the displayed state never drifts from UDC.
     const setIsDirty = useCallback((value) => {
+        if (isDirtyRef.current === value) {
+            return;
+        }
+
+        isDirtyRef.current = value;
         setIsDirtyState(value);
         setUdcIsDirty(value);
     }, [setUdcIsDirty]);
@@ -275,6 +281,7 @@ const PageEditor = () => {
 
     useExternalChanges(componentId, (state, metadata) => {
         const sourceId = metadata?.sourceId || '';
+        const operationType = metadata?.type;
 
         // Check if update came from isolated components FIRST, before any state updates
         const isFromIsolatedComponent =
@@ -301,9 +308,27 @@ const PageEditor = () => {
             return;
         }
 
+        const shouldSyncWidgets = [
+            OperationTypes.ADD_WIDGET,
+            OperationTypes.UPDATE_WIDGET_CONFIG,
+            OperationTypes.MOVE_WIDGET,
+            OperationTypes.REMOVE_WIDGET,
+            OperationTypes.INIT_VERSION,
+            OperationTypes.SWITCH_VERSION,
+            OperationTypes.UPDATE_PAGE_VERSION_DATA,
+        ].includes(operationType);
+
+        if (!shouldSyncWidgets) {
+            return;
+        }
+
         // Update local widgets from external UDC changes (other components/users)
         if (versionId && state.versions[versionId]?.widgets) {
             const externalWidgets = state.versions[versionId].widgets;
+            if (defaultEqualityFn(pageVersionData?.widgets || {}, externalWidgets)) {
+                return;
+            }
+
             setLocalWidgets(externalWidgets);
 
             // Normal update for non-isolated sources (other users, other components, etc.)
