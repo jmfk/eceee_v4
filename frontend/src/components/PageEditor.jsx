@@ -177,7 +177,7 @@ const PageEditor = () => {
     const location = useLocation()
 
     // Use global isDirty from UnifiedDataContext
-    const { useExternalChanges, setIsDirty: setUdcIsDirty, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
 
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
@@ -245,9 +245,8 @@ const PageEditor = () => {
     const [isDirty, setIsDirtyState] = useState(false);
     const isDirtyRef = useRef(false);
 
-    // Wrapper that keeps the local React isDirty state and the UDC global
-    // metadata.isDirty in sync. All explicit dirty toggles in this component
-    // should go through this so the displayed state never drifts from UDC.
+    // Local dirty state derived from semantic diff (original vs current data).
+    // PageEditor is the single owner of dirty for the page editor UI.
     const setIsDirty = useCallback((value) => {
         if (isDirtyRef.current === value) {
             return;
@@ -255,8 +254,7 @@ const PageEditor = () => {
 
         isDirtyRef.current = value;
         setIsDirtyState(value);
-        setUdcIsDirty(value);
-    }, [setUdcIsDirty]);
+    }, []);
 
     // Helper to recompute dirty state based on semantic comparison.
     // This is the single source of truth for the local isDirty value used by
@@ -283,30 +281,22 @@ const PageEditor = () => {
         const sourceId = metadata?.sourceId || '';
         const operationType = metadata?.type;
 
-        // Check if update came from isolated components FIRST, before any state updates
-        const isFromIsolatedComponent =
+        // Form-buffer and field-level updates: these components manage their own state
+        // and UDC subscriptions — skip to avoid double-processing and unnecessary rerenders.
+        const isFormBufferSource =
             sourceId.startsWith('isolated-form-') ||
             sourceId.startsWith('special-editor-') ||
             sourceId.startsWith('field-') ||
-            sourceId.includes('-field-') || // Field-level updates (bannerwidget-*-field-*)
-            sourceId.startsWith('bannerwidget-') ||
-            sourceId.startsWith('two-columns-widget-') ||
-            sourceId.startsWith('three-columns-widget-') ||
-            sourceId.startsWith('section-widget-') ||
-            sourceId.startsWith('contentcardwidget-') ||
-            sourceId.startsWith('widget-') ||
-            /^[a-z-]+widget-\d+/.test(sourceId);
+            sourceId.includes('-field-');
+
+        if (isFormBufferSource) {
+            return;
+        }
 
         // Note: do NOT mirror state.metadata.isDirty here. The local
         // isDirty value is derived from a semantic diff via
         // recomputeDirtyState() so that load-time normalization or
         // hydration cannot force the editor into a dirty state.
-
-        if (isFromIsolatedComponent) {
-            // Isolated components handle their own state and UDC subscriptions
-            // Don't update other state to prevent unnecessary rerenders
-            return;
-        }
 
         const shouldSyncWidgets = [
             OperationTypes.ADD_WIDGET,
@@ -331,7 +321,6 @@ const PageEditor = () => {
 
             setLocalWidgets(externalWidgets);
 
-            // Normal update for non-isolated sources (other users, other components, etc.)
             setPageVersionData(prev => ({
                 ...prev,
                 widgets: externalWidgets
@@ -557,7 +546,7 @@ const PageEditor = () => {
     const [namespace, setNamespace] = useState(null)
 
     const queryClient = useQueryClient()
-    const { showError, showConfirm } = useNotificationContext()
+    const { showError, showConfirm, showSaveConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
 
     // Load default namespace for media operations
@@ -871,47 +860,33 @@ const PageEditor = () => {
 
     // Handle close with unsaved changes check
     const handleClose = async () => {
-        // Check for widget unsaved changes first
-        if (isDirty && widgetEditorOpen) {
-            const confirmed = await showConfirm({
-                title: 'Unsaved Changes',
-                message: 'You have unsaved changes. What would you like to do?',
-                confirmText: 'Save Changes',
-                cancelText: 'Discard Changes',
-                confirmButtonStyle: 'primary'
-            })
-
-            if (confirmed) {
-                // Save widget changes using the panel's save method
-                if (widgetEditorRef.current) {
-                    const savedWidget = widgetEditorRef.current.saveCurrentWidget()
-                    if (savedWidget) {
-                        await handleSaveWidget(savedWidget)
-                    }
-                }
-            } else {
-                // Discard widget changes
-                handleCloseWidgetEditor()
-            }
-            return // Don't close the page editor yet
+        // If widget editor is open, close it first so the page-level dirty
+        // state is all that remains to check.
+        if (widgetEditorOpen) {
+            handleCloseWidgetEditor()
         }
 
-        // Check for page unsaved changes
-        if (isDirty) {
-            addNotification('Checking for unsaved changes...', 'info', 'editor-close')
-            const confirmed = await showConfirm({
-                title: 'Unsaved Changes',
-                message: 'You have unsaved changes. Are you sure you want to close?',
-                confirmText: 'Close without saving',
-                confirmButtonStyle: 'danger'
-            })
-            if (!confirmed) {
-                addNotification('Close cancelled - staying in editor', 'info', 'editor-close')
-                return
-            }
+        if (!isDirty) {
+            navigate(previousView)
+            return
         }
-        addNotification('Closing page editor...', 'info', 'editor-close')
-        navigate(previousView)
+
+        const decision = await showSaveConfirm({
+            title: 'Unsaved Changes',
+            message: 'You have unsaved changes to this page. What would you like to do?'
+        })
+
+        if (decision === 'save') {
+            try {
+                await handleActualSave({ description: 'Save before leaving' })
+                navigate(previousView)
+            } catch {
+                // handleActualSave already shows an error notification; stay on page
+            }
+        } else if (decision === 'discard') {
+            navigate(previousView)
+        }
+        // 'cancel' → do nothing, stay on page
     }
 
     // Version management functions
@@ -1228,20 +1203,19 @@ const PageEditor = () => {
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
-            // Collect current widget data (from pageVersionData) and any unsaved changes from ContentEditor
+            // Collect current widget data from pageVersionData (always current after fix)
             collectedData.widgets = pageVersionData?.widgets || {};
 
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
-                    const widgetResult = await contentEditorRef.current.saveWidgets({
+                    // Call saveWidgets only to publish SAVED_TO_SERVER to UDC downstream listeners.
+                    // Widget data is already current in pageVersionData.widgets — we do not use the return value.
+                    await contentEditorRef.current.saveWidgets({
                         source: 'smart_save_from_statusbar',
-                        description: 'Smart save triggered from status bar',
-                        collectOnly: true  // Tell ContentEditor to collect data, not save
+                        description: 'Smart save triggered from status bar'
                     });
-                    // Merge any changes from ContentEditor with existing widgets
-                    collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
                 } catch (error) {
-                    console.error('❌ SMART SAVE: Widget data collection failed', error);
+                    console.error('❌ SMART SAVE: saveWidgets notification failed', error);
                 }
             }
 
@@ -1362,11 +1336,6 @@ const PageEditor = () => {
             // Clear To-Do items on success
             setErrorTodoItems([])
 
-            // Mark LayoutRenderer as clean after successful save
-            if (contentEditorRef.current?.layoutRenderer) {
-                contentEditorRef.current.layoutRenderer.markAsClean();
-            }
-
             // Show success notification with smart summary
             const actionDescription = saveResult.strategy === 'page-only' ? 'Page updated' :
                 saveResult.strategy === 'version-only' ? 'New version created' :
@@ -1439,14 +1408,14 @@ const PageEditor = () => {
             collectedData.widgets = pageVersionData?.widgets || {};
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
-                    const widgetResult = await contentEditorRef.current.saveWidgets({
+                    // Call saveWidgets only to publish SAVED_TO_SERVER.
+                    // Widget data is already current in pageVersionData.widgets.
+                    await contentEditorRef.current.saveWidgets({
                         source: 'smart_save_analysis',
-                        description: 'Analyzing changes for save decision',
-                        collectOnly: true
+                        description: 'Analyzing changes for save decision'
                     });
-                    collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
                 } catch (error) {
-                    console.error('❌ Widget data collection failed during analysis', error);
+                    console.error('❌ Widget saveWidgets notification failed during analysis', error);
                 }
             }
             // Collect settings data
@@ -1592,6 +1561,14 @@ const PageEditor = () => {
     useEffect(() => {
         recomputeDirtyState();
     }, [recomputeDirtyState]);
+
+    // Warn on browser-level navigation (tab close / refresh) when there are unsaved changes
+    useEffect(() => {
+        if (!isDirty) return;
+        const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [isDirty]);
 
     // Conflict resolution handlers
     const handleConflictResolve = useCallback(async (resolutions) => {

@@ -7,7 +7,6 @@ import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataCont
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import WidgetSelectionModal from './WidgetSelectionModal'
 import SlotIconMenu from './SlotIconMenu'
-import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { useEditorContext } from '../contexts/unified-data/hooks'
 import { useClipboard } from '../contexts/ClipboardContext'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../utils/clipboardService'

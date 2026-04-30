@@ -49,11 +49,13 @@ const Modal = ({
         }
     }
 
+    const isCompact = size === 'sm'
+
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-[10050] overflow-y-auto">
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-black/20 transition-opacity"
+                className="fixed inset-0 bg-black/50 transition-opacity"
                 onClick={onClose}
             />
 
@@ -63,13 +65,13 @@ const Modal = ({
                     relative bg-white rounded-lg shadow-xl transform transition-all flex flex-col
                     w-full ${getSizeClasses()}
                 `}
-                style={{
+                style={isCompact ? {} : {
                     height: '85vh',
                     maxHeight: '800px',
                     minHeight: '500px'
                 }}>
                     {/* Header */}
-                    <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+                    <div className={`flex items-center justify-between border-b border-gray-200 flex-shrink-0 ${isCompact ? 'px-4 py-3' : 'p-6'}`}>
                         <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
                             {title}
                         </div>
@@ -84,8 +86,8 @@ const Modal = ({
                         )}
                     </div>
 
-                    {/* Content - scrollable */}
-                    <div className="p-6 flex-1 overflow-y-auto">
+                    {/* Content - scrollable for large modals, auto for compact */}
+                    <div className={isCompact ? 'px-4 py-3' : 'p-6 flex-1 overflow-y-auto'}>
                         {children}
                     </div>
                 </div>
