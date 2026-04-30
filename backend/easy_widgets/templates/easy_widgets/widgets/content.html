@@ -9,7 +9,7 @@
         {% if config.processed_content %}
             {{ config.processed_content|safe }}
         {% else %}
-            {{ config.content|sanitize_html:config.allow_scripts }}
+            {% with allow_scripts=config.allow_scripts|default:False %}{{ config.content|sanitize_html:allow_scripts }}{% endwith %}
         {% endif %}
     </div>
 </div>

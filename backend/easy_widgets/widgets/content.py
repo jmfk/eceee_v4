@@ -346,9 +346,9 @@ class ContentWidget(BaseWidget):
                 align=align,
             )
 
-        if styled_html:
-            new_tag = BeautifulSoup(styled_html, "html.parser")
-            media_insert.replace_with(new_tag)
+            if styled_html:
+                new_tag = BeautifulSoup(styled_html, "html.parser")
+                media_insert.replace_with(new_tag)
 
         # Resolve link objects in HTML content
         from webpages.services.link_resolver import resolve_links_in_html
