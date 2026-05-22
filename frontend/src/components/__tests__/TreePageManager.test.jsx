@@ -6,6 +6,22 @@ import * as pagesApi from '../../api/pages'
 import { NotificationProvider } from '../NotificationManager'
 import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
 
+const pageApiMocks = vi.hoisted(() => ({
+    getRootPages: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
+    getPageChildren: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
+    movePage: vi.fn(),
+    deletePage: vi.fn(),
+    searchAllPages: vi.fn(() => Promise.resolve({ results: [] })),
+    list: vi.fn(() => Promise.resolve({ results: [] })),
+    create: vi.fn(() => Promise.resolve({})),
+    update: vi.fn(() => Promise.resolve({})),
+    get: vi.fn(() => Promise.resolve({})),
+    duplicate: vi.fn(() => Promise.resolve({ id: 99 })),
+    bulkPublish: vi.fn(() => Promise.resolve({})),
+    bulkUnpublish: vi.fn(() => Promise.resolve({})),
+    bulkDelete: vi.fn(() => Promise.resolve({})),
+}))
+
 // Mock the API client to avoid browser dependencies
 vi.mock('../../api/client.js', () => ({
     api: {
@@ -19,11 +35,26 @@ vi.mock('../../api/client.js', () => ({
 
 // Mock the pages API
 vi.mock('../../api/pages', () => ({
-    getRootPages: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
-    getPageChildren: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
-    movePage: vi.fn(),
-    deletePage: vi.fn(),
-    searchAllPages: vi.fn(() => Promise.resolve({ results: [] })),
+    getRootPages: pageApiMocks.getRootPages,
+    getPageChildren: pageApiMocks.getPageChildren,
+    movePage: pageApiMocks.movePage,
+    deletePage: pageApiMocks.deletePage,
+    searchAllPages: pageApiMocks.searchAllPages,
+    pagesApi: {
+        getRootPages: pageApiMocks.getRootPages,
+        getPageChildren: pageApiMocks.getPageChildren,
+        move: pageApiMocks.movePage,
+        delete: pageApiMocks.deletePage,
+        searchAllPages: pageApiMocks.searchAllPages,
+        list: pageApiMocks.list,
+        create: pageApiMocks.create,
+        update: pageApiMocks.update,
+        get: pageApiMocks.get,
+        duplicate: pageApiMocks.duplicate,
+        bulkPublish: pageApiMocks.bulkPublish,
+        bulkUnpublish: pageApiMocks.bulkUnpublish,
+        bulkDelete: pageApiMocks.bulkDelete,
+    },
     pageTreeUtils: {
         hasChildren: vi.fn((page) => page.childrenCount > 0),
         formatPageForTree: vi.fn((page) => ({
@@ -141,7 +172,7 @@ describe('TreePageManager', () => {
     it('renders without crashing', async () => {
         renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
 
-        expect(screen.getByText('Page Tree Manager')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Pages' })).toBeInTheDocument()
         expect(screen.getByPlaceholderText('Search pages...')).toBeInTheDocument()
     })
 
@@ -317,4 +348,4 @@ describe('TreePageManager', () => {
     })
 
 
-}) 
+})

@@ -449,10 +449,14 @@ describe('useSlotPreview', () => {
         expect(result.current.detectedSlots[0].name).toBe('header') // Mock returns consistent data
     })
 
-    it('should set detecting state during processing', () => {
+    it('should set detecting state during processing', async () => {
         const { result } = renderHook(() => useSlotPreview('<div data-widget-slot="header">Header</div>'))
 
         // Initially should be detecting or have completed quickly
         expect(typeof result.current.isDetecting).toBe('boolean')
+
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 10))
+        })
     })
-}) 
+})

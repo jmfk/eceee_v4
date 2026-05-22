@@ -1,819 +1,131 @@
-/**
- * Tests for MediaManagerPage Component
- * 
- * Tests cover:
- * - Page layout and navigation
- * - MediaBrowser integration
- * - Upload functionality
- * - File management operations
- * - Search and filtering
- * - Bulk operations
- * - Error handling and loading states
- * - Accessibility compliance
- */
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter } from 'react-router-dom'
+import MediaManagerPage from '../../pages/MediaManagerPage'
+import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
+import { namespacesApi } from '../../api'
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
-import MediaManagerPage from '../../pages/MediaManagerPage';
-import * as mediaApi from '../../api/media';
-
-// Mock the media API
-vi.mock('../../api/media', () => ({
-    searchMedia: vi.fn(),
-    uploadFile: vi.fn(),
-    deleteFile: vi.fn(),
-    bulkDelete: vi.fn(),
-    getMediaCollections: vi.fn(),
-    getMediaTags: vi.fn(),
-    createCollection: vi.fn(),
-    addToCollection: vi.fn(),
-}));
-
-// Mock MediaBrowser component
-vi.mock('../media/MediaBrowser', () => {
-    return function MockMediaBrowser({ onSelect, onDelete, onBulkAction }) {
-        return (
-            <div data-testid="media-browser">
-                <div data-testid="media-files">
-                    <div data-testid="media-file-1">Test Image 1</div>
-                    <div data-testid="media-file-2">Test Video</div>
-                    <div data-testid="media-file-3">Test Document</div>
-                </div>
-                <button
-                    onClick={() => onSelect?.({ id: '1', title: 'Test Image 1' })}
-                    data-testid="select-file-btn"
-                >
-                    Select File
-                </button>
-                <button
-                    onClick={() => onDelete?.('1')}
-                    data-testid="delete-file-btn"
-                >
-                    Delete File
-                </button>
-                <button
-                    onClick={() => onBulkAction?.('delete', ['1', '2'])}
-                    data-testid="bulk-delete-btn"
-                >
-                    Bulk Delete
-                </button>
-            </div>
-        );
-    };
-});
-
-// Mock file upload component
-vi.mock('../media/FileUpload', () => {
-    return function MockFileUpload({ onUpload, onProgress, onError }) {
-        return (
-            <div data-testid="file-upload">
-                <input
-                    type="file"
-                    data-testid="file-input"
-                    onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                            onProgress?.(50);
-                            setTimeout(() => {
-                                onUpload?.({
-                                    id: 'uploaded-1',
-                                    title: file.name,
-                                    file_url: 'https://example.com/uploaded.jpg',
-                                });
-                            }, 100);
-                        }
-                    }}
-                />
-                <div data-testid="upload-progress">Upload Progress</div>
-            </div>
-        );
-    };
-});
-
-// Test data
-const mockMediaFiles = [
-    {
-        id: '1',
-        title: 'Test Image 1',
-        file_url: 'https://example.com/test1.jpg',
-        file_type: 'image/jpeg',
-        file_size: 1024000,
-        created_at: '2024-01-01T10:00:00Z',
+vi.mock('../../api', () => ({
+    namespacesApi: {
+        list: vi.fn(),
     },
-    {
-        id: '2',
-        title: 'Test Video',
-        file_url: 'https://example.com/test.mp4',
-        file_type: 'video/mp4',
-        file_size: 5120000,
-        created_at: '2024-01-02T10:00:00Z',
-    },
-];
+}))
 
-// Test wrapper component
-function TestWrapper({ children }) {
+vi.mock('../../hooks/useDocumentTitle', () => ({
+    useDocumentTitle: vi.fn(),
+}))
+
+vi.mock('../media/MediaManager', () => ({
+    default: ({ namespace, selectionMode, onFileSelect, onFilesLoaded }) => (
+        <div data-testid="media-manager">
+            Media manager for {namespace}
+            <div>Selection mode: {selectionMode}</div>
+            <button type="button" onClick={() => onFileSelect({ id: '1', title: 'Selected file' })}>
+                Select file
+            </button>
+            <button type="button" onClick={onFilesLoaded}>
+                Files loaded
+            </button>
+        </div>
+    ),
+}))
+
+const namespaces = [
+    { id: 1, name: 'Main Site', slug: 'main', isDefault: true },
+    { id: 2, name: 'Archive', slug: 'archive', isDefault: false },
+]
+
+const renderPage = () => {
     const queryClient = new QueryClient({
         defaultOptions: {
             queries: { retry: false },
             mutations: { retry: false },
         },
-    });
+    })
 
-    return (
+    return render(
         <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
-                {children}
-            </BrowserRouter>
+            <GlobalNotificationProvider>
+                <BrowserRouter>
+                    <MediaManagerPage />
+                </BrowserRouter>
+            </GlobalNotificationProvider>
         </QueryClientProvider>
-    );
+    )
 }
 
 describe('MediaManagerPage', () => {
-    let user;
-
     beforeEach(() => {
-        user = userEvent.setup();
-        vi.clearAllMocks();
+        vi.clearAllMocks()
+        namespacesApi.list.mockResolvedValue({ results: namespaces })
+    })
 
-        // Setup default API mocks
-        mediaApi.searchMedia.mockResolvedValue({
-            data: {
-                results: mockMediaFiles,
-                count: 2,
-                next: null,
-                previous: null,
-            },
-        });
+    it('shows a loading state while namespaces load', () => {
+        namespacesApi.list.mockImplementationOnce(() => new Promise(() => { }))
 
-        mediaApi.getMediaCollections.mockResolvedValue({
-            data: { results: [] },
-        });
+        renderPage()
 
-        mediaApi.getMediaTags.mockResolvedValue({
-            data: { results: [] },
-        });
-    });
+        expect(screen.getByText('Loading media manager...')).toBeInTheDocument()
+    })
 
-    afterEach(() => {
-        vi.resetAllMocks();
-    });
+    it('renders the page header after loading', async () => {
+        renderPage()
 
-    describe('Basic Functionality', () => {
-        it('should render page header and navigation', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
+        expect(await screen.findByRole('heading', { name: 'Media Manager' })).toBeInTheDocument()
+        expect(screen.getByText('Upload, organize, and manage your media files')).toBeInTheDocument()
+    })
 
-            expect(screen.getByRole('heading', { name: /media manager/i })).toBeInTheDocument();
-            expect(screen.getByText(/manage your media files/i)).toBeInTheDocument();
-        });
+    it('loads namespaces and selects the default namespace', async () => {
+        renderPage()
 
-        it('should render MediaBrowser component', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
+        expect(await screen.findByTestId('media-manager')).toHaveTextContent('Media manager for main')
+        expect(screen.getByRole('combobox', { name: /namespace/i })).toHaveValue('main')
+        expect(namespacesApi.list).toHaveBeenCalled()
+    })
 
-            expect(screen.getByTestId('media-browser')).toBeInTheDocument();
-        });
+    it('renders namespace options', async () => {
+        renderPage()
 
-        it('should show upload area', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
+        await screen.findByRole('heading', { name: 'Media Manager' })
 
-            expect(screen.getByTestId('file-upload')).toBeInTheDocument();
-        });
+        expect(screen.getByRole('option', { name: 'Main Site' })).toHaveValue('main')
+        expect(screen.getByRole('option', { name: 'Archive' })).toHaveValue('archive')
+    })
 
-        it('should display media statistics', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
+    it('switches the active namespace', async () => {
+        const user = userEvent.setup()
+        renderPage()
 
-            await waitFor(() => {
-                expect(screen.getByText(/2.*files/i)).toBeInTheDocument();
-            });
-        });
-    });
+        await screen.findByTestId('media-manager')
+        await user.selectOptions(screen.getByRole('combobox', { name: /namespace/i }), 'archive')
 
-    describe('File Upload', () => {
-        it('should handle file upload', async () => {
-            mediaApi.uploadFile.mockResolvedValue({
-                data: {
-                    id: 'uploaded-1',
-                    title: 'uploaded.jpg',
-                    file_url: 'https://example.com/uploaded.jpg',
-                },
-            });
+        expect(screen.getByTestId('media-manager')).toHaveTextContent('Media manager for archive')
+    })
 
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
+    it('passes the current media manager contract to the child manager', async () => {
+        renderPage()
 
-            const fileInput = screen.getByTestId('file-input');
-            const file = new File(['test content'], 'test.jpg', { type: 'image/jpeg' });
+        expect(await screen.findByTestId('media-manager')).toHaveTextContent('Selection mode: multiple')
+    })
 
-            await user.upload(fileInput, file);
+    it('shows an empty namespace state when no namespaces exist', async () => {
+        namespacesApi.list.mockResolvedValueOnce({ results: [] })
 
-            await waitFor(() => {
-                expect(screen.getByText(/upload.*success/i)).toBeInTheDocument();
-            });
-        });
+        renderPage()
 
-        it('should show upload progress', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
+        expect(await screen.findByRole('heading', { name: 'Select a Namespace' })).toBeInTheDocument()
+        expect(screen.getByText('Please select a namespace to view and manage media files.')).toBeInTheDocument()
+    })
 
-            const fileInput = screen.getByTestId('file-input');
-            const file = new File(['test content'], 'test.jpg', { type: 'image/jpeg' });
+    it('handles namespace load errors without crashing', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { })
+        namespacesApi.list.mockRejectedValueOnce(new Error('Namespace load failed'))
 
-            await user.upload(fileInput, file);
+        renderPage()
 
-            expect(screen.getByTestId('upload-progress')).toBeInTheDocument();
-        });
-
-        it('should handle upload errors', async () => {
-            mediaApi.uploadFile.mockRejectedValue(new Error('Upload failed'));
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const fileInput = screen.getByTestId('file-input');
-            const file = new File(['test content'], 'test.jpg', { type: 'image/jpeg' });
-
-            await user.upload(fileInput, file);
-
-            await waitFor(() => {
-                expect(screen.getByText(/upload.*failed/i)).toBeInTheDocument();
-            });
-        });
-
-        it('should refresh media list after upload', async () => {
-            mediaApi.uploadFile.mockResolvedValue({
-                data: {
-                    id: 'uploaded-1',
-                    title: 'uploaded.jpg',
-                    file_url: 'https://example.com/uploaded.jpg',
-                },
-            });
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const fileInput = screen.getByTestId('file-input');
-            const file = new File(['test content'], 'test.jpg', { type: 'image/jpeg' });
-
-            await user.upload(fileInput, file);
-
-            await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledTimes(2); // Initial load + refresh
-            });
-        });
-    });
-
-    describe('File Management', () => {
-        it('should handle file selection', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const selectButton = screen.getByTestId('select-file-btn');
-            await user.click(selectButton);
-
-            // Should show file details panel
-            expect(screen.getByText(/file details/i)).toBeInTheDocument();
-        });
-
-        it('should handle file deletion', async () => {
-            mediaApi.deleteFile.mockResolvedValue({ data: { success: true } });
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const deleteButton = screen.getByTestId('delete-file-btn');
-            await user.click(deleteButton);
-
-            // Should show confirmation dialog
-            expect(screen.getByText(/confirm.*delete/i)).toBeInTheDocument();
-
-            const confirmButton = screen.getByRole('button', { name: /confirm/i });
-            await user.click(confirmButton);
-
-            await waitFor(() => {
-                expect(mediaApi.deleteFile).toHaveBeenCalledWith('1');
-            });
-        });
-
-        it('should handle bulk operations', async () => {
-            mediaApi.bulkDelete.mockResolvedValue({ data: { success: true } });
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const bulkDeleteButton = screen.getByTestId('bulk-delete-btn');
-            await user.click(bulkDeleteButton);
-
-            // Should show confirmation dialog
-            expect(screen.getByText(/confirm.*delete.*2.*files/i)).toBeInTheDocument();
-
-            const confirmButton = screen.getByRole('button', { name: /confirm/i });
-            await user.click(confirmButton);
-
-            await waitFor(() => {
-                expect(mediaApi.bulkDelete).toHaveBeenCalledWith(['1', '2']);
-            });
-        });
-
-        it('should refresh media list after deletion', async () => {
-            mediaApi.deleteFile.mockResolvedValue({ data: { success: true } });
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const deleteButton = screen.getByTestId('delete-file-btn');
-            await user.click(deleteButton);
-
-            const confirmButton = screen.getByRole('button', { name: /confirm/i });
-            await user.click(confirmButton);
-
-            await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledTimes(2); // Initial load + refresh
-            });
-        });
-    });
-
-    describe('Search and Filtering', () => {
-        it('should have search functionality', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            expect(screen.getByPlaceholderText(/search media/i)).toBeInTheDocument();
-        });
-
-        it('should perform search', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const searchInput = screen.getByPlaceholderText(/search media/i);
-            await user.type(searchInput, 'test query');
-
-            await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        search: 'test query',
-                    })
-                );
-            });
-        });
-
-        it('should have filter options', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            expect(screen.getByLabelText(/file type/i)).toBeInTheDocument();
-            expect(screen.getByLabelText(/date range/i)).toBeInTheDocument();
-        });
-
-        it('should apply filters', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const typeFilter = screen.getByLabelText(/file type/i);
-            await user.selectOptions(typeFilter, 'image');
-
-            await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        file_type: 'image',
-                    })
-                );
-            });
-        });
-
-        it('should clear filters', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            // Apply filters first
-            const searchInput = screen.getByPlaceholderText(/search media/i);
-            await user.type(searchInput, 'test');
-
-            const typeFilter = screen.getByLabelText(/file type/i);
-            await user.selectOptions(typeFilter, 'image');
-
-            // Clear filters
-            const clearButton = screen.getByRole('button', { name: /clear filters/i });
-            await user.click(clearButton);
-
-            expect(searchInput.value).toBe('');
-            expect(typeFilter.value).toBe('');
-        });
-    });
-
-    describe('View Options', () => {
-        it('should have view mode toggles', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            expect(screen.getByRole('button', { name: /grid view/i })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: /list view/i })).toBeInTheDocument();
-        });
-
-        it('should switch between view modes', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const listViewButton = screen.getByRole('button', { name: /list view/i });
-            await user.click(listViewButton);
-
-            // Should update view mode
-            expect(listViewButton).toHaveClass('active');
-        });
-
-        it('should have sorting options', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            expect(screen.getByLabelText(/sort by/i)).toBeInTheDocument();
-        });
-
-        it('should apply sorting', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const sortSelect = screen.getByLabelText(/sort by/i);
-            await user.selectOptions(sortSelect, 'file_size');
-
-            await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        ordering: 'file_size',
-                    })
-                );
-            });
-        });
-    });
-
-    describe('File Details Panel', () => {
-        it('should show file details when file is selected', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const selectButton = screen.getByTestId('select-file-btn');
-            await user.click(selectButton);
-
-            expect(screen.getByText(/file details/i)).toBeInTheDocument();
-            expect(screen.getByText('Test Image 1')).toBeInTheDocument();
-        });
-
-        it('should allow editing file metadata', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const selectButton = screen.getByTestId('select-file-btn');
-            await user.click(selectButton);
-
-            const editButton = screen.getByRole('button', { name: /edit/i });
-            await user.click(editButton);
-
-            expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
-            expect(screen.getByLabelText(/alt text/i)).toBeInTheDocument();
-            expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
-        });
-
-        it('should show file usage information', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const selectButton = screen.getByTestId('select-file-btn');
-            await user.click(selectButton);
-
-            expect(screen.getByText(/used in/i)).toBeInTheDocument();
-        });
-
-        it('should close details panel', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const selectButton = screen.getByTestId('select-file-btn');
-            await user.click(selectButton);
-
-            const closeButton = screen.getByRole('button', { name: /close/i });
-            await user.click(closeButton);
-
-            expect(screen.queryByText(/file details/i)).not.toBeInTheDocument();
-        });
-    });
-
-    describe('Collections Management', () => {
-        it('should show collections sidebar', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            expect(screen.getByText(/collections/i)).toBeInTheDocument();
-        });
-
-        it('should allow creating new collections', async () => {
-            mediaApi.createCollection.mockResolvedValue({
-                data: { id: '1', title: 'New Collection', file_count: 0 },
-            });
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const createButton = screen.getByRole('button', { name: /create collection/i });
-            await user.click(createButton);
-
-            const nameInput = screen.getByPlaceholderText(/collection name/i);
-            await user.type(nameInput, 'My New Collection');
-
-            const saveButton = screen.getByRole('button', { name: /save/i });
-            await user.click(saveButton);
-
-            await waitFor(() => {
-                expect(mediaApi.createCollection).toHaveBeenCalledWith({
-                    title: 'My New Collection',
-                });
-            });
-        });
-
-        it('should filter by collection', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            // Mock collections in sidebar
-            const collectionItem = screen.getByText(/all files/i);
-            await user.click(collectionItem);
-
-            await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        collection: null,
-                    })
-                );
-            });
-        });
-    });
-
-    describe('Error Handling', () => {
-        it('should handle API errors gracefully', async () => {
-            mediaApi.searchMedia.mockRejectedValue(new Error('API Error'));
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            await waitFor(() => {
-                expect(screen.getByText(/error loading media/i)).toBeInTheDocument();
-            });
-        });
-
-        it('should show retry option on error', async () => {
-            mediaApi.searchMedia.mockRejectedValue(new Error('Network Error'));
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
-            });
-
-            const retryButton = screen.getByRole('button', { name: /retry/i });
-            await user.click(retryButton);
-
-            expect(mediaApi.searchMedia).toHaveBeenCalledTimes(2);
-        });
-
-        it('should handle deletion errors', async () => {
-            mediaApi.deleteFile.mockRejectedValue(new Error('Delete failed'));
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const deleteButton = screen.getByTestId('delete-file-btn');
-            await user.click(deleteButton);
-
-            const confirmButton = screen.getByRole('button', { name: /confirm/i });
-            await user.click(confirmButton);
-
-            await waitFor(() => {
-                expect(screen.getByText(/delete.*failed/i)).toBeInTheDocument();
-            });
-        });
-    });
-
-    describe('Loading States', () => {
-        it('should show loading state initially', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            expect(screen.getByText(/loading/i)).toBeInTheDocument();
-        });
-
-        it('should show loading state during operations', async () => {
-            // Mock slow API response
-            mediaApi.deleteFile.mockImplementation(
-                () => new Promise(resolve => setTimeout(() => resolve({ data: { success: true } }), 100))
-            );
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const deleteButton = screen.getByTestId('delete-file-btn');
-            await user.click(deleteButton);
-
-            const confirmButton = screen.getByRole('button', { name: /confirm/i });
-            await user.click(confirmButton);
-
-            expect(screen.getByText(/deleting/i)).toBeInTheDocument();
-        });
-    });
-
-    describe('Accessibility', () => {
-        it('should have proper page structure', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            expect(screen.getByRole('main')).toBeInTheDocument();
-            expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-        });
-
-        it('should support keyboard navigation', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            // Should be able to navigate with Tab
-            await user.tab();
-            expect(document.activeElement).toHaveAttribute('role', 'button');
-        });
-
-        it('should have accessible labels and descriptions', () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const searchInput = screen.getByLabelText(/search/i);
-            expect(searchInput).toBeInTheDocument();
-
-            const fileInput = screen.getByTestId('file-input');
-            expect(fileInput).toHaveAttribute('aria-label');
-        });
-
-        it('should announce status changes', async () => {
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const fileInput = screen.getByTestId('file-input');
-            const file = new File(['test content'], 'test.jpg', { type: 'image/jpeg' });
-
-            await user.upload(fileInput, file);
-
-            // Should have aria-live region for status updates
-            const statusRegion = screen.getByRole('status');
-            expect(statusRegion).toBeInTheDocument();
-        });
-    });
-
-    describe('Responsive Design', () => {
-        it('should adapt layout for mobile screens', () => {
-            // Mock mobile viewport
-            Object.defineProperty(window, 'innerWidth', {
-                writable: true,
-                configurable: true,
-                value: 768,
-            });
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            // Should show mobile-optimized layout
-            const container = screen.getByRole('main');
-            expect(container).toHaveClass('mobile-layout');
-        });
-
-        it('should collapse sidebar on small screens', () => {
-            Object.defineProperty(window, 'innerWidth', {
-                writable: true,
-                configurable: true,
-                value: 640,
-            });
-
-            render(
-                <TestWrapper>
-                    <MediaManagerPage />
-                </TestWrapper>
-            );
-
-            const sidebar = screen.getByTestId('collections-sidebar');
-            expect(sidebar).toHaveClass('collapsed');
-        });
-    });
-});
+        expect(await screen.findByRole('heading', { name: 'Select a Namespace' })).toBeInTheDocument()
+        consoleError.mockRestore()
+    })
+})

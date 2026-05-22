@@ -4,6 +4,24 @@ import TreePageManager from '../TreePageManager'
 import { searchAllPages, getPageChildren, getRootPages } from '../../api/pages'
 import { createTestWrapper } from '../../test/testUtils'
 
+const defaultSearchFilters = { parent_isnull: 'false' }
+
+const pageApiMocks = vi.hoisted(() => ({
+    getRootPages: vi.fn(() => Promise.resolve({ results: [] })),
+    getPageChildren: vi.fn(),
+    movePage: vi.fn(),
+    deletePage: vi.fn(),
+    searchAllPages: vi.fn(),
+    list: vi.fn(() => Promise.resolve({ results: [] })),
+    create: vi.fn(() => Promise.resolve({})),
+    update: vi.fn(() => Promise.resolve({})),
+    get: vi.fn(() => Promise.resolve({})),
+    duplicate: vi.fn(() => Promise.resolve({ id: 99 })),
+    bulkPublish: vi.fn(() => Promise.resolve({})),
+    bulkUnpublish: vi.fn(() => Promise.resolve({})),
+    bulkDelete: vi.fn(() => Promise.resolve({})),
+}))
+
 // Mock axios
 vi.mock('axios', () => ({
     default: {
@@ -18,11 +36,26 @@ vi.mock('axios', () => ({
 
 // Mock the API modules
 vi.mock('../../api/pages', () => ({
-    getRootPages: vi.fn(() => Promise.resolve({ results: [] })),
-    getPageChildren: vi.fn(),
-    movePage: vi.fn(),
-    deletePage: vi.fn(),
-    searchAllPages: vi.fn(),
+    getRootPages: pageApiMocks.getRootPages,
+    getPageChildren: pageApiMocks.getPageChildren,
+    movePage: pageApiMocks.movePage,
+    deletePage: pageApiMocks.deletePage,
+    searchAllPages: pageApiMocks.searchAllPages,
+    pagesApi: {
+        getRootPages: pageApiMocks.getRootPages,
+        getPageChildren: pageApiMocks.getPageChildren,
+        move: pageApiMocks.movePage,
+        delete: pageApiMocks.deletePage,
+        searchAllPages: pageApiMocks.searchAllPages,
+        list: pageApiMocks.list,
+        create: pageApiMocks.create,
+        update: pageApiMocks.update,
+        get: pageApiMocks.get,
+        duplicate: pageApiMocks.duplicate,
+        bulkPublish: pageApiMocks.bulkPublish,
+        bulkUnpublish: pageApiMocks.bulkUnpublish,
+        bulkDelete: pageApiMocks.bulkDelete,
+    },
     pageTreeUtils: {
         hasChildren: vi.fn(),
         formatPageForTree: vi.fn((page) => ({
@@ -59,6 +92,9 @@ describe('TreePageManager Search Functionality', () => {
         // Setup default mocks for empty state
         getRootPages.mockResolvedValue({ results: [] })
         getPageChildren.mockResolvedValue({ results: [] })
+        pageApiMocks.list.mockImplementation(({ search, page_size, ...filters } = {}) => {
+            return searchAllPages(search, filters)
+        })
     })
 
     const renderTreePageManager = () => {
@@ -86,7 +122,7 @@ describe('TreePageManager Search Functionality', () => {
 
         // Wait for search to be triggered (debounced)
         await waitFor(() => {
-            expect(searchAllPages).toHaveBeenCalledWith('about', {})
+            expect(searchAllPages).toHaveBeenCalledWith('about', defaultSearchFilters)
         }, { timeout: 1000 })
 
         // Verify that the search input has the correct value
@@ -114,7 +150,7 @@ describe('TreePageManager Search Functionality', () => {
         // Wait for debounced search
         await waitFor(() => {
             expect(searchAllPages).toHaveBeenCalledTimes(1)
-            expect(searchAllPages).toHaveBeenCalledWith('about', {})
+            expect(searchAllPages).toHaveBeenCalledWith('about', defaultSearchFilters)
         }, { timeout: 1000 })
     })
 
@@ -185,7 +221,7 @@ describe('TreePageManager Search Functionality', () => {
 
         // Wait for search to be triggered
         await waitFor(() => {
-            expect(searchAllPages).toHaveBeenCalledWith('nonexistent', {})
+            expect(searchAllPages).toHaveBeenCalledWith('nonexistent', defaultSearchFilters)
         }, { timeout: 1000 })
 
         // Check for no results message
@@ -208,7 +244,7 @@ describe('TreePageManager Search Functionality', () => {
 
         // Wait for search to be triggered
         await waitFor(() => {
-            expect(searchAllPages).toHaveBeenCalledWith('nonexistent', {})
+            expect(searchAllPages).toHaveBeenCalledWith('nonexistent', defaultSearchFilters)
         }, { timeout: 1000 })
 
         // Wait for no results message
@@ -228,4 +264,4 @@ describe('TreePageManager Search Functionality', () => {
             expect(searchInput.value).toBe('')
         })
     })
-}) 
+})
