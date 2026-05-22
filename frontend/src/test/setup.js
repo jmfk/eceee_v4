@@ -5,6 +5,63 @@ import { cleanup } from '@testing-library/react'
 // Compatibility for legacy tests that still use Jest globals.
 global.jest = vi
 
+const createStorageMock = () => {
+    const storage = {}
+    const entries = new Map()
+
+    Object.defineProperty(storage, 'length', {
+        get: () => entries.size,
+    })
+
+    storage.key = vi.fn((index) => Array.from(entries.keys())[index] ?? null)
+    storage.getItem = vi.fn((key) => {
+        const normalizedKey = String(key)
+        return entries.has(normalizedKey) ? entries.get(normalizedKey) : null
+    })
+    storage.setItem = vi.fn((key, value) => {
+        const normalizedKey = String(key)
+        const normalizedValue = String(value)
+        entries.set(normalizedKey, normalizedValue)
+        storage[normalizedKey] = normalizedValue
+    })
+    storage.removeItem = vi.fn((key) => {
+        const normalizedKey = String(key)
+        entries.delete(normalizedKey)
+        delete storage[normalizedKey]
+    })
+    storage.clear = vi.fn(() => {
+        for (const key of entries.keys()) {
+            delete storage[key]
+        }
+        entries.clear()
+    })
+
+    return storage
+}
+
+const installStorageMock = (storageName) => {
+    const storage = createStorageMock()
+
+    Object.defineProperty(globalThis, storageName, {
+        value: storage,
+        configurable: true,
+        writable: true,
+    })
+
+    if (globalThis.window) {
+        Object.defineProperty(globalThis.window, storageName, {
+            value: storage,
+            configurable: true,
+            writable: true,
+        })
+    }
+
+    return storage
+}
+
+installStorageMock('localStorage')
+installStorageMock('sessionStorage')
+
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
     constructor() { }
