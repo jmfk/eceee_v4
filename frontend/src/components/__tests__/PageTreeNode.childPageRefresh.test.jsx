@@ -1,18 +1,10 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import PageTreeNode from '../PageTreeNode'
-import { api } from '../../api/client'
 import { NotificationProvider } from '../NotificationManager'
-
-// Mock the API
-vi.mock('../../api/client', () => ({
-    api: {
-        post: vi.fn(),
-        patch: vi.fn()
-    }
-}))
+import { mockAxiosInstance, resetApiMocks } from '../../test/apiMockUtils'
 
 // Mock toast
 vi.mock('react-hot-toast', () => ({
@@ -61,6 +53,11 @@ const mockParentPage = {
     childrenLoaded: true
 }
 
+const mockCollapsedParentPage = {
+    ...mockParentPage,
+    isExpanded: false
+}
+
 const renderWithProviders = (component) => {
     const queryClient = new QueryClient({
         defaultOptions: {
@@ -81,76 +78,58 @@ const renderWithProviders = (component) => {
 describe('PageTreeNode - Child Page Refresh', () => {
     let user
     let mockOnRefreshChildren
+    let mockOnEdit
 
     beforeEach(() => {
         user = userEvent.setup()
         vi.clearAllMocks()
+        resetApiMocks({ results: [] })
         mockOnRefreshChildren = vi.fn()
+        mockOnEdit = vi.fn()
     })
 
-    it('should NOT call onRefreshChildren when parent page title is updated (using targeted updates)', async () => {
-        const mockResponse = { data: { ...mockParentPage, title: 'Updated Parent Page' } }
-        api.patch.mockResolvedValue(mockResponse)
-
+    it('should NOT call onRefreshChildren when parent page title opens editor', async () => {
         renderWithProviders(
             <PageTreeNode
-                page={mockParentPage}
+                page={mockCollapsedParentPage}
                 level={0}
+                onEdit={mockOnEdit}
                 onRefreshChildren={mockOnRefreshChildren}
             />
         )
 
-        // Find and click the title to enter edit mode
         const titleElement = screen.getByText('Parent Page')
         await user.click(titleElement)
 
-        // Find the input field and update the title
-        const titleInput = screen.getByDisplayValue('Parent Page')
-        await user.clear(titleInput)
-        await user.type(titleInput, 'Updated Parent Page')
-
-        // Click save button
-        const saveButton = screen.getByTitle('Save (Enter)')
-        await user.click(saveButton)
-
-        // Wait for the mutation to complete
-        await waitFor(() => {
-            expect(api.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { title: 'Updated Parent Page' })
-        })
-
-        // Should NOT call onRefreshChildren because we use targeted updates now
+        expect(mockOnEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 1, title: 'Parent Page' }))
+        expect(mockAxiosInstance.patch).not.toHaveBeenCalled()
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
     it('should NOT call onRefreshChildren when parent page slug is updated (using targeted updates)', async () => {
         const mockResponse = { data: { ...mockParentPage, slug: 'updated-parent-page' } }
-        api.patch.mockResolvedValue(mockResponse)
+        mockAxiosInstance.patch.mockResolvedValue(mockResponse)
 
         renderWithProviders(
             <PageTreeNode
-                page={mockParentPage}
-                level={0}
+                page={mockCollapsedParentPage}
+                level={1}
                 onRefreshChildren={mockOnRefreshChildren}
             />
         )
 
-        // Find and click the slug to enter edit mode - use getAllByText and get the first one (parent)
-        const slugElements = screen.getAllByText('/test-page')
-        const parentSlugElement = slugElements[0] // First one is the parent
-        await user.click(parentSlugElement)
+        await user.click(screen.getByText('parent-page'))
 
-        // Find the input field and update the slug
         const slugInput = screen.getByDisplayValue('parent-page')
         await user.clear(slugInput)
         await user.type(slugInput, 'updated-parent-page')
 
-        // Click save button
         const saveButton = screen.getByTitle('Save slug (Enter)')
         await user.click(saveButton)
 
         // Wait for the mutation to complete
         await waitFor(() => {
-            expect(api.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' })
+            expect(mockAxiosInstance.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' }, {})
         })
 
         // Should NOT call onRefreshChildren because we use targeted updates now
@@ -159,11 +138,11 @@ describe('PageTreeNode - Child Page Refresh', () => {
 
     it('should NOT call onRefreshChildren when parent page publication status is toggled (using targeted updates)', async () => {
         const mockResponse = { data: { ...mockParentPage, publicationStatus: 'unpublished' } }
-        api.post.mockResolvedValue(mockResponse)
+        mockAxiosInstance.post.mockResolvedValue(mockResponse)
 
         renderWithProviders(
             <PageTreeNode
-                page={mockParentPage}
+                page={mockCollapsedParentPage}
                 level={0}
                 onRefreshChildren={mockOnRefreshChildren}
             />
@@ -176,14 +155,14 @@ describe('PageTreeNode - Child Page Refresh', () => {
 
         // Wait for the mutation to complete
         await waitFor(() => {
-            expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/unpublish/')
+            expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/unpublish/', { mode: 'current' }, {})
         })
 
         // Should NOT call onRefreshChildren because we use targeted updates now
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
-    it('should NOT call onRefreshChildren when child page is updated (no children)', async () => {
+    it('should NOT call onRefreshChildren when child page title opens editor', async () => {
         const mockChildPage = {
             id: 2,
             title: 'Child Page 1',
@@ -195,36 +174,20 @@ describe('PageTreeNode - Child Page Refresh', () => {
             childrenLoaded: true
         }
 
-        const mockResponse = { data: { ...mockChildPage, title: 'Updated Child Page' } }
-        api.patch.mockResolvedValue(mockResponse)
-
         renderWithProviders(
             <PageTreeNode
                 page={mockChildPage}
                 level={1}
+                onEdit={mockOnEdit}
                 onRefreshChildren={mockOnRefreshChildren}
             />
         )
 
-        // Find and click the title to enter edit mode
         const titleElement = screen.getByText('Child Page 1')
         await user.click(titleElement)
 
-        // Find the input field and update the title
-        const titleInput = screen.getByDisplayValue('Child Page 1')
-        await user.clear(titleInput)
-        await user.type(titleInput, 'Updated Child Page')
-
-        // Click save button
-        const saveButton = screen.getByTitle('Save (Enter)')
-        await user.click(saveButton)
-
-        // Wait for the mutation to complete
-        await waitFor(() => {
-            expect(api.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/2/', { title: 'Updated Child Page' })
-        })
-
-        // Should NOT call onRefreshChildren because child has no children
+        expect(mockOnEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 2, title: 'Child Page 1' }))
+        expect(mockAxiosInstance.patch).not.toHaveBeenCalled()
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
@@ -232,74 +195,62 @@ describe('PageTreeNode - Child Page Refresh', () => {
         const mockParentWithoutChildren = {
             ...mockParentPage,
             children: [],
-            childrenLoaded: false
+            childrenLoaded: false,
+            isExpanded: false
         }
 
-        const mockResponse = { data: { ...mockParentWithoutChildren, title: 'Updated Parent Page' } }
-        api.patch.mockResolvedValue(mockResponse)
+        const mockResponse = { data: { ...mockParentWithoutChildren, slug: 'updated-parent-page' } }
+        mockAxiosInstance.patch.mockResolvedValue(mockResponse)
 
         renderWithProviders(
             <PageTreeNode
                 page={mockParentWithoutChildren}
-                level={0}
+                level={1}
                 onRefreshChildren={mockOnRefreshChildren}
             />
         )
 
-        // Find and click the title to enter edit mode
-        const titleElement = screen.getByText('Parent Page')
-        await user.click(titleElement)
+        await user.click(screen.getByText('parent-page'))
 
-        // Find the input field and update the title
-        const titleInput = screen.getByDisplayValue('Parent Page')
-        await user.clear(titleInput)
-        await user.type(titleInput, 'Updated Parent Page')
+        const slugInput = screen.getByDisplayValue('parent-page')
+        await user.clear(slugInput)
+        await user.type(slugInput, 'updated-parent-page')
 
-        // Click save button
-        const saveButton = screen.getByTitle('Save (Enter)')
+        const saveButton = screen.getByTitle('Save slug (Enter)')
         await user.click(saveButton)
 
-        // Wait for the mutation to complete
         await waitFor(() => {
-            expect(api.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { title: 'Updated Parent Page' })
+            expect(mockAxiosInstance.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' }, {})
         })
 
-        // Should NOT call onRefreshChildren because children are not loaded
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
     it('should handle missing onRefreshChildren gracefully', async () => {
-        const mockResponse = { data: { ...mockParentPage, title: 'Updated Parent Page' } }
-        api.patch.mockResolvedValue(mockResponse)
+        const mockResponse = { data: { ...mockParentPage, slug: 'updated-parent-page' } }
+        mockAxiosInstance.patch.mockResolvedValue(mockResponse)
 
         renderWithProviders(
             <PageTreeNode
-                page={mockParentPage}
-                level={0}
+                page={mockCollapsedParentPage}
+                level={1}
             // No onRefreshChildren prop
             />
         )
 
-        // Find and click the title to enter edit mode
-        const titleElement = screen.getByText('Parent Page')
-        await user.click(titleElement)
+        await user.click(screen.getByText('parent-page'))
 
-        // Find the input field and update the title
-        const titleInput = screen.getByDisplayValue('Parent Page')
-        await user.clear(titleInput)
-        await user.type(titleInput, 'Updated Parent Page')
+        const slugInput = screen.getByDisplayValue('parent-page')
+        await user.clear(slugInput)
+        await user.type(slugInput, 'updated-parent-page')
 
-        // Click save button
-        const saveButton = screen.getByTitle('Save (Enter)')
+        const saveButton = screen.getByTitle('Save slug (Enter)')
         await user.click(saveButton)
 
-        // Wait for the mutation to complete
         await waitFor(() => {
-            expect(api.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { title: 'Updated Parent Page' })
+            expect(mockAxiosInstance.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' }, {})
         })
 
-        // Should not crash when onRefreshChildren is not provided
-        // Just verify the API call was made successfully
-        expect(api.patch).toHaveBeenCalledTimes(1)
+        expect(mockAxiosInstance.patch).toHaveBeenCalledTimes(1)
     })
-}) 
+})

@@ -27,11 +27,14 @@ vi.mock('../../api/media', () => ({
             list: vi.fn(),
             get: vi.fn(),
             update: vi.fn(),
-            delete: vi.fn()
+            delete: vi.fn(),
+            restore: vi.fn(),
+            forceDelete: vi.fn()
         },
         upload: {
             single: vi.fn(),
-            multiple: vi.fn()
+            multiple: vi.fn(),
+            upload: vi.fn()
         },
         search: {
             search: vi.fn()
@@ -66,11 +69,14 @@ vi.mock('../../api/media', () => ({
             list: vi.fn(),
             get: vi.fn(),
             update: vi.fn(),
-            delete: vi.fn()
+            delete: vi.fn(),
+            restore: vi.fn(),
+            forceDelete: vi.fn()
         },
         upload: {
             single: vi.fn(),
-            multiple: vi.fn()
+            multiple: vi.fn(),
+            upload: vi.fn()
         },
         search: {
             search: vi.fn()
@@ -112,7 +118,10 @@ const mockMediaFiles = [
         file_type: 'image/jpeg',
         file_size: 1024000,
         created_at: '2024-01-01T10:00:00Z',
-        tags: ['nature', 'landscape'],
+        tags: [
+            { id: '1', name: 'nature', color: '#3B82F6' },
+            { id: '2', name: 'landscape', color: '#10B981' },
+        ],
         thumbnails: {
             small: 'https://example.com/test1_small.jpg',
             medium: 'https://example.com/test1_medium.jpg',
@@ -125,7 +134,9 @@ const mockMediaFiles = [
         file_type: 'video/mp4',
         file_size: 5120000,
         created_at: '2024-01-02T10:00:00Z',
-        tags: ['demo'],
+        tags: [
+            { id: '3', name: 'demo', color: '#8B5CF6' },
+        ],
         thumbnails: {
             small: 'https://example.com/test_video_small.jpg',
             medium: 'https://example.com/test_video_medium.jpg',
@@ -138,7 +149,9 @@ const mockMediaFiles = [
         file_type: 'application/pdf',
         file_size: 2048000,
         created_at: '2024-01-03T10:00:00Z',
-        tags: ['document'],
+        tags: [
+            { id: '4', name: 'document', color: '#F59E0B' },
+        ],
         thumbnails: {},
     },
 ];
@@ -204,8 +217,21 @@ describe('MediaBrowser', () => {
             results: mockTags,
         });
 
-        mediaApi.mediaApi.tags.list.mockResolvedValue({
-            results: mockTags,
+        mediaApi.mediaApi.tags.list.mockImplementation(() => (
+            vi.fn().mockResolvedValue({ results: mockTags })
+        ));
+        mediaApi.mediaApi.files.get.mockImplementation((id) => (
+            vi.fn().mockResolvedValue(mockMediaFiles.find(file => file.id === id) || mockMediaFiles[0])
+        ));
+        mediaApi.mediaApi.files.restore.mockImplementation(() => (
+            vi.fn().mockResolvedValue({ success: true })
+        ));
+        mediaApi.mediaApi.files.forceDelete.mockImplementation(() => (
+            vi.fn().mockResolvedValue({ success: true })
+        ));
+        mediaApi.mediaApi.upload.upload.mockResolvedValue({
+            files: mockMediaFiles,
+            pending: [],
         });
     });
 
