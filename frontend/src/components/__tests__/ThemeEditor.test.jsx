@@ -180,9 +180,11 @@ describe('ThemeEditor', () => {
         renderThemeEditor()
 
         const nameInput = await screen.findByPlaceholderText('My Awesome Theme')
-        await user.type(nameInput, 'Test Theme')
+        await user.type(nameInput, 'Test Theme', { delay: 1 })
 
-        expect(nameInput).toHaveValue('Test Theme')
+        await waitFor(() => {
+            expect(nameInput).toHaveValue('Test Theme')
+        })
     })
 
     it('renders an existing theme in edit mode from the current route params', async () => {
