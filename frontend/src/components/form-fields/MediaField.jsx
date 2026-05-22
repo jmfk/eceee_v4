@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Image, FolderOpen, X, Eye } from 'lucide-react'
+import { Image, FolderOpen, X, Eye, RefreshCw } from 'lucide-react'
 import MediaSelectModal from '../media/MediaSelectModal'
 import OptimizedImage from '../media/OptimizedImage'
 
@@ -74,8 +74,11 @@ const MediaField = ({
     const canAddMore = multiple ? (!maxItems || displayFiles.length < maxItems) : !hasFiles
 
     // Validation state
-    const hasError = showValidation && validation && !validation.isValid
+    const hasError = showValidation && validation && (validation.hasError || validation.isValid === false)
     const errorMessage = hasError ? validation.message : null
+    const descriptionId = description ? `${label?.replace(/\s+/g, '-').toLowerCase() || 'media-field'}-description` : undefined
+    const errorId = hasError ? `${label?.replace(/\s+/g, '-').toLowerCase() || 'media-field'}-error` : undefined
+    const describedBy = [descriptionId, errorId].filter(Boolean).join(' ') || undefined
 
     return (
         <div className="space-y-3">
@@ -86,7 +89,7 @@ const MediaField = ({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 {description && (
-                    <div className="text-sm text-gray-500 mt-1">{description}</div>
+                    <div id={descriptionId} className="text-sm text-gray-500 mt-1">{description}</div>
                 )}
             </div>
 
@@ -95,8 +98,9 @@ const MediaField = ({
                 <button
                     type="button"
                     onClick={() => setShowMediaPicker(true)}
+                    aria-describedby={describedBy}
                     className={`w-full flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-lg transition-colors ${hasError
-                        ? 'border-red-300 hover:border-red-400 hover:bg-red-50'
+                        ? 'error border-red-300 hover:border-red-400 hover:bg-red-50'
                         : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
                         }`}
                 >
@@ -104,7 +108,7 @@ const MediaField = ({
                     <span className="text-gray-600">
                         {hasFiles
                             ? `Add ${multiple ? 'More' : 'Another'} ${mediaTypes.includes('image') ? 'Media' : 'File'}`
-                            : `Select ${mediaTypes.includes('image') ? 'Media' : 'File'}${multiple ? 's' : ''} from Library`
+                            : `Select ${mediaTypes.includes('image') ? 'Media' : `File${multiple ? 's' : ''}`} from Library`
                         }
                     </span>
                 </button>
@@ -120,13 +124,19 @@ const MediaField = ({
                     </div>
 
                     <div className={`grid gap-3 ${multiple ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-                        {displayFiles.map((file) => (
+                        {displayFiles.map((file) => {
+                            const fileType = file.fileType || file.file_type || ''
+                            const fileUrl = file.fileUrl || file.file_url
+                            const thumbnailUrl = file.thumbnailUrl || file.thumbnails?.small || file.imgproxyBaseUrl || fileUrl
+                            const fileSize = file.fileSizeDisplay || file.file_size_display || 'Unknown size'
+
+                            return (
                             <div key={file.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
                                 {/* Media Preview */}
                                 <div className="flex-shrink-0">
-                                    {file.fileType?.startsWith('image/') || file.file_type?.startsWith('image/') ? (
+                                    {fileType.startsWith('image/') ? (
                                         <OptimizedImage
-                                            src={file.thumbnailUrl || file.imgproxyBaseUrl || file.fileUrl}
+                                            src={thumbnailUrl}
                                             alt={file.title}
                                             width={48}
                                             height={48}
@@ -151,7 +161,7 @@ const MediaField = ({
                                         {file.title}
                                     </div>
                                     <div className="text-xs text-gray-500 truncate">
-                                        {file.fileType} • {file.fileSizeDisplay || 'Unknown size'}
+                                        {fileType} • {fileSize}
                                     </div>
                                     {file.description && (
                                         <div className="text-xs text-gray-600 truncate mt-1" title={file.description}>
@@ -162,9 +172,20 @@ const MediaField = ({
 
                                 {/* Actions */}
                                 <div className="flex items-center space-x-1 flex-shrink-0">
-                                    {file.fileUrl && (
+                                    {!multiple && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowMediaPicker(true)}
+                                            className="p-1 text-gray-400 hover:text-blue-600"
+                                            title="Change file"
+                                            aria-label="Change file"
+                                        >
+                                            <RefreshCw className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    {fileUrl && (
                                         <a
-                                            href={file.fileUrl}
+                                            href={fileUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="p-1 text-gray-400 hover:text-blue-600"
@@ -178,19 +199,21 @@ const MediaField = ({
                                         onClick={() => handleRemoveMedia(file.id)}
                                         className="p-1 text-gray-400 hover:text-red-600"
                                         title="Remove file"
+                                        aria-label={`Remove ${file.title || 'file'}`}
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
             )}
 
             {/* Validation Message */}
             {hasError && (
-                <div className="text-sm text-red-600">
+                <div id={errorId} role="alert" className="text-sm text-red-600">
                     {errorMessage}
                 </div>
             )}
