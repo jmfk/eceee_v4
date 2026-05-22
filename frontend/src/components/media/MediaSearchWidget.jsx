@@ -11,7 +11,11 @@ const MediaSearchWidget = ({
     autoSearch = true, // Auto-trigger search after typing (debounced)
     autoSearchDelay = 500 // Delay in ms for auto-search (debounce)
 }) => {
-    const [inputValue, setInputValue] = useState('')
+    const getTextSearchValue = useCallback(
+        () => searchTerms.find(term => term.type === 'text')?.value || '',
+        [searchTerms]
+    )
+    const [inputValue, setInputValue] = useState(getTextSearchValue)
     const [showSuggestions, setShowSuggestions] = useState(false)
     const [selectedIndex, setSelectedIndex] = useState(-1)
     const [availableTags, setAvailableTags] = useState([])
@@ -24,7 +28,7 @@ const MediaSearchWidget = ({
 
     // Debounced search function for server-side tag lookup
     const searchTags = useCallback(async (searchQuery) => {
-        if (!namespace) return;
+        if (!namespace || disabled) return;
 
         // Clear previous timeout
         if (searchTimeoutRef.current) {
@@ -57,12 +61,12 @@ const MediaSearchWidget = ({
                 setIsSearching(false);
             }
         }, 300);
-    }, [namespace]);
+    }, [namespace, disabled]);
 
     // Load initial tags when namespace changes (optional - could be removed if you want search-only)
     useEffect(() => {
         const loadInitialTags = async () => {
-            if (!namespace) return;
+            if (!namespace || disabled) return;
 
             setIsLoading(true);
             try {
@@ -81,7 +85,7 @@ const MediaSearchWidget = ({
         };
 
         loadInitialTags();
-    }, [namespace]);
+    }, [namespace, disabled]);
 
     // Cleanup timeout on unmount
     useEffect(() => {
@@ -94,6 +98,10 @@ const MediaSearchWidget = ({
             }
         };
     }, []);
+
+    useEffect(() => {
+        setInputValue(getTextSearchValue())
+    }, [getTextSearchValue])
 
     // Filter suggestions to exclude already selected search terms (case-insensitive)
     const suggestions = availableTags
@@ -332,6 +340,7 @@ const MediaSearchWidget = ({
                                     onClick={() => removeSearchTerm(term)}
                                     className="ml-2 text-blue-600 hover:text-blue-800"
                                     type="button"
+                                    aria-label={`Remove ${term.value}`}
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
