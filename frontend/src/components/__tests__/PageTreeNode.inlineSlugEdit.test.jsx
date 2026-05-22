@@ -337,7 +337,7 @@ describe('PageTreeNode - Inline Slug Editing', () => {
             )
 
             // Enter edit mode
-            const slugElement = screen.getByText('/test-page')
+            const slugElement = screen.getByText('test-page')
             await user.click(slugElement)
 
             // Enter test input
@@ -359,4 +359,4 @@ describe('PageTreeNode - Inline Slug Editing', () => {
             vi.clearAllMocks()
         }
     })
-}) 
+})
