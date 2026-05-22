@@ -106,7 +106,7 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
                         </div>
                     )}
 
-                    {message.stack && import.meta.env.DEV && (
+                    {message.stack && import.meta.env.DEV && process.env.NODE_ENV !== 'production' && (
                         <details className="mt-2">
                             <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">
                                 Show technical details
@@ -122,4 +122,4 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
     )
 }
 
-export default Notification 
+export default Notification

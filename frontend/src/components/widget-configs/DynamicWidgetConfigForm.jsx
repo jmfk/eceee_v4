@@ -84,6 +84,7 @@ export default function DynamicWidgetConfigForm({
         const fieldValue = config[fieldName]
         const component = ui.component || 'TextInput'
         const fieldLabel = ui.label || formatFieldLabel(fieldName)
+        const fieldId = `widget-config-${fieldName.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
         // Hidden fields
         if (ui.hidden) {
@@ -95,6 +96,7 @@ export default function DynamicWidgetConfigForm({
 
         // Common props
         const commonProps = {
+            id: fieldId,
             label: fieldLabel + (required ? ' *' : ''),
             description: description || ui.helpText,
             value: fieldValue,
@@ -108,10 +110,11 @@ export default function DynamicWidgetConfigForm({
             case 'TextInput':
                 return (
                     <div key={fieldName}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
                             {commonProps.label}
                         </label>
                         <input
+                            id={fieldId}
                             type="text"
                             value={fieldValue || ''}
                             onChange={(e) => handleFieldChange(fieldName, e.target.value)}
@@ -135,10 +138,11 @@ export default function DynamicWidgetConfigForm({
             case 'HtmlSource':
                 return (
                     <div key={fieldName}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
                             {commonProps.label}
                         </label>
                         <textarea
+                            id={fieldId}
                             value={fieldValue || ''}
                             onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                             placeholder={ui.placeholder}
@@ -155,10 +159,11 @@ export default function DynamicWidgetConfigForm({
             case 'NumberInput':
                 return (
                     <div key={fieldName}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
                             {commonProps.label}
                         </label>
                         <input
+                            id={fieldId}
                             type="number"
                             value={fieldValue ?? ''}
                             onChange={(e) => handleFieldChange(fieldName, e.target.value ? parseFloat(e.target.value) : null)}
@@ -178,6 +183,7 @@ export default function DynamicWidgetConfigForm({
                     <div key={fieldName} className="flex items-start space-x-3">
                         <div className="flex items-center h-5">
                             <input
+                                id={fieldId}
                                 type="checkbox"
                                 checked={fieldValue || false}
                                 onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
@@ -186,7 +192,7 @@ export default function DynamicWidgetConfigForm({
                             />
                         </div>
                         <div className="flex-1">
-                            <label className="text-sm font-medium text-gray-700">
+                            <label htmlFor={fieldId} className="text-sm font-medium text-gray-700">
                                 {commonProps.label}
                             </label>
                             {description && (
@@ -206,10 +212,11 @@ export default function DynamicWidgetConfigForm({
                 const selectOptions = enumValues || ui.options || []
                 return (
                     <div key={fieldName}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
                             {commonProps.label}
                         </label>
                         <select
+                            id={fieldId}
                             value={fieldValue || ''}
                             onChange={(e) => handleFieldChange(fieldName, e.target.value || null)}
                             disabled={disabled}
@@ -272,10 +279,11 @@ export default function DynamicWidgetConfigForm({
             case 'URLInput':
                 return (
                     <div key={fieldName}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
                             {commonProps.label}
                         </label>
                         <input
+                            id={fieldId}
                             type="url"
                             value={fieldValue || ''}
                             onChange={(e) => handleFieldChange(fieldName, e.target.value)}
@@ -293,10 +301,11 @@ export default function DynamicWidgetConfigForm({
                 // Fallback for unsupported component types
                 return (
                     <div key={fieldName}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
                             {commonProps.label}
                         </label>
                         <input
+                            id={fieldId}
                             type="text"
                             value={typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : fieldValue || ''}
                             onChange={(e) => {
@@ -432,10 +441,11 @@ export default function DynamicWidgetConfigForm({
                 </div>
             ) : (
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="widget-config-json" className="block text-sm font-medium text-gray-700 mb-2">
                         Configuration JSON
                     </label>
                     <textarea
+                        id="widget-config-json"
                         value={jsonValue}
                         onChange={(e) => handleJsonChange(e.target.value)}
                         className="w-full h-96 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -449,4 +459,3 @@ export default function DynamicWidgetConfigForm({
         </div>
     )
 }
-

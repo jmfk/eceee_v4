@@ -6,18 +6,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import DjangoTemplateRenderer from '../DjangoTemplateRenderer.js';
 
+const createMockElement = (tag) => ({
+    tag,
+    className: '',
+    innerHTML: '',
+    textContent: '',
+    setAttribute: vi.fn(),
+    appendChild: vi.fn(),
+    nodeType: 1,
+    style: {}
+});
+
 // Mock DOM methods for Node.js testing environment
 global.document = {
-    createElement: vi.fn((tag) => ({
-        tag,
-        className: '',
-        innerHTML: '',
-        textContent: '',
-        setAttribute: vi.fn(),
-        appendChild: vi.fn(),
-        nodeType: 1,
-        style: {}
-    })),
+    createElement: vi.fn(createMockElement),
     createTextNode: vi.fn((text) => ({
         textContent: text,
         nodeType: 3
@@ -26,6 +28,18 @@ global.document = {
         appendChild: vi.fn(),
         nodeType: 11
     }))
+};
+
+const resetDocumentMocks = () => {
+    global.document.createElement = vi.fn(createMockElement);
+    global.document.createTextNode = vi.fn((text) => ({
+        textContent: text,
+        nodeType: 3
+    }));
+    global.document.createDocumentFragment = vi.fn(() => ({
+        appendChild: vi.fn(),
+        nodeType: 11
+    }));
 };
 
 // Mock window and localStorage for development mode detection
@@ -45,6 +59,7 @@ describe('DjangoTemplateRenderer', () => {
     let renderer;
 
     beforeEach(() => {
+        resetDocumentMocks();
         renderer = new DjangoTemplateRenderer();
         vi.clearAllMocks();
     });

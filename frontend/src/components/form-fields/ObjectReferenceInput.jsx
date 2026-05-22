@@ -242,7 +242,7 @@ const ObjectReferenceInput = ({
             )}
 
             {/* Search / Add Controls */}
-            {!disabled && (canAddMore || selectedIds.length === 0) && (
+            {(canAddMore || selectedIds.length === 0) && (
                 <div className="relative" ref={dropdownRef}>
                     {/* Search Input */}
                     <div className="relative">
@@ -408,4 +408,3 @@ const ObjectReferenceInput = ({
 }
 
 export default ObjectReferenceInput
-

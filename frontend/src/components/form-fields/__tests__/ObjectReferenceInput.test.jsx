@@ -1,13 +1,14 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { vi } from 'vitest'
 import ObjectReferenceInput from '../ObjectReferenceInput'
 import { objectRelationshipsApi } from '../../../api/objectStorage'
 
 // Mock the API
-jest.mock('../../../api/objectStorage', () => ({
+vi.mock('../../../api/objectStorage', () => ({
     objectRelationshipsApi: {
-        searchForReferences: jest.fn(),
-        getObjectDetails: jest.fn()
+        searchForReferences: vi.fn(),
+        getObjectDetails: vi.fn()
     }
 }))
 
@@ -30,7 +31,7 @@ const createWrapper = () => {
 
 describe('ObjectReferenceInput', () => {
     beforeEach(() => {
-        jest.clearAllMocks()
+        vi.clearAllMocks()
     })
 
     it('renders with label', () => {
@@ -236,4 +237,3 @@ describe('ObjectReferenceInput', () => {
         })
     })
 })
-

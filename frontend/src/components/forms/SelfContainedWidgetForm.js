@@ -184,6 +184,7 @@ class SelfContainedWidgetForm {
         this.hasUnsavedChanges = false
         this.isDestroyed = false
         this.isInitialized = false
+        this.updateLock = false
 
         // Options
         this.showValidationInline = options.showValidationInline !== false
@@ -749,7 +750,6 @@ class SelfContainedWidgetForm {
         const oldValue = this.currentConfig[fieldName]
         if (oldValue === value) return // No change
 
-        // Execute update with lock
         // Update config
         this.currentConfig[fieldName] = value
 
@@ -776,6 +776,50 @@ class SelfContainedWidgetForm {
             value,
             source: options.source || 'unknown'
         })
+    }
+
+    /**
+     * Apply an external configuration update without creating a feedback loop.
+     */
+    updateConfig(config = {}, options = {}) {
+        if (this.isDestroyed || !config) return
+
+        this.updateLock = true
+
+        try {
+            this.currentConfig = {
+                ...this.currentConfig,
+                ...config
+            }
+
+            Object.entries(config).forEach(([fieldName, value]) => {
+                const input = this.fieldElements.get(fieldName)
+                if (!input) return
+
+                if (input.type === 'checkbox') {
+                    input.checked = Boolean(value)
+                } else {
+                    input.value = value ?? ''
+                }
+            })
+
+            if (!options.skipDirty) {
+                this.updateDirtyState()
+            }
+
+            if (!options.skipValidation) {
+                this.debounceValidation()
+            }
+        } finally {
+            this.updateLock = false
+        }
+    }
+
+    /**
+     * Whether the form is currently applying an external update.
+     */
+    isUpdateLocked() {
+        return this.updateLock
     }
 
     /**

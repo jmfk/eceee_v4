@@ -2,6 +2,9 @@ import '@testing-library/jest-dom'
 import { beforeAll, afterEach, afterAll, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
+// Compatibility for legacy tests that still use Jest globals.
+global.jest = vi
+
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
     constructor() { }

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { useState } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DynamicWidgetConfigForm from '../DynamicWidgetConfigForm'
@@ -101,12 +102,22 @@ describe('DynamicWidgetConfigForm', () => {
         const onChange = vi.fn()
         const user = userEvent.setup()
 
+        const StatefulForm = () => {
+            const [config, setConfig] = useState({})
+            return (
+                <DynamicWidgetConfigForm
+                    widgetType="test.TestWidget"
+                    config={config}
+                    onChange={(newConfig) => {
+                        setConfig(newConfig)
+                        onChange(newConfig)
+                    }}
+                />
+            )
+        }
+
         render(
-            <DynamicWidgetConfigForm
-                widgetType="test.TestWidget"
-                config={{}}
-                onChange={onChange}
-            />
+            <StatefulForm />
         )
 
         await waitFor(() => {
@@ -181,6 +192,7 @@ describe('DynamicWidgetConfigForm', () => {
     })
 
     it('handles errors gracefully', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
         WidgetConfigRegistry.getWidgetSchema.mockReturnValue(null)
 
         render(
@@ -192,8 +204,11 @@ describe('DynamicWidgetConfigForm', () => {
         )
 
         await waitFor(() => {
-            expect(screen.getByText(/No configuration available/i)).toBeInTheDocument()
+            expect(screen.getByText(/Failed to load configuration/i)).toBeInTheDocument()
+            expect(screen.getByText(/No configuration schema found/i)).toBeInTheDocument()
         })
+
+        consoleErrorSpy.mockRestore()
     })
 
     it('disables fields when disabled prop is true', async () => {
@@ -211,4 +226,3 @@ describe('DynamicWidgetConfigForm', () => {
         })
     })
 })
-

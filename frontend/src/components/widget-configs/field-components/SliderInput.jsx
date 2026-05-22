@@ -6,6 +6,7 @@ import React from 'react'
  * Numeric input with a visual slider control
  */
 export default function SliderInput({
+    id,
     value,
     onChange,
     min = 0,
@@ -33,13 +34,14 @@ export default function SliderInput({
     return (
         <div className={`space-y-2 ${className}`}>
             {label && (
-                <label className="block text-sm font-medium text-gray-700">
+                <label htmlFor={id} className="block text-sm font-medium text-gray-700">
                     {label}
                 </label>
             )}
 
             <div className="flex items-center space-x-4">
                 <input
+                    id={id}
                     type="range"
                     min={min}
                     max={max}
@@ -78,4 +80,3 @@ export default function SliderInput({
         </div>
     )
 }
-

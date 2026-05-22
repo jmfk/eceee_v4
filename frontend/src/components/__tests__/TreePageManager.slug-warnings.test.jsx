@@ -9,6 +9,7 @@ import { BrowserRouter } from 'react-router-dom'
 import TreePageManager from '../TreePageManager'
 import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
 import { NotificationProvider } from '../NotificationManager'
+import { pagesApi } from '../../api'
 
 // Mock the API
 vi.mock('../../api', () => ({
@@ -20,29 +21,11 @@ vi.mock('../../api', () => ({
     deletePage: vi.fn()
 }))
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-    Search: () => null,
-    Plus: () => null,
-    RefreshCw: () => null,
-    Filter: () => null,
-    Scissors: () => null,
-    FolderPlus: () => null,
-    AlertCircle: () => null,
-    Loader2: () => null,
-    X: () => null,
-    Save: () => null,
-    AlignJustify: () => null,
-    Download: () => null,
-    ChevronDown: () => null,
-    ChevronRight: () => null,
-    Eye: () => null,
-    Edit2: () => null,
-    Copy: () => null,
-    Trash2: () => null,
-    MoreVertical: () => null,
-    FileText: () => null
-}))
+// Use real icon exports so component imports stay in sync as toolbar icons evolve.
+vi.mock('lucide-react', async (importOriginal) => {
+    const actual = await importOriginal()
+    return actual
+})
 
 // Test wrapper component with all required providers
 const TestWrapper = ({ children }) => {
@@ -72,7 +55,6 @@ describe('TreePageManager - Slug Warning Display', () => {
         vi.clearAllMocks()
 
         // Mock successful root pages query
-        const { pagesApi } = require('../../api')
         pagesApi.getRootPages.mockResolvedValue({
             results: [],
             count: 0
@@ -81,8 +63,6 @@ describe('TreePageManager - Slug Warning Display', () => {
     })
 
     it('should display warning notification when slug is auto-renamed on page creation', async () => {
-        const { pagesApi } = require('../../api')
-
         // Mock page creation with slug warning
         pagesApi.create.mockResolvedValue({
             id: 1,
@@ -108,8 +88,6 @@ describe('TreePageManager - Slug Warning Display', () => {
     })
 
     it('should display warning notification when slug is auto-renamed on root page creation', async () => {
-        const { pagesApi } = require('../../api')
-
         // Mock root page creation with slug warning
         pagesApi.create.mockResolvedValue({
             id: 2,
@@ -135,8 +113,6 @@ describe('TreePageManager - Slug Warning Display', () => {
     })
 
     it('should not display warning when no slug modification occurs', async () => {
-        const { pagesApi } = require('../../api')
-
         // Mock page creation without warnings
         pagesApi.create.mockResolvedValue({
             id: 3,
@@ -157,8 +133,6 @@ describe('TreePageManager - Slug Warning Display', () => {
     })
 
     it('should handle multiple warnings if present', async () => {
-        const { pagesApi } = require('../../api')
-
         // Mock page creation with multiple warnings
         pagesApi.create.mockResolvedValue({
             id: 4,
@@ -190,8 +164,6 @@ describe('TreePageManager - Slug Warning Display', () => {
     })
 
     it('should handle page creation without warnings field', async () => {
-        const { pagesApi } = require('../../api')
-
         // Mock page creation without warnings field at all
         pagesApi.create.mockResolvedValue({
             id: 5,
@@ -211,4 +183,3 @@ describe('TreePageManager - Slug Warning Display', () => {
         })
     })
 })
-
