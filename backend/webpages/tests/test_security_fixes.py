@@ -19,6 +19,7 @@ from unittest.mock import patch, Mock
 import io
 from contextlib import redirect_stderr
 
+from core.models import Tenant
 from webpages.models import WebPage
 from webpages.middleware import DynamicHostValidationMiddleware
 from webpages.management.commands.sync_hostnames import Command
@@ -40,6 +41,11 @@ class ManagementCommandSecurityTest(TestCase):
             email="user@example.com",
             is_staff=False,
         )
+        self.tenant = Tenant.objects.create(
+            name="Security Command Tenant",
+            identifier="security-command",
+            created_by=self.user,
+        )
 
         from django.db import connection
         if connection.vendor == 'sqlite':
@@ -52,6 +58,7 @@ class ManagementCommandSecurityTest(TestCase):
             slug="test",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
     def test_add_hostname_requires_username(self):
@@ -131,7 +138,7 @@ class ManagementCommandSecurityTest(TestCase):
                 "--page-id",
                 str(self.page.id),
                 "--username",
-                "teststaff",
+                self.user.username,
             )
 
             # Check that hostname was added
@@ -185,6 +192,11 @@ class PortValidationTest(TestCase):
         self.user = User.objects.create_user(
             username="testuser", password="testpass123", email="test@example.com"
         )
+        self.tenant = Tenant.objects.create(
+            name="Port Validation Tenant",
+            identifier="port-validation",
+            created_by=self.user,
+        )
 
     def test_ipv6_with_port_validation(self):
         """Test that IPv6 addresses with ports are validated correctly."""
@@ -197,6 +209,7 @@ class PortValidationTest(TestCase):
             hostnames=["[::1]:8080"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Should not raise validation error
@@ -216,6 +229,7 @@ class PortValidationTest(TestCase):
             hostnames=["example.com:70000"],  # Port too high
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         with self.assertRaises(Exception):
@@ -232,6 +246,7 @@ class PortValidationTest(TestCase):
             hostnames=["2001:db8::1"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Should handle IPv6 without brackets gracefully
@@ -365,6 +380,11 @@ class IntegrationTest(TestCase):
         self.user = User.objects.create_user(
             username="testuser_integration", password="testpass123", email="test@example.com"
         )
+        self.tenant = Tenant.objects.create(
+            name="Security Integration Tenant",
+            identifier="security-integration",
+            created_by=self.user,
+        )
         try:
             cache.clear()
         except Exception:
@@ -384,10 +404,11 @@ class IntegrationTest(TestCase):
             hostnames=["[::1]:8080", "münchen.de"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Test middleware with these hostnames
-        middleware = DynamicHostValidationMiddleware()
+        middleware = DynamicHostValidationMiddleware(Mock(return_value=Mock()))
 
         # Test IPv6 hostname
         result1 = middleware.is_host_allowed("[::1]:8080")
@@ -399,7 +420,7 @@ class IntegrationTest(TestCase):
 
         # Test cache behavior (should use cached results on second call)
         with patch("webpages.models.WebPage.get_all_hostnames") as mock_get:
-            mock_get.return_value = ["[::1]:8080", "xn--mnchen-3ya.de"]
+            mock_get.return_value = ["[::1]", "xn--mnchen-3ya.de"]
 
             # Clear cache first
             cache.clear()
@@ -423,6 +444,11 @@ class WildcardSecurityTest(TestCase):
         self.user = User.objects.create_user(
             username="testuser", password="testpass123", email="test@example.com"
         )
+        self.tenant = Tenant.objects.create(
+            name="Wildcard Security Tenant",
+            identifier="wildcard-security",
+            created_by=self.user,
+        )
         # Create mock get_response function for middleware
         self.get_response = Mock(return_value=Mock())
         self.middleware = DynamicHostValidationMiddleware(self.get_response)
@@ -439,6 +465,7 @@ class WildcardSecurityTest(TestCase):
             hostnames=["*"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Should allow any host when wildcard is enabled
@@ -457,6 +484,7 @@ class WildcardSecurityTest(TestCase):
             hostnames=["*"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Should block wildcard when disabled
@@ -486,6 +514,7 @@ class WildcardSecurityTest(TestCase):
                 hostnames=["*"],
                 created_by=self.user,
                 last_modified_by=self.user,
+                tenant=self.tenant,
             )
             page.full_clean()
 
@@ -588,6 +617,11 @@ class ManagementCommandWildcardTest(TestCase):
             email="test@example.com",
             is_staff=True,
         )
+        self.tenant = Tenant.objects.create(
+            name="Wildcard Command Tenant",
+            identifier="wildcard-command",
+            created_by=self.user,
+        )
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.page = None
@@ -597,6 +631,7 @@ class ManagementCommandWildcardTest(TestCase):
             slug="test",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
     @patch("getpass.getpass")
@@ -622,7 +657,7 @@ class ManagementCommandWildcardTest(TestCase):
                 "--page-id",
                 str(self.page.id),
                 "--username",
-                "teststaff",
+                self.user.username,
             )
 
             output = captured_output.getvalue()
