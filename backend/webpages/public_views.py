@@ -847,14 +847,18 @@ def custom_404_handler(request, exception=None):
     """
     import re
 
+    from django.views.defaults import page_not_found
+    from django.core.exceptions import DisallowedHost
+
     # Get hostname from request
-    hostname = request.get_host().lower()
+    try:
+        hostname = request.get_host().lower()
+    except DisallowedHost:
+        return page_not_found(request, exception)
 
     # Validate hostname format
     if not re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) or ".." in hostname:
         # Invalid hostname, use default 404
-        from django.views.defaults import page_not_found
-
         return page_not_found(request, exception)
 
     # Find the root page for this hostname
