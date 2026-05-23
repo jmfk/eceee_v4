@@ -626,7 +626,7 @@ AWS_S3_INTERNAL_ENDPOINT_URL = config(
 )
 AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="us-east-1")
 AWS_S3_USE_SSL = config("AWS_S3_USE_SSL", default=False, cast=bool)
-AWS_DEFAULT_ACL = config("AWS_DEFAULT_ACL", default="public-read")
+AWS_DEFAULT_ACL = config("AWS_DEFAULT_ACL", default="private")
 
 # S3 Client Configuration (for Linode Object Storage compatibility)
 AWS_S3_SIGNATURE_VERSION = config("AWS_S3_SIGNATURE_VERSION", default="s3v4")
