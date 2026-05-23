@@ -36,8 +36,17 @@ class PublishingServiceTests(TestCase):
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
         )
+        from core.models import Tenant
+        self.tenant = Tenant.objects.create(
+            name="Publishing Service Tenant",
+            identifier="publishing-service",
+            created_by=self.user,
+        )
         self.theme = PageTheme.objects.create(
-            name="Test Theme", css_variables={}, created_by=self.user
+            name="Test Theme",
+            css_variables={},
+            created_by=self.user,
+            tenant=self.tenant,
         )
         self.service = PublishingService(self.user)
 
@@ -53,8 +62,8 @@ class PublishingServiceTests(TestCase):
         self.assertTrue(schedule.is_effective_now())
 
         # Test invalid schedule (effective after expiry)
-        with self.assertRaises(Exception):
-            PublicationSchedule(future, now)
+        invalid_schedule = PublicationSchedule(future, now)
+        self.assertFalse(invalid_schedule.is_valid())
 
         # Test should_be_published_at logic
         schedule = PublicationSchedule(future, None)

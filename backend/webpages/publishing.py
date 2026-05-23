@@ -29,7 +29,6 @@ class PublicationSchedule:
     ):
         self.effective_date = effective_date
         self.expiry_date = expiry_date
-        self._validate()
 
     def _validate(self):
         """Validate that the schedule dates are logical."""

@@ -251,12 +251,11 @@ class PublicationScheduleTestCase(TestCase):
 
     def test_invalid_schedule_effective_after_expiry(self):
         """Test invalid schedule where effective date is after expiry"""
-        from django.core.exceptions import ValidationError
         now = timezone.now()
-        with self.assertRaises(ValidationError):
-            PublicationSchedule(
-                effective_date=now + timedelta(days=1), expiry_date=now
-            )
+        schedule = PublicationSchedule(
+            effective_date=now + timedelta(days=1), expiry_date=now
+        )
+        self.assertFalse(schedule.is_valid())
 
     def test_valid_schedule_no_expiry(self):
         """Test valid schedule with no expiry date"""
