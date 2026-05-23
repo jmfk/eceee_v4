@@ -41,12 +41,14 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         """Enhanced queryset with special filtering for current and latest versions"""
         queryset = super().get_queryset()
 
-        # SECURITY: For non-staff users, only allow access to published versions
+        # SECURITY: For non-staff users, allow their own versions plus published versions
         if not self.request.user.is_staff:
             now = timezone.now()
-            # Filter to only published versions (have effective_date and are not expired)
-            queryset = queryset.filter(effective_date__lte=now).filter(
+            published_versions = Q(effective_date__lte=now) & (
                 Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+            )
+            queryset = queryset.filter(
+                Q(created_by=self.request.user) | published_versions
             )
 
         # Handle special query parameters
@@ -169,6 +171,33 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    @action(detail=True, methods=["post"], url_path="create-draft")
+    def create_draft(self, request, pk=None):
+        """Create a draft from a published version."""
+        version = self.get_object()
+        description = (
+            request.data.get("description")
+            or request.data.get("version_title")
+            or f"Draft based on version {version.version_number}"
+        )
+
+        try:
+            draft = version.create_draft_from_published(request.user, description)
+            draft.change_summary = description
+            draft.save(update_fields=["change_summary"])
+            serializer = self.get_serializer(draft)
+            return Response(
+                {
+                    "message": "Draft created successfully",
+                    "version": serializer.data,
+                }
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Draft creation failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     @action(detail=True, methods=["patch"], url_path="widgets")
     def update_widgets(self, request, pk=None):
         """Update only widget data - no page_data validation"""
@@ -277,12 +306,13 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         version = self.get_object()
 
         try:
-            new_version = version.restore_as_current(request.user)
-            serializer = self.get_serializer(new_version)
+            version.restore(request.user)
+            version.refresh_from_db()
+            serializer = self.get_serializer(version)
             return Response(
                 {
                     "message": "Version restored successfully",
-                    "new_version": serializer.data,
+                    "version": serializer.data,
                 }
             )
         except Exception as e:

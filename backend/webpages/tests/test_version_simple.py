@@ -39,15 +39,15 @@ class PageVersionCoreTest(TestCase):
         """Test complete draft to published workflow"""
         # Create draft
         draft = self.page.create_version(self.user, "Initial draft")
-        self.assertEqual(draft.status, "draft")
-        self.assertFalse(draft.is_current)
+        self.assertEqual(draft.get_publication_status(), "draft")
+        self.assertFalse(draft.is_current_published())
 
         # Publish draft
         published = draft.publish(self.user2)
-        self.assertEqual(published.status, "published")
-        self.assertTrue(published.is_current)
-        self.assertEqual(published.published_by, self.user2)
-        self.assertIsNotNone(published.published_at)
+        self.assertEqual(published.get_publication_status(), "published")
+        self.assertTrue(published.is_current_published())
+        self.assertEqual(published.page.last_modified_by, self.user2)
+        self.assertIsNotNone(published.effective_date)
 
     def test_create_draft_from_published(self):
         """Test creating draft from published version"""
@@ -58,7 +58,7 @@ class PageVersionCoreTest(TestCase):
 
         # Create draft from it
         draft = published.create_draft_from_published(self.user2, "New draft")
-        self.assertEqual(draft.status, "draft")
+        self.assertEqual(draft.get_publication_status(), "draft")
         self.assertEqual(draft.version_number, 2)
         self.assertEqual(draft.created_by, self.user2)
 
@@ -87,20 +87,20 @@ class PageVersionCoreTest(TestCase):
     def test_page_helper_methods(self):
         """Test page helper methods for version management"""
         # Initially no versions
-        self.assertIsNone(self.page.get_current_version())
-        self.assertIsNone(self.page.get_latest_draft())
-        self.assertFalse(self.page.has_unpublished_changes())
+        self.assertIsNone(self.page.get_current_published_version())
+        self.assertIsNone(self.page.get_latest_version())
+        self.assertFalse(self.page.has_newer_versions())
 
         # Create draft
         draft = self.page.create_version(self.user, "Draft")
-        self.assertIsNone(self.page.get_current_version())
-        self.assertEqual(self.page.get_latest_draft(), draft)
-        self.assertTrue(self.page.has_unpublished_changes())
+        self.assertIsNone(self.page.get_current_published_version())
+        self.assertEqual(self.page.get_latest_version(), draft)
+        self.assertTrue(self.page.has_newer_versions())
 
         # Publish draft
         draft.publish(self.user)
-        self.assertEqual(self.page.get_current_version(), draft)
-        self.assertFalse(self.page.has_unpublished_changes())
+        self.assertEqual(self.page.get_current_published_version(), draft)
+        self.assertFalse(self.page.has_newer_versions())
 
 
 class PageVersionAPISimpleTest(APITestCase):
@@ -161,7 +161,7 @@ class PageVersionAPISimpleTest(APITestCase):
 
         # Verify it was published
         new_draft.refresh_from_db()
-        self.assertEqual(new_draft.status, "published")
+        self.assertEqual(new_draft.get_publication_status(), "published")
 
     def test_create_draft_api(self):
         """Test creating draft from published via API"""
@@ -173,7 +173,9 @@ class PageVersionAPISimpleTest(APITestCase):
 
         # Verify new draft exists
         new_draft = PageVersion.objects.filter(
-            page=self.page, status="draft", description="API created draft"
+            page=self.page,
+            effective_date__isnull=True,
+            version_title="API created draft",
         ).first()
         self.assertIsNotNone(new_draft)
 
@@ -225,29 +227,23 @@ class PageVersionIntegrationSimpleTest(APITestCase):
             last_modified_by=self.user,
         )
 
-    def test_page_update_creates_version(self):
-        """Test that updating a page creates a version"""
+    def test_page_update_does_not_create_version(self):
+        """Test that updating page fields does not implicitly create a version"""
         initial_count = PageVersion.objects.filter(page=self.page).count()
 
         # Update page
         url = reverse("api:webpage-detail", kwargs={"pk": self.page.pk})
-        data = {"title": "Updated Title", "version_description": "Title update"}
+        data = {"title": "Updated Title"}
 
         response = self.client.patch(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check version was created
-        new_count = PageVersion.objects.filter(page=self.page).count()
-        self.assertEqual(new_count, initial_count + 1)
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.title, "Updated Title")
 
-        # Check it's a draft with correct description
-        latest = (
-            PageVersion.objects.filter(page=self.page)
-            .order_by("-version_number")
-            .first()
-        )
-        self.assertEqual(latest.status, "draft")
-        self.assertEqual(latest.description, "Title update")
+        # Version creation is handled explicitly through PageVersion endpoints
+        new_count = PageVersion.objects.filter(page=self.page).count()
+        self.assertEqual(new_count, initial_count)
 
     def test_page_publish_action(self):
         """Test page publish action creates published version"""
@@ -258,7 +254,8 @@ class PageVersionIntegrationSimpleTest(APITestCase):
 
         # Check published version was created
         published = PageVersion.objects.filter(
-            page=self.page, status="published"
+            page=self.page,
+            effective_date__isnull=False,
         ).first()
         self.assertIsNotNone(published)
-        self.assertTrue(published.is_current)
+        self.assertTrue(published.is_current_published())
