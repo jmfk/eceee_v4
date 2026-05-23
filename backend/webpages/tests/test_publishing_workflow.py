@@ -243,12 +243,12 @@ class PublishingWorkflowAPITests(APITestCase):
 
         # Refresh page from database
         self.page1.refresh_from_db()
-        self.assertEqual(self.page1.publication_status, "scheduled")
+        latest_version = self.page1.get_latest_version()
         self.assertAlmostEqual(
-            self.page1.effective_date, future_date, delta=timedelta(seconds=1)
+            latest_version.effective_date, future_date, delta=timedelta(seconds=1)
         )
         self.assertAlmostEqual(
-            self.page1.expiry_date, expiry_date, delta=timedelta(seconds=1)
+            latest_version.expiry_date, expiry_date, delta=timedelta(seconds=1)
         )
 
     def test_schedule_endpoint_past_date_error(self):
@@ -289,15 +289,13 @@ class PublishingWorkflowAPITests(APITestCase):
         response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("Successfully published 2 pages", response.data["message"])
+        self.assertIn("Successfully published 2 page(s)", response.data["message"])
 
         # Check pages are published
         self.page1.refresh_from_db()
         self.page2.refresh_from_db()
-        self.assertEqual(self.page1.publication_status, "published")
-        self.assertEqual(self.page2.publication_status, "published")
-        self.assertIsNotNone(self.page1.effective_date)
-        self.assertIsNotNone(self.page2.effective_date)
+        self.assertTrue(self.page1.is_published())
+        self.assertTrue(self.page2.is_published())
 
     def test_bulk_publish_empty_list_error(self):
         """Test bulk publish with empty page list returns error"""
@@ -307,7 +305,7 @@ class PublishingWorkflowAPITests(APITestCase):
         response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("page_ids list is required", response.data["error"])
+        self.assertIn("page_ids is required", response.data["error"])
 
     def test_bulk_schedule_success(self):
         """Test bulk scheduling multiple pages"""
@@ -322,24 +320,32 @@ class PublishingWorkflowAPITests(APITestCase):
         response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("Successfully scheduled 2 pages", response.data["message"])
+        self.assertIn("Successfully scheduled 2 page(s)", response.data["message"])
 
         # Check pages are scheduled
         self.page1.refresh_from_db()
         self.page2.refresh_from_db()
-        self.assertEqual(self.page1.publication_status, "scheduled")
-        self.assertEqual(self.page2.publication_status, "scheduled")
+        self.assertAlmostEqual(
+            self.page1.get_latest_version().effective_date,
+            future_date,
+            delta=timedelta(seconds=1),
+        )
+        self.assertAlmostEqual(
+            self.page2.get_latest_version().effective_date,
+            future_date,
+            delta=timedelta(seconds=1),
+        )
 
     def test_publication_status_endpoint(self):
         """Test publication status overview endpoint"""
         # Set up pages with different statuses
-        self.page1.publication_status = "published"
-        self.page1.effective_date = timezone.now() - timedelta(hours=1)
-        self.page1.save()
+        page1_version = self.page1.get_latest_version()
+        page1_version.effective_date = timezone.now() - timedelta(hours=1)
+        page1_version.save(update_fields=["effective_date"])
 
-        self.page2.publication_status = "scheduled"
-        self.page2.effective_date = timezone.now() + timedelta(hours=1)
-        self.page2.save()
+        page2_version = self.page2.get_latest_version()
+        page2_version.effective_date = timezone.now() + timedelta(hours=1)
+        page2_version.save(update_fields=["effective_date"])
 
         url = reverse("api:webpage-publication-status")
         response = self.client.get(url)
