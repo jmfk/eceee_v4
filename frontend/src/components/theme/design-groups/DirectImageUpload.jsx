@@ -10,6 +10,7 @@ import { Upload, X, ImageIcon, Loader2, FolderOpen } from 'lucide-react';
 import { themesApi } from '../../../api/themes';
 import { useGlobalNotifications } from '../../../contexts/GlobalNotificationContext';
 import ImageLibraryPicker from '../ImageLibraryPicker';
+import OptimizedImage from '../../media/OptimizedImage';
 
 const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }) => {
     const [isUploading, setIsUploading] = useState(false);
@@ -19,7 +20,6 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
     const { addNotification } = useGlobalNotifications();
 
     const handleFileSelect = async (file) => {
-        
         if (!file) return;
 
         // Validate file type
@@ -44,13 +44,13 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
 
         setIsUploading(true);
         try {
-            
             const result = await themesApi.uploadDesignGroupImage(themeId, file);
-            
 
             // Call onChange with the image data including dimensions
             const imageData = {
                 url: result.url,
+                publicUrl: result.publicUrl,
+                imgproxyBaseUrl: result.imgproxyBaseUrl || result.url,
                 filename: result.filename,
                 size: result.size,
             };
@@ -63,9 +63,7 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                 imageData.dpr = 2;
             }
             
-            
             onChange(imageData);
-            
 
             addNotification({
                 type: 'success',
@@ -125,6 +123,8 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
     const handleLibrarySelect = (image) => {
         const imageData = {
             url: image.url,
+            publicUrl: image.publicUrl,
+            imgproxyBaseUrl: image.imgproxyBaseUrl || image.url,
             filename: image.filename,
             size: image.size,
         };
@@ -142,7 +142,7 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
     };
 
     // Extract image info for display
-    const imageUrl = value?.url;
+    const imageUrl = value?.imgproxyBaseUrl || value?.publicUrl || value?.url;
     const imageFilename = value?.filename || 'Image';
 
     return (
@@ -158,10 +158,16 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
                 <div className="border border-gray-300 rounded-lg p-3 bg-white">
                     {/* Full-width image preview */}
                     <div className="w-full mb-3">
-                        <img
+                        <OptimizedImage
                             src={imageUrl}
                             alt={imageFilename}
+                            width={value?.width}
+                            height={value?.height}
+                            actualWidth={value?.width}
+                            actualHeight={value?.height}
                             className="w-full h-auto max-h-48 object-contain rounded border border-gray-200 bg-gray-50"
+                            resizeType="fit"
+                            quality={85}
                         />
                     </div>
 
@@ -306,4 +312,3 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
 DirectImageUpload.displayName = 'DirectImageUpload';
 
 export default DirectImageUpload;
-

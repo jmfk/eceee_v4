@@ -56,7 +56,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
 
     def validate_site_icon(self, value):
         """Handle empty string as None for clearing the field"""
-        if value == '' or value is None:
+        if value == "" or value is None:
             return None
         return value
 
@@ -112,12 +112,16 @@ class PageThemeSerializer(serializers.ModelSerializer):
         # Always include computed breakpoints (with defaults if not set)
         data["breakpoints"] = instance.get_breakpoints()
 
+        if data.get("design_groups"):
+            data["design_groups"] = instance.resolve_design_group_library_image_urls(data["design_groups"])
+
         # Convert site_icon field to full URL with imgproxy optimization
         if instance.site_icon:
             site_icon_url = instance.site_icon.url
             if site_icon_url.startswith("s3://"):
                 try:
                     from django.core.files.storage import default_storage
+
                     parts = site_icon_url.replace("s3://", "").split("/", 1)
                     if len(parts) == 2:
                         file_path = parts[1]
@@ -127,6 +131,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
                             site_icon_url = default_storage.url(instance.site_icon.name)
                 except Exception as e:
                     import logging
+
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Failed to convert site_icon s3:// URL to public URL: {e}")
 
@@ -205,13 +210,9 @@ class PageThemeSerializer(serializers.ModelSerializer):
             min_val = 0 if key == "xs" else 1
             if not isinstance(val, int) or val < min_val:
                 if key == "xs":
-                    raise serializers.ValidationError(
-                        f"Breakpoint '{key}' must be a non-negative integer (pixels)"
-                    )
+                    raise serializers.ValidationError(f"Breakpoint '{key}' must be a non-negative integer (pixels)")
                 else:
-                    raise serializers.ValidationError(
-                        f"Breakpoint '{key}' must be a positive integer (pixels)"
-                    )
+                    raise serializers.ValidationError(f"Breakpoint '{key}' must be a positive integer (pixels)")
 
         # Validate ascending order if multiple breakpoints provided
         if len(value) > 1:
@@ -253,21 +254,13 @@ class PageThemeSerializer(serializers.ModelSerializer):
 
         for color_name, color_value in value.items():
             if not isinstance(color_value, str):
-                raise serializers.ValidationError(
-                    f"Color '{color_name}' must be a string"
-                )
+                raise serializers.ValidationError(f"Color '{color_name}' must be a string")
 
             # Allow hex, rgb, rgba, hsl, hsla formats
-            if not (
-                hex_pattern.match(color_value)
-                or rgb_pattern.match(color_value)
-                or hsl_pattern.match(color_value)
-            ):
+            if not (hex_pattern.match(color_value) or rgb_pattern.match(color_value) or hsl_pattern.match(color_value)):
                 # Allow CSS named colors
                 if not color_value.isalpha():
-                    raise serializers.ValidationError(
-                        f"Color '{color_name}' has invalid format: {color_value}"
-                    )
+                    raise serializers.ValidationError(f"Color '{color_name}' has invalid format: {color_value}")
 
         return value
 
@@ -289,14 +282,10 @@ class PageThemeSerializer(serializers.ModelSerializer):
         # Validate each style has required fields
         for style_name, style_config in value.items():
             if not isinstance(style_config, dict):
-                raise serializers.ValidationError(
-                    f"Component style '{style_name}' must be an object"
-                )
+                raise serializers.ValidationError(f"Component style '{style_name}' must be an object")
 
             if "template" not in style_config:
-                raise serializers.ValidationError(
-                    f"Component style '{style_name}' must have a 'template' field"
-                )
+                raise serializers.ValidationError(f"Component style '{style_name}' must have a 'template' field")
 
         return value
 
@@ -308,9 +297,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
         # Auto-fix and validate each style
         for style_name, style_config in value.items():
             if not isinstance(style_config, dict):
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' must be an object"
-                )
+                raise serializers.ValidationError(f"Image style '{style_name}' must be an object")
 
             # Auto-fix: Add missing template with default value
             if "template" not in style_config:
@@ -332,59 +319,33 @@ class PageThemeSerializer(serializers.ModelSerializer):
                 )
 
             # Validate lightbox configuration
-            if "enableLightbox" in style_config and not isinstance(
-                style_config["enableLightbox"], bool
-            ):
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' enableLightbox must be a boolean"
-                )
+            if "enableLightbox" in style_config and not isinstance(style_config["enableLightbox"], bool):
+                raise serializers.ValidationError(f"Image style '{style_name}' enableLightbox must be a boolean")
 
-            if "lightboxTemplate" in style_config and not isinstance(
-                style_config["lightboxTemplate"], str
-            ):
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' lightboxTemplate must be a string"
-                )
+            if "lightboxTemplate" in style_config and not isinstance(style_config["lightboxTemplate"], str):
+                raise serializers.ValidationError(f"Image style '{style_name}' lightboxTemplate must be a string")
 
             # Validate default values
-            if "defaultShowCaptions" in style_config and not isinstance(
-                style_config["defaultShowCaptions"], bool
-            ):
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' defaultShowCaptions must be a boolean"
-                )
+            if "defaultShowCaptions" in style_config and not isinstance(style_config["defaultShowCaptions"], bool):
+                raise serializers.ValidationError(f"Image style '{style_name}' defaultShowCaptions must be a boolean")
 
-            if "defaultLightboxGroup" in style_config and not isinstance(
-                style_config["defaultLightboxGroup"], str
-            ):
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' defaultLightboxGroup must be a string"
-                )
+            if "defaultLightboxGroup" in style_config and not isinstance(style_config["defaultLightboxGroup"], str):
+                raise serializers.ValidationError(f"Image style '{style_name}' defaultLightboxGroup must be a string")
 
-            if "defaultRandomize" in style_config and not isinstance(
-                style_config["defaultRandomize"], bool
-            ):
-                raise serializers.ValidationError(
-                    f"Image style '{style_name}' defaultRandomize must be a boolean"
-                )
+            if "defaultRandomize" in style_config and not isinstance(style_config["defaultRandomize"], bool):
+                raise serializers.ValidationError(f"Image style '{style_name}' defaultRandomize must be a boolean")
 
             # Validate carousel-specific defaults only for carousel styles
             style_type = style_config["styleType"]
             if style_type == "carousel":
-                if "defaultAutoPlay" in style_config and not isinstance(
-                    style_config["defaultAutoPlay"], bool
-                ):
+                if "defaultAutoPlay" in style_config and not isinstance(style_config["defaultAutoPlay"], bool):
                     raise serializers.ValidationError(
                         f"Carousel style '{style_name}' defaultAutoPlay must be a boolean"
                     )
 
                 if "defaultAutoPlayInterval" in style_config:
                     interval = style_config["defaultAutoPlayInterval"]
-                    if (
-                        not isinstance(interval, (int, float))
-                        or interval < 1
-                        or interval > 30
-                    ):
+                    if not isinstance(interval, (int, float)) or interval < 1 or interval > 30:
                         raise serializers.ValidationError(
                             f"Carousel style '{style_name}' defaultAutoPlayInterval must be a number between 1 and 30"
                         )
@@ -422,21 +383,15 @@ class PageThemeSerializer(serializers.ModelSerializer):
         # Validate each element's styles
         for element, styles in value.items():
             if not isinstance(element, str):
-                raise serializers.ValidationError(
-                    f"Element key must be a string, got {type(element)}"
-                )
+                raise serializers.ValidationError(f"Element key must be a string, got {type(element)}")
 
             if not isinstance(styles, dict):
-                raise serializers.ValidationError(
-                    f"Styles for element '{element}' must be a JSON object"
-                )
+                raise serializers.ValidationError(f"Styles for element '{element}' must be a JSON object")
 
             # Validate CSS property names and values
             for prop, val in styles.items():
                 if not isinstance(prop, str):
-                    raise serializers.ValidationError(
-                        f"CSS property name must be a string for element '{element}'"
-                    )
+                    raise serializers.ValidationError(f"CSS property name must be a string for element '{element}'")
                 if not isinstance(val, (str, int, float)):
                     raise serializers.ValidationError(
                         f"CSS property value must be a string or number for element '{element}', property '{prop}'"

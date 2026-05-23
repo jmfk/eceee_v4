@@ -20,7 +20,14 @@ class ImgProxyService:
 
     def __init__(self):
         self.internal_url = getattr(settings, "IMGPROXY_URL", "http://imgproxy:8080")
-        self.public_url = getattr(settings, "IMGPROXY_PUBLIC_URL", self.internal_url)
+        configured_public_url = getattr(settings, "IMGPROXY_PUBLIC_URL", self.internal_url)
+        self.proxy_path = getattr(settings, "IMGPROXY_PROXY_PATH", "/imgproxy").rstrip("/")
+        self.use_same_origin_proxy = getattr(
+            settings,
+            "IMGPROXY_USE_SAME_ORIGIN_PROXY",
+            getattr(settings, "DEBUG", False),
+        )
+        self.public_url = self._resolve_public_url(configured_public_url)
         self.key = getattr(settings, "IMGPROXY_KEY", "")
         self.salt = getattr(settings, "IMGPROXY_SALT", "")
         self.signature_size = getattr(settings, "IMGPROXY_SIGNATURE_SIZE", 32)
@@ -35,6 +42,23 @@ class ImgProxyService:
             self.salt_bytes = bytes.fromhex(self.salt)
         else:
             self.salt_bytes = b""
+
+    def _resolve_public_url(self, configured_public_url: str) -> str:
+        """
+        Prefer a same-origin proxy for local imgproxy URLs in development.
+
+        Some browsers and extensions block CSS background images from localhost:8080.
+        A same-origin Django URL avoids that without changing the signed imgproxy path.
+        """
+        if not self.use_same_origin_proxy or not configured_public_url:
+            return configured_public_url
+
+        parsed = urllib.parse.urlparse(configured_public_url)
+        local_hosts = {"localhost", "127.0.0.1", "::1", "imgproxy", "eceee-v4-imgproxy"}
+        if parsed.hostname in local_hosts and (parsed.port in {None, 8080}):
+            return self.proxy_path or "/imgproxy"
+
+        return configured_public_url
 
     def generate_url(
         self,
@@ -75,15 +99,15 @@ class ImgProxyService:
         elif source_url.startswith("/media/"):
             # Handle relative media URLs by prepending the internal minio URL
             # This is common in dev where storage.url() might return relative paths
-            internal_source_url = f"{internal_endpoint}/{settings.AWS_STORAGE_BUCKET_NAME}{source_url.replace('/media/', '/')}"
+            internal_source_url = (
+                f"{internal_endpoint}/{settings.AWS_STORAGE_BUCKET_NAME}{source_url.replace('/media/', '/')}"
+            )
         elif source_url.startswith("theme_images/"):
             # Handle theme images explicitly from the theme_images bucket
             internal_source_url = f"{internal_endpoint}/theme-images/{source_url.replace('theme_images/', '')}"
         elif not source_url.startswith(("http://", "https://")):
             # Handle other relative paths
-            internal_source_url = (
-                f"{internal_endpoint}/{settings.AWS_STORAGE_BUCKET_NAME}/{source_url.lstrip('/')}"
-            )
+            internal_source_url = f"{internal_endpoint}/{settings.AWS_STORAGE_BUCKET_NAME}/{source_url.lstrip('/')}"
 
         try:
             # Build processing options
@@ -116,11 +140,7 @@ class ImgProxyService:
                     processing_options.append(f"{option_key}:{value}")
 
             # Encode source URL
-            encoded_source_url = (
-                base64.urlsafe_b64encode(internal_source_url.encode())
-                .decode()
-                .rstrip("=")
-            )
+            encoded_source_url = base64.urlsafe_b64encode(internal_source_url.encode()).decode().rstrip("=")
 
             # Build path
             processing_path = "/".join(processing_options) if processing_options else ""
@@ -133,9 +153,7 @@ class ImgProxyService:
             else:
                 # Unsigned URL (for development only)
                 signed_path = f"/unsafe{path}"
-                logger.warning(
-                    "Using unsigned imgproxy URLs - not recommended for production"
-                )
+                logger.warning("Using unsigned imgproxy URLs - not recommended for production")
 
             return f"{self.public_url}{signed_path}"
 
@@ -316,9 +334,7 @@ class ImgProxyService:
             densities = [1, 2]
 
         # Constrain base dimensions (1x)
-        base_width, base_height = self._constrain_dimensions(
-            max_width, max_height, original_width, original_height
-        )
+        base_width, base_height = self._constrain_dimensions(max_width, max_height, original_width, original_height)
 
         result = {}
         srcset_parts = []
@@ -404,9 +420,7 @@ class ImgProxyService:
 imgproxy_service = ImgProxyService()
 
 
-def get_image_url(
-    source_url: str, width: Optional[int] = None, height: Optional[int] = None, **kwargs
-) -> str:
+def get_image_url(source_url: str, width: Optional[int] = None, height: Optional[int] = None, **kwargs) -> str:
     """
     Convenience function to generate imgproxy URL.
 
@@ -419,14 +433,10 @@ def get_image_url(
     Returns:
         imgproxy URL
     """
-    return imgproxy_service.generate_url(
-        source_url=source_url, width=width, height=height, **kwargs
-    )
+    return imgproxy_service.generate_url(source_url=source_url, width=width, height=height, **kwargs)
 
 
-def get_thumbnail_url(
-    source_url: str, size: int = 150, version: Optional[str] = None
-) -> str:
+def get_thumbnail_url(source_url: str, size: int = 150, version: Optional[str] = None) -> str:
     """
     Generate thumbnail URL.
 

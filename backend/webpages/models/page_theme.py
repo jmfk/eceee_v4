@@ -16,9 +16,7 @@ class PageTheme(models.Model):
     Supports HTML element-specific styling and can be applied to pages, layouts, and object types.
     """
 
-    name = models.CharField(
-        max_length=255
-    )  # Unique per tenant (enforced by unique_together)
+    name = models.CharField(max_length=255)  # Unique per tenant (enforced by unique_together)
     description = models.TextField(blank=True)
 
     # New structure - 5 theme parts
@@ -74,9 +72,7 @@ class PageTheme(models.Model):
         help_text="DEPRECATED: Use 'image_styles' field instead",
     )
     table_templates = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Predefined table templates for the Table widget"
+        default=dict, blank=True, help_text="Predefined table templates for the Table widget"
     )
     breakpoints = models.JSONField(
         default=dict,
@@ -89,19 +85,13 @@ class PageTheme(models.Model):
     )
 
     # Deprecated fields (kept for migration compatibility)
-    css_variables = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="DEPRECATED: Use 'colors' field instead"
-    )
+    css_variables = models.JSONField(default=dict, blank=True, help_text="DEPRECATED: Use 'colors' field instead")
     html_elements = models.JSONField(
         default=dict,
         blank=True,
         help_text="DEPRECATED: Use 'design_groups' field instead",
     )
-    custom_css = models.TextField(
-        blank=True, help_text="Additional custom CSS for this theme"
-    )
+    custom_css = models.TextField(blank=True, help_text="Additional custom CSS for this theme")
     image = models.ImageField(
         storage=system_storage,
         upload_to="theme_images/",
@@ -267,11 +257,7 @@ class PageTheme(models.Model):
             target_css_classes = group.get("targetCssClasses", "")
             if target_css_classes:
                 # Parse comma or newline-separated selectors
-                custom_selectors = [
-                    s.strip()
-                    for s in re.split(r"[,\n]", target_css_classes)
-                    if s.strip()
-                ]
+                custom_selectors = [s.strip() for s in re.split(r"[,\n]", target_css_classes) if s.strip()]
                 base_selectors = custom_selectors
             else:
                 # No custom selectors specified - would apply globally
@@ -325,10 +311,7 @@ class PageTheme(models.Model):
 
         # Apply frontend scoping if requested
         if frontend_scoped:
-            base_selectors = [
-                f".cms-content {sel}".strip() if sel else ".cms-content"
-                for sel in base_selectors
-            ]
+            base_selectors = [f".cms-content {sel}".strip() if sel else ".cms-content" for sel in base_selectors]
 
         # Calculate variants selector string
         variants_selector = ""
@@ -338,9 +321,7 @@ class PageTheme(models.Model):
 
         # Calculate layout part selectors
         layout_part_selectors = {}
-        layout_properties = group.get("layoutProperties", {}) or group.get(
-            "layout_properties", {}
-        )
+        layout_properties = group.get("layoutProperties", {}) or group.get("layout_properties", {})
         if layout_properties:
             # Get widget type metadata to look up selectors and relationships for layout parts
             part_metadata_map = {}
@@ -354,9 +335,7 @@ class PageTheme(models.Model):
                             if isinstance(part_config, dict):
                                 part_metadata_map[part_id] = {
                                     "selector": part_config.get("selector"),
-                                    "relationship": part_config.get(
-                                        "relationship", "auto"
-                                    ),
+                                    "relationship": part_config.get("relationship", "auto"),
                                 }
 
             for part in layout_properties.keys():
@@ -368,37 +347,25 @@ class PageTheme(models.Model):
                     part_selectors = []
                     for base in base_selectors:
                         if base:
-                            part_selectors.append(
-                                f"{base} {custom_selector}{variants_selector}{css_modifier}".strip()
-                            )
+                            part_selectors.append(f"{base} {custom_selector}{variants_selector}{css_modifier}".strip())
                         else:
-                            part_selectors.append(
-                                f"{custom_selector}{variants_selector}{css_modifier}"
-                            )
+                            part_selectors.append(f"{custom_selector}{variants_selector}{css_modifier}")
                 else:
                     # Default behavior logic
                     if relationship == "auto":
                         relationship = (
-                            "same-element"
-                            if (part.endswith("-widget") or part == "container")
-                            else "descendant"
+                            "same-element" if (part.endswith("-widget") or part == "container") else "descendant"
                         )
 
                     part_selectors = []
                     for base in base_selectors:
                         if base:
                             if relationship == "same-element":
-                                part_selectors.append(
-                                    f"{base}.{part}{variants_selector}{css_modifier}".strip()
-                                )
+                                part_selectors.append(f"{base}.{part}{variants_selector}{css_modifier}".strip())
                             elif relationship == "direct-child":
-                                part_selectors.append(
-                                    f"{base}>.{part}{variants_selector}{css_modifier}".strip()
-                                )
+                                part_selectors.append(f"{base}>.{part}{variants_selector}{css_modifier}".strip())
                             else:  # descendant
-                                part_selectors.append(
-                                    f"{base} .{part}{variants_selector}{css_modifier}".strip()
-                                )
+                                part_selectors.append(f"{base} .{part}{variants_selector}{css_modifier}".strip())
                         else:
                             part_selectors.append(f".{part}{variants_selector}{css_modifier}")
 
@@ -420,11 +387,7 @@ class PageTheme(models.Model):
                 ]
             else:
                 elem_selectors = [
-                    (
-                        f"{base} {element}{css_modifier}".strip() 
-                        if base 
-                        else f"{element}{css_modifier}"
-                    )
+                    (f"{base} {element}{css_modifier}".strip() if base else f"{element}{css_modifier}")
                     for base in base_selectors
                 ]
             element_selectors[element] = elem_selectors
@@ -467,20 +430,14 @@ class PageTheme(models.Model):
         """Override save to ensure only one default theme exists, increment sync version, and invalidate CSS cache"""
         if self.is_default:
             # Clear any existing default themes
-            PageTheme.objects.filter(is_default=True).exclude(id=self.id).update(
-                is_default=False
-            )
+            PageTheme.objects.filter(is_default=True).exclude(id=self.id).update(is_default=False)
 
         # Increment sync version on each save (unless explicitly skipped)
         skip_version = kwargs.pop("skip_version_increment", False)
         if not skip_version:
             if self.pk:
                 # Existing theme - get current version and increment
-                current = (
-                    PageTheme.objects.filter(pk=self.pk)
-                    .values_list("sync_version", flat=True)
-                    .first()
-                )
+                current = PageTheme.objects.filter(pk=self.pk).values_list("sync_version", flat=True).first()
                 if current is not None:
                     self.sync_version = current + 1
             else:
@@ -507,9 +464,7 @@ class PageTheme(models.Model):
         except cls.MultipleObjectsReturned:
             # If somehow multiple defaults exist, return the first one and fix the data
             default_theme = cls.objects.filter(is_default=True, is_active=True).first()
-            cls.objects.filter(is_default=True).exclude(id=default_theme.id).update(
-                is_default=False
-            )
+            cls.objects.filter(is_default=True).exclude(id=default_theme.id).update(is_default=False)
             return default_theme
 
     @classmethod
@@ -534,14 +489,12 @@ class PageTheme(models.Model):
                 admin_user = User.objects.filter(is_staff=True).first()
             if not admin_user:
                 # Create a system user if no admin exists
-                admin_user = User.objects.create_user(
-                    username="system", is_staff=True, is_superuser=True
-                )
+                admin_user = User.objects.create_user(username="system", is_staff=True, is_superuser=True)
 
             default_theme = cls.objects.create(
                 name="System Default",
                 description="Automatically created default theme for object content editors",
-                tenant=getattr(admin_user, 'tenant', None) or getattr(WebPage.objects.first(), 'tenant', None),
+                tenant=getattr(admin_user, "tenant", None) or getattr(WebPage.objects.first(), "tenant", None),
                 fonts={
                     "google_fonts": [
                         {
@@ -720,9 +673,7 @@ class PageTheme(models.Model):
     grid-template-columns: 1fr !important;
   }
 }""",
-                "variables": {
-                    "columns": {"type": "number", "default": 3, "min": 1, "max": 6}
-                },
+                "variables": {"columns": {"type": "number", "default": 3, "min": 1, "max": 6}},
                 "imgproxy_config": {
                     "width": 800,
                     "height": 600,
@@ -829,9 +780,7 @@ class PageTheme(models.Model):
     grid-template-columns: 1fr !important;
   }
 }""",
-                "variables": {
-                    "columns": {"type": "number", "default": 3, "min": 1, "max": 6}
-                },
+                "variables": {"columns": {"type": "number", "default": 3, "min": 1, "max": 6}},
                 "imgproxy_config": {
                     "width": 800,
                     "height": 600,
@@ -1553,9 +1502,7 @@ class PageTheme(models.Model):
             },
         }
 
-    def generate_css(
-        self, scope="", widget_type=None, slot=None, frontend_scoped=False
-    ):
+    def generate_css(self, scope="", widget_type=None, slot=None, frontend_scoped=False):
         """
         Generate complete CSS for this theme including colors, design groups, and custom CSS.
         Supports both new design_groups structure and legacy html_elements for backwards compatibility.
@@ -1581,9 +1528,7 @@ class PageTheme(models.Model):
 
         # Design groups styling (new structure with groups)
         if self.design_groups and self.design_groups.get("groups"):
-            design_groups_css = self._generate_design_groups_css(
-                scope, widget_type, slot, frontend_scoped
-            )
+            design_groups_css = self._generate_design_groups_css(scope, widget_type, slot, frontend_scoped)
             if design_groups_css:
                 css_parts.append(design_groups_css)
         # Fallback to legacy html_elements
@@ -1599,9 +1544,7 @@ class PageTheme(models.Model):
 
         return "\n\n".join(css_parts)
 
-    def _generate_design_groups_css(
-        self, scope, widget_type=None, slot=None, frontend_scoped=False
-    ):
+    def _generate_design_groups_css(self, scope, widget_type=None, slot=None, frontend_scoped=False):
         """
         Generate CSS for design groups with optional targeting by widget_type/slot.
         Groups are applied in order, with more specific groups overriding general ones.
@@ -1661,11 +1604,7 @@ class PageTheme(models.Model):
                 target_css_classes = group.get("targetCssClasses", "")
                 if target_css_classes:
                     # Parse comma or newline-separated selectors
-                    custom_selectors = [
-                        s.strip()
-                        for s in re.split(r"[,\n]", target_css_classes)
-                        if s.strip()
-                    ]
+                    custom_selectors = [s.strip() for s in re.split(r"[,\n]", target_css_classes) if s.strip()]
                     base_selectors = custom_selectors
                 else:
                     # No custom selectors specified - would apply globally
@@ -1713,10 +1652,7 @@ class PageTheme(models.Model):
 
             # Apply frontend scoping if requested
             if frontend_scoped:
-                base_selectors = [
-                    f".cms-content {sel}".strip() if sel else ".cms-content"
-                    for sel in base_selectors
-                ]
+                base_selectors = [f".cms-content {sel}".strip() if sel else ".cms-content" for sel in base_selectors]
 
             # Calculate selectors for each HTML element
             element_selectors_map = {}
@@ -1739,14 +1675,10 @@ class PageTheme(models.Model):
                     ]
                 else:
                     element_selectors = [
-                        (
-                            f"{base} {element}{css_modifier}".strip()
-                            if base
-                            else f"{element}{css_modifier}"
-                        )
+                        (f"{base} {element}{css_modifier}".strip() if base else f"{element}{css_modifier}")
                         for base in base_selectors
                     ]
-                
+
                 selector = ",\n".join(element_selectors)
                 css_rule = f"{selector} {{\n"
                 # Convert camelCase (or snake_case) to kebab-case for CSS properties
@@ -1770,10 +1702,7 @@ class PageTheme(models.Model):
                         "border_top_color",
                         "border_bottom_color",
                     ]
-                    if (
-                        property_name in color_properties
-                        and property_value in self.colors
-                    ):
+                    if property_name in color_properties and property_value in self.colors:
                         property_value = f"var(--{property_value})"
 
                     # Handle font-family - wrap fonts with spaces in quotes
@@ -1827,11 +1756,8 @@ class PageTheme(models.Model):
                 css_rule += "}"
                 css_parts.append(css_rule)
 
-
             # Generate layout properties CSS for widget layout parts
-            layout_properties = group.get("layoutProperties") or group.get(
-                "layout_properties"
-            )
+            layout_properties = group.get("layoutProperties") or group.get("layout_properties")
             if layout_properties:
                 # Get theme breakpoints for media queries
                 breakpoints = self.get_breakpoints()
@@ -1848,9 +1774,7 @@ class PageTheme(models.Model):
                                 if isinstance(part_config, dict):
                                     part_metadata_map[part_id] = {
                                         "selector": part_config.get("selector"),
-                                        "relationship": part_config.get(
-                                            "relationship", "auto"
-                                        ),
+                                        "relationship": part_config.get("relationship", "auto"),
                                     }
 
                 # Note: Images and colors are now generated as direct CSS properties
@@ -1865,9 +1789,7 @@ class PageTheme(models.Model):
                     custom_breakpoints = [
                         bp
                         for bp in part_breakpoints.keys()
-                        if bp not in standard_breakpoints
-                        and bp not in legacy_breakpoints
-                        and bp.isdigit()
+                        if bp not in standard_breakpoints and bp not in legacy_breakpoints and bp.isdigit()
                     ]
 
                     # Combine all breakpoints
@@ -1882,11 +1804,7 @@ class PageTheme(models.Model):
                         return breakpoints.get(bp, 0)
 
                     sorted_breakpoints = sorted(
-                        [
-                            bp
-                            for bp in all_breakpoints
-                            if bp in part_breakpoints or bp == "xs"
-                        ],
+                        [bp for bp in all_breakpoints if bp in part_breakpoints or bp == "xs"],
                         key=get_breakpoint_value,
                     )
 
@@ -1900,27 +1818,17 @@ class PageTheme(models.Model):
                                 bp_props.update(part_breakpoints["default"])
                             if part_breakpoints.get("mobile"):  # Legacy: mobile -> xs
                                 bp_props.update(part_breakpoints["mobile"])
-                            if part_breakpoints.get(
-                                "xs"
-                            ):  # New format (takes precedence)
+                            if part_breakpoints.get("xs"):  # New format (takes precedence)
                                 bp_props.update(part_breakpoints["xs"])
                         elif bp_key == "sm":
                             # sm was previously base, now check for legacy desktop
                             bp_props = {}
-                            if part_breakpoints.get(
-                                "desktop"
-                            ):  # Very old: desktop -> sm
+                            if part_breakpoints.get("desktop"):  # Very old: desktop -> sm
                                 bp_props.update(part_breakpoints["desktop"])
-                            if part_breakpoints.get(
-                                "sm"
-                            ):  # New format (takes precedence)
+                            if part_breakpoints.get("sm"):  # New format (takes precedence)
                                 bp_props.update(part_breakpoints["sm"])
                         elif bp_key == "md":
-                            bp_props = (
-                                part_breakpoints.get("md")
-                                or part_breakpoints.get("tablet")
-                                or {}
-                            )
+                            bp_props = part_breakpoints.get("md") or part_breakpoints.get("tablet") or {}
                         else:
                             # Standard or custom breakpoint
                             bp_props = part_breakpoints.get(bp_key) or {}
@@ -1945,9 +1853,7 @@ class PageTheme(models.Model):
                                     )
                                 else:
                                     # Global - use custom selector as-is with variants and modifier
-                                    part_selectors.append(
-                                        f"{custom_selector}{variants_selector}{css_modifier}"
-                                    )
+                                    part_selectors.append(f"{custom_selector}{variants_selector}{css_modifier}")
                         else:
                             # Default behavior: use part id as class name
                             # base_selectors contain widget-type classes like:
@@ -1970,9 +1876,7 @@ class PageTheme(models.Model):
                                     if relationship == "same-element":
                                         # Same element: both classes on same element
                                         # .slot-main>.widget-type-{type}.{part}.variants
-                                        part_selectors.append(
-                                            f"{base}.{part}{variants_selector}{css_modifier}".strip()
-                                        )
+                                        part_selectors.append(f"{base}.{part}{variants_selector}{css_modifier}".strip())
                                     elif relationship == "direct-child":
                                         # Direct child: immediate child selector
                                         # .slot-main>.widget-type-{type}>.{part}.variants
@@ -2000,9 +1904,7 @@ class PageTheme(models.Model):
                             if prop_name in ["background_image", "backgroundImage"]:
                                 if isinstance(prop_value, dict):
                                     # Dict format: composite image property
-                                    image_url = prop_value.get("url") or prop_value.get(
-                                        "fileUrl"
-                                    )
+                                    image_url = prop_value.get("url") or prop_value.get("fileUrl")
                                     if image_url:
                                         # Generate retina-aware CSS with image-set
                                         image_css = self._generate_retina_image_css(
@@ -2012,50 +1914,35 @@ class PageTheme(models.Model):
                                             css_rules.extend(image_css)
 
                                         # Handle composite background properties (only if set)
-                                        bg_size = prop_value.get(
-                                            "background_size"
-                                        ) or prop_value.get("backgroundSize")
+                                        bg_size = prop_value.get("background_size") or prop_value.get("backgroundSize")
                                         if bg_size and bg_size.strip():
-                                            css_rules.append(
-                                                f"  background-size: {bg_size};"
-                                            )
+                                            css_rules.append(f"  background-size: {bg_size};")
 
-                                        bg_position = prop_value.get(
-                                            "background_position"
-                                        ) or prop_value.get("backgroundPosition")
+                                        bg_position = prop_value.get("background_position") or prop_value.get(
+                                            "backgroundPosition"
+                                        )
                                         if bg_position and bg_position.strip():
-                                            css_rules.append(
-                                                f"  background-position: {bg_position};"
-                                            )
+                                            css_rules.append(f"  background-position: {bg_position};")
 
-                                        bg_repeat = prop_value.get(
-                                            "background_repeat"
-                                        ) or prop_value.get("backgroundRepeat")
+                                        bg_repeat = prop_value.get("background_repeat") or prop_value.get(
+                                            "backgroundRepeat"
+                                        )
                                         if bg_repeat and bg_repeat.strip():
-                                            css_rules.append(
-                                                f"  background-repeat: {bg_repeat};"
-                                            )
+                                            css_rules.append(f"  background-repeat: {bg_repeat};")
 
                                         # Handle aspect-ratio (only if explicitly enabled)
-                                        use_aspect_ratio = prop_value.get(
-                                            "use_aspect_ratio"
-                                        ) or prop_value.get("useAspectRatio")
-                                        aspect_ratio = prop_value.get(
-                                            "aspect_ratio"
-                                        ) or prop_value.get("aspectRatio")
-                                        if (
-                                            use_aspect_ratio is True
-                                            and aspect_ratio
-                                            and str(aspect_ratio).strip()
-                                        ):
-                                            css_rules.append(
-                                                f"  aspect-ratio: {aspect_ratio};"
-                                            )
+                                        use_aspect_ratio = prop_value.get("use_aspect_ratio") or prop_value.get(
+                                            "useAspectRatio"
+                                        )
+                                        aspect_ratio = prop_value.get("aspect_ratio") or prop_value.get("aspectRatio")
+                                        if use_aspect_ratio is True and aspect_ratio and str(aspect_ratio).strip():
+                                            css_rules.append(f"  aspect-ratio: {aspect_ratio};")
                                 elif isinstance(prop_value, str):
                                     # String format: just a URL - route through imgproxy for caching/headers
                                     from file_manager.imgproxy import imgproxy_service
 
                                     try:
+                                        prop_value = self._resolve_theme_library_image_url(prop_value)
                                         # Generate imgproxy URL without resize (original size for caching)
                                         imgproxy_url = imgproxy_service.generate_url(
                                             source_url=prop_value,
@@ -2063,17 +1950,11 @@ class PageTheme(models.Model):
                                             height=0,
                                             resize_type="auto",
                                         )
-                                        css_rules.append(
-                                            f"  background-image: url('{imgproxy_url}');"
-                                        )
+                                        css_rules.append(f"  background-image: url('{imgproxy_url}');")
                                     except Exception as e:
-                                        logger.warning(
-                                            f"Failed to generate imgproxy URL for legacy string: {e}"
-                                        )
+                                        logger.warning(f"Failed to generate imgproxy URL for legacy string: {e}")
                                         # Fallback to original URL if imgproxy fails
-                                        css_rules.append(
-                                            f"  background-image: url('{prop_value}');"
-                                        )
+                                        css_rules.append(f"  background-image: url('{prop_value}');")
                                 else:
                                     logger.warning(
                                         f"Unexpected background_image type in '{part}.{bp_key}': {type(prop_value)}"
@@ -2086,9 +1967,7 @@ class PageTheme(models.Model):
                                 continue
 
                             css_prop = (
-                                self._camel_to_kebab(prop_name)
-                                if "_" not in prop_name
-                                else prop_name.replace("_", "-")
+                                self._camel_to_kebab(prop_name) if "_" not in prop_name else prop_name.replace("_", "-")
                             )
 
                             # Convert color names to CSS variables
@@ -2101,11 +1980,7 @@ class PageTheme(models.Model):
                                 "border-top-color",
                                 "border-bottom-color",
                             ]
-                            if (
-                                css_prop in color_properties
-                                and self.colors
-                                and prop_value in self.colors
-                            ):
+                            if css_prop in color_properties and self.colors and prop_value in self.colors:
                                 prop_value = f"var(--{prop_value})"
 
                             css_rules.append(f"  {css_prop}: {prop_value};")
@@ -2159,6 +2034,7 @@ class PageTheme(models.Model):
 
         logger = logging.getLogger(__name__)
         css_rules = []
+        image_url = self._resolve_theme_library_image_url(image_url, image_data.get("filename"))
 
         # Determine CSS property name
         if image_key in ["background", "backgroundImage"]:
@@ -2208,24 +2084,14 @@ class PageTheme(models.Model):
             # Generate image-set CSS with both webkit and standard syntax
             # Webkit prefix for older Safari versions
             css_rules.append(
-                f"  {css_property}: -webkit-image-set("
-                f"url('{url_1x}') 1x, "
-                f"url('{url_max}') {dpr}x"
-                f");"
+                f"  {css_property}: -webkit-image-set(" f"url('{url_1x}') 1x, " f"url('{url_max}') {dpr}x" f");"
             )
             # Standard syntax
-            css_rules.append(
-                f"  {css_property}: image-set("
-                f"url('{url_1x}') 1x, "
-                f"url('{url_max}') {dpr}x"
-                f");"
-            )
+            css_rules.append(f"  {css_property}: image-set(" f"url('{url_1x}') 1x, " f"url('{url_max}') {dpr}x" f");")
         else:
             # No dimensions available or dpr=1 - route through imgproxy for caching
             if not width or not height:
-                logger.debug(
-                    f"No dimensions available for image, routing through imgproxy for caching"
-                )
+                logger.debug(f"No dimensions available for image, routing through imgproxy for caching")
             try:
                 # Generate imgproxy URL without resize (original size for caching)
                 imgproxy_url = imgproxy_service.generate_url(
@@ -2241,6 +2107,79 @@ class PageTheme(models.Model):
                 css_rules.append(f"  {css_property}: url('{image_url}');")
 
         return css_rules
+
+    def _resolve_theme_library_image_url(self, image_url, filename=None):
+        """
+        Resolve cloned theme image URLs against this theme's library when possible.
+
+        Older cloned themes can keep absolute URLs that point to the source theme's
+        `theme_images/<old_id>/library/` path. If this theme has the same filename
+        in its own library folder, prefer that URL so generated CSS does not depend
+        on stale source-theme objects.
+        """
+        if not image_url or "theme_images/" not in str(image_url):
+            return image_url
+
+        try:
+            import posixpath
+            from urllib.parse import urlparse
+
+            parsed = urlparse(str(image_url))
+            path = parsed.path or str(image_url)
+            if f"/theme_images/{self.id}/library/" in path:
+                return image_url
+
+            filename = filename or posixpath.basename(path)
+            if not filename:
+                return image_url
+
+            current_theme_path = f"theme_images/{self.id}/library/{filename}"
+            if system_storage.exists(current_theme_path):
+                return system_storage.url(current_theme_path)
+        except Exception:
+            return image_url
+
+        return image_url
+
+    def resolve_design_group_library_image_urls(self, design_groups):
+        """
+        Return design groups with stale cloned library URLs resolved for this theme.
+
+        Stored theme JSON can still reference `theme_images/<old_id>/library/`
+        after older clone/import flows. The editor should preview the current
+        theme's copied file when the same filename exists in this theme library.
+        """
+        import copy
+
+        resolved_groups = copy.deepcopy(design_groups)
+
+        def resolve_value(value):
+            if isinstance(value, dict):
+                filename = value.get("filename")
+                for key in (
+                    "url",
+                    "fileUrl",
+                    "file_url",
+                    "publicUrl",
+                    "public_url",
+                    "imgproxyBaseUrl",
+                    "imgproxy_base_url",
+                ):
+                    if value.get(key):
+                        value[key] = self._resolve_theme_library_image_url(value[key], filename)
+
+                if filename and value.get("url"):
+                    value.setdefault("public_url", value["url"])
+                    value.setdefault("imgproxy_base_url", value["url"])
+
+                for child in value.values():
+                    resolve_value(child)
+            elif isinstance(value, list):
+                for item in value:
+                    resolve_value(item)
+
+        resolve_value(resolved_groups)
+        return resolved_groups
 
     def _camel_to_kebab(self, text):
         """Convert camelCase to kebab-case for CSS properties"""
@@ -2280,12 +2219,7 @@ class PageTheme(models.Model):
 
         for line in lines:
             stripped = line.strip()
-            if (
-                stripped
-                and not stripped.startswith("/*")
-                and not stripped.startswith("*/")
-                and "{" in stripped
-            ):
+            if stripped and not stripped.startswith("/*") and not stripped.startswith("*/") and "{" in stripped:
                 # This is a CSS rule, scope it
                 if not stripped.startswith(scope):
                     line = line.replace(stripped, f"{scope} {stripped}")
@@ -2351,27 +2285,36 @@ class PageTheme(models.Model):
         image_data_list = []
         if self.design_groups and "groups" in self.design_groups:
             for group in self.design_groups["groups"]:
-                if "layoutProperties" in group:
-                    for part, breakpoints in group["layoutProperties"].items():
-                        for bp, props in breakpoints.items():
-                            if "images" in props and isinstance(props["images"], dict):
-                                for image_key, image_data in props["images"].items():
-                                    if isinstance(image_data, dict):
-                                        # Support both new format (url) and old format (fileUrl)
-                                        url = image_data.get("url") or image_data.get(
-                                            "fileUrl"
-                                        )
-                                        if url:
-                                            metadata = {
-                                                "filename": image_data.get(
-                                                    "filename", ""
-                                                ),
-                                                "size": image_data.get("size", 0),
-                                                "part": part,
-                                                "breakpoint": bp,
-                                                "image_key": image_key,
-                                            }
-                                            image_data_list.append((url, metadata))
+                for part, bp, props in self._iter_design_group_layout_props(group):
+                    for prop_name, prop_value in props.items():
+                        if prop_name == "images":
+                            continue
+                        if isinstance(prop_value, dict):
+                            url = self._get_image_value_url(prop_value)
+                            if url:
+                                metadata = {
+                                    "filename": prop_value.get("filename", ""),
+                                    "size": prop_value.get("size", 0),
+                                    "part": part,
+                                    "breakpoint": bp,
+                                    "image_key": prop_name,
+                                }
+                                image_data_list.append((url, metadata))
+
+                    if "images" in props and isinstance(props["images"], dict):
+                        for image_key, image_data in props["images"].items():
+                            if isinstance(image_data, dict):
+                                # Support both new format (url) and old format (fileUrl)
+                                url = self._get_image_value_url(image_data)
+                                if url:
+                                    metadata = {
+                                        "filename": image_data.get("filename", ""),
+                                        "size": image_data.get("size", 0),
+                                        "part": part,
+                                        "breakpoint": bp,
+                                        "image_key": image_key,
+                                    }
+                                    image_data_list.append((url, metadata))
         return image_data_list
 
     def list_library_images(self):
@@ -2392,9 +2335,7 @@ class PageTheme(models.Model):
                 return files
             return []
         except Exception as e:
-            logger.warning(
-                f"Failed to list library images for theme {self.id}: {str(e)}"
-            )
+            logger.warning(f"Failed to list library images for theme {self.id}: {str(e)}")
             return []
 
     def get_image_usage(self, filename):
@@ -2412,32 +2353,52 @@ class PageTheme(models.Model):
         if self.design_groups and "groups" in self.design_groups:
             for group in self.design_groups["groups"]:
                 group_name = group.get("name", "Unnamed Group")
-                if "layoutProperties" in group:
-                    for part, breakpoints in group["layoutProperties"].items():
-                        for bp, props in breakpoints.items():
-                            if not isinstance(props, dict):
-                                continue
+                for part, bp, props in self._iter_design_group_layout_props(group):
+                    for prop_name, prop_value in props.items():
+                        if prop_name == "images":
+                            continue
+                        if self._image_value_references_filename(prop_value, filename):
+                            usage.append(f"design_group:{group_name}:{part}:{bp}:{prop_name}")
 
-                            for prop_name, prop_value in props.items():
-                                if prop_name == "images":
-                                    continue
-                                if self._image_value_references_filename(
-                                    prop_value, filename
-                                ):
-                                    usage.append(
-                                        f"design_group:{group_name}:{part}:{bp}:{prop_name}"
-                                    )
-
-                            if "images" in props and isinstance(props["images"], dict):
-                                for image_key, image_data in props["images"].items():
-                                    if self._image_value_references_filename(
-                                        image_data, filename
-                                    ):
-                                        usage.append(
-                                            f"design_group:{group_name}:{part}:{bp}:{image_key}"
-                                        )
+                    if "images" in props and isinstance(props["images"], dict):
+                        for image_key, image_data in props["images"].items():
+                            if self._image_value_references_filename(image_data, filename):
+                                usage.append(f"design_group:{group_name}:{part}:{bp}:{image_key}")
 
         return list(set(usage))  # Remove duplicates
+
+    @staticmethod
+    def _iter_design_group_layout_props(group):
+        """Yield layout property dictionaries from camelCase or snake_case JSON."""
+        for layout_key in ("layoutProperties", "layout_properties"):
+            layout_properties = group.get(layout_key)
+            if not isinstance(layout_properties, dict):
+                continue
+
+            for part, breakpoints in layout_properties.items():
+                if not isinstance(breakpoints, dict):
+                    continue
+                for bp, props in breakpoints.items():
+                    if isinstance(props, dict):
+                        yield part, bp, props
+
+    @staticmethod
+    def _get_image_value_url(value):
+        if not isinstance(value, dict):
+            return None
+        for key in (
+            "url",
+            "fileUrl",
+            "file_url",
+            "publicUrl",
+            "public_url",
+            "imgproxyBaseUrl",
+            "imgproxy_base_url",
+        ):
+            url = value.get(key)
+            if url:
+                return url
+        return None
 
     @staticmethod
     def _image_value_references_filename(value, filename):
@@ -2452,7 +2413,15 @@ class PageTheme(models.Model):
             if value.get("filename") == filename:
                 return True
 
-            for key in ("url", "fileUrl", "publicUrl", "imgproxyBaseUrl"):
+            for key in (
+                "url",
+                "fileUrl",
+                "file_url",
+                "publicUrl",
+                "public_url",
+                "imgproxyBaseUrl",
+                "imgproxy_base_url",
+            ):
                 url = value.get(key)
                 if url and filename in str(url):
                     return True
@@ -2472,37 +2441,28 @@ class PageTheme(models.Model):
         if self.design_groups and "groups" in self.design_groups:
             updated = False
             for group in self.design_groups["groups"]:
-                if "layoutProperties" in group:
-                    for part, breakpoints in group["layoutProperties"].items():
-                        for bp, props in breakpoints.items():
-                            if not isinstance(props, dict):
-                                continue
+                for _part, _bp, props in self._iter_design_group_layout_props(group):
+                    direct_props_to_remove = []
+                    for prop_name, prop_value in props.items():
+                        if prop_name == "images":
+                            continue
+                        if self._image_value_references_filename(prop_value, filename):
+                            direct_props_to_remove.append(prop_name)
+                            updated = True
 
-                            direct_props_to_remove = []
-                            for prop_name, prop_value in props.items():
-                                if prop_name == "images":
-                                    continue
-                                if self._image_value_references_filename(
-                                    prop_value, filename
-                                ):
-                                    direct_props_to_remove.append(prop_name)
-                                    updated = True
+                    for prop_name in direct_props_to_remove:
+                        del props[prop_name]
 
-                            for prop_name in direct_props_to_remove:
-                                del props[prop_name]
+                    if "images" in props and isinstance(props["images"], dict):
+                        images_to_remove = []
+                        for image_key, image_data in props["images"].items():
+                            if self._image_value_references_filename(image_data, filename):
+                                images_to_remove.append(image_key)
+                                updated = True
 
-                            if "images" in props and isinstance(props["images"], dict):
-                                images_to_remove = []
-                                for image_key, image_data in props["images"].items():
-                                    if self._image_value_references_filename(
-                                        image_data, filename
-                                    ):
-                                        images_to_remove.append(image_key)
-                                        updated = True
-
-                                # Remove the images
-                                for image_key in images_to_remove:
-                                    del props["images"][image_key]
+                        # Remove the images
+                        for image_key in images_to_remove:
+                            del props["images"][image_key]
 
             if updated:
                 self.save(update_fields=["design_groups"])
@@ -2512,9 +2472,7 @@ class PageTheme(models.Model):
         if self.image and filename in str(self.image):
             self.image = None
             self.save(update_fields=["image"])
-            logger.info(
-                f"Cleared preview image reference to {filename} from theme {self.id}"
-            )
+            logger.info(f"Cleared preview image reference to {filename} from theme {self.id}")
 
     @staticmethod
     def _extract_path_from_url(url):
@@ -2543,23 +2501,30 @@ class PageTheme(models.Model):
         import copy
 
         updated_groups = copy.deepcopy(design_groups)
-        if updated_groups and "groups" in updated_groups:
-            for group in updated_groups["groups"]:
-                if "layoutProperties" in group:
-                    for part, breakpoints in group["layoutProperties"].items():
-                        for bp, props in breakpoints.items():
-                            if "images" in props and isinstance(props["images"], dict):
-                                for image_key, image_data in props["images"].items():
-                                    if isinstance(image_data, dict):
-                                        # Check both url and fileUrl for backward compatibility
-                                        old_url = image_data.get(
-                                            "url"
-                                        ) or image_data.get("fileUrl")
-                                        if old_url and old_url in url_mapping:
-                                            image_data["url"] = url_mapping[old_url]
-                                            # Remove fileUrl if it exists (migration to new format)
-                                            if "fileUrl" in image_data:
-                                                del image_data["fileUrl"]
+
+        def update_value(value):
+            if isinstance(value, dict):
+                for key in (
+                    "url",
+                    "fileUrl",
+                    "file_url",
+                    "publicUrl",
+                    "public_url",
+                    "imgproxyBaseUrl",
+                    "imgproxy_base_url",
+                ):
+                    old_url = value.get(key)
+                    if old_url in url_mapping:
+                        value["url"] = url_mapping[old_url]
+                        value.pop("fileUrl", None)
+                        value.pop("file_url", None)
+                for child in value.values():
+                    update_value(child)
+            elif isinstance(value, list):
+                for item in value:
+                    update_value(item)
+
+        update_value(updated_groups)
         return updated_groups
 
     def delete(self, *args, **kwargs):
@@ -2580,9 +2545,7 @@ class PageTheme(models.Model):
                         storage.delete(path)
                         logger.info(f"Deleted design group image: {path}")
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to delete design group image {url}: {str(e)}"
-                    )
+                    logger.warning(f"Failed to delete design group image {url}: {str(e)}")
 
         # Call parent delete
         super().delete(*args, **kwargs)
@@ -2605,9 +2568,7 @@ class PageTheme(models.Model):
             fonts=self.fonts.copy() if self.fonts else {},
             colors=self.colors.copy() if self.colors else {},
             design_groups=self.design_groups.copy() if self.design_groups else {},
-            component_styles=(
-                self.component_styles.copy() if self.component_styles else {}
-            ),
+            component_styles=(self.component_styles.copy() if self.component_styles else {}),
             image_styles=self.image_styles.copy() if self.image_styles else {},
             gallery_styles=self.gallery_styles.copy() if self.gallery_styles else {},
             carousel_styles=self.carousel_styles.copy() if self.carousel_styles else {},
@@ -2663,14 +2624,10 @@ class PageTheme(models.Model):
                             f"theme_images/{cloned_theme.id}/library/{filename}"
                         )
                     else:
-                        logger.warning(
-                            f"Source image not found during clone: {old_path}"
-                        )
+                        logger.warning(f"Source image not found during clone: {old_path}")
 
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to copy library image during clone: {str(e)}"
-                    )
+                    logger.warning(f"Failed to copy library image during clone: {str(e)}")
 
             # Update design_groups JSON with new URLs
             if url_mapping:
@@ -2690,14 +2647,10 @@ class PageTheme(models.Model):
                 try:
                     directories, files = storage.listdir(old_design_groups_path)
                     if files:
-                        logger.info(
-                            f"Found {len(files)} legacy design_groups images to migrate during clone"
-                        )
+                        logger.info(f"Found {len(files)} legacy design_groups images to migrate during clone")
                         for filename in files:
                             old_path = f"{old_design_groups_path}{filename}"
-                            new_path = (
-                                f"theme_images/{cloned_theme.id}/library/{filename}"
-                            )
+                            new_path = f"theme_images/{cloned_theme.id}/library/{filename}"
                             if storage.exists(old_path):
                                 old_file = storage._open(old_path, "rb")
                                 file_content = old_file.read()
@@ -2706,8 +2659,6 @@ class PageTheme(models.Model):
                 except:
                     pass  # Directory might not exist
         except Exception as e:
-            logger.warning(
-                f"Failed to check legacy design_groups during clone: {str(e)}"
-            )
+            logger.warning(f"Failed to check legacy design_groups during clone: {str(e)}")
 
         return cloned_theme
