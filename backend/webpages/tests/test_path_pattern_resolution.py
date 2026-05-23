@@ -33,21 +33,22 @@ class PathPatternModelTests(TestCase):
             self.skipTest("ArrayField not supported on SQLite")
         page = WebPage.objects.create(
             slug="test",
-            path_pattern_key="^(?P<slug>[\\w-]+)/$",
+            path_pattern_key="news_slug",
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
         )
-        self.assertEqual(page.path_pattern_key, "^(?P<slug>[\\w-]+)/$")
+        self.assertEqual(page.path_pattern_key, "news_slug")
 
-    def test_valid_regex_pattern(self):
-        """Test that valid regex patterns are accepted"""
+    def test_valid_registered_pattern_key(self):
+        """Test that registered path pattern keys are accepted"""
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.skipTest("ArrayField not supported on SQLite")
         page = WebPage(
+            title="News",
             slug="news",
-            path_pattern_key="^(?P<news_slug>[\\w-]+)/$",
+            path_pattern_key="news_slug",
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
@@ -57,23 +58,24 @@ class PathPatternModelTests(TestCase):
         page.save()
         self.assertIsNotNone(page.id)
 
-    def test_invalid_regex_pattern(self):
-        """Test that invalid regex patterns are rejected"""
+    def test_invalid_pattern_key(self):
+        """Test that unknown pattern keys are rejected"""
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.skipTest("ArrayField not supported on SQLite")
         from django.core.exceptions import ValidationError
 
         page = WebPage(
+            title="Invalid",
             slug="invalid",
-            path_pattern_key="^(?P<slug>[\\w-+)/$",  # Invalid - missing closing bracket
+            path_pattern_key="unknown_pattern",
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
         )
         with self.assertRaises(ValidationError) as context:
             page.full_clean()
-        self.assertIn("Invalid regex pattern", str(context.exception))
+        self.assertIn("Invalid path pattern key", str(context.exception))
 
     def test_empty_path_pattern_allowed(self):
         """Test that empty path_pattern_key is allowed (backward compatibility)"""
@@ -89,14 +91,15 @@ class PathPatternModelTests(TestCase):
         )
         self.assertEqual(page.path_pattern_key, "")
 
-    def test_complex_regex_pattern(self):
-        """Test that complex regex patterns with multiple captures work"""
+    def test_registered_complex_pattern_key(self):
+        """Test that registered pattern keys with multiple captures work"""
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.skipTest("ArrayField not supported on SQLite")
         page = WebPage(
+            title="Events",
             slug="events",
-            path_pattern_key="^(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<slug>[\\w-]+)/$",
+            path_pattern_key="date_slug",
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
@@ -141,7 +144,7 @@ class PathResolutionTests(TestCase):
         self.news_page = WebPage.objects.create(
             slug="news",
             parent=self.root_page,
-            path_pattern_key="^(?P<news_slug>[\\w-]+)/$",
+            path_pattern_key="news_slug",
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
@@ -294,6 +297,7 @@ class PathResolutionTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
         
         # Create published version for about page
@@ -365,8 +369,8 @@ class PathVariableSecurityTests(TestCase):
             variables = view._extract_path_variables("news_slug", remaining_path)
             if variables:
                 # Verify variable exists and matches expected
-                self.assertIn("slug", variables)
-                self.assertEqual(variables["slug"], expected_slug)
+                self.assertIn("news_slug", variables)
+                self.assertEqual(variables["news_slug"], expected_slug)
 
     def test_special_characters_are_escaped(self):
         """Test that special HTML characters are escaped in path variables"""
@@ -561,7 +565,7 @@ class PathPatternIntegrationTests(TestCase):
         self.events_page = WebPage.objects.create(
             slug="events",
             parent=self.root_page,
-            path_pattern_key="^(?P<event_slug>[\\w-]+)/$",
+            path_pattern_key="event_slug",
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
