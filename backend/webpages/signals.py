@@ -147,7 +147,7 @@ def update_page_publication_cache(page):
     published_version = (
         page.versions.filter(effective_date__lte=now)
         .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-        .order_by("-version_number")
+        .order_by("-effective_date", "-version_number")
         .first()
     )
 
