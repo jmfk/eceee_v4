@@ -1,44 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { usePageChildren } from '../../hooks/usePageStructure'
-import { Menu, X, ChevronDown } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { prepareNavigationContext } from '../../utils/mustacheRenderer'
 import { pagesApi } from '../../api'
+import EditorNavLink, { EditorNavLinkMenu } from './EditorNavLink'
+import {
+    isEditorNavMenuContext,
+    itemFromStyledAnchor,
+    processNavItems,
+} from './editorNavLinkUtils'
 
 /**
  * Process menu items to extract link_data structure
  * Handles both new format (with link_data) and old format (direct fields)
  */
-const processMenuItems = (items) => {
-    if (!items || !Array.isArray(items)) return []
-    
-    return items.map((item, index) => {
-        // Check if item has link_data field (new format)
-        if (item.linkData || item.link_data) {
-            const linkData = item.linkData || item.link_data
-            const order = item.order !== undefined ? item.order : index
-            
-            return {
-                label: linkData.label,
-                url: linkData.url || '',
-                isActive: linkData.isActive !== false && linkData.is_active !== false,
-                targetBlank: linkData.targetBlank || linkData.target_blank || false,
-                type: linkData.type || 'external',
-                order,
-            }
-        }
-        
-        // Old format - direct fields (backwards compatibility)
-        return {
-            label: item.label,
-            url: item.url || '',
-            isActive: item.isActive !== false && item.is_active !== false,
-            targetBlank: item.targetBlank || item.target_blank || false,
-            type: item.type || 'external',
-            order: item.order !== undefined ? item.order : index,
-        }
-    })
-}
+const processMenuItems = processNavItems
 
 /**
  * EASY Navigation Widget Component
@@ -52,18 +29,20 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     } = config
     const pageId = context?.pageId
     const pageVersionData = context?.pageVersionData
-    const { data: children, isLoading, error } = usePageChildren(pageId)
+    const { data: children } = usePageChildren(pageId)
     
     // Process menu items to extract link_data (handles both new and old formats)
     const processedMenuItems = processMenuItems(menuItems)
+    const shouldUseEditorNavMenus = isEditorNavMenuContext(mode, context)
 
     // State for owner page data (for inherited widgets)
     const [ownerPageData, setOwnerPageData] = useState(null)
-    const [loadingOwnerPage, setLoadingOwnerPage] = useState(false)
+    const [, setLoadingOwnerPage] = useState(false)
     
     // State for overflow detection
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [componentStyleMenu, setComponentStyleMenu] = useState(null)
     const navRef = useRef(null)
 
     // Fetch owner page data if this widget is inherited
@@ -100,6 +79,9 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
             isActive: true,
             targetBlank: false,
             type: 'internal',
+            pageId: child.page?.id,
+            isPublished: Boolean(child.currentVersion || child.current_version),
+            currentVersionId: child.currentVersion?.id || child.current_version?.id,
             order: child.page?.order !== undefined ? child.page.order : index,
         }))
     }
@@ -122,16 +104,21 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
                 url: `#${child.config.anchor}`,
                 isActive: true,
                 targetBlank: false,
+                type: 'anchor',
             }
         })
     }
     if (children && children.length > 0 && menus.activeGroup === "pageSubmenu") {
-        localMenu = children.map((child) => ({ 
+        localMenu = children.map((child) => ({
             id: `submenu-${child.page.id}`, 
             label: child.page.title, 
             url: child.page.path,
             isActive: true,
             targetBlank: false,
+            type: 'internal',
+            pageId: child.page.id,
+            isPublished: Boolean(child.currentVersion || child.current_version),
+            currentVersionId: child.currentVersion?.id || child.current_version?.id,
         }))
     }
     
@@ -184,22 +171,19 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
 
         return items.map((item, index) => (
             <li key={index}>
-                <a 
-                    href={mode === 'editor' ? '#' : item.url}
-                    target={item.targetBlank || item.target_blank ? "_blank" : undefined}
-                    rel={item.targetBlank || item.target_blank ? "noopener noreferrer" : undefined}
+                <EditorNavLink
+                    item={item}
+                    mode={mode}
+                    enableEditorMenu={shouldUseEditorNavMenus}
                     className={linkClasses}
-                    onClick={(e) => {
-                        if (mode === 'editor') {
-                            e.preventDefault()
-                        }
+                    onEditorAction={() => {
                         if (isInDropdown) {
                             setIsMobileMenuOpen(false)
                         }
                     }}
                 >
                     {item.label}
-                </a>
+                </EditorNavLink>
             </li>
         ))
     }
@@ -217,6 +201,30 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     const allItems = [...dynamicMenuItems, ...processedMenuItems]
     const hasItems = allItems.length > 0
 
+    const handleComponentStyleClick = (event) => {
+        if (!shouldUseEditorNavMenus) return
+
+        const anchor = event.target.closest?.('a')
+        if (!anchor) return
+
+        event.preventDefault()
+        event.stopPropagation()
+
+        const item = itemFromStyledAnchor(anchor, allItems)
+        if (!item) {
+            setComponentStyleMenu(null)
+            return
+        }
+
+        setComponentStyleMenu({
+            item,
+            position: {
+                top: event.clientY + 6,
+                left: event.clientX,
+            },
+        })
+    }
+
     // If Component Style is selected, use Mustache rendering
     if (hasComponentStyle) {
         const style = theme.componentStyles[navigationStyle]
@@ -233,13 +241,24 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
         )
 
         return (
+        <>
             <ComponentStyleRenderer
                 template={style.template}
                 context={mustacheContext}
                 css={style.css}
                 styleId={`nav-${navigationStyle}`}
                 className="navigation-widget-component-style"
+                onClick={handleComponentStyleClick}
             />
+            {shouldUseEditorNavMenus && (
+                <EditorNavLinkMenu
+                    item={componentStyleMenu?.item}
+                    open={Boolean(componentStyleMenu)}
+                    position={componentStyleMenu?.position}
+                    onClose={() => setComponentStyleMenu(null)}
+                />
+            )}
+        </>
         )
     }
 

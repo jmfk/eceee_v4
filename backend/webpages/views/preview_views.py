@@ -66,6 +66,328 @@ class PreviewSizeViewSet(viewsets.ModelViewSet):
         return PreviewSize.objects.all().order_by("sort_order", "id")
 
 
+PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
+        (function() {
+            const API_BASE = '/api/v1/webpages';
+            const MENU_ID = 'eceee-preview-nav-link-menu';
+            let activeLink = null;
+
+            function getPreviewToken() {
+                return new URLSearchParams(window.location.search).get('token');
+            }
+
+            async function fetchJson(url) {
+                const headers = { Accept: 'application/json' };
+                const token = getPreviewToken();
+                if (token) {
+                    headers.Authorization = `Bearer ${token}`;
+                }
+
+                const response = await fetch(url, {
+                    credentials: 'same-origin',
+                    headers,
+                });
+
+                if (response.status === 204) {
+                    return null;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Request failed: ${response.status}`);
+                }
+
+                return response.json();
+            }
+
+            function removeMenu() {
+                const existing = document.getElementById(MENU_ID);
+                if (existing) {
+                    existing.remove();
+                }
+                activeLink = null;
+            }
+
+            function isHttpUrl(url) {
+                return url.protocol === 'http:' || url.protocol === 'https:';
+            }
+
+            function isAnchorOnly(link) {
+                const rawHref = link.getAttribute('href') || '';
+                return rawHref.trim().startsWith('#');
+            }
+
+            function getUrl(link) {
+                const href = link.getAttribute('href') || '';
+                try {
+                    return new URL(href, document.baseURI || window.location.href);
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            function isInternalUrl(url) {
+                const internalOrigins = new Set([window.location.origin]);
+                try {
+                    internalOrigins.add(new URL(document.baseURI || window.location.href).origin);
+                } catch (error) {
+                    // Ignore invalid base URI and fall back to the preview origin.
+                }
+                return internalOrigins.has(url.origin);
+            }
+
+            function isNavigationLink(link) {
+                return Boolean(link.closest('nav, .navigation-widget, .navbar-widget, .widget-type-navigation, .widget-type-navbar'));
+            }
+
+            function openNewTab(url) {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
+
+            function openEditorHere(url) {
+                try {
+                    window.top.location.href = url;
+                } catch (error) {
+                    window.location.href = url;
+                }
+            }
+
+            function createButton(label, options) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = label;
+                button.setAttribute('role', 'menuitem');
+                button.disabled = Boolean(options.disabled);
+                if (options.title) {
+                    button.title = options.title;
+                }
+                button.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (button.disabled) return;
+                    options.onClick();
+                    removeMenu();
+                });
+                return button;
+            }
+
+            function renderMenu(link, items, position) {
+                removeMenu();
+                activeLink = link;
+
+                const menu = document.createElement('div');
+                menu.id = MENU_ID;
+                menu.setAttribute('role', 'menu');
+                menu.style.top = `${position.top}px`;
+                menu.style.left = `${position.left}px`;
+
+                items.forEach(function(item) {
+                    menu.appendChild(createButton(item.label, item));
+                });
+
+                document.body.appendChild(menu);
+            }
+
+            function renderLoadingMenu(link, position) {
+                removeMenu();
+                activeLink = link;
+
+                const menu = document.createElement('div');
+                menu.id = MENU_ID;
+                menu.setAttribute('role', 'menu');
+                menu.style.top = `${position.top}px`;
+                menu.style.left = `${position.left}px`;
+
+                const loading = document.createElement('div');
+                loading.className = 'eceee-preview-nav-menu-loading';
+                loading.textContent = 'Loading page actions...';
+                menu.appendChild(loading);
+
+                document.body.appendChild(menu);
+            }
+
+            async function resolveInternalPage(url) {
+                const path = url.pathname || '/';
+                const currentQuery = `path=${encodeURIComponent(path)}&version_filter=current_published`;
+                const anyQuery = `path=${encodeURIComponent(path)}`;
+
+                const publishedPage = await fetchJson(`${API_BASE}/pages/by-path/?${currentQuery}`).catch(function() {
+                    return null;
+                });
+                const page = publishedPage || await fetchJson(`${API_BASE}/pages/by-path/?${anyQuery}`).catch(function() {
+                    return null;
+                });
+
+                const pageId = page && (page.id || page.pageId || page.page_id);
+                const latestVersion = pageId
+                    ? await fetchJson(`${API_BASE}/pages/${pageId}/versions/latest/`).catch(function() {
+                        return null;
+                    })
+                    : null;
+                const versionId = latestVersion && (latestVersion.id || latestVersion.versionId || latestVersion.version_id);
+
+                return {
+                    pageId,
+                    isPublished: Boolean(publishedPage),
+                    latestVersionId: versionId,
+                    publicUrl: `${url.pathname}${url.search}${url.hash}`,
+                };
+            }
+
+            function menuPositionFromEvent(event, link) {
+                const rect = link.getBoundingClientRect();
+                return {
+                    top: Math.round(rect.bottom + window.scrollY + 4),
+                    left: Math.round(Math.max(8, Math.min(rect.left + window.scrollX, window.innerWidth - 260))),
+                };
+            }
+
+            function showExternalMenu(link, url, event) {
+                renderMenu(link, [{
+                    label: 'Open in new tab',
+                    disabled: false,
+                    onClick: function() { openNewTab(url.href); },
+                }], menuPositionFromEvent(event, link));
+            }
+
+            async function showInternalMenu(link, url, event) {
+                const position = menuPositionFromEvent(event, link);
+                renderLoadingMenu(link, position);
+
+                const page = await resolveInternalPage(url);
+                if (!page.pageId) {
+                    renderMenu(link, [{
+                        label: 'Open in new tab',
+                        disabled: false,
+                        onClick: function() { openNewTab(`${url.pathname}${url.search}${url.hash}`); },
+                    }], position);
+                    return;
+                }
+
+                const editorUrl = `/pages/${page.pageId}/edit`;
+                const previewUrl = page.latestVersionId
+                    ? `${API_BASE}/pages/${page.pageId}/versions/${page.latestVersionId}/preview/${window.location.search || ''}`
+                    : '';
+
+                renderMenu(link, [
+                    {
+                        label: 'Open public page in new tab',
+                        disabled: !page.isPublished,
+                        title: page.isPublished ? '' : 'This page does not have a published version',
+                        onClick: function() { openNewTab(page.publicUrl); },
+                    },
+                    {
+                        label: 'Open preview in new tab',
+                        disabled: !previewUrl,
+                        title: previewUrl ? '' : 'No page version is available to preview',
+                        onClick: function() { openNewTab(previewUrl); },
+                    },
+                    {
+                        label: 'Open editor here',
+                        disabled: false,
+                        onClick: function() { openEditorHere(editorUrl); },
+                    },
+                    {
+                        label: 'Open editor in new tab',
+                        disabled: false,
+                        onClick: function() { openNewTab(editorUrl); },
+                    },
+                ], position);
+            }
+
+            document.addEventListener('click', function(event) {
+                const link = event.target.closest ? event.target.closest('a') : null;
+                if (!link) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!isNavigationLink(link) || isAnchorOnly(link)) {
+                    removeMenu();
+                    return false;
+                }
+
+                const url = getUrl(link);
+                if (!url || !isHttpUrl(url)) {
+                    removeMenu();
+                    return false;
+                }
+
+                if (!isInternalUrl(url)) {
+                    showExternalMenu(link, url, event);
+                } else {
+                    showInternalMenu(link, url, event);
+                }
+
+                return false;
+            }, true);
+
+            document.addEventListener('submit', function(event) {
+                event.preventDefault();
+                console.log('Form submission prevented in preview');
+                return false;
+            }, true);
+
+            document.addEventListener('mousedown', function(event) {
+                const menu = document.getElementById(MENU_ID);
+                if (!menu) return;
+                if (menu.contains(event.target) || activeLink?.contains(event.target)) return;
+                removeMenu();
+            });
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    removeMenu();
+                }
+            });
+
+            const style = document.createElement('style');
+            style.textContent = `
+                a { cursor: default !important; }
+                a:hover { opacity: 0.8; }
+                #${MENU_ID} {
+                    position: absolute;
+                    z-index: 2147483647;
+                    min-width: 14rem;
+                    max-width: 18rem;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 0.375rem;
+                    background: #fff;
+                    padding: 0.25rem 0;
+                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+                    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                }
+                #${MENU_ID} button {
+                    display: block;
+                    width: 100%;
+                    border: 0;
+                    background: transparent;
+                    padding: 0.5rem 0.75rem;
+                    color: #374151;
+                    font: inherit;
+                    font-size: 0.875rem;
+                    line-height: 1.25rem;
+                    text-align: left;
+                    cursor: pointer;
+                }
+                #${MENU_ID} button:hover:not(:disabled) {
+                    background: #f3f4f6;
+                }
+                #${MENU_ID} button:disabled {
+                    color: #9ca3af;
+                    cursor: not-allowed;
+                }
+                .eceee-preview-nav-menu-loading {
+                    padding: 0.5rem 0.75rem;
+                    color: #6b7280;
+                    font-size: 0.875rem;
+                    line-height: 1.25rem;
+                }
+            `;
+            document.head.appendChild(style);
+        })();
+"""
+
+
 @api_view(["GET"])
 @authentication_classes([
     PreviewTokenAuthentication,
@@ -179,7 +501,7 @@ def render_version_preview(request, page_id, version_id):
             pass  # Lightbox CSS not found, continue without it
 
         # Build complete HTML document with base tag for proper URL resolution
-        # and JavaScript to prevent navigation in preview
+        # and JavaScript to keep preview links inside the editor workflow.
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -199,33 +521,7 @@ def render_version_preview(request, page_id, version_id):
         {result.get('css', '')}
     </style>
     <script>
-        // Prevent all navigation in preview mode
-        document.addEventListener('DOMContentLoaded', function() {{
-            // Prevent all link clicks
-            document.addEventListener('click', function(e) {{
-                const link = e.target.closest('a');
-                if (link) {{
-                    e.preventDefault();
-                    console.log('Navigation prevented in preview:', link.href);
-                    return false;
-                }}
-            }}, true);
-            
-            // Prevent form submissions
-            document.addEventListener('submit', function(e) {{
-                e.preventDefault();
-                console.log('Form submission prevented in preview');
-                return false;
-            }}, true);
-            
-            // Add visual indicator that this is preview mode
-            const style = document.createElement('style');
-            style.textContent = `
-                a {{ cursor: default !important; }}
-                a:hover {{ opacity: 0.8; }}
-            `;
-            document.head.appendChild(style);
-        }});
+{PREVIEW_NAVIGATION_MENU_SCRIPT}
     </script>
 </head>
 <body>

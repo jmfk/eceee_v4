@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Menu, X, MoreHorizontal } from 'lucide-react'
+import EditorNavLink from './EditorNavLink'
+import { isEditorNavMenuContext, processNavItems } from './editorNavLinkUtils'
 
 /**
  * Extract URL from image object
@@ -23,34 +25,7 @@ const getImageUrl = (image) => {
  * Handles both new format (with link_data) and old format (direct fields)
  */
 const processMenuItems = (items) => {
-    if (!items || !Array.isArray(items)) return []
-
-    return items.map((item, index) => {
-        // Check if item has link_data field (new format)
-        if (item.linkData || item.link_data) {
-            const linkData = item.linkData || item.link_data
-            const order = item.order !== undefined ? item.order : index
-
-            return {
-                label: linkData.label,
-                url: linkData.url || '',
-                isActive: linkData.isActive !== false && linkData.is_active !== false,
-                targetBlank: linkData.targetBlank || linkData.target_blank || false,
-                type: linkData.type || 'external',
-                order,
-            }
-        }
-
-        // Old format - direct fields (backwards compatibility)
-        return {
-            label: item.label,
-            url: item.url || '',
-            isActive: item.isActive !== false && item.is_active !== false,
-            targetBlank: item.targetBlank || item.target_blank || false,
-            type: item.type || 'external',
-            order: item.order !== undefined ? item.order : index,
-        }
-    })
+    return processNavItems(items)
 }
 
 /**
@@ -58,40 +33,12 @@ const processMenuItems = (items) => {
  * Handles both new format (with link_data) and old format (direct fields)
  */
 const processSecondaryMenuItems = (items) => {
-    if (!items || !Array.isArray(items)) return []
-
-    return items.map((item, index) => {
-        // Check if item has link_data field (new format)
-        if (item.linkData || item.link_data) {
-            const linkData = item.linkData || item.link_data
-            const order = item.order !== undefined ? item.order : index
-
-            return {
-                label: linkData.label,
-                url: linkData.url || '',
-                isActive: linkData.isActive !== false && linkData.is_active !== false,
-                targetBlank: linkData.targetBlank || linkData.target_blank || false,
-                type: linkData.type || 'external',
-                backgroundColor: item.backgroundColor || item.background_color,
-                textColor: item.textColor || item.text_color,
-                backgroundImage: item.backgroundImage || item.background_image,
-                order,
-            }
-        }
-
-        // Old format - direct fields (backwards compatibility)
-        return {
-            label: item.label,
-            url: item.url || '',
-            isActive: item.isActive !== false && item.is_active !== false,
-            targetBlank: item.targetBlank || item.target_blank || false,
-            type: item.type || 'external',
-            backgroundColor: item.backgroundColor || item.background_color,
-            textColor: item.textColor || item.text_color,
-            backgroundImage: item.backgroundImage || item.background_image,
-            order: item.order !== undefined ? item.order : index,
-        }
-    })
+    return processNavItems(items).map((item) => ({
+        ...item,
+        backgroundColor: item.backgroundColor || item.background_color,
+        textColor: item.textColor || item.text_color,
+        backgroundImage: item.backgroundImage || item.background_image,
+    }))
 }
 
 /**
@@ -127,6 +74,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     // Process menu items to extract link_data (handles both new and old formats)
     const processedMenuItems = processMenuItems(menuItems)
     const processedSecondaryMenuItems = processSecondaryMenuItems(secondaryMenuItems)
+    const shouldUseEditorNavMenus = isEditorNavMenuContext(mode, context)
 
     // Filter active items
     const activeMenuItems = processedMenuItems.filter(item => item.isActive !== false)
@@ -303,18 +251,14 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
         } : {}
 
         return (
-            <a
+            <EditorNavLink
                 key={index}
-                href={mode === 'editor' ? '#' : item.url}
-                data-href={item.url}
-                target={item.targetBlank ? '_blank' : undefined}
-                rel={item.targetBlank ? 'noopener noreferrer' : undefined}
+                item={item}
+                mode={mode}
+                enableEditorMenu={shouldUseEditorNavMenus}
                 className={linkClasses}
                 style={linkStyle}
-                onClick={(e) => {
-                    if (mode === 'editor') {
-                        e.preventDefault()
-                    }
+                onEditorAction={() => {
                     if (isInDropdown) {
                         setIsOverflowMenuOpen(false)
                     }
@@ -324,7 +268,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                 }}
             >
                 {item.label}
-            </a>
+            </EditorNavLink>
         )
     }
 
@@ -364,25 +308,21 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
         }
 
         return (
-            <a
+            <EditorNavLink
                 key={index}
-                href={mode === 'editor' ? '#' : item.url}
-                data-href={item.url}
-                target={item.targetBlank ? '_blank' : undefined}
-                rel={item.targetBlank ? 'noopener noreferrer' : undefined}
+                item={item}
+                mode={mode}
+                enableEditorMenu={shouldUseEditorNavMenus}
                 style={itemStyle}
                 className="navbar-link navbar-secondary-link hover:opacity-80"
-                onClick={(e) => {
-                    if (mode === 'editor') {
-                        e.preventDefault()
-                    }
+                onEditorAction={() => {
                     if (showHamburger) {
                         setIsMobileMenuOpen(false)
                     }
                 }}
             >
                 {item.label}
-            </a>
+            </EditorNavLink>
         )
     }
 
@@ -567,20 +507,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                                         }),
                                     }}
                                 >
-                                    <a
-                                        href={mode === 'editor' ? '#' : item.url}
-                                        data-href={item.url}
-                                        target={item.targetBlank ? '_blank' : undefined}
-                                        rel={item.targetBlank ? 'noopener noreferrer' : undefined}
-                                        className="navbar-link navbar-secondary-link hover:opacity-80"
-                                        onClick={(e) => {
-                                            if (mode === 'editor') {
-                                                e.preventDefault()
-                                            }
-                                        }}
-                                    >
-                                        {item.label}
-                                    </a>
+                                    {renderSecondaryMenuItem(item, index, false)}
                                 </li>
                             )
                         })}

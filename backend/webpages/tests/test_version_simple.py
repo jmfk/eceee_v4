@@ -192,6 +192,47 @@ class PageVersionAPISimpleTest(APITestCase):
         self.assertIn("version2", response.data)
         self.assertIn("changes", response.data)
 
+    def test_latest_version_for_page_returns_latest_draft_for_staff(self):
+        """Test latest-version endpoint returns latest version without requiring publication."""
+        staff_user = User.objects.create_user(
+            username="staff_latest",
+            email="staff-latest@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=staff_user)
+        latest_draft = self.page.create_version(staff_user, "Latest draft")
+
+        url = reverse("api:page-latest-version", kwargs={"page_id": self.page.pk})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], latest_draft.id)
+        self.assertEqual(response.data["publication_status"], "draft")
+
+    def test_latest_version_for_page_does_not_create_missing_version(self):
+        """Test latest-version endpoint returns 204 when a page has no versions."""
+        staff_user = User.objects.create_user(
+            username="staff_empty_latest",
+            email="staff-empty-latest@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=staff_user)
+        empty_page = WebPage.objects.create(
+            title="Empty Page",
+            slug="empty-page",
+            tenant=self.tenant,
+            created_by=staff_user,
+            last_modified_by=staff_user,
+        )
+
+        url = reverse("api:page-latest-version", kwargs={"page_id": empty_page.pk})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(PageVersion.objects.filter(page=empty_page).count(), 0)
+
     def test_restore_version_api(self):
         """Test restoring a version via API"""
         url = reverse("api:pageversion-restore", kwargs={"pk": self.draft.pk})

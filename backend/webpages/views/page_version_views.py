@@ -496,6 +496,27 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(current_version)
         return Response(serializer.data)
 
+    def latest_for_page(self, request, page_id=None):
+        """Get the latest version for a page without creating one as a side effect."""
+        try:
+            page = get_object_or_404(WebPage, id=page_id)
+        except ValueError:
+            return Response(
+                {"error": "Invalid page ID"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if request.user.is_staff:
+            latest_version = page.get_latest_version()
+        else:
+            latest_version = page.get_current_published_version()
+
+        if not latest_version:
+            return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+        serializer = self.get_serializer(latest_version)
+        return Response(serializer.data)
+
     @action(detail=False, methods=["post"], url_path="pack-drafts")
     def pack_drafts(self, request):
         """Remove only draft versions older than current published"""
