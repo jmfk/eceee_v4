@@ -410,7 +410,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     if (mode === 'editor' && (!activeMenuItems || activeMenuItems.length === 0)) {
         return (
             <nav
-                className={`shadow-sm h-[28px] ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
+                className={`widget-type-navbar navbar-widget shadow-sm h-[28px] ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
                 style={navStyles}
             >
                 <div className="flex items-center h-full pl-[20px]">
@@ -427,7 +427,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
         return (
             <nav
                 ref={navRef}
-                className={`shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
+                className={`widget-type-navbar navbar-widget shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
                 style={navStyles}
             >
                 <div className="flex items-center h-full px-[20px] justify-between">
@@ -472,7 +472,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     return (
         <nav
             ref={navRef}
-            className={`shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
+            className={`widget-type-navbar navbar-widget shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
             style={navStyles}
         >
             <div className="flex justify-between items-center h-full w-full">
@@ -647,4 +647,3 @@ NavbarWidget.metadata = {
 }
 
 export default NavbarWidget
-

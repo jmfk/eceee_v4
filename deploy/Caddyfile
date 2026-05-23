@@ -56,6 +56,11 @@ app.{$DOMAIN} {
         reverse_proxy backend:8000
     }
 
+    # Same-origin imgproxy URLs emitted by backend-generated theme CSS
+    handle /imgproxy/* {
+        reverse_proxy backend:8000
+    }
+
     # Static files from backend
     handle /static/* {
         reverse_proxy backend:8000

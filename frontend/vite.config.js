@@ -124,6 +124,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/imgproxy': {
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/static': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,

@@ -374,12 +374,6 @@ const HeroWidget = ({
     }
 
     // Preview mode
-    const hasContent = header || beforeText || afterText || image
-
-    if (!hasContent) {
-        return null
-    }
-
     return (
         <div className="hero-widget widget-type-easy-widgets-herowidget" style={heroStyle}>
             <div className="hero-content">
@@ -425,4 +419,3 @@ HeroWidget.metadata = {
 }
 
 export default HeroWidget
-
