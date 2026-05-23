@@ -475,7 +475,7 @@ refresh-db-collation: prepare-test-infra
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test
+	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --verbosity=2 --failfast
 
 # Run frontend tests
 frontend-test: prepare-test-infra
