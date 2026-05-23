@@ -144,24 +144,20 @@ class Command(BaseCommand):
 
         Shows what would be done without making changes.
         """
-        from webpages.models import WebPage
-
-        # Count what would be processed
-        scheduled_pages = WebPage.objects.filter(publication_status="scheduled")
-        published_pages = WebPage.objects.filter(publication_status="published")
-
-        publish_count = sum(
-            1 for page in scheduled_pages if page.should_be_published_now(now)
+        publish_count, publish_errors = publishing_service.process_scheduled_publications(
+            now
         )
-        expire_count = sum(
-            1 for page in published_pages if page.should_be_expired_now(now)
-        )
+        expire_count, expire_errors = publishing_service.process_expired_pages(now)
 
         if self.verbose:
             self.stdout.write(f"Would publish {publish_count} pages")
             self.stdout.write(f"Would expire {expire_count} pages")
 
-        return {"published": publish_count, "expired": expire_count, "errors": []}
+        return {
+            "published": publish_count,
+            "expired": expire_count,
+            "errors": publish_errors + expire_errors,
+        }
 
     def _report_results(self, results):
         """Single responsibility: Report the results of processing."""
