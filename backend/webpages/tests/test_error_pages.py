@@ -424,6 +424,7 @@ class ErrorPageIntegrationTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         error_404_site2 = WebPage.objects.create(
@@ -432,6 +433,7 @@ class ErrorPageIntegrationTests(TestCase):
             parent=root_page_2,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Both should be valid (no ValidationError)
