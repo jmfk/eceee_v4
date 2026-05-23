@@ -342,6 +342,7 @@ class PageThemeTest(TestCase):
             name="Test Theme",
             description="A test theme",
             css_variables={"--primary-color": "#007bff"},
+            tenant=self.tenant,
             created_by=self.user,
         )
 
