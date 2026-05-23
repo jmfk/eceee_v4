@@ -22,6 +22,9 @@ class WebPagePreviewTest(TestCase):
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.skipTest("ArrayField not supported on SQLite")
+        from webpages.layout_autodiscovery import autodiscover_layouts
+        autodiscover_layouts()
+
         self.client = APIClient()
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
