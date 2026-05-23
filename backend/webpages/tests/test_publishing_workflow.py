@@ -942,7 +942,8 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         # Check initial status
         status_url = reverse("api:webpage-publication-status")
         response = self.client.get(status_url)
-        # ... rest of the test ...
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        initial_counts = response.data["status_counts"]
 
         # Bulk publish
         bulk_url = reverse("api:webpage-bulk-publish")
@@ -957,6 +958,4 @@ class PublishingWorkflowIntegrationTests(APITestCase):
 
         # Verify counts changed
         self.assertEqual(updated_counts["published"], initial_counts["published"] + 3)
-        self.assertEqual(
-            updated_counts["unpublished"], initial_counts["unpublished"] - 3
-        )
+        self.assertEqual(updated_counts["draft"], initial_counts["draft"] - 3)
