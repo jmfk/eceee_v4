@@ -483,7 +483,7 @@ backend-test-parallel: prepare-test-infra refresh-db-collation
 
 # Run frontend tests
 frontend-test: prepare-test-infra
-	docker-compose -f docker-compose.dev.yml exec -T frontend npm run test:run
+	docker-compose -f docker-compose.dev.yml exec -T frontend npm run test:run -- --bail=1
 
 # Run all tests
 test: backend-test frontend-test
