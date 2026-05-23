@@ -13,6 +13,7 @@ const PAGE_FIELDS = new Set([
     'parent',
     'parentId',
     'sortOrder',
+    'pathPatternKey',
     'hostnames',
     'enableCssInjection',
     'pageCssVariables',
@@ -31,7 +32,8 @@ const VERSION_FIELDS = new Set([
     'effectiveDate',
     'expiryDate',
     'metaTitle',
-    'metaDescription'
+    'metaDescription',
+    'tags'
 ]);
 
 // Fields that are metadata/computed (don't save)
@@ -176,6 +178,12 @@ export function analyzeChanges(originalWebpageData = {}, currentWebpageData = {}
                     changes.changedFieldNames.push('title');
                 }
             }
+        } else if (field === 'tags') {
+            if (JSON.stringify(originalPageVersionData[field] || []) !== JSON.stringify(currentPageVersionData[field] || [])) {
+                changes.versionFields[field] = currentPageVersionData[field];
+                changes.hasVersionChanges = true;
+                changes.changedFieldNames.push(field);
+            }
         } else {
             // Compare other version fields directly
             if (originalPageVersionData[field] !== currentPageVersionData[field]) {
@@ -234,7 +242,7 @@ export function determineSaveStrategy(changes) {
  * @returns {String} Human-readable summary
  */
 export function generateChangeSummary(changes) {
-    const { changedFieldNames, hasPageChanges, hasVersionChanges } = changes;
+    const { changedFieldNames } = changes;
 
     if (changedFieldNames.length === 0) {
         return 'No changes detected';

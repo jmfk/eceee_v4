@@ -8,7 +8,7 @@
  * Instead of mounting the full PageEditor (too many deps), we test the key
  * units that compose the flow:
  *   1. analyzeChanges correctly flags widget edits as dirty
- *   2. The PageEditor isolated-source filter no longer drops widget CRUD ops
+ *   2. PageEditor mirrors field-buffer UDC edits into its dirty snapshot
  */
 
 import { describe, it, expect } from 'vitest'
@@ -82,20 +82,43 @@ describe('analyzeChanges — widget dirty detection', () => {
         const dirty = analyzeChanges(baseWebpage, baseWebpage, baseVersion, editedVersion)
         expect(dirty.hasVersionChanges).toBe(true)
     })
+
+    it('returns hasPageChanges=true when the path pattern changes', () => {
+        const originalWebpage = { ...baseWebpage, pathPatternKey: '' }
+        const editedWebpage = { ...baseWebpage, pathPatternKey: 'news_slug' }
+
+        const result = analyzeChanges(originalWebpage, editedWebpage, baseVersion, baseVersion)
+
+        expect(result.hasPageChanges).toBe(true)
+        expect(result.pageFields.pathPatternKey).toBe('news_slug')
+        expect(result.changedFieldNames).toContain('pathPatternKey')
+    })
+
+    it('returns hasVersionChanges=true when page tags change', () => {
+        const originalVersion = { ...baseVersion, tags: ['energy'] }
+        const editedVersion = { ...baseVersion, tags: ['energy', 'policy'] }
+
+        const result = analyzeChanges(baseWebpage, baseWebpage, originalVersion, editedVersion)
+
+        expect(result.hasVersionChanges).toBe(true)
+        expect(result.versionFields.tags).toEqual(['energy', 'policy'])
+        expect(result.changedFieldNames).toContain('tags')
+    })
 })
 
 // ---------------------------------------------------------------------------
-// 2. PageEditor isolated-source filter — regression guard
+// 2. PageEditor UDC source handling — regression guard
 //
 // We test the filter logic directly as a pure function so we don't need to
 // mount the full component. The filter is extracted inline for testability.
 // ---------------------------------------------------------------------------
 
 /**
- * Mirrors the filter logic in PageEditor.useExternalChanges after the fix.
- * Returns true if the update should be SKIPPED (i.e., it's a form-buffer source).
+ * Mirrors the field-buffer source detection in PageEditor.useExternalChanges.
+ * These sources should sync the canonical UDC version snapshot before returning
+ * so save can activate for isolated form fields and special editors.
  */
-function shouldSkipSource(sourceId) {
+function shouldSyncVersionBeforeReturning(sourceId) {
     return (
         sourceId.startsWith('isolated-form-') ||
         sourceId.startsWith('special-editor-') ||
@@ -104,40 +127,40 @@ function shouldSkipSource(sourceId) {
     )
 }
 
-describe('PageEditor isolated-source filter', () => {
-    it('skips isolated-form- sources (WidgetEditorPanel form buffer)', () => {
-        expect(shouldSkipSource('isolated-form-widget-abc123')).toBe(true)
+describe('PageEditor UDC source handling', () => {
+    it('syncs isolated-form- sources (WidgetEditorPanel form buffer)', () => {
+        expect(shouldSyncVersionBeforeReturning('isolated-form-widget-abc123')).toBe(true)
     })
 
-    it('skips special-editor- sources', () => {
-        expect(shouldSkipSource('special-editor-table-1')).toBe(true)
+    it('syncs special-editor- sources', () => {
+        expect(shouldSyncVersionBeforeReturning('special-editor-table-1')).toBe(true)
     })
 
-    it('skips field- sources', () => {
-        expect(shouldSkipSource('field-title')).toBe(true)
+    it('syncs field- sources', () => {
+        expect(shouldSyncVersionBeforeReturning('field-title')).toBe(true)
     })
 
-    it('skips -field- sources (bannerwidget-*-field-* pattern)', () => {
-        expect(shouldSkipSource('bannerwidget-123-field-imageUrl')).toBe(true)
+    it('syncs -field- sources (bannerwidget-*-field-* pattern)', () => {
+        expect(shouldSyncVersionBeforeReturning('bannerwidget-123-field-imageUrl')).toBe(true)
     })
 
-    it('does NOT skip widget- sources (inline ContentWidget, BannerWidget etc.)', () => {
-        expect(shouldSkipSource('widget-abc123')).toBe(false)
+    it('continues normal handling for widget- sources (inline ContentWidget, BannerWidget etc.)', () => {
+        expect(shouldSyncVersionBeforeReturning('widget-abc123')).toBe(false)
     })
 
-    it('does NOT skip bannerwidget- sources for widget CRUD ops', () => {
-        expect(shouldSkipSource('bannerwidget-abc123')).toBe(false)
+    it('continues normal handling for bannerwidget- sources for widget CRUD ops', () => {
+        expect(shouldSyncVersionBeforeReturning('bannerwidget-abc123')).toBe(false)
     })
 
-    it('does NOT skip page-editor- sources', () => {
-        expect(shouldSkipSource('page-editor-1-10')).toBe(false)
+    it('continues normal handling for page-editor- sources', () => {
+        expect(shouldSyncVersionBeforeReturning('page-editor-1-10')).toBe(false)
     })
 
-    it('does NOT skip section-widget- sources', () => {
-        expect(shouldSkipSource('section-widget-abc')).toBe(false)
+    it('continues normal handling for section-widget- sources', () => {
+        expect(shouldSyncVersionBeforeReturning('section-widget-abc')).toBe(false)
     })
 
-    it('does NOT skip contentcardwidget- sources', () => {
-        expect(shouldSkipSource('contentcardwidget-abc')).toBe(false)
+    it('continues normal handling for contentcardwidget- sources', () => {
+        expect(shouldSyncVersionBeforeReturning('contentcardwidget-abc')).toBe(false)
     })
 })

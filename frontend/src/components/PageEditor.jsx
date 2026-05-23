@@ -281,15 +281,34 @@ const PageEditor = () => {
         const sourceId = metadata?.sourceId || '';
         const operationType = metadata?.type;
 
-        // Form-buffer and field-level updates: these components manage their own state
-        // and UDC subscriptions — skip to avoid double-processing and unnecessary rerenders.
         const isFormBufferSource =
             sourceId.startsWith('isolated-form-') ||
             sourceId.startsWith('special-editor-') ||
             sourceId.startsWith('field-') ||
             sourceId.includes('-field-');
 
+        const externalPageId = String(webpageData?.id || pageId || state.metadata?.currentPageId || '');
+        const externalVersionId = String(versionId || state.metadata?.currentVersionId || '');
+        const externalPage = externalPageId ? state.pages?.[externalPageId] : null;
+        const externalVersion = externalVersionId ? state.versions?.[externalVersionId] : null;
+
+        const syncExternalPage = () => {
+            if (externalPage && !defaultEqualityFn(webpageData || {}, externalPage)) {
+                setWebpageData(externalPage);
+            }
+        };
+
+        const syncExternalVersion = () => {
+            if (externalVersion && !defaultEqualityFn(pageVersionData || {}, externalVersion)) {
+                setPageVersionData(externalVersion);
+            }
+        };
+
+        // Field buffers and special editors update canonical UDC state directly.
+        // Mirror that canonical snapshot into PageEditor so the semantic dirty
+        // check can enable/disable save without forcing every field to rerender.
         if (isFormBufferSource) {
+            syncExternalVersion();
             return;
         }
 
@@ -297,6 +316,29 @@ const PageEditor = () => {
         // isDirty value is derived from a semantic diff via
         // recomputeDirtyState() so that load-time normalization or
         // hydration cannot force the editor into a dirty state.
+
+        const shouldSyncPage = [
+            OperationTypes.UPDATE_WEBPAGE_DATA,
+            OperationTypes.INIT_PAGE,
+        ].includes(operationType);
+
+        if (shouldSyncPage) {
+            syncExternalPage();
+        }
+
+        const shouldSyncVersion = [
+            OperationTypes.ADD_WIDGET,
+            OperationTypes.UPDATE_WIDGET_CONFIG,
+            OperationTypes.MOVE_WIDGET,
+            OperationTypes.REMOVE_WIDGET,
+            OperationTypes.INIT_VERSION,
+            OperationTypes.SWITCH_VERSION,
+            OperationTypes.UPDATE_PAGE_VERSION_DATA,
+        ].includes(operationType);
+
+        if (shouldSyncVersion) {
+            syncExternalVersion();
+        }
 
         const shouldSyncWidgets = [
             OperationTypes.ADD_WIDGET,
@@ -308,23 +350,18 @@ const PageEditor = () => {
             OperationTypes.UPDATE_PAGE_VERSION_DATA,
         ].includes(operationType);
 
-        if (!shouldSyncWidgets) {
+        if (!shouldSyncWidgets || !externalVersion?.widgets) {
             return;
         }
 
         // Update local widgets from external UDC changes (other components/users)
-        if (versionId && state.versions[versionId]?.widgets) {
-            const externalWidgets = state.versions[versionId].widgets;
-            if (defaultEqualityFn(pageVersionData?.widgets || {}, externalWidgets)) {
+        if (versionId) {
+            const externalWidgets = externalVersion.widgets;
+            if (defaultEqualityFn(localWidgets || {}, externalWidgets)) {
                 return;
             }
 
             setLocalWidgets(externalWidgets);
-
-            setPageVersionData(prev => ({
-                ...prev,
-                widgets: externalWidgets
-            }));
         }
     });
 
