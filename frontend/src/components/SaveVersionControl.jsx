@@ -126,7 +126,7 @@ const SaveVersionControl = ({
             <button
                 onClick={onSaveClick}
                 disabled={isSaving}
-                className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 rounded transition-colors flex items-center space-x-1"
+                className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 rounded transition-colors flex items-center space-x-1"
                 title="Create new page"
             >
                 {isSaving ? (
@@ -152,7 +152,7 @@ const SaveVersionControl = ({
                 <button
                     onClick={onSaveClick}
                     disabled={isSaving}
-                    className="h-6 font-medium px-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-6 font-medium px-2 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={
                         isSaving
                             ? "Saving..."
@@ -179,7 +179,7 @@ const SaveVersionControl = ({
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     disabled={isSaving}
-                    className={`h-6 font-medium px-2 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none rounded-r border-l transition-colors flex items-center justify-center ${
+                    className={`h-6 font-medium px-2 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-r border-l transition-colors flex items-center justify-center ${
                         isOpen ? 'bg-blue-700 border-blue-800' : 'bg-blue-600 hover:bg-blue-700 border-blue-800'
                     }`}
                     title="More options (versions, undo, save new)"
