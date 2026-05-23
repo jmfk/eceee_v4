@@ -203,6 +203,11 @@ class PageVersionTest(TestCase):
             identifier="default",
             defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        from easy_layouts.layouts.main_layout import MainLayoutLayout
+        from webpages.layout_registry import layout_registry
+
+        if not layout_registry.is_registered("main_layout"):
+            layout_registry.register(MainLayoutLayout)
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
@@ -522,14 +527,14 @@ class LayoutIntegrationTest(TestCase):
 
         # Create a version with code_layout since it's stored in PageVersion now
         version = page.create_version(self.user, "Test version")
-        version.code_layout = "single_column"
+        version.code_layout = "main_layout"
         version.save()
 
         # Code layout is now accessed via the version
-        self.assertEqual(version.code_layout, "single_column")
+        self.assertEqual(version.code_layout, "main_layout")
 
         # Should be able to get layout from registry
         from webpages.layout_registry import layout_registry
 
-        layout = layout_registry.get_layout("single_column")
+        layout = layout_registry.get_layout("main_layout")
         self.assertIsNotNone(layout)
