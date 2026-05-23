@@ -293,6 +293,7 @@ class WebPageTest(TestCase):
             slug="test-page",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         self.assertEqual(page.title, "Test Page")
@@ -306,6 +307,7 @@ class WebPageTest(TestCase):
             slug="parent",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         child = WebPage.objects.create(
@@ -314,6 +316,7 @@ class WebPageTest(TestCase):
             parent=parent,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         self.assertEqual(child.parent, parent)
