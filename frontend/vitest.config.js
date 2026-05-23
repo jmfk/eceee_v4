@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
@@ -9,6 +9,7 @@ export default defineConfig({
         environment: 'jsdom',
         setupFiles: ['./src/test/setup.js'],
         css: true,
+        exclude: [...configDefaults.exclude, 'e2e/**'],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
@@ -34,4 +35,4 @@ export default defineConfig({
             '@assets': path.resolve(__dirname, './src/assets'),
         },
     },
-}) 
+})

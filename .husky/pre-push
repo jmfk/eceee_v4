@@ -77,10 +77,9 @@ PROMPT
 	printf '\n<pre_push_test_output>\n'
 	cat "$TEST_LOG"
 	printf '\n</pre_push_test_output>\n'
-} | "$CODEX_BIN" exec \
+} | "$CODEX_BIN" --ask-for-approval never exec \
 	--cd "$(pwd)" \
 	--sandbox "${HUSKY_AGENT_SANDBOX:-workspace-write}" \
-	--ask-for-approval never \
 	--ephemeral \
 	--color never \
 	- >"$AGENT_LOG" 2>&1; then
