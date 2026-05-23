@@ -45,6 +45,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
+      - ./docs:/app/docs:ro
       - ./.env:/app/.env
       - backend_static:/app/staticfiles
       - ./backend/media:/app/media

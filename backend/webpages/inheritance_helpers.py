@@ -173,40 +173,45 @@ class InheritanceTreeHelpers:
         if not options.apply_inheritance_behavior:
             return all_widgets
 
-        # Group widgets by inheritance behavior
+        # Apply inheritance behavior logic. Overrides hide deeper ancestors, but
+        # keep local insertions before the closest override.
         override_widgets = [
             w
             for w in all_widgets
             if w.inheritance_behavior == WidgetInheritanceBehavior.OVERRIDE_PARENT
         ]
-        before_widgets = [
+        if override_widgets:
+            closest_override_depth = min(w.depth for w in override_widgets)
+            all_widgets = [w for w in all_widgets if w.depth <= closest_override_depth]
+
+        visible_override_widgets = [
+            w
+            for w in all_widgets
+            if w.inheritance_behavior == WidgetInheritanceBehavior.OVERRIDE_PARENT
+        ]
+        visible_before_widgets = [
             w
             for w in all_widgets
             if w.inheritance_behavior == WidgetInheritanceBehavior.INSERT_BEFORE_PARENT
         ]
-        after_widgets = [
+        visible_after_widgets = [
             w
             for w in all_widgets
             if w.inheritance_behavior == WidgetInheritanceBehavior.INSERT_AFTER_PARENT
         ]
 
-        # Apply inheritance behavior logic
-        if override_widgets:
-            # Override widgets replace ALL other widgets
-            result = sorted(override_widgets, key=lambda w: (w.depth, w.order))
-            return result
-
-        # Combine: before + inherited (after) widgets
-        # Note: "inherited" widgets are those with INSERT_AFTER_PARENT behavior
         result = []
 
-        # Add before widgets (sorted by depth, then order)
-        before_sorted = sorted(before_widgets, key=lambda w: (w.depth, w.order))
-        result.extend(before_sorted)
+        # Add before widgets from current page upward.
+        result.extend(sorted(visible_before_widgets, key=lambda w: (w.depth, w.order)))
 
-        # Add after widgets (sorted by depth, then order)
-        after_sorted = sorted(after_widgets, key=lambda w: (w.depth, w.order))
-        result.extend(after_sorted)
+        # Add override widgets after local "before" insertions.
+        result.extend(
+            sorted(visible_override_widgets, key=lambda w: (w.depth, w.order))
+        )
+
+        # Add after widgets from ancestors down to the current page.
+        result.extend(sorted(visible_after_widgets, key=lambda w: (-w.depth, w.order)))
 
         return result
 
