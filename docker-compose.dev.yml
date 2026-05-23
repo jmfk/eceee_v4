@@ -4,6 +4,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        REQUIREMENTS_FILE: dev.txt
     image: ${BACKEND_IMAGE:-eceee-v4-backend}:latest
     container_name: ${BACKEND_CONTAINER_NAME:-eceee-v4-backend}
     restart: "no"

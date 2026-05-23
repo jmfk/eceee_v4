@@ -28,8 +28,8 @@ RUN apt-get update \
 
 # Install Python dependencies
 COPY requirements/ requirements/
-# Install production dependencies
-RUN pip install --no-cache-dir -r requirements/production.txt
+ARG REQUIREMENTS_FILE=production.txt
+RUN pip install --no-cache-dir -r requirements/${REQUIREMENTS_FILE}
 
 # Copy project
 COPY . .

@@ -464,7 +464,7 @@ prepare-test-infra:
 		echo "Creating local database '$$DB_NAME'..."; \
 		docker-compose -f docker-compose.infra.yml exec -T db createdb -U postgres "$$DB_NAME"; \
 	fi; \
-	docker-compose -f docker-compose.dev.yml up -d backend frontend
+	docker-compose -f docker-compose.dev.yml up -d --build backend frontend
 
 # Clear stale local Postgres collation metadata before creating Django test databases.
 refresh-db-collation: prepare-test-infra
