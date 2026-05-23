@@ -22,8 +22,11 @@ class WebPagePreviewTest(TestCase):
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.skipTest("ArrayField not supported on SQLite")
-        from webpages.layout_autodiscovery import autodiscover_layouts
-        autodiscover_layouts()
+        from easy_layouts.layouts.main_layout import MainLayoutLayout
+        from webpages.layout_registry import layout_registry
+
+        if not layout_registry.is_registered("main_layout"):
+            layout_registry.register(MainLayoutLayout)
 
         self.client = APIClient()
         self.user = User.objects.create_user(
