@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ThemeEditor from '../ThemeEditor'
 import { renderWithStateProviders, createTestQueryClient } from '../../test/testUtils'
@@ -174,13 +174,12 @@ describe('ThemeEditor', () => {
     })
 
     it('updates fields in the create route through the unified state provider', async () => {
-        const user = userEvent.setup()
         routerMocks.params = { themeId: 'new' }
 
         renderThemeEditor()
 
         const nameInput = await screen.findByPlaceholderText('My Awesome Theme')
-        await user.type(nameInput, 'Test Theme', { delay: 1 })
+        fireEvent.change(nameInput, { target: { value: 'Test Theme' } })
 
         await waitFor(() => {
             expect(nameInput).toHaveValue('Test Theme')

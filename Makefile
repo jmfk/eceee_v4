@@ -463,27 +463,26 @@ prepare-test-infra:
 	if ! docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$DB_NAME'" | grep -q 1; then \
 		echo "Creating local database '$$DB_NAME'..."; \
 		docker-compose -f docker-compose.infra.yml exec -T db createdb -U postgres "$$DB_NAME"; \
-	fi; \
-	docker-compose -f docker-compose.dev.yml up -d $(TEST_UP_FLAGS) backend frontend
+	fi
 
 # Clear stale local Postgres collation metadata before creating Django test databases.
 refresh-db-collation: prepare-test-infra
 	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
 	DB_NAME=$${DB_NAME:-eceee_v4}; \
-	docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d "$$DB_NAME" -v ON_ERROR_STOP=1 \
-		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres') OR datname = current_database();" >/dev/null
+	docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_$$DB_NAME');" >/dev/null
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
+	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
 
 # Run backend tests in parallel once the suite is stable.
 backend-test-parallel: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
+	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
 
 # Run frontend tests
 frontend-test: prepare-test-infra
-	docker-compose -f docker-compose.dev.yml exec -T frontend npm run test:run -- --bail=1
+	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T frontend npm run test:run -- --bail=1
 
 # Run all tests
 test: backend-test frontend-test
