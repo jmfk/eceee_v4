@@ -127,7 +127,7 @@ const TreeImporterModal = ({ isOpen, onClose, parentPage = null, onSuccess }) =>
                     <div className="flex items-center space-x-2">
                         <Download className="w-5 h-5 text-blue-600" />
                         <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
-                            {importMode === 'root' ? 'Import Page Tree as Root' : 'Import Page Tree as Subpage'}
+                            {importMode === 'root' ? 'Import External Site as Root' : 'Import External Site as Subpage'}
                         </div>
                     </div>
                     <button
@@ -167,14 +167,14 @@ const TreeImporterModal = ({ isOpen, onClose, parentPage = null, onSuccess }) =>
                             <div className="text-sm text-blue-800">
                                 {importMode === 'root' ? (
                                     <div>
-                                        <span className="font-bold">Import as root page</span>
+                                        <span className="font-bold">Import external site as root page</span>
                                         <div className="mt-1 text-blue-700">
                                             The imported pages will be created as a new root page tree. You must specify a hostname.
                                         </div>
                                     </div>
                                 ) : (
                                     <div>
-                                        <span className="font-bold">Import as subpage</span>
+                                        <span className="font-bold">Import external site as subpage</span>
                                         <div className="mt-1 text-blue-700">
                                             The imported pages will be created under:{' '}
                                             <span className="font-semibold">
@@ -419,4 +419,3 @@ const TreeImporterModal = ({ isOpen, onClose, parentPage = null, onSuccess }) =>
 }
 
 export default TreeImporterModal
-

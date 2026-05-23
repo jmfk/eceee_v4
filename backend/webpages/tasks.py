@@ -11,6 +11,34 @@ from django.core.management import call_command
 logger = logging.getLogger(__name__)
 
 
+@shared_task(bind=True, max_retries=1)
+def export_site_package(self, job_id):
+    """Create a site ZIP export package in object storage."""
+    from webpages.models import SitePackageJob
+    from webpages.services.site_package import SitePackageExporter
+
+    job = SitePackageJob.objects.get(id=job_id)
+    try:
+        return SitePackageExporter(job).run()
+    except Exception as e:
+        logger.error(f"Site package export {job_id} failed: {e}")
+        raise
+
+
+@shared_task(bind=True, max_retries=1)
+def import_site_package(self, job_id):
+    """Import a staged site ZIP package from object storage."""
+    from webpages.models import SitePackageJob
+    from webpages.services.site_package import SitePackageImporter
+
+    job = SitePackageJob.objects.get(id=job_id)
+    try:
+        return SitePackageImporter(job).run()
+    except Exception as e:
+        logger.error(f"Site package import {job_id} failed: {e}")
+        raise
+
+
 @shared_task(bind=True, max_retries=3)
 def send_duplicate_page_report(self, period="day"):
     """

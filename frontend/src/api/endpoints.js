@@ -60,6 +60,14 @@ export const endpoints = {
         displayInfo: `${BASE_PATH}/webpages/links/display-info/`
     },
 
+    sitePackages: {
+        exports: `${BASE_PATH}/webpages/site-packages/exports/`,
+        exportDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/`,
+        exportDownload: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/download/`,
+        imports: `${BASE_PATH}/webpages/site-packages/imports/`,
+        importDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/imports/${jobId}/`
+    },
+
     // Versions endpoints (CONSISTENT PATH-BASED API)
     versions: {
         base: `${BASE_PATH}/webpages/versions`,

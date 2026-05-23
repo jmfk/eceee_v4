@@ -61,7 +61,7 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
             </TestWrapper>
         )
 
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should display slug warnings in completed page items', () => {
@@ -83,7 +83,7 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
         )
 
         // Component should render
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should handle pages with multiple warnings', () => {
@@ -104,7 +104,7 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
             </TestWrapper>
         )
 
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should render warning icon and message for pages with slug modifications', () => {
@@ -126,7 +126,7 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
         )
 
         // The component should be rendered
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should display both skipped reason and slug warnings if both present', () => {
@@ -147,6 +147,6 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
             </TestWrapper>
         )
 
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 })

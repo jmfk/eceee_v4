@@ -17,6 +17,7 @@ from .page_version import PageVersion
 from .page_data_schema import PageDataSchema
 from .preview_size import PreviewSize
 from .duplicate_page_log import DuplicatePageLog
+from .site_package_job import SitePackageJob
 
 __all__ = [
     "PageTheme",
@@ -25,4 +26,5 @@ __all__ = [
     "PageDataSchema",
     "PreviewSize",
     "DuplicatePageLog",
+    "SitePackageJob",
 ]

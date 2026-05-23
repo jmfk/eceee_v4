@@ -20,6 +20,7 @@ import {
     Save,
     Search,
     Download,
+    Upload,
 } from 'lucide-react'
 import { pagesApi } from '../api'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
@@ -149,6 +150,7 @@ const PageTreeNode = memo(({
     onDelete,
     onAddPageBelow,
     onImport,
+    onExport,
     cutPageIds = [],
     copyPageIds = [],
     isSearchMode = false,
@@ -351,6 +353,10 @@ const PageTreeNode = memo(({
 
     const handleImport = () => {
         onImport?.(page)
+    }
+
+    const handleExport = () => {
+        onExport?.(page)
     }
 
     const handleMoveUp = async () => {
@@ -911,17 +917,33 @@ const PageTreeNode = memo(({
                         </button>
                     </Tooltip>
 
-                    <Tooltip text="Import page tree as subpage of this page" position="top">
+                    <Tooltip text="Import external site as subpage of this page" position="top">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleImport()
                             }}
+                            aria-label={`Import external site under ${page.title}`}
                             className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors"
                         >
-                            <Download className="w-4 h-4" />
+                            <Upload className="w-4 h-4" />
                         </button>
                     </Tooltip>
+
+                    {level === 0 && onExport && (
+                        <Tooltip text="Export root site package" position="top">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport()
+                                }}
+                                aria-label={`Export root site package for ${page.title}`}
+                                className="p-1.5 rounded hover:bg-indigo-100 text-gray-500 hover:text-indigo-600 transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                            </button>
+                        </Tooltip>
+                    )}
 
                     {(cutPageIds.length > 0 || copyPageIds.length > 0) && (
                         <>
@@ -989,6 +1011,7 @@ const PageTreeNode = memo(({
                             onDelete={onDelete}
                             onAddPageBelow={onAddPageBelow}
                             onImport={onImport}
+                            onExport={onExport}
                             cutPageIds={cutPageIds}
                             copyPageIds={copyPageIds}
                             isSearchMode={isSearchMode}
@@ -1148,4 +1171,4 @@ const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {
     )
 }
 
-export default PageTreeNode 
+export default PageTreeNode

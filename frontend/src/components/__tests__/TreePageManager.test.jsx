@@ -225,6 +225,41 @@ describe('TreePageManager', () => {
         expect(addRootPageButton).toBeInTheDocument()
     })
 
+    it('opens site package ZIP import from root toolbar', async () => {
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        const importButton = screen.getByTestId('import-site-package-button')
+        fireEvent.click(importButton)
+
+        expect(screen.getByText('Import Root Site')).toBeInTheDocument()
+        expect(screen.getByText('Creates a new root page tree from a site package ZIP.')).toBeInTheDocument()
+    })
+
+    it('shows root site package export actions for root pages', async () => {
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        expect(screen.getByRole('button', { name: 'Export root site package for Home Page' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Export root site package for About Page' })).toBeInTheDocument()
+    })
+
+    it('opens root export options from root page action', async () => {
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Export root site package for Home Page' }))
+
+        expect(screen.getByText('Export Root Site')).toBeInTheDocument()
+        expect(screen.getByText('Include referenced media files')).toBeInTheDocument()
+        expect(screen.getByText('Include referenced themes and theme assets')).toBeInTheDocument()
+    })
+
     it('handles error state gracefully', async () => {
         const mockError = new Error('API Error')
         pagesApi.getRootPages.mockRejectedValue(mockError)

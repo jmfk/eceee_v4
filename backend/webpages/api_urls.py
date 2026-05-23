@@ -38,6 +38,13 @@ from .views.page_import_views import (
     ImportStatusView,
     ImportSinglePageView,
 )
+from .views.site_package_views import (
+    SitePackageExportDetailView,
+    SitePackageExportDownloadView,
+    SitePackageExportListView,
+    SitePackageImportDetailView,
+    SitePackageImportListView,
+)
 from .views.widget_quick_reference_views import (
     widget_quick_reference_list,
     widget_quick_reference_detail,
@@ -225,6 +232,32 @@ urlpatterns = [
     ),
     path(
         "pages/import-page/", ImportSinglePageView.as_view(), name="import-single-page"
+    ),
+    # Site package ZIP export/import endpoints
+    path(
+        "site-packages/exports/",
+        SitePackageExportListView.as_view(),
+        name="site-package-export-list",
+    ),
+    path(
+        "site-packages/exports/<uuid:job_id>/",
+        SitePackageExportDetailView.as_view(),
+        name="site-package-export-detail",
+    ),
+    path(
+        "site-packages/exports/<uuid:job_id>/download/",
+        SitePackageExportDownloadView.as_view(),
+        name="site-package-export-download",
+    ),
+    path(
+        "site-packages/imports/",
+        SitePackageImportListView.as_view(),
+        name="site-package-import-list",
+    ),
+    path(
+        "site-packages/imports/<uuid:job_id>/",
+        SitePackageImportDetailView.as_view(),
+        name="site-package-import-detail",
     ),
     # Pydantic model schema endpoint for ConditionalGroupField
     re_path(
