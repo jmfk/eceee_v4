@@ -264,10 +264,6 @@ class NavbarWidget(BaseWidget):
         if not menu_items:
             return []
 
-        # Get hostname from request
-        request = context.get("request") if context else None
-        hostname = request.get_host().lower() if request else None
-
         # Get theme colors for CSS variable conversion
         theme = context.get("theme") if context else None
         theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
@@ -358,40 +354,18 @@ class NavbarWidget(BaseWidget):
                 id__in=internal_page_ids.keys(),
                 is_deleted=False,
                 is_currently_published=True,
-            ).values("id", "cached_path", "cached_root_hostnames")
+            ).values("id", "cached_path")
 
-            # Build lookup with hostname info
-            page_data = {
-                p["id"]: {
-                    "path": p["cached_path"],
-                    "hostnames": p["cached_root_hostnames"],
-                }
-                for p in page_query
-            }
+            page_paths = {p["id"]: p["cached_path"] for p in page_query}
 
             # Update processed items with resolved paths
             for page_id, indices in internal_page_ids.items():
-                data = page_data.get(page_id)
-                if data:
-                    path = data["path"]
-                    target_hostnames = data["hostnames"]
-
-                    # Check if target page is on different hostname
-                    url = path
-                    if target_hostnames and hostname:
-                        target_hostname = target_hostnames[0]
-                        if target_hostname.lower() != hostname.lower():
-                            # Build absolute URL with protocol
-                            if target_hostname.startswith(("localhost", "127.0.0.1")):
-                                protocol = "http"
-                            else:
-                                protocol = "https"
-                            url = f"{protocol}://{target_hostname}{path}"
-
+                path = page_paths.get(page_id)
+                if path is not None:
                     for idx in indices:
                         anchor = processed_items[idx].get("anchor")
                         processed_items[idx]["url"] = (
-                            f"{url}#{anchor}" if anchor else url
+                            f"{path}#{anchor}" if anchor else path
                         )
                         valid_indices.add(idx)
 
