@@ -30,7 +30,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -464,7 +464,7 @@ prepare-test-infra:
 		echo "Creating local database '$$DB_NAME'..."; \
 		docker-compose -f docker-compose.infra.yml exec -T db createdb -U postgres "$$DB_NAME"; \
 	fi; \
-	docker-compose -f docker-compose.dev.yml up -d --build backend frontend
+	docker-compose -f docker-compose.dev.yml up -d $(TEST_UP_FLAGS) backend frontend
 
 # Clear stale local Postgres collation metadata before creating Django test databases.
 refresh-db-collation: prepare-test-infra
@@ -475,7 +475,7 @@ refresh-db-collation: prepare-test-infra
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --verbosity=2 --failfast --noinput
+	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
 
 # Run frontend tests
 frontend-test: prepare-test-infra
@@ -483,6 +483,10 @@ frontend-test: prepare-test-infra
 
 # Run all tests
 test: backend-test frontend-test
+
+# Rebuild app containers before running all tests.
+test-build: TEST_UP_FLAGS=--build
+test-build: test
 
 # Test Playwright service endpoints
 playwright-test:
