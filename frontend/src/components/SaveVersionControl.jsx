@@ -120,6 +120,13 @@ const SaveVersionControl = ({
         }
     }
 
+    const saveButtonClasses = isDirty
+        ? 'bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-500'
+        : 'bg-green-600 hover:bg-green-700 focus-visible:ring-green-500'
+    const dropdownButtonClasses = isDirty
+        ? (isOpen ? 'bg-blue-700 border-blue-800 focus-visible:ring-blue-500' : 'bg-blue-600 hover:bg-blue-700 border-blue-800 focus-visible:ring-blue-500')
+        : (isOpen ? 'bg-green-700 border-green-800 focus-visible:ring-green-500' : 'bg-green-600 hover:bg-green-700 border-green-800 focus-visible:ring-green-500')
+
     // Simple save button for new pages (no dropdown)
     if (isNewPage) {
         return (
@@ -152,7 +159,7 @@ const SaveVersionControl = ({
                 <button
                     onClick={onSaveClick}
                     disabled={isSaving}
-                    className="h-6 font-medium px-2 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`h-6 font-medium px-2 text-white focus:outline-none focus-visible:ring-2 rounded-l transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${saveButtonClasses}`}
                     title={
                         isSaving
                             ? "Saving..."
@@ -179,9 +186,7 @@ const SaveVersionControl = ({
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     disabled={isSaving}
-                    className={`h-6 font-medium px-2 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-r border-l transition-colors flex items-center justify-center ${
-                        isOpen ? 'bg-blue-700 border-blue-800' : 'bg-blue-600 hover:bg-blue-700 border-blue-800'
-                    }`}
+                    className={`h-6 font-medium px-2 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 rounded-r border-l transition-colors flex items-center justify-center ${dropdownButtonClasses}`}
                     title="More options (versions, undo, save new)"
                 >
                     <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
