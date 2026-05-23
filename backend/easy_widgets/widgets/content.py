@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 from bs4 import BeautifulSoup
 import logging
+from django.core.exceptions import ValidationError
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
@@ -565,7 +566,7 @@ class ContentWidget(BaseWidget):
                         "height": media_file.height,
                     }
                 )
-        except (MediaFile.DoesNotExist, MediaCollection.DoesNotExist) as e:
+        except (MediaFile.DoesNotExist, MediaCollection.DoesNotExist, ValidationError, ValueError) as e:
             logger.error(f"Media not found: {e}")
             return None
 
