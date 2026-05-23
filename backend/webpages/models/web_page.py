@@ -1584,7 +1584,7 @@ class WebPage(models.Model):
             ),
             "page_custom_css": (
                 version_page_custom_css
-                if version_page_custom_css is not None
+                if version_page_custom_css
                 else (self.page_custom_css or "")
             ),
             # CSS injection priority: version-level setting > page-level setting
