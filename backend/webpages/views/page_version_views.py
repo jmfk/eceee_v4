@@ -291,6 +291,43 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    @action(detail=False, methods=["get"])
+    def compare(self, request):
+        """Compare two page versions."""
+        version1_id = request.query_params.get("version1")
+        version2_id = request.query_params.get("version2")
+
+        if not version1_id or not version2_id:
+            return Response(
+                {"error": "version1 and version2 query parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        accessible_versions = PageVersion.objects.select_related(
+            "page", "created_by"
+        )
+        if not request.user.is_staff:
+            now = timezone.now()
+            accessible_versions = accessible_versions.filter(
+                Q(created_by=request.user)
+                | (
+                    Q(effective_date__lte=now)
+                    & (Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+                )
+            )
+
+        version1 = get_object_or_404(accessible_versions, pk=version1_id)
+        version2 = get_object_or_404(accessible_versions, pk=version2_id)
+
+        serializer = self.get_serializer(
+            {
+                "version1": version1,
+                "version2": version2,
+                "changes": version2.compare_with(version1),
+            }
+        )
+        return Response(serializer.data)
+
     @action(detail=False, methods=["post"], url_path="pack-aggressive")
     def pack_aggressive(self, request):
         """Remove all superseded and draft versions older than current published"""
