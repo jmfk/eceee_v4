@@ -49,6 +49,8 @@ export const normalizeNavItem = (item = {}, index = 0) => {
         anchor: source.anchor || item.anchor || '',
         isPublished: source.isPublished ?? source.is_published ?? item.isPublished ?? item.is_published,
         currentVersionId: source.currentVersionId || source.current_version_id || item.currentVersionId || item.current_version_id || null,
+        _navListKey: item._navListKey,
+        _navIndex: item._navIndex,
         order,
     }
 }
@@ -56,6 +58,47 @@ export const normalizeNavItem = (item = {}, index = 0) => {
 export const processNavItems = (items = []) => {
     if (!Array.isArray(items)) return []
     return items.map((item, index) => normalizeNavItem(item, index))
+}
+
+export const processEditableNavItems = (items = [], listKey = 'menuItems') => {
+    if (!Array.isArray(items)) return []
+    return items.map((item, index) => normalizeNavItem({
+        ...item,
+        _navListKey: listKey,
+        _navIndex: index,
+    }, index))
+}
+
+export const cleanConfigNavItems = (items = []) => {
+    return items.map((item, index) => {
+        const cleanItem = { ...item }
+        delete cleanItem._navListKey
+        delete cleanItem._navIndex
+
+        if (cleanItem.linkData || cleanItem.link_data) {
+            delete cleanItem.url
+            delete cleanItem.targetBlank
+            delete cleanItem.target_blank
+            delete cleanItem.label
+            delete cleanItem.type
+            delete cleanItem.pageId
+            delete cleanItem.page_id
+            delete cleanItem.pageTitle
+            delete cleanItem.page_title
+            delete cleanItem.pageShortTitle
+            delete cleanItem.page_short_title
+            delete cleanItem.anchor
+            delete cleanItem.isPublished
+            delete cleanItem.is_published
+            delete cleanItem.currentVersionId
+            delete cleanItem.current_version_id
+        }
+
+        return {
+            ...cleanItem,
+            order: index,
+        }
+    })
 }
 
 export const itemFromStyledAnchor = (anchor, items = []) => {

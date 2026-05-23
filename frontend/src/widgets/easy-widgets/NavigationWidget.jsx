@@ -4,24 +4,25 @@ import { Menu, X } from 'lucide-react'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { prepareNavigationContext } from '../../utils/mustacheRenderer'
 import { pagesApi } from '../../api'
-import EditorNavLink, { EditorNavLinkMenu } from './EditorNavLink'
+import EditorNavLink, { EditorNavItemModal, EditorNavLinkMenu } from './EditorNavLink'
 import {
+    cleanConfigNavItems,
     isEditorNavMenuContext,
     itemFromStyledAnchor,
-    processNavItems,
+    processEditableNavItems,
 } from './editorNavLinkUtils'
 
 /**
  * Process menu items to extract link_data structure
  * Handles both new format (with link_data) and old format (direct fields)
  */
-const processMenuItems = processNavItems
+const processMenuItems = (items) => processEditableNavItems(items, 'menuItems')
 
 /**
  * EASY Navigation Widget Component
  * Renders navigation menus with dropdowns, mobile support, and branding
  */
-const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
+const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, onConfigChange }) => {
     const {
         menuItems = [],
         includeSubpages = false,
@@ -43,6 +44,7 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [componentStyleMenu, setComponentStyleMenu] = useState(null)
+    const [editingMenuItem, setEditingMenuItem] = useState(null)
     const navRef = useRef(null)
 
     // Fetch owner page data if this widget is inherited
@@ -175,6 +177,7 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
                     item={item}
                     mode={mode}
                     enableEditorMenu={shouldUseEditorNavMenus}
+                    editorActions={navEditorActions}
                     className={linkClasses}
                     onEditorAction={() => {
                         if (isInDropdown) {
@@ -200,6 +203,67 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     // Combine static and dynamic menu items (matching backend logic)
     const allItems = [...dynamicMenuItems, ...processedMenuItems]
     const hasItems = allItems.length > 0
+
+    const updateConfigList = (listKey, updater) => {
+        if (!onConfigChange || listKey !== 'menuItems') return
+
+        const currentItems = Array.isArray(config.menuItems) ? config.menuItems : []
+        const updatedItems = updater([...currentItems])
+        onConfigChange({
+            ...config,
+            menuItems: cleanConfigNavItems(updatedItems),
+        })
+    }
+
+    const navEditorActions = onConfigChange ? {
+        getListLength: (listKey) => (Array.isArray(config[listKey]) ? config[listKey].length : 0),
+        onEdit: (item) => setEditingMenuItem({ mode: 'edit', item }),
+        onAddAfter: (item) => setEditingMenuItem({ mode: 'add', item }),
+        onDelete: (item) => {
+            updateConfigList(item._navListKey, (items) => items.filter((_, index) => index !== item._navIndex))
+        },
+        onMove: (item, toIndex) => {
+            updateConfigList(item._navListKey, (items) => {
+                const fromIndex = item._navIndex
+                if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) {
+                    return items
+                }
+                const [movedItem] = items.splice(fromIndex, 1)
+                items.splice(toIndex, 0, movedItem)
+                return items
+            })
+        },
+    } : null
+
+    const handleSaveMenuItem = (linkData) => {
+        if (!editingMenuItem) return
+
+        const { item, mode: modalMode } = editingMenuItem
+        updateConfigList(item._navListKey, (items) => {
+            if (modalMode === 'add') {
+                items.splice(item._navIndex + 1, 0, { linkData })
+                return items
+            }
+
+            items[item._navIndex] = {
+                ...items[item._navIndex],
+                linkData,
+            }
+            return items
+        })
+        setEditingMenuItem(null)
+    }
+
+    const editMenuItemModal = (
+        <EditorNavItemModal
+            open={Boolean(editingMenuItem)}
+            item={editingMenuItem?.item}
+            mode={editingMenuItem?.mode}
+            context={context}
+            onClose={() => setEditingMenuItem(null)}
+            onSave={handleSaveMenuItem}
+        />
+    )
 
     const handleComponentStyleClick = (event) => {
         if (!shouldUseEditorNavMenus) return
@@ -256,8 +320,10 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
                     open={Boolean(componentStyleMenu)}
                     position={componentStyleMenu?.position}
                     onClose={() => setComponentStyleMenu(null)}
+                    editorActions={navEditorActions}
                 />
             )}
+            {editMenuItemModal}
         </>
         )
     }
@@ -265,47 +331,56 @@ const NavigationWidget = ({ config = {}, mode = 'preview', context = {}, }) => {
     // Otherwise, use React rendering (existing code)
     if (mode === 'editor') {
         return (
-            <nav className="navigation-widget">
-                <ul className="nav-container list-none m-0 p-0 flex gap-4 items-center">
-                    {hasItems ? renderMenuItems(allItems) : null}
-                </ul>
-            </nav>
+            <>
+                <nav className="navigation-widget">
+                    <ul className="nav-container list-none m-0 p-0 flex gap-4 items-center">
+                        {hasItems ? renderMenuItems(allItems) : null}
+                    </ul>
+                </nav>
+                {editMenuItemModal}
+            </>
         )
     }
 
     // Collapsed mode with hamburger menu
     if (isCollapsed) {
         return (
-            <nav ref={navRef} className="navigation-widget nav-collapsed relative">
-                <div className="flex items-center justify-between h-full">
-                    <button
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="p-2 hover:opacity-70 transition-opacity"
-                        aria-label="Toggle menu"
-                    >
-                        {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                    </button>
-                </div>
-
-                {/* Dropdown menu */}
-                {isMobileMenuOpen && hasItems && (
-                    <div className="absolute top-full left-0 w-64 bg-white shadow-lg z-50 border border-gray-200 rounded-md mt-1">
-                        <ul className="list-none m-0 p-0 py-2">
-                            {renderMenuItems(allItems, true)}
-                        </ul>
+            <>
+                <nav ref={navRef} className="navigation-widget nav-collapsed relative">
+                    <div className="flex items-center justify-between h-full">
+                        <button
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="p-2 hover:opacity-70 transition-opacity"
+                            aria-label="Toggle menu"
+                        >
+                            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                        </button>
                     </div>
-                )}
-            </nav>
+
+                    {/* Dropdown menu */}
+                    {isMobileMenuOpen && hasItems && (
+                        <div className="absolute top-full left-0 w-64 bg-white shadow-lg z-50 border border-gray-200 rounded-md mt-1">
+                            <ul className="list-none m-0 p-0 py-2">
+                                {renderMenuItems(allItems, true)}
+                            </ul>
+                        </div>
+                    )}
+                </nav>
+                {editMenuItemModal}
+            </>
         )
     }
 
     // Expanded mode
     return (
-        <nav ref={navRef} className="navigation-widget">
-            <ul className="nav-container list-none m-0 p-0 flex gap-4 items-center">
-                {hasItems ? renderMenuItems(allItems) : null}
-            </ul>
-        </nav>
+        <>
+            <nav ref={navRef} className="navigation-widget">
+                <ul className="nav-container list-none m-0 p-0 flex gap-4 items-center">
+                    {hasItems ? renderMenuItems(allItems) : null}
+                </ul>
+            </nav>
+            {editMenuItemModal}
+        </>
     )
 }
 

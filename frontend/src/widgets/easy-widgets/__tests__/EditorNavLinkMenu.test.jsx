@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import EditorNavLink from '../EditorNavLink'
 import NavigationWidget from '../NavigationWidget'
@@ -26,6 +27,20 @@ vi.mock('../../../hooks/usePageStructure', () => ({
 }))
 
 const openSpy = vi.fn()
+
+const renderWithQueryClient = (ui) => {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            queries: { retry: false },
+        },
+    })
+    const Wrapper = ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+            {children}
+        </QueryClientProvider>
+    )
+    return render(ui, { wrapper: Wrapper })
+}
 
 beforeEach(() => {
     vi.clearAllMocks()
@@ -110,6 +125,38 @@ describe('EditorNavLink', () => {
 
         expect(screen.getByRole('menuitem', { name: 'Open in new tab' })).toBeEnabled()
         expect(screen.queryByRole('menuitem', { name: 'Open preview in new tab' })).not.toBeInTheDocument()
+    })
+
+    it('shows config editing actions for editable menu items', async () => {
+        const user = userEvent.setup()
+
+        render(
+            <EditorNavLink
+                mode="editor"
+                item={{
+                    type: 'external',
+                    url: 'https://example.com',
+                    label: 'Editable External',
+                    _navListKey: 'menuItems',
+                    _navIndex: 0,
+                }}
+                editorActions={{
+                    getListLength: () => 2,
+                    onEdit: vi.fn(),
+                    onAddAfter: vi.fn(),
+                    onMove: vi.fn(),
+                    onDelete: vi.fn(),
+                }}
+            />
+        )
+
+        await user.click(screen.getByRole('link', { name: 'Editable External' }))
+
+        expect(screen.getByRole('menuitem', { name: 'Edit menu item' })).toBeEnabled()
+        expect(screen.getByRole('menuitem', { name: 'Delete menu item' })).toBeEnabled()
+        expect(screen.getByRole('menuitem', { name: 'Add new menu item after' })).toBeEnabled()
+        expect(screen.getByRole('menuitem', { name: 'Move backward' })).toBeDisabled()
+        expect(screen.getByRole('menuitem', { name: 'Move forward' })).toBeEnabled()
     })
 })
 
@@ -199,6 +246,106 @@ describe('NavigationWidget admin links', () => {
         await user.click(screen.getByRole('link', { name: 'Previewed About' }))
 
         expect(await screen.findByRole('menuitem', { name: 'Open editor here' })).toBeEnabled()
+    })
+
+    it('edits a navigation menu item from the action menu modal', async () => {
+        const user = userEvent.setup()
+        const onConfigChange = vi.fn()
+
+        renderWithQueryClient(
+            <NavigationWidget
+                mode="editor"
+                onConfigChange={onConfigChange}
+                config={{
+                    menuItems: [
+                        { linkData: { type: 'external', url: 'https://old.test', label: 'Old Label' } },
+                    ],
+                }}
+            />
+        )
+
+        await user.click(screen.getByRole('link', { name: 'Old Label' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Edit menu item' }))
+
+        const labelInput = screen.getByPlaceholderText('Menu item label')
+        await user.clear(labelInput)
+        await user.type(labelInput, 'New Label')
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({
+            menuItems: [
+                expect.objectContaining({
+                    linkData: expect.objectContaining({
+                        label: 'New Label',
+                        url: 'https://old.test',
+                    }),
+                    order: 0,
+                }),
+            ],
+        }))
+    })
+
+    it('deletes, moves, and adds navigation menu items from the action menu', async () => {
+        const user = userEvent.setup()
+        const onConfigChange = vi.fn()
+        const config = {
+            menuItems: [
+                { linkData: { type: 'external', url: 'https://one.test', label: 'One' } },
+                { linkData: { type: 'external', url: 'https://two.test', label: 'Two' } },
+            ],
+        }
+
+        const { rerender } = renderWithQueryClient(
+            <NavigationWidget
+                mode="editor"
+                onConfigChange={onConfigChange}
+                config={config}
+            />
+        )
+
+        await user.click(screen.getByRole('link', { name: 'One' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Move forward' }))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
+            menuItems: [
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'Two' }) }),
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'One' }) }),
+            ],
+        }))
+
+        rerender(
+            <NavigationWidget
+                mode="editor"
+                onConfigChange={onConfigChange}
+                config={config}
+            />
+        )
+        await user.click(screen.getByRole('link', { name: 'One' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Delete menu item' }))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
+            menuItems: [
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'Two' }) }),
+            ],
+        }))
+
+        rerender(
+            <NavigationWidget
+                mode="editor"
+                onConfigChange={onConfigChange}
+                config={config}
+            />
+        )
+        await user.click(screen.getByRole('link', { name: 'One' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Add new menu item after' }))
+        await user.type(screen.getByPlaceholderText('Menu item label'), 'Inserted')
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
+            menuItems: [
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'One' }) }),
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'Inserted' }) }),
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'Two' }) }),
+            ],
+        }))
     })
 
     it('intercepts component-style links in editor display preview mode', async () => {
@@ -313,5 +460,52 @@ describe('NavbarWidget admin links', () => {
         await user.click(screen.getByRole('link', { name: 'Preview Navbar' }))
 
         expect(screen.getByRole('menuitem', { name: 'Open in new tab' })).toBeEnabled()
+    })
+
+    it('updates primary and secondary navbar menu item lists from action menu commands', async () => {
+        const user = userEvent.setup()
+        const onConfigChange = vi.fn()
+        const config = {
+            menuItems: [
+                { linkData: { type: 'external', url: 'https://primary.test', label: 'Primary' } },
+            ],
+            secondaryMenuItems: [
+                { linkData: { type: 'external', url: 'https://secondary.test', label: 'Secondary' } },
+            ],
+        }
+
+        const { rerender } = renderWithQueryClient(
+            <NavbarWidget
+                mode="editor"
+                onConfigChange={onConfigChange}
+                config={config}
+            />
+        )
+
+        await user.click(screen.getByRole('link', { name: 'Primary' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Add new menu item after' }))
+        await user.type(screen.getByPlaceholderText('Menu item label'), 'After Primary')
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
+            menuItems: [
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'Primary' }) }),
+                expect.objectContaining({ linkData: expect.objectContaining({ label: 'After Primary' }) }),
+            ],
+        }))
+
+        rerender(
+            <NavbarWidget
+                mode="editor"
+                onConfigChange={onConfigChange}
+                config={config}
+            />
+        )
+        await user.click(screen.getByRole('link', { name: 'Secondary' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Delete menu item' }))
+
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
+            secondaryMenuItems: [],
+        }))
     })
 })
