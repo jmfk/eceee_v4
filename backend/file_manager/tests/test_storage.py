@@ -15,6 +15,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
 from unittest.mock import patch, MagicMock, Mock
 import boto3
+import uuid
 try:
     from moto import mock_aws
     MOTO_INSTALLED = True
@@ -66,10 +67,11 @@ class S3MediaStorageTest(TestCase):
             aws_access_key_id="minioadmin",
             aws_secret_access_key="minioadmin",
         )
-        conn.create_bucket(Bucket="test-bucket")
+        bucket_name = f"test-bucket-{uuid.uuid4().hex}"
+        conn.create_bucket(Bucket=bucket_name)
 
         with override_settings(
-            AWS_STORAGE_BUCKET_NAME="test-bucket",
+            AWS_STORAGE_BUCKET_NAME=bucket_name,
             AWS_S3_REGION_NAME="us-east-1",
             AWS_S3_ENDPOINT_URL="http://minio:9000",
             AWS_ACCESS_KEY_ID="minioadmin",
@@ -77,7 +79,7 @@ class S3MediaStorageTest(TestCase):
         ):
             storage = S3MediaStorage()
             self.assertIsNotNone(storage.bucket_name)
-            self.assertEqual(storage.bucket_name, "test-bucket")
+            self.assertEqual(storage.bucket_name, bucket_name)
             self.assertEqual(storage.endpoint_url, "http://minio:9000")
 
     @patch("boto3.client")
