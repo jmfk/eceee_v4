@@ -99,6 +99,7 @@ class ErrorPageValidationTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Try to create error page under child page
@@ -108,6 +109,7 @@ class ErrorPageValidationTests(TestCase):
             parent=child_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         with self.assertRaises(ValidationError) as context:
@@ -127,6 +129,7 @@ class ErrorPageValidationTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Try to create another 404 page under same root
@@ -136,6 +139,7 @@ class ErrorPageValidationTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         with self.assertRaises(ValidationError) as context:
@@ -211,6 +215,7 @@ class ErrorPageRenderingTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Publish the error page
@@ -219,7 +224,7 @@ class ErrorPageRenderingTests(TestCase):
         version = PageVersion.objects.create(
             page=error_404,
             version_number=1,
-            title="Not Found",
+            version_title="Not Found",
             created_by=self.user,
             widgets={},
             page_data={},
@@ -256,6 +261,7 @@ class ErrorPageRenderingTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         view = HostnamePageView()
@@ -275,6 +281,7 @@ class ErrorPageRenderingTests(TestCase):
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         from webpages.models import PageVersion
@@ -282,7 +289,7 @@ class ErrorPageRenderingTests(TestCase):
         version = PageVersion.objects.create(
             page=error_404,
             version_number=1,
-            title="Not Found",
+            version_title="Not Found",
             created_by=self.user,
             widgets={},
             page_data={},
