@@ -128,6 +128,8 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {}, onConfigCha
             if (!navRef.current) return
 
             const navWidth = navRef.current.offsetWidth
+            if (navWidth <= 0) return
+
             const OVERFLOW_BUTTON_WIDTH = 60 // Approximate width for "..." button
             const PADDING = 40 // Left padding
             const RIGHT_PADDING = 20 // Right padding
