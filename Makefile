@@ -504,7 +504,7 @@ lint:
 
 # Start all services with Docker Compose
 docker-up: infra-up
-	docker-compose -f docker-compose.dev.yml up --build
+	docker-compose -f docker-compose.dev.yml up --build backend frontend celery-worker
 
 # Stop all Docker Compose services
 docker-down:
