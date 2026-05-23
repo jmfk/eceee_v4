@@ -4,7 +4,7 @@ services:
     image: postgres:15-alpine
     platform: linux/arm64
     container_name: eceee-v4-db
-    restart: unless-stopped
+    restart: "no"
     environment:
       POSTGRES_DB: eceee_v4
       POSTGRES_USER: postgres
@@ -26,7 +26,7 @@ services:
     image: redis:7-alpine
     platform: linux/arm64
     container_name: eceee-v4-redis
-    restart: unless-stopped
+    restart: "no"
     ports:
       - "6379:6379" # Exposed for shared access by other repositories
     volumes:
@@ -42,7 +42,7 @@ services:
     image: minio/minio:latest
     platform: linux/arm64
     container_name: eceee-v4-minio
-    restart: unless-stopped
+    restart: "no"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -63,7 +63,7 @@ services:
     image: darthsim/imgproxy:latest
     platform: linux/arm64
     container_name: eceee-v4-imgproxy
-    restart: unless-stopped
+    restart: "no"
     environment:
       IMGPROXY_ALLOW_UNSAFE_URL: true
       IMGPROXY_KEY: 943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
@@ -109,4 +109,3 @@ volumes:
 networks:
   default:
     # name: eceee_shared_network
-

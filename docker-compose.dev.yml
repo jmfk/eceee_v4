@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     image: ${BACKEND_IMAGE:-eceee-v4-backend}:latest
     container_name: ${BACKEND_CONTAINER_NAME:-eceee-v4-backend}
-    restart: unless-stopped
+    restart: "no"
     environment:
       - DEBUG=1
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@eceee-v4-db:5432/eceee_v4}
@@ -65,7 +65,7 @@ services:
       target: development
     image: ${FRONTEND_IMAGE:-eceee-v4-frontend}:latest
     container_name: ${FRONTEND_CONTAINER_NAME:-eceee-v4-frontend}
-    restart: unless-stopped
+    restart: "no"
     environment:
       - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000/api}
       - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-http://localhost:8000}
@@ -96,7 +96,7 @@ services:
       dockerfile: Dockerfile
     image: ${THEME_SYNC_IMAGE:-eceee-v4-theme-sync}:latest
     container_name: ${THEME_SYNC_CONTAINER_NAME:-eceee-v4-theme-sync}
-    restart: unless-stopped
+    restart: "no"
     networks:
       - default
       # - eceee_shared
