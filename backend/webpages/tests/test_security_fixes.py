@@ -523,6 +523,10 @@ class EnhancedSecurityTest(TestCase):
         logger.setLevel(logging.CRITICAL)
 
         try:
+            from django.core.cache import cache
+
+            cache.delete(self.middleware.get_cache_key())
+
             # Mock database failure
             with patch("webpages.models.WebPage.get_all_hostnames") as mock_get:
                 mock_get.side_effect = Exception("Database error")
