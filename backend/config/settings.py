@@ -274,12 +274,24 @@ DATABASES = {
     }
 }
 
-# Use SQLite for tests to avoid Postgres collation issues in Docker
-if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DJANGO_TESTING") or "test" in sys.argv or "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv):
+# Use SQLite for tests by default to avoid Postgres collation issues in Docker.
+# Set DJANGO_TEST_DATABASE=postgres for suites that need Postgres-specific schema
+# support, such as ArrayField migrations.
+IS_TEST_RUN = (
+    os.environ.get("PYTEST_CURRENT_TEST")
+    or os.environ.get("DJANGO_TESTING")
+    or "test" in sys.argv
+    or "pytest" in sys.modules
+    or any("pytest" in arg for arg in sys.argv)
+)
+
+if IS_TEST_RUN and os.environ.get("DJANGO_TEST_DATABASE", "sqlite").lower() == "sqlite":
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
+
+if IS_TEST_RUN:
     # Speed up tests with faster password hashing
     PASSWORD_HASHERS = [
         "django.contrib.auth.hashers.MD5PasswordHasher",

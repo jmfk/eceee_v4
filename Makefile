@@ -30,7 +30,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -445,9 +445,16 @@ prod-explain-image-problem: ## Debug imgproxy 403 for a URL (use: make prod-expl
 shell:
 	docker-compose -f docker-compose.dev.yml exec backend bash
 
+# Clear stale local Postgres collation metadata before creating Django test databases.
+refresh-db-collation:
+	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
+	DB_NAME=$${DB_NAME:-eceee_v4}; \
+	docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -v db_name="$$DB_NAME" \
+		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', :'db_name') AND datcollversion IS NOT NULL;" >/dev/null
+
 # Run backend tests
-backend-test:
-	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_SETTINGS_MODULE=config.settings_test backend python -m pytest
+backend-test: refresh-db-collation
+	docker-compose -f docker-compose.dev.yml exec -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test
 
 # Run frontend tests
 frontend-test:
