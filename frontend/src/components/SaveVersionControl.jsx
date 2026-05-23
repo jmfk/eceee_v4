@@ -151,17 +151,14 @@ const SaveVersionControl = ({
                 {/* Main save button */}
                 <button
                     onClick={onSaveClick}
-                    disabled={isSaving || (!isDirty && !isNewPage)}
-                    className={`h-6 font-medium px-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 ${isDirty || isNewPage ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
-                        }`}
+                    disabled={isSaving}
+                    className="h-6 font-medium px-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={
                         isSaving
                             ? "Saving..."
-                            : !isDirty && !isNewPage
-                                ? "No changes to save"
-                                : validationState.hasErrors
-                                    ? "Save changes (validation errors will be handled)"
-                                    : "Update current version"
+                            : validationState.hasErrors
+                                ? "Save changes (validation errors will be handled)"
+                                : "Update current version"
                     }
                 >
                     {isSaving ? (
@@ -183,9 +180,7 @@ const SaveVersionControl = ({
                     onClick={() => setIsOpen(!isOpen)}
                     disabled={isSaving}
                     className={`h-6 font-medium px-2 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none rounded-r border-l transition-colors flex items-center justify-center ${
-                        isDirty || isNewPage 
-                            ? (isOpen ? 'bg-blue-700 border-blue-800' : 'bg-blue-600 hover:bg-blue-700 border-blue-800') 
-                            : 'bg-gray-400 border-gray-500'
+                        isOpen ? 'bg-blue-700 border-blue-800' : 'bg-blue-600 hover:bg-blue-700 border-blue-800'
                     }`}
                     title="More options (versions, undo, save new)"
                 >
@@ -286,4 +281,3 @@ const SaveVersionControl = ({
 }
 
 export default SaveVersionControl
-
