@@ -80,13 +80,31 @@ class Namespace(models.Model):
         if not default:
             default = cls.objects.filter(is_active=True).first()
             if not default:
+                user = User.objects.first()
+                if not user:
+                    user = User.objects.create_user(
+                        username="system",
+                        email="system@localhost",
+                    )
+
+                from core.models import Tenant
+
+                tenant, _ = Tenant.objects.get_or_create(
+                    identifier="default",
+                    defaults={
+                        "name": "Default Tenant",
+                        "created_by": user,
+                    },
+                )
+
                 # Create a default namespace if none exists
                 default = cls.objects.create(
                     name="Default",
                     slug="default",
                     description="Default namespace for content",
                     is_default=True,
-                    created_by=User.objects.first() if User.objects.exists() else None,
+                    created_by=user,
+                    tenant=tenant,
                 )
         return default
 
