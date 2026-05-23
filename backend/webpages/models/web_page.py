@@ -737,7 +737,7 @@ class WebPage(models.Model):
             )
 
         # Validate site_icon assignment
-        if self.site_icon and self.parent is not None:
+        if getattr(self, "site_icon", None) and self.parent is not None:
             raise ValidationError(
                 "Only root pages (pages without a parent) can have a site icon."
             )
