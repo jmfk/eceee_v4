@@ -24,7 +24,7 @@ services:
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
       - AWS_STORAGE_BUCKET_NAME=eceee-media
-      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:9002}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:9000}
       - AWS_S3_INTERNAL_ENDPOINT_URL=${AWS_S3_INTERNAL_ENDPOINT_URL:-http://eceee-v4-minio:9000}
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False
@@ -116,7 +116,7 @@ services:
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
       - AWS_STORAGE_BUCKET_NAME=eceee-media
-      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:9002}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:9000}
       - AWS_S3_INTERNAL_ENDPOINT_URL=${AWS_S3_INTERNAL_ENDPOINT_URL:-http://eceee-v4-minio:9000}
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False

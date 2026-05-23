@@ -340,3 +340,44 @@ class StorageConfigurationTest(TestCase):
         # Verify secure defaults
         self.assertEqual(storage.default_acl, "private")
         self.assertFalse(storage.file_overwrite)
+
+    @patch("boto3.client")
+    def test_signed_urls_use_public_endpoint_when_internal_endpoint_is_configured(self, mock_boto):
+        """Presigned browser URLs should not expose Docker-only hostnames."""
+        internal_client = MagicMock()
+        public_client = MagicMock()
+        public_client.generate_presigned_url.return_value = (
+            "http://localhost:9000/eceee-media/uploads/test.jpg?X-Amz-Signature=test"
+        )
+        mock_boto.side_effect = [internal_client, public_client]
+
+        with override_settings(
+            AWS_STORAGE_BUCKET_NAME="eceee-media",
+            AWS_S3_ENDPOINT_URL="http://localhost:9000",
+            AWS_S3_INTERNAL_ENDPOINT_URL="http://eceee-v4-minio:9000",
+            AWS_S3_REGION_NAME="us-east-1",
+            AWS_ACCESS_KEY_ID="minioadmin",
+            AWS_SECRET_ACCESS_KEY="minioadmin",
+        ):
+            storage = S3MediaStorage()
+            signed_url = storage.generate_signed_url("uploads/test.jpg")
+
+        self.assertEqual(storage.client, internal_client)
+        self.assertEqual(storage.presign_client, public_client)
+        self.assertEqual(
+            signed_url,
+            "http://localhost:9000/eceee-media/uploads/test.jpg?X-Amz-Signature=test",
+        )
+        self.assertEqual(
+            mock_boto.call_args_list[0].kwargs["endpoint_url"],
+            "http://eceee-v4-minio:9000",
+        )
+        self.assertEqual(
+            mock_boto.call_args_list[1].kwargs["endpoint_url"],
+            "http://localhost:9000",
+        )
+        public_client.generate_presigned_url.assert_called_once_with(
+            "get_object",
+            Params={"Bucket": "eceee-media", "Key": "uploads/test.jpg"},
+            ExpiresIn=3600,
+        )

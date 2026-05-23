@@ -654,7 +654,9 @@ use-external-infra: ## Update .env to use the shared infrastructure from the oth
 		sed -i '' 's/eceee_v4_db/eceee-v4-db/g' .env; \
 		sed -i '' 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
 		sed -i '' 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
-		sed -i '' 's/AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
+		sed -i '' 's/^AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i '' 's/^AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i '' 's/^AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
 	else \
 		sed -i 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
 		sed -i 's/@db:5432/@eceee-v4-db:5432/' .env; \
@@ -663,7 +665,9 @@ use-external-infra: ## Update .env to use the shared infrastructure from the oth
 		sed -i 's/eceee_v4_db/eceee-v4-db/g' .env; \
 		sed -i 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
 		sed -i 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
-		sed -i 's/AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
+		sed -i 's/^AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i 's/^AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i 's/^AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
 	fi
 	@# Check if summerstudy is in /etc/hosts and update if so
 	@if grep -q "summerstudy" /etc/hosts; then \

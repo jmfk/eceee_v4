@@ -73,22 +73,30 @@ class S3MediaStorage(Storage):
             s3={"addressing_style": self.addressing_style},
         )
 
-        self.client = boto3.client(
+        self.client = self._create_client(self.internal_endpoint_url, s3_config)
+        if self.endpoint_url and self.endpoint_url != self.internal_endpoint_url:
+            self.presign_client = self._create_client(self.endpoint_url, s3_config)
+        else:
+            self.presign_client = self.client
+
+    def _create_client(self, endpoint_url, s3_config):
+        """Create an S3 client for either internal IO or browser-facing URL signing."""
+        return boto3.client(
             "s3",
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
             region_name=self.region_name,
-            endpoint_url=self.internal_endpoint_url,
+            endpoint_url=endpoint_url,
             config=s3_config,
         )
 
     def make_public(self, name):
         """
         Set an existing file to public-read ACL.
-        
+
         Args:
             name: File name or path
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -118,7 +126,7 @@ class S3MediaStorage(Storage):
         This is the preferred way for Linode and modern MinIO.
         """
         import json
-        
+
         policy = {
             "Version": "2012-10-17",
             "Statement": [
@@ -130,7 +138,7 @@ class S3MediaStorage(Storage):
                 }
             ]
         }
-        
+
         try:
             self.client.put_bucket_policy(
                 Bucket=self.bucket_name,
@@ -506,7 +514,7 @@ class S3MediaStorage(Storage):
         """
         key = self._get_key(name)
         try:
-            url = self.client.generate_presigned_url(
+            url = self.presign_client.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": self.bucket_name, "Key": key},
                 ExpiresIn=expires,
@@ -515,6 +523,10 @@ class S3MediaStorage(Storage):
         except ClientError as e:
             logger.error(f"Failed to generate signed URL for {name}: {e}")
             raise
+
+    def generate_presigned_url(self, name: str, expiration: int = 3600) -> str:
+        """Backward-compatible alias for generate_signed_url."""
+        return self.generate_signed_url(name, expires=expiration)
 
     def validate_file_type(self, file: UploadedFile) -> bool:
         """
