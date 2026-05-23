@@ -1423,7 +1423,16 @@ class WebPage(models.Model):
         """Get the canonical URL for this page"""
         return self.get_absolute_url()
 
-    def create_version(self, user, version_title=""):
+    def create_version(
+        self,
+        user,
+        version_title="",
+        status=None,
+        auto_publish=False,
+        effective_date=None,
+        expiry_date=None,
+        **kwargs,
+    ):
         """Create a new version snapshot of the current page state"""
         from django.utils import timezone
 
@@ -1474,6 +1483,17 @@ class WebPage(models.Model):
                 version_title=version_title,
                 page_data={},
                 widgets=widgets_data,
+                effective_date=(
+                    effective_date
+                    or (
+                        timezone.now()
+                        if auto_publish or status == "published"
+                        else None
+                    )
+                ),
+                expiry_date=expiry_date,
+                change_summary=kwargs.get("description")
+                or kwargs.get("change_summary", ""),
                 created_by=user,
             )
             return version
