@@ -6,6 +6,7 @@ behaves correctly and matches the canonical test cases.
 """
 
 import json
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 from webpages.models import WebPage, PageVersion
@@ -33,12 +34,15 @@ class InheritanceTreeTest(TestCase):
         # Create Home page (root)
         self.home_page = WebPage.objects.create(
             title="Home", slug="home", parent=None, hostnames=["localhost:8000"],
-            tenant=self.tenant
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
         )
         home_version = PageVersion.objects.create(
             page=self.home_page,
             version_number=1,
             effective_date=timezone.now(),
+            created_by=self.user,
             widgets={
                 "header": [
                     {
@@ -68,12 +72,15 @@ class InheritanceTreeTest(TestCase):
         # Create About page (child of Home)
         self.about_page = WebPage.objects.create(
             title="About", slug="about", parent=self.home_page,
-            tenant=self.tenant
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
         )
         about_version = PageVersion.objects.create(
             page=self.about_page,
             version_number=1,
             effective_date=timezone.now(),
+            created_by=self.user,
             widgets={
                 "main": [
                     {
@@ -103,12 +110,15 @@ class InheritanceTreeTest(TestCase):
         # Create History page (child of About)
         self.history_page = WebPage.objects.create(
             title="History", slug="history", parent=self.about_page,
-            tenant=self.tenant
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
         )
         history_version = PageVersion.objects.create(
             page=self.history_page,
             version_number=1,
             effective_date=timezone.now(),
+            created_by=self.user,
             widgets={
                 "main": [
                     {
