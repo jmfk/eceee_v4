@@ -196,6 +196,86 @@ class SitePackageServiceTests(TestCase):
         self.assertTrue(imported_version.effective_date)
         self.assertIn("/media/", json.dumps(imported_version.widgets))
 
+    def test_import_remaps_exported_page_and_version_ids_inside_json(self):
+        child_version = PageVersion.objects.create(
+            page=self.child,
+            version_number=1,
+            page_data={"title": "Child"},
+            widgets={},
+            created_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=self.root,
+            version_number=1,
+            effective_date=timezone.now() - timedelta(days=1),
+            page_data={
+                "featuredLink": {
+                    "type": "internal",
+                    "page_id": self.child.id,
+                    "current_version_id": child_version.id,
+                }
+            },
+            widgets={
+                "main": [
+                    {
+                        "type": "Navigation",
+                        "data": {
+                            "menu_items": [
+                                {
+                                    "link_data": {
+                                        "type": "internal",
+                                        "label": "Child",
+                                        "pageId": self.child.id,
+                                        "currentVersionId": child_version.id,
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                ]
+            },
+            created_by=self.user,
+        )
+        export_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT,
+            root_page=self.root,
+            created_by=self.user,
+            options={"include_media": False, "include_themes": False},
+        )
+        storage = MemoryStorage()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            SitePackageExporter(export_job, storage=storage).write_package(
+                package, self.root, include_media=False, include_themes=False
+            )
+        buffer.seek(0)
+
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id)},
+        )
+        with zipfile.ZipFile(buffer, "r") as package:
+            imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
+
+        imported_child = imported_root.children.get(title="Child")
+        imported_root_version = imported_root.versions.get(version_number=1)
+        imported_child_version = imported_child.versions.get(version_number=1)
+        imported_link = imported_root_version.widgets["main"][0]["data"]["menu_items"][0]["link_data"]
+
+        self.assertNotEqual(imported_child.id, self.child.id)
+        self.assertEqual(imported_root_version.page_data["featuredLink"]["page_id"], imported_child.id)
+        self.assertEqual(
+            imported_root_version.page_data["featuredLink"]["current_version_id"],
+            imported_child_version.id,
+        )
+        self.assertEqual(imported_link["pageId"], imported_child.id)
+        self.assertEqual(imported_link["currentVersionId"], imported_child_version.id)
+        self.assertEqual(
+            import_job.progress["object_maps"]["pages"][str(self.child.id)],
+            imported_child.id,
+        )
+
 
 class FakeMultipartClient:
     def __init__(self):
@@ -295,9 +375,7 @@ class SitePackageAPITests(APITestCase):
             root_page=self.root,
             created_by=self.user,
         )
-        response = self.client.get(
-            f"/api/v1/webpages/site-packages/exports/{job.id}/download/"
-        )
+        response = self.client.get(f"/api/v1/webpages/site-packages/exports/{job.id}/download/")
         self.assertEqual(response.status_code, 409)
 
     @patch("webpages.views.site_package_views.import_site_package.delay")

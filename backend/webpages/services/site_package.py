@@ -24,9 +24,31 @@ from file_manager.models import MediaFile
 from file_manager.storage import S3MediaStorage
 from webpages.models import PageTheme, PageVersion, SitePackageJob, WebPage
 
-
 PACKAGE_VERSION = "1.0"
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+PAGE_REFERENCE_KEYS = {
+    "pageId",
+    "page_id",
+    "parentPageId",
+    "parent_page_id",
+    "rootPageId",
+    "root_page_id",
+    "siteRootId",
+    "site_root_id",
+}
+PAGE_REFERENCE_LIST_KEYS = {"pageIds", "page_ids"}
+VERSION_REFERENCE_KEYS = {
+    "versionId",
+    "version_id",
+    "currentVersionId",
+    "current_version_id",
+    "publishedVersionId",
+    "published_version_id",
+}
+VERSION_REFERENCE_LIST_KEYS = {"versionIds", "version_ids"}
+THEME_REFERENCE_KEYS = {"themeId", "theme_id"}
+MEDIA_REFERENCE_KEYS = {"mediaId", "media_id", "fileId", "file_id"}
+MEDIA_REFERENCE_LIST_KEYS = {"mediaIds", "media_ids", "fileIds", "file_ids"}
 
 
 class MultipartUploadWriter(io.RawIOBase):
@@ -137,6 +159,78 @@ def _replace_in_json(value: Any, replacements: Dict[str, str]) -> Any:
         return {key: _replace_in_json(item, replacements) for key, item in value.items()}
     if isinstance(value, list):
         return [_replace_in_json(item, replacements) for item in value]
+    return value
+
+
+def _remap_reference_value(value: Any, reference_map: Dict[str, Any]) -> Any:
+    if value is None:
+        return value
+    return reference_map.get(str(value), value)
+
+
+def _remap_reference_collection(value: Any, reference_map: Dict[str, Any]) -> Any:
+    if isinstance(value, list):
+        return [_remap_reference_value(item, reference_map) for item in value]
+    return _remap_reference_value(value, reference_map)
+
+
+def _remap_structured_references(
+    value: Any,
+    *,
+    page_map: Optional[Dict[str, int]] = None,
+    version_map: Optional[Dict[str, int]] = None,
+    theme_map: Optional[Dict[str, int]] = None,
+    media_map: Optional[Dict[str, str]] = None,
+) -> Any:
+    """
+    Rewrite exported database ids inside known JSON reference fields.
+
+    Site packages cannot preserve integer primary keys across databases, so JSON
+    config needs a targeted pass for shapes like internal links
+    ({type: "internal", pageId: 123}) without touching unrelated numeric values.
+    """
+    page_map = page_map or {}
+    version_map = version_map or {}
+    theme_map = theme_map or {}
+    media_map = media_map or {}
+
+    if isinstance(value, dict):
+        remapped = {}
+        for key, item in value.items():
+            if key in PAGE_REFERENCE_KEYS:
+                remapped[key] = _remap_reference_value(item, page_map)
+            elif key in PAGE_REFERENCE_LIST_KEYS:
+                remapped[key] = _remap_reference_collection(item, page_map)
+            elif key in VERSION_REFERENCE_KEYS:
+                remapped[key] = _remap_reference_value(item, version_map)
+            elif key in VERSION_REFERENCE_LIST_KEYS:
+                remapped[key] = _remap_reference_collection(item, version_map)
+            elif key in THEME_REFERENCE_KEYS:
+                remapped[key] = _remap_reference_value(item, theme_map)
+            elif key in MEDIA_REFERENCE_KEYS:
+                remapped[key] = _remap_reference_value(item, media_map)
+            elif key in MEDIA_REFERENCE_LIST_KEYS:
+                remapped[key] = _remap_reference_collection(item, media_map)
+            else:
+                remapped[key] = _remap_structured_references(
+                    item,
+                    page_map=page_map,
+                    version_map=version_map,
+                    theme_map=theme_map,
+                    media_map=media_map,
+                )
+        return remapped
+    if isinstance(value, list):
+        return [
+            _remap_structured_references(
+                item,
+                page_map=page_map,
+                version_map=version_map,
+                theme_map=theme_map,
+                media_map=media_map,
+            )
+            for item in value
+        ]
     return value
 
 
@@ -321,11 +415,7 @@ class SitePackageExporter:
 
         media_ids = self._collect_media_ids(selected_versions) if include_media else set()
         media_files = list(MediaFile.objects.filter(id__in=media_ids).order_by("id"))
-        themes = (
-            list(PageTheme.objects.filter(id__in=theme_ids).order_by("id"))
-            if include_themes
-            else []
-        )
+        themes = list(PageTheme.objects.filter(id__in=theme_ids).order_by("id")) if include_themes else []
 
         _write_json(package, "pages.json", {"pages": pages_payload})
         self._write_themes(package, themes)
@@ -368,9 +458,7 @@ class SitePackageExporter:
         while queue:
             page = queue.pop(0)
             collected.append(page)
-            queue.extend(
-                page.children.filter(is_deleted=False).order_by("sort_order", "id")
-            )
+            queue.extend(page.children.filter(is_deleted=False).order_by("sort_order", "id"))
         return collected
 
     def _select_versions(self, page: WebPage) -> List[PageVersion]:
@@ -402,10 +490,7 @@ class SitePackageExporter:
                     candidates.add(str(match).lower())
         if not candidates:
             return set()
-        return set(
-            str(value)
-            for value in MediaFile.objects.filter(id__in=candidates).values_list("id", flat=True)
-        )
+        return set(str(value) for value in MediaFile.objects.filter(id__in=candidates).values_list("id", flat=True))
 
     def _write_themes(self, package: zipfile.ZipFile, themes: List[PageTheme]):
         storage = self.storage
@@ -490,6 +575,8 @@ class SitePackageImporter:
 
         tenant = self._destination_tenant()
         page_map: Dict[int, WebPage] = {}
+        imported_versions: List[PageVersion] = []
+        version_map: Dict[int, PageVersion] = {}
         imported_root = None
 
         for page_data in pages_payload:
@@ -515,14 +602,30 @@ class SitePackageImporter:
             if parent is None:
                 imported_root = page
 
+        page_reference_map = {str(source_id): page.id for source_id, page in page_map.items()}
+        theme_reference_map = {str(source_id): theme.id for source_id, theme in theme_map.items()}
+        media_reference_map = {str(source_id): str(media.id) for source_id, media in media_map.items()}
+
         for page_data in pages_payload:
             page = page_map[page_data["source_id"]]
             for version_data in page_data.get("versions", []):
                 theme = theme_map.get(version_data.get("theme_source_id"))
-                preserve_publication = (self.job.options or {}).get(
-                    "preserve_publication_status", True
+                preserve_publication = (self.job.options or {}).get("preserve_publication_status", True)
+                page_data_payload = _replace_in_json(version_data.get("page_data", {}), replacements)
+                widgets_payload = _replace_in_json(version_data.get("widgets", {}), replacements)
+                page_data_payload = _remap_structured_references(
+                    page_data_payload,
+                    page_map=page_reference_map,
+                    theme_map=theme_reference_map,
+                    media_map=media_reference_map,
                 )
-                PageVersion.objects.create(
+                widgets_payload = _remap_structured_references(
+                    widgets_payload,
+                    page_map=page_reference_map,
+                    theme_map=theme_reference_map,
+                    media_map=media_reference_map,
+                )
+                imported_version = PageVersion.objects.create(
                     page=page,
                     version_number=version_data["version_number"],
                     version_title=version_data.get("version_title", ""),
@@ -530,28 +633,58 @@ class SitePackageImporter:
                     meta_title=version_data.get("meta_title", ""),
                     meta_description=version_data.get("meta_description", ""),
                     code_layout=version_data.get("code_layout", ""),
-                    page_data=_replace_in_json(version_data.get("page_data", {}), replacements),
-                    widgets=_replace_in_json(version_data.get("widgets", {}), replacements),
+                    page_data=page_data_payload,
+                    widgets=widgets_payload,
                     theme=theme,
                     page_css_variables=version_data.get("page_css_variables", {}),
                     page_custom_css=version_data.get("page_custom_css", ""),
                     enable_css_injection=version_data.get("enable_css_injection", True),
                     effective_date=(
-                        self._parse_datetime(version_data.get("effective_date"))
-                        if preserve_publication
-                        else None
+                        self._parse_datetime(version_data.get("effective_date")) if preserve_publication else None
                     ),
                     expiry_date=(
-                        self._parse_datetime(version_data.get("expiry_date"))
-                        if preserve_publication
-                        else None
+                        self._parse_datetime(version_data.get("expiry_date")) if preserve_publication else None
                     ),
                     tags=version_data.get("tags", []),
                     created_by=self.job.created_by,
                 )
+                imported_versions.append(imported_version)
+                version_map[version_data["source_id"]] = imported_version
+
+        if version_map:
+            version_reference_map = {str(source_id): version.id for source_id, version in version_map.items()}
+            for imported_version in imported_versions:
+                page_data_payload = _remap_structured_references(
+                    imported_version.page_data,
+                    page_map=page_reference_map,
+                    version_map=version_reference_map,
+                    theme_map=theme_reference_map,
+                    media_map=media_reference_map,
+                )
+                widgets_payload = _remap_structured_references(
+                    imported_version.widgets,
+                    page_map=page_reference_map,
+                    version_map=version_reference_map,
+                    theme_map=theme_reference_map,
+                    media_map=media_reference_map,
+                )
+                if page_data_payload != imported_version.page_data or widgets_payload != imported_version.widgets:
+                    imported_version.page_data = page_data_payload
+                    imported_version.widgets = widgets_payload
+                    imported_version.save(update_fields=["page_data", "widgets", "updated_at"])
 
         if not imported_root:
             raise ValueError("Package did not contain a root page")
+        self.job.progress = {
+            **(self.job.progress or {}),
+            "object_maps": {
+                "pages": {str(source_id): page.id for source_id, page in page_map.items()},
+                "versions": {str(source_id): version.id for source_id, version in version_map.items()},
+                "themes": {str(source_id): theme.id for source_id, theme in theme_map.items()},
+                "media": {str(source_id): str(media.id) for source_id, media in media_map.items()},
+            },
+        }
+        self.job.save(update_fields=["progress", "updated_at"])
         return imported_root
 
     def _parse_datetime(self, value):
@@ -610,17 +743,40 @@ class SitePackageImporter:
 
     def _restore_theme_assets(self, package, theme: PageTheme, data: Dict[str, Any]):
         prefix = f"themes/assets/{data['source_id']}/"
+        asset_replacements = {}
         for name in package.namelist():
             if not name.startswith(prefix) or name.endswith("/"):
                 continue
-            original_path = name[len(prefix):]
+            original_path = name[len(prefix) :]
             content = package.read(name)
             new_path = f"theme_images/{theme.id}/library/{os.path.basename(original_path)}"
             self.storage._save(new_path, ContentFile(content))
+            asset_replacements[original_path] = new_path
             if original_path == data.get("image"):
                 theme.image.name = new_path
             if original_path == data.get("site_icon"):
                 theme.site_icon.name = new_path
+
+        if asset_replacements:
+            for field_name in (
+                "fonts",
+                "colors",
+                "design_groups",
+                "component_styles",
+                "image_styles",
+                "gallery_styles",
+                "carousel_styles",
+                "table_templates",
+                "breakpoints",
+                "css_variables",
+                "html_elements",
+            ):
+                setattr(
+                    theme,
+                    field_name,
+                    _replace_in_json(getattr(theme, field_name), asset_replacements),
+                )
+            theme.custom_css = _replace_in_json(theme.custom_css, asset_replacements)
         theme.save()
 
     def _import_media(self, package: zipfile.ZipFile) -> Dict[str, MediaFile]:
@@ -650,7 +806,9 @@ class SitePackageImporter:
                 original_filename=data.get("original_filename", os.path.basename(new_path)),
                 file_path=new_path,
                 file_size=data.get("file_size") or len(content),
-                content_type=data.get("content_type") or mimetypes.guess_type(new_path)[0] or "application/octet-stream",
+                content_type=data.get("content_type")
+                or mimetypes.guess_type(new_path)[0]
+                or "application/octet-stream",
                 file_hash=data["file_hash"],
                 file_type=data.get("file_type", "other"),
                 width=data.get("width"),
