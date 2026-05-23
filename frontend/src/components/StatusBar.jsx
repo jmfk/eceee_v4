@@ -7,6 +7,7 @@ import SaveVersionControl from './SaveVersionControl'
 
 const StatusBar = ({
     customStatusContent = null,
+    stickyStatusContent = null,
     className = "",
     // Version management props
     currentVersion = null,
@@ -241,6 +242,12 @@ const StatusBar = ({
                     )}
                 </div>
 
+                {stickyStatusContent && (
+                    <div className="flex items-center flex-shrink-0 ml-4">
+                        {stickyStatusContent}
+                    </div>
+                )}
+
                 {/* Clipboard Indicator - Always Visible Three States */}
                 <div className={`flex items-center space-x-2 px-3 py-1 border rounded text-xs flex-shrink-0 ml-4 transition-all ${
                     !clipboardData || !clipboardData.data || clipboardData.data.length === 0
@@ -305,4 +312,4 @@ const StatusBar = ({
     )
 }
 
-export default StatusBar 
+export default StatusBar

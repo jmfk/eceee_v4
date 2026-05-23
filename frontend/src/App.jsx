@@ -154,6 +154,19 @@ const ContextMenuToggle = () => {
   )
 }
 
+const GitHashBadge = () => {
+  const commitHash = import.meta.env.VITE_GIT_COMMIT_HASH?.trim()
+
+  return (
+    <span
+      className="inline-flex items-center rounded border border-gray-200 bg-gray-50 px-2 py-0.5 font-mono text-xs text-gray-600"
+      title={commitHash ? `Git commit ${commitHash}` : 'Git commit hash unavailable'}
+    >
+      Git {commitHash || 'unknown'}
+    </span>
+  )
+}
+
 const AppRoutes = () => {
   useAutoPageTitle()
 
@@ -208,7 +221,10 @@ const AppRoutes = () => {
                   </div>
                 </div>
               </main>
-              <StatusBar customStatusContent={<span>Pages Management - Ready</span>} />
+              <StatusBar
+                customStatusContent={<span>Pages Management - Ready</span>}
+                stickyStatusContent={<GitHashBadge />}
+              />
             </div>
           </PrivateRoute>
         } />

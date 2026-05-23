@@ -76,6 +76,7 @@ services:
       - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://backend:8000}
       - VITE_IMGPROXY_URL=http://localhost:8080
       - VITE_ENABLE_CONTEXT_MENU_TOGGLE=true
+      - VITE_GIT_COMMIT_HASH=${VITE_GIT_COMMIT_HASH:-}
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
     networks:
@@ -86,6 +87,7 @@ services:
     volumes:
       - ./frontend:/app
       - ./docs:/docs:ro
+      - ./.git:/repo/.git:ro
       - frontend_node_modules:/app/node_modules
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

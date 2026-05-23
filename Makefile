@@ -170,7 +170,7 @@ backend:
 frontend:
 	@FP=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
 	 echo "🚀 Starting Frontend on http://localhost:$$FP (internal: 3000)"; \
-	 docker-compose -f docker-compose.dev.yml up frontend
+	 VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up frontend
 
 # Run Playwright website rendering service
 playwright-service:
@@ -504,7 +504,7 @@ lint:
 
 # Start all services with Docker Compose
 docker-up: infra-up
-	docker-compose -f docker-compose.dev.yml up --build backend frontend celery-worker
+	VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up --build backend frontend celery-worker
 
 # Stop all Docker Compose services
 docker-down:
