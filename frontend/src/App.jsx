@@ -290,6 +290,13 @@ const AppRoutes = () => {
             </SettingsLayout>
           </PrivateRoute>
         } />
+        <Route path="/settings/themes/:themeId/images/:imageFilename" element={
+          <PrivateRoute>
+            <SettingsLayout>
+              <SettingsManager />
+            </SettingsLayout>
+          </PrivateRoute>
+        } />
         <Route path="/settings/themes/:themeId/:tab" element={
           <PrivateRoute>
             <SettingsLayout>

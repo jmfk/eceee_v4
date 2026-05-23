@@ -23,7 +23,7 @@
         @click.away="isOverflowMenuOpen = false; isMobileMenuOpen = false"
     >
         <!-- Hamburger menu mode (mobile) -->
-        <div x-show="showHamburger" class="navbar-hamburger-mode" style="display: flex; align-items: center; height: 100%; padding: 0 20px; justify-content: space-between;">
+        <div x-cloak x-show="showHamburger" class="navbar-hamburger-mode" style="display: flex; align-items: center; height: 100%; padding: 0 20px; justify-content: space-between;">
             <button 
                 @click="isMobileMenuOpen = !isMobileMenuOpen"
                 style="color: white; background: none; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center;"
@@ -42,7 +42,8 @@
         </div>
 
         <!-- Mobile slide-out menu -->
-        <div 
+        <div
+            x-cloak
             x-show="showHamburger && isMobileMenuOpen" 
             x-transition
             style="position: absolute; top: 100%; left: 0; width: 16rem; background: white; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 50; border: 1px solid #e5e7eb;"
@@ -96,7 +97,8 @@
         </div>
 
         <!-- Desktop mode with overflow menu -->
-        <div 
+        <div
+            x-cloak
             :style="showHamburger ? 'display: none;' : 'display: flex; position: relative; justify-content: space-between; align-items: center; height: 28px; width: 100%;'"
         >
             <!-- Primary menu (left-aligned) -->

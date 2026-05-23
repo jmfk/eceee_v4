@@ -31,6 +31,7 @@ import ImageStylesTab from './theme/ImageStylesTab';
 import TableTemplatesTab from './theme/TableTemplatesTab';
 import BreakpointsTab from './theme/BreakpointsTab';
 import ImagesTab from './theme/ImagesTab';
+import ThemeImageEditView from './theme/ThemeImageEditView';
 import ImageUpload from './theme/ImageUpload';
 import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
 import CopyButton from './theme/CopyButton';
@@ -38,7 +39,7 @@ import CloneThemeDialog from './theme/CloneThemeDialog';
 import PasteThemeDialog from './theme/PasteThemeDialog';
 
 const ThemeEditor = ({ onSave }) => {
-    const { themeId, tab } = useParams();
+    const { themeId, tab, imageFilename } = useParams();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const queryClient = useQueryClient();
@@ -55,7 +56,7 @@ const ThemeEditor = ({ onSave }) => {
     const isCreating = themeId === 'new';
     const isEditing = !!themeId && themeId !== 'new';
     const currentView = themeId ? 'edit' : 'list';
-    const activeTab = tab || 'basic';
+    const activeTab = imageFilename ? 'images' : (tab || 'basic');
 
     // Use UDC for theme data management
     const {
@@ -1081,15 +1082,25 @@ const ThemeEditor = ({ onSave }) => {
                     )}
 
                     {activeTab === 'images' && (
-                        <ImagesTab
-                            themeId={themeId}
-                            theme={themeData}
-                            onThemeUpdate={() => {
-                                // Reload theme data when images are updated
-                                queryClient.invalidateQueries(['themes', themeId]);
-                                queryClient.invalidateQueries(['themes']);
-                            }}
-                        />
+                        imageFilename ? (
+                            <ThemeImageEditView
+                                themeId={themeId}
+                                imageFilename={imageFilename}
+                                theme={themeData}
+                                onDesignGroupsChange={(designGroups) => updateThemeField('designGroups', designGroups)}
+                                onDirty={() => setThemeDirty(true)}
+                            />
+                        ) : (
+                            <ImagesTab
+                                themeId={themeId}
+                                theme={themeData}
+                                onThemeUpdate={() => {
+                                    // Reload theme data when images are updated
+                                    queryClient.invalidateQueries(['themes', themeId]);
+                                    queryClient.invalidateQueries(['themes']);
+                                }}
+                            />
+                        )
                     )}
 
                     {activeTab === 'breakpoints' && (

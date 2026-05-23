@@ -971,17 +971,49 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             # Delete old file
             storage.delete(old_path)
 
-            # Update references in design_groups
+            # Update references in design_groups, including current direct
+            # layoutProperties.backgroundImage objects and legacy images maps.
             if theme.design_groups:
-                updated = False
-                for group in theme.design_groups:
-                    if "image" in group and group["image"]:
-                        if filename in group["image"]:
-                            group["image"] = group["image"].replace(
-                                filename, new_filename
-                            )
-                            updated = True
+                image_reference_keys = {
+                    "backgroundImage",
+                    "fileUrl",
+                    "filename",
+                    "image",
+                    "imgproxyBaseUrl",
+                    "publicUrl",
+                    "url",
+                }
+
+                def replace_filename(value, key=None):
+                    if isinstance(value, str):
+                        if key not in image_reference_keys:
+                            return value, False
+                        replaced = value.replace(filename, new_filename)
+                        return replaced, replaced != value
+
+                    if isinstance(value, list):
+                        changed = False
+                        updated_items = []
+                        for item in value:
+                            updated_item, item_changed = replace_filename(item, key)
+                            updated_items.append(updated_item)
+                            changed = changed or item_changed
+                        return updated_items, changed
+
+                    if isinstance(value, dict):
+                        changed = False
+                        updated_dict = {}
+                        for child_key, item in value.items():
+                            updated_item, item_changed = replace_filename(item, child_key)
+                            updated_dict[child_key] = updated_item
+                            changed = changed or item_changed
+                        return updated_dict, changed
+
+                    return value, False
+
+                updated_design_groups, updated = replace_filename(theme.design_groups)
                 if updated:
+                    theme.design_groups = updated_design_groups
                     theme.save(update_fields=["design_groups"])
 
             # Update theme preview image if it matches

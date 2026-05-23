@@ -33,6 +33,12 @@
     {% if effective_layout and effective_layout.css_content %}
     <style>{{ effective_layout.css_content|safe }}</style>
     {% endif %}
+
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
     
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.1" 
@@ -55,4 +61,3 @@
     {% include 'includes/lightbox.html' %}
 </body>
 </html>
-

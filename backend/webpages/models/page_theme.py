@@ -2415,17 +2415,49 @@ class PageTheme(models.Model):
                 if "layoutProperties" in group:
                     for part, breakpoints in group["layoutProperties"].items():
                         for bp, props in breakpoints.items():
+                            if not isinstance(props, dict):
+                                continue
+
+                            for prop_name, prop_value in props.items():
+                                if prop_name == "images":
+                                    continue
+                                if self._image_value_references_filename(
+                                    prop_value, filename
+                                ):
+                                    usage.append(
+                                        f"design_group:{group_name}:{part}:{bp}:{prop_name}"
+                                    )
+
                             if "images" in props and isinstance(props["images"], dict):
                                 for image_key, image_data in props["images"].items():
-                                    if isinstance(image_data, dict):
-                                        url = image_data.get("url") or image_data.get(
-                                            "fileUrl"
+                                    if self._image_value_references_filename(
+                                        image_data, filename
+                                    ):
+                                        usage.append(
+                                            f"design_group:{group_name}:{part}:{bp}:{image_key}"
                                         )
-                                        if url and filename in url:
-                                            usage.append(f"design_group:{group_name}")
-                                            break
 
         return list(set(usage))  # Remove duplicates
+
+    @staticmethod
+    def _image_value_references_filename(value, filename):
+        """Return True when a direct or legacy image value points at filename."""
+        if not value or not filename:
+            return False
+
+        if isinstance(value, str):
+            return filename in value
+
+        if isinstance(value, dict):
+            if value.get("filename") == filename:
+                return True
+
+            for key in ("url", "fileUrl", "publicUrl", "imgproxyBaseUrl"):
+                url = value.get(key)
+                if url and filename in str(url):
+                    return True
+
+        return False
 
     def delete_library_image(self, filename):
         """
@@ -2443,16 +2475,30 @@ class PageTheme(models.Model):
                 if "layoutProperties" in group:
                     for part, breakpoints in group["layoutProperties"].items():
                         for bp, props in breakpoints.items():
+                            if not isinstance(props, dict):
+                                continue
+
+                            direct_props_to_remove = []
+                            for prop_name, prop_value in props.items():
+                                if prop_name == "images":
+                                    continue
+                                if self._image_value_references_filename(
+                                    prop_value, filename
+                                ):
+                                    direct_props_to_remove.append(prop_name)
+                                    updated = True
+
+                            for prop_name in direct_props_to_remove:
+                                del props[prop_name]
+
                             if "images" in props and isinstance(props["images"], dict):
                                 images_to_remove = []
                                 for image_key, image_data in props["images"].items():
-                                    if isinstance(image_data, dict):
-                                        url = image_data.get("url") or image_data.get(
-                                            "fileUrl"
-                                        )
-                                        if url and filename in url:
-                                            images_to_remove.append(image_key)
-                                            updated = True
+                                    if self._image_value_references_filename(
+                                        image_data, filename
+                                    ):
+                                        images_to_remove.append(image_key)
+                                        updated = True
 
                                 # Remove the images
                                 for image_key in images_to_remove:
