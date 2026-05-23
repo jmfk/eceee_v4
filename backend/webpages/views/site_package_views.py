@@ -16,6 +16,10 @@ from webpages.serializers import (
     SitePackageImportCreateSerializer,
     SitePackageJobSerializer,
 )
+from webpages.services.site_package import (
+    build_site_package_export_object_key,
+    get_site_package_download_filename,
+)
 from webpages.tasks import export_site_package, import_site_package
 
 
@@ -37,6 +41,7 @@ class SitePackageExportListView(APIView):
             status=SitePackageJob.STATUS_PENDING,
             root_page=root_page,
             created_by=request.user,
+            object_key=build_site_package_export_object_key(root_page),
             options={
                 "include_media": serializer.validated_data["include_media"],
                 "include_themes": serializer.validated_data["include_themes"],
@@ -65,8 +70,15 @@ class SitePackageExportDownloadView(APIView):
                 {"error": "Export is not ready for download"},
                 status=status.HTTP_409_CONFLICT,
             )
-        signed_url = S3MediaStorage().generate_signed_url(job.object_key, expires=3600)
-        return Response({"download_url": signed_url, "expires_in": 3600})
+        filename = get_site_package_download_filename(job)
+        signed_url = S3MediaStorage().generate_signed_url(
+            job.object_key,
+            expires=3600,
+            response_filename=filename,
+        )
+        return Response(
+            {"download_url": signed_url, "filename": filename, "expires_in": 3600}
+        )
 
 
 class SitePackageImportListView(APIView):

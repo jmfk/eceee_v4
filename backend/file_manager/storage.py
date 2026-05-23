@@ -501,22 +501,28 @@ class S3MediaStorage(Storage):
         """
         return self.url(name)
 
-    def generate_signed_url(self, name: str, expires: int = 3600) -> str:
+    def generate_signed_url(
+        self, name: str, expires: int = 3600, response_filename: str = None
+    ) -> str:
         """
         Generate a pre-signed URL for a file.
 
         Args:
             name: File name or path
             expires: URL expiration time in seconds
+            response_filename: Optional filename to suggest through Content-Disposition
 
         Returns:
             Pre-signed URL
         """
         key = self._get_key(name)
+        params = {"Bucket": self.bucket_name, "Key": key}
+        if response_filename:
+            params["ResponseContentDisposition"] = f'attachment; filename="{response_filename}"'
         try:
             url = self.presign_client.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": self.bucket_name, "Key": key},
+                Params=params,
                 ExpiresIn=expires,
             )
             return url
@@ -524,9 +530,13 @@ class S3MediaStorage(Storage):
             logger.error(f"Failed to generate signed URL for {name}: {e}")
             raise
 
-    def generate_presigned_url(self, name: str, expiration: int = 3600) -> str:
+    def generate_presigned_url(
+        self, name: str, expiration: int = 3600, response_filename: str = None
+    ) -> str:
         """Backward-compatible alias for generate_signed_url."""
-        return self.generate_signed_url(name, expires=expiration)
+        return self.generate_signed_url(
+            name, expires=expiration, response_filename=response_filename
+        )
 
     def validate_file_type(self, file: UploadedFile) -> bool:
         """

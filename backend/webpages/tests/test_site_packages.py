@@ -19,6 +19,7 @@ from webpages.services.site_package import (
     MultipartUploadWriter,
     SitePackageExporter,
     SitePackageImporter,
+    build_site_package_export_filename,
 )
 
 
@@ -36,7 +37,7 @@ class MemoryStorage:
         self.files[name] = content.read()
         return name
 
-    def generate_signed_url(self, name, expires=3600):
+    def generate_signed_url(self, name, expires=3600, response_filename=None):
         return f"https://storage.test/{name}?expires={expires}"
 
 
@@ -325,10 +326,25 @@ class SitePackageAPITests(APITestCase):
         self.root = WebPage.objects.create(
             title="Root",
             slug="root",
+            hostnames=["www.Example.com:8000"],
             tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
+
+    def test_export_filename_uses_hostname_with_random_suffix(self):
+        filename = build_site_package_export_filename(self.root, random_part="abc123")
+
+        self.assertEqual(filename, "www.example.com-abc123.zip")
+
+    def test_export_filename_falls_back_to_root_title(self):
+        self.root.hostnames = []
+        self.root.title = "Summer Study 2026"
+        self.root.save()
+
+        filename = build_site_package_export_filename(self.root, random_part="abc123")
+
+        self.assertEqual(filename, "summer-study-2026-abc123.zip")
 
     @patch("webpages.views.site_package_views.export_site_package.delay")
     def test_start_export_job(self, delay):
@@ -343,6 +359,14 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(job.root_page, self.root)
         self.assertTrue(job.options["include_media"])
         self.assertFalse(job.options["include_themes"])
+        self.assertRegex(
+            job.object_key,
+            r"^site-packages/exports/www\.example\.com-[0-9a-f]{8}\.zip$",
+        )
+        self.assertRegex(
+            response.data["download_filename"],
+            r"^www\.example\.com-[0-9a-f]{8}\.zip$",
+        )
         delay.assert_called_once_with(str(job.id))
 
     def test_list_export_jobs_returns_recent_user_jobs(self):
@@ -377,6 +401,25 @@ class SitePackageAPITests(APITestCase):
         )
         response = self.client.get(f"/api/v1/webpages/site-packages/exports/{job.id}/download/")
         self.assertEqual(response.status_code, 409)
+
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_download_returns_hostname_based_filename(self, storage_class):
+        storage = MemoryStorage()
+        storage_class.return_value = storage
+        job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            root_page=self.root,
+            object_key="site-packages/exports/www.example.com-abc123.zip",
+            created_by=self.user,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.get(f"/api/v1/webpages/site-packages/exports/{job.id}/download/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["filename"], "www.example.com-abc123.zip")
+        self.assertIn("www.example.com-abc123.zip", response.data["download_url"])
 
     @patch("webpages.views.site_package_views.import_site_package.delay")
     @patch("webpages.views.site_package_views.S3MediaStorage")

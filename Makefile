@@ -30,7 +30,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -111,6 +111,10 @@ help: ## Show this help message (use: make help [target])
 		echo ""; \
 		echo "Testing & Quality:"; \
 		echo "  backend-test      Run backend tests"; \
+		echo "  frontend-public-e2e-test Run public-site Playwright regression tests"; \
+		echo "  frontend-admin-e2e-test  Run admin Playwright regression tests"; \
+		echo "  frontend-e2e-test        Run public then admin Playwright regression tests"; \
+		echo "  regression-test          Run browser regression tests"; \
 		echo "  playwright-test   Test Playwright service endpoints"; \
 		echo "  lint              Lint frontend code"; \
 		echo ""; \
@@ -493,6 +497,30 @@ test-build: test
 
 # Run the full suite with parallel backend tests.
 test-parallel: backend-test-parallel frontend-test
+
+# Run admin browser regression tests
+frontend-admin-e2e-test:
+	cd frontend && npm run test:e2e:admin
+
+# Run public browser regression tests against the Django public renderer
+frontend-public-e2e-test: prepare-test-infra
+	docker-compose -f docker-compose.dev.yml up -d backend
+	@BP=$${BACKEND_PORT:-8000}; \
+	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
+	i=0; \
+	until curl -fsS "http://127.0.0.1:$$BP/health/" >/dev/null 2>&1; do \
+		i=$$((i + 1)); \
+		if [ $$i -ge 60 ]; then echo "Error: backend did not become ready."; exit 1; fi; \
+		sleep 1; \
+	done; \
+	docker-compose -f docker-compose.dev.yml exec -T backend python manage.py seed_public_regression_site --hostname public-regression.localhost; \
+	cd frontend && PLAYWRIGHT_PUBLIC_BASE_URL="http://public-regression.localhost:$$BP" npm run test:e2e:public
+
+# Run frontend browser regression tests, public side first
+frontend-e2e-test: frontend-public-e2e-test frontend-admin-e2e-test
+
+# Run browser regression tests
+regression-test: frontend-e2e-test
 
 # Test Playwright service endpoints
 playwright-test:

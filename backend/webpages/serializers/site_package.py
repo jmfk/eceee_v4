@@ -6,6 +6,7 @@ from ..models import SitePackageJob, WebPage
 
 class SitePackageJobSerializer(serializers.ModelSerializer):
     download_available = serializers.SerializerMethodField()
+    download_filename = serializers.SerializerMethodField()
     root_page_id = serializers.SerializerMethodField()
     root_page_title = serializers.SerializerMethodField()
     imported_root_page_id = serializers.SerializerMethodField()
@@ -27,11 +28,21 @@ class SitePackageJobSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "download_available",
+            "download_filename",
         ]
         read_only_fields = fields
 
     def get_download_available(self, obj):
-        return bool(obj.kind == SitePackageJob.KIND_EXPORT and obj.status == SitePackageJob.STATUS_COMPLETED and obj.object_key)
+        return bool(
+            obj.kind == SitePackageJob.KIND_EXPORT
+            and obj.status == SitePackageJob.STATUS_COMPLETED
+            and obj.object_key
+        )
+
+    def get_download_filename(self, obj):
+        if obj.kind != SitePackageJob.KIND_EXPORT or not obj.object_key:
+            return None
+        return obj.object_key.rsplit("/", 1)[-1]
 
     def get_root_page_id(self, obj):
         return obj.root_page_id

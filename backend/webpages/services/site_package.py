@@ -7,6 +7,7 @@ import json
 import mimetypes
 import os
 import re
+import secrets
 import tempfile
 import zipfile
 from datetime import timedelta
@@ -137,6 +138,53 @@ def _json_default(value):
 
 def _write_json(zip_file: zipfile.ZipFile, path: str, payload: Dict[str, Any]):
     zip_file.writestr(path, json.dumps(payload, indent=2, default=_json_default))
+
+
+def _safe_export_filename_part(value: str) -> str:
+    normalized = WebPage.normalize_hostname(value) if value else ""
+    normalized = normalized or value or ""
+    normalized = normalized.strip().lower().strip("[]")
+    normalized = re.sub(r"[^a-z0-9._-]+", "-", normalized)
+    normalized = re.sub(r"[-_.]{2,}", "-", normalized).strip("-_.")
+    return normalized or "site"
+
+
+def build_site_package_export_filename(
+    root_page: WebPage, random_part: Optional[str] = None
+) -> str:
+    """
+    Build a browser-friendly ZIP filename from the public site identity.
+
+    Prefer the first hostname because it maps to the public site visitors know.
+    Fall back to the root page title when the site has not been assigned a hostname.
+    """
+    site_name = (
+        (root_page.hostnames or [None])[0]
+        or root_page.title
+        or root_page.slug
+        or "site"
+    )
+    suffix = random_part or secrets.token_hex(4)
+    return f"{_safe_export_filename_part(site_name)}-{suffix}.zip"
+
+
+def build_site_package_export_object_key(
+    root_page: WebPage, random_part: Optional[str] = None
+) -> str:
+    return (
+        "site-packages/exports/"
+        f"{build_site_package_export_filename(root_page, random_part=random_part)}"
+    )
+
+
+def get_site_package_download_filename(job: SitePackageJob) -> str:
+    if job.object_key:
+        filename = os.path.basename(job.object_key)
+        if filename:
+            return filename
+    if job.root_page:
+        return build_site_package_export_filename(job.root_page)
+    return f"site-package-{secrets.token_hex(4)}.zip"
 
 
 def _walk_json(value: Any) -> Iterable[str]:
@@ -369,7 +417,9 @@ class SitePackageExporter:
         options = self.job.options or {}
         include_media = options.get("include_media", True)
         include_themes = options.get("include_themes", True)
-        object_key = self.job.object_key or f"site-packages/exports/{self.job.id}.zip"
+        object_key = self.job.object_key or build_site_package_export_object_key(
+            root_page
+        )
         writer = MultipartUploadWriter(self.storage, object_key)
         try:
             with zipfile.ZipFile(writer, "w", zipfile.ZIP_DEFLATED) as package:
