@@ -156,6 +156,15 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     def get_is_published(self, obj):
         return obj.is_published()
 
+    def get_current_published_version(self, obj):
+        published_version = obj.get_current_published_version()
+        if not published_version:
+            return None
+
+        from .version import PageVersionSerializer
+
+        return PageVersionSerializer(published_version, context=self.context).data
+
     def get_breadcrumbs(self, obj):
         breadcrumbs = obj.get_breadcrumbs()
         return [
@@ -729,4 +738,3 @@ class DeletedPageSerializer(serializers.ModelSerializer):
                 )
 
         return warnings
-
