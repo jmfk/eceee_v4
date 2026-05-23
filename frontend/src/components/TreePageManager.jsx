@@ -68,8 +68,29 @@ const useDebounce = (value, delay) => {
 
 const SITE_PACKAGE_POLL_INTERVAL_MS = 2000
 const SITE_PACKAGE_MAX_POLLS = 900
+const SITE_PACKAGE_DISMISSED_JOBS_KEY = 'sitePackageDismissedJobs'
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+const getSitePackageJobList = (response) => {
+    if (Array.isArray(response)) return response
+    if (Array.isArray(response?.results)) return response.results
+    return []
+}
+
+const isActiveSitePackageJob = (job) => job.status === 'pending' || job.status === 'running'
+
+const getDismissedSitePackageJobIds = () => {
+    try {
+        return new Set(JSON.parse(localStorage.getItem(SITE_PACKAGE_DISMISSED_JOBS_KEY) || '[]'))
+    } catch {
+        return new Set()
+    }
+}
+
+const persistDismissedSitePackageJobIds = (jobIds) => {
+    localStorage.setItem(SITE_PACKAGE_DISMISSED_JOBS_KEY, JSON.stringify([...jobIds]))
+}
 
 const TreePageManager = () => {
     const navigate = useNavigate()
@@ -79,6 +100,7 @@ const TreePageManager = () => {
 
     // State management
     const pagesRef = useRef([])
+    const sitePackagePollingJobsRef = useRef(new Set())
     const [, forceUpdate] = useState({})
     const [activeTab, setActiveTab] = useState('active') // 'active' or 'deleted'
     const [searchTerm, setSearchTerm] = useState('')
@@ -581,20 +603,37 @@ const TreePageManager = () => {
         addNotification('Page tree refreshed', 'success', 'tree-refresh')
     }, [addNotification, queryClient])
 
+    const decorateSitePackageJob = useCallback((job) => {
+        const rootTitle = job.rootTitle || job.rootPageTitle
+        const label = job.label || (job.kind === 'export'
+            ? `Export ${rootTitle || 'site package'}`
+            : 'Import site package')
+
+        return {
+            ...job,
+            rootTitle,
+            label
+        }
+    }, [])
+
     const upsertSitePackageJob = useCallback((job) => {
         setSitePackageJobs(prev => {
+            const decoratedJob = decorateSitePackageJob(job)
             const existingIndex = prev.findIndex(existingJob => existingJob.id === job.id)
             if (existingIndex === -1) {
-                return [job, ...prev].slice(0, 5)
+                return [decoratedJob, ...prev].slice(0, 5)
             }
 
             const next = [...prev]
-            next[existingIndex] = { ...next[existingIndex], ...job }
+            next[existingIndex] = decorateSitePackageJob({ ...next[existingIndex], ...job })
             return next
         })
-    }, [])
+    }, [decorateSitePackageJob])
 
     const removeSitePackageJob = useCallback((jobId) => {
+        const dismissedJobIds = getDismissedSitePackageJobIds()
+        dismissedJobIds.add(jobId)
+        persistDismissedSitePackageJobIds(dismissedJobIds)
         setSitePackageJobs(prev => prev.filter(job => job.id !== jobId))
     }, [])
 
@@ -621,9 +660,100 @@ const TreePageManager = () => {
         upsertSitePackageJob({
             id: jobId,
             status: 'running',
-            message: 'Still running. Keep this page open to continue polling.'
+            message: 'Still running. This job will reappear after reload.'
         })
     }, [upsertSitePackageJob])
+
+    const completeSitePackageJob = useCallback(async (completedJob) => {
+        if (completedJob.kind === 'export') {
+            const download = await sitePackagesApi.getExportDownload(completedJob.id)
+            const downloadUrl = download.downloadUrl || download.download_url
+            upsertSitePackageJob({
+                ...completedJob,
+                downloadUrl
+            })
+            addNotification(`Export "${completedJob.rootPageTitle || completedJob.rootTitle || 'site package'}" is ready`, 'success', `site-export-${completedJob.id}`)
+            return
+        }
+
+        upsertSitePackageJob(completedJob)
+        queryClient.removeQueries({ queryKey: ['pages'] })
+        queryClient.removeQueries({ queryKey: ['page-children'] })
+        await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
+        addNotification('Site package imported as a new root', 'success', `site-import-${completedJob.id}`)
+    }, [addNotification, queryClient, upsertSitePackageJob])
+
+    const resumeSitePackagePolling = useCallback((job) => {
+        if (!isActiveSitePackageJob(job) || sitePackagePollingJobsRef.current.has(job.id)) {
+            return
+        }
+
+        sitePackagePollingJobsRef.current.add(job.id)
+        pollSitePackageJob({
+            jobId: job.id,
+            getJob: job.kind === 'export' ? sitePackagesApi.getExport : sitePackagesApi.getImport,
+            onCompleted: completeSitePackageJob
+        }).catch((error) => {
+            console.error('Failed to poll site package job:', error)
+            upsertSitePackageJob({
+                ...job,
+                status: 'failed',
+                errors: [error.message]
+            })
+        }).finally(() => {
+            sitePackagePollingJobsRef.current.delete(job.id)
+        })
+    }, [completeSitePackageJob, pollSitePackageJob, upsertSitePackageJob])
+
+    useEffect(() => {
+        let isMounted = true
+
+        const loadSitePackageJobs = async () => {
+            try {
+                const [exportResponse, importResponse] = await Promise.all([
+                    sitePackagesApi.listExports(),
+                    sitePackagesApi.listImports()
+                ])
+
+                if (!isMounted) return
+
+                const dismissedJobIds = getDismissedSitePackageJobIds()
+                const jobs = [
+                    ...getSitePackageJobList(exportResponse),
+                    ...getSitePackageJobList(importResponse)
+                ]
+                    .filter(job => isActiveSitePackageJob(job) || !dismissedJobIds.has(job.id))
+                    .sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0))
+
+                jobs.slice(0, 5).forEach((job) => {
+                    upsertSitePackageJob(job)
+                    if (isActiveSitePackageJob(job)) {
+                        resumeSitePackagePolling(job)
+                    } else if (job.kind === 'export' && job.status === 'completed' && job.downloadAvailable) {
+                        sitePackagesApi.getExportDownload(job.id)
+                            .then((download) => {
+                                if (!isMounted) return
+                                upsertSitePackageJob({
+                                    ...job,
+                                    downloadUrl: download.downloadUrl || download.download_url
+                                })
+                            })
+                            .catch((error) => {
+                                console.error('Failed to recover site package download URL:', error)
+                            })
+                    }
+                })
+            } catch (error) {
+                console.error('Failed to load site package jobs:', error)
+            }
+        }
+
+        loadSitePackageJobs()
+
+        return () => {
+            isMounted = false
+        }
+    }, [resumeSitePackagePolling, upsertSitePackageJob])
 
     const openExportRootPackage = useCallback((rootPage) => {
         setExportRootPage(rootPage)

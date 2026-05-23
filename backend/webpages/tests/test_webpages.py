@@ -361,6 +361,82 @@ class PageThemeTest(TestCase):
         css_model = CSSVariables(variables=valid_css)
         self.assertEqual(css_model.variables["--primary-color"], "#007bff")
 
+    def test_theme_library_urls_are_resolved_to_current_theme_for_css(self):
+        """Stale copied theme image URLs should render from the current theme."""
+        theme = PageTheme.objects.create(
+            name="Copied Theme",
+            tenant=self.tenant,
+            created_by=self.user,
+            design_groups={
+                "groups": [
+                    {
+                        "name": "Header",
+                        "widgetTypes": ["easy_widgets.HeaderWidget"],
+                        "layoutProperties": {
+                            "header-widget": {
+                                "xs": {
+                                    "backgroundImage": {
+                                        "url": "https://storage.test/theme_images/22/library/header.png",
+                                        "filename": "header.png",
+                                        "width": 1280,
+                                        "height": 224,
+                                        "dpr": 2,
+                                    }
+                                }
+                            }
+                        },
+                    }
+                ]
+            },
+        )
+
+        from unittest.mock import patch
+
+        with (
+            patch("webpages.models.page_theme.system_storage.exists", return_value=True),
+            patch(
+                "file_manager.imgproxy.imgproxy_service.generate_url",
+                side_effect=lambda source_url, **kwargs: source_url,
+            ),
+        ):
+            css = theme.generate_css()
+
+        self.assertIn(f"theme_images/{theme.id}/library/header.png", css)
+        self.assertNotIn("theme_images/22/library/header.png", css)
+
+    def test_clone_updates_direct_design_group_image_urls(self):
+        design_groups = {
+            "groups": [
+                {
+                    "layoutProperties": {
+                        "header-widget": {
+                            "xs": {
+                                "backgroundImage": {
+                                    "url": "https://storage.test/theme_images/1/library/header.png",
+                                    "fileUrl": "https://storage.test/theme_images/1/library/header.png",
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+
+        updated = PageTheme._update_image_urls_in_design_groups(
+            design_groups,
+            {
+                "https://storage.test/theme_images/1/library/header.png": "https://storage.test/theme_images/2/library/header.png"
+            },
+        )
+
+        image = updated["groups"][0]["layoutProperties"]["header-widget"]["xs"][
+            "backgroundImage"
+        ]
+        self.assertEqual(
+            image["url"], "https://storage.test/theme_images/2/library/header.png"
+        )
+        self.assertNotIn("fileUrl", image)
+
 
 class InheritanceEnhancementTest(TestCase):
     """Test enhanced widget inheritance functionality."""

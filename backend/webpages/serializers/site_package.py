@@ -7,6 +7,7 @@ from ..models import SitePackageJob, WebPage
 class SitePackageJobSerializer(serializers.ModelSerializer):
     download_available = serializers.SerializerMethodField()
     root_page_id = serializers.SerializerMethodField()
+    root_page_title = serializers.SerializerMethodField()
     imported_root_page_id = serializers.SerializerMethodField()
 
     class Meta:
@@ -16,6 +17,7 @@ class SitePackageJobSerializer(serializers.ModelSerializer):
             "kind",
             "status",
             "root_page_id",
+            "root_page_title",
             "imported_root_page_id",
             "object_key",
             "progress",
@@ -33,6 +35,9 @@ class SitePackageJobSerializer(serializers.ModelSerializer):
 
     def get_root_page_id(self, obj):
         return obj.root_page_id
+
+    def get_root_page_title(self, obj):
+        return obj.root_page.title if obj.root_page_id and obj.root_page else None
 
     def get_imported_root_page_id(self, obj):
         return obj.imported_root_page_id

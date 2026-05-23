@@ -1,6 +1,7 @@
 """API views for site package ZIP export/import jobs."""
 
 from datetime import timedelta
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -20,6 +21,10 @@ from webpages.tasks import export_site_package, import_site_package
 
 class SitePackageExportListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        jobs = _get_job_queryset(request, SitePackageJob.KIND_EXPORT)
+        return Response(SitePackageJobSerializer(jobs[:10], many=True).data)
 
     def post(self, request):
         serializer = SitePackageExportCreateSerializer(
@@ -68,6 +73,10 @@ class SitePackageImportListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
+    def get(self, request):
+        jobs = _get_job_queryset(request, SitePackageJob.KIND_IMPORT)
+        return Response(SitePackageJobSerializer(jobs[:10], many=True).data)
+
     def post(self, request):
         serializer = SitePackageImportCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -103,7 +112,18 @@ class SitePackageImportDetailView(APIView):
 
 
 def _get_job(request, job_id, kind):
-    queryset = SitePackageJob.objects.filter(kind=kind)
+    queryset = _get_job_queryset(request, kind)
+    return get_object_or_404(queryset, id=job_id)
+
+
+def _get_job_queryset(request, kind):
+    queryset = SitePackageJob.objects.filter(kind=kind).select_related(
+        "root_page", "imported_root_page"
+    )
     if not request.user.is_staff:
         queryset = queryset.filter(created_by=request.user)
-    return get_object_or_404(queryset, id=job_id)
+
+    now = timezone.now()
+    return queryset.filter(Q(expires_at__isnull=True) | Q(expires_at__gte=now)).order_by(
+        "-created_at"
+    )

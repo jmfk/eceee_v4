@@ -265,6 +265,29 @@ class SitePackageAPITests(APITestCase):
         self.assertFalse(job.options["include_themes"])
         delay.assert_called_once_with(str(job.id))
 
+    def test_list_export_jobs_returns_recent_user_jobs(self):
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT,
+            status=SitePackageJob.STATUS_PENDING,
+            root_page=self.root,
+            created_by=self.user,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            root_page=self.root,
+            created_by=self.user,
+            expires_at=timezone.now() - timedelta(hours=1),
+        )
+
+        response = self.client.get("/api/v1/webpages/site-packages/exports/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["status"], SitePackageJob.STATUS_PENDING)
+        self.assertEqual(response.data[0]["root_page_title"], self.root.title)
+
     def test_download_requires_completed_export(self):
         job = SitePackageJob.objects.create(
             kind=SitePackageJob.KIND_EXPORT,
@@ -294,3 +317,17 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(job.kind, SitePackageJob.KIND_IMPORT)
         self.assertIn(str(job.id), job.object_key)
         delay.assert_called_once_with(str(job.id))
+
+    def test_list_import_jobs_returns_recent_user_jobs(self):
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_RUNNING,
+            created_by=self.user,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.get("/api/v1/webpages/site-packages/imports/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["kind"], SitePackageJob.KIND_IMPORT)

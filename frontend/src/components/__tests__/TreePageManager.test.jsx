@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TreePageManager from '../TreePageManager'
 import * as pagesApi from '../../api/pages'
+import { api } from '../../api/client.js'
 import { NotificationProvider } from '../NotificationManager'
 import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
 
@@ -25,7 +26,7 @@ const pageApiMocks = vi.hoisted(() => ({
 // Mock the API client to avoid browser dependencies
 vi.mock('../../api/client.js', () => ({
     api: {
-        get: vi.fn(),
+        get: vi.fn(() => Promise.resolve({ data: [] })),
         post: vi.fn(),
         patch: vi.fn(),
         delete: vi.fn()
@@ -167,6 +168,8 @@ describe('TreePageManager', () => {
         // Mock successful API response
         pagesApi.getRootPages.mockResolvedValue(mockPages)
         pagesApi.searchAllPages.mockResolvedValue({ results: [] })
+        api.get.mockResolvedValue({ data: [] })
+        localStorage.clear()
     })
 
     it('renders without crashing', async () => {
@@ -258,6 +261,34 @@ describe('TreePageManager', () => {
         expect(screen.getByText('Export Root Site')).toBeInTheDocument()
         expect(screen.getByText('Include referenced media files')).toBeInTheDocument()
         expect(screen.getByText('Include referenced themes and theme assets')).toBeInTheDocument()
+    })
+
+    it('restores queued site package exports after reload', async () => {
+        const queuedJob = {
+            id: '11111111-1111-4111-8111-111111111111',
+            kind: 'export',
+            status: 'pending',
+            rootPageTitle: 'Home Page',
+            createdAt: '2026-05-23T10:00:00Z'
+        }
+
+        api.get.mockImplementation((url) => {
+            const endpoint = String(url)
+            if (endpoint.endsWith('/site-packages/exports/')) {
+                return Promise.resolve({ data: [queuedJob] })
+            }
+            if (endpoint.includes(`/site-packages/exports/${queuedJob.id}/`)) {
+                return Promise.resolve({ data: queuedJob })
+            }
+            return Promise.resolve({ data: [] })
+        })
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Export Home Page')).toBeInTheDocument()
+            expect(screen.getByText('Queued')).toBeInTheDocument()
+        })
     })
 
     it('handles error state gracefully', async () => {

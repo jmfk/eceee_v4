@@ -7,6 +7,10 @@ import { endpoints } from './endpoints.js'
 import { wrapApiCall } from './utils.js'
 
 export const sitePackagesApi = {
+    listExports: wrapApiCall(async () => {
+        return api.get(endpoints.sitePackages.exports)
+    }, 'sitePackages.listExports'),
+
     createExport: wrapApiCall(async ({ rootPageId, includeMedia = true, includeThemes = true }) => {
         return api.post(endpoints.sitePackages.exports, {
             rootPageId,
@@ -22,6 +26,10 @@ export const sitePackagesApi = {
     getExportDownload: wrapApiCall(async (jobId) => {
         return api.get(endpoints.sitePackages.exportDownload(jobId))
     }, 'sitePackages.getExportDownload'),
+
+    listImports: wrapApiCall(async () => {
+        return api.get(endpoints.sitePackages.imports)
+    }, 'sitePackages.listImports'),
 
     createImport: wrapApiCall(async ({ file, preservePublicationStatus = true }) => {
         const formData = new FormData()
