@@ -65,6 +65,9 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
         }
     }
 
+    const isProduction = import.meta.env.PROD || globalThis.process?.env?.NODE_ENV === 'production'
+    const shouldShowTechnicalDetails = message.stack && import.meta.env.DEV && !isProduction
+
     return (
         <div className="fixed top-4 right-4 z-50 max-w-sm w-full">
             {/* Notification */}
@@ -106,7 +109,7 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
                         </div>
                     )}
 
-                    {message.stack && import.meta.env.DEV && process.env.NODE_ENV !== 'production' && (
+                    {shouldShowTechnicalDetails && (
                         <details className="mt-2">
                             <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">
                                 Show technical details

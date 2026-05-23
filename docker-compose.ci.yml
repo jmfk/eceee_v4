@@ -1,0 +1,12 @@
+services:
+  db:
+    platform: linux/amd64
+
+  redis:
+    platform: linux/amd64
+
+  minio:
+    platform: linux/amd64
+
+  imgproxy:
+    platform: linux/amd64

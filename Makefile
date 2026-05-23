@@ -4,6 +4,14 @@
 -include .env
 export
 
+DOCKER_COMPOSE ?= docker-compose
+DOCKER_COMPOSE_BIN := $(firstword $(DOCKER_COMPOSE))
+COMPOSE_DEV_FILES ?= -f docker-compose.dev.yml
+COMPOSE_INFRA_FILES ?= -f docker-compose.infra.yml
+COMPOSE_DEV = $(DOCKER_COMPOSE) $(COMPOSE_DEV_FILES)
+COMPOSE_INFRA = $(DOCKER_COMPOSE) $(COMPOSE_INFRA_FILES)
+PY_LINT_BASE ?= origin/main
+
 # Global help request check
 HELP_REQUESTED := $(filter --help -h help,$(MAKECMDGOALS))
 
@@ -30,7 +38,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -451,42 +459,42 @@ shell:
 
 # Start and validate the local services required by make test.
 prepare-test-infra:
-	@command -v docker-compose >/dev/null 2>&1 || (echo "Error: docker-compose is required to run tests."; exit 1)
+	@command -v $(DOCKER_COMPOSE_BIN) >/dev/null 2>&1 || (echo "Error: $(DOCKER_COMPOSE) is required to run tests."; exit 1)
 	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
 	DB_NAME=$${DB_NAME:-eceee_v4}; \
 	case "$$DB_NAME" in -*|*[!A-Za-z0-9_-]*|"") echo "Error: Invalid POSTGRES_DB '$$DB_NAME'."; exit 1;; esac; \
 	echo "Starting test infrastructure..."; \
-	docker-compose -f docker-compose.infra.yml up -d db redis minio imgproxy; \
+	$(COMPOSE_INFRA) up -d db redis minio imgproxy; \
 	echo "Waiting for Postgres..."; \
 	i=0; \
-	until docker-compose -f docker-compose.infra.yml exec -T db pg_isready -U postgres >/dev/null 2>&1; do \
+	until $(COMPOSE_INFRA) exec -T db pg_isready -U postgres >/dev/null 2>&1; do \
 		i=$$((i + 1)); \
 		if [ $$i -ge 30 ]; then echo "Error: Postgres did not become ready."; exit 1; fi; \
 		sleep 1; \
 	done; \
-	if ! docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$DB_NAME'" | grep -q 1; then \
+	if ! $(COMPOSE_INFRA) exec -T db psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$DB_NAME'" | grep -q 1; then \
 		echo "Creating local database '$$DB_NAME'..."; \
-		docker-compose -f docker-compose.infra.yml exec -T db createdb -U postgres "$$DB_NAME"; \
+		$(COMPOSE_INFRA) exec -T db createdb -U postgres "$$DB_NAME"; \
 	fi
 
 # Clear stale local Postgres collation metadata before creating Django test databases.
 refresh-db-collation: prepare-test-infra
 	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
 	DB_NAME=$${DB_NAME:-eceee_v4}; \
-	docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+	$(COMPOSE_INFRA) exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
 		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_$$DB_NAME');" >/dev/null
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
+	$(COMPOSE_DEV) run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
 
 # Run backend tests in parallel once the suite is stable.
 backend-test-parallel: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
+	$(COMPOSE_DEV) run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
 
 # Run frontend tests
 frontend-test: prepare-test-infra
-	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T frontend npm run test:run -- --bail=1
+	$(COMPOSE_DEV) run --rm --no-deps -T frontend npm run test:run -- --bail=1
 
 # Run all tests
 test: backend-test frontend-test
@@ -504,7 +512,7 @@ frontend-admin-e2e-test:
 
 # Run public browser regression tests against the Django public renderer
 frontend-public-e2e-test: prepare-test-infra
-	docker-compose -f docker-compose.dev.yml up -d backend
+	$(COMPOSE_DEV) up -d backend
 	@BP=$${BACKEND_PORT:-8000}; \
 	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
 	i=0; \
@@ -513,7 +521,7 @@ frontend-public-e2e-test: prepare-test-infra
 		if [ $$i -ge 60 ]; then echo "Error: backend did not become ready."; exit 1; fi; \
 		sleep 1; \
 	done; \
-	docker-compose -f docker-compose.dev.yml exec -T backend python manage.py seed_public_regression_site --hostname public-regression.localhost; \
+	$(COMPOSE_DEV) exec -T backend python manage.py seed_public_regression_site --hostname public-regression.localhost; \
 	cd frontend && PLAYWRIGHT_PUBLIC_BASE_URL="http://public-regression.localhost:$$BP" npm run test:e2e:public
 
 # Run frontend browser regression tests, public side first
@@ -526,23 +534,36 @@ regression-test: frontend-e2e-test
 playwright-test:
 	cd playwright-service && python test_service.py
 
+# Lint backend Python code
+backend-lint:
+	@files=$$(git diff --name-only --diff-filter=ACMRT $(PY_LINT_BASE)...HEAD -- 'backend/*.py' 'backend/**/*.py' ':(exclude)backend/**/migrations/**' | sed 's#^backend/##' | tr '\n' ' '); \
+	if [ -z "$$(echo "$$files" | xargs)" ]; then \
+		echo "No changed backend Python files to lint."; \
+		exit 0; \
+	fi; \
+	echo "Linting changed backend Python files: $$files"; \
+	$(COMPOSE_DEV) run --rm --no-deps -T backend sh -c "black --check $$files && isort --check-only $$files && flake8 $$files"
+
 # Lint frontend code
-lint:
+frontend-lint:
 	cd frontend && npm run lint
+
+# Lint backend and frontend code
+lint: backend-lint frontend-lint
 
 # Start all services with Docker Compose
 docker-up: infra-up
-	VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up --build backend frontend celery-worker
+	VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) $(COMPOSE_DEV) up --build backend frontend celery-worker
 
 # Stop all Docker Compose services
 docker-down:
-	docker-compose -f docker-compose.dev.yml down
-	docker-compose -f docker-compose.infra.yml down
+	$(COMPOSE_DEV) down
+	$(COMPOSE_INFRA) down
 
 # Restart all Docker Compose services
 restart:
-	docker-compose -f docker-compose.dev.yml restart
-	docker-compose -f docker-compose.infra.yml restart
+	$(COMPOSE_DEV) restart
+	$(COMPOSE_INFRA) restart
 
 # Stop Playwright service
 playwright-down:
