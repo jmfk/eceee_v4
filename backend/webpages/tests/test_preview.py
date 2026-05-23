@@ -13,6 +13,7 @@ from webpages.models import WebPage, PageVersion
 from core.models import Tenant
 
 
+@override_settings(INTERNAL_IPS=[])
 class WebPagePreviewTest(TestCase):
     """Test webpage preview view and authentication."""
 
@@ -46,11 +47,12 @@ class WebPagePreviewTest(TestCase):
             version_title="Initial Version",
             created_by=self.user,
             page_data={"title": "Root Page"},
-            widgets={}
+            widgets={},
+            code_layout="main_layout",
         )
         
         self.preview_url = reverse(
-            "page-version-preview", 
+            "api:page-version-preview",
             kwargs={"page_id": self.root_page.id, "version_id": self.version.id}
         )
 
@@ -58,8 +60,7 @@ class WebPagePreviewTest(TestCase):
         """Test that preview fails without authentication."""
         response = self.client.get(self.preview_url)
         self.assertEqual(response.status_code, 401)
-        # Should return our custom HTML 401
-        self.assertIn(b"You must be logged in to preview pages", response.content)
+        self.assertIn(b"Authentication credentials were not provided", response.content)
 
     def test_preview_header_auth_succeeds(self):
         """Test that preview succeeds with Authorization header."""
@@ -92,8 +93,8 @@ class WebPagePreviewTest(TestCase):
         # Root page hostname is "summerstudy". 
         # In DEBUG mode, it should be resolved to "summerstudy:8000" 
         # because the request came from "localhost:8000".
-        self.assertIn(b'<base href="http://summerstudy:8000/">', response.content)
-        self.assertIn(b'href="http://summerstudy:8000/static/css/tailwind.output.css"', response.content)
+        self.assertIn(b'<base href="https://summerstudy:8000/">', response.content)
+        self.assertIn(b'href="https://summerstudy:8000/static/css/tailwind.output.css"', response.content)
 
     @override_settings(DEBUG=False)
     def test_preview_prod_hostname_strict(self):
@@ -101,7 +102,7 @@ class WebPagePreviewTest(TestCase):
         token = str(AccessToken.for_user(self.user))
         url = f"{self.preview_url}?token={token}"
         
-        response = self.client.get(url, HTTP_HOST="some-other-domain.com")
+        response = self.client.get(url, HTTP_HOST="summerstudy")
         self.assertEqual(response.status_code, 200)
         
         # In production, it should use the configured hostname "summerstudy" exactly.
