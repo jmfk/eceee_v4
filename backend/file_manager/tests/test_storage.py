@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from unittest.mock import patch, MagicMock, Mock
 import boto3
 import uuid
+from botocore.exceptions import ClientError
 try:
     from moto import mock_aws
     MOTO_INSTALLED = True
@@ -246,6 +247,10 @@ class StorageErrorHandlingTest(TestCase):
         # Mock S3 client
         mock_s3_client = MagicMock()
         mock_boto_client.return_value = mock_s3_client
+        mock_s3_client.head_object.side_effect = ClientError(
+            {"Error": {"Code": "404", "Message": "Not Found"}},
+            "HeadObject",
+        )
         mock_s3_client.upload_fileobj.side_effect = Exception("Upload failed")
 
         # Initialize storage AFTER patching boto3.client
