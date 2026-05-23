@@ -68,8 +68,12 @@ export const buildQueryParams = (params = {}) => {
  * @returns {Object} Processed response data
  */
 export const processResponse = (response) => {
+    if (response === null || response === undefined) {
+        return response
+    }
+
     // Handle different response structures
-    if (response.data) {
+    if (Object.prototype.hasOwnProperty.call(Object(response), 'data')) {
         return response.data
     }
 
