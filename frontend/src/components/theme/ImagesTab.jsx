@@ -75,6 +75,32 @@ const formatPartName = (part, widgetType, widgetTypes) => {
     return getWidgetLayoutParts(widget)?.[part]?.label || part.replace(/[-_]/g, ' ');
 };
 
+const formatBackendUsageLabel = (usage) => {
+    if (!usage?.startsWith('design_group:')) return usage;
+
+    const [, groupName, part, breakpoint, property] = usage.split(':');
+    return [
+        groupName || 'Unnamed group',
+        part,
+        breakpoint,
+        property,
+    ].filter(Boolean).join(' / ');
+};
+
+const getUsageLabels = (assignments, image, widgetTypes) => {
+    if (assignments.length > 0) {
+        return assignments.map(item => [
+            item.groupName,
+            formatWidgetName(item.widgetTypes[0], widgetTypes),
+            formatPartName(item.part, item.widgetTypes[0], widgetTypes),
+            item.breakpoint,
+            item.property,
+        ].filter(Boolean).join(' / '));
+    }
+
+    return (image.usedIn || []).map(formatBackendUsageLabel);
+};
+
 // Empty state drop zone component
 const EmptyStateDropZone = ({ onUpload, onFilesDropped }) => {
     const [dragActive, setDragActive] = useState(false);
@@ -567,7 +593,10 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                     {images.map((image) => {
                         const isSelected = selectedImages.includes(image.filename);
                         const imageAssignments = getImageAssignments(theme, image.filename);
-                        const usageCount = imageAssignments.length || image.usedIn?.length || 0;
+                        const usageLabels = getUsageLabels(imageAssignments, image, widgetTypes);
+                        const usageCount = usageLabels.length;
+                        const visibleUsageLabels = usageLabels.slice(0, viewMode === 'compact' ? 1 : 2);
+                        const hiddenUsageCount = usageLabels.length - visibleUsageLabels.length;
 
                         return (
                             <div
@@ -661,15 +690,22 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                                                         {usageCount > 0 && (
                                                             <span
                                                                 className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full inline-flex items-center gap-1"
-                                                                title={imageAssignments.length > 0
-                                                                    ? imageAssignments.map(item => `${item.groupName}: ${formatWidgetName(item.widgetTypes[0], widgetTypes)} / ${formatPartName(item.part, item.widgetTypes[0], widgetTypes)} / ${item.breakpoint}`).join(', ')
-                                                                    : image.usedIn.join(', ')}
+                                                                title={usageLabels.join(', ')}
                                                             >
                                                                 <AlertCircle className="h-3 w-3" />
                                                                 Used: {usageCount}
                                                             </span>
                                                         )}
                                                     </div>
+                                                    {usageCount > 0 && (
+                                                        <div className={`${viewMode === 'compact' ? 'mt-1 text-xs' : 'mt-2 text-sm'} text-gray-700`}>
+                                                            <span className="font-medium text-gray-900">Currently used in:</span>{' '}
+                                                            <span className="text-gray-600">
+                                                                {visibleUsageLabels.join('; ')}
+                                                                {hiddenUsageCount > 0 ? `; +${hiddenUsageCount} more` : ''}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -761,9 +797,7 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                                                         <div className="flex items-center gap-1 flex-wrap mb-2">
                                                             <span
                                                                 className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full inline-flex items-center gap-1"
-                                                                title={imageAssignments.length > 0
-                                                                    ? imageAssignments.map(item => `${item.groupName}: ${formatWidgetName(item.widgetTypes[0], widgetTypes)} / ${formatPartName(item.part, item.widgetTypes[0], widgetTypes)} / ${item.breakpoint}`).join(', ')
-                                                                    : image.usedIn.join(', ')}
+                                                                title={usageLabels.join(', ')}
                                                             >
                                                                 <AlertCircle className="h-3 w-3" />
                                                                 {usageCount}
