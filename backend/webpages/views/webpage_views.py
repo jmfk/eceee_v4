@@ -260,7 +260,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
             page.last_modified_by = user
         page.save()
 
-        # Create unpublished version (no effective_date means it's a draft)
+        # Expire any currently published versions, then create a draft version.
+        page.versions.filter(effective_date__lte=now).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+        ).update(expiry_date=now)
         version = page.create_version(user, "Unpublished via API")
 
         serializer = self.get_serializer(page)

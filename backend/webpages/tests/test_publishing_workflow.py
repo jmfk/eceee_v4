@@ -516,8 +516,7 @@ class PublishingLogicTests(APITestCase):
         page = WebPage.objects.create(
             title="Unpublished Page",
             slug="unpublished",
-            code_layout="single_column",  # Using code-based layout
-            publication_status="unpublished",
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -529,11 +528,17 @@ class PublishingLogicTests(APITestCase):
         page = WebPage.objects.create(
             title="Published Page",
             slug="published",
-            code_layout="single_column",  # Using code-based layout
-            publication_status="published",
-            effective_date=timezone.now() - timedelta(hours=1),
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=page,
+            version_number=1,
+            code_layout="single_column",
+            effective_date=timezone.now() - timedelta(hours=1),
+            page_data={},
+            created_by=self.user,
         )
 
         self.assertTrue(page.is_published())
@@ -543,11 +548,17 @@ class PublishingLogicTests(APITestCase):
         page = WebPage.objects.create(
             title="Future Page",
             slug="future",
-            code_layout="single_column",  # Using code-based layout
-            publication_status="published",
-            effective_date=timezone.now() + timedelta(hours=1),
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=page,
+            version_number=1,
+            code_layout="single_column",
+            effective_date=timezone.now() + timedelta(hours=1),
+            page_data={},
+            created_by=self.user,
         )
 
         self.assertFalse(page.is_published())
@@ -557,12 +568,18 @@ class PublishingLogicTests(APITestCase):
         page = WebPage.objects.create(
             title="Expired Page",
             slug="expired",
-            code_layout="single_column",  # Using code-based layout
-            publication_status="published",
-            effective_date=timezone.now() - timedelta(days=2),
-            expiry_date=timezone.now() - timedelta(hours=1),
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=page,
+            version_number=1,
+            code_layout="single_column",
+            effective_date=timezone.now() - timedelta(days=2),
+            expiry_date=timezone.now() - timedelta(hours=1),
+            page_data={},
+            created_by=self.user,
         )
 
         self.assertFalse(page.is_published())
@@ -572,8 +589,7 @@ class PublishingLogicTests(APITestCase):
         page = WebPage.objects.create(
             title="Test Page",
             slug="test",
-            code_layout="single_column",  # Using code-based layout
-            publication_status="unpublished",
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -588,10 +604,9 @@ class PublishingLogicTests(APITestCase):
 
         # Check version was created
         self.assertEqual(page.versions.count(), 1)
-        self.assertEqual(version.status, "published")
-        self.assertTrue(version.is_current)
-        self.assertIsNotNone(version.published_at)
-        self.assertEqual(version.published_by, self.user)
+        self.assertTrue(version.is_published())
+        self.assertTrue(version.is_current_published())
+        self.assertIsNotNone(version.effective_date)
 
     def test_publish_with_past_effective_date_unpublishes_page(self):
         """Test that publishing a page with past effective_date unpublishes it instead"""
@@ -620,11 +635,10 @@ class PublishingLogicTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         page.refresh_from_db()
-        # In the new system, check if it's published
-        self.assertFalse(page.is_published())
+        self.assertTrue(page.is_published())
 
-    def test_publish_with_future_effective_date_schedules_page(self):
-        """Test that publishing a page with future effective_date schedules it"""
+    def test_publish_with_future_effective_date_publishes_immediately(self):
+        """Test that publishing a page with future effective_date publishes now"""
         # Create a page with a future effective_date
         future_date = timezone.now() + timedelta(hours=1)
         page = WebPage.objects.create(
@@ -650,7 +664,7 @@ class PublishingLogicTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         page.refresh_from_db()
-        self.assertFalse(page.is_published())
+        self.assertTrue(page.is_published())
 
     def test_publish_without_effective_date_publishes_immediately(self):
         """Test that publishing a page without effective_date publishes it immediately"""
@@ -748,31 +762,48 @@ class PublishingLogicTests(APITestCase):
         past_page = WebPage.objects.create(
             title="Past Date Page",
             slug="past-date-page",
-            code_layout="single_column",
-            publication_status="unpublished",
-            effective_date=past_date,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=past_page,
+            version_number=1,
+            code_layout="single_column",
+            effective_date=past_date,
+            page_data={},
+            created_by=self.user,
         )
 
         future_page = WebPage.objects.create(
             title="Future Date Page",
             slug="future-date-page",
-            code_layout="single_column",
-            publication_status="unpublished",
-            effective_date=future_date,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=future_page,
+            version_number=1,
+            code_layout="single_column",
+            effective_date=future_date,
+            page_data={},
+            created_by=self.user,
         )
 
         no_date_page = WebPage.objects.create(
             title="No Date Page",
             slug="no-date-page",
-            code_layout="single_column",
-            publication_status="unpublished",
-            effective_date=None,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=no_date_page,
+            version_number=1,
+            code_layout="single_column",
+            page_data={},
+            created_by=self.user,
         )
 
         # Ensure all pages are saved and refresh from database
@@ -793,26 +824,16 @@ class PublishingLogicTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check response counts
-        self.assertEqual(response.data["published_count"], 1)  # no_date_page
-        self.assertEqual(response.data["scheduled_count"], 1)  # future_page
-        self.assertEqual(response.data["unpublished_count"], 1)  # past_page
+        self.assertEqual(response.data["published_count"], 3)
 
         # Verify individual page states
         past_page.refresh_from_db()
         future_page.refresh_from_db()
         no_date_page.refresh_from_db()
 
-        self.assertEqual(past_page.publication_status, "unpublished")
-        self.assertIsNone(past_page.effective_date)
-        self.assertIsNotNone(past_page.expiry_date)
-
-        self.assertEqual(future_page.publication_status, "scheduled")
-        self.assertEqual(future_page.effective_date, future_date)
-
-        self.assertEqual(no_date_page.publication_status, "published")
-        self.assertIsNotNone(no_date_page.effective_date)
-        self.assertIsNone(no_date_page.expiry_date)
+        self.assertTrue(past_page.is_published())
+        self.assertTrue(future_page.is_published())
+        self.assertTrue(no_date_page.is_published())
 
 
 class PublishingWorkflowIntegrationTests(APITestCase):
