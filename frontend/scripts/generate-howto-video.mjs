@@ -11,6 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const frontendRoot = resolve(__dirname, '..')
 const docsDir = join(frontendRoot, 'src/docs/how-to')
 const recordingTempDirName = '.recording-tmp'
+const defaultHelpVideoLanguage = 'sv'
 const defaultAnthropicTranslationModel = 'claude-3-5-haiku-20241022'
 const defaultAnthropicTranslationFallbackModels = [
   'claude-3-5-haiku-latest',
@@ -34,7 +35,8 @@ const getEnvVoiceIdForLanguage = (language = '') => {
 const parseArgs = (argv) => {
   const args = {
     baseUrl: process.env.HOWTO_BASE_URL || 'http://127.0.0.1:3100',
-    outputDir: process.env.HOWTO_OUTPUT_DIR || join(frontendRoot, 'howto-video-output'),
+    outputDir: process.env.HOWTO_OUTPUT_DIR || '',
+    workDir: process.env.HOWTO_WORK_DIR || '',
     width: Number(process.env.HOWTO_VIDEO_WIDTH || 1440),
     height: Number(process.env.HOWTO_VIDEO_HEIGHT || 900),
     headless: process.env.HEADED !== '1',
@@ -47,7 +49,7 @@ const parseArgs = (argv) => {
     format: process.env.HOWTO_VIDEO_FORMAT || 'webm',
     ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
     voiceProvider: process.env.HOWTO_VOICE_PROVIDER || '',
-    language: process.env.HOWTO_LANGUAGE || 'en',
+    language: process.env.HOWTO_LANGUAGE || defaultHelpVideoLanguage,
     voiceId: process.env.HOWTO_VOICE_ID || '',
     elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || '',
     elevenLabsModelId: process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2',
@@ -73,6 +75,9 @@ const parseArgs = (argv) => {
     voicePageSize: Number(process.env.HOWTO_VOICE_PAGE_SIZE || 20),
     segmentedNarration: process.env.HOWTO_SEGMENTED_NARRATION !== '0',
     sfx: process.env.HOWTO_SFX === '1',
+    cursor: process.env.HOWTO_CURSOR !== '0',
+    typingDelayMs: Number(process.env.HOWTO_TYPING_DELAY_MS || 75),
+    pointerMoveMs: Number(process.env.HOWTO_POINTER_MOVE_MS || 650),
     help: false
   }
 
@@ -82,6 +87,7 @@ const parseArgs = (argv) => {
 
     if (arg === '--base-url') args.baseUrl = next
     if (arg === '--output-dir') args.outputDir = next
+    if (arg === '--work-dir') args.workDir = next
     if (arg === '--topic') args.topicId = next
     if (arg === '--guide') args.guideId = next
     if (arg === '--storage-state') args.storageState = next
@@ -116,6 +122,10 @@ const parseArgs = (argv) => {
     if (arg === '--linear-narration') args.segmentedNarration = false
     if (arg === '--sfx') args.sfx = true
     if (arg === '--no-sfx') args.sfx = false
+    if (arg === '--cursor') args.cursor = true
+    if (arg === '--no-cursor') args.cursor = false
+    if (arg === '--typing-delay-ms') args.typingDelayMs = Number(next)
+    if (arg === '--pointer-move-ms') args.pointerMoveMs = Number(next)
     if (arg === '--help' || arg === '-h') args.help = true
 
     if (arg.startsWith('--') && next && !next.startsWith('--')) {
@@ -125,6 +135,14 @@ const parseArgs = (argv) => {
 
   if (!args.voiceId) {
     args.voiceId = getEnvVoiceIdForLanguage(args.language) || process.env.ELEVENLABS_VOICE_ID || ''
+  }
+
+  if (!args.outputDir) {
+    args.outputDir = join(frontendRoot, 'public/howto-videos/prod', args.language)
+  }
+
+  if (!args.workDir) {
+    args.workDir = join(frontendRoot, 'howto-video-output/work', args.language)
   }
 
   return args
@@ -142,10 +160,11 @@ Options:
   --topic <id>             Record the first guide in a help topic.
   --guide <id>             Record one guide.
   --base-url <url>         Running frontend URL. Defaults to HOWTO_BASE_URL or http://127.0.0.1:3100.
-  --output-dir <path>      Output folder. Defaults to frontend/howto-video-output.
+  --output-dir <path>      Public output folder. Defaults to frontend/public/howto-videos/prod/<language>.
+  --work-dir <path>        Work folder for temporary audio/manifests. Defaults to frontend/howto-video-output/work/<language>.
   --format <webm|mp4|both> Output format. Defaults to webm.
   --voice elevenlabs        Generate narration audio with ElevenLabs and mux it into MP4.
-  --language <code>         Narration language. Use "sv" for Swedish. Defaults to en.
+  --language <code>         Narration language. Use "sv" for Swedish. Defaults to sv.
   --voice-id <id>           ElevenLabs voice ID. Also read from HOWTO_VOICE_ID,
                             ELEVENLABS_VOICE_ID_SWE, ELEVENLABS_VOICE_ID_ENG,
                             or ELEVENLABS_VOICE_ID.
@@ -167,6 +186,10 @@ Options:
   --voice-type <type>       Filter voices. Examples: default, community, workspace, saved.
   --voice-category <type>   Filter category. Examples: premade, generated, professional.
   --sfx                     Mix in simple computer sounds for clicks, typing, and navigation.
+  --cursor                  Show a visible tutorial cursor, click pulse, and typing badge. Default.
+  --no-cursor               Disable visible cursor overlays.
+  --typing-delay-ms <ms>    Delay per typed character. Defaults to 75.
+  --pointer-move-ms <ms>    Cursor move duration before an action. Defaults to 650.
   --mock-api               Stub admin API calls for documentation-only recordings.
   --storage-state <path>   Playwright auth state for recording against a real backend.
   --headed                 Show the browser while recording.
@@ -222,6 +245,14 @@ const validateArgs = (args) => {
 
   if (!Number.isFinite(args.elevenLabsMaxRetries) || args.elevenLabsMaxRetries < 0) {
     throw new Error('--elevenlabs-max-retries must be a non-negative number.')
+  }
+
+  if (!Number.isFinite(args.typingDelayMs) || args.typingDelayMs < 0) {
+    throw new Error('--typing-delay-ms must be a non-negative number.')
+  }
+
+  if (!Number.isFinite(args.pointerMoveMs) || args.pointerMoveMs < 0) {
+    throw new Error('--pointer-move-ms must be a non-negative number.')
   }
 }
 
@@ -879,6 +910,176 @@ const setCaptionOverlay = async (page, text) => {
   }, text)
 }
 
+const ensureCursorOverlay = async (page, args) => {
+  if (!args.cursor) return
+
+  await page.evaluate(() => {
+    if (document.querySelector('[data-howto-cursor-overlay]')) return
+
+    const style = document.createElement('style')
+    style.setAttribute('data-howto-cursor-style', 'true')
+    style.textContent = `
+      [data-howto-cursor-overlay] {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 2147483647;
+        width: 96px;
+        height: 128px;
+        pointer-events: none;
+        transform: translate3d(28px, 64px, 0);
+        transition: transform 650ms cubic-bezier(.22, .9, .25, 1);
+        filter: drop-shadow(0 4px 8px rgba(15, 23, 42, .35));
+      }
+
+      [data-howto-cursor-overlay] svg {
+        display: block;
+        height: 100%;
+        width: 100%;
+        overflow: visible;
+      }
+
+      [data-howto-click-rays] {
+        opacity: 0;
+        transform-origin: 65px 64px;
+      }
+
+      [data-howto-cursor-overlay].is-clicking [data-howto-click-rays] {
+        animation: howto-click-rays 520ms ease-out forwards;
+      }
+
+      [data-howto-typing-badge] {
+        position: fixed;
+        z-index: 2147483646;
+        padding: 5px 9px;
+        border-radius: 9999px;
+        background: rgba(17, 24, 39, .9);
+        color: white;
+        font: 700 12px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        pointer-events: none;
+        transform: translate(18px, -8px);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, .28);
+      }
+
+      @keyframes howto-click-rays {
+        0% { opacity: 0; transform: scale(.92); }
+        18% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.08); }
+      }
+    `
+    document.head.appendChild(style)
+
+    const cursor = document.createElement('div')
+    cursor.setAttribute('data-howto-cursor-overlay', 'true')
+    cursor.innerHTML = `
+      <svg viewBox="0 0 150 200" aria-hidden="true">
+        <g
+          data-howto-click-rays
+          fill="none"
+          stroke="black"
+          stroke-width="10"
+          stroke-linecap="round"
+        >
+          <line x1="62" y1="12" x2="66" y2="44" />
+          <line x1="28" y1="34" x2="53" y2="55" />
+          <line x1="13" y1="77" x2="46" y2="72" />
+          <line x1="44" y1="94" x2="25" y2="120" />
+          <line x1="89" y1="39" x2="109" y2="13" />
+          <line x1="96" y1="64" x2="128" y2="59" />
+        </g>
+        <path
+          d="M64 64 L139 132 L106 143 L132 184 L115 195 L89 152 L58 177 Z"
+          fill="white"
+          stroke="black"
+          stroke-width="12"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+      </svg>
+    `
+    document.body.appendChild(cursor)
+  })
+}
+
+const moveTutorialCursor = async (page, args, x, y) => {
+  if (!args.cursor) return
+
+  await ensureCursorOverlay(page, args)
+  await page.evaluate(({ nextX, nextY, durationMs }) => {
+    const cursor = document.querySelector('[data-howto-cursor-overlay]')
+    if (!cursor) return
+
+    cursor.style.transitionDuration = `${durationMs}ms`
+    cursor.style.transform = `translate3d(${Math.round(nextX - 41)}px, ${Math.round(nextY - 41)}px, 0)`
+  }, { nextX: x, nextY: y, durationMs: args.pointerMoveMs })
+  await page.mouse.move(x, y, { steps: 16 })
+  await page.waitForTimeout(Math.min(args.pointerMoveMs + 120, 1200))
+}
+
+const flashClickPulse = async (page, args, x, y) => {
+  if (!args.cursor) return
+
+  await page.evaluate(() => {
+    const cursor = document.querySelector('[data-howto-cursor-overlay]')
+    if (!cursor) return
+
+    cursor.classList.remove('is-clicking')
+    void cursor.offsetWidth
+    cursor.classList.add('is-clicking')
+    window.setTimeout(() => cursor.classList.remove('is-clicking'), 540)
+  }, { nextX: x, nextY: y })
+  await page.waitForTimeout(360)
+}
+
+const showTypingBadge = async (page, args, x, y, text = 'Typing') => {
+  if (!args.cursor) return
+
+  await page.evaluate(({ nextX, nextY, label }) => {
+    let badge = document.querySelector('[data-howto-typing-badge]')
+    if (!badge) {
+      badge = document.createElement('div')
+      badge.setAttribute('data-howto-typing-badge', 'true')
+      document.body.appendChild(badge)
+    }
+
+    badge.textContent = label
+    badge.style.left = `${Math.round(nextX)}px`
+    badge.style.top = `${Math.round(nextY)}px`
+    badge.style.display = 'block'
+  }, { nextX: x, nextY: y, label: text })
+}
+
+const hideTypingBadge = async (page, args) => {
+  if (!args.cursor) return
+
+  await page.evaluate(() => {
+    const badge = document.querySelector('[data-howto-typing-badge]')
+    if (badge) badge.style.display = 'none'
+  })
+}
+
+const locatorCenter = async (locator) => {
+  await locator.first().scrollIntoViewIfNeeded()
+  const box = await locator.first().boundingBox()
+
+  if (!box) {
+    throw new Error('Unable to locate visible element for tutorial action.')
+  }
+
+  return {
+    x: box.x + (box.width / 2),
+    y: box.y + (box.height / 2)
+  }
+}
+
+const resolveLocator = (page, action) => {
+  if (action.selector) return page.locator(action.selector)
+  if (action.label) return page.getByLabel(action.label, { exact: Boolean(action.exact) })
+  if (action.placeholder) return page.getByPlaceholder(action.placeholder, { exact: Boolean(action.exact) })
+  if (action.role) return page.getByRole(action.role, { name: action.name ? new RegExp(action.name, 'i') : undefined })
+  return page.getByText(action.text, { exact: Boolean(action.exact) })
+}
+
 const mockCmsApi = async (page) => {
   const json = (route, body, status = 200) => route.fulfill({
     status,
@@ -924,30 +1125,57 @@ const mockCmsApi = async (page) => {
   await page.route('**/health/**', route => json(route, { status: 'healthy', service: 'eceee-v4-backend' }))
 }
 
-const runAction = async (page, action, baseUrl) => {
+const runAction = async (page, action, baseUrl, args) => {
+  await ensureCursorOverlay(page, args)
+
   if (action.type === 'goto') {
     await page.goto(new URL(action.path || '/', baseUrl).toString(), { waitUntil: 'networkidle' })
+    await ensureCursorOverlay(page, args)
+    await moveTutorialCursor(page, args, action.cursorX || 92, action.cursorY || 112)
     return
   }
 
   if (action.type === 'click') {
-    const locator = action.selector
-      ? page.locator(action.selector)
-      : page.getByText(action.text, { exact: Boolean(action.exact) })
+    const locator = resolveLocator(page, action)
+    const point = await locatorCenter(locator)
+
+    await moveTutorialCursor(page, args, point.x, point.y)
+    await flashClickPulse(page, args, point.x, point.y)
     await locator.first().click()
     return
   }
 
   if (action.type === 'fill') {
-    const locator = action.selector
-      ? page.locator(action.selector)
-      : page.getByLabel(action.label)
-    await locator.first().fill(action.value || '')
+    const locator = resolveLocator(page, action)
+    const point = await locatorCenter(locator)
+
+    await moveTutorialCursor(page, args, point.x, point.y)
+    await flashClickPulse(page, args, point.x, point.y)
+    await locator.first().click()
+    await locator.first().fill('')
+    await showTypingBadge(page, args, point.x, point.y, action.typingLabel || 'Typing')
+    await locator.first().pressSequentially(action.value || '', { delay: action.delayMs ?? args.typingDelayMs })
+    await hideTypingBadge(page, args)
+    return
+  }
+
+  if (action.type === 'select') {
+    const locator = resolveLocator(page, action)
+    const point = await locatorCenter(locator)
+
+    await moveTutorialCursor(page, args, point.x, point.y)
+    await flashClickPulse(page, args, point.x, point.y)
+    await locator.first().selectOption(action.value || action.label || '')
     return
   }
 
   if (action.type === 'waitForText') {
     await page.getByText(action.text, { exact: Boolean(action.exact) }).first().waitFor({ timeout: action.timeout || 10000 })
+    return
+  }
+
+  if (action.type === 'caption') {
+    await page.waitForTimeout(action.ms || 1200)
     return
   }
 
@@ -961,7 +1189,7 @@ const createContextOptions = (args) => {
     baseURL: args.baseUrl,
     viewport: { width: args.width, height: args.height },
     recordVideo: {
-      dir: join(args.outputDir, recordingTempDirName),
+      dir: join(args.workDir, recordingTempDirName),
       size: { width: args.width, height: args.height }
     }
   }
@@ -1008,7 +1236,7 @@ const prepareActionSegments = async (args, guide, actions, safeName) => {
 
     if (args.voiceProvider === 'elevenlabs' && args.segmentedNarration && caption) {
       const narration = await createElevenLabsSpeech(caption, args)
-      const partPath = join(args.outputDir, `${safeName}-part-${String(index + 1).padStart(2, '0')}.mp3`)
+      const partPath = join(args.workDir, `${safeName}-part-${String(index + 1).padStart(2, '0')}.mp3`)
 
       await copyAudioPart(narration.audioPath, partPath)
 
@@ -1101,7 +1329,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     }
 
     console.log(`    Part ${segment.partIndex}: running ${action.type}`)
-    await runAction(page, action, args.baseUrl)
+    await runAction(page, action, args.baseUrl, args)
     await page.waitForTimeout(action.holdMs || 1500)
 
     cues.push({
@@ -1124,7 +1352,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
 
   if (narrationEvents.length > 0) {
     console.log('  - Building segmented narration track')
-    const narrationTrackPath = join(args.outputDir, `${safeName}-narration.mp3`)
+    const narrationTrackPath = join(args.workDir, `${safeName}-narration.mp3`)
     const narrationAudioPath = await createTimelineAudioTrack(narrationEvents, narrationTrackPath, args, 'narration timeline')
 
     if (narrationAudioPath) {
@@ -1168,7 +1396,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
 
   if (args.sfx) {
     console.log('  - Generating interface sounds')
-    const sfxPath = join(args.outputDir, `${safeName}-sfx.mp3`)
+    const sfxPath = join(args.workDir, `${safeName}-sfx.mp3`)
     const sfxAudioPath = await createSfxTrack(sfxEvents, cues.at(-1)?.end || 1000, sfxPath, args)
 
     if (sfxAudioPath) {
@@ -1197,7 +1425,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
 
   await writeVtt(subtitlesPath, cues)
 
-  const manifestPath = join(args.outputDir, `${safeName}.json`)
+  const manifestPath = join(args.workDir, `${safeName}.json`)
   const videoPath = args.format === 'webm' ? webmPath : mp4Path
   const manifest = {
     topicId: doc.id,
@@ -1263,9 +1491,11 @@ const main = async () => {
   }
 
   await mkdir(args.outputDir, { recursive: true })
+  await mkdir(args.workDir, { recursive: true })
   console.log(`Preparing ${targets.length} how-to guide${targets.length === 1 ? '' : 's'}.`)
   console.log(`Base URL: ${args.baseUrl}`)
   console.log(`Output: ${args.outputDir}`)
+  console.log(`Work dir: ${args.workDir}`)
   console.log(`Language: ${args.language}`)
 
   const browser = await chromium.launch({ headless: args.headless })
@@ -1280,7 +1510,7 @@ const main = async () => {
     }
   } finally {
     await browser.close()
-    await rm(join(args.outputDir, recordingTempDirName), { force: true, recursive: true })
+    await rm(join(args.workDir, recordingTempDirName), { force: true, recursive: true })
   }
 
   console.log(`Recorded ${recordings.length} how-to guide${recordings.length === 1 ? '' : 's'}.`)

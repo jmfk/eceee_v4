@@ -1,9 +1,37 @@
 WEBVTT
 
 1
-00:00:04.019 --> 00:00:09.045
-Öppna Pages-arbetsytan.
+00:00:05.469 --> 00:00:10.990
+Open the Pages workspace and wait for the page tree to load.
 
 2
-00:00:09.045 --> 00:00:15.952
-Sidträdet är där redigerare skapar och organiserar webbplatssidor.
+00:00:10.990 --> 00:00:14.339
+Click the add root page button to start a new site tree.
+
+3
+00:00:14.339 --> 00:00:16.155
+The root page form asks for the key fields before anything is saved.
+
+4
+00:00:16.155 --> 00:00:20.432
+Type a clear page title. The title helps editors recognize the new site tree.
+
+5
+00:00:20.432 --> 00:00:24.867
+Enter the hostname where the root page should answer.
+
+6
+00:00:24.867 --> 00:00:28.192
+Keep the page unpublished while you are still preparing content.
+
+7
+00:00:28.192 --> 00:00:31.757
+For this walkthrough we cancel instead of creating demo content on the server.
+
+8
+00:00:31.757 --> 00:00:36.368
+Use search to find existing pages before editing or adding more content.
+
+9
+00:00:36.368 --> 00:00:40.326
+Refresh the page tree after changes or when collaborating with other editors.

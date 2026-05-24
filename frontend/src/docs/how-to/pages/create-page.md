@@ -22,7 +22,64 @@ Start a new page and place it in the page tree.
 
 ```video
 [
-  { "type": "goto", "path": "/pages", "caption": "Open the Pages workspace." },
-  { "type": "waitForText", "text": "Pages", "caption": "The page tree is where editors create and organize site pages." }
+  {
+    "type": "goto",
+    "path": "/pages",
+    "caption": "Open the Pages workspace and wait for the page tree to load.",
+    "holdMs": 2200
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='add-root-page-button']",
+    "caption": "Click the add root page button to start a new site tree.",
+    "holdMs": 900
+  },
+  {
+    "type": "waitForText",
+    "text": "Create Root Page",
+    "caption": "The root page form asks for the key fields before anything is saved.",
+    "holdMs": 900
+  },
+  {
+    "type": "fill",
+    "selector": "#root-page-title",
+    "value": "Demo Help Site",
+    "caption": "Type a clear page title. The title helps editors recognize the new site tree.",
+    "holdMs": 800
+  },
+  {
+    "type": "fill",
+    "selector": "#root-page-hostnames",
+    "value": "demo.example.org",
+    "caption": "Enter the hostname where the root page should answer.",
+    "holdMs": 800
+  },
+  {
+    "type": "select",
+    "selector": "#root-publication-status",
+    "value": "unpublished",
+    "caption": "Keep the page unpublished while you are still preparing content.",
+    "holdMs": 900
+  },
+  {
+    "type": "click",
+    "text": "Cancel",
+    "exact": true,
+    "caption": "For this walkthrough we cancel instead of creating demo content on the server.",
+    "holdMs": 1200
+  },
+  {
+    "type": "fill",
+    "placeholder": "Search pages...",
+    "value": "Example Site",
+    "caption": "Use search to find existing pages before editing or adding more content.",
+    "holdMs": 1200
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='refresh-button']",
+    "caption": "Refresh the page tree after changes or when collaborating with other editors.",
+    "holdMs": 1600
+  }
 ]
 ```
