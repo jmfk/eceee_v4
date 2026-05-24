@@ -119,7 +119,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  lint              Lint frontend code"; \
 		echo ""; \
 		echo "How-To Video Generation:"; \
-		echo "  howto-auth-prod       Save browser auth state for app.eceee.org"; \
+		echo "  howto-auth-prod       Prompt for prod username/password and save auth state"; \
 		echo "  howto-voices          List Swedish ElevenLabs voice candidates"; \
 		echo "  howto-video-prod      Generate one narrated prod help video (GUIDE=id, HOWTO_LANGUAGE=sv|en)"; \
 		echo "  howto-video-prod-both Generate one prod help video in Swedish and English (GUIDE=id)"; \
@@ -545,15 +545,14 @@ playwright-test:
 lint:
 	cd frontend && npm run lint
 
-howto-auth-prod: ## Save browser auth state for production help videos
+howto-auth-prod: ## Prompt for production username/password and save auth state for help videos
 ifneq ($(HELP_REQUESTED),)
 	@$(call print_help,howto-auth-prod)
 else
 	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
 	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
 	mkdir -p "$$(dirname "$$AUTH_STATE")"; \
-	echo "Opening browser for $(HOWTO_PROD_BASE_URL). Log in, then close the browser window to save auth state."; \
-	cd frontend && npx playwright codegen --save-storage="$$AUTH_STATE" "$(HOWTO_PROD_BASE_URL)"
+	npm run howto:auth -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE"
 endif
 
 howto-voices: ## List Swedish ElevenLabs voice candidates from repo-root .env
