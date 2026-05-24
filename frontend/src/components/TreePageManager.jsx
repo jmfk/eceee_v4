@@ -34,6 +34,7 @@ import PageTreeNode from './PageTreeNode'
 import TreeImporterModalV2 from './TreeImporterModalV2'
 import BulkActionsToolbar from './BulkActionsToolbar'
 import Tooltip from './Tooltip'
+import ContextualHelpLink from './help/ContextualHelpLink'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import pageTreeUtils from '../utils/pageTreeUtils'
@@ -1174,6 +1175,7 @@ const TreePageManager = () => {
                                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
                                 )}
                             </button>
+                            <ContextualHelpLink topicId="pages" label="Open Pages help" className="ml-1" />
                             <button
                                 onClick={() => setActiveTab('deleted')}
                                 className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-all relative whitespace-nowrap ${activeTab === 'deleted'

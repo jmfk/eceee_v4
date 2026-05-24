@@ -12,6 +12,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import StatusBar from '../components/StatusBar'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import Breadcrumbs from '../components/common/Breadcrumbs'
+import ContextualHelpLink from '../components/help/ContextualHelpLink'
 
 // Import individual tab components
 import ObjectContentView from '../components/objectEdit/ObjectContentView'
@@ -434,6 +435,7 @@ const ObjectInstanceEditPage = () => {
                                 <div className="text-lg font-semibold text-gray-900 truncate flex items-center" role="heading" aria-level="1">
                                     {objectType?.iconImage ? <img src={objectType.iconImage} alt={objectType.label} className="w-5 h-5 object-cover rounded mr-2" /> : <Layout className="h-5 w-5 mr-2" />}
                                     {isNewInstance ? `New ${objectType?.label}` : instance?.title || 'Untitled'}
+                                    <ContextualHelpLink topicId="objects-manage" label="Open Object editor help" className="ml-2" />
                                 </div>
                                 <div className="text-sm text-gray-500">{isNewInstance ? `Create a new ${objectType?.label?.toLowerCase()}` : `Edit ${objectType?.label?.toLowerCase()}`}</div>
                             </div>

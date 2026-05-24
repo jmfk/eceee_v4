@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '../SettingsManager'
+import { getSettingsHelpTopic } from '../../utils/howToHelp'
 import { renderWithStateProviders } from '../../test/testUtils'
 
 const routerMocks = vi.hoisted(() => ({
@@ -155,6 +156,27 @@ describe('SettingsManager', () => {
         renderSettings('/settings/layouts')
 
         expect(screen.getByTestId('layout-editor')).toBeInTheDocument()
+    })
+
+    it('links settings sections to contextual how-to anchors', async () => {
+        const user = userEvent.setup()
+        renderSettings('/settings/themes')
+
+        await user.click(screen.getByRole('button', { name: /open settings help/i }))
+
+        expect(screen.getByRole('menuitem', { name: /edit themes/i })).toHaveAttribute(
+            'href',
+            '/help/how-to/settings-themes'
+        )
+        expect(screen.getByRole('menuitem', { name: /edit themes/i })).toHaveAttribute('target', '_blank')
+    })
+
+    it('maps active settings tabs to the expected help topics', () => {
+        expect(getSettingsHelpTopic('layouts')).toBe('settings-layouts')
+        expect(getSettingsHelpTopic('themes')).toBe('settings-themes')
+        expect(getSettingsHelpTopic('publishing')).toBe('settings-publishing')
+        expect(getSettingsHelpTopic('widgets')).toBe('widgets-edit')
+        expect(getSettingsHelpTopic('unknown')).toBe('settings')
     })
 
     it('renders theme management for theme routes and shows the theme status bar', () => {

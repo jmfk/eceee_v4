@@ -59,6 +59,7 @@ const Navbar = () => {
     if (path.startsWith('/media')) return 'Media'
     if (path.startsWith('/tags')) return 'Tags'
     if (path.startsWith('/profile')) return 'Profile'
+    if (path.startsWith('/help/how-to')) return 'How-To Help'
     return ''
   }
 

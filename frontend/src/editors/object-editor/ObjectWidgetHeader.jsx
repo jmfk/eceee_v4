@@ -18,7 +18,9 @@ import {
     Scissors,
     ClipboardPaste
 } from 'lucide-react'
+import ContextualHelpLink from '../../components/help/ContextualHelpLink'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
+import { getWidgetHelpTopic } from '../../utils/howToHelp'
 import { useClipboard } from '../../contexts/ClipboardContext'
 
 const ObjectWidgetHeader = ({
@@ -50,6 +52,7 @@ const ObjectWidgetHeader = ({
     const [showMenu, setShowMenu] = useState(false)
     const menuRef = useRef(null)
     const { refreshClipboard, pasteModeActive } = useClipboard()
+    const helpTopicId = getWidgetHelpTopic(widget?.type || widgetType)
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -223,6 +226,11 @@ const ObjectWidgetHeader = ({
 
                 {/* Quick actions */}
                 <div className="flex items-center space-x-1">
+                    <ContextualHelpLink
+                        topicId={helpTopicId}
+                        label={`Open ${widgetType} widget help`}
+                        size="sm"
+                    />
                     {onEdit && (
                         <button
                             onClick={onEdit}

@@ -29,13 +29,15 @@ export const createTestWrapper = (queryClient = null) => {
     const client = queryClient || createTestQueryClient()
 
     return ({ children }) => (
-        <QueryClientProvider client={client}>
-            <GlobalNotificationProvider>
-                <NotificationProvider>
-                    {children}
-                </NotificationProvider>
-            </GlobalNotificationProvider>
-        </QueryClientProvider>
+        <MemoryRouter>
+            <QueryClientProvider client={client}>
+                <GlobalNotificationProvider>
+                    <NotificationProvider>
+                        {children}
+                    </NotificationProvider>
+                </GlobalNotificationProvider>
+            </QueryClientProvider>
+        </MemoryRouter>
     )
 }
 

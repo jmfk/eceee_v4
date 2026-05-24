@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 
 // API
 import { layoutsApi } from '../api/layouts'
+import ContextualHelpLink from './help/ContextualHelpLink'
 
 const LayoutEditor = ({
     onSelect,
@@ -89,6 +90,7 @@ const LayoutEditor = ({
                         <div className="text-xl font-semibold text-gray-900 flex items-center" role="heading" aria-level="2">
                             <Grid3X3 className="h-6 w-6 mr-2 text-blue-600" />
                             Layout Overview
+                            <ContextualHelpLink topicId="settings-layouts" label="Open Layout help" className="ml-2" />
                         </div>
                         <div className="mt-1 text-sm text-gray-600">
                             Available page layout templates defined in the system

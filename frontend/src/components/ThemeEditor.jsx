@@ -18,6 +18,7 @@ import { useNotificationContext } from './NotificationManager';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
 import { normalizeThemeData } from '../utils/themeDataNormalizer';
+import ContextualHelpLink from './help/ContextualHelpLink';
 import {
     Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw, Clipboard, Download, FileUp, Files
 } from 'lucide-react';
@@ -658,7 +659,10 @@ const ThemeEditor = ({ onSave }) => {
                     <div className="mb-6">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Theme Management</div>
+                                <div className="flex items-center gap-2">
+                                    <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Theme Management</div>
+                                    <ContextualHelpLink topicId="settings-themes" label="Open Theme help" />
+                                </div>
                                 <div className="text-sm text-gray-600 mt-1">
                                     Create and manage themes with fonts, colors, typography, component styles, and table templates
                                 </div>

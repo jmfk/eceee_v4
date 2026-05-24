@@ -6,6 +6,7 @@ import { objectTypesApi } from '../api/objectStorage'
 import ObjectTypeForm from '../components/ObjectTypeForm'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import ContextualHelpLink from '../components/help/ContextualHelpLink'
 
 const ObjectTypeEditorPage = () => {
     const { id, tab = 'basic' } = useParams()
@@ -156,8 +157,11 @@ const ObjectTypeEditorPage = () => {
                             <ArrowLeft className="h-5 w-5" />
                         </button>
                         <div>
-                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">
-                                {isCreating ? 'Create Object Type' : `Edit ${objectType?.label || 'Object Type'}`}
+                            <div className="flex items-center gap-2">
+                                <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">
+                                    {isCreating ? 'Create Object Type' : `Edit ${objectType?.label || 'Object Type'}`}
+                                </div>
+                                <ContextualHelpLink topicId="settings-data" label="Open Object type help" />
                             </div>
                             <div className="text-gray-600 mt-1">
                                 {isCreating

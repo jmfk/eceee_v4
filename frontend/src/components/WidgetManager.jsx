@@ -20,6 +20,7 @@ import {
     getWidgetCategory,
     getAvailableCoreCategories as getAvailableCategories
 } from '../widgets'
+import ContextualHelpLink from './help/ContextualHelpLink'
 
 const WidgetManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
@@ -113,7 +114,10 @@ const WidgetManager = () => {
             {/* Simplified Header */}
             <div className="mb-6">
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">{filteredWidgetTypes.length} widget types</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">{filteredWidgetTypes.length} widget types</span>
+                        <ContextualHelpLink topicId="widgets-edit" label="Open Widgets help" />
+                    </div>
                 </div>
             </div>
 

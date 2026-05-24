@@ -25,6 +25,7 @@ import MediaManagerPage from '@pages/MediaManagerPage'
 import TagsPage from '@pages/TagsPage'
 import ProfilePage from '@pages/ProfilePage'
 import UserManagementPage from '@pages/UserManagementPage'
+import HowToHelpPage from '@pages/HowToHelpPage'
 import ObjectBrowser from '@components/ObjectBrowser'
 import ObjectTypeEditorPage from '@pages/ObjectTypeEditorPage'
 import ObjectInstanceEditPage from '@pages/ObjectInstanceEditPage'
@@ -266,6 +267,11 @@ const AppRoutes = () => {
               </main>
               <StatusBar customStatusContent={<span>Profile - Ready</span>} />
             </div>
+          </PrivateRoute>
+        } />
+        <Route path="/help/*" element={
+          <PrivateRoute>
+            <HowToHelpPage />
           </PrivateRoute>
         } />
         <Route path="/settings/users" element={

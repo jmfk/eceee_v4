@@ -57,6 +57,7 @@ export function useAutoPageTitle() {
         else if (path.startsWith('/schemas/layout')) title = 'Layout Schemas'
         else if (path.startsWith('/pages/') && path.includes('/edit')) title = 'Edit Page'
         else if (path.startsWith('/pages/') && path.includes('/versions')) title = 'Version Timeline'
+        else if (path.startsWith('/help')) title = 'How-To Help'
         else if (path.startsWith('/demo/')) title = 'Demo'
         else if (path === '/login') title = 'Login'
 

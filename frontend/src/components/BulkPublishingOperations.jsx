@@ -14,6 +14,7 @@ import { CheckCircle, AlertTriangle } from 'lucide-react';
 import SearchAndFilter from './bulk-publishing/SearchAndFilter';
 import BulkOperationControls from './bulk-publishing/BulkOperationControls';
 import PageSelectionTable from './bulk-publishing/PageSelectionTable';
+import ContextualHelpLink from './help/ContextualHelpLink';
 
 const BulkPublishingOperations = () => {
     const [pages, setPages] = useState([]);
@@ -145,7 +146,10 @@ const BulkPublishingOperations = () => {
         <div className="space-y-6">
             {/* Header */}
             <div className="border-b border-gray-200 pb-4">
-                <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Bulk Publishing Operations</div>
+                <div className="flex items-center gap-2">
+                    <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Bulk Publishing Operations</div>
+                    <ContextualHelpLink topicId="settings-publishing" label="Open Publishing help" />
+                </div>
                 <div className="mt-2 text-gray-600">
                     Select multiple pages to publish immediately or schedule for future publication.
                 </div>

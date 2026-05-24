@@ -6,6 +6,7 @@ import { objectTypesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 
 import ConfirmDialog from './ConfirmDialog'
+import ContextualHelpLink from './help/ContextualHelpLink'
 
 const ObjectTypeManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
@@ -144,6 +145,7 @@ const ObjectTypeManager = () => {
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center">
                             <span className="text-sm text-gray-500">{filteredTypes.length} object types</span>
+                            <ContextualHelpLink topicId="settings-data" label="Open Object types help" className="ml-2" />
                         </div>
                         <button
                             onClick={handleCreateNew}

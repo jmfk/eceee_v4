@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import TreePageManager from '../TreePageManager'
 import * as pagesApi from '../../api/pages'
 import { api } from '../../api/client.js'
@@ -152,13 +153,15 @@ const renderWithProviders = (component) => {
     const queryClient = createTestQueryClient()
 
     return render(
-        <QueryClientProvider client={queryClient}>
-            <GlobalNotificationProvider>
-                <NotificationProvider>
-                    {component}
-                </NotificationProvider>
-            </GlobalNotificationProvider>
-        </QueryClientProvider>
+        <MemoryRouter>
+            <QueryClientProvider client={queryClient}>
+                <GlobalNotificationProvider>
+                    <NotificationProvider>
+                        {component}
+                    </NotificationProvider>
+                </GlobalNotificationProvider>
+            </QueryClientProvider>
+        </MemoryRouter>
     )
 }
 

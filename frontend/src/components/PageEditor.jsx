@@ -38,6 +38,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import ContextualHelpLink from './help/ContextualHelpLink'
 import { useUnifiedData, defaultEqualityFn } from '../contexts/unified-data'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
@@ -1910,8 +1911,11 @@ const PageEditor = () => {
                             <div className="h-6 w-px bg-gray-300"></div>
 
                             <div>
-                                <div className="text-lg font-semibold text-gray-900 truncate" role="heading" aria-level="1">
-                                    {isNewPage ? 'New Page' : (webpageData?.title || 'Untitled Page')}
+                                <div className="flex items-center gap-2">
+                                    <div className="text-lg font-semibold text-gray-900 truncate" role="heading" aria-level="1">
+                                        {isNewPage ? 'New Page' : (webpageData?.title || 'Untitled Page')}
+                                    </div>
+                                    <ContextualHelpLink topicId="pages-create" label="Open Page editor help" />
                                 </div>
                                 {/* Show hostnames for root pages, otherwise show path */}
                                 {!isNewPage && !webpageData?.parent && webpageData?.hostnames && webpageData.hostnames.length > 0 ? (

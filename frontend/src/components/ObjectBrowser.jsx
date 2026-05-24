@@ -6,6 +6,7 @@ import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import ContextualHelpLink from './help/ContextualHelpLink'
 import OptimizedImage from './media/OptimizedImage'
 
 const ObjectBrowser = () => {
@@ -220,6 +221,7 @@ const ObjectBrowser = () => {
                                     <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
                                         <FolderOpen className="h-6 w-6 mr-3" />
                                         Objects Publisher
+                                        <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
                                     </div>
                                 </div>
                             </div>
@@ -324,6 +326,7 @@ const ObjectBrowser = () => {
                                                     )}
                                                 </div>
                                                 {selectedObjectType.pluralLabel}
+                                                <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
                                             </div>
                                         </div>
                                         <div className="text-gray-600 ml-9">

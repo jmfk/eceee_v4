@@ -17,8 +17,10 @@ import {
     Scissors
 } from 'lucide-react'
 import ConfirmationModal from '../../components/ConfirmationModal'
+import ContextualHelpLink from '../../components/help/ContextualHelpLink'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
 import { generateNewWidgetIds } from '../../utils/widgetClipboard'
+import { getWidgetHelpTopic } from '../../utils/howToHelp'
 import { useClipboard } from '../../contexts/ClipboardContext'
 
 const PageWidgetHeader = ({
@@ -54,6 +56,7 @@ const PageWidgetHeader = ({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isActive, setIsActive] = useState(widget?.config?.isActive !== false);
     const { refreshClipboard } = useClipboard();
+    const helpTopicId = getWidgetHelpTopic(widget?.type || widgetType);
 
     if (!showControls) {
         return null
@@ -291,6 +294,11 @@ const PageWidgetHeader = ({
 
                     {/* Quick actions */}
                     <div className="flex items-center space-x-1">
+                        <ContextualHelpLink
+                            topicId={helpTopicId}
+                            label={`Open ${widgetType} widget help`}
+                            size="sm"
+                        />
                         {onEdit && (
                             <button
                                 onClick={onEdit}

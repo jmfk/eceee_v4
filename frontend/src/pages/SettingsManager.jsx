@@ -43,10 +43,12 @@ import NamespaceManager from '../components/NamespaceManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
 import DataConnectionsManager from '../components/DataConnectionsManager'
 import MigrationManager from '../components/contentMigration/MigrationManager'
+import ContextualHelpLink from '../components/help/ContextualHelpLink'
 import WidgetManager from '../components/WidgetManager'
 import ValueListEditor from '../components/ValueListEditor'
 import SettingsDashboard from '../components/SettingsDashboard'
 import { extractErrorMessage } from '../utils/errorHandling.js'
+import { getSettingsHelpTopic } from '../utils/howToHelp'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
@@ -428,6 +430,12 @@ const SettingsManager = () => {
         <div className="space-y-6 max-w-7xl mx-auto pb-12">
             {/* Tab Content */}
             <div className="bg-white rounded-lg shadow">
+                <div className="flex justify-end px-4 pt-4">
+                    <ContextualHelpLink
+                        topicId={getSettingsHelpTopic(activeTab)}
+                        label="Open Settings help"
+                    />
+                </div>
                 <div>
                     {renderTabContent()}
                 </div>

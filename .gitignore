@@ -70,6 +70,7 @@ backend/.pytest_cache/
 # Production builds
 /build
 /dist
+frontend/howto-video-output/
 
 # IDE
 .vscode/
