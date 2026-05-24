@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # deploy.sh - Deploy eceee_v4 to production
-# Usage: bash deploy/scripts/deploy.sh [TAG|BRANCH]
-#   TAG/BRANCH: git ref to deploy (default: origin/main)
+# Usage: bash deploy/scripts/deploy.sh [TAG|HASH|REF]
+#   TAG/HASH/REF: git ref to deploy (default: origin/main)
 #
 # Runs entirely on the production server.
 # Called by: make prod-deploy (via SSH)
@@ -73,12 +73,12 @@ unset _sk
 
 # ── 2. Determine REF ─────────────────────────────────────────────────────────
 REF="${1:-}"
+git -C "$REPO" fetch origin --tags --prune --quiet
 if [ -z "$REF" ]; then
-    git -C "$REPO" fetch origin --quiet
     REF="origin/main"
 fi
 # Resolve short SHA for Docker image tag (slashes are invalid in image tags)
-IMAGE_TAG=$(git -C "$REPO" rev-parse --short "$REF")
+IMAGE_TAG=$(git -C "$REPO" rev-parse --short "${REF}^{commit}")
 info "Deploying: $REF (image tag: $IMAGE_TAG)"
 
 # ── 3. Backup ─────────────────────────────────────────────────────────────────

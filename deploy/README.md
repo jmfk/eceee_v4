@@ -94,9 +94,13 @@ All commands run from your **local machine** and SSH to the server.
 ### Deploy a new version
 
 ```bash
-make prod-deploy              # deploys latest git tag
+make prod-deploy              # deploys latest origin/main
 make prod-deploy TAG=v0.1.5   # deploys a specific tag
+make prod-deploy TAG=abc1234  # deploys a specific commit hash
 ```
+
+`prod-deploy` resolves the requested ref to a commit hash first, runs preflight
+checks from a temporary worktree at that exact commit, then deploys the same hash.
 
 ### Rollback
 

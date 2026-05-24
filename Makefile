@@ -127,7 +127,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  clean             Clean Python, Node, and Docker artifacts"; \
 		echo ""; \
 		echo "Production Deployment:"; \
-		echo "  prod-deploy       Run lint, tests, regression tests, then deploy (TAG=v0.x.x optional)"; \
+		echo "  prod-deploy       Check and deploy latest main, or a specific TAG/ref/hash"; \
 		echo "  prod-rollback     Rollback to previous deployment"; \
 		echo "  prod-backup       Run ad-hoc production DB backup"; \
 		echo "  prod-logs         Tail production logs (SERVICE=backend optional)"; \
@@ -858,14 +858,15 @@ PROD_HOST ?= root@eceee-vps
 PROD_DIR  ?= /srv/eceee_v4
 TAG       ?=
 
-prod-preflight: ## Run checks required before production deploy
-	$(MAKE) lint
-	$(MAKE) test
-	$(MAKE) regression-test
+prod-preflight: ## Run checks required before production deploy (use: make prod-preflight [TAG=v0.x.x|hash])
+	bash deploy/scripts/preflight.sh "$(TAG)"
 
-prod-deploy: prod-preflight ## Run checks, then deploy to production (use: make prod-deploy [TAG=v0.x.x])
-	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)"
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $(TAG)"
+prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TAG=v0.x.x|hash])
+	@DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
+	echo "Resolved deploy ref: $$DEPLOY_REF"; \
+	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
+	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)"; \
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --tags --prune --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $$DEPLOY_REF"
 
 prod-restart: ## Sync deploy/.env and restart production containers
 	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
