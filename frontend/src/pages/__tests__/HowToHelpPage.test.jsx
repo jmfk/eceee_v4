@@ -23,12 +23,15 @@ describe('HowToHelpPage', () => {
         expect(screen.getAllByRole('link', { name: 'Settings' })[0]).toHaveAttribute('href', '/help/how-to/section/settings')
     })
 
-    it('renders written steps and video placeholders for v1 docs', () => {
+    it('renders written steps and the MP4 player for v1 docs', () => {
         renderPage('/help/how-to/pages-create')
 
         expect(screen.getByRole('heading', { name: 'Create a page' })).toBeInTheDocument()
         expect(screen.getByText('Open Pages from the main navigation.')).toBeInTheDocument()
-        expect(screen.getAllByText('Video coming soon').length).toBeGreaterThan(0)
+        expect(screen.getByRole('link', { name: 'Open MP4 file' })).toHaveAttribute(
+            'href',
+            '/howto-videos/prod/sv/pages-pages-create.mp4'
+        )
     })
 
     it('renders a dedicated route for an individual widget help page', () => {

@@ -1,9 +1,9 @@
 import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { BookOpen, ChevronLeft, ChevronRight, ListChecks, Menu } from 'lucide-react'
 import { useState } from 'react'
-import YouTubeEmbed from '../components/help/YouTubeEmbed'
+import HelpVideoPlayer from '../components/help/HelpVideoPlayer'
 import { howToDocs } from '../data/howToDocs'
-import { getHelpGuidePath, getHelpIndexPath, getHelpSectionPath } from '../utils/howToHelp'
+import { getHelpGuidePath, getHelpIndexPath, getHelpSectionPath, getHelpVideoConfig } from '../utils/howToHelp'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const getAllGuides = () => howToDocs.flatMap(doc => doc.guides.map(guide => ({ ...guide, section: doc })))
@@ -119,7 +119,7 @@ const GuideCard = ({ guide }) => (
 const HelpIndexPage = () => (
     <HelpShell
         title="How-To Help"
-        subtitle="Short admin walkthroughs with written steps, focused markdown files, and space for YouTube videos."
+        subtitle="Short admin walkthroughs with written steps, focused markdown files, and MP4 help videos."
     >
         <div className="space-y-6">
             {howToDocs.map(doc => (
@@ -160,6 +160,8 @@ const HelpGuidePage = () => {
 
     if (!guide) return <Navigate to={getHelpIndexPath()} replace />
 
+    const videoConfig = getHelpVideoConfig(guide, guide.section.id)
+
     return (
         <HelpShell title={guide.title} subtitle={guide.summary}>
             <article className="rounded border border-gray-200 bg-white p-5 sm:p-6">
@@ -171,7 +173,10 @@ const HelpGuidePage = () => {
                     <span>{guide.title}</span>
                 </div>
 
-                <YouTubeEmbed
+                <HelpVideoPlayer
+                    videoUrl={videoConfig.videoUrl}
+                    captionsUrl={videoConfig.captionsUrl}
+                    language={videoConfig.language}
                     youtubeId={guide.youtubeId}
                     youtubeUrl={guide.youtubeUrl}
                     title={`${guide.title} video`}

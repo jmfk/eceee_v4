@@ -93,6 +93,11 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
                 title,
                 summary,
                 order: Number(frontmatter.order || 999),
+                videoUrl: frontmatter.videoUrl || '',
+                mp4Url: frontmatter.mp4Url || '',
+                captionsUrl: frontmatter.captionsUrl || '',
+                subtitlesUrl: frontmatter.subtitlesUrl || '',
+                videoLanguage: frontmatter.videoLanguage || '',
                 youtubeId: frontmatter.youtubeId || '',
                 youtubeUrl: frontmatter.youtubeUrl || '',
                 narration: frontmatter.narration || extractCommentValue(body, 'narration'),
@@ -128,12 +133,22 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
         const guideId = extractCommentValue(guideBody, 'id') || `${id}-${slugify(guide.title)}`
         const youtubeId = extractCommentValue(guideBody, 'youtubeId')
         const youtubeUrl = extractCommentValue(guideBody, 'youtubeUrl')
+        const videoUrl = extractCommentValue(guideBody, 'videoUrl')
+        const mp4Url = extractCommentValue(guideBody, 'mp4Url')
+        const captionsUrl = extractCommentValue(guideBody, 'captionsUrl')
+        const subtitlesUrl = extractCommentValue(guideBody, 'subtitlesUrl')
+        const videoLanguage = extractCommentValue(guideBody, 'videoLanguage')
         const narration = extractCommentValue(guideBody, 'narration')
 
         return {
             id: guideId,
             title: guide.title,
             summary: parseGuideSummary(guideBody),
+            videoUrl,
+            mp4Url,
+            captionsUrl,
+            subtitlesUrl,
+            videoLanguage,
             youtubeId,
             youtubeUrl,
             narration,

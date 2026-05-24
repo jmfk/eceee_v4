@@ -76,7 +76,7 @@ const getContextDocs = (topicId) => {
 }
 
 const GuideMenuItem = ({ guide, onSelect }) => {
-    const hasVideo = Boolean(guide.youtubeId || guide.youtubeUrl)
+    const hasVideo = Boolean(guide.videoUrl || guide.mp4Url || guide.youtubeId || guide.youtubeUrl)
     const hasVideoScript = Array.isArray(guide.actions) && guide.actions.length > 0
 
     return (
@@ -90,7 +90,7 @@ const GuideMenuItem = ({ guide, onSelect }) => {
         >
             <span className="block font-medium text-gray-900">{guide.title}</span>
             <span className="mt-0.5 block text-xs text-gray-500">
-                {hasVideo ? 'Video available' : hasVideoScript ? 'Instructions and video script' : 'Instructions'}
+                {hasVideo ? 'Video available' : hasVideoScript ? 'Instructions and MP4 player' : 'Instructions'}
             </span>
         </a>
     )

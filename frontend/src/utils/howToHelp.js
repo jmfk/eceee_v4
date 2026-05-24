@@ -1,4 +1,5 @@
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/
+const DEFAULT_HELP_VIDEO_LANGUAGE = 'sv'
 
 export const extractYouTubeId = (value) => {
     if (!value || typeof value !== 'string') return ''
@@ -29,6 +30,37 @@ export const extractYouTubeId = (value) => {
     }
 
     return ''
+}
+
+const normalizeVideoLanguage = (language = DEFAULT_HELP_VIDEO_LANGUAGE) => (
+    language.toString().trim().toLowerCase() || DEFAULT_HELP_VIDEO_LANGUAGE
+)
+
+export const getHelpVideoBasePath = (language = DEFAULT_HELP_VIDEO_LANGUAGE) => (
+    `/howto-videos/prod/${normalizeVideoLanguage(language)}`
+)
+
+export const getDefaultHelpVideoPath = (sectionId, guideId, language = DEFAULT_HELP_VIDEO_LANGUAGE, extension = 'mp4') => {
+    if (!sectionId || !guideId) return ''
+
+    const cleanExtension = extension.replace(/^\./, '') || 'mp4'
+    return `${getHelpVideoBasePath(language)}/${sectionId}-${guideId}.${cleanExtension}`
+}
+
+export const getHelpVideoConfig = (guide, sectionId) => {
+    const language = guide?.videoLanguage || DEFAULT_HELP_VIDEO_LANGUAGE
+    const videoUrl = guide?.videoUrl
+        || guide?.mp4Url
+        || getDefaultHelpVideoPath(sectionId, guide?.id, language, 'mp4')
+    const captionsUrl = guide?.captionsUrl
+        || guide?.subtitlesUrl
+        || (videoUrl ? getDefaultHelpVideoPath(sectionId, guide?.id, language, 'vtt') : '')
+
+    return {
+        videoUrl,
+        captionsUrl,
+        language
+    }
 }
 
 const SETTINGS_HELP_TOPICS = {

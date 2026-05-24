@@ -17,6 +17,8 @@ Demo summary.
 ## First Guide
 
 <!-- id: demo-first -->
+<!-- videoUrl: /howto-videos/prod/sv/demo-demo-first.mp4 -->
+<!-- captionsUrl: /howto-videos/prod/sv/demo-demo-first.vtt -->
 <!-- narration: Explain the first guide. -->
 
 This guide does the first thing.
@@ -37,6 +39,8 @@ This guide does the first thing.
             id: 'demo-first',
             title: 'First Guide',
             summary: 'This guide does the first thing.',
+            videoUrl: '/howto-videos/prod/sv/demo-demo-first.mp4',
+            captionsUrl: '/howto-videos/prod/sv/demo-demo-first.vtt',
             narration: 'Explain the first guide.',
             steps: ['Open the page.', 'Confirm the result.']
         })
