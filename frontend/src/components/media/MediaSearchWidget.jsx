@@ -286,8 +286,8 @@ const MediaSearchWidget = ({
                             ref={suggestionsRef}
                             className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
                         >
-                            {/* Show loading state */}
-                            {isSearching && (
+                            {/* Show loading state when there are no cached suggestions to show yet. */}
+                            {isSearching && suggestions.length === 0 && (
                                 <div className="px-4 py-3 text-center text-gray-500">
                                     <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
                                     <span className="text-sm">Searching tags...</span>
@@ -295,7 +295,7 @@ const MediaSearchWidget = ({
                             )}
 
                             {/* Show search results */}
-                            {!isSearching && suggestions.length > 0 && suggestions.map((tag, index) => (
+                            {suggestions.length > 0 && suggestions.map((tag, index) => (
                                 <button
                                     key={tag.id}
                                     type="button"
