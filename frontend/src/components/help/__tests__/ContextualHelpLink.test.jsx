@@ -23,7 +23,7 @@ describe('ContextualHelpLink', () => {
             '/help/how-to/pages-create'
         )
         expect(screen.getByRole('menuitem', { name: /create a page/i })).toHaveAttribute('target', '_blank')
-        expect(screen.getAllByText('Instructions and video script').length).toBeGreaterThan(0)
+        expect(screen.getAllByText('Instructions and MP4 player').length).toBeGreaterThan(0)
     })
 
     it('opens widget-specific help from widget headers', async () => {
