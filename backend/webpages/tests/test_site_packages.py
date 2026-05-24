@@ -1,7 +1,7 @@
 import io
 import json
 import zipfile
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -332,19 +332,29 @@ class SitePackageAPITests(APITestCase):
             last_modified_by=self.user,
         )
 
-    def test_export_filename_uses_hostname_with_random_suffix(self):
-        filename = build_site_package_export_filename(self.root, random_part="abc123")
+    def test_export_filename_uses_hostname_with_export_datetime_and_random_suffix(self):
+        export_datetime = datetime(2026, 5, 24, 13, 14, 15, tzinfo=datetime_timezone.utc)
+        filename = build_site_package_export_filename(
+            self.root,
+            random_part="abc123",
+            export_datetime=export_datetime,
+        )
 
-        self.assertEqual(filename, "www.example.com-abc123.zip")
+        self.assertEqual(filename, "www.example.com-20260524-131415-abc123.zip")
 
     def test_export_filename_falls_back_to_root_title(self):
         self.root.hostnames = []
         self.root.title = "Summer Study 2026"
         self.root.save()
 
-        filename = build_site_package_export_filename(self.root, random_part="abc123")
+        export_datetime = datetime(2026, 5, 24, 13, 14, 15, tzinfo=datetime_timezone.utc)
+        filename = build_site_package_export_filename(
+            self.root,
+            random_part="abc123",
+            export_datetime=export_datetime,
+        )
 
-        self.assertEqual(filename, "summer-study-2026-abc123.zip")
+        self.assertEqual(filename, "summer-study-2026-20260524-131415-abc123.zip")
 
     @patch("webpages.views.site_package_views.export_site_package.delay")
     def test_start_export_job(self, delay):
@@ -361,11 +371,11 @@ class SitePackageAPITests(APITestCase):
         self.assertFalse(job.options["include_themes"])
         self.assertRegex(
             job.object_key,
-            r"^site-packages/exports/www\.example\.com-[0-9a-f]{8}\.zip$",
+            r"^site-packages/exports/www\.example\.com-\d{8}-\d{6}-[0-9a-f]{8}\.zip$",
         )
         self.assertRegex(
             response.data["download_filename"],
-            r"^www\.example\.com-[0-9a-f]{8}\.zip$",
+            r"^www\.example\.com-\d{8}-\d{6}-[0-9a-f]{8}\.zip$",
         )
         delay.assert_called_once_with(str(job.id))
 

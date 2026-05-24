@@ -10,7 +10,7 @@ import re
 import secrets
 import tempfile
 import zipfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 from django.core.files.base import ContentFile
@@ -149,8 +149,19 @@ def _safe_export_filename_part(value: str) -> str:
     return normalized or "site"
 
 
+def _format_export_datetime(export_datetime: Optional[datetime] = None) -> str:
+    export_datetime = export_datetime or timezone.now()
+    if timezone.is_naive(export_datetime):
+        export_datetime = timezone.make_aware(export_datetime, timezone.get_current_timezone())
+    else:
+        export_datetime = timezone.localtime(export_datetime)
+    return export_datetime.strftime("%Y%m%d-%H%M%S")
+
+
 def build_site_package_export_filename(
-    root_page: WebPage, random_part: Optional[str] = None
+    root_page: WebPage,
+    random_part: Optional[str] = None,
+    export_datetime: Optional[datetime] = None,
 ) -> str:
     """
     Build a browser-friendly ZIP filename from the public site identity.
@@ -164,16 +175,19 @@ def build_site_package_export_filename(
         or root_page.slug
         or "site"
     )
-    suffix = random_part or secrets.token_hex(4)
+    random_code = random_part or secrets.token_hex(4)
+    suffix = f"{_format_export_datetime(export_datetime)}-{random_code}"
     return f"{_safe_export_filename_part(site_name)}-{suffix}.zip"
 
 
 def build_site_package_export_object_key(
-    root_page: WebPage, random_part: Optional[str] = None
+    root_page: WebPage,
+    random_part: Optional[str] = None,
+    export_datetime: Optional[datetime] = None,
 ) -> str:
     return (
         "site-packages/exports/"
-        f"{build_site_package_export_filename(root_page, random_part=random_part)}"
+        f"{build_site_package_export_filename(root_page, random_part=random_part, export_datetime=export_datetime)}"
     )
 
 
