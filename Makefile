@@ -30,7 +30,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -127,7 +127,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  clean             Clean Python, Node, and Docker artifacts"; \
 		echo ""; \
 		echo "Production Deployment:"; \
-		echo "  prod-deploy       Push deploy/.env then deploy (TAG=v0.x.x optional)"; \
+		echo "  prod-deploy       Run lint, tests, regression tests, then deploy (TAG=v0.x.x optional)"; \
 		echo "  prod-rollback     Rollback to previous deployment"; \
 		echo "  prod-backup       Run ad-hoc production DB backup"; \
 		echo "  prod-logs         Tail production logs (SERVICE=backend optional)"; \
@@ -858,7 +858,12 @@ PROD_HOST ?= root@eceee-vps
 PROD_DIR  ?= /srv/eceee_v4
 TAG       ?=
 
-prod-deploy: ## Deploy to production (pushes deploy/.env then runs deploy; use: make prod-deploy [TAG=v0.x.x])
+prod-preflight: ## Run checks required before production deploy
+	$(MAKE) lint
+	$(MAKE) test
+	$(MAKE) regression-test
+
+prod-deploy: prod-preflight ## Run checks, then deploy to production (use: make prod-deploy [TAG=v0.x.x])
 	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)"
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $(TAG)"
 
