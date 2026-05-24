@@ -325,38 +325,30 @@ describe('PageTreeNode - Inline Slug Editing', () => {
             { input: 'Test Page', expected: 'test-page' },
             { input: 'Multiple   Spaces', expected: 'multiple-spaces' },
             { input: 'Special!@#$%^&*()Characters', expected: 'specialcharacters' },
-            { input: 'numbers-123-test', expected: 'numbers-123-test' },
+            { input: 'Numbers 123 Test', expected: 'numbers-123-test' },
             { input: 'UPPERCASE-text', expected: 'uppercase-text' },
             { input: '---multiple---dashes---', expected: 'multiple-dashes' },
         ]
 
+        renderWithProviders(
+            <PageTreeNode page={mockPage} level={1} />
+        )
+
+        // Enter edit mode once; each case only needs to validate synchronous normalization.
+        const slugElement = screen.getByText('test-page')
+        await user.click(slugElement)
+
         for (const testCase of testCases) {
-            // Create a fresh render for each test case
-            const { unmount } = renderWithProviders(
-                <PageTreeNode page={mockPage} level={1} />
-            )
+            const inputElement = screen.getByRole('textbox')
+            fireEvent.change(inputElement, { target: { value: testCase.input } })
 
-            // Enter edit mode
-            const slugElement = screen.getByText('test-page')
-            await user.click(slugElement)
-
-            // Enter test input
-            const inputElement = screen.getByDisplayValue('test-page')
-            await user.clear(inputElement)
-            await user.type(inputElement, testCase.input)
-
-            // Click save
             const saveButton = screen.getByTitle('Save slug (Enter)')
-            await user.click(saveButton)
+            fireEvent.click(saveButton)
 
             // Should sanitize to expected format
             await waitFor(() => {
                 expect(screen.getByDisplayValue(testCase.expected)).toBeInTheDocument()
             })
-
-            // Cleanup for next iteration
-            unmount()
-            vi.clearAllMocks()
         }
     })
 })
