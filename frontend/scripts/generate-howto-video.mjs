@@ -11,6 +11,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const frontendRoot = resolve(__dirname, '..')
 const docsDir = join(frontendRoot, 'src/docs/how-to')
 const recordingTempDirName = '.recording-tmp'
+const defaultAnthropicTranslationModel = 'claude-3-5-haiku-20241022'
+const defaultAnthropicTranslationFallbackModels = [
+  'claude-3-5-haiku-latest',
+  'claude-3-haiku-20240307'
+]
 
 const getEnvVoiceIdForLanguage = (language = '') => {
   const normalized = language.toLowerCase()
@@ -47,16 +52,26 @@ const parseArgs = (argv) => {
     elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || '',
     elevenLabsModelId: process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2',
     elevenLabsOutputFormat: process.env.ELEVENLABS_OUTPUT_FORMAT || 'mp3_44100_128',
+    elevenLabsMaxRetries: Number(process.env.ELEVENLABS_MAX_RETRIES || 3),
     audioCacheDir: process.env.HOWTO_AUDIO_CACHE_DIR || join(frontendRoot, 'howto-audio-cache'),
     translationProvider: process.env.HOWTO_TRANSLATION_PROVIDER || '',
-    translationModel: process.env.HOWTO_TRANSLATION_MODEL || 'gpt-5.4-mini',
+    translationModel: process.env.HOWTO_TRANSLATION_MODEL || defaultAnthropicTranslationModel,
+    translationModelFallbacks: (process.env.HOWTO_TRANSLATION_MODEL_FALLBACKS || defaultAnthropicTranslationFallbackModels.join(','))
+      .split(',')
+      .map(model => model.trim())
+      .filter(Boolean),
+    translationFallback: process.env.HOWTO_TRANSLATION_FALLBACK || 'original',
     translationCacheDir: process.env.HOWTO_TRANSLATION_CACHE_DIR || join(frontendRoot, 'howto-translation-cache'),
+    narrationPaddingMs: Number(process.env.HOWTO_NARRATION_PADDING_MS || 1200),
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+    anthropicVersion: process.env.ANTHROPIC_VERSION || '2023-06-01',
     openAiApiKey: process.env.OPENAI_API_KEY || '',
     listVoices: false,
     voiceSearch: process.env.HOWTO_VOICE_SEARCH || '',
     voiceType: process.env.HOWTO_VOICE_TYPE || '',
     voiceCategory: process.env.HOWTO_VOICE_CATEGORY || '',
     voicePageSize: Number(process.env.HOWTO_VOICE_PAGE_SIZE || 20),
+    segmentedNarration: process.env.HOWTO_SEGMENTED_NARRATION !== '0',
     sfx: process.env.HOWTO_SFX === '1',
     help: false
   }
@@ -82,15 +97,23 @@ const parseArgs = (argv) => {
     if (arg === '--voice-id') args.voiceId = next
     if (arg === '--model-id') args.elevenLabsModelId = next
     if (arg === '--audio-cache-dir') args.audioCacheDir = next
-    if (arg === '--translate') args.translationProvider = next && !next.startsWith('--') ? next : 'openai'
+    if (arg === '--translate') args.translationProvider = next && !next.startsWith('--') ? next : 'anthropic'
     if (arg === '--no-translate') args.translationProvider = ''
     if (arg === '--translation-model') args.translationModel = next
+    if (arg === '--translation-model-fallbacks') {
+      args.translationModelFallbacks = (next || '').split(',').map(model => model.trim()).filter(Boolean)
+    }
+    if (arg === '--translation-fallback') args.translationFallback = next
     if (arg === '--translation-cache-dir') args.translationCacheDir = next
+    if (arg === '--narration-padding-ms') args.narrationPaddingMs = Number(next)
     if (arg === '--list-voices') args.listVoices = true
     if (arg === '--voice-search') args.voiceSearch = next
     if (arg === '--voice-type') args.voiceType = next
     if (arg === '--voice-category') args.voiceCategory = next
     if (arg === '--voice-page-size') args.voicePageSize = Number(next)
+    if (arg === '--elevenlabs-max-retries') args.elevenLabsMaxRetries = Number(next)
+    if (arg === '--segmented-narration') args.segmentedNarration = true
+    if (arg === '--linear-narration') args.segmentedNarration = false
     if (arg === '--sfx') args.sfx = true
     if (arg === '--no-sfx') args.sfx = false
     if (arg === '--help' || arg === '-h') args.help = true
@@ -127,8 +150,18 @@ Options:
                             ELEVENLABS_VOICE_ID_SWE, ELEVENLABS_VOICE_ID_ENG,
                             or ELEVENLABS_VOICE_ID.
   --model-id <id>           ElevenLabs model. Defaults to eleven_multilingual_v2.
-  --translate openai        Translate captions/subtitles/narration before TTS.
-  --translation-model <id>  OpenAI translation model. Defaults to gpt-5.4-mini.
+  --translate anthropic     Translate captions/subtitles/narration before TTS.
+  --translation-model <id>  Translation model. Defaults to claude-3-5-haiku-20241022.
+  --translation-model-fallbacks <ids>
+                            Comma-separated Anthropic model fallbacks.
+  --translation-fallback <original|error>
+                            Use original text on translation failure, or fail.
+  --narration-padding-ms <ms>
+                            Extra time after narration before the MP4 ends. Defaults to 1200.
+  --elevenlabs-max-retries <n>
+                            Retry transient ElevenLabs failures. Defaults to 3.
+  --linear-narration       Use one narration track instead of per-step audio.
+  --segmented-narration    Pause, play step audio, run action, then repeat. Default.
   --list-voices             List available ElevenLabs voices, then exit.
   --voice-search <term>     Search voices by name, description, or labels.
   --voice-type <type>       Filter voices. Examples: default, community, workspace, saved.
@@ -167,12 +200,28 @@ const validateArgs = (args) => {
     throw new Error('Set --voice-id or ELEVENLABS_VOICE_ID when using --voice elevenlabs. Use --list-voices to browse options.')
   }
 
-  if (args.translationProvider && args.translationProvider !== 'openai') {
-    throw new Error(`Unsupported --translate "${args.translationProvider}". Use "openai".`)
+  if (args.translationProvider && !['anthropic', 'openai'].includes(args.translationProvider)) {
+    throw new Error(`Unsupported --translate "${args.translationProvider}". Use "anthropic" or "openai".`)
+  }
+
+  if (!['original', 'error'].includes(args.translationFallback)) {
+    throw new Error(`Unsupported --translation-fallback "${args.translationFallback}". Use "original" or "error".`)
   }
 
   if (args.translationProvider === 'openai' && !isEnglishLanguage(args.language) && !args.openAiApiKey) {
     throw new Error('OPENAI_API_KEY is required when using --translate openai.')
+  }
+
+  if (args.translationProvider === 'anthropic' && !isEnglishLanguage(args.language) && !args.anthropicApiKey) {
+    throw new Error('ANTHROPIC_API_KEY is required when using --translate anthropic.')
+  }
+
+  if (!Number.isFinite(args.narrationPaddingMs) || args.narrationPaddingMs < 0) {
+    throw new Error('--narration-padding-ms must be a non-negative number.')
+  }
+
+  if (!Number.isFinite(args.elevenLabsMaxRetries) || args.elevenLabsMaxRetries < 0) {
+    throw new Error('--elevenlabs-max-retries must be a non-negative number.')
   }
 }
 
@@ -268,7 +317,77 @@ const runCommand = (command, commandArgs) => new Promise((resolveCommand, reject
   })
 })
 
-const convertWebmToMp4 = async (webmPath, mp4Path, ffmpegPath, audioPaths = []) => {
+const runCommandCapture = (command, commandArgs) => new Promise((resolveCommand, rejectCommand) => {
+  const child = spawn(command, commandArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
+  const stdout = []
+  const stderr = []
+
+  child.stdout.on('data', chunk => stdout.push(chunk.toString()))
+  child.stderr.on('data', chunk => stderr.push(chunk.toString()))
+  child.on('error', rejectCommand)
+  child.on('close', code => {
+    if (code === 0) {
+      resolveCommand({ stdout: stdout.join(''), stderr: stderr.join('') })
+      return
+    }
+
+    rejectCommand(new Error(`${command} exited with code ${code}\n${stderr.join('')}${stdout.join('')}`))
+  })
+})
+
+const ffprobePathFor = (ffmpegPath) => {
+  if (ffmpegPath.endsWith('/ffmpeg')) {
+    return `${ffmpegPath.slice(0, -'ffmpeg'.length)}ffprobe`
+  }
+
+  return 'ffprobe'
+}
+
+const getMediaDurationSeconds = async (path, ffmpegPath) => {
+  const { stdout } = await runCommandCapture(ffprobePathFor(ffmpegPath), [
+    '-v',
+    'error',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'default=noprint_wrappers=1:nokey=1',
+    path
+  ])
+  const duration = Number(stdout.trim())
+
+  if (!Number.isFinite(duration)) {
+    throw new Error(`Could not read media duration for ${path}`)
+  }
+
+  return duration
+}
+
+const formatDuration = (seconds) => `${seconds.toFixed(1)}s`
+
+const convertWebmToMp4 = async (webmPath, mp4Path, args, audioPaths = []) => {
+  const videoDuration = await getMediaDurationSeconds(webmPath, args.ffmpegPath)
+  const audioDurations = []
+
+  for (const audioPath of audioPaths) {
+    audioDurations.push(await getMediaDurationSeconds(audioPath, args.ffmpegPath))
+  }
+
+  const audioDuration = audioDurations.length > 0 ? Math.max(...audioDurations) : 0
+  const targetDuration = audioDuration > 0 ? audioDuration + (args.narrationPaddingMs / 1000) : videoDuration
+  const padSeconds = Math.max(0, targetDuration - videoDuration)
+  const videoFilterArgs = padSeconds > 0.05
+    ? ['-vf', `tpad=stop_mode=clone:stop_duration=${padSeconds.toFixed(3)}`]
+    : []
+
+  console.log(`    Video duration: ${formatDuration(videoDuration)}`)
+  if (audioDuration > 0) {
+    console.log(`    Audio duration: ${formatDuration(audioDuration)}`)
+  }
+
+  if (padSeconds > 0.05) {
+    console.log(`    Padding video tail: ${formatDuration(padSeconds)} so narration has room`)
+  }
+
   const audioInputs = audioPaths.flatMap(path => ['-i', path])
   const audioArgs = audioPaths.length === 0
     ? ['-an']
@@ -287,7 +406,7 @@ const convertWebmToMp4 = async (webmPath, mp4Path, ffmpegPath, audioPaths = []) 
         '128k'
       ]
 
-  await runCommand(ffmpegPath, [
+  await runCommand(args.ffmpegPath, [
     '-y',
     '-i',
     webmPath,
@@ -300,6 +419,7 @@ const convertWebmToMp4 = async (webmPath, mp4Path, ffmpegPath, audioPaths = []) 
     '23',
     '-pix_fmt',
     'yuv420p',
+    ...videoFilterArgs,
     '-movflags',
     '+faststart',
     ...audioArgs,
@@ -369,27 +489,25 @@ const extractOpenAiText = (response) => {
     .join('\n')
 }
 
-const translateText = async (text, args) => {
-  if (!text || !args.translationProvider || isEnglishLanguage(args.language)) {
+const extractAnthropicText = (response) => (response.content || [])
+  .filter(item => item.type === 'text')
+  .map(item => item.text || '')
+  .filter(Boolean)
+  .join('\n')
+
+const handleTranslationFallback = (text, args, message) => {
+  if (args.translationFallback === 'original') {
+    console.warn(`  ! Translation skipped for ${args.language}: ${message}`)
+    console.warn('    Continuing with original text. Set HOWTO_TRANSLATION_FALLBACK=error to fail instead.')
     return text
   }
 
-  requireFetch()
+  throw new Error(message)
+}
 
-  await mkdir(args.translationCacheDir, { recursive: true })
+const isAnthropicModelMissing = (status, body) => status === 404 && body.includes('not_found_error') && body.includes('model:')
 
-  const cacheKey = hashValue(JSON.stringify({
-    provider: args.translationProvider,
-    model: args.translationModel,
-    language: args.language,
-    text
-  }))
-  const translationPath = join(args.translationCacheDir, `${cacheKey}.txt`)
-
-  if (existsSync(translationPath)) {
-    return readFile(translationPath, 'utf8')
-  }
-
+const translateWithOpenAi = async (text, args) => {
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
@@ -409,21 +527,142 @@ const translateText = async (text, args) => {
   })
 
   if (!response.ok) {
-    throw new Error(`OpenAI translation failed: ${response.status} ${await response.text()}`)
+    return handleTranslationFallback(text, args, `OpenAI translation failed: ${response.status} ${await response.text()}`)
   }
 
   const translated = extractOpenAiText(await response.json()).trim()
   if (!translated) {
-    throw new Error('OpenAI translation returned no text.')
+    return handleTranslationFallback(text, args, 'OpenAI translation returned no text.')
   }
 
-  await writeFile(translationPath, translated, 'utf8')
   return translated
 }
+
+const translateWithAnthropicModel = async (text, args, model) => {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': args.anthropicApiKey,
+      'anthropic-version': args.anthropicVersion
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 900,
+      system: [
+        `Translate admin how-to video text into ${languageName(args.language)}.`,
+        'Preserve product names, UI labels, URLs, file paths, keyboard shortcuts, placeholders, and markdown-like punctuation.',
+        'Return only the translated text, with no commentary.'
+      ].join(' '),
+      messages: [{
+        role: 'user',
+        content: text
+      }]
+    })
+  })
+
+  const responseBody = await response.text()
+  if (!response.ok) {
+    return {
+      ok: false,
+      missingModel: isAnthropicModelMissing(response.status, responseBody),
+      message: `Anthropic translation failed with ${model}: ${response.status} ${responseBody}`
+    }
+  }
+
+  const translated = extractAnthropicText(JSON.parse(responseBody)).trim()
+  if (!translated) {
+    return {
+      ok: false,
+      missingModel: false,
+      message: `Anthropic translation with ${model} returned no text.`
+    }
+  }
+
+  return {
+    ok: true,
+    model,
+    text: translated
+  }
+}
+
+const translateWithAnthropic = async (text, args) => {
+  const models = [...new Set([args.translationModel, ...args.translationModelFallbacks].filter(Boolean))]
+
+  for (const [index, model] of models.entries()) {
+    if (index > 0) {
+      console.log(`    Retrying Anthropic translation with fallback model ${model}`)
+    }
+
+    const result = await translateWithAnthropicModel(text, args, model)
+    if (result.ok) return result.text
+
+    console.warn(`    ${result.message}`)
+    if (!result.missingModel) {
+      return handleTranslationFallback(text, args, result.message)
+    }
+  }
+
+  return handleTranslationFallback(text, args, `Anthropic translation failed: none of these models were available (${models.join(', ')})`)
+}
+
+const translateText = async (text, args) => {
+  if (!text || !args.translationProvider || isEnglishLanguage(args.language)) {
+    return text
+  }
+
+  requireFetch()
+
+  await mkdir(args.translationCacheDir, { recursive: true })
+
+  const cacheKey = hashValue(JSON.stringify({
+    provider: args.translationProvider,
+    model: args.translationModel,
+    language: args.language,
+    text
+  }))
+  const translationPath = join(args.translationCacheDir, `${cacheKey}.txt`)
+
+  if (existsSync(translationPath)) {
+    console.log(`    Translation cache hit (${args.translationProvider})`)
+    return readFile(translationPath, 'utf8')
+  }
+
+  console.log(`    Translating to ${languageName(args.language)} with ${args.translationProvider}/${args.translationModel}`)
+  const translated = args.translationProvider === 'anthropic'
+    ? await translateWithAnthropic(text, args)
+    : await translateWithOpenAi(text, args)
+
+  if (translated !== text || args.translationFallback === 'error') {
+    await writeFile(translationPath, translated, 'utf8')
+  }
+
+  return translated
+}
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 const elevenLabsHeaders = (args) => ({
   'Content-Type': 'application/json',
   'xi-api-key': args.elevenLabsApiKey
+})
+
+const isRetryableElevenLabsStatus = (status) => status === 408 || status === 409 || status === 425 || status === 429 || status >= 500
+
+const requestElevenLabsSpeech = async (url, text, args) => fetch(url, {
+  method: 'POST',
+  headers: elevenLabsHeaders(args),
+  body: JSON.stringify({
+    text,
+    model_id: args.elevenLabsModelId,
+    language_code: args.language,
+    voice_settings: {
+      stability: 0.48,
+      similarity_boost: 0.78,
+      style: 0.18,
+      use_speaker_boost: true
+    }
+  })
 })
 
 const createElevenLabsSpeech = async (text, args) => {
@@ -442,33 +681,38 @@ const createElevenLabsSpeech = async (text, args) => {
   const audioPath = join(args.audioCacheDir, `${cacheKey}.mp3`)
 
   if (existsSync(audioPath)) {
+    console.log(`    Narration cache hit: ${audioPath}`)
     return { audioPath, cached: true }
   }
 
+  console.log(`    Calling ElevenLabs TTS (${text.length} chars)`)
   const url = new URL(`https://api.elevenlabs.io/v1/text-to-speech/${args.voiceId}`)
   url.searchParams.set('output_format', args.elevenLabsOutputFormat)
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: elevenLabsHeaders(args),
-    body: JSON.stringify({
-      text,
-      model_id: args.elevenLabsModelId,
-      language_code: args.language,
-      voice_settings: {
-        stability: 0.48,
-        similarity_boost: 0.78,
-        style: 0.18,
-        use_speaker_boost: true
-      }
-    })
-  })
+  let response
+  let errorText = ''
 
-  if (!response.ok) {
-    throw new Error(`ElevenLabs speech generation failed: ${response.status} ${await response.text()}`)
+  for (let attempt = 1; attempt <= args.elevenLabsMaxRetries + 1; attempt += 1) {
+    response = await requestElevenLabsSpeech(url, text, args)
+
+    if (response.ok) break
+
+    errorText = await response.text()
+    if (!isRetryableElevenLabsStatus(response.status) || attempt > args.elevenLabsMaxRetries) {
+      break
+    }
+
+    const delayMs = Math.min(8000, 750 * (2 ** (attempt - 1)))
+    console.warn(`    ElevenLabs TTS failed (${response.status}), retrying in ${delayMs}ms [${attempt}/${args.elevenLabsMaxRetries}]`)
+    await sleep(delayMs)
+  }
+
+  if (!response?.ok) {
+    throw new Error(`ElevenLabs speech generation failed: ${response?.status} ${errorText}`)
   }
 
   await writeFile(audioPath, Buffer.from(await response.arrayBuffer()))
+  console.log(`    Saved narration: ${audioPath}`)
   return { audioPath, cached: false }
 }
 
@@ -537,6 +781,7 @@ const createSfxTrack = async (events, durationMs, outputPath, args) => {
   if (events.length === 0) return ''
 
   const durationSeconds = Math.max(1, Math.ceil(durationMs / 1000) + 1)
+  console.log(`    Building ${events.length} interface sound event${events.length === 1 ? '' : 's'} over ${formatDuration(durationSeconds)}`)
   const inputs = ['-f', 'lavfi', '-i', `anullsrc=r=44100:cl=stereo:d=${durationSeconds}`]
   const filters = []
   const mixInputs = ['[0:a]']
@@ -554,6 +799,42 @@ const createSfxTrack = async (events, durationMs, outputPath, args) => {
   })
 
   filters.push(`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0[a]`)
+
+  await runCommand(args.ffmpegPath, [
+    '-y',
+    ...inputs,
+    '-filter_complex',
+    filters.join(';'),
+    '-map',
+    '[a]',
+    '-c:a',
+    'mp3',
+    outputPath
+  ])
+
+  return outputPath
+}
+
+const createTimelineAudioTrack = async (events, outputPath, args, label = 'timeline audio') => {
+  if (events.length === 0) return ''
+
+  const endMs = Math.max(...events.map(event => event.at + event.durationMs)) + args.narrationPaddingMs
+  const durationSeconds = Math.max(1, Math.ceil(endMs / 1000))
+  const inputs = ['-f', 'lavfi', '-i', `anullsrc=r=44100:cl=stereo:d=${durationSeconds}`]
+  const filters = []
+  const mixInputs = ['[0:a]']
+
+  events.forEach((event, index) => {
+    const inputIndex = index + 1
+    const delay = Math.max(0, Math.round(event.at))
+
+    inputs.push('-i', event.audioPath)
+    filters.push(`[${inputIndex}:a]adelay=${delay}|${delay}[n${index}]`)
+    mixInputs.push(`[n${index}]`)
+  })
+
+  filters.push(`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0[a]`)
+  console.log(`    Building ${label}: ${events.length} part${events.length === 1 ? '' : 's'} over ${formatDuration(durationSeconds)}`)
 
   await runCommand(args.ffmpegPath, [
     '-y',
@@ -692,7 +973,74 @@ const createContextOptions = (args) => {
   return contextOptions
 }
 
+const guideLabel = ({ doc, guide }) => `${doc.title || doc.id} / ${guide.title || guide.id}`
+
+const safeGuideName = (doc, guide) => `${doc.id}-${guide.id}`.replace(/[^a-z0-9_-]+/gi, '-')
+
+const guideActions = (guide) => (
+  guide.actions.length > 0
+    ? guide.actions
+    : [{ type: 'goto', path: `/help/how-to/${guide.id}`, caption: guide.narration || guide.summary }]
+)
+
+const copyAudioPart = async (sourcePath, partPath) => {
+  if (resolve(sourcePath) !== resolve(partPath)) {
+    await copyFile(sourcePath, partPath)
+  }
+}
+
+const prepareActionSegments = async (args, guide, actions, safeName) => {
+  console.log('  - Preparing per-step narration')
+
+  const segments = []
+
+  for (const [index, action] of actions.entries()) {
+    const sourceCaption = getActionCaption(action, guide, args.language)
+    const caption = await translateText(sourceCaption, args)
+    const segment = {
+      action,
+      caption,
+      audioPath: '',
+      audioDurationMs: 0,
+      cached: false,
+      partIndex: index + 1
+    }
+
+    if (args.voiceProvider === 'elevenlabs' && args.segmentedNarration && caption) {
+      const narration = await createElevenLabsSpeech(caption, args)
+      const partPath = join(args.outputDir, `${safeName}-part-${String(index + 1).padStart(2, '0')}.mp3`)
+
+      await copyAudioPart(narration.audioPath, partPath)
+
+      const durationSeconds = await getMediaDurationSeconds(partPath, args.ffmpegPath)
+      segment.audioPath = partPath
+      segment.audioDurationMs = Math.ceil(durationSeconds * 1000)
+      segment.cached = narration.cached
+
+      console.log(`    Part ${index + 1}: ${formatDuration(durationSeconds)} -> ${partPath}`)
+    }
+
+    segments.push(segment)
+  }
+
+  return segments
+}
+
+const loadInitialFrame = async (page, args) => {
+  console.log('  - Loading initial frame')
+  await page.goto(new URL('/', args.baseUrl).toString(), { waitUntil: 'networkidle' })
+  await page.waitForTimeout(750)
+}
+
 const recordGuide = async (browser, args, { doc, guide }) => {
+  const actions = guideActions(guide)
+  const safeName = safeGuideName(doc, guide)
+  const webmPath = join(args.outputDir, `${safeName}.webm`)
+  const mp4Path = join(args.outputDir, `${safeName}.mp4`)
+  const subtitlesPath = join(args.outputDir, `${safeName}.vtt`)
+  const segments = await prepareActionSegments(args, guide, actions, safeName)
+
+  console.log('  - Capturing browser actions')
   const context = await browser.newContext(createContextOptions(args))
   const page = await context.newPage()
 
@@ -704,45 +1052,60 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     })
   }
 
-  const actions = guide.actions.length > 0
-    ? guide.actions
-    : [{ type: 'goto', path: `/help/how-to/${guide.id}`, caption: guide.narration || guide.summary }]
-
   const cues = []
   const sfxEvents = []
+  const narrationEvents = []
   const startedAt = Date.now()
 
-  for (const action of actions) {
-    const sourceCaption = getActionCaption(action, guide, args.language)
-    const caption = await translateText(sourceCaption, args)
-    const start = Date.now() - startedAt
+  await loadInitialFrame(page, args)
 
+  for (const segment of segments) {
+    const { action, caption } = segment
+    const narrationStart = Date.now() - startedAt
+
+    console.log(`    Part ${segment.partIndex}: narrating "${caption.slice(0, 72)}${caption.length > 72 ? '...' : ''}"`)
     if (args.overlayCaptions) {
       await setCaptionOverlay(page, caption)
     }
 
+    if (segment.audioPath) {
+      narrationEvents.push({
+        audioPath: segment.audioPath,
+        at: narrationStart,
+        durationMs: segment.audioDurationMs,
+        text: caption,
+        partIndex: segment.partIndex
+      })
+      await page.waitForTimeout(segment.audioDurationMs + 300)
+    } else {
+      await page.waitForTimeout(action.preHoldMs || 900)
+    }
+
+    const actionStart = Date.now() - startedAt
+
     if (args.sfx) {
       if (action.type === 'goto') {
-        sfxEvents.push({ type: 'navigate', at: start + 250 })
+        sfxEvents.push({ type: 'navigate', at: actionStart + 250 })
       }
 
       if (action.type === 'click') {
-        sfxEvents.push({ type: 'click', at: start + 250 })
+        sfxEvents.push({ type: 'click', at: actionStart + 250 })
       }
 
       if (action.type === 'fill') {
         const valueLength = String(action.value || '').length
         for (let index = 0; index < valueLength; index += 1) {
-          sfxEvents.push({ type: 'key', at: start + 180 + (index * 55) })
+          sfxEvents.push({ type: 'key', at: actionStart + 180 + (index * 55) })
         }
       }
     }
 
+    console.log(`    Part ${segment.partIndex}: running ${action.type}`)
     await runAction(page, action, args.baseUrl)
     await page.waitForTimeout(action.holdMs || 1500)
 
     cues.push({
-      start,
+      start: narrationStart,
       end: Date.now() - startedAt,
       text: caption
     })
@@ -756,14 +1119,34 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   await page.close()
   await context.close()
 
-  const safeName = `${doc.id}-${guide.id}`.replace(/[^a-z0-9_-]+/gi, '-')
-  const webmPath = join(args.outputDir, `${safeName}.webm`)
-  const mp4Path = join(args.outputDir, `${safeName}.mp4`)
-  const subtitlesPath = join(args.outputDir, `${safeName}.vtt`)
   const audioPaths = []
   const manifestAudio = {}
 
-  if (args.voiceProvider === 'elevenlabs') {
+  if (narrationEvents.length > 0) {
+    console.log('  - Building segmented narration track')
+    const narrationTrackPath = join(args.outputDir, `${safeName}-narration.mp3`)
+    const narrationAudioPath = await createTimelineAudioTrack(narrationEvents, narrationTrackPath, args, 'narration timeline')
+
+    if (narrationAudioPath) {
+      audioPaths.push(narrationAudioPath)
+      manifestAudio.narration = {
+        provider: 'elevenlabs',
+        mode: 'segmented',
+        language: args.language,
+        voiceId: args.voiceId,
+        modelId: args.elevenLabsModelId,
+        audio: narrationAudioPath,
+        parts: narrationEvents.map(event => ({
+          index: event.partIndex,
+          audio: event.audioPath,
+          at: event.at,
+          durationMs: event.durationMs,
+          text: event.text
+        }))
+      }
+    }
+  } else if (args.voiceProvider === 'elevenlabs') {
+    console.log('  - Generating narration')
     const sourceNarrationText = buildNarrationText(guide, cues, args.language)
     const narrationText = await translateText(sourceNarrationText, args)
 
@@ -775,6 +1158,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
         language: args.language,
         voiceId: args.voiceId,
         modelId: args.elevenLabsModelId,
+        mode: 'linear',
         audio: narration.audioPath,
         cached: narration.cached,
         text: narrationText
@@ -783,6 +1167,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   }
 
   if (args.sfx) {
+    console.log('  - Generating interface sounds')
     const sfxPath = join(args.outputDir, `${safeName}-sfx.mp3`)
     const sfxAudioPath = await createSfxTrack(sfxEvents, cues.at(-1)?.end || 1000, sfxPath, args)
 
@@ -803,7 +1188,8 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     }
 
     if (args.format === 'mp4' || args.format === 'both') {
-      await convertWebmToMp4(rawVideoPath, mp4Path, args.ffmpegPath, audioPaths)
+      console.log('  - Encoding MP4')
+      await convertWebmToMp4(rawVideoPath, mp4Path, args, audioPaths)
     }
   } finally {
     await rm(rawVideoPath, { force: true })
@@ -877,13 +1263,20 @@ const main = async () => {
   }
 
   await mkdir(args.outputDir, { recursive: true })
+  console.log(`Preparing ${targets.length} how-to guide${targets.length === 1 ? '' : 's'}.`)
+  console.log(`Base URL: ${args.baseUrl}`)
+  console.log(`Output: ${args.outputDir}`)
+  console.log(`Language: ${args.language}`)
 
   const browser = await chromium.launch({ headless: args.headless })
   const recordings = []
 
   try {
-    for (const target of targets) {
+    for (const [index, target] of targets.entries()) {
+      const label = guideLabel(target)
+      console.log(`[${index + 1}/${targets.length}] Recording ${label}`)
       recordings.push(await recordGuide(browser, args, target))
+      console.log(`[${index + 1}/${targets.length}] Done ${label}`)
     }
   } finally {
     await browser.close()

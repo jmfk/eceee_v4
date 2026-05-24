@@ -215,7 +215,9 @@ SERVER ?= http://localhost:8000
 HOWTO_PROD_BASE_URL ?= https://app.eceee.org
 HOWTO_AUTH_STATE ?= .auth/eceee-prod-storage-state.json
 HOWTO_LANGUAGE ?= sv
-HOWTO_TRANSLATION_PROVIDER ?= openai
+HOWTO_TRANSLATION_PROVIDER ?= anthropic
+HOWTO_TRANSLATION_MODEL ?=
+HOWTO_TRANSLATION_FALLBACK ?= original
 HOWTO_OUTPUT_BASE_DIR ?= $(CURDIR)/frontend/howto-video-output/prod
 HOWTO_OUTPUT_DIR ?= $(HOWTO_OUTPUT_BASE_DIR)/$(HOWTO_LANGUAGE)
 HOWTO_EXTRA_FLAGS ?=
@@ -578,9 +580,15 @@ else
 		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
 		exit 1; \
 	fi
-	@if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -z "$$OPENAI_API_KEY" ]; then \
-		echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
-		exit 1; \
+	@if [ "$(HOWTO_LANGUAGE)" != "en" ]; then \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
+			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
 	fi
 	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
 	case "$(HOWTO_LANGUAGE)" in \
@@ -601,7 +609,7 @@ else
 	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
 	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
 	mkdir -p "$$OUTPUT_DIR"; \
-	npm run howto:video -- --guide "$(GUIDE)" --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --sfx $(HOWTO_EXTRA_FLAGS)
+	npm run howto:video -- --guide "$(GUIDE)" --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
 endif
 
 howto-video-prod-both: ## Generate one narrated help video from production in Swedish and English (use: make howto-video-prod-both GUIDE=pages-create)
@@ -624,9 +632,15 @@ else
 		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
 		exit 1; \
 	fi
-	@if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -z "$$OPENAI_API_KEY" ]; then \
-		echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
-		exit 1; \
+	@if [ "$(HOWTO_LANGUAGE)" != "en" ]; then \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
+			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
 	fi
 	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
 	case "$(HOWTO_LANGUAGE)" in \
@@ -647,7 +661,7 @@ else
 	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
 	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
 	mkdir -p "$$OUTPUT_DIR"; \
-	npm run howto:video:all -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --sfx $(HOWTO_EXTRA_FLAGS)
+	npm run howto:video:all -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
 endif
 
 howto-video-prod-all-both: ## Generate all narrated help videos from production in Swedish and English
