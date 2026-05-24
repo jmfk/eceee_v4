@@ -83,7 +83,7 @@ const isActiveSitePackageJob = (job) => job.status === 'pending' || job.status =
 
 const getDismissedSitePackageJobIds = () => {
     try {
-        return new Set(JSON.parse(localStorage.getItem(SITE_PACKAGE_DISMISSED_JOBS_KEY) || '[]'))
+        return new Set(JSON.parse(localStorage.getItem(SITE_PACKAGE_DISMISSED_JOBS_KEY) || '[]').map(String))
     } catch {
         return new Set()
     }
@@ -91,6 +91,10 @@ const getDismissedSitePackageJobIds = () => {
 
 const persistDismissedSitePackageJobIds = (jobIds) => {
     localStorage.setItem(SITE_PACKAGE_DISMISSED_JOBS_KEY, JSON.stringify([...jobIds]))
+}
+
+const isSitePackageJobDismissed = (jobId) => {
+    return getDismissedSitePackageJobIds().has(String(jobId))
 }
 
 const TreePageManager = () => {
@@ -618,6 +622,10 @@ const TreePageManager = () => {
     }, [])
 
     const upsertSitePackageJob = useCallback((job) => {
+        if (isSitePackageJobDismissed(job.id)) {
+            return
+        }
+
         setSitePackageJobs(prev => {
             const decoratedJob = decorateSitePackageJob(job)
             const existingIndex = prev.findIndex(existingJob => existingJob.id === job.id)
@@ -633,14 +641,23 @@ const TreePageManager = () => {
 
     const removeSitePackageJob = useCallback((jobId) => {
         const dismissedJobIds = getDismissedSitePackageJobIds()
-        dismissedJobIds.add(jobId)
+        dismissedJobIds.add(String(jobId))
         persistDismissedSitePackageJobIds(dismissedJobIds)
+        sitePackagePollingJobsRef.current.delete(jobId)
         setSitePackageJobs(prev => prev.filter(job => job.id !== jobId))
     }, [])
 
     const pollSitePackageJob = useCallback(async ({ jobId, getJob, onCompleted }) => {
         for (let i = 0; i < SITE_PACKAGE_MAX_POLLS; i += 1) {
+            if (isSitePackageJobDismissed(jobId)) {
+                return
+            }
+
             const job = await getJob(jobId)
+            if (isSitePackageJobDismissed(jobId)) {
+                return
+            }
+
             upsertSitePackageJob(job)
 
             if (job.status === 'completed') {
@@ -668,6 +685,10 @@ const TreePageManager = () => {
     const completeSitePackageJob = useCallback(async (completedJob) => {
         if (completedJob.kind === 'export') {
             const download = await sitePackagesApi.getExportDownload(completedJob.id)
+            if (isSitePackageJobDismissed(completedJob.id)) {
+                return
+            }
+
             const downloadUrl = download.downloadUrl || download.download_url
             upsertSitePackageJob({
                 ...completedJob,
@@ -678,6 +699,10 @@ const TreePageManager = () => {
         }
 
         upsertSitePackageJob(completedJob)
+        if (isSitePackageJobDismissed(completedJob.id)) {
+            return
+        }
+
         queryClient.removeQueries({ queryKey: ['pages'] })
         queryClient.removeQueries({ queryKey: ['page-children'] })
         await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
@@ -723,7 +748,7 @@ const TreePageManager = () => {
                     ...getSitePackageJobList(exportResponse),
                     ...getSitePackageJobList(importResponse)
                 ]
-                    .filter(job => isActiveSitePackageJob(job) || !dismissedJobIds.has(job.id))
+                    .filter(job => isActiveSitePackageJob(job) || !dismissedJobIds.has(String(job.id)))
                     .sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0))
 
                 jobs.slice(0, 5).forEach((job) => {
@@ -781,6 +806,10 @@ const TreePageManager = () => {
                 getJob: sitePackagesApi.getExport,
                 onCompleted: async (completedJob) => {
                     const download = await sitePackagesApi.getExportDownload(completedJob.id)
+                    if (isSitePackageJobDismissed(completedJob.id)) {
+                        return
+                    }
+
                     const downloadUrl = download.downloadUrl || download.download_url
                     upsertSitePackageJob({
                         ...completedJob,
@@ -825,6 +854,10 @@ const TreePageManager = () => {
                 jobId: job.id,
                 getJob: sitePackagesApi.getImport,
                 onCompleted: async (completedJob) => {
+                    if (isSitePackageJobDismissed(completedJob.id)) {
+                        return
+                    }
+
                     upsertSitePackageJob({
                         ...completedJob,
                         label: `Import ${file.name}`

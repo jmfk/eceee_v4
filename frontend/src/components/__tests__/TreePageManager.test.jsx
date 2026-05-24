@@ -294,6 +294,52 @@ describe('TreePageManager', () => {
         })
     })
 
+    it('does not restore dismissed completed site package exports after download URL recovery', async () => {
+        const completedJob = {
+            id: '22222222-2222-4222-8222-222222222222',
+            kind: 'export',
+            status: 'completed',
+            rootPageTitle: 'Home Page',
+            downloadAvailable: true,
+            createdAt: '2026-05-23T10:00:00Z'
+        }
+        let resolveDownload
+        const downloadPromise = new Promise(resolve => {
+            resolveDownload = resolve
+        })
+
+        api.get.mockImplementation((url) => {
+            const endpoint = String(url)
+            if (endpoint.endsWith('/site-packages/exports/')) {
+                return Promise.resolve({ data: [completedJob] })
+            }
+            if (endpoint.includes(`/site-packages/exports/${completedJob.id}/download/`)) {
+                return downloadPromise
+            }
+            return Promise.resolve({ data: [] })
+        })
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Export Home Page')).toBeInTheDocument()
+            expect(screen.getByText('Completed')).toBeInTheDocument()
+        })
+        await waitFor(() => {
+            expect(api.get).toHaveBeenCalledWith(expect.stringContaining(`/site-packages/exports/${completedJob.id}/download/`))
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss site package job' }))
+        expect(screen.queryByText('Export Home Page')).not.toBeInTheDocument()
+
+        resolveDownload({ data: { downloadUrl: 'https://example.test/export.zip' } })
+
+        await waitFor(() => {
+            expect(screen.queryByText('Export Home Page')).not.toBeInTheDocument()
+            expect(screen.queryByText('Ready to download')).not.toBeInTheDocument()
+        })
+    })
+
     it('handles error state gracefully', async () => {
         const mockError = new Error('API Error')
         pagesApi.getRootPages.mockRejectedValue(mockError)
