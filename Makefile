@@ -19,7 +19,7 @@ endef
 
 # Help print helper
 define print_help
-	@grep -E '^$(1):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage:\033[0m make %s %s\n", $$1, $$2}'
+	grep -hE '^$(1):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage:\033[0m make %s %s\n", $$1, $$2}'
 endef
 
 # Help check helper
@@ -30,7 +30,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-auth-prod howto-voices howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -42,12 +42,12 @@ endef
 .DEFAULT_GOAL := help
 
 help-%: ## Show help for a specific target
-	$(call print_help,$*)
+	@$(call print_help,$*)
 
 help: ## Show this help message (use: make help [target])
 	@if [ -n "$(filter-out help,$(MAKECMDGOALS))" ]; then \
 		for target in $(filter-out help,$(MAKECMDGOALS)); do \
-			grep -E "^$$target:.*?## " $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage for %s:\033[0m make %s %s\n", $$1, $$1, $$2}'; \
+			grep -hE "^$$target:.*?## " $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage for %s:\033[0m make %s %s\n", $$1, $$1, $$2}'; \
 		done; \
 	else \
 		echo "Available make targets:"; \
@@ -117,6 +117,14 @@ help: ## Show this help message (use: make help [target])
 		echo "  regression-test          Run browser regression tests"; \
 		echo "  playwright-test   Test Playwright service endpoints"; \
 		echo "  lint              Lint frontend code"; \
+		echo ""; \
+		echo "How-To Video Generation:"; \
+		echo "  howto-auth-prod       Save browser auth state for app.eceee.org"; \
+		echo "  howto-voices          List Swedish ElevenLabs voice candidates"; \
+		echo "  howto-video-prod      Generate one narrated prod help video (GUIDE=id, HOWTO_LANGUAGE=sv|en)"; \
+		echo "  howto-video-prod-both Generate one prod help video in Swedish and English (GUIDE=id)"; \
+		echo "  howto-video-prod-all  Generate narrated prod help videos for all guides (HOWTO_LANGUAGE=sv|en)"; \
+		echo "  howto-video-prod-all-both Generate all prod help videos in Swedish and English"; \
 		echo ""; \
 		echo "Docker Management:"; \
 		echo "  docker-up         Start all services with Docker Compose"; \
@@ -204,6 +212,13 @@ changepassword:
 
 # API Token Management
 SERVER ?= http://localhost:8000
+HOWTO_PROD_BASE_URL ?= https://app.eceee.org
+HOWTO_AUTH_STATE ?= .auth/eceee-prod-storage-state.json
+HOWTO_LANGUAGE ?= sv
+HOWTO_TRANSLATION_PROVIDER ?= openai
+HOWTO_OUTPUT_BASE_DIR ?= $(CURDIR)/frontend/howto-video-output/prod
+HOWTO_OUTPUT_DIR ?= $(HOWTO_OUTPUT_BASE_DIR)/$(HOWTO_LANGUAGE)
+HOWTO_EXTRA_FLAGS ?=
 
 create-api-token: ## Create DRF token for user (use: make create-api-token USER=username [SERVER=url])
 	$(call check_help,create-api-token)
@@ -529,6 +544,120 @@ playwright-test:
 # Lint frontend code
 lint:
 	cd frontend && npm run lint
+
+howto-auth-prod: ## Save browser auth state for production help videos
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-auth-prod)
+else
+	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
+	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
+	mkdir -p "$$(dirname "$$AUTH_STATE")"; \
+	echo "Opening browser for $(HOWTO_PROD_BASE_URL). Log in, then close the browser window to save auth state."; \
+	cd frontend && npx playwright codegen --save-storage="$$AUTH_STATE" "$(HOWTO_PROD_BASE_URL)"
+endif
+
+howto-voices: ## List Swedish ElevenLabs voice candidates from repo-root .env
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-voices)
+else
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	npm run howto:voices -- --language "$(HOWTO_LANGUAGE)" $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-prod: ## Generate one narrated help video from production (use: make howto-video-prod GUIDE=pages-create)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod)
+else
+	@if [ -z "$(GUIDE)" ]; then \
+		echo "❌ GUIDE is required. Example: make howto-video-prod GUIDE=pages-create"; \
+		exit 1; \
+	fi
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+		echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+		exit 1; \
+	fi
+	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
+	case "$(HOWTO_LANGUAGE)" in \
+		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
+		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
+	esac; \
+	if [ -z "$$VOICE_ID" ]; then \
+		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
+		exit 1; \
+	fi
+	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
+	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
+	if [ ! -f "$$AUTH_STATE" ]; then \
+		echo "❌ Auth state not found: $$AUTH_STATE"; \
+		echo "Run: make howto-auth-prod"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	npm run howto:video -- --guide "$(GUIDE)" --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-prod-both: ## Generate one narrated help video from production in Swedish and English (use: make howto-video-prod-both GUIDE=pages-create)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod-both)
+else
+	@if [ -z "$(GUIDE)" ]; then \
+		echo "❌ GUIDE is required. Example: make howto-video-prod-both GUIDE=pages-create"; \
+		exit 1; \
+	fi
+	$(MAKE) howto-video-prod GUIDE="$(GUIDE)" HOWTO_LANGUAGE=sv HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/sv"
+	$(MAKE) howto-video-prod GUIDE="$(GUIDE)" HOWTO_LANGUAGE=en HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/en"
+endif
+
+howto-video-prod-all: ## Generate all narrated help videos from production
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod-all)
+else
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+		echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+		exit 1; \
+	fi
+	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
+	case "$(HOWTO_LANGUAGE)" in \
+		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
+		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
+	esac; \
+	if [ -z "$$VOICE_ID" ]; then \
+		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
+		exit 1; \
+	fi
+	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
+	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
+	if [ ! -f "$$AUTH_STATE" ]; then \
+		echo "❌ Auth state not found: $$AUTH_STATE"; \
+		echo "Run: make howto-auth-prod"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	npm run howto:video:all -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-prod-all-both: ## Generate all narrated help videos from production in Swedish and English
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod-all-both)
+else
+	$(MAKE) howto-video-prod-all HOWTO_LANGUAGE=sv HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/sv"
+	$(MAKE) howto-video-prod-all HOWTO_LANGUAGE=en HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/en"
+endif
 
 # Start all services with Docker Compose
 docker-up: infra-up

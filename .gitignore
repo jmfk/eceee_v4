@@ -58,6 +58,7 @@ themes/**/*.conflict
 
 # Testing
 /coverage
+.auth/
 .nyc_output
 .coverage
 .coverage.*
@@ -70,6 +71,8 @@ backend/.pytest_cache/
 # Production builds
 /build
 /dist
+frontend/howto-audio-cache/
+frontend/howto-translation-cache/
 frontend/howto-video-output/
 
 # IDE

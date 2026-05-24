@@ -161,6 +161,8 @@ export const parseHowToMarkdownCollection = (modules) => {
         const parsed = parseHowToMarkdown(source, path.split('/').pop()?.replace(/\.md$/, ''))
 
         if (parsed.type === 'guide') {
+            parsed.guide.sourcePath = path
+
             if (!sections.has(parsed.sectionId)) {
                 sections.set(parsed.sectionId, {
                     type: 'section',
@@ -181,13 +183,18 @@ export const parseHowToMarkdownCollection = (modules) => {
             return
         }
 
+        const sectionWithSourcePaths = {
+            ...parsed,
+            guides: parsed.guides.map(guide => ({ ...guide, sourcePath: path }))
+        }
+
         if (!sections.has(parsed.id)) {
-            sections.set(parsed.id, parsed)
+            sections.set(parsed.id, sectionWithSourcePaths)
             return
         }
 
         const section = sections.get(parsed.id)
-        section.guides.push(...parsed.guides)
+        section.guides.push(...parsed.guides.map(guide => ({ ...guide, sourcePath: path })))
     })
 
     return [...sections.values()]

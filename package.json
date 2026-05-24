@@ -3,6 +3,9 @@
     "husky": "^9.1.7"
   },
   "scripts": {
+    "howto:video": "npm --prefix frontend run howto:video --",
+    "howto:video:all": "npm --prefix frontend run howto:video:all --",
+    "howto:voices": "npm --prefix frontend run howto:voices --",
     "prepare": "husky"
   }
 }
