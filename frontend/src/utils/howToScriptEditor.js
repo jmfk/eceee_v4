@@ -294,7 +294,7 @@ export const normalizeScriptBlock = (block = {}, fallbackCaption = '') => {
         : block.action && typeof block.action === 'object'
         ? block.action
         : block
-    const caption = trimString(block.caption ?? actionSource?.caption ?? fallbackCaption ?? '')
+    const caption = textValue(block.caption ?? actionSource?.caption ?? fallbackCaption ?? '')
 
     return {
         caption,

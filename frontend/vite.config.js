@@ -224,20 +224,20 @@ const extractAnthropicText = (response) => (response.content || [])
   .filter(Boolean)
   .join('\n')
 
-const markdownFileNameForIdentity = (guideId, uuid = '', language = '') => [
-  safeSegment(uuid || guideId, 'guide'),
+const markdownFileNameForIdentity = (guideId, language = '') => [
+  safeSegment(guideId, 'guide'),
   safeSegment(language, 'en')
 ].filter(Boolean).join('.').concat('.md')
 
-const translationPathFor = (sectionId, guideId, language, uuid = '') => path.join(
+const translationPathFor = (sectionId, guideId, language) => path.join(
   translationsRoot,
   safeSegment(language, 'sv'),
-  markdownFileNameForIdentity(guideId, uuid, language)
+  markdownFileNameForIdentity(guideId, language)
 )
 
-const originPathFor = (sectionId, guideId, uuid = '') => path.join(
+const originPathFor = (sectionId, guideId) => path.join(
   docsRoot,
-  markdownFileNameForIdentity(guideId, uuid, 'en')
+  markdownFileNameForIdentity(guideId, 'en')
 )
 
 const readMarkdownFrontmatter = (filePath) => {
@@ -266,10 +266,12 @@ const readMarkdownFrontmatter = (filePath) => {
     }, {})
 }
 
-const findMarkdownByIdentity = (rootDir, { guideId = '', uuid = '' } = {}) => {
+const findMarkdownByIdentity = (rootDir, { guideId = '', uuid = '', language = '' } = {}) => {
   if (!existsSync(rootDir)) return ''
 
   const matches = []
+  const canonicalName = guideId && language ? markdownFileNameForIdentity(guideId, language) : ''
+
   const visit = (dir) => {
     readdirSync(dir, { withFileTypes: true }).forEach(entry => {
       const entryPath = path.join(dir, entry.name)
@@ -285,13 +287,19 @@ const findMarkdownByIdentity = (rootDir, { guideId = '', uuid = '' } = {}) => {
       const fileUuid = frontmatter.uuid || frontmatter.guideUuid || ''
       const fileId = frontmatter.id || ''
 
-      if (uuid && fileUuid === uuid) {
-        matches.push({ path: entryPath, score: 2 })
+      if (canonicalName && entry.name === canonicalName) {
+        matches.push({ path: entryPath, score: 4 })
         return
       }
 
       if (guideId && fileId === guideId) {
+        matches.push({ path: entryPath, score: 3 })
+        return
+      }
+
+      if (uuid && fileUuid === uuid) {
         matches.push({ path: entryPath, score: 1 })
+        return
       }
     })
   }
@@ -380,22 +388,21 @@ const markdownPathForLanguage = (sectionId, guideId, language, identity = {}) =>
   const rootDir = normalizedLanguage === 'en'
     ? docsRoot
     : path.join(translationsRoot, normalizedLanguage)
-  const existingPath = findMarkdownByIdentity(rootDir, { guideId, uuid })
+  const existingPath = findMarkdownByIdentity(rootDir, { guideId, uuid, language: normalizedLanguage })
 
   if (existingPath) return existingPath
 
   return normalizedLanguage === 'en'
-    ? originPathFor(sectionId, guideId, uuid)
-    : translationPathFor(sectionId, guideId, language, uuid)
+    ? originPathFor(sectionId, guideId)
+    : translationPathFor(sectionId, guideId, normalizedLanguage)
 }
 
 const canonicalMarkdownPathForLanguage = (sectionId, guideId, language, identity = {}) => {
   const normalizedLanguage = safeSegment(language || 'en', 'en')
-  const uuid = identity.uuid || identity.guideUuid || ''
 
   return normalizedLanguage === 'en'
-    ? originPathFor(sectionId, guideId, uuid)
-    : translationPathFor(sectionId, guideId, normalizedLanguage, uuid)
+    ? originPathFor(sectionId, guideId)
+    : translationPathFor(sectionId, guideId, normalizedLanguage)
 }
 
 const setFrontmatterValue = (markdown, key, value) => {
@@ -615,11 +622,12 @@ const copyFileWithUndo = async (operation, sourcePath, targetPath) => {
   await copyFile(sourcePath, targetPath)
 }
 
-const writeMarkdownWithOptionalMove = async (operation, sourcePath, targetPath, markdown) => {
+const writeMarkdownWithOptionalMove = async (operation, sourcePath, targetPath, markdown, options = {}) => {
   const resolvedSourcePath = sourcePath ? path.resolve(sourcePath) : ''
   const resolvedTargetPath = path.resolve(targetPath)
+  const allowOverwrite = Boolean(options.allowOverwrite)
 
-  if (resolvedSourcePath && resolvedSourcePath !== resolvedTargetPath && existsSync(resolvedTargetPath)) {
+  if (resolvedSourcePath && resolvedSourcePath !== resolvedTargetPath && existsSync(resolvedTargetPath) && !allowOverwrite) {
     throw new Error(`Refusing to overwrite existing markdown file: ${path.relative(__dirname, resolvedTargetPath)}`)
   }
 
@@ -628,6 +636,10 @@ const writeMarkdownWithOptionalMove = async (operation, sourcePath, targetPath, 
     await writeFileWithUndo(operation, resolvedTargetPath, markdown, 'utf8')
     await rm(resolvedSourcePath, { force: true })
     return
+  }
+
+  if (!resolvedSourcePath && existsSync(resolvedTargetPath) && !allowOverwrite) {
+    throw new Error(`Markdown file already exists: ${path.relative(__dirname, resolvedTargetPath)}`)
   }
 
   await writeFileWithUndo(operation, resolvedTargetPath, markdown, 'utf8')
@@ -763,9 +775,10 @@ Target section hint: ${requestedSection || '(choose the best existing section)'}
 Video languages: ${languageList}
 
 Requirements:
-- Create exactly one new English markdown file under frontend/src/docs/how-to/<uuid>.en.md. Do not put the section in the file path.
+- Create exactly one new English markdown file under frontend/src/docs/how-to/<guide-id>.en.md. Do not put the section in the file path.
 - Use the existing help-doc format in frontend/src/docs/how-to as the source of truth.
-- Include frontmatter with uuid, id, title, summary, order, language, sectionId, sectionTitle, sectionSummary, sectionOrder, videoLanguage, and videoLanguages.
+- Include frontmatter with id, title, summary, order, language, sectionId, sectionTitle, sectionSummary, sectionOrder, videoLanguage, and videoLanguages.
+- The id frontmatter is the Guide ID and must match the markdown filename.
 - Use sectionId/sectionTitle frontmatter to choose where the manuscript browser shows the guide.
 - Use the sequential editor format: a \`\`\`video-script JSON block with blocks that can be caption-only, action-only, or both.
 - Use "caption" for spoken text. Do not introduce the old Narration/Goal/Why/Outcome sections unless an existing local pattern requires it.
@@ -908,7 +921,9 @@ const howToScriptEditorPlugin = () => ({
 
       try {
         const body = await readRequestJson(req)
-        const targetPath = resolveHowToSourcePath(body.sourcePath, body.sectionId, body.guideId)
+        const targetPath = body.sourcePath
+          ? resolveHowToSourcePath(body.sourcePath, body.sectionId, body.guideId)
+          : markdownPathForLanguage(body.sectionId, body.guideId, body.language || 'en', body)
 
         if (!existsSync(targetPath)) {
           throw new Error(`Markdown file not found: ${path.relative(__dirname, targetPath)}`)
@@ -1104,12 +1119,18 @@ const howToScriptEditorPlugin = () => ({
           throw new Error('Markdown is empty.')
         }
 
-        const sourcePath = resolveHowToSourcePath(body.sourcePath, body.sectionId, body.guideId)
+        const sourcePath = body.sourcePath
+          ? resolveHowToSourcePath(body.sourcePath, body.sectionId, body.guideId)
+          : ''
         const targetPath = body.useCanonicalPath
           ? canonicalMarkdownPathForLanguage(body.sectionId, body.guideId, body.language || 'en', body)
           : sourcePath
 
-        if (body.requireExisting && !existsSync(sourcePath)) {
+        if (!targetPath) {
+          throw new Error('Guide ID is required before saving markdown.')
+        }
+
+        if (body.requireExisting && (!sourcePath || !existsSync(sourcePath))) {
           throw new Error(`Refusing to overwrite missing file: ${path.relative(__dirname, sourcePath)}`)
         }
 
@@ -1118,7 +1139,9 @@ const howToScriptEditorPlugin = () => ({
           body.appendToUndoId || ''
         )
 
-        await writeMarkdownWithOptionalMove(undoOperation, sourcePath, targetPath, markdown)
+        await writeMarkdownWithOptionalMove(undoOperation, sourcePath, targetPath, markdown, {
+          allowOverwrite: Boolean(body.allowOverwrite)
+        })
         const undo = commitUndoOperation(undoOperation)
 
         sendJson(res, 200, {
@@ -1319,7 +1342,9 @@ const howToScriptEditorPlugin = () => ({
           undoOperation
         })
 
-        await writeMarkdownWithOptionalMove(undoOperation, sourcePath, targetPath, markdown)
+        await writeMarkdownWithOptionalMove(undoOperation, sourcePath, targetPath, markdown, {
+          allowOverwrite: true
+        })
         const undo = commitUndoOperation(undoOperation)
 
         sendJson(res, 200, {

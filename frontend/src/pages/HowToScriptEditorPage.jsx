@@ -47,6 +47,13 @@ const getGuideOptions = () => howToDocs.flatMap(section => (
     section.guides.map(guide => ({ section, guide }))
 ))
 
+const normalizeGuideIdInput = (value = '') => value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
 const getReadableSourcePath = (sourcePath = '') => sourcePath
     .replace(/^\.\.\//, 'frontend/src/')
     .replace(/^src\//, 'frontend/src/')
@@ -250,7 +257,7 @@ const FieldLabel = ({ children }) => (
     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">{children}</label>
 )
 
-const TextInput = ({ label, value, onChange, placeholder = '', type = 'text', disabled = false, onBlur, onKeyDown }) => (
+const TextInput = ({ label, value, onChange, placeholder = '', type = 'text', disabled = false, readOnly = false, onBlur, onKeyDown }) => (
     <div>
         <FieldLabel>{label}</FieldLabel>
         <input
@@ -258,10 +265,11 @@ const TextInput = ({ label, value, onChange, placeholder = '', type = 'text', di
             value={value ?? ''}
             placeholder={placeholder}
             disabled={disabled}
+            readOnly={readOnly}
             onChange={event => onChange(event.target.value)}
             onBlur={onBlur}
             onKeyDown={onKeyDown}
-            className="mt-1 w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+            className="mt-1 w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 read-only:bg-gray-50 read-only:text-gray-600"
         />
     </div>
 )
@@ -463,8 +471,8 @@ const MetadataChangeConfirmModal = ({ change, isApplying, onConfirm, onCancel })
     const isGuideIdChange = change.kind === 'guide-id'
     const title = isGuideIdChange ? 'Change Guide ID?' : 'Change section?'
     const description = isGuideIdChange
-        ? 'The markdown file stays UUID-based, but the current preview video link is cleared so the next render creates a video with the new Guide ID.'
-        : 'The markdown file stays UUID-based. The manuscript browser will move this guide because its section frontmatter changes.'
+        ? 'Guide ID changes are saved as file operations. The current preview video link is cleared so the next render uses the new Guide ID.'
+        : 'The markdown file path stays based on Guide ID. The manuscript browser will move this guide because its section frontmatter changes.'
     const fromValue = isGuideIdChange ? change.previousId : change.previousSectionTitle
     const toValue = isGuideIdChange ? change.nextId : change.nextSectionTitle
 
@@ -506,6 +514,77 @@ const MetadataChangeConfirmModal = ({ change, isApplying, onConfirm, onCancel })
                     </button>
                 </div>
             </div>
+        </div>
+    )
+}
+
+const SaveAsModal = ({ isOpen, guideId, overwrite, error, isSaving, onGuideIdChange, onOverwriteChange, onSubmit, onClose }) => {
+    if (!isOpen) return null
+
+    const normalizedGuideId = normalizeGuideIdInput(guideId)
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 px-4 py-6">
+            <form
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="save-as-title"
+                onSubmit={event => {
+                    event.preventDefault()
+                    if (normalizedGuideId) onSubmit(normalizedGuideId)
+                }}
+                className="w-full max-w-md rounded border border-gray-200 bg-white p-4 shadow-xl"
+            >
+                <h2 id="save-as-title" className="text-base font-semibold text-gray-900">Save manuscript as</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                    The Guide ID is the filename identity on disk. The section comes from the markdown frontmatter.
+                </p>
+                <div className="mt-4">
+                    <TextInput
+                        label="Guide ID"
+                        value={guideId}
+                        onChange={onGuideIdChange}
+                        placeholder="pages-create-demo"
+                        disabled={isSaving}
+                    />
+                    {guideId && guideId !== normalizedGuideId && (
+                        <p className="mt-1 text-xs text-gray-500">Will save as <code>{normalizedGuideId}</code>.</p>
+                    )}
+                </div>
+                <label className="mt-4 flex items-start gap-2 text-sm text-gray-700">
+                    <input
+                        type="checkbox"
+                        checked={overwrite}
+                        disabled={isSaving}
+                        onChange={event => onOverwriteChange(event.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Overwrite if this Guide ID already exists.</span>
+                </label>
+                {error && (
+                    <div className="mt-3 rounded border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-800">
+                        {error}
+                    </div>
+                )}
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isSaving}
+                        className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={!normalizedGuideId || isSaving}
+                        className="inline-flex items-center gap-2 rounded bg-green-700 px-3 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <Save className="h-4 w-4" />
+                        {isSaving ? 'Saving...' : 'Save As'}
+                    </button>
+                </div>
+            </form>
         </div>
     )
 }
@@ -972,8 +1051,8 @@ const QualityPanel = ({
     const hasErrors = issues.some(issue => issue.level === 'error')
     const translationTargetLanguage = activeLanguage === DEFAULT_EDITOR_LANGUAGE ? 'sv' : DEFAULT_EDITOR_LANGUAGE
     const translationButtonLabel = activeLanguage === DEFAULT_EDITOR_LANGUAGE
-        ? 'Re-translate Swedish'
-        : 'Sync to English'
+        ? 'Translate to Swedish'
+        : 'Translate to English'
 
     return (
         <aside className="space-y-4">
@@ -1007,7 +1086,7 @@ const QualityPanel = ({
             </section>
 
             <section className="rounded border border-gray-200 bg-white p-4">
-                <h2 className="text-base font-semibold text-gray-900">Kontroll</h2>
+                <h2 className="text-base font-semibold text-gray-900">Review</h2>
                 <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
                     <div className="rounded bg-gray-50 p-3">
                         <dt className="text-xs text-gray-500">Block</dt>
@@ -1029,7 +1108,7 @@ const QualityPanel = ({
                     {issues.length === 0 ? (
                         <div className="flex items-center gap-2 rounded bg-green-50 px-3 py-2 text-sm text-green-800">
                             <CheckCircle2 className="h-4 w-4" />
-                            Ser redo ut
+                            Looks ready
                         </div>
                     ) : issues.map((issue, index) => (
                         <div
@@ -1197,7 +1276,14 @@ const HowToScriptEditorPage = () => {
     const [isTranslationLogClosed, setIsTranslationLogClosed] = useState(false)
     const [undoInfo, setUndoInfo] = useState(null)
     const [processLogSource, setProcessLogSource] = useState('video')
-    const [guideIdInput, setGuideIdInput] = useState('')
+    const [loadGuideId, setLoadGuideId] = useState('')
+    const [saveAsState, setSaveAsState] = useState({
+        isOpen: false,
+        guideId: '',
+        overwrite: false,
+        error: '',
+        isSaving: false
+    })
     const [pendingMetadataChange, setPendingMetadataChange] = useState(null)
     const [isApplyingMetadataChange, setIsApplyingMetadataChange] = useState(false)
 
@@ -1290,10 +1376,28 @@ const HowToScriptEditorPage = () => {
         : ''
     const pagePreviewLanguage = activeDraftLanguage
     const renderLanguages = [activeDraftLanguage]
+    const browserSections = useMemo(() => sectionOptions.map(section => {
+        const docsSection = howToDocs.find(candidate => candidate.id === section.id)
+        const guides = [...(docsSection?.guides || [])]
 
-    useEffect(() => {
-        setGuideIdInput(activeDraft?.id || '')
-    }, [activeDraft?.id, activePreviewKey])
+        openDrafts
+            .filter(draft => draft.sourcePath && draft.sectionId === section.id)
+            .forEach(draft => {
+                if (guides.some(guide => guide.id === draft.id)) return
+                guides.push({
+                    id: draft.id,
+                    title: draft.title || draft.id,
+                    summary: draft.summary || '',
+                    order: Number(draft.order || 999),
+                    sourcePath: draft.sourcePath
+                })
+            })
+
+        return {
+            ...section,
+            guides: guides.sort((a, b) => Number(a.order || 999) - Number(b.order || 999) || a.title.localeCompare(b.title))
+        }
+    }), [openDrafts, sectionOptions])
 
     const loadRenderLogs = async () => {
         const response = await fetch('/__howto-script-editor/render-logs')
@@ -1471,33 +1575,6 @@ const HowToScriptEditorPage = () => {
         setClosedLogById(current => ({ ...current, [activePreviewKey]: true }))
     }
 
-    const requestGuideIdChange = (id) => {
-        if (isRendering || !activeDraft) return
-
-        const nextId = id.trim()
-        const currentId = activeDraft.id || ''
-        if (nextId === currentId) return
-        if (!nextId) {
-            setGuideIdInput(currentId)
-            toast.error('Guide ID cannot be empty.')
-            return
-        }
-
-        const nextVideoLinks = { ...(activeDraft.videoLinks || {}) }
-        delete nextVideoLinks[activeDraftLanguage]
-
-        setPendingMetadataChange({
-            kind: 'guide-id',
-            previousId: currentId,
-            nextId,
-            nextDraft: {
-                ...activeDraft,
-                id: nextId,
-                videoLinks: nextVideoLinks
-            }
-        })
-    }
-
     const requestSectionChange = (sectionId) => {
         if (isRendering || !activeDraft) return
 
@@ -1526,7 +1603,6 @@ const HowToScriptEditorPage = () => {
     }
 
     const cancelMetadataChange = () => {
-        setGuideIdInput(activeDraft?.id || '')
         setPendingMetadataChange(null)
     }
 
@@ -1543,7 +1619,6 @@ const HowToScriptEditorPage = () => {
         setOpenDrafts(current => current.map(draft => (
             getDraftSessionKey(draft) === activePreviewKey ? nextDraft : draft
         )))
-        setGuideIdInput(nextDraft.id || '')
         clearCurrentVideoState()
         navigate(getScriptEditorPath(nextDraft.id, nextDraft.language || activeDraftLanguage), { replace: true })
         editorSession.activeDraftKey = nextDraftKey
@@ -1716,6 +1791,48 @@ const HowToScriptEditorPage = () => {
         navigate(getScriptEditorPath(option.guide.id, language))
     }
 
+    const openGuideByGuideId = async (event) => {
+        event.preventDefault()
+        if (isRendering) return
+
+        const guideId = normalizeGuideIdInput(loadGuideId)
+        if (!guideId) return
+
+        const language = activeDraftLanguage || routeLanguage
+        const option = getGuideOptionById(guideOptions, guideId)
+        if (option) {
+            openGuide(option)
+            return
+        }
+
+        try {
+            const endpoint = language === DEFAULT_EDITOR_LANGUAGE
+                ? '/__howto-script-editor/open-source'
+                : '/__howto-script-editor/open-translation'
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    guideId,
+                    sectionId: activeDraft?.sectionId || '',
+                    language
+                })
+            })
+            const data = await response.json()
+
+            if (!response.ok) throw new Error(data.error || 'Could not load manuscript')
+            if (data.exists === false) throw new Error(`No ${language.toUpperCase()} manuscript found for ${guideId}`)
+
+            const draft = withWorkingLanguage(draftFromMarkdown(data.markdown, data.sourcePath, language, guideId), language)
+            upsertDraft(draft, { guideId: draft.id, language })
+            setLoadGuideId('')
+            navigate(getScriptEditorPath(draft.id, language))
+            toast.success(`Opened ${draft.id}`)
+        } catch (error) {
+            toast.error(error.message)
+        }
+    }
+
     const closeDraft = (draftKey) => {
         if (isRendering) return
         const next = openDrafts.filter(draft => getDraftSessionKey(draft) !== draftKey)
@@ -1750,21 +1867,32 @@ const HowToScriptEditorPage = () => {
         updateScript(script)
     }
 
-    const resetDraft = () => {
+    const revertToSavedVersion = async () => {
         if (isRendering) return
-        const option = guideOptions.find(candidate => candidate.guide.id === activeDraft.id)
-        if (!option) return
-        const next = loadDraftForGuide(option, activeDraftLanguage)
-        upsertDraft(next, { guideId: activeDraft.id, language: activeDraftLanguage })
-        toast.success('Utkast återställt')
+
+        try {
+            if (activeDraft?.sourcePath) {
+                await reloadActiveDraftFromDisk()
+                toast.success('Reverted to saved version')
+                return
+            }
+
+            const option = guideOptions.find(candidate => candidate.guide.id === activeDraft.id)
+            if (!option) return
+            const next = loadDraftForGuide(option, activeDraftLanguage)
+            upsertDraft(next, { guideId: activeDraft.id, language: activeDraftLanguage })
+            toast.success('Reverted to saved version')
+        } catch (error) {
+            toast.error(error.message)
+        }
     }
 
     const copyMarkdown = async () => {
         try {
             await writeClipboardText(markdown)
-            toast.success('Markdown kopierad')
+            toast.success('Markdown copied')
         } catch {
-            toast.error('Kunde inte kopiera markdown')
+            toast.error('Could not copy markdown')
         }
     }
 
@@ -1791,6 +1919,7 @@ const HowToScriptEditorPage = () => {
                 markdown: markdownText,
                 requireExisting: options.requireExisting !== false,
                 useCanonicalPath: options.useCanonicalPath !== false,
+                allowOverwrite: Boolean(options.allowOverwrite),
                 appendToUndoId: options.appendToUndoId || '',
                 undoLabel: options.undoLabel || ''
             })
@@ -1802,16 +1931,89 @@ const HowToScriptEditorPage = () => {
         return data
     }
 
+    const openSaveAsModal = (guideId = activeDraft?.id || '') => {
+        setSaveAsState({
+            isOpen: true,
+            guideId,
+            overwrite: false,
+            error: '',
+            isSaving: false
+        })
+    }
+
+    const closeSaveAsModal = () => {
+        if (saveAsState.isSaving) return
+        setSaveAsState(current => ({ ...current, isOpen: false, error: '' }))
+    }
+
+    const saveMarkdownAs = async (guideId) => {
+        const nextGuideId = normalizeGuideIdInput(guideId)
+        if (!nextGuideId || isRendering) return
+
+        setSaveAsState(current => ({ ...current, isSaving: true, error: '' }))
+
+        try {
+            const nextVideoLinks = { ...(activeDraft.videoLinks || {}) }
+            delete nextVideoLinks[activeDraftLanguage]
+            const nextDraft = withDraftSessionKey({
+                ...activeDraft,
+                id: nextGuideId,
+                uuid: '',
+                sourcePath: '',
+                videoLinks: nextVideoLinks,
+                videoLanguage: activeDraftLanguage,
+                videoLanguages: [activeDraftLanguage]
+            }, nextGuideId, activeDraftLanguage)
+            const nextMarkdown = createMarkdownFromDraft(nextDraft)
+            const data = await saveDraftMarkdownToDisk(nextDraft, nextMarkdown, {
+                requireExisting: false,
+                allowOverwrite: saveAsState.overwrite,
+                undoLabel: `Save as ${nextGuideId}`
+            })
+            const savedDraft = withDraftSessionKey({
+                ...nextDraft,
+                sourcePath: data.sourcePath || nextDraft.sourcePath
+            }, nextGuideId, activeDraftLanguage)
+            const savedDraftKey = getDraftSessionKey(savedDraft)
+
+            setOpenDrafts(current => current.map(draft => (
+                getDraftSessionKey(draft) === activePreviewKey ? savedDraft : draft
+            )))
+            setActiveDraftKey(savedDraftKey)
+            editorSession.activeDraftKey = savedDraftKey
+            clearCurrentVideoState()
+            if (data.undo) setUndoInfo(data.undo)
+            setSaveAsState(current => ({ ...current, isOpen: false, isSaving: false, error: '' }))
+            navigate(getScriptEditorPath(nextGuideId, activeDraftLanguage), { replace: true })
+            toast.success(`Saved ${getReadableSourcePath(data.sourcePath || savedDraft.sourcePath)}`)
+        } catch (error) {
+            setSaveAsState(current => ({ ...current, isSaving: false, error: error.message }))
+            toast.error(error.message)
+        }
+    }
+
     const saveMarkdownToDisk = async () => {
         if (isRendering) return
-        try {
-            const data = await saveDraftMarkdownToDisk(activeDraft, markdown, { requireExisting: true })
+        if (!activeDraft?.id || !activeDraft?.sourcePath) {
+            openSaveAsModal(activeDraft?.id || '')
+            return
+        }
 
+        if (!window.confirm(`Save changes to ${getReadableSourcePath(activeDraft.sourcePath)}? This overwrites the saved markdown file.`)) {
+            return
+        }
+
+        try {
+            const data = await saveDraftMarkdownToDisk(activeDraft, markdown, {
+                requireExisting: true,
+                allowOverwrite: true,
+                undoLabel: `Save ${activeDraft.id}`
+            })
 
             const nextSourcePath = data.sourcePath || activeDraft.sourcePath
             updateActiveDraft({ sourcePath: nextSourcePath })
             if (data.undo) setUndoInfo(data.undo)
-            toast.success(`Overwrote ${getReadableSourcePath(nextSourcePath)}`)
+            toast.success(`Saved ${getReadableSourcePath(nextSourcePath)}`)
         } catch (error) {
             toast.error(error.message)
         }
@@ -2363,8 +2565,8 @@ const HowToScriptEditorPage = () => {
         return (
             <div className="min-h-screen bg-gray-50 px-6 py-8">
                 <div className="mx-auto max-w-4xl rounded border border-gray-200 bg-white p-6">
-                    <h1 className="text-xl font-semibold text-gray-900">Inga guider hittades</h1>
-                    <p className="mt-2 text-sm text-gray-600">Lägg till markdownfiler under `frontend/src/docs/how-to` först.</p>
+                    <h1 className="text-xl font-semibold text-gray-900">No guides found</h1>
+                    <p className="mt-2 text-sm text-gray-600">Add markdown files under `frontend/src/docs/how-to` first.</p>
                 </div>
             </div>
         )
@@ -2386,7 +2588,7 @@ const HowToScriptEditorPage = () => {
                 <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
                     <div>
                         <Link to={getHelpIndexPath()} className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                            Hjälpguider
+                            Help guides
                         </Link>
                         <h1 className="mt-1 text-2xl font-semibold text-gray-900">Video Script Editor</h1>
                     </div>
@@ -2396,27 +2598,31 @@ const HowToScriptEditorPage = () => {
                             className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
                             <FileText className="h-4 w-4" />
-                            Visa guide
+                            View guide
                         </Link>
-                        <button type="button" onClick={resetDraft} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                        <button type="button" onClick={revertToSavedVersion} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
                             <RotateCcw className="h-4 w-4" />
-                            Återställ
+                            Revert to saved
                         </button>
                         <button type="button" onClick={undoLastOverwrite} disabled={!undoInfo || isRendering || isTranslating || isPublishing} title={undoInfo ? `Undo ${undoInfo.label}` : 'Nothing to undo'} className="inline-flex items-center gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50">
                             <RotateCcw className="h-4 w-4" />
-                            Undo overwrite
+                            Undo last save
                         </button>
                         <button type="button" onClick={saveMarkdownToDisk} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-green-700 px-3 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50">
                             <Save className="h-4 w-4" />
-                            Overwrite file
+                            Save
+                        </button>
+                        <button type="button" onClick={() => openSaveAsModal(activeDraft.id)} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-800 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50">
+                            <Save className="h-4 w-4" />
+                            Save As
                         </button>
                         <button type="button" onClick={copyMarkdown} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
                             <Copy className="h-4 w-4" />
-                            Kopiera markdown
+                            Copy markdown
                         </button>
                         <button type="button" onClick={downloadMarkdown} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
                             <Download className="h-4 w-4" />
-                            Ladda ner
+                            Download
                         </button>
                     </div>
                 </div>
@@ -2435,12 +2641,31 @@ const HowToScriptEditorPage = () => {
                     />
 
                     <section className="rounded border border-gray-200 bg-white p-3">
-                        <h2 className="px-1 text-sm font-semibold text-gray-900">Manus browser</h2>
+                        <h2 className="px-1 text-sm font-semibold text-gray-900">Manuscript browser</h2>
+                        <form onSubmit={openGuideByGuideId} className="mt-3 flex gap-2">
+                            <input
+                                value={loadGuideId}
+                                onChange={event => setLoadGuideId(event.target.value)}
+                                placeholder="Load Guide ID"
+                                disabled={isRendering}
+                                className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+                            />
+                            <button
+                                type="submit"
+                                disabled={isRendering || !normalizeGuideIdInput(loadGuideId)}
+                                className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Open
+                            </button>
+                        </form>
                         <div className="mt-3 max-h-[calc(100vh-180px)] space-y-3 overflow-y-auto pr-1">
-                            {howToDocs.map(section => (
+                            {browserSections.map(section => (
                                 <div key={section.id}>
                                     <div className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{section.title}</div>
                                     <div className="mt-1 space-y-1">
+                                        {section.guides.length === 0 && (
+                                            <div className="px-2 py-1 text-xs text-gray-400">No manuscripts yet</div>
+                                        )}
                                         {section.guides.map(guide => (
                                             <button
                                                 key={guide.id}
@@ -2449,7 +2674,8 @@ const HowToScriptEditorPage = () => {
                                                 onClick={() => openGuide({ section, guide })}
                                                 className={`block w-full rounded px-2 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${activeDraft.id === guide.id && activeDraftLanguage === routeLanguage ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
                                             >
-                                                {guide.title}
+                                                <span className="block font-medium">{guide.title}</span>
+                                                <code className="mt-0.5 block truncate text-xs text-gray-500">{guide.id}</code>
                                             </button>
                                         ))}
                                     </div>
@@ -2515,14 +2741,14 @@ const HowToScriptEditorPage = () => {
                             <TextInput label="Title" value={activeDraft.title} onChange={title => updateActiveDraft({ title })} disabled={isRendering} />
                             <TextInput
                                 label="Guide ID"
-                                value={guideIdInput}
-                                onChange={setGuideIdInput}
-                                onBlur={() => requestGuideIdChange(guideIdInput)}
-                                onKeyDown={event => {
-                                    if (event.key === 'Enter') event.currentTarget.blur()
-                                }}
+                                value={activeDraft.id || ''}
+                                onChange={() => {}}
+                                readOnly
                                 disabled={isRendering || isApplyingMetadataChange}
                             />
+                            <div className="-mt-3 text-xs text-gray-500 md:col-start-2">
+                                Use Save As to create a manuscript with a different Guide ID.
+                            </div>
                             <TextInput label="Order" type="number" value={activeDraft.order} onChange={order => updateActiveDraft({ order })} disabled={isRendering} />
                             <TextArea label="Summary" value={activeDraft.summary} onChange={summary => updateActiveDraft({ summary })} rows={2} disabled={isRendering} />
                             <SelectInput label="Section" value={activeDraft.sectionId} onChange={requestSectionChange} disabled={isRendering || isApplyingMetadataChange}>
@@ -2554,7 +2780,7 @@ const HowToScriptEditorPage = () => {
 
                     <section className="space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h2 className="text-base font-semibold text-gray-900">Sekventiellt filmmanus</h2>
+                            <h2 className="text-base font-semibold text-gray-900">Sequential video script</h2>
                             <div className="flex flex-wrap gap-2">
                                 <button type="button" onClick={addBlock} disabled={isRendering || isGeneratingBlock} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
                                     <Plus className="h-4 w-4" />
@@ -2639,6 +2865,18 @@ const HowToScriptEditorPage = () => {
                 isApplying={isApplyingMetadataChange}
                 onConfirm={applyMetadataChange}
                 onCancel={cancelMetadataChange}
+            />
+
+            <SaveAsModal
+                isOpen={saveAsState.isOpen}
+                guideId={saveAsState.guideId}
+                overwrite={saveAsState.overwrite}
+                error={saveAsState.error}
+                isSaving={saveAsState.isSaving}
+                onGuideIdChange={guideId => setSaveAsState(current => ({ ...current, guideId, error: '' }))}
+                onOverwriteChange={overwrite => setSaveAsState(current => ({ ...current, overwrite }))}
+                onSubmit={saveMarkdownAs}
+                onClose={closeSaveAsModal}
             />
 
             <ProgressLogDock

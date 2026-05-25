@@ -180,4 +180,14 @@ describe('howToScriptEditor', () => {
             action: { type: 'goto', path: '/pages' }
         })
     })
+
+    it('preserves in-progress caption whitespace while editing', () => {
+        expect(normalizeScriptBlock({
+            caption: 'Open the page ',
+            action: null
+        })).toMatchObject({
+            caption: 'Open the page ',
+            action: null
+        })
+    })
 })

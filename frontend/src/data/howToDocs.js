@@ -15,7 +15,7 @@ const translationModules = import.meta.glob('../docs/how-to-translations/**/*.md
 const baseDocs = parseHowToMarkdownCollection(markdownModules)
 const translationDocs = parseHowToMarkdownCollection(translationModules)
 
-const guideIdentity = (guide = {}) => guide.uuid || guide.guideUuid || guide.id
+const guideIdentity = (guide = {}) => guide.id || guide.uuid || guide.guideUuid
 const translationsByGuideIdentity = new Map()
 
 translationDocs.forEach(section => {

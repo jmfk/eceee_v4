@@ -7,11 +7,11 @@ export const slugify = (value = '') => value
 
 const VIDEO_LANGUAGE_CODES = ['sv', 'en']
 
-const guideIdentity = (guide = {}) => guide.uuid || guide.guideUuid || guide.id
+const guideIdentity = (guide = {}) => guide.id || guide.uuid || guide.guideUuid
 
 const guideCompletenessScore = (guide = {}) => [
     guide.uuid || guide.guideUuid ? 8 : 0,
-    guide.sourcePath && guide.uuid && guide.sourcePath.split('/').pop()?.startsWith(`${guide.uuid}.`) ? 8 : 0,
+    guide.sourcePath && guide.id && guide.sourcePath.split('/').pop()?.startsWith(`${guide.id}.`) ? 8 : 0,
     (guide.videoSources || []).length > 0 ? 4 : 0,
     guide.language ? 2 : 0,
     guide.sourcePath ? 1 : 0
