@@ -798,6 +798,10 @@ const QualityPanel = ({
     const actions = script.filter(block => block.action).length
     const both = script.filter(block => block.caption && block.action).length
     const hasErrors = issues.some(issue => issue.level === 'error')
+    const translationTargetLanguage = activeLanguage === DEFAULT_EDITOR_LANGUAGE ? 'sv' : DEFAULT_EDITOR_LANGUAGE
+    const translationButtonLabel = activeLanguage === DEFAULT_EDITOR_LANGUAGE
+        ? 'Re-translate Swedish'
+        : 'Sync to English'
 
     return (
         <aside className="space-y-4">
@@ -816,17 +820,15 @@ const QualityPanel = ({
                         <option key={option.code} value={option.code}>{option.label}</option>
                     ))}
                 </SelectInput>
-                {activeLanguage === 'sv' && (
-                    <button
-                        type="button"
-                        onClick={() => onGenerateTranslation('sv')}
-                        disabled={isRendering || isTranslating}
-                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        <Bot className="h-4 w-4" />
-                        {isTranslating ? 'Translating...' : 'Re-translate Swedish'}
-                    </button>
-                )}
+                <button
+                    type="button"
+                    onClick={() => onGenerateTranslation(translationTargetLanguage)}
+                    disabled={isRendering || isTranslating}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    <Bot className="h-4 w-4" />
+                    {isTranslating ? 'Translating...' : translationButtonLabel}
+                </button>
                 <div className="mt-3 rounded bg-gray-50 px-3 py-2 text-xs text-gray-600">
                     Preview and voice language: <span className="font-semibold uppercase">{activeLanguage}</span>
                 </div>
@@ -1581,7 +1583,7 @@ const HowToScriptEditorPage = () => {
             }
 
             if (nextLanguage === DEFAULT_EDITOR_LANGUAGE) {
-                const originalDraft = getOriginalDraft(activeDraft)
+                const originalDraft = await loadTranslatedDraft(DEFAULT_EDITOR_LANGUAGE) || getOriginalDraft(activeDraft)
                 replaceActiveDraft(withWorkingLanguage(originalDraft, DEFAULT_EDITOR_LANGUAGE))
                 navigate(getScriptEditorPath(activeDraft.id, DEFAULT_EDITOR_LANGUAGE))
                 toast.success('Switched to English origin')
@@ -1606,10 +1608,12 @@ const HowToScriptEditorPage = () => {
     const generateTranslation = async (language = 'sv', options = {}) => {
         if (!activeDraft || isRendering || isTranslating) return
 
-        const originalDraft = getOriginalDraft(activeDraft)
-        const originalMarkdown = activeDraftLanguage === 'en'
-            ? markdown
-            : createMarkdownFromDraft({ ...originalDraft, language: 'en' })
+        const targetLanguage = normalizeEditorLanguage(language)
+        const sourceLanguage = activeDraftLanguage
+        if (targetLanguage === sourceLanguage) return
+
+        const sourceMarkdown = markdown
+        const sourceDraft = activeDraft
 
         setProcessLogSource('translation')
         setIsTranslationLogClosed(false)
@@ -1620,15 +1624,15 @@ const HowToScriptEditorPage = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    guideId: originalDraft.id,
-                    sectionId: originalDraft.sectionId,
-                    language
+                    guideId: sourceDraft.id,
+                    sectionId: sourceDraft.sectionId,
+                    language: targetLanguage
                 })
             })
             const status = await statusResponse.json()
 
             if (!statusResponse.ok) throw new Error(status.error || 'Could not check translation status')
-            if (status.exists && !options.force && !window.confirm(`A ${language.toUpperCase()} translation already exists at ${status.sourcePath}. Replace it with a new Haiku translation?`)) {
+            if (status.exists && !options.force && !window.confirm(`A ${targetLanguage.toUpperCase()} markdown file already exists at ${status.sourcePath}. Replace it with a new Haiku translation?`)) {
                 return
             }
 
@@ -1644,10 +1648,11 @@ const HowToScriptEditorPage = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    guideId: originalDraft.id,
-                    sectionId: originalDraft.sectionId,
-                    language,
-                    markdown: originalMarkdown,
+                    guideId: sourceDraft.id,
+                    sectionId: sourceDraft.sectionId,
+                    language: targetLanguage,
+                    sourceLanguage,
+                    markdown: sourceMarkdown,
                     overwrite: Boolean(status.exists || options.force)
                 })
             })
@@ -1675,11 +1680,11 @@ const HowToScriptEditorPage = () => {
                     if (event.type === 'log') {
                         appendLog(event.text || '')
                     } else if (event.type === 'done') {
-                        const translatedDraft = draftFromMarkdown(event.markdown, event.sourcePath, language, originalDraft.id)
-                        replaceActiveDraft(withWorkingLanguage(translatedDraft, language))
-                        if (options.activate !== false) navigate(getScriptEditorPath(originalDraft.id, language))
+                        const translatedDraft = draftFromMarkdown(event.markdown, event.sourcePath, targetLanguage, sourceDraft.id)
+                        replaceActiveDraft(withWorkingLanguage(translatedDraft, targetLanguage))
+                        if (options.activate !== false) navigate(getScriptEditorPath(sourceDraft.id, targetLanguage))
                         if (event.undo) setUndoInfo(event.undo)
-                        toast.success(`Saved ${language.toUpperCase()} translation`)
+                        toast.success(`Saved ${targetLanguage.toUpperCase()} markdown`)
                     } else if (event.type === 'error') {
                         throw new Error(event.error || 'Could not translate markdown')
                     }

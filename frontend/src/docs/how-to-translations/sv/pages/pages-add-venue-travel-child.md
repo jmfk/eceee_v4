@@ -26,8 +26,9 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
 4. Ett nytt sidformuläret öppnas där du kan fylla i infromation om den nya sidan
 5. Ange en tydlig titel för undersidan.
 6. Kontrollera slugen eftersom den blir en del av URL:en.
-7. Klicka på Create Page för att skapa undersidan.
-8. Innan du publicerar kontrollerar du att sidans sökväg och navigeringsområde matchar den förälder sida du valde.
+7. Välj en layout för undersidan innan du skapar den.
+8. Klicka på Create Page för att skapa undersidan.
+9. Innan du publicerar kontrollerar du att sidans sökväg och navigeringsområde matchar den förälder sida du valde.
 
 ```video-script
 [
@@ -79,6 +80,15 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
       "placeholder": "e.g., news, about-us, contact",
       "value": "getting-around-town",
       "holdMs": 400
+    }
+  },
+  {
+    "caption": "Välj en layout för undersidan innan du skapar den.",
+    "action": {
+      "type": "select",
+      "label": "Layout (optional)",
+      "value": "main_layout",
+      "holdMs": 500
     }
   },
   {

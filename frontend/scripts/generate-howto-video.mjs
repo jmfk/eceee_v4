@@ -85,6 +85,7 @@ const parseArgs = (argv) => {
     minActionableSteps: Number(process.env.HOWTO_MIN_ACTIONABLE_STEPS || 1),
     narrationActionLeadMs: Number(process.env.HOWTO_NARRATION_ACTION_LEAD_MS || 300),
     postActionHoldMs: Number(process.env.HOWTO_POST_ACTION_HOLD_MS || 250),
+    actionTimeoutMs: Number(process.env.HOWTO_ACTION_TIMEOUT_MS || 10000),
     globalHoldMs: Number(process.env.HOWTO_GLOBAL_HOLD_MS || 0),
     noVoicePreHoldMs: Number(process.env.HOWTO_NO_VOICE_PRE_HOLD_MS || 250),
     noVoiceHoldMs: Number(process.env.HOWTO_NO_VOICE_HOLD_MS || 650),
@@ -150,6 +151,7 @@ const parseArgs = (argv) => {
     if (arg === '--min-actionable-steps') args.minActionableSteps = Number(next)
     if (arg === '--narration-action-lead-ms') args.narrationActionLeadMs = Number(next)
     if (arg === '--post-action-hold-ms') args.postActionHoldMs = Number(next)
+    if (arg === '--action-timeout-ms') args.actionTimeoutMs = Number(next)
     if (arg === '--global-hold-ms') args.globalHoldMs = Number(next)
     if (arg === '--no-voice-pre-hold-ms') args.noVoicePreHoldMs = Number(next)
     if (arg === '--no-voice-hold-ms') args.noVoiceHoldMs = Number(next)
@@ -243,6 +245,7 @@ Options:
                             Delay after voice starts before running the action. Defaults to 300.
   --post-action-hold-ms <ms>
                             Minimum pause after an action when narration timing already covers it. Defaults to 250.
+  --action-timeout-ms <ms>  Max time to wait for click/fill/select targets before skipping that action. Defaults to 10000.
   --global-hold-ms <ms>     Extra pause added to every block holdMs. Defaults to 0.
   --no-voice-pre-hold-ms <ms>
                             Caption-only delay before running an action. Defaults to 250.
@@ -338,6 +341,7 @@ const validateArgs = (args) => {
   for (const [name, value] of [
     ['--narration-action-lead-ms', args.narrationActionLeadMs],
     ['--post-action-hold-ms', args.postActionHoldMs],
+    ['--action-timeout-ms', args.actionTimeoutMs],
     ['--global-hold-ms', args.globalHoldMs],
     ['--no-voice-pre-hold-ms', args.noVoicePreHoldMs],
     ['--no-voice-hold-ms', args.noVoiceHoldMs]
@@ -1303,9 +1307,9 @@ const hideTypingBadge = async (page, args) => {
   })
 }
 
-const locatorCenter = async (locator) => {
-  await locator.first().scrollIntoViewIfNeeded()
-  const box = await locator.first().boundingBox()
+const locatorCenter = async (locator, timeout = 10000) => {
+  await locator.first().scrollIntoViewIfNeeded({ timeout })
+  const box = await locator.first().boundingBox({ timeout })
 
   if (!box) {
     throw new Error('Unable to locate visible element for tutorial action.')
@@ -1831,6 +1835,7 @@ const mockCmsApi = async (page) => {
 
 const runAction = async (page, action, baseUrl, args) => {
   await ensureCursorOverlay(page, args)
+  const actionTimeout = action.timeout || args.actionTimeoutMs
 
   if (action.type === 'goto') {
     const targetUrl = new URL(resolveActionPath(action.path || '/'), baseUrl)
@@ -1874,7 +1879,7 @@ const runAction = async (page, action, baseUrl, args) => {
     }
 
     const locator = resolveLocator(page, action)
-    const point = await locatorCenter(locator)
+    const point = await locatorCenter(locator, actionTimeout)
 
     await moveTutorialCursor(page, args, point.x, point.y)
     await flashClickPulse(page, args, point.x, point.y)
@@ -1885,7 +1890,7 @@ const runAction = async (page, action, baseUrl, args) => {
 
   if (action.type === 'fill') {
     const locator = resolveLocator(page, action)
-    const point = await locatorCenter(locator)
+    const point = await locatorCenter(locator, actionTimeout)
 
     await moveTutorialCursor(page, args, point.x, point.y)
     await flashClickPulse(page, args, point.x, point.y)
@@ -1899,7 +1904,7 @@ const runAction = async (page, action, baseUrl, args) => {
 
   if (action.type === 'select') {
     const locator = resolveLocator(page, action)
-    const point = await locatorCenter(locator)
+    const point = await locatorCenter(locator, actionTimeout)
 
     await moveTutorialCursor(page, args, point.x, point.y)
     await flashClickPulse(page, args, point.x, point.y)
@@ -1919,6 +1924,59 @@ const runAction = async (page, action, baseUrl, args) => {
 
   if (action.type === 'pause') {
     await page.waitForTimeout(action.ms || 1000)
+  }
+}
+
+const describeActionTarget = (action = {}) => {
+  const targetFields = [
+    ['selector', action.selector],
+    ['label', action.label],
+    ['placeholder', action.placeholder],
+    ['text', action.text],
+    ['role', action.role ? `${action.role}${action.name ? `:${action.name}` : ''}` : ''],
+    ['rowText', action.rowText],
+    ['pageTreeAddChildForText', action.pageTreeAddChildForText],
+    ['path', action.path]
+  ].filter(([, value]) => value)
+
+  if (targetFields.length === 0) return 'no target'
+  return targetFields.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(', ')
+}
+
+const actionErrorMessage = (error) => {
+  if (!error) return 'Unknown error'
+  if (error.name && error.message) return `${error.name}: ${error.message}`
+  if (error.message) return error.message
+  return String(error)
+}
+
+const runActionBestEffort = async (page, action, baseUrl, args, segment) => {
+  try {
+    await runAction(page, action, baseUrl, args)
+    return { ok: true }
+  } catch (error) {
+    await hideTypingBadge(page, args).catch(() => {})
+    const target = describeActionTarget(action)
+    console.warn(`    ! Part ${segment.partIndex}: ${action.type || 'unknown'} action failed (${target}); continuing without this action.`)
+    console.warn(`      ${actionErrorMessage(error)}`)
+    return { ok: false, error }
+  }
+}
+
+const addSfxEventsForAction = (sfxEvents, action, actionStart) => {
+  if (action.type === 'goto' || action.type === 'reload') {
+    sfxEvents.push({ type: 'navigate', at: actionStart + 250 })
+  }
+
+  if (action.type === 'click') {
+    sfxEvents.push({ type: 'click', at: actionStart + 250 })
+  }
+
+  if (action.type === 'fill') {
+    const valueLength = String(action.value || '').length
+    for (let index = 0; index < valueLength; index += 1) {
+      sfxEvents.push({ type: 'key', at: actionStart + 180 + (index * 55) })
+    }
   }
 }
 
@@ -2171,28 +2229,15 @@ const recordGuide = async (browser, args, { doc, guide }) => {
 
     const actionStart = Date.now() - startedAt
 
-    if (args.sfx) {
-      if (action.type === 'goto' || action.type === 'reload') {
-        sfxEvents.push({ type: 'navigate', at: actionStart + 250 })
-      }
-
-      if (action.type === 'click') {
-        sfxEvents.push({ type: 'click', at: actionStart + 250 })
-      }
-
-      if (action.type === 'fill') {
-        const valueLength = String(action.value || '').length
-        for (let index = 0; index < valueLength; index += 1) {
-          sfxEvents.push({ type: 'key', at: actionStart + 180 + (index * 55) })
-        }
-      }
-    }
-
     console.log(`    Part ${segment.partIndex}: running ${action.type}`)
-    await runAction(page, action, args.baseUrl, args)
+    const actionResult = await runActionBestEffort(page, action, args.baseUrl, args, segment)
     const actionEnd = Date.now() - startedAt
 
-    if (shouldCutActionFromVideo(action, caption, args)) {
+    if (actionResult.ok && args.sfx) {
+      addSfxEventsForAction(sfxEvents, action, actionStart)
+    }
+
+    if (actionResult.ok && shouldCutActionFromVideo(action, caption, args)) {
       timelineCuts.push({
         start: actionStart,
         end: actionEnd,

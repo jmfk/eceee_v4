@@ -230,6 +230,18 @@ const translationPathFor = (sectionId, guideId, language) => path.join(
   `${safeSegment(guideId, 'guide')}.md`
 )
 
+const originPathFor = (sectionId, guideId) => path.join(
+  docsRoot,
+  safeSegment(sectionId, 'editor'),
+  `${safeSegment(guideId, 'guide')}.md`
+)
+
+const markdownPathForLanguage = (sectionId, guideId, language) => (
+  safeSegment(language || 'sv', 'sv') === 'en'
+    ? originPathFor(sectionId, guideId)
+    : translationPathFor(sectionId, guideId, language)
+)
+
 const setFrontmatterValue = (markdown, key, value) => {
   const source = String(markdown || '').trim()
   const line = `${key}: ${value}`
@@ -255,7 +267,49 @@ const setFrontmatterValue = (markdown, key, value) => {
   return ['---', ...nextFrontmatter, '---', source.slice(endIndex + 4).trim()].join('\n').trimEnd().concat('\n')
 }
 
-const translateMarkdownWithHaiku = async ({ markdown, language }) => {
+const removeFrontmatterValue = (markdown, key) => {
+  const source = String(markdown || '').trim()
+
+  if (!source.startsWith('---')) return source
+
+  const endIndex = source.indexOf('\n---', 3)
+  if (endIndex === -1) return source
+
+  const keyPattern = new RegExp(`^${key}:`, 'i')
+  const frontmatterLines = source
+    .slice(3, endIndex)
+    .trim()
+    .split('\n')
+    .filter(line => line && !keyPattern.test(line))
+
+  return ['---', ...frontmatterLines, '---', source.slice(endIndex + 4).trim()].join('\n').trimEnd().concat('\n')
+}
+
+const normalizeTranslatedMarkdownFrontmatter = (markdown, { language, sourceLanguage }) => {
+  let next = setFrontmatterValue(
+    setFrontmatterValue(
+      setFrontmatterValue(markdown, 'language', language),
+      'videoLanguage',
+      language
+    ),
+    'videoLanguages',
+    language
+  )
+
+  if (language === 'en') {
+    next = removeFrontmatterValue(next, 'sourceLanguage')
+    next = removeFrontmatterValue(next, 'translationOf')
+    return next
+  }
+
+  return setFrontmatterValue(
+    setFrontmatterValue(next, 'sourceLanguage', sourceLanguage || 'en'),
+    'translationOf',
+    sourceLanguage === 'en' ? 'english-origin' : `${sourceLanguage || 'source'}-origin`
+  )
+}
+
+const translateMarkdownWithHaiku = async ({ markdown, language, sourceLanguage = 'en' }) => {
   const apiKey = process.env.ANTHROPIC_API_KEY || ''
   const model = process.env.HOWTO_TRANSLATION_MODEL || 'claude-3-5-haiku-20241022'
 
@@ -274,7 +328,7 @@ const translateMarkdownWithHaiku = async ({ markdown, language }) => {
       model,
       max_tokens: 6000,
       system: [
-        `Translate this help markdown from English to ${languageName(language)}.`,
+        `Translate this help markdown from ${languageName(sourceLanguage)} to ${languageName(language)}.`,
         'Return only the translated markdown, with no commentary.',
         'Preserve markdown structure, frontmatter keys, ids, order numbers, paths, URLs, and video URLs.',
         'In video-script JSON blocks, translate caption strings only.',
@@ -295,15 +349,7 @@ const translateMarkdownWithHaiku = async ({ markdown, language }) => {
   const translated = extractAnthropicText(JSON.parse(responseBody)).trim()
   if (!translated) throw new Error('Haiku translation returned no markdown.')
 
-  return setFrontmatterValue(
-    setFrontmatterValue(
-      setFrontmatterValue(translated, 'language', language),
-      'sourceLanguage',
-      'en'
-    ),
-    'translationOf',
-    'english-origin'
-  )
+  return normalizeTranslatedMarkdownFrontmatter(translated, { language, sourceLanguage })
 }
 
 const resolveHowToSourcePath = (sourcePath, sectionId, guideId) => {
@@ -718,7 +764,7 @@ const howToScriptEditorPlugin = () => ({
 
       try {
         const body = await readRequestJson(req)
-        const targetPath = translationPathFor(body.sectionId, body.guideId, body.language || 'sv')
+        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, body.language || 'sv')
 
         sendJson(res, 200, {
           exists: existsSync(targetPath),
@@ -738,7 +784,7 @@ const howToScriptEditorPlugin = () => ({
 
       try {
         const body = await readRequestJson(req)
-        const targetPath = translationPathFor(body.sectionId, body.guideId, body.language || 'sv')
+        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, body.language || 'sv')
 
         if (!existsSync(targetPath)) {
           sendJson(res, 200, {
@@ -770,7 +816,8 @@ const howToScriptEditorPlugin = () => ({
         const body = await readRequestJson(req)
         const markdown = String(body.markdown || '')
         const language = safeSegment(body.language || 'sv', 'sv')
-        const targetPath = translationPathFor(body.sectionId, body.guideId, language)
+        const sourceLanguage = safeSegment(body.sourceLanguage || 'en', 'en')
+        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, language)
         const overwrite = Boolean(body.overwrite)
 
         if (!markdown.trim()) {
@@ -789,8 +836,8 @@ const howToScriptEditorPlugin = () => ({
           return
         }
 
-        writeEvent(res, 'log', { text: `Translating English origin to ${languageName(language)} with Claude Haiku...\n` })
-        const translatedMarkdown = await translateMarkdownWithHaiku({ markdown, language })
+        writeEvent(res, 'log', { text: `Translating ${languageName(sourceLanguage)} markdown to ${languageName(language)} with Claude Haiku...\n` })
+        const translatedMarkdown = await translateMarkdownWithHaiku({ markdown, language, sourceLanguage })
         const undoOperation = getUndoOperation(`Translate ${language.toUpperCase()} markdown`)
 
         await writeFileWithUndo(undoOperation, targetPath, translatedMarkdown, 'utf8')
