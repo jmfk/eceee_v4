@@ -46,8 +46,8 @@ class ThemeCSSView(View):
         # Initialize generator
         generator = ThemeCSSGenerator()
 
-        # Skip cache entirely in development (when CACHE_TIMEOUT is 0)
-        if generator.CACHE_TIMEOUT == 0:
+        # Skip cache entirely in development or when CACHE_TIMEOUT is 0.
+        if settings.DEBUG or generator.CACHE_TIMEOUT == 0:
             # Development mode - always generate fresh CSS
             css = generator.generate_complete_css(theme, frontend_scoped=frontend_scoped)
         else:

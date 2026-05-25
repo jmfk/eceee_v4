@@ -323,6 +323,7 @@ class SitePackageAPITests(APITestCase):
             identifier="site-package-api",
             created_by=self.user,
         )
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
         self.root = WebPage.objects.create(
             title="Root",
             slug="root",

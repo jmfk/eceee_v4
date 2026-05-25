@@ -2126,8 +2126,6 @@ class PageTheme(models.Model):
 
             parsed = urlparse(str(image_url))
             path = parsed.path or str(image_url)
-            if f"/theme_images/{self.id}/library/" in path:
-                return image_url
 
             filename = filename or posixpath.basename(path)
             if not filename:

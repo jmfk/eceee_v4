@@ -35,6 +35,22 @@ class PageThemeImageResolutionTests(SimpleTestCase):
         storage.exists.assert_called_once_with("theme_images/3/library/header.png")
         self.assertEqual(resolved, "theme_images/3/library/header.png")
 
+    def test_resolves_current_theme_library_url_to_configured_storage(self):
+        theme = PageTheme(id=3, name="Local")
+        remote_url = "https://example.com/eceee-v4-media/theme_images/3/library/header.png"
+
+        with patch("webpages.models.page_theme.system_storage") as storage:
+            storage.exists.return_value = True
+            storage.url.return_value = "http://minio:9000/eceee-media/theme_images/3/library/header.png"
+
+            resolved = theme._resolve_theme_library_image_url(remote_url)
+
+        storage.exists.assert_called_once_with("theme_images/3/library/header.png")
+        self.assertEqual(
+            resolved,
+            "http://minio:9000/eceee-media/theme_images/3/library/header.png",
+        )
+
     def test_serializer_resolves_snake_case_design_group_image_urls(self):
         theme = PageTheme(
             id=3,
