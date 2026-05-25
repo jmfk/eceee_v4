@@ -81,7 +81,18 @@ const ADVANCED_ACTION_FIELDS = new Set([
     'selectors'
 ])
 
-const trimString = value => typeof value === 'string' ? value.trim() : value
+const textValue = (value) => {
+    if (value === undefined || value === null) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    if (typeof value === 'object') {
+        return textValue(value.caption ?? value.text ?? value.webText ?? value.label ?? '')
+    }
+
+    return ''
+}
+
+const trimString = value => textValue(value).trim()
 const hasActionValue = value => Array.isArray(value)
     ? value.length > 0
     : value !== undefined && value !== null && value !== ''
@@ -271,7 +282,7 @@ export const normalizeScriptBlock = (block = {}, fallbackCaption = '') => {
         : block.action && typeof block.action === 'object'
         ? block.action
         : block
-    const caption = block.caption || actionSource?.caption || fallbackCaption || ''
+    const caption = trimString(block.caption ?? actionSource?.caption ?? fallbackCaption ?? '')
 
     return {
         caption,

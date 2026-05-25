@@ -155,7 +155,7 @@ const draftFromMarkdown = (source, sourcePath, language = 'en', fallbackId = '')
 }
 
 const getDraftSteps = (draft = {}) => (draft.script || [])
-    .map(block => block.caption?.trim())
+    .map(block => normalizeScriptBlock(block).caption)
     .filter(Boolean)
 
 const getDraftVideoSources = (draft = {}) => Object.entries(draft.videoLinks || {})
@@ -708,10 +708,10 @@ const QualityPanel = ({
     isVideoExpanded,
     onToggleVideoExpanded
 }) => {
-    const script = draft.script || []
-    const captions = script.filter(block => block.caption?.trim()).length
+    const script = (draft.script || []).map(normalizeScriptBlock)
+    const captions = script.filter(block => block.caption).length
     const actions = script.filter(block => block.action).length
-    const both = script.filter(block => block.caption?.trim() && block.action).length
+    const both = script.filter(block => block.caption && block.action).length
     const hasErrors = issues.some(issue => issue.level === 'error')
 
     return (

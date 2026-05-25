@@ -3,6 +3,7 @@ import {
     createMarkdownFromDraft,
     guideToScriptDraft,
     getPublishedVideoLinks,
+    normalizeScriptBlock,
     serializeAction,
     validateScriptDraft
 } from '../howToScriptEditor'
@@ -168,5 +169,15 @@ describe('howToScriptEditor', () => {
 
         expect(issues.map(issue => issue.message)).toContain('Block 1: target is missing.')
         expect(issues.map(issue => issue.message)).not.toContain('Block 1: caption is missing.')
+    })
+
+    it('normalizes non-string caption values without crashing previews', () => {
+        expect(normalizeScriptBlock({
+            caption: { text: 'Open Pages.' },
+            action: { type: 'goto', path: '/pages' }
+        })).toMatchObject({
+            caption: 'Open Pages.',
+            action: { type: 'goto', path: '/pages' }
+        })
     })
 })
