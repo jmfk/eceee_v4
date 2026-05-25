@@ -139,7 +139,7 @@ const runCodexAgent = ({ prompt, outputPath, sandbox = 'workspace-write' }, onCh
     'exec',
     '-C', repoRoot,
     '--sandbox', sandbox,
-    '--ask-for-approval', 'never',
+    '-c', 'approval_policy="never"',
     '--color', 'never',
     '--output-last-message', outputPath,
     '-'

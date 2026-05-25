@@ -313,6 +313,109 @@ const CodexHelpWriterPanel = ({
     </section>
 )
 
+const CodexScriptBlockModal = ({
+    isOpen,
+    prompt,
+    insertLabel,
+    isGenerating,
+    onPromptChange,
+    onSubmit,
+    onClose
+}) => {
+    const textareaRef = useRef(null)
+
+    useEffect(() => {
+        if (!isOpen) return
+        requestAnimationFrame(() => textareaRef.current?.focus())
+    }, [isOpen])
+
+    useEffect(() => {
+        if (!isOpen) return undefined
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape' && !isGenerating) onClose()
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [isGenerating, isOpen, onClose])
+
+    if (!isOpen) return null
+
+    const canSubmit = Boolean(prompt.trim()) && !isGenerating
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 px-4 py-6">
+            <form
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="codex-script-block-modal-title"
+                onSubmit={event => {
+                    event.preventDefault()
+                    if (canSubmit) onSubmit()
+                }}
+                className="w-full max-w-xl rounded border border-gray-200 bg-white p-4 shadow-xl"
+            >
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 id="codex-script-block-modal-title" className="text-base font-semibold text-gray-900">
+                            Add script block with Codex
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-600">
+                            Describe the caption, action, or both for the new sequential block.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isGenerating}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Close Codex block modal"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                <div className="mt-4">
+                    <FieldLabel>What should the new block do?</FieldLabel>
+                    <textarea
+                        ref={textareaRef}
+                        value={prompt}
+                        onChange={event => onPromptChange(event.target.value)}
+                        rows={6}
+                        disabled={isGenerating}
+                        placeholder="Example: Say that the editor opens the page settings, then click Save draft."
+                        className="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                        <span>{insertLabel}</span>
+                        <span>Codex can return speech only, action only, or both.</span>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isGenerating}
+                        className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={!canSubmit}
+                        className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <Bot className="h-4 w-4" />
+                        {isGenerating ? 'Generating...' : 'Generate block'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    )
+}
+
 const ActionField = ({ field, action, onChange, disabled = false }) => {
     if (field === 'targetMode') {
         return (
@@ -886,6 +989,8 @@ const HowToScriptEditorPage = () => {
     const [isPublishing, setIsPublishing] = useState(false)
     const [isGeneratingDoc, setIsGeneratingDoc] = useState(false)
     const [isGeneratingBlock, setIsGeneratingBlock] = useState(false)
+    const [codexBlockPrompt, setCodexBlockPrompt] = useState('')
+    const [pendingBlockInsert, setPendingBlockInsert] = useState(null)
     const [codexPrompt, setCodexPrompt] = useState('')
     const [codexSectionId, setCodexSectionId] = useState(firstGuide?.section?.id || '')
     const [codexRun, setCodexRun] = useState({ log: '', error: '', finalMessage: '' })
@@ -962,6 +1067,13 @@ const HowToScriptEditorPage = () => {
         : processLogSource === 'translation'
         ? 'Translation complete'
         : 'Render complete'
+    const codexBlockInsertLabel = pendingBlockInsert
+        ? pendingBlockInsert.insertIndex <= 0
+            ? 'The generated block will be inserted before the first block.'
+            : pendingBlockInsert.insertIndex >= (activeDraft?.script || []).length
+            ? 'The generated block will be inserted after the last block.'
+            : `The generated block will be inserted between block ${pendingBlockInsert.insertIndex} and ${pendingBlockInsert.insertIndex + 1}.`
+        : ''
     const pagePreviewLanguage = activeDraftLanguage
     const renderLanguages = [activeDraftLanguage]
 
@@ -1137,13 +1249,27 @@ const HowToScriptEditorPage = () => {
 
     const updateScript = (script) => updateActiveDraft({ script: script.map(normalizeScriptBlock) })
 
-    const requestCodexScriptBlock = async ({ insertIndex }) => {
+    const openCodexBlockModal = (insertIndex) => {
+        if (isRendering || isGeneratingBlock || isGeneratingDoc) return
+
+        setPendingBlockInsert({ insertIndex })
+        setCodexBlockPrompt('')
+    }
+
+    const closeCodexBlockModal = () => {
+        if (isGeneratingBlock) return
+
+        setPendingBlockInsert(null)
+        setCodexBlockPrompt('')
+    }
+
+    const requestCodexScriptBlock = async ({ insertIndex, userPrompt }) => {
         if (isRendering || isGeneratingBlock || isGeneratingDoc) return
 
         const blockKind = 'block'
-        const userPrompt = window.prompt('What should this new script block do? Codex can create speech, an action, or both.')
+        const trimmedPrompt = userPrompt?.trim()
 
-        if (!userPrompt?.trim()) return
+        if (!trimmedPrompt) return
 
         const script = (activeDraft.script || []).map(normalizeScriptBlock)
         const nearbyBlocks = {
@@ -1168,7 +1294,7 @@ const HowToScriptEditorPage = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt: userPrompt,
+                    prompt: trimmedPrompt,
                     blockKind,
                     language: activeDraftLanguage,
                     draft: {
@@ -1240,6 +1366,16 @@ const HowToScriptEditorPage = () => {
         }
     }
 
+    const submitCodexScriptBlock = () => {
+        const trimmedPrompt = codexBlockPrompt.trim()
+        if (!trimmedPrompt || !pendingBlockInsert) return
+
+        const insertIndex = pendingBlockInsert.insertIndex
+        setPendingBlockInsert(null)
+        setCodexBlockPrompt('')
+        requestCodexScriptBlock({ insertIndex, userPrompt: trimmedPrompt })
+    }
+
     const openGuide = (option) => {
         if (isRendering) return
         const language = activeDraftLanguage || routeLanguage
@@ -1271,12 +1407,12 @@ const HowToScriptEditorPage = () => {
 
     const addBlock = () => {
         const script = activeDraft.script || []
-        requestCodexScriptBlock({ insertIndex: script.length })
+        openCodexBlockModal(script.length)
     }
 
     const insertBlock = (index, position) => {
         const insertIndex = position === 'before' ? index : index + 1
-        requestCodexScriptBlock({ insertIndex })
+        openCodexBlockModal(insertIndex)
     }
 
     const moveBlock = (index, offset) => {
@@ -1916,6 +2052,16 @@ const HowToScriptEditorPage = () => {
 
     return (
         <div className={`min-h-screen bg-gray-50 text-gray-900 ${isLogOpen ? 'pb-[38vh]' : ''}`}>
+            <CodexScriptBlockModal
+                isOpen={Boolean(pendingBlockInsert)}
+                prompt={codexBlockPrompt}
+                insertLabel={codexBlockInsertLabel}
+                isGenerating={isGeneratingBlock}
+                onPromptChange={setCodexBlockPrompt}
+                onSubmit={submitCodexScriptBlock}
+                onClose={closeCodexBlockModal}
+            />
+
             <header className="border-b border-gray-200 bg-white">
                 <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
                     <div>
