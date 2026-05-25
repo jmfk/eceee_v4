@@ -14,9 +14,23 @@ sectionOrder: 2
 Present a person with image and biography text.
 
 <!-- narration: Use the Bio widget when a page needs a concise person profile. -->
+<!-- goal: In this walkthrough, we add the Bio widget to a page slot and open its settings. -->
+<!-- why: This matters because each widget type has its own purpose, and choosing the right widget keeps the page easier to maintain. -->
+<!-- outcome: After this walkthrough, you should know where to add the Bio widget and where to continue configuring it. -->
 
 1. Add or edit a Bio widget.
 2. Select the portrait or profile image.
 3. Enter the name, role, and biography text.
 4. Keep the biography short enough for the surrounding layout.
 5. Preview the widget to confirm the image crop and text length.
+
+```video
+[
+  { "type": "goto", "path": "/pages/101/edit/slots", "caption": "Start in All Slots on a page editor so you can add the Bio widget in context." },
+  { "type": "click", "selector": "[data-testid='page-slot-toggle-content']", "caption": "Expand the Main Content slot so its widget controls are visible." },
+  { "type": "click", "selector": "[data-testid='page-slot-add-content']", "caption": "Click the plus icon on the Main Content slot." },
+  { "type": "click", "selector": "[data-testid='page-widget-option-easy-widgets-biowidget']", "caption": "Choose Bio widget from the widget picker." },
+  { "type": "click", "selector": "[data-testid='page-widget-edit-easy-widgets-biowidget']", "caption": "Open the settings panel for the new Bio widget." },
+  { "type": "caption", "caption": "Configure the fields, then save and preview the page before publishing.", "ms": 1200 }
+]
+```

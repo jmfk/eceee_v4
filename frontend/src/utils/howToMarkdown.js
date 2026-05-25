@@ -5,6 +5,34 @@ export const slugify = (value = '') => value
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 
+const VIDEO_LANGUAGE_CODES = ['sv', 'en']
+
+const languageSuffix = (language = '') => {
+    const normalized = language.toString().trim().toLowerCase()
+    return normalized ? `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}` : ''
+}
+
+const parseVideoLanguages = (value = '') => value
+    .split(',')
+    .map(language => language.trim().toLowerCase())
+    .filter(Boolean)
+
+const getVideoSourcesFromData = (data = {}) => VIDEO_LANGUAGE_CODES
+    .map(language => {
+        const suffix = languageSuffix(language)
+        const videoUrl = data[`videoUrl${suffix}`] || data[`mp4Url${suffix}`] || ''
+        const captionsUrl = data[`captionsUrl${suffix}`] || data[`subtitlesUrl${suffix}`] || ''
+
+        return videoUrl || captionsUrl ? {
+            language,
+            videoUrl,
+            mp4Url: data[`mp4Url${suffix}`] || videoUrl,
+            captionsUrl,
+            subtitlesUrl: data[`subtitlesUrl${suffix}`] || captionsUrl
+        } : null
+    })
+    .filter(Boolean)
+
 const parseFrontmatter = (source) => {
     if (!source.startsWith('---')) return [{}, source]
 
@@ -32,8 +60,9 @@ const extractCommentValue = (body, key) => {
     return match ? match[1].trim() : ''
 }
 
-const extractVideoActions = (body) => {
-    const match = body.match(/```(?:video|video-actions)\s*([\s\S]*?)```/i)
+const extractJsonBlock = (body, blockNames) => {
+    const pattern = blockNames.join('|')
+    const match = body.match(new RegExp(`\\\`\\\`\\\`(?:${pattern})\\s*([\\s\\S]*?)\\\`\\\`\\\``, 'i'))
     if (!match) return []
 
     try {
@@ -44,12 +73,48 @@ const extractVideoActions = (body) => {
     }
 }
 
+const extractVideoScript = (body) => extractJsonBlock(body, ['video-script', 'script'])
+
+const scriptAction = (item = {}) => {
+    const action = item.action === null
+        ? {}
+        : item.action && typeof item.action === 'object'
+            ? item.action
+            : item
+    const caption = item.caption || action.caption || ''
+
+    if (!action.type && caption) {
+        return { type: 'caption', caption }
+    }
+
+    return {
+        ...action,
+        ...(caption ? { caption } : {})
+    }
+}
+
+const scriptStep = (item = {}) => item.step || item.webText || item.caption || item.action?.caption || ''
+
+const extractVideoActions = (body) => {
+    const script = extractVideoScript(body)
+    if (script.length > 0) {
+        return script.map(scriptAction).filter(action => action.type)
+    }
+
+    return extractJsonBlock(body, ['video', 'video-actions'])
+}
+
 const stripGuideMarkup = (body) => body
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/```(?:video|video-actions)\s*[\s\S]*?```/gi, '')
+    .replace(/```(?:video|video-actions|video-script|script)\s*[\s\S]*?```/gi, '')
     .trim()
 
 const parseSteps = (body) => {
+    const script = extractVideoScript(body)
+    if (script.length > 0) {
+        return script.map(scriptStep).map(step => step.trim()).filter(Boolean)
+    }
+
     const lines = stripGuideMarkup(body).split('\n')
 
     return lines
@@ -82,6 +147,8 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
         .find(line => line && !line.startsWith('#')) || ''
 
     if (frontmatter.sectionId) {
+        const script = extractVideoScript(body)
+
         return {
             type: 'guide',
             sectionId: frontmatter.sectionId,
@@ -98,9 +165,18 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
                 captionsUrl: frontmatter.captionsUrl || '',
                 subtitlesUrl: frontmatter.subtitlesUrl || '',
                 videoLanguage: frontmatter.videoLanguage || '',
+                videoLanguages: parseVideoLanguages(frontmatter.videoLanguages || frontmatter.videoLanguage || ''),
+                language: frontmatter.language || 'en',
+                sourceLanguage: frontmatter.sourceLanguage || '',
+                translationOf: frontmatter.translationOf || '',
+                videoSources: getVideoSourcesFromData(frontmatter),
+                goal: frontmatter.goal || extractCommentValue(body, 'goal'),
+                why: frontmatter.why || extractCommentValue(body, 'why'),
+                outcome: frontmatter.outcome || extractCommentValue(body, 'outcome'),
                 youtubeId: frontmatter.youtubeId || '',
                 youtubeUrl: frontmatter.youtubeUrl || '',
                 narration: frontmatter.narration || extractCommentValue(body, 'narration'),
+                script,
                 steps: parseSteps(body),
                 actions: extractVideoActions(body),
                 markdown: stripGuideMarkup(body)
@@ -138,7 +214,25 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
         const captionsUrl = extractCommentValue(guideBody, 'captionsUrl')
         const subtitlesUrl = extractCommentValue(guideBody, 'subtitlesUrl')
         const videoLanguage = extractCommentValue(guideBody, 'videoLanguage')
+        const videoLanguages = parseVideoLanguages(extractCommentValue(guideBody, 'videoLanguages') || videoLanguage)
+        const commentVideoData = {
+            videoUrl,
+            mp4Url,
+            captionsUrl,
+            subtitlesUrl
+        }
+        VIDEO_LANGUAGE_CODES.forEach(language => {
+            const suffix = languageSuffix(language)
+            commentVideoData[`videoUrl${suffix}`] = extractCommentValue(guideBody, `videoUrl${suffix}`)
+            commentVideoData[`mp4Url${suffix}`] = extractCommentValue(guideBody, `mp4Url${suffix}`)
+            commentVideoData[`captionsUrl${suffix}`] = extractCommentValue(guideBody, `captionsUrl${suffix}`)
+            commentVideoData[`subtitlesUrl${suffix}`] = extractCommentValue(guideBody, `subtitlesUrl${suffix}`)
+        })
+        const goal = extractCommentValue(guideBody, 'goal')
+        const why = extractCommentValue(guideBody, 'why')
+        const outcome = extractCommentValue(guideBody, 'outcome')
         const narration = extractCommentValue(guideBody, 'narration')
+        const script = extractVideoScript(guideBody)
 
         return {
             id: guideId,
@@ -149,9 +243,18 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
             captionsUrl,
             subtitlesUrl,
             videoLanguage,
+            videoLanguages,
+            language: extractCommentValue(guideBody, 'language') || 'en',
+            sourceLanguage: extractCommentValue(guideBody, 'sourceLanguage'),
+            translationOf: extractCommentValue(guideBody, 'translationOf'),
+            videoSources: getVideoSourcesFromData(commentVideoData),
+            goal,
+            why,
+            outcome,
             youtubeId,
             youtubeUrl,
             narration,
+            script,
             steps: parseSteps(guideBody),
             actions: extractVideoActions(guideBody),
             markdown: stripGuideMarkup(guideBody)

@@ -55,9 +55,23 @@ class SitePackageJobSerializer(serializers.ModelSerializer):
 
 
 class SitePackageExportCreateSerializer(serializers.Serializer):
-    root_page_id = serializers.IntegerField()
-    include_media = serializers.BooleanField(default=True)
-    include_themes = serializers.BooleanField(default=True)
+    root_page_id = serializers.IntegerField(required=False)
+    rootPageId = serializers.IntegerField(
+        source="root_page_id", required=False, write_only=True
+    )
+    include_media = serializers.BooleanField(default=True, required=False)
+    includeMedia = serializers.BooleanField(
+        source="include_media", required=False, write_only=True
+    )
+    include_themes = serializers.BooleanField(default=True, required=False)
+    includeThemes = serializers.BooleanField(
+        source="include_themes", required=False, write_only=True
+    )
+
+    def validate(self, attrs):
+        if "root_page_id" not in attrs:
+            raise serializers.ValidationError({"rootPageId": "This field is required."})
+        return attrs
 
     def validate_root_page_id(self, value):
         request = self.context["request"]

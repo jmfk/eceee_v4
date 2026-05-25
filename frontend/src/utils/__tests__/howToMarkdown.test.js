@@ -19,6 +19,9 @@ Demo summary.
 <!-- id: demo-first -->
 <!-- videoUrl: /howto-videos/prod/sv/demo-demo-first.mp4 -->
 <!-- captionsUrl: /howto-videos/prod/sv/demo-demo-first.vtt -->
+<!-- goal: Show the first guide goal. -->
+<!-- why: Explain why the first guide matters. -->
+<!-- outcome: Know what to do next. -->
 <!-- narration: Explain the first guide. -->
 
 This guide does the first thing.
@@ -41,6 +44,9 @@ This guide does the first thing.
             summary: 'This guide does the first thing.',
             videoUrl: '/howto-videos/prod/sv/demo-demo-first.mp4',
             captionsUrl: '/howto-videos/prod/sv/demo-demo-first.vtt',
+            goal: 'Show the first guide goal.',
+            why: 'Explain why the first guide matters.',
+            outcome: 'Know what to do next.',
             narration: 'Explain the first guide.',
             steps: ['Open the page.', 'Confirm the result.']
         })

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import HelpVideoPlayer from '../HelpVideoPlayer'
-import { extractYouTubeId, getDefaultHelpVideoPath, getHelpVideoConfig } from '../../../utils/howToHelp'
+import {
+    extractYouTubeId,
+    getDefaultHelpVideoPath,
+    getHelpVideoConfig,
+    getManualHelpVideoPath
+} from '../../../utils/howToHelp'
 
 describe('extractYouTubeId', () => {
     it.each([
@@ -54,6 +59,34 @@ describe('HelpVideoPlayer', () => {
         )
     })
 
+    it('falls back from a missing manual MP4 to the generated MP4', () => {
+        const { container } = render(
+            <HelpVideoPlayer
+                videoSources={[
+                    {
+                        videoUrl: '/howto-videos/manual/sv/pages-pages-create.mp4',
+                        captionsUrl: '/howto-videos/manual/sv/pages-pages-create.vtt'
+                    },
+                    {
+                        videoUrl: '/howto-videos/prod/sv/pages-pages-create.mp4',
+                        captionsUrl: '/howto-videos/prod/sv/pages-pages-create.vtt'
+                    }
+                ]}
+                title="Pages video"
+            />
+        )
+
+        expect(container.querySelector('source')).toHaveAttribute('src', '/howto-videos/manual/sv/pages-pages-create.mp4')
+
+        fireEvent.error(container.querySelector('video'))
+
+        expect(container.querySelector('source')).toHaveAttribute('src', '/howto-videos/prod/sv/pages-pages-create.mp4')
+        expect(screen.getByRole('link', { name: 'Open MP4 file' })).toHaveAttribute(
+            'href',
+            '/howto-videos/prod/sv/pages-pages-create.mp4'
+        )
+    })
+
     it('renders a privacy-enhanced YouTube iframe for configured videos', () => {
         render(<HelpVideoPlayer youtubeUrl="https://youtu.be/dQw4w9WgXcQ" title="Pages video" />)
 
@@ -64,12 +97,75 @@ describe('HelpVideoPlayer', () => {
 })
 
 describe('help video paths', () => {
-    it('builds default public MP4 and captions URLs for a guide', () => {
+    it('builds manual-first and generated fallback MP4 URLs for a guide', () => {
+        expect(getManualHelpVideoPath('pages', 'pages-create')).toBe('/howto-videos/manual/sv/pages-pages-create.mp4')
         expect(getDefaultHelpVideoPath('pages', 'pages-create')).toBe('/howto-videos/prod/sv/pages-pages-create.mp4')
         expect(getHelpVideoConfig({ id: 'pages-create' }, 'pages')).toMatchObject({
-            videoUrl: '/howto-videos/prod/sv/pages-pages-create.mp4',
-            captionsUrl: '/howto-videos/prod/sv/pages-pages-create.vtt',
+            videoUrl: '/howto-videos/manual/sv/pages-pages-create.mp4',
+            captionsUrl: '/howto-videos/manual/sv/pages-pages-create.vtt',
+            videoSources: [
+                {
+                    videoUrl: '/howto-videos/manual/sv/pages-pages-create.mp4',
+                    captionsUrl: '/howto-videos/manual/sv/pages-pages-create.vtt',
+                    source: 'manual'
+                },
+                {
+                    videoUrl: '/howto-videos/prod/sv/pages-pages-create.mp4',
+                    captionsUrl: '/howto-videos/prod/sv/pages-pages-create.vtt',
+                    source: 'generated'
+                }
+            ],
             language: 'sv'
+        })
+    })
+
+    it('uses explicit MP4 metadata before conventional manual or generated paths', () => {
+        expect(getHelpVideoConfig({
+            id: 'widgets-edit',
+            mp4Url: '/custom/widgets-edit.mp4',
+            captionsUrl: '/custom/widgets-edit.vtt'
+        }, 'widgets')).toMatchObject({
+            videoUrl: '/custom/widgets-edit.mp4',
+            captionsUrl: '/custom/widgets-edit.vtt',
+            videoSources: [
+                {
+                    videoUrl: '/custom/widgets-edit.mp4',
+                    captionsUrl: '/custom/widgets-edit.vtt',
+                    source: 'explicit'
+                }
+            ],
+            language: 'sv'
+        })
+    })
+
+    it('uses language-specific MP4 metadata for the active help language', () => {
+        expect(getHelpVideoConfig({
+            id: 'pages-create',
+            captionsUrl: '/custom/sv/legacy-global.vtt',
+            videoSources: [
+                {
+                    language: 'sv',
+                    videoUrl: '/custom/sv/pages-create.mp4',
+                    captionsUrl: '/custom/sv/pages-create.vtt'
+                },
+                {
+                    language: 'en',
+                    videoUrl: '/custom/en/pages-create.mp4',
+                    captionsUrl: '/custom/en/pages-create.vtt'
+                }
+            ]
+        }, 'pages', 'en')).toMatchObject({
+            videoUrl: '/custom/en/pages-create.mp4',
+            captionsUrl: '/custom/en/pages-create.vtt',
+            videoSources: [
+                {
+                    videoUrl: '/custom/en/pages-create.mp4',
+                    captionsUrl: '/custom/en/pages-create.vtt',
+                    language: 'en',
+                    source: 'explicit'
+                }
+            ],
+            language: 'en'
         })
     })
 })

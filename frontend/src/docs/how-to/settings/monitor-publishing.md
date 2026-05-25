@@ -22,7 +22,29 @@ Use publishing views to review scheduled, live, and bulk publication work.
 
 ```video
 [
-  { "type": "goto", "path": "/settings/publishing", "caption": "Open publishing settings." },
-  { "type": "waitForText", "text": "Status Dashboard", "caption": "Use publishing views to monitor and coordinate publication work." }
+  {
+    "type": "goto",
+    "path": "/settings/publishing",
+    "caption": "Start in Publishing to review current publication status.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='publishing-refresh-button']",
+    "caption": "Refresh the dashboard before making publication decisions.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='publishing-tab-timeline']",
+    "caption": "Open the timeline when you need to understand scheduled or recent publication activity.",
+    "holdMs": 500
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='publishing-tab-bulk']",
+    "caption": "Open Bulk Operations when you need to publish or review many pages together.",
+    "holdMs": 500
+  }
 ]
 ```

@@ -22,7 +22,31 @@ Manage colors, typography, component styles, and image styles.
 
 ```video
 [
-  { "type": "goto", "path": "/settings/themes", "caption": "Open Theme Management." },
-  { "type": "waitForText", "text": "Theme Management", "caption": "Themes define the reusable visual style of the site." }
+  {
+    "type": "goto",
+    "path": "/settings/themes",
+    "caption": "Start in Theme Management when you need to change reusable visual styling.",
+    "holdMs": 450
+  },
+  {
+    "type": "fill",
+    "selector": "[data-testid='themes-search-input']",
+    "value": "Demo",
+    "caption": "Search first to see whether the theme already exists.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='themes-create-button']",
+    "caption": "Click Create Theme when you need a new reusable theme.",
+    "holdMs": 500
+  },
+  {
+    "type": "fill",
+    "placeholder": "My Awesome Theme",
+    "value": "Tutorial Theme",
+    "caption": "Give the theme a clear name before editing colors, typography, and component styles.",
+    "holdMs": 500
+  }
 ]
 ```

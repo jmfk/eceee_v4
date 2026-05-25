@@ -22,7 +22,24 @@ Configure object types, value lists, widgets, and data connections.
 
 ```video
 [
-  { "type": "goto", "path": "/settings/object-types", "caption": "Open a data-structure settings section." },
-  { "type": "waitForText", "text": "Object Types", "caption": "Object types define reusable structured content." }
+  {
+    "type": "goto",
+    "path": "/settings/object-types",
+    "caption": "Start in Object Types when you need to manage reusable structured content.",
+    "holdMs": 450
+  },
+  {
+    "type": "fill",
+    "selector": "[data-testid='object-types-search-input']",
+    "value": "speaker",
+    "caption": "Search for an existing object type before adding a new structure.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='object-types-new-button']",
+    "caption": "Click New Object Type when the structure does not already exist.",
+    "holdMs": 500
+  }
 ]
 ```

@@ -36,8 +36,18 @@ const normalizeVideoLanguage = (language = DEFAULT_HELP_VIDEO_LANGUAGE) => (
     language.toString().trim().toLowerCase() || DEFAULT_HELP_VIDEO_LANGUAGE
 )
 
+const sourceForLanguage = (source, language) => {
+    const normalizedLanguage = normalizeVideoLanguage(language)
+
+    return !source?.language || normalizeVideoLanguage(source.language) === normalizedLanguage
+}
+
 export const getHelpVideoBasePath = (language = DEFAULT_HELP_VIDEO_LANGUAGE) => (
     `/howto-videos/prod/${normalizeVideoLanguage(language)}`
+)
+
+export const getManualHelpVideoBasePath = (language = DEFAULT_HELP_VIDEO_LANGUAGE) => (
+    `/howto-videos/manual/${normalizeVideoLanguage(language)}`
 )
 
 export const getDefaultHelpVideoPath = (sectionId, guideId, language = DEFAULT_HELP_VIDEO_LANGUAGE, extension = 'mp4') => {
@@ -47,18 +57,63 @@ export const getDefaultHelpVideoPath = (sectionId, guideId, language = DEFAULT_H
     return `${getHelpVideoBasePath(language)}/${sectionId}-${guideId}.${cleanExtension}`
 }
 
-export const getHelpVideoConfig = (guide, sectionId) => {
-    const language = guide?.videoLanguage || DEFAULT_HELP_VIDEO_LANGUAGE
-    const videoUrl = guide?.videoUrl
-        || guide?.mp4Url
-        || getDefaultHelpVideoPath(sectionId, guide?.id, language, 'mp4')
-    const captionsUrl = guide?.captionsUrl
+export const getManualHelpVideoPath = (sectionId, guideId, language = DEFAULT_HELP_VIDEO_LANGUAGE, extension = 'mp4') => {
+    if (!sectionId || !guideId) return ''
+
+    const cleanExtension = extension.replace(/^\./, '') || 'mp4'
+    return `${getManualHelpVideoBasePath(language)}/${sectionId}-${guideId}.${cleanExtension}`
+}
+
+export const getHelpVideoConfig = (guide, sectionId, languageOverride = '') => {
+    const language = languageOverride || guide?.videoLanguage || DEFAULT_HELP_VIDEO_LANGUAGE
+    const explicitVideoUrl = guide?.videoUrl || guide?.mp4Url
+    const explicitCaptionsUrl = guide?.captionsUrl || guide?.subtitlesUrl
+    const localizedExplicitSources = Array.isArray(guide?.videoSources)
+        ? guide.videoSources
+            .filter(source => sourceForLanguage(source, language))
+            .map(source => ({
+                videoUrl: source.videoUrl || source.mp4Url || '',
+                captionsUrl: source.captionsUrl || source.subtitlesUrl || '',
+                language: source.language,
+                source: 'explicit'
+            }))
+            .filter(source => source.videoUrl)
+        : []
+    const generatedVideoUrl = getDefaultHelpVideoPath(sectionId, guide?.id, language, 'mp4')
+    const generatedCaptionsUrl = getDefaultHelpVideoPath(sectionId, guide?.id, language, 'vtt')
+    const videoSources = localizedExplicitSources.length > 0
+        ? localizedExplicitSources
+        : explicitVideoUrl
+        ? [{
+            videoUrl: explicitVideoUrl,
+            captionsUrl: explicitCaptionsUrl || generatedCaptionsUrl,
+            language,
+            source: 'explicit'
+        }]
+        : [
+            {
+                videoUrl: getManualHelpVideoPath(sectionId, guide?.id, language, 'mp4'),
+                captionsUrl: getManualHelpVideoPath(sectionId, guide?.id, language, 'vtt'),
+                language,
+                source: 'manual'
+            },
+            {
+                videoUrl: generatedVideoUrl,
+                captionsUrl: generatedCaptionsUrl,
+                language,
+                source: 'generated'
+            }
+        ]
+    const videoUrl = videoSources[0]?.videoUrl || ''
+    const captionsUrl = videoSources[0]?.captionsUrl
+        || guide?.captionsUrl
         || guide?.subtitlesUrl
-        || (videoUrl ? getDefaultHelpVideoPath(sectionId, guide?.id, language, 'vtt') : '')
+        || ''
 
     return {
         videoUrl,
         captionsUrl,
+        videoSources,
         language
     }
 }

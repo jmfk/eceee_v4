@@ -24,8 +24,11 @@ Use the row actions to manage widgets without leaving the editor.
 
 ```video
 [
-  { "type": "goto", "path": "/pages", "caption": "Open the page editor that contains the widget." },
-  { "type": "caption", "caption": "The widget row toolbar contains move, copy, cut, paste, settings, active, and delete actions." },
-  { "type": "caption", "caption": "Use Active or Inactive when you need to temporarily hide a widget without losing its settings." }
+  { "type": "goto", "path": "/pages/101/edit/slots", "caption": "Start on a page editor that already contains widgets." },
+  { "type": "click", "selector": "[data-testid='page-slot-toggle-content']", "caption": "Expand Main Content to reveal the widget row you want to manage." },
+  { "type": "waitForText", "text": "Example content", "caption": "Find the widget row you want to manage." },
+  { "type": "click", "selector": "[data-testid='page-widget-copy-easy-widgets-contentwidget']", "caption": "Click the copy icon when you want to reuse this widget elsewhere." },
+  { "type": "click", "selector": "[data-testid='page-widget-active-easy-widgets-contentwidget']", "caption": "Click Active to temporarily hide the widget without deleting its settings." },
+  { "type": "click", "selector": "[data-testid='page-widget-edit-easy-widgets-contentwidget']", "caption": "Click the settings icon when you need to edit the widget configuration." }
 ]
 ```

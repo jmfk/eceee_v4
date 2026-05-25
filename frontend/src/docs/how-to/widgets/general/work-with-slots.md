@@ -23,8 +23,10 @@ Add child widgets to container slots.
 
 ```video
 [
-  { "type": "goto", "path": "/pages", "caption": "Open a page with a section or container widget." },
-  { "type": "caption", "caption": "Container slots can hold their own child widgets." },
-  { "type": "caption", "caption": "Use the slot toolbar to add, copy, paste, or clear nested widgets." }
+  { "type": "goto", "path": "/pages/101/edit/slots", "caption": "Start in All Slots where the layout exposes named slots." },
+  { "type": "click", "selector": "[data-testid='page-slot-toggle-sidebar']", "caption": "Expand the Sidebar slot so the slot toolbar is visible." },
+  { "type": "click", "selector": "[data-testid='page-slot-add-sidebar']", "caption": "Click the plus icon on the Sidebar slot to add content exactly there." },
+  { "type": "click", "selector": "[data-testid='page-widget-option-easy-widgets-sidebartopnewswidget']", "caption": "Choose a widget that belongs in the sidebar slot." },
+  { "type": "click", "selector": "[data-testid='page-widget-edit-easy-widgets-sidebartopnewswidget']", "caption": "Open the new widget settings so the sidebar content can be configured." }
 ]
 ```

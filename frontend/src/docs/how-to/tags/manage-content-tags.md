@@ -22,7 +22,39 @@ Create and maintain the tag vocabulary used across the CMS.
 
 ```video
 [
-  { "type": "goto", "path": "/tags", "caption": "Open the tag manager." },
-  { "type": "waitForText", "text": "Tags", "caption": "Tags organize pages, objects, and media." }
+  {
+    "type": "goto",
+    "path": "/tags",
+    "caption": "Start in Tags when you need to organize pages, objects, or media by shared labels.",
+    "holdMs": 450
+  },
+  {
+    "type": "fill",
+    "selector": "[data-testid='tags-search-input']",
+    "value": "venue",
+    "caption": "Search first so you do not create duplicate tags.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='tags-create-button']",
+    "caption": "Click Create Tag when the tag does not already exist.",
+    "holdMs": 500
+  },
+  {
+    "type": "fill",
+    "placeholder": "Enter tag name",
+    "value": "venue",
+    "caption": "Enter the tag name that editors will recognize.",
+    "holdMs": 500
+  },
+  {
+    "type": "click",
+    "text": "Create Tag",
+    "exact": true,
+    "mockOnly": true,
+    "caption": "Save the tag in tutorial recordings. On real content, confirm naming rules before saving.",
+    "holdMs": 500
+  }
 ]
 ```

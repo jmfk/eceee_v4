@@ -21,7 +21,23 @@ Inspect page layout templates and their available slots.
 
 ```video
 [
-  { "type": "goto", "path": "/settings/layouts", "caption": "Open the Layout Overview." },
-  { "type": "waitForText", "text": "Layout Overview", "caption": "Layouts define the slots available to editors." }
+  {
+    "type": "goto",
+    "path": "/settings/layouts",
+    "caption": "Start in Layout Overview to see which slots editors can use on pages.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='layout-card-main-layout']",
+    "caption": "Click a layout card to inspect the slots and metadata for that layout.",
+    "holdMs": 500
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='layout-preview-main-layout']",
+    "caption": "Use the preview icon when you need a closer look at a layout before assigning it to content.",
+    "holdMs": 500
+  }
 ]
 ```

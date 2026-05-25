@@ -14,6 +14,9 @@ sectionOrder: 1
 Start a new page and place it in the page tree.
 
 <!-- narration: Start in the Pages area, create a page, fill in its required details, then save it as a draft until it is ready to publish. -->
+<!-- goal: In this walkthrough, we create a new page from the Pages workspace and look at the required fields before saving. -->
+<!-- why: This is useful because almost every content task starts by finding the right place in the page tree and understanding whether the page should stay as a draft or be published. -->
+<!-- outcome: After this walkthrough, you should know where to start a new page, which fields matter first, and why it is safer to keep new work unpublished until the content is ready. -->
 
 1. Open Pages from the main navigation.
 2. Choose the add page action for a normal page, or add a root page when starting a new site tree.
@@ -71,7 +74,7 @@ Start a new page and place it in the page tree.
   {
     "type": "fill",
     "placeholder": "Search pages...",
-    "value": "Example Site",
+    "value": "ECEEE Example Site",
     "caption": "Use search to find existing pages before editing or adding more content.",
     "holdMs": 1200
   },

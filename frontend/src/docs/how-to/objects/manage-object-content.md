@@ -22,7 +22,30 @@ Choose an object type and create or edit its content items.
 
 ```video
 [
-  { "type": "goto", "path": "/objects", "caption": "Open Objects from the main admin navigation." },
-  { "type": "waitForText", "text": "Objects", "caption": "Object types group reusable structured content." }
+  {
+    "type": "goto",
+    "path": "/objects",
+    "caption": "Start on Objects. First choose the content type you want to work with.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='object-type-card-news']",
+    "caption": "Click an object type card to open its list of reusable content items.",
+    "holdMs": 500
+  },
+  {
+    "type": "fill",
+    "selector": "[data-testid='objects-search-input']",
+    "value": "keynote",
+    "caption": "Search inside the selected type when you need to find an existing object before creating a new one.",
+    "holdMs": 500
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='objects-new-button']",
+    "caption": "Use the New button when the item does not already exist.",
+    "holdMs": 500
+  }
 ]
 ```

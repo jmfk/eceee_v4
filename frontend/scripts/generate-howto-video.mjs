@@ -9,7 +9,6 @@ import { parseHowToMarkdownCollection } from '../src/utils/howToMarkdown.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const frontendRoot = resolve(__dirname, '..')
-const docsDir = join(frontendRoot, 'src/docs/how-to')
 const recordingTempDirName = '.recording-tmp'
 const defaultHelpVideoLanguage = 'sv'
 const defaultAnthropicTranslationModel = 'claude-3-5-haiku-20241022'
@@ -36,7 +35,10 @@ const parseArgs = (argv) => {
   const args = {
     baseUrl: process.env.HOWTO_BASE_URL || 'http://127.0.0.1:3100',
     outputDir: process.env.HOWTO_OUTPUT_DIR || '',
+    publicDir: process.env.HOWTO_PUBLIC_DIR || '',
+    docsDir: process.env.HOWTO_DOCS_DIR || join(frontendRoot, 'src/docs/how-to'),
     workDir: process.env.HOWTO_WORK_DIR || '',
+    recordingTempDir: '',
     width: Number(process.env.HOWTO_VIDEO_WIDTH || 1440),
     height: Number(process.env.HOWTO_VIDEO_HEIGHT || 900),
     headless: process.env.HEADED !== '1',
@@ -44,6 +46,7 @@ const parseArgs = (argv) => {
     topicId: '',
     storageState: process.env.HOWTO_AUTH_STATE || '',
     mockApi: process.env.HOWTO_MOCK_API === '1',
+    cleanBrowserState: process.env.HOWTO_CLEAN_BROWSER_STATE !== '0',
     overlayCaptions: process.env.HOWTO_NO_OVERLAY !== '1',
     all: false,
     format: process.env.HOWTO_VIDEO_FORMAT || 'webm',
@@ -76,6 +79,17 @@ const parseArgs = (argv) => {
     segmentedNarration: process.env.HOWTO_SEGMENTED_NARRATION !== '0',
     sfx: process.env.HOWTO_SFX === '1',
     cursor: process.env.HOWTO_CURSOR !== '0',
+    contextSegments: process.env.HOWTO_CONTEXT_SEGMENTS !== '0',
+    contextHoldMs: Number(process.env.HOWTO_CONTEXT_HOLD_MS || 1800),
+    requireActionableSteps: process.env.HOWTO_ALLOW_PASSIVE_GUIDES !== '1' && process.env.HOWTO_REQUIRE_ACTIONABLE_STEPS !== '0',
+    minActionableSteps: Number(process.env.HOWTO_MIN_ACTIONABLE_STEPS || 1),
+    narrationActionLeadMs: Number(process.env.HOWTO_NARRATION_ACTION_LEAD_MS || 300),
+    postActionHoldMs: Number(process.env.HOWTO_POST_ACTION_HOLD_MS || 250),
+    noVoicePreHoldMs: Number(process.env.HOWTO_NO_VOICE_PRE_HOLD_MS || 250),
+    noVoiceHoldMs: Number(process.env.HOWTO_NO_VOICE_HOLD_MS || 650),
+    cutPageLoad: process.env.HOWTO_CUT_PAGE_LOAD !== '0',
+    trimInitialLoad: process.env.HOWTO_TRIM_INITIAL_LOAD !== '0',
+    initialLoadTrimThresholdMs: Number(process.env.HOWTO_INITIAL_LOAD_TRIM_THRESHOLD_MS || 1500),
     typingDelayMs: Number(process.env.HOWTO_TYPING_DELAY_MS || 75),
     pointerMoveMs: Number(process.env.HOWTO_POINTER_MOVE_MS || 650),
     help: false
@@ -87,18 +101,21 @@ const parseArgs = (argv) => {
 
     if (arg === '--base-url') args.baseUrl = next
     if (arg === '--output-dir') args.outputDir = next
+    if (arg === '--public-dir') args.publicDir = next
+    if (arg === '--docs-dir') args.docsDir = next
     if (arg === '--work-dir') args.workDir = next
     if (arg === '--topic') args.topicId = next
     if (arg === '--guide') args.guideId = next
     if (arg === '--storage-state') args.storageState = next
     if (arg === '--headed') args.headless = false
     if (arg === '--mock-api') args.mockApi = true
+    if (arg === '--clean-browser-state') args.cleanBrowserState = true
+    if (arg === '--keep-browser-state') args.cleanBrowserState = false
     if (arg === '--no-overlay') args.overlayCaptions = false
     if (arg === '--all') args.all = true
     if (arg === '--format') args.format = next
     if (arg === '--ffmpeg') args.ffmpegPath = next
     if (arg === '--voice') args.voiceProvider = next
-    if (arg === '--no-audio') args.voiceProvider = ''
     if (arg === '--language') args.language = next
     if (arg === '--voice-id') args.voiceId = next
     if (arg === '--model-id') args.elevenLabsModelId = next
@@ -124,6 +141,21 @@ const parseArgs = (argv) => {
     if (arg === '--no-sfx') args.sfx = false
     if (arg === '--cursor') args.cursor = true
     if (arg === '--no-cursor') args.cursor = false
+    if (arg === '--context') args.contextSegments = true
+    if (arg === '--no-context') args.contextSegments = false
+    if (arg === '--context-hold-ms') args.contextHoldMs = Number(next)
+    if (arg === '--require-actionable-steps') args.requireActionableSteps = true
+    if (arg === '--allow-passive-guides') args.requireActionableSteps = false
+    if (arg === '--min-actionable-steps') args.minActionableSteps = Number(next)
+    if (arg === '--narration-action-lead-ms') args.narrationActionLeadMs = Number(next)
+    if (arg === '--post-action-hold-ms') args.postActionHoldMs = Number(next)
+    if (arg === '--no-voice-pre-hold-ms') args.noVoicePreHoldMs = Number(next)
+    if (arg === '--no-voice-hold-ms') args.noVoiceHoldMs = Number(next)
+    if (arg === '--cut-page-load') args.cutPageLoad = true
+    if (arg === '--keep-page-load') args.cutPageLoad = false
+    if (arg === '--trim-initial-load') args.trimInitialLoad = true
+    if (arg === '--keep-initial-load') args.trimInitialLoad = false
+    if (arg === '--initial-load-trim-threshold-ms') args.initialLoadTrimThresholdMs = Number(next)
     if (arg === '--typing-delay-ms') args.typingDelayMs = Number(next)
     if (arg === '--pointer-move-ms') args.pointerMoveMs = Number(next)
     if (arg === '--help' || arg === '-h') args.help = true
@@ -141,9 +173,15 @@ const parseArgs = (argv) => {
     args.outputDir = join(frontendRoot, 'public/howto-videos/prod', args.language)
   }
 
+  if (!args.publicDir) {
+    args.publicDir = join(frontendRoot, 'public/howto-videos/prod', args.language)
+  }
+
   if (!args.workDir) {
     args.workDir = join(frontendRoot, 'howto-video-output/work', args.language)
   }
+
+  args.recordingTempDir = join(args.workDir, recordingTempDirName, String(process.pid))
 
   return args
 }
@@ -160,7 +198,9 @@ Options:
   --topic <id>             Record the first guide in a help topic.
   --guide <id>             Record one guide.
   --base-url <url>         Running frontend URL. Defaults to HOWTO_BASE_URL or http://127.0.0.1:3100.
-  --output-dir <path>      Public output folder. Defaults to frontend/public/howto-videos/prod/<language>.
+  --output-dir <path>      Recording output folder. Defaults to frontend/public/howto-videos/prod/<language>.
+  --public-dir <path>      Folder copied into the help site. Defaults to frontend/public/howto-videos/prod/<language>.
+  --docs-dir <path>        Markdown guide folder. Defaults to frontend/src/docs/how-to.
   --work-dir <path>        Work folder for temporary audio/manifests. Defaults to frontend/howto-video-output/work/<language>.
   --format <webm|mp4|both> Output format. Defaults to webm.
   --voice elevenlabs        Generate narration audio with ElevenLabs and mux it into MP4.
@@ -169,6 +209,7 @@ Options:
                             ELEVENLABS_VOICE_ID_SWE, ELEVENLABS_VOICE_ID_ENG,
                             or ELEVENLABS_VOICE_ID.
   --model-id <id>           ElevenLabs model. Defaults to eleven_multilingual_v2.
+  --audio-cache-dir <path>  MP3 cache for unchanged narration. Defaults to frontend/howto-audio-cache.
   --translate anthropic     Translate captions/subtitles/narration before TTS.
   --translation-model <id>  Translation model. Defaults to claude-3-5-haiku-20241022.
   --translation-model-fallbacks <ids>
@@ -188,9 +229,33 @@ Options:
   --sfx                     Mix in simple computer sounds for clicks, typing, and navigation.
   --cursor                  Show a visible tutorial cursor, click pulse, and typing badge. Default.
   --no-cursor               Disable visible cursor overlays.
+  --context                 Add intro/outcome context around each walkthrough. Default.
+  --no-context              Disable automatic context segments.
+  --context-hold-ms <ms>    Time to hold each context card. Defaults to 1800.
+  --require-actionable-steps
+                            Skip guides unless their video script contains user actions. Default.
+  --allow-passive-guides    Allow screenshot-style guides with no click/fill/select steps.
+  --min-actionable-steps <n>
+                            Required click/fill/select steps before recording. Defaults to 1.
+  --narration-action-lead-ms <ms>
+                            Delay after voice starts before running the action. Defaults to 300.
+  --post-action-hold-ms <ms>
+                            Minimum pause after an action when narration timing already covers it. Defaults to 250.
+  --no-voice-pre-hold-ms <ms>
+                            Caption-only delay before running an action. Defaults to 250.
+  --no-voice-hold-ms <ms>
+                            Caption-only pause after an action. Defaults to 650.
+  --cut-page-load          Cut marked page-load/wait intervals out of the final video. Default.
+  --keep-page-load         Keep marked page-load/wait intervals in the final video.
+  --trim-initial-load      Cut the initial browser page load before the first narrated part. Default.
+  --keep-initial-load      Keep the initial browser page load in the final video.
+  --initial-load-trim-threshold-ms <ms>
+                            Only trim initial loading if it is at least this long. Defaults to 1500.
   --typing-delay-ms <ms>    Delay per typed character. Defaults to 75.
   --pointer-move-ms <ms>    Cursor move duration before an action. Defaults to 650.
   --mock-api               Stub admin API calls for documentation-only recordings.
+  --clean-browser-state    Clear local/session storage except auth tokens before recording. Default.
+  --keep-browser-state     Keep storage state exactly as loaded.
   --storage-state <path>   Playwright auth state for recording against a real backend.
   --headed                 Show the browser while recording.
   --no-overlay             Disable burned-in caption overlay.
@@ -254,9 +319,32 @@ const validateArgs = (args) => {
   if (!Number.isFinite(args.pointerMoveMs) || args.pointerMoveMs < 0) {
     throw new Error('--pointer-move-ms must be a non-negative number.')
   }
+
+  if (!Number.isFinite(args.initialLoadTrimThresholdMs) || args.initialLoadTrimThresholdMs < 0) {
+    throw new Error('--initial-load-trim-threshold-ms must be a non-negative number.')
+  }
+
+  if (!Number.isFinite(args.contextHoldMs) || args.contextHoldMs < 0) {
+    throw new Error('--context-hold-ms must be a non-negative number.')
+  }
+
+  if (!Number.isInteger(args.minActionableSteps) || args.minActionableSteps < 0) {
+    throw new Error('--min-actionable-steps must be a non-negative integer.')
+  }
+
+  for (const [name, value] of [
+    ['--narration-action-lead-ms', args.narrationActionLeadMs],
+    ['--post-action-hold-ms', args.postActionHoldMs],
+    ['--no-voice-pre-hold-ms', args.noVoicePreHoldMs],
+    ['--no-voice-hold-ms', args.noVoiceHoldMs]
+  ]) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${name} must be a non-negative number.`)
+    }
+  }
 }
 
-const loadDocs = async () => {
+const loadDocs = async (docsDir) => {
   const modules = {}
 
   const readMarkdownFiles = async (dir) => {
@@ -301,6 +389,45 @@ const findGuides = (docs, args) => {
   const match = findGuide(docs, args)
   return match.doc && match.guide ? [match] : []
 }
+
+const actionableActionTypes = new Set(['click', 'fill', 'select'])
+
+const countActionableSteps = (guide) => (
+  (guide.actions || []).filter(action => actionableActionTypes.has(action.type)).length
+)
+
+const filterActionableTargets = (targets, args) => {
+  if (!args.requireActionableSteps) {
+    return {
+      recordableTargets: targets,
+      skippedTargets: []
+    }
+  }
+
+  const recordableTargets = []
+  const skippedTargets = []
+
+  targets.forEach(target => {
+    const actionableSteps = countActionableSteps(target.guide)
+
+    if (actionableSteps >= args.minActionableSteps) {
+      recordableTargets.push(target)
+      return
+    }
+
+    skippedTargets.push({
+      ...target,
+      actionableSteps
+    })
+  })
+
+  return {
+    recordableTargets,
+    skippedTargets
+  }
+}
+
+const pluralizeSteps = (count) => `${count} actionable step${count === 1 ? '' : 's'}`
 
 const escapeVtt = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -395,6 +522,107 @@ const getMediaDurationSeconds = async (path, ffmpegPath) => {
 
 const formatDuration = (seconds) => `${seconds.toFixed(1)}s`
 
+const normalizeTimelineCuts = (cuts = [], minDurationMs = 120) => {
+  const sorted = cuts
+    .map(cut => ({
+      start: Math.max(0, Math.round(cut.start || 0)),
+      end: Math.max(0, Math.round(cut.end || 0)),
+      reason: cut.reason || 'cut'
+    }))
+    .filter(cut => cut.end - cut.start >= minDurationMs)
+    .sort((a, b) => a.start - b.start)
+  const merged = []
+
+  sorted.forEach(cut => {
+    const previous = merged.at(-1)
+
+    if (previous && cut.start <= previous.end) {
+      previous.end = Math.max(previous.end, cut.end)
+      previous.reason = `${previous.reason}, ${cut.reason}`
+      return
+    }
+
+    merged.push({ ...cut })
+  })
+
+  return merged
+}
+
+const timelineCutDurationBefore = (timeMs, cuts) => cuts.reduce((duration, cut) => {
+  if (timeMs >= cut.end) return duration + (cut.end - cut.start)
+  if (timeMs > cut.start) return duration + (timeMs - cut.start)
+  return duration
+}, 0)
+
+const mapTimelineTime = (timeMs, cuts) => Math.max(0, Math.round(timeMs - timelineCutDurationBefore(timeMs, cuts)))
+
+const remapTimelineEvents = (items, cuts, keys = ['at']) => items.map(item => {
+  const next = { ...item }
+
+  keys.forEach(key => {
+    if (Number.isFinite(next[key])) next[key] = mapTimelineTime(next[key], cuts)
+  })
+
+  return next
+})
+
+const remapTimelineCues = (cues, cuts) => cues
+  .map(cue => ({
+    ...cue,
+    start: mapTimelineTime(cue.start, cuts),
+    end: mapTimelineTime(cue.end, cuts)
+  }))
+  .filter(cue => cue.end > cue.start)
+
+const createCutVideo = async (inputPath, outputPath, args, cuts) => {
+  const durationMs = Math.ceil(await getMediaDurationSeconds(inputPath, args.ffmpegPath) * 1000)
+  const ranges = []
+  let cursor = 0
+
+  cuts.forEach(cut => {
+    if (cut.start > cursor) ranges.push({ start: cursor, end: Math.min(cut.start, durationMs) })
+    cursor = Math.max(cursor, cut.end)
+  })
+
+  if (cursor < durationMs) ranges.push({ start: cursor, end: durationMs })
+
+  const keptRanges = ranges.filter(range => range.end - range.start >= 40)
+
+  if (keptRanges.length === 0) {
+    throw new Error('Timeline cuts removed the whole video.')
+  }
+
+  const filters = keptRanges.map((range, index) => (
+    `[0:v]trim=start=${(range.start / 1000).toFixed(3)}:end=${(range.end / 1000).toFixed(3)},setpts=PTS-STARTPTS[v${index}]`
+  ))
+  filters.push(`${keptRanges.map((_, index) => `[v${index}]`).join('')}concat=n=${keptRanges.length}:v=1:a=0[v]`)
+
+  console.log(`    Cutting ${cuts.length} loading interval${cuts.length === 1 ? '' : 's'} from video timeline`)
+  cuts.forEach(cut => console.log(`      - ${formatDuration(cut.start / 1000)}-${formatDuration(cut.end / 1000)} ${cut.reason}`))
+
+  await runCommand(args.ffmpegPath, [
+    '-y',
+    '-i',
+    inputPath,
+    '-filter_complex',
+    filters.join(';'),
+    '-map',
+    '[v]',
+    '-an',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '23',
+    '-pix_fmt',
+    'yuv420p',
+    outputPath
+  ])
+
+  return outputPath
+}
+
 const convertWebmToMp4 = async (webmPath, mp4Path, args, audioPaths = []) => {
   const videoDuration = await getMediaDurationSeconds(webmPath, args.ffmpegPath)
   const audioDurations = []
@@ -471,12 +699,15 @@ const getLocalizedValue = (source, key, language) => {
   return source[`${key}${suffix}`] || source[`${key}_${language}`] || source[key] || ''
 }
 
-const getActionCaption = (action, guide, language) => (
-  getLocalizedValue(action, 'caption', language)
-  || getLocalizedValue(guide, 'narration', language)
-  || getLocalizedValue(guide, 'summary', language)
-  || guide.title
-)
+const getActionCaption = (action, guide, language) => {
+  const actionCaption = getLocalizedValue(action, 'caption', language)
+
+  if (actionCaption || action.type !== 'caption') return actionCaption
+
+  return getLocalizedValue(guide, 'narration', language)
+    || getLocalizedValue(guide, 'summary', language)
+    || guide.title
+}
 
 const buildNarrationText = (guide, cues, language) => {
   const guideNarration = getLocalizedValue(guide, 'narration', language)
@@ -673,6 +904,13 @@ const translateText = async (text, args) => {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
+const elevenLabsVoiceSettings = Object.freeze({
+  stability: 0.48,
+  similarity_boost: 0.78,
+  style: 0.18,
+  use_speaker_boost: true
+})
+
 const elevenLabsHeaders = (args) => ({
   'Content-Type': 'application/json',
   'xi-api-key': args.elevenLabsApiKey
@@ -687,12 +925,7 @@ const requestElevenLabsSpeech = async (url, text, args) => fetch(url, {
     text,
     model_id: args.elevenLabsModelId,
     language_code: args.language,
-    voice_settings: {
-      stability: 0.48,
-      similarity_boost: 0.78,
-      style: 0.18,
-      use_speaker_boost: true
-    }
+    voice_settings: elevenLabsVoiceSettings
   })
 })
 
@@ -701,15 +934,18 @@ const createElevenLabsSpeech = async (text, args) => {
 
   await mkdir(args.audioCacheDir, { recursive: true })
 
-  const cacheKey = hashValue(JSON.stringify({
+  const cachePayload = {
     provider: 'elevenlabs',
     voiceId: args.voiceId,
     modelId: args.elevenLabsModelId,
     outputFormat: args.elevenLabsOutputFormat,
+    voiceSettings: elevenLabsVoiceSettings,
     language: args.language,
     text
-  }))
+  }
+  const cacheKey = hashValue(JSON.stringify(cachePayload))
   const audioPath = join(args.audioCacheDir, `${cacheKey}.mp3`)
+  const metadataPath = join(args.audioCacheDir, `${cacheKey}.json`)
 
   if (existsSync(audioPath)) {
     console.log(`    Narration cache hit: ${audioPath}`)
@@ -743,6 +979,11 @@ const createElevenLabsSpeech = async (text, args) => {
   }
 
   await writeFile(audioPath, Buffer.from(await response.arrayBuffer()))
+  await writeFile(metadataPath, JSON.stringify({
+    ...cachePayload,
+    createdAt: new Date().toISOString(),
+    audioPath
+  }, null, 2))
   console.log(`    Saved narration: ${audioPath}`)
   return { audioPath, cached: false }
 }
@@ -924,12 +1165,12 @@ const ensureCursorOverlay = async (page, args) => {
         left: 0;
         top: 0;
         z-index: 2147483647;
-        width: 96px;
-        height: 128px;
+        width: 48px;
+        height: 64px;
         pointer-events: none;
         transform: translate3d(28px, 64px, 0);
         transition: transform 650ms cubic-bezier(.22, .9, .25, 1);
-        filter: drop-shadow(0 4px 8px rgba(15, 23, 42, .35));
+        filter: drop-shadow(0 2px 5px rgba(15, 23, 42, .35));
       }
 
       [data-howto-cursor-overlay] svg {
@@ -1010,7 +1251,7 @@ const moveTutorialCursor = async (page, args, x, y) => {
     if (!cursor) return
 
     cursor.style.transitionDuration = `${durationMs}ms`
-    cursor.style.transform = `translate3d(${Math.round(nextX - 41)}px, ${Math.round(nextY - 41)}px, 0)`
+    cursor.style.transform = `translate3d(${Math.round(nextX - 20)}px, ${Math.round(nextY - 20)}px, 0)`
   }, { nextX: x, nextY: y, durationMs: args.pointerMoveMs })
   await page.mouse.move(x, y, { steps: 16 })
   await page.waitForTimeout(Math.min(args.pointerMoveMs + 120, 1200))
@@ -1072,19 +1313,332 @@ const locatorCenter = async (locator) => {
   }
 }
 
+const pageTreeAddChildPoint = async (page, rowText) => page.evaluate(({ targetText }) => {
+  const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim().toLowerCase()
+  const wanted = normalize(targetText)
+
+  const isVisible = (element) => {
+    if (!element) return false
+
+    const style = window.getComputedStyle(element)
+    const rect = element.getBoundingClientRect()
+
+    return style.visibility !== 'hidden'
+      && style.display !== 'none'
+      && rect.width > 0
+      && rect.height > 0
+      && rect.bottom >= 0
+      && rect.right >= 0
+      && rect.top <= window.innerHeight
+      && rect.left <= window.innerWidth
+  }
+
+  const buttonScore = (button, index, buttons) => {
+    const testId = button.getAttribute('data-testid') || ''
+    const label = [
+      button.getAttribute('aria-label'),
+      button.getAttribute('title'),
+      button.textContent,
+      button.className
+    ].join(' ').toLowerCase()
+
+    if (testId.startsWith('page-tree-add-child-')) return 100
+    if (label.includes('add child') || label.includes('add page') || label.includes('underordnad')) return 90
+    if (label.includes('green')) return 80
+    if (buttons.length >= 6 && index === 5) return 70
+    if (buttons.length >= 5 && index === 4) return 60
+    return 0
+  }
+
+  const textNodes = Array.from(document.querySelectorAll('span, mark, button, a, div'))
+    .filter(element => {
+      if (!isVisible(element)) return false
+
+      const rect = element.getBoundingClientRect()
+      const text = normalize(element.textContent)
+
+      return text.includes(wanted) && rect.height < 120
+    })
+
+  for (const textNode of textNodes) {
+    let candidate = textNode
+
+    for (let depth = 0; candidate && depth < 10; depth += 1) {
+      const rect = candidate.getBoundingClientRect()
+      const buttons = Array.from(candidate.querySelectorAll('button'))
+        .filter(button => isVisible(button) && !button.disabled)
+
+      if (buttons.length >= 4 && rect.width > 240 && rect.height <= 140) {
+        const scoredButtons = buttons
+          .map((button, index) => ({ button, score: buttonScore(button, index, buttons) }))
+          .filter(item => item.score > 0)
+          .sort((a, b) => b.score - a.score)
+
+        if (scoredButtons.length > 0) {
+          const buttonRect = scoredButtons[0].button.getBoundingClientRect()
+
+          return {
+            x: buttonRect.left + (buttonRect.width / 2),
+            y: buttonRect.top + (buttonRect.height / 2),
+            rowText: normalize(candidate.textContent),
+            buttonIndex: buttons.indexOf(scoredButtons[0].button),
+            buttonClass: scoredButtons[0].button.className,
+            buttonAria: scoredButtons[0].button.getAttribute('aria-label') || '',
+            score: scoredButtons[0].score
+          }
+        }
+      }
+
+      candidate = candidate.parentElement
+    }
+  }
+
+  return null
+}, { targetText: rowText })
+
 const resolveLocator = (page, action) => {
+  if (action.rowText && action.rowActionSelector) {
+    const rowLocator = action.rowSelector
+      ? page.locator(action.rowSelector).filter({ hasText: action.rowText })
+      : page
+        .locator("[data-testid^='page-tree-node-']")
+        .filter({ hasText: action.rowText })
+        .or(page.getByText(action.rowText, { exact: Boolean(action.exactRowText) }).locator(
+          'xpath=ancestor::div[contains(@class, "group") and contains(@class, "relative")][1]'
+        ))
+
+    return rowLocator.locator(action.rowActionSelector)
+  }
+
+  if (Array.isArray(action.selectors) && action.selectors.length > 0) {
+    return action.selectors
+      .map(selector => page.locator(selector))
+      .reduce((combined, locator) => combined.or(locator))
+  }
+
   if (action.selector) return page.locator(action.selector)
   if (action.label) return page.getByLabel(action.label, { exact: Boolean(action.exact) })
   if (action.placeholder) return page.getByPlaceholder(action.placeholder, { exact: Boolean(action.exact) })
   if (action.role) return page.getByRole(action.role, { name: action.name ? new RegExp(action.name, 'i') : undefined })
+  if (!action.text) {
+    throw new Error(`Action "${action.type || 'unknown'}" needs a target. Add text, label, placeholder, role, selector, selectors, rowText/rowActionSelector, or pageTreeAddChildForText.`)
+  }
   return page.getByText(action.text, { exact: Boolean(action.exact) })
 }
+
+const resolveActionPath = (path = '') => path.replace(/\$\{([A-Z0-9_]+)\}/g, (match, envName) => {
+  const value = process.env[envName]
+
+  if (!value) {
+    throw new Error(`Missing environment variable ${envName} for video action path "${path}".`)
+  }
+
+  return value
+})
 
 const mockCmsApi = async (page) => {
   const json = (route, body, status = 200) => route.fulfill({
     status,
     contentType: 'application/json',
     body: JSON.stringify(body)
+  })
+  const pages = [
+    {
+      id: 101,
+      title: 'ECEEE Example Site',
+      slug: 'eceee-example-site',
+      parent: null,
+      sortOrder: 10,
+      children: [],
+      childrenCount: 3,
+      hostnames: ['example.local'],
+      publicationStatus: 'published'
+    },
+    {
+      id: 171,
+      title: 'Venue and travel',
+      slug: 'venue-travel',
+      parent: 101,
+      sortOrder: 30,
+      children: [],
+      childrenCount: 2,
+      hostnames: [],
+      publicationStatus: 'published'
+    },
+    {
+      id: 172,
+      title: 'Accommodation',
+      slug: 'accommodation',
+      parent: 171,
+      sortOrder: 10,
+      children: [],
+      childrenCount: 0,
+      hostnames: [],
+      publicationStatus: 'published'
+    },
+    {
+      id: 173,
+      title: 'Getting there',
+      slug: 'getting-there',
+      parent: 171,
+      sortOrder: 20,
+      children: [],
+      childrenCount: 0,
+      hostnames: [],
+      publicationStatus: 'published'
+    },
+    {
+      id: 271,
+      title: 'Papers',
+      slug: 'papers',
+      parent: 101,
+      sortOrder: 20,
+      children: [],
+      childrenCount: 0,
+      hostnames: [],
+      publicationStatus: 'published'
+    },
+    {
+      id: 371,
+      title: 'Programme',
+      slug: 'programme',
+      parent: 101,
+      sortOrder: 40,
+      children: [],
+      childrenCount: 0,
+      hostnames: [],
+      publicationStatus: 'published'
+    }
+  ]
+  const createdPage = {
+    id: 999,
+    title: 'Getting around town',
+    slug: 'getting-around-town',
+    parent: 171,
+    sortOrder: 0,
+    children: [],
+    childrenCount: 0,
+    hostnames: [],
+    publicationStatus: 'unpublished',
+    codeLayout: 'main_layout'
+  }
+  const demoPage = {
+    id: 101,
+    title: 'ECEEE Example Site',
+    slug: 'eceee-example-site',
+    parent: null,
+    hostnames: ['example.local'],
+    publicationStatus: 'published',
+    codeLayout: 'main_layout'
+  }
+  const demoVersion = {
+    id: 501,
+    versionId: 501,
+    versionNumber: 1,
+    page: 101,
+    pageId: 101,
+    codeLayout: 'main_layout',
+    pageData: {},
+    widgets: {
+      header: [{ id: 'header-1', type: 'easy_widgets.HeaderWidget', config: { title: 'ECEEE Example Site' }, slotName: 'header' }],
+      navigation: [{ id: 'navigation-1', type: 'easy_widgets.NavigationWidget', config: { items: [{ label: 'Papers', url: '/papers' }] }, slotName: 'navigation' }],
+      content: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<p>Example content</p>' }, slotName: 'content' }],
+      sidebar: [{ id: 'sidebar-1', type: 'easy_widgets.SidebarWidget', config: { title: 'Sidebar' }, slotName: 'sidebar' }]
+    },
+    metaTitle: 'ECEEE Example Site',
+    metaDescription: ''
+  }
+  const layouts = {
+    count: 2,
+    next: null,
+    previous: null,
+    results: [
+      {
+        name: 'main_layout',
+        description: 'Default page layout with header, navigation, content, sidebar, and footer slots.',
+        isActive: true,
+        slotConfiguration: {
+          slots: [
+            { name: 'header', label: 'Page Header' },
+            { name: 'navigation', label: 'Navigation Bar' },
+            { name: 'content', label: 'Main Content' },
+            { name: 'sidebar', label: 'Sidebar' },
+            { name: 'footer', label: 'Footer' }
+          ]
+        }
+      },
+      {
+        name: 'landing_page',
+        description: 'Landing page layout with hero and flexible content slots.',
+        isActive: true,
+        slotConfiguration: {
+          slots: [
+            { name: 'hero', label: 'Hero slot' },
+            { name: 'content', label: 'Main Content' }
+          ]
+        }
+      }
+    ]
+  }
+  const objectTypes = [
+    {
+      id: 1,
+      name: 'news',
+      label: 'News',
+      pluralLabel: 'News',
+      description: 'Articles and updates.',
+      isActive: true,
+      instanceCount: 3,
+      schemaFieldsCount: 4,
+      slotsCount: 1
+    },
+    {
+      id: 2,
+      name: 'speaker',
+      label: 'Speaker',
+      pluralLabel: 'Speakers',
+      description: 'People shown in the programme.',
+      isActive: true,
+      instanceCount: 8,
+      schemaFieldsCount: 5,
+      slotsCount: 0
+    }
+  ]
+  const widgetTypes = [
+    ['easy_widgets.BannerWidget', 'Banner widget', 'Focused visual band with text and media.'],
+    ['easy_widgets.BioWidget', 'Bio widget', 'Concise person profile with image and text.'],
+    ['easy_widgets.ContentCardWidget', 'Content card widget', 'Compact reusable content card.'],
+    ['easy_widgets.ContentWidget', 'Content widget', 'Rich text content for page slots.'],
+    ['easy_widgets.FooterWidget', 'Footer widget', 'Reusable footer content and child widgets.'],
+    ['easy_widgets.FormsWidget', 'Forms widget', 'Schema-driven visitor form.'],
+    ['easy_widgets.HeaderWidget', 'Header widget', 'Top page area styled by the active theme.'],
+    ['easy_widgets.HeadlineWidget', 'Headline widget', 'Structured heading text for a page section.'],
+    ['easy_widgets.HeroWidget', 'Hero widget', 'Prominent visual page introduction.'],
+    ['easy_widgets.ImageWidget', 'Image widget', 'Single image, gallery, or media display.'],
+    ['easy_widgets.NavbarWidget', 'Navbar widget', 'Compact navigation bar with menu items.'],
+    ['easy_widgets.NavigationWidget', 'Navigation widget', 'Menu and navigation configuration.'],
+    ['easy_widgets.NewsDetailWidget', 'News detail widget', 'Single article detail page content.'],
+    ['easy_widgets.NewsListWidget', 'News list widget', 'Filtered article list.'],
+    ['easy_widgets.PathDebugWidget', 'Path debug widget', 'Routing and path context diagnostics.'],
+    ['easy_widgets.SectionWidget', 'Section widget', 'Section container with child slots.'],
+    ['easy_widgets.SidebarTopNewsWidget', 'Sidebar top news widget', 'Compact featured-news list for sidebars.'],
+    ['easy_widgets.SidebarWidget', 'Sidebar widget', 'Container for secondary page content.'],
+    ['easy_widgets.TableWidget', 'Table widget', 'Responsive data table.'],
+    ['easy_widgets.ThreeColumnsWidget', 'Three columns widget', 'Three balanced child-widget columns.'],
+    ['easy_widgets.TopNewsPlugWidget', 'Top news plug widget', 'Visual featured-news grid.'],
+    ['easy_widgets.TwoColumnsWidget', 'Two columns widget', 'Two balanced child-widget columns.']
+  ].map(([type, name, description]) => ({ type, name, description, category: 'core', isActive: true }))
+  const theme = {
+    id: 1,
+    name: 'Demo Theme',
+    description: 'Theme used for help recordings.',
+    isActive: true
+  }
+  const paginated = (results) => ({
+    count: results.length,
+    next: null,
+    previous: null,
+    results
   })
 
   await page.route('**/api/v1/**', async (route, request) => {
@@ -1100,22 +1654,168 @@ const mockCmsApi = async (page) => {
       })
     }
 
-    if (url.pathname.includes('/webpages/pages/')) {
+    const pageIdMatch = url.pathname.match(/\/webpages\/pages\/(101|71)\//)
+    const demoPageId = pageIdMatch ? Number(pageIdMatch[1]) : 101
+    const versionForPage = {
+      ...demoVersion,
+      page: demoPageId,
+      pageId: demoPageId
+    }
+    const pageForId = {
+      ...demoPage,
+      id: demoPageId
+    }
+
+    if (url.pathname.match(/\/webpages\/pages\/(101|71)\/versions\/current\/?$/)) {
+      return json(route, versionForPage)
+    }
+
+    if (url.pathname.match(/\/webpages\/pages\/(101|71)\/versions\/501\/?$/)) {
+      return json(route, versionForPage)
+    }
+
+    if (url.pathname.match(/\/webpages\/pages\/(101|71)\/versions\/?$/)) {
+      return json(route, paginated([{ id: 501, versionNumber: 1, status: 'draft', createdAt: '2026-05-25T00:00:00Z' }]))
+    }
+
+    if (url.pathname.match(/\/webpages\/pages\/(101|71)\/widget-inheritance\/?$/)) {
+      return json(route, { widgets: {}, rules: {}, hasInheritedContent: false })
+    }
+
+    if (url.pathname.match(/\/webpages\/pages\/(101|71)\/?$/)) {
+      return json(route, pageForId)
+    }
+
+    if (url.pathname.includes('/webpages/page-data-schemas/')) {
+      return json(route, { schema: { type: 'object', properties: {} }, fields: [] })
+    }
+
+    if (url.pathname.includes('/namespaces')) {
+      return json(route, paginated([
+        { id: 1, name: 'Default', slug: 'default', isDefault: true }
+      ]))
+    }
+
+    if (url.pathname.includes('/webpages/layouts/combined')) {
+      return json(route, { codeLayouts: layouts.results, slots: layouts.results.flatMap(layout => layout.slotConfiguration.slots) })
+    }
+
+    if (url.pathname.includes('/webpages/layouts/')) {
+      if (url.pathname.endsWith('/json/')) {
+        return json(route, {
+          name: 'main_layout',
+          slots: layouts.results[0].slotConfiguration.slots
+        })
+      }
+
+      if (url.pathname.includes('/all_slots')) {
+        return json(route, { slots: layouts.results.flatMap(layout => layout.slotConfiguration.slots), total: 5 })
+      }
+
+      return json(route, layouts)
+    }
+
+    if (url.pathname.match(/\/webpages\/widget-types\/.+\/config-ui-schema\/?$/)) {
       return json(route, {
-        count: 1,
+        schema: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              title: 'Title',
+              placeholder: 'Enter widget title...'
+            },
+            label: {
+              type: 'string',
+              title: 'Label',
+              placeholder: 'Enter menu label...'
+            },
+            url: {
+              type: 'string',
+              title: 'Link URL',
+              placeholder: 'Enter link URL...'
+            },
+            content: {
+              type: 'string',
+              title: 'Content',
+              placeholder: 'Enter content...',
+              controlType: 'textarea'
+            }
+          }
+        },
+        uiSchema: {}
+      })
+    }
+
+    if (url.pathname.match(/\/webpages\/widget-types\/.+\/validate\/?$/)) {
+      return json(route, { isValid: true, errors: {}, warnings: {} })
+    }
+
+    if (url.pathname.includes('/webpages/widget-types/')) {
+      return json(route, widgetTypes)
+    }
+
+    if (url.pathname.includes('/webpages/themes/')) {
+      if (request.method() === 'POST') return json(route, { ...theme, id: 2, name: 'Tutorial Theme' }, 201)
+      return json(route, paginated([theme]))
+    }
+
+    if (url.pathname.includes('/objects/object-types/main_browser_types')) {
+      return json(route, objectTypes)
+    }
+
+    if (url.pathname.includes('/objects/object-types/')) {
+      return json(route, paginated(objectTypes))
+    }
+
+    if (url.pathname.includes('/objects/objects/')) {
+      return json(route, paginated([
+        { id: 11, title: 'Opening keynote', status: 'draft', objectType: objectTypes[0], parent: null }
+      ]))
+    }
+
+    if (url.pathname.includes('/tags/')) {
+      return json(route, paginated([
+        { id: 1, name: 'conference', slug: 'conference', color: '#2563eb', usageCount: 4 },
+        { id: 2, name: 'venue', slug: 'venue', color: '#16a34a', usageCount: 2 }
+      ]))
+    }
+
+    if (url.pathname.includes('/media/')) {
+      return json(route, paginated([
+        { id: 1, title: 'Venue logo', filename: 'venue-logo.png', fileType: 'image', tags: [], namespace: 'default' }
+      ]))
+    }
+
+    if (url.pathname.match(/\/webpages\/pages\/?$/) && request.method() === 'POST') {
+      return json(route, createdPage, 201)
+    }
+
+    if (url.pathname.match(/\/webpages\/pages\/999\/?$/)) {
+      return json(route, createdPage)
+    }
+
+    if (url.pathname.includes('/webpages/pages/')) {
+      const search = (url.searchParams.get('search') || '').toLowerCase()
+      const parent = url.searchParams.get('parent')
+      const parentIsNull = url.searchParams.get('parent_isnull')
+      let results = pages
+
+      if (search) {
+        results = results.filter(item => `${item.title} ${item.slug}`.toLowerCase().includes(search))
+      } else if (parent) {
+        results = results.filter(item => String(item.parent) === parent)
+      } else if (parentIsNull === 'true') {
+        results = results.filter(item => item.parent === null)
+      } else if (parentIsNull === 'false') {
+        results = results.filter(item => item.parent !== null)
+      }
+
+      return json(route, {
+        count: results.length,
         next: null,
         previous: null,
-        results: [{
-          id: 101,
-          title: 'Example Site',
-          slug: 'example-site',
-          parent: null,
-          sortOrder: 10,
-          children: [],
-          childrenCount: 0,
-          hostnames: ['example.local'],
-          publicationStatus: 'published'
-        }]
+        results
       })
     }
 
@@ -1129,18 +1829,52 @@ const runAction = async (page, action, baseUrl, args) => {
   await ensureCursorOverlay(page, args)
 
   if (action.type === 'goto') {
-    await page.goto(new URL(action.path || '/', baseUrl).toString(), { waitUntil: 'networkidle' })
+    const targetUrl = new URL(resolveActionPath(action.path || '/'), baseUrl)
+    const currentUrl = page.url() ? new URL(page.url()) : null
+    const isAlreadyThere = currentUrl
+      && currentUrl.origin === targetUrl.origin
+      && currentUrl.pathname === targetUrl.pathname
+      && currentUrl.search === targetUrl.search
+      && currentUrl.hash === targetUrl.hash
+
+    if (!isAlreadyThere) {
+      await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' })
+    }
+
+    await ensureCursorOverlay(page, args)
+    await moveTutorialCursor(page, args, action.cursorX || 92, action.cursorY || 112)
+    return
+  }
+
+  if (action.type === 'reload') {
+    await page.reload({ waitUntil: 'networkidle' })
     await ensureCursorOverlay(page, args)
     await moveTutorialCursor(page, args, action.cursorX || 92, action.cursorY || 112)
     return
   }
 
   if (action.type === 'click') {
+    if (action.pageTreeAddChildForText) {
+      const point = await pageTreeAddChildPoint(page, action.pageTreeAddChildForText)
+
+      if (!point) {
+        throw new Error(`Unable to find the add child page button for page tree row "${action.pageTreeAddChildForText}".`)
+      }
+
+      await moveTutorialCursor(page, args, point.x, point.y)
+      await flashClickPulse(page, args, point.x, point.y)
+      if (action.mockOnly && !args.mockApi) return
+      await page.mouse.click(point.x, point.y)
+      console.log(`      Clicked page-tree add child at ${Math.round(point.x)},${Math.round(point.y)} (${point.rowText || 'unknown row'}, button ${point.buttonIndex}, score ${point.score})`)
+      return
+    }
+
     const locator = resolveLocator(page, action)
     const point = await locatorCenter(locator)
 
     await moveTutorialCursor(page, args, point.x, point.y)
     await flashClickPulse(page, args, point.x, point.y)
+    if (action.mockOnly && !args.mockApi) return
     await locator.first().click()
     return
   }
@@ -1188,8 +1922,9 @@ const createContextOptions = (args) => {
   const contextOptions = {
     baseURL: args.baseUrl,
     viewport: { width: args.width, height: args.height },
+    serviceWorkers: 'block',
     recordVideo: {
-      dir: join(args.workDir, recordingTempDirName),
+      dir: args.recordingTempDir,
       size: { width: args.width, height: args.height }
     }
   }
@@ -1201,15 +1936,85 @@ const createContextOptions = (args) => {
   return contextOptions
 }
 
+const installRecordingStateReset = async (page, args) => {
+  if (!args.cleanBrowserState) return
+
+  await page.addInitScript(() => {
+    const accessToken = window.localStorage.getItem('access_token')
+    const refreshToken = window.localStorage.getItem('refresh_token')
+
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+
+    if (accessToken) window.localStorage.setItem('access_token', accessToken)
+    if (refreshToken) window.localStorage.setItem('refresh_token', refreshToken)
+
+    window.__HOWTO_RECORDING__ = true
+  })
+}
+
 const guideLabel = ({ doc, guide }) => `${doc.title || doc.id} / ${guide.title || guide.id}`
 
 const safeGuideName = (doc, guide) => `${doc.id}-${guide.id}`.replace(/[^a-z0-9_-]+/gi, '-')
 
-const guideActions = (guide) => (
-  guide.actions.length > 0
+const ensureSentence = (value = '') => {
+  const trimmed = value.toString().trim()
+  if (!trimmed) return ''
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`
+}
+
+const lowerFirst = (value = '') => {
+  const trimmed = value.toString().trim()
+  if (!trimmed) return ''
+  return `${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`
+}
+
+const contextAction = (caption, args, overrides = {}) => ({
+  type: 'caption',
+  caption,
+  preHoldMs: 250,
+  ms: args.contextHoldMs,
+  holdMs: 250,
+  ...overrides
+})
+
+const guideContextActions = (guide, args) => {
+  if (!args.contextSegments) return []
+
+  const title = getLocalizedValue(guide, 'title', args.language) || guide.title
+  const summary = getLocalizedValue(guide, 'summary', args.language) || guide.summary
+  const goal = getLocalizedValue(guide, 'goal', args.language)
+  const why = getLocalizedValue(guide, 'why', args.language)
+  const outcome = getLocalizedValue(guide, 'outcome', args.language)
+
+  const intro = goal
+    || `In this walkthrough, we are going to ${lowerFirst(title)}. ${ensureSentence(summary)}`
+  const purpose = why
+    || 'This is useful because it shows the path through the admin interface before you need to do the same task on real content.'
+  const wrapUp = outcome
+    || 'By the end, you should know where to start, what to click, and what to check before you save or publish your work.'
+
+  return [
+    contextAction(intro, args, { preHoldMs: 350 }),
+    contextAction(purpose, args),
+    { after: true, action: contextAction(wrapUp, args, { holdMs: 500 }) }
+  ]
+}
+
+const guideActions = (guide, args) => {
+  const baseActions = guide.actions.length > 0
     ? guide.actions
     : [{ type: 'goto', path: `/help/how-to/${guide.id}`, caption: guide.narration || guide.summary }]
-)
+  const contextActions = guideContextActions(guide, args)
+  const beforeActions = contextActions.filter(item => !item.after)
+  const afterActions = contextActions.filter(item => item.after).map(item => item.action)
+
+  return [
+    ...beforeActions,
+    ...baseActions,
+    ...afterActions
+  ]
+}
 
 const copyAudioPart = async (sourcePath, partPath) => {
   if (resolve(sourcePath) !== resolve(partPath)) {
@@ -1254,14 +2059,48 @@ const prepareActionSegments = async (args, guide, actions, safeName) => {
   return segments
 }
 
-const loadInitialFrame = async (page, args) => {
+const getInitialFramePath = (guide) => {
+  const firstGoto = (guide.actions || []).find(action => action.type === 'goto')
+
+  return firstGoto?.path || '/'
+}
+
+const shouldCutActionFromVideo = (action, caption, args) => {
+  if (!args.cutPageLoad) return false
+  if (action.cutFromVideo === false) return false
+  if (action.cutFromVideo === true) return true
+
+  return !caption && ['waitForText', 'goto', 'reload'].includes(action.type)
+}
+
+const loadInitialFrame = async (page, args, initialPath = '/') => {
   console.log('  - Loading initial frame')
-  await page.goto(new URL('/', args.baseUrl).toString(), { waitUntil: 'networkidle' })
-  await page.waitForTimeout(750)
+  await page.goto(new URL(resolveActionPath(initialPath), args.baseUrl).toString(), { waitUntil: 'networkidle' })
+  await page.waitForTimeout(300)
+}
+
+const publishHelpVideoArtifacts = async (args, safeName, videoPath, subtitlesPath) => {
+  await mkdir(args.publicDir, { recursive: true })
+
+  const publishedVideoPath = join(args.publicDir, `${safeName}.mp4`)
+  const publishedSubtitlesPath = join(args.publicDir, `${safeName}.vtt`)
+
+  if (videoPath.endsWith('.mp4') && resolve(videoPath) !== resolve(publishedVideoPath)) {
+    await copyFile(videoPath, publishedVideoPath)
+  }
+
+  if (subtitlesPath && resolve(subtitlesPath) !== resolve(publishedSubtitlesPath)) {
+    await copyFile(subtitlesPath, publishedSubtitlesPath)
+  }
+
+  return {
+    videoPath: videoPath.endsWith('.mp4') ? publishedVideoPath : '',
+    subtitlesPath: publishedSubtitlesPath
+  }
 }
 
 const recordGuide = async (browser, args, { doc, guide }) => {
-  const actions = guideActions(guide)
+  const actions = guideActions(guide, args)
   const safeName = safeGuideName(doc, guide)
   const webmPath = join(args.outputDir, `${safeName}.webm`)
   const mp4Path = join(args.outputDir, `${safeName}.mp4`)
@@ -1271,6 +2110,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   console.log('  - Capturing browser actions')
   const context = await browser.newContext(createContextOptions(args))
   const page = await context.newPage()
+  await installRecordingStateReset(page, args)
 
   if (args.mockApi) {
     await mockCmsApi(page)
@@ -1283,16 +2123,32 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   const cues = []
   const sfxEvents = []
   const narrationEvents = []
+  const timelineCuts = []
   const startedAt = Date.now()
 
-  await loadInitialFrame(page, args)
+  await loadInitialFrame(page, args, getInitialFramePath(guide))
+  const initialLoadMs = Date.now() - startedAt
+
+  if (args.trimInitialLoad && initialLoadMs >= args.initialLoadTrimThresholdMs) {
+    timelineCuts.push({
+      start: 0,
+      end: initialLoadMs,
+      reason: 'initial page load'
+    })
+    console.log(`    Detected initial page load: ${formatDuration(initialLoadMs / 1000)}; trimming it from the final MP4`)
+  }
 
   for (const segment of segments) {
     const { action, caption } = segment
     const narrationStart = Date.now() - startedAt
 
-    console.log(`    Part ${segment.partIndex}: narrating "${caption.slice(0, 72)}${caption.length > 72 ? '...' : ''}"`)
-    if (args.overlayCaptions) {
+    if (caption) {
+      console.log(`    Part ${segment.partIndex}: narrating "${caption.slice(0, 72)}${caption.length > 72 ? '...' : ''}"`)
+    } else {
+      console.log(`    Part ${segment.partIndex}: silent ${action.type}`)
+    }
+
+    if (args.overlayCaptions && caption) {
       await setCaptionOverlay(page, caption)
     }
 
@@ -1304,15 +2160,15 @@ const recordGuide = async (browser, args, { doc, guide }) => {
         text: caption,
         partIndex: segment.partIndex
       })
-      await page.waitForTimeout(segment.audioDurationMs + 300)
-    } else {
-      await page.waitForTimeout(action.preHoldMs || 900)
+      await page.waitForTimeout(action.narrationLeadMs ?? args.narrationActionLeadMs)
+    } else if (caption) {
+      await page.waitForTimeout(action.preHoldMs ?? args.noVoicePreHoldMs)
     }
 
     const actionStart = Date.now() - startedAt
 
     if (args.sfx) {
-      if (action.type === 'goto') {
+      if (action.type === 'goto' || action.type === 'reload') {
         sfxEvents.push({ type: 'navigate', at: actionStart + 250 })
       }
 
@@ -1330,13 +2186,32 @@ const recordGuide = async (browser, args, { doc, guide }) => {
 
     console.log(`    Part ${segment.partIndex}: running ${action.type}`)
     await runAction(page, action, args.baseUrl, args)
-    await page.waitForTimeout(action.holdMs || 1500)
+    const actionEnd = Date.now() - startedAt
 
-    cues.push({
-      start: narrationStart,
-      end: Date.now() - startedAt,
-      text: caption
-    })
+    if (shouldCutActionFromVideo(action, caption, args)) {
+      timelineCuts.push({
+        start: actionStart,
+        end: actionEnd,
+        reason: `${action.type} loading/wait`
+      })
+    }
+
+    const elapsedSegmentMs = Date.now() - startedAt - narrationStart
+    const targetSegmentMs = segment.audioPath
+      ? Math.max(segment.audioDurationMs + 120, action.holdMs || 0)
+      : action.holdMs ?? args.noVoiceHoldMs
+    const remainingSegmentMs = targetSegmentMs - elapsedSegmentMs
+    const postActionHoldMs = action.postHoldMs ?? args.postActionHoldMs
+
+    await page.waitForTimeout(Math.max(postActionHoldMs, remainingSegmentMs, 0))
+
+    if (caption) {
+      cues.push({
+        start: narrationStart,
+        end: Date.now() - startedAt,
+        text: caption
+      })
+    }
   }
 
   if (args.overlayCaptions) {
@@ -1349,6 +2224,20 @@ const recordGuide = async (browser, args, { doc, guide }) => {
 
   const audioPaths = []
   const manifestAudio = {}
+  const cuts = normalizeTimelineCuts(timelineCuts)
+
+  if (cuts.length > 0) {
+    const originalCueCount = cues.length
+    const originalNarrationCount = narrationEvents.length
+    const originalSfxCount = sfxEvents.length
+
+    cues.splice(0, cues.length, ...remapTimelineCues(cues, cuts))
+    narrationEvents.splice(0, narrationEvents.length, ...remapTimelineEvents(narrationEvents, cuts, ['at']))
+    sfxEvents.splice(0, sfxEvents.length, ...remapTimelineEvents(sfxEvents, cuts, ['at']))
+
+    console.log(`  - Removed ${formatDuration(cuts.reduce((total, cut) => total + (cut.end - cut.start), 0) / 1000)} of loading/waiting from the timeline`)
+    console.log(`    Remapped ${originalCueCount} subtitle cue${originalCueCount === 1 ? '' : 's'}, ${originalNarrationCount} narration event${originalNarrationCount === 1 ? '' : 's'}, ${originalSfxCount} sound event${originalSfxCount === 1 ? '' : 's'}`)
+  }
 
   if (narrationEvents.length > 0) {
     console.log('  - Building segmented narration track')
@@ -1409,24 +2298,37 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   }
 
   const rawVideoPath = await video.path()
+  const cutVideoPath = cuts.length > 0
+    ? await createCutVideo(rawVideoPath, join(args.workDir, `${safeName}-cut.mp4`), args, cuts)
+    : rawVideoPath
 
   try {
     if (args.format === 'webm' || args.format === 'both') {
+      if (cuts.length > 0) {
+        console.warn('    Timeline cuts are applied to the MP4 output; WebM copy keeps the raw browser recording.')
+      }
       await copyFile(rawVideoPath, webmPath)
     }
 
-    if (args.format === 'mp4' || args.format === 'both') {
-      console.log('  - Encoding MP4')
-      await convertWebmToMp4(rawVideoPath, mp4Path, args, audioPaths)
+  if (args.format === 'mp4' || args.format === 'both') {
+    console.log('  - Encoding MP4')
+    if (audioPaths.length === 0) {
+      console.warn('    No audio track will be muxed. Use --voice elevenlabs for narrated videos.')
     }
+    await convertWebmToMp4(cutVideoPath, mp4Path, args, audioPaths)
+  }
   } finally {
     await rm(rawVideoPath, { force: true })
+    if (cutVideoPath !== rawVideoPath) {
+      await rm(cutVideoPath, { force: true })
+    }
   }
 
   await writeVtt(subtitlesPath, cues)
+  const videoPath = args.format === 'webm' ? webmPath : mp4Path
+  const published = await publishHelpVideoArtifacts(args, safeName, videoPath, subtitlesPath)
 
   const manifestPath = join(args.workDir, `${safeName}.json`)
-  const videoPath = args.format === 'webm' ? webmPath : mp4Path
   const manifest = {
     topicId: doc.id,
     guideId: guide.id,
@@ -1434,7 +2336,10 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     format: args.format,
     video: videoPath,
     subtitles: subtitlesPath,
-    sourceMarkdown: guide.sourcePath || join(docsDir, `${doc.id}.md`)
+    publicVideo: published.videoPath,
+    publicSubtitles: published.subtitlesPath,
+    timelineCuts: cuts,
+    sourceMarkdown: guide.sourcePath || join(args.docsDir, `${doc.id}.md`)
   }
 
   if (args.format === 'webm' || args.format === 'both') {
@@ -1456,6 +2361,10 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   console.log(`Recorded ${guide.title}`)
   console.log(`Video: ${videoPath}`)
   console.log(`Subtitles: ${subtitlesPath}`)
+  if (published.videoPath) {
+    console.log(`Published video: ${published.videoPath}`)
+  }
+  console.log(`Published subtitles: ${published.subtitlesPath}`)
   console.log(`Manifest: ${manifestPath}`)
 
   return {
@@ -1481,7 +2390,7 @@ const main = async () => {
     return
   }
 
-  const docs = await loadDocs()
+  const docs = await loadDocs(args.docsDir)
   const targets = findGuides(docs, args)
 
   if (targets.length === 0) {
@@ -1490,11 +2399,31 @@ const main = async () => {
     return
   }
 
+  const { recordableTargets, skippedTargets } = filterActionableTargets(targets, args)
+
+  if (skippedTargets.length > 0) {
+    console.warn(
+      `Skipping ${skippedTargets.length} how-to guide${skippedTargets.length === 1 ? '' : 's'} with fewer than ${pluralizeSteps(args.minActionableSteps)}.`
+    )
+    skippedTargets.forEach(target => {
+      console.warn(`  - ${guideLabel(target)} (${pluralizeSteps(target.actionableSteps)})`)
+    })
+    console.warn('    Add click/fill/select actions to the guide video block, or run with --allow-passive-guides.')
+  }
+
+  if (recordableTargets.length === 0) {
+    console.error('No recordable how-to guides found.')
+    process.exitCode = 1
+    return
+  }
+
   await mkdir(args.outputDir, { recursive: true })
   await mkdir(args.workDir, { recursive: true })
-  console.log(`Preparing ${targets.length} how-to guide${targets.length === 1 ? '' : 's'}.`)
+  console.log(`Preparing ${recordableTargets.length} how-to guide${recordableTargets.length === 1 ? '' : 's'}.`)
   console.log(`Base URL: ${args.baseUrl}`)
+  console.log(`Docs: ${args.docsDir}`)
   console.log(`Output: ${args.outputDir}`)
+  console.log(`Public output: ${args.publicDir}`)
   console.log(`Work dir: ${args.workDir}`)
   console.log(`Language: ${args.language}`)
 
@@ -1502,15 +2431,15 @@ const main = async () => {
   const recordings = []
 
   try {
-    for (const [index, target] of targets.entries()) {
+    for (const [index, target] of recordableTargets.entries()) {
       const label = guideLabel(target)
-      console.log(`[${index + 1}/${targets.length}] Recording ${label}`)
+      console.log(`[${index + 1}/${recordableTargets.length}] Recording ${label}`)
       recordings.push(await recordGuide(browser, args, target))
-      console.log(`[${index + 1}/${targets.length}] Done ${label}`)
+      console.log(`[${index + 1}/${recordableTargets.length}] Done ${label}`)
     }
   } finally {
     await browser.close()
-    await rm(join(args.workDir, recordingTempDirName), { force: true, recursive: true })
+    await rm(args.recordingTempDir, { force: true, recursive: true })
   }
 
   console.log(`Recorded ${recordings.length} how-to guide${recordings.length === 1 ? '' : 's'}.`)

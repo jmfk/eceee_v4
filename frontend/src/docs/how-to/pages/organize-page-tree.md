@@ -22,7 +22,30 @@ Move, copy, import, export, and clean up pages.
 
 ```video
 [
-  { "type": "goto", "path": "/pages", "caption": "Open the page tree." },
-  { "type": "waitForText", "text": "Pages", "caption": "Bulk actions appear when one or more pages are selected." }
+  {
+    "type": "goto",
+    "path": "/pages",
+    "caption": "Start on the page tree. Expand and search before moving or editing pages.",
+    "holdMs": 450
+  },
+  {
+    "type": "fill",
+    "placeholder": "Search pages...",
+    "value": "Venue and travel",
+    "caption": "Use search to narrow the tree when the site has many pages.",
+    "holdMs": 500
+  },
+  {
+    "type": "waitForText",
+    "text": "Venue and travel",
+    "caption": "The matching page row is now visible, so you can use its row actions without relying on a specific root page name.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='refresh-button']",
+    "caption": "Refresh the tree after imports, publishes, or work by another editor.",
+    "holdMs": 500
+  }
 ]
 ```

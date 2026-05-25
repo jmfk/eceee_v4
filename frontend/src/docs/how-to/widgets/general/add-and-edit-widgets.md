@@ -23,9 +23,12 @@ Add a widget to a slot and open its configuration.
 
 ```video
 [
-  { "type": "goto", "path": "/pages", "caption": "Open Pages and choose the page you want to edit." },
-  { "type": "waitForText", "text": "Pages", "caption": "The page tree is the starting point for page content edits." },
-  { "type": "caption", "caption": "Open a page editor, then use the plus action in a slot to add a widget." },
-  { "type": "caption", "caption": "Use the settings action on the widget row to edit its configuration." }
+  { "type": "goto", "path": "/pages/101/edit/slots", "caption": "Start in All Slots on the page editor, because widgets are added inside page slots." },
+  { "type": "waitForText", "text": "ECEEE Example Site", "caption": "Confirm that the editor has opened the page you want to change." },
+  { "type": "click", "selector": "[data-testid='page-slot-toggle-content']", "caption": "Expand the Main Content slot so its widget controls are visible." },
+  { "type": "click", "selector": "[data-testid='page-slot-add-content']", "caption": "Click the plus icon on the Main Content slot where the new widget should appear." },
+  { "type": "click", "selector": "[data-testid='page-widget-option-easy-widgets-imagewidget']", "caption": "Choose Image widget from the widget picker." },
+  { "type": "click", "selector": "[data-testid='page-widget-edit-easy-widgets-imagewidget']", "caption": "Click the settings icon on the new widget row to open its configuration panel." },
+  { "type": "caption", "caption": "The right panel is where you configure the widget before saving the page.", "ms": 1200 }
 ]
 ```

@@ -22,7 +22,36 @@ Add media files to the selected namespace and keep the library tidy.
 
 ```video
 [
-  { "type": "goto", "path": "/media", "caption": "Open the Media Manager." },
-  { "type": "waitForText", "text": "Media Manager", "caption": "Select a namespace before managing files." }
+  {
+    "type": "goto",
+    "path": "/media",
+    "caption": "Start on the Media Manager. Choose the namespace you are working in before you upload or organize files.",
+    "holdMs": 450
+  },
+  {
+    "type": "fill",
+    "placeholder": "Search media files...",
+    "value": "logo",
+    "caption": "Use search to find an existing file before uploading a duplicate.",
+    "holdMs": 500
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='media-tab-collections']",
+    "caption": "Open Collections when files should be grouped for reuse.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='media-tab-tags']",
+    "caption": "Open Tags when you need to clean up or review media tags.",
+    "holdMs": 450
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='media-tab-pending']",
+    "caption": "Open Pending Files to approve or reject files that were uploaded for review.",
+    "holdMs": 500
+  }
 ]
 ```

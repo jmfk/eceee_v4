@@ -1,5 +1,5 @@
 import { PlayCircle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { extractYouTubeId } from '../../utils/howToHelp'
 
 const getVideoMimeType = (url = '') => {
@@ -18,37 +18,70 @@ const VideoPlaceholder = ({ message = 'MP4 video coming soon', detail = 'Generat
     </div>
 )
 
+const normalizeVideoSources = ({ videoSources, sourceUrl, captionsUrl }) => {
+    if (Array.isArray(videoSources) && videoSources.length > 0) {
+        return videoSources
+            .map(source => ({
+                videoUrl: source.videoUrl || source.mp4Url || '',
+                captionsUrl: source.captionsUrl || source.subtitlesUrl || ''
+            }))
+            .filter(source => source.videoUrl)
+    }
+
+    return sourceUrl ? [{ videoUrl: sourceUrl, captionsUrl }] : []
+}
+
 const HelpVideoPlayer = ({
     videoUrl,
     mp4Url,
     captionsUrl,
+    videoSources,
     language = 'sv',
     youtubeId,
     youtubeUrl,
     title
 }) => {
     const sourceUrl = mp4Url || videoUrl
+    const sources = useMemo(
+        () => normalizeVideoSources({ videoSources, sourceUrl, captionsUrl }),
+        [videoSources, sourceUrl, captionsUrl]
+    )
+    const sourceKey = sources.map(source => `${source.videoUrl}:${source.captionsUrl}`).join('|')
+    const [sourceIndex, setSourceIndex] = useState(0)
     const [hasVideoError, setHasVideoError] = useState(false)
+    const currentSource = sources[sourceIndex]
 
     useEffect(() => {
+        setSourceIndex(0)
         setHasVideoError(false)
-    }, [sourceUrl])
+    }, [sourceKey])
 
-    if (sourceUrl && !hasVideoError) {
+    const handleVideoError = () => {
+        if (sourceIndex < sources.length - 1) {
+            setSourceIndex(index => index + 1)
+            setHasVideoError(false)
+            return
+        }
+
+        setHasVideoError(true)
+    }
+
+    if (currentSource?.videoUrl && !hasVideoError) {
         return (
             <div className="overflow-hidden rounded border border-gray-200 bg-black">
                 <video
+                    key={currentSource.videoUrl}
                     className="aspect-video h-full w-full bg-black"
                     controls
                     preload="metadata"
                     title={title || 'How-to video'}
-                    onError={() => setHasVideoError(true)}
+                    onError={handleVideoError}
                 >
-                    <source src={sourceUrl} type={getVideoMimeType(sourceUrl)} />
-                    {captionsUrl && (
+                    <source src={currentSource.videoUrl} type={getVideoMimeType(currentSource.videoUrl)} />
+                    {currentSource.captionsUrl && (
                         <track
                             kind="captions"
-                            src={captionsUrl}
+                            src={currentSource.captionsUrl}
                             srcLang={language}
                             label={language.startsWith('en') ? 'English' : 'Svenska'}
                         />
@@ -56,7 +89,7 @@ const HelpVideoPlayer = ({
                 </video>
                 <div className="bg-white px-3 py-2 text-xs">
                     <a
-                        href={sourceUrl}
+                        href={currentSource.videoUrl}
                         className="font-medium text-blue-600 hover:text-blue-700"
                         target="_blank"
                         rel="noopener noreferrer"

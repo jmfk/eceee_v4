@@ -30,7 +30,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-auth-prod howto-voices howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-edit howto-video-demo-all howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -93,6 +93,8 @@ help: ## Show this help message (use: make help [target])
 		echo "  sample-pages      Create sample pages"; \
 		echo "  sample-data       Create both sample content and pages"; \
 		echo "  sample-clean      Clean and recreate sample data"; \
+		echo "  demo-reset-site   Reset local demo DB from the Summer Study export"; \
+		echo "  demo-site         Reset demo DB and start backend/frontend on localhost"; \
 		echo ""; \
 		echo "Data Migration:"; \
 		echo "  migrate-to-camelcase-dry  Dry run camelCase migration"; \
@@ -119,8 +121,12 @@ help: ## Show this help message (use: make help [target])
 		echo "  lint              Lint frontend code"; \
 		echo ""; \
 		echo "How-To Video Generation:"; \
+		echo "  howto-script-editor  Start the local video script editor"; \
+		echo "  howto-video-demo      Generate one narrated help video against local demo"; \
+		echo "  howto-video-demo-all  Generate all narrated help videos against local demo"; \
 		echo "  howto-auth-prod       Prompt for prod username/password and save auth state"; \
 		echo "  howto-voices          List Swedish ElevenLabs voice candidates"; \
+		echo "  howto-video-edit      Trim an existing rendered MP4 without recording again"; \
 		echo "  howto-video-prod      Generate one narrated prod help video (GUIDE=id, HOWTO_LANGUAGE=sv|en)"; \
 		echo "  howto-video-prod-both Generate one prod help video in Swedish and English (GUIDE=id)"; \
 		echo "  howto-video-prod-all  Generate narrated prod help videos for all guides (HOWTO_LANGUAGE=sv|en)"; \
@@ -213,6 +219,7 @@ changepassword:
 # API Token Management
 SERVER ?= http://localhost:8000
 HOWTO_PROD_BASE_URL ?= https://app.eceee.org
+HOWTO_DEMO_BASE_URL ?= http://localhost:3000
 HOWTO_AUTH_STATE ?= .auth/eceee-prod-storage-state.json
 HOWTO_LANGUAGE ?= sv
 HOWTO_TRANSLATION_PROVIDER ?= anthropic
@@ -220,7 +227,34 @@ HOWTO_TRANSLATION_MODEL ?=
 HOWTO_TRANSLATION_FALLBACK ?= original
 HOWTO_OUTPUT_BASE_DIR ?= $(CURDIR)/frontend/public/howto-videos/prod
 HOWTO_OUTPUT_DIR ?= $(HOWTO_OUTPUT_BASE_DIR)/$(HOWTO_LANGUAGE)
+HOWTO_DEMO_OUTPUT_DIR ?= $(CURDIR)/frontend/public/howto-videos/demo/$(HOWTO_LANGUAGE)
+HOWTO_MD ?= $(MD)
+HOWTO_VIDEO ?= $(VIDEO)
+HOWTO_VIDEO_OUTPUT ?= $(OUTPUT)
+HOWTO_VIDEO_CUTS ?= $(CUTS)
 HOWTO_EXTRA_FLAGS ?=
+HOWTO_SCRIPT_EDITOR_PATH ?= /help/script-editor
+DEMO_EXPORT ?= demo/summerstudy.eceee.org-20260525-181814-871e39ea.zip
+DEMO_DB ?= eceee_demo
+DEMO_BACKEND_PORT ?= 8000
+DEMO_FRONTEND_PORT ?= 3000
+DEMO_HOSTNAMES ?= localhost,127.0.0.1
+DEMO_USER ?= demo
+DEMO_PASSWORD ?= demo
+
+demo-reset-site: ## Reset local demo DB from export (use: make demo-reset-site [DEMO_EXPORT=demo/file.zip])
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,demo-reset-site)
+else
+	DEMO_EXPORT="$(DEMO_EXPORT)" DEMO_DB="$(DEMO_DB)" DEMO_BACKEND_PORT="$(DEMO_BACKEND_PORT)" DEMO_FRONTEND_PORT="$(DEMO_FRONTEND_PORT)" DEMO_HOSTNAMES="$(DEMO_HOSTNAMES)" DEMO_USER="$(DEMO_USER)" DEMO_PASSWORD="$(DEMO_PASSWORD)" scripts/reset-demo-site.sh
+endif
+
+demo-site: ## Reset local demo DB and start backend/frontend (use: make demo-site)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,demo-site)
+else
+	DEMO_EXPORT="$(DEMO_EXPORT)" DEMO_DB="$(DEMO_DB)" DEMO_BACKEND_PORT="$(DEMO_BACKEND_PORT)" DEMO_FRONTEND_PORT="$(DEMO_FRONTEND_PORT)" DEMO_HOSTNAMES="$(DEMO_HOSTNAMES)" DEMO_USER="$(DEMO_USER)" DEMO_PASSWORD="$(DEMO_PASSWORD)" START_DEMO_SITE=1 scripts/reset-demo-site.sh
+endif
 
 create-api-token: ## Create DRF token for user (use: make create-api-token USER=username [SERVER=url])
 	$(call check_help,create-api-token)
@@ -547,6 +581,16 @@ playwright-test:
 lint:
 	cd frontend && npm run lint
 
+howto-script-editor: ## Start the local video script editor (use: make howto-script-editor [FP=3000])
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-script-editor)
+else
+	@FP="$${FP:-$$(grep "^FRONTEND_PORT=" .env 2>/dev/null | cut -d= -f2 || echo "3000")}"; \
+	if [ -z "$$FP" ]; then FP="3000"; fi; \
+	echo "🎬 Starting video script editor on http://localhost:$$FP$(HOWTO_SCRIPT_EDITOR_PATH)"; \
+	cd frontend && VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) npm run dev -- --host 0.0.0.0 --port "$$FP" --strictPort --open "$(HOWTO_SCRIPT_EDITOR_PATH)"
+endif
+
 howto-auth-prod: ## Prompt for production username/password and save auth state for help videos
 ifneq ($(HELP_REQUESTED),)
 	@$(call print_help,howto-auth-prod)
@@ -566,6 +610,99 @@ else
 		exit 1; \
 	fi
 	npm run howto:voices -- --language "$(HOWTO_LANGUAGE)" $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-demo: ## Generate one narrated help video against local demo (use: make howto-video-demo MD=frontend/src/docs/how-to/pages/create-page.md)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo)
+else
+	@if [ -z "$(GUIDE)" ] && [ -z "$(HOWTO_MD)" ]; then \
+		echo "❌ GUIDE or MD is required."; \
+		echo "   Example: make howto-video-demo MD=frontend/src/docs/how-to/pages/add-subpage-under-venue-travel.md"; \
+		echo "   Legacy:  make howto-video-demo GUIDE=pages-create"; \
+		exit 1; \
+	fi
+	@if [ -n "$(HOWTO_MD)" ] && [ ! -f "$(HOWTO_MD)" ]; then \
+		echo "❌ Markdown file not found: $(HOWTO_MD)"; \
+		exit 1; \
+	fi
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@if [ "$(HOWTO_LANGUAGE)" != "en" ]; then \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
+			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+	fi
+	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
+	case "$(HOWTO_LANGUAGE)" in \
+		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
+		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
+	esac; \
+	if [ -z "$$VOICE_ID" ]; then \
+		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
+		exit 1; \
+	fi
+	@OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	GUIDE_ID="$(GUIDE)"; \
+	if [ -n "$(HOWTO_MD)" ]; then \
+		GUIDE_ID=$$(awk -F: '/^id:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -z "$$GUIDE_ID" ]; then \
+			echo "❌ Could not read frontmatter id from $(HOWTO_MD)"; \
+			exit 1; \
+		fi; \
+		echo "🎬 Generating demo video for $$GUIDE_ID from $(HOWTO_MD)"; \
+	else \
+		echo "🎬 Generating demo video for $$GUIDE_ID"; \
+	fi; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	cd frontend && \
+	npm run howto:video -- --guide "$$GUIDE_ID" --base-url "$(HOWTO_DEMO_BASE_URL)" --output-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-demo-all: ## Generate all narrated help videos against local demo
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo-all)
+else
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	cd frontend && \
+	npm run howto:video:all -- --base-url "$(HOWTO_DEMO_BASE_URL)" --output-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-edit: ## Trim an existing rendered MP4 (use: make howto-video-edit VIDEO=frontend/public/howto-videos/editor-preview/sv/file.mp4 CUTS=0:10 [OUTPUT=edited.mp4])
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-edit)
+else
+	@if [ -z "$(HOWTO_VIDEO)" ]; then \
+		echo "❌ VIDEO is required. Example: make howto-video-edit VIDEO=frontend/public/howto-videos/editor-preview/sv/pages-pages-create.mp4 CUTS=0:10"; \
+		exit 1; \
+	fi
+	@if [ -z "$(HOWTO_VIDEO_CUTS)" ]; then \
+		echo "❌ CUTS is required. Example: CUTS=0:10 or CUTS=0:10,45.5:48"; \
+		exit 1; \
+	fi
+	@INPUT="$(HOWTO_VIDEO)"; \
+	OUTPUT="$(HOWTO_VIDEO_OUTPUT)"; \
+	case "$$INPUT" in /*) ;; *) INPUT="$(CURDIR)/$$INPUT";; esac; \
+	if [ -n "$$OUTPUT" ]; then case "$$OUTPUT" in /*) ;; *) OUTPUT="$(CURDIR)/$$OUTPUT";; esac; fi; \
+	if [ -n "$$OUTPUT" ]; then \
+		cd frontend && node scripts/edit-howto-video.mjs --input "$$INPUT" --cuts "$(HOWTO_VIDEO_CUTS)" --output "$$OUTPUT"; \
+	else \
+		cd frontend && node scripts/edit-howto-video.mjs --input "$$INPUT" --cuts "$(HOWTO_VIDEO_CUTS)"; \
+	fi
 endif
 
 howto-video-prod: ## Generate one narrated help video from production (use: make howto-video-prod GUIDE=pages-create)
