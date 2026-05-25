@@ -33,6 +33,7 @@ __all__ = [
     # Layout
     "LayoutSerializer",
     # Page
+    "WebPageListSerializer",
     "WebPageSimpleSerializer",
     "PageHierarchySerializer",
     "DeletedPageSerializer",

@@ -23,6 +23,7 @@ from .layout import LayoutSerializer
 
 # Page serializers
 from .page import (
+    WebPageListSerializer,
     WebPageSimpleSerializer,
     PageHierarchySerializer,
     DeletedPageSerializer,
@@ -56,6 +57,7 @@ __all__ = [
     # Layout
     "LayoutSerializer",
     # Page
+    "WebPageListSerializer",
     "WebPageSimpleSerializer",
     "PageHierarchySerializer",
     "DeletedPageSerializer",

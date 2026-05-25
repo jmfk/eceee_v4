@@ -9,12 +9,13 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.throttling import UserRateThrottle
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import models
-from django.db.models import Q, Exists, OuterRef, F
+from django.db.models import Q, Exists, OuterRef, F, Count
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from ..models import WebPage, PageVersion
 from ..serializers import (
+    WebPageListSerializer,
     WebPageSimpleSerializer,
     PageHierarchySerializer,
 )
@@ -57,7 +58,9 @@ class WebPageViewSet(viewsets.ModelViewSet):
     ]
 
     def get_serializer_class(self):
-        """Use WebPageSimpleSerializer for all actions (includes version data)"""
+        """Use a lean serializer for list views and full page data elsewhere."""
+        if self.action == "list":
+            return WebPageListSerializer
         return WebPageSimpleSerializer
 
     def get_queryset(self):
@@ -88,7 +91,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Using Prefetch to add them as cached attributes
             from django.db.models import Prefetch
 
-            queryset = queryset.prefetch_related(
+            queryset = queryset.annotate(
+                children_count=Count(
+                    "children",
+                    filter=Q(children__is_deleted=False),
+                    distinct=True,
+                )
+            ).prefetch_related(
                 Prefetch(
                     "versions",
                     queryset=PageVersion.objects.filter(effective_date__lte=now)
