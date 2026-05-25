@@ -12,8 +12,8 @@ sectionSummary: Create, organize, edit, and publish pages in the site tree.
 sectionOrder: 1
 videoLanguage: sv
 videoLanguages: sv
-mp4UrlSv: /howto-videos/editor-preview/sv/pages-pages-add-venue-travel-child.mp4
-captionsUrlSv: /howto-videos/editor-preview/sv/pages-pages-add-venue-travel-child.vtt
+mp4UrlSv: /howto-videos/prod/sv/pages-pages-add-venue-travel-child.mp4
+captionsUrlSv: /howto-videos/prod/sv/pages-pages-add-venue-travel-child.vtt
 ---
 
 # Lägg till en undersida
