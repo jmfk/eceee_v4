@@ -30,7 +30,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-edit howto-video-demo-all howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -123,7 +123,9 @@ help: ## Show this help message (use: make help [target])
 		echo "How-To Video Generation:"; \
 		echo "  howto-script-editor  Start the local video script editor"; \
 		echo "  howto-video-demo      Generate one narrated help video against local demo"; \
+		echo "  howto-video-demo-both Generate one local demo help video in Swedish and English"; \
 		echo "  howto-video-demo-all  Generate all narrated help videos against local demo"; \
+		echo "  howto-video-demo-all-both Generate all local demo help videos in Swedish and English"; \
 		echo "  howto-auth-prod       Prompt for prod username/password and save auth state"; \
 		echo "  howto-voices          List Swedish ElevenLabs voice candidates"; \
 		echo "  howto-video-edit      Trim an existing rendered MP4 without recording again"; \
@@ -222,11 +224,14 @@ HOWTO_PROD_BASE_URL ?= https://app.eceee.org
 HOWTO_DEMO_BASE_URL ?= http://localhost:3000
 HOWTO_AUTH_STATE ?= .auth/eceee-prod-storage-state.json
 HOWTO_LANGUAGE ?= sv
-HOWTO_TRANSLATION_PROVIDER ?= anthropic
+HOWTO_TRANSLATION_PROVIDER ?=
+HOWTO_USE_SCRIPT_TRANSLATION ?= 0
 HOWTO_TRANSLATION_MODEL ?=
 HOWTO_TRANSLATION_FALLBACK ?= original
+HOWTO_DOCS_DIR ?=
 HOWTO_OUTPUT_BASE_DIR ?= $(CURDIR)/frontend/public/howto-videos/prod
 HOWTO_OUTPUT_DIR ?= $(HOWTO_OUTPUT_BASE_DIR)/$(HOWTO_LANGUAGE)
+HOWTO_DEMO_OUTPUT_BASE_DIR ?= $(CURDIR)/frontend/public/howto-videos/demo
 HOWTO_DEMO_OUTPUT_DIR ?= $(CURDIR)/frontend/public/howto-videos/demo/$(HOWTO_LANGUAGE)
 HOWTO_MD ?= $(MD)
 HOWTO_VIDEO ?= $(VIDEO)
@@ -241,6 +246,11 @@ DEMO_FRONTEND_PORT ?= 3000
 DEMO_HOSTNAMES ?= localhost,127.0.0.1
 DEMO_USER ?= demo
 DEMO_PASSWORD ?= demo
+
+HOWTO_LANGUAGE_ORIGIN := $(origin HOWTO_LANGUAGE)
+HOWTO_OUTPUT_DIR_ORIGIN := $(origin HOWTO_OUTPUT_DIR)
+HOWTO_DEMO_OUTPUT_DIR_ORIGIN := $(origin HOWTO_DEMO_OUTPUT_DIR)
+HOWTO_TRANSLATE_FLAGS := $(if $(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION)),$(if $(strip $(HOWTO_TRANSLATION_PROVIDER)),--translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)",--no-translate),--no-translate)
 
 demo-reset-site: ## Reset local demo DB from export (use: make demo-reset-site [DEMO_EXPORT=demo/file.zip])
 ifneq ($(HELP_REQUESTED),)
@@ -630,26 +640,55 @@ else
 		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
 		exit 1; \
 	fi
-	@if [ "$(HOWTO_LANGUAGE)" != "en" ]; then \
+	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
+	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
+		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
+	fi; \
+	if [ "$$REQUESTED_LANGUAGE" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
 		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
-			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $$REQUESTED_LANGUAGE translation."; \
 			exit 1; \
 		fi; \
 		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
-			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $$REQUESTED_LANGUAGE translation."; \
 			exit 1; \
 		fi; \
 	fi
-	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
-	case "$(HOWTO_LANGUAGE)" in \
+	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
+	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
+		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
+	fi; \
+	VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
+	case "$$REQUESTED_LANGUAGE" in \
 		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
 		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
 	esac; \
 	if [ -z "$$VOICE_ID" ]; then \
-		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
+		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$$REQUESTED_LANGUAGE. Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
 		exit 1; \
 	fi
-	@OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
+	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
+	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
+		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
+	fi; \
+	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$$REQUESTED_LANGUAGE" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$$REQUESTED_LANGUAGE" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$$REQUESTED_LANGUAGE: $$DOCS_DIR"; \
+		echo "   Create the translated markdown first, or set HOWTO_DOCS_DIR=frontend/src/docs/how-to"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
+	if [ "$(HOWTO_DEMO_OUTPUT_DIR_ORIGIN)" = "file" ]; then OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/$$REQUESTED_LANGUAGE"; fi; \
 	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
 	GUIDE_ID="$(GUIDE)"; \
 	if [ -n "$(HOWTO_MD)" ]; then \
@@ -662,9 +701,23 @@ else
 	else \
 		echo "🎬 Generating demo video for $$GUIDE_ID"; \
 	fi; \
+	echo "📚 Using $$REQUESTED_LANGUAGE markdown from $$DOCS_DIR"; \
 	mkdir -p "$$OUTPUT_DIR"; \
 	cd frontend && \
-	npm run howto:video -- --guide "$$GUIDE_ID" --base-url "$(HOWTO_DEMO_BASE_URL)" --output-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
+	npm run howto:video -- --guide "$$GUIDE_ID" --base-url "$(HOWTO_DEMO_BASE_URL)" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$$REQUESTED_LANGUAGE" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-demo-both: ## Generate one narrated help video against local demo in Swedish and English (use: make howto-video-demo-both MD=frontend/src/docs/how-to/pages/create-page.md)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo-both)
+else
+	@if [ -z "$(GUIDE)" ] && [ -z "$(HOWTO_MD)" ]; then \
+		echo "❌ GUIDE or MD is required."; \
+		echo "   Example: make howto-video-demo-both MD=frontend/src/docs/how-to/pages/add-subpage-under-venue-travel.md"; \
+		exit 1; \
+	fi
+	$(MAKE) howto-video-demo GUIDE="$(GUIDE)" MD="$(HOWTO_MD)" HOWTO_LANGUAGE=en HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/en"
+	$(MAKE) howto-video-demo GUIDE="$(GUIDE)" MD="$(HOWTO_MD)" HOWTO_LANGUAGE=sv HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/sv"
 endif
 
 howto-video-demo-all: ## Generate all narrated help videos against local demo
@@ -675,11 +728,31 @@ else
 		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
 		exit 1; \
 	fi
-	@OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
+	@DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$(HOWTO_LANGUAGE)" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
 	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
 	mkdir -p "$$OUTPUT_DIR"; \
 	cd frontend && \
-	npm run howto:video:all -- --base-url "$(HOWTO_DEMO_BASE_URL)" --output-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
+	npm run howto:video:all -- --base-url "$(HOWTO_DEMO_BASE_URL)" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-demo-all-both: ## Generate all narrated help videos against local demo in Swedish and English
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo-all-both)
+else
+	$(MAKE) howto-video-demo-all HOWTO_LANGUAGE=en HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/en"
+	$(MAKE) howto-video-demo-all HOWTO_LANGUAGE=sv HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/sv"
 endif
 
 howto-video-edit: ## Trim an existing rendered MP4 (use: make howto-video-edit VIDEO=frontend/public/howto-videos/editor-preview/sv/file.mp4 CUTS=0:10 [OUTPUT=edited.mp4])
@@ -717,7 +790,7 @@ else
 		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
 		exit 1; \
 	fi
-	@if [ "$(HOWTO_LANGUAGE)" != "en" ]; then \
+	@if [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
 		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
 			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
 			exit 1; \
@@ -743,10 +816,22 @@ else
 		echo "Run: make howto-auth-prod"; \
 		exit 1; \
 	fi; \
+	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$(HOWTO_LANGUAGE)" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
+		exit 1; \
+	fi; \
 	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
 	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
 	mkdir -p "$$OUTPUT_DIR"; \
-	npm run howto:video -- --guide "$(GUIDE)" --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
+	npm run howto:video -- --guide "$(GUIDE)" --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
 endif
 
 howto-video-prod-both: ## Generate one narrated help video from production in Swedish and English (use: make howto-video-prod-both GUIDE=pages-create)
@@ -769,7 +854,7 @@ else
 		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
 		exit 1; \
 	fi
-	@if [ "$(HOWTO_LANGUAGE)" != "en" ]; then \
+	@if [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
 		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
 			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
 			exit 1; \
@@ -795,10 +880,22 @@ else
 		echo "Run: make howto-auth-prod"; \
 		exit 1; \
 	fi; \
+	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$(HOWTO_LANGUAGE)" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
+		exit 1; \
+	fi; \
 	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
 	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
 	mkdir -p "$$OUTPUT_DIR"; \
-	npm run howto:video:all -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --output-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" --translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)" --sfx $(HOWTO_EXTRA_FLAGS)
+	npm run howto:video:all -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
 endif
 
 howto-video-prod-all-both: ## Generate all narrated help videos from production in Swedish and English

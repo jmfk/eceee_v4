@@ -2,8 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { execSync, spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 
@@ -208,6 +208,7 @@ const normalizeRenderLanguages = (value) => {
 const docsRoot = path.join(__dirname, 'src/docs/how-to')
 const translationsRoot = path.join(__dirname, 'src/docs/how-to-translations')
 const publicRoot = path.join(__dirname, 'public')
+const renderLogRoot = path.join(__dirname, '.howto-script-preview', 'render-logs')
 let lastOverwriteUndo = null
 
 const languageName = (language) => {
@@ -236,11 +237,154 @@ const originPathFor = (sectionId, guideId) => path.join(
   `${safeSegment(guideId, 'guide')}.md`
 )
 
-const markdownPathForLanguage = (sectionId, guideId, language) => (
-  safeSegment(language || 'sv', 'sv') === 'en'
+const readMarkdownFrontmatter = (filePath) => {
+  if (!existsSync(filePath)) return {}
+
+  const source = readFileSync(filePath, 'utf8')
+  if (!source.startsWith('---')) return {}
+
+  const endIndex = source.indexOf('\n---', 3)
+  if (endIndex === -1) return {}
+
+  return source
+    .slice(3, endIndex)
+    .trim()
+    .split('\n')
+    .reduce((frontmatter, line) => {
+      const separatorIndex = line.indexOf(':')
+      if (separatorIndex === -1) return frontmatter
+
+      const key = line.slice(0, separatorIndex).trim()
+      const value = line.slice(separatorIndex + 1).trim().replace(/^['"]|['"]$/g, '')
+      return {
+        ...frontmatter,
+        [key]: value
+      }
+    }, {})
+}
+
+const findMarkdownByIdentity = (rootDir, { guideId = '', uuid = '' } = {}) => {
+  if (!existsSync(rootDir)) return ''
+
+  const matches = []
+  const visit = (dir) => {
+    readdirSync(dir, { withFileTypes: true }).forEach(entry => {
+      const entryPath = path.join(dir, entry.name)
+
+      if (entry.isDirectory()) {
+        visit(entryPath)
+        return
+      }
+
+      if (!entry.isFile() || !entry.name.endsWith('.md')) return
+
+      const frontmatter = readMarkdownFrontmatter(entryPath)
+      const fileUuid = frontmatter.uuid || frontmatter.guideUuid || ''
+      const fileId = frontmatter.id || ''
+
+      if (uuid && fileUuid === uuid) {
+        matches.push({ path: entryPath, score: 2 })
+        return
+      }
+
+      if (guideId && fileId === guideId) {
+        matches.push({ path: entryPath, score: 1 })
+      }
+    })
+  }
+
+  visit(rootDir)
+
+  return matches
+    .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
+    .at(0)?.path || ''
+}
+
+const saveRenderLog = async (record = {}) => {
+  const createdAt = record.createdAt || new Date().toISOString()
+  const id = record.id || randomUUID().slice(0, 8)
+  const languages = Array.isArray(record.languages) ? record.languages : []
+  const fileName = [
+    createdAt.replace(/[:.]/g, '-'),
+    safeSegment(record.guideId, 'guide'),
+    safeSegment(languages.join('-') || record.language || 'language', 'language'),
+    id
+  ].join('-').concat('.json')
+  const filePath = path.join(renderLogRoot, fileName)
+  const payload = {
+    id,
+    createdAt,
+    status: record.status || 'unknown',
+    guideId: record.guideId || '',
+    sectionId: record.sectionId || '',
+    languages,
+    baseUrl: record.baseUrl || '',
+    username: record.username || '',
+    voice: Boolean(record.voice),
+    globalHoldMs: Number(record.globalHoldMs || 0),
+    videos: Array.isArray(record.videos) ? record.videos : [],
+    error: record.error || '',
+    log: record.log || ''
+  }
+
+  await mkdir(renderLogRoot, { recursive: true })
+  await writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+
+  return {
+    ...payload,
+    path: path.relative(__dirname, filePath)
+  }
+}
+
+const listRenderLogs = async () => {
+  const entries = await readdir(renderLogRoot, { withFileTypes: true }).catch(() => [])
+  const logs = await Promise.all(entries
+    .filter(entry => entry.isFile() && entry.name.endsWith('.json'))
+    .map(async entry => {
+      const filePath = path.join(renderLogRoot, entry.name)
+
+      try {
+        const payload = JSON.parse(await readFile(filePath, 'utf8'))
+        return {
+          id: payload.id || entry.name.replace(/\.json$/, ''),
+          createdAt: payload.createdAt || '',
+          status: payload.status || 'unknown',
+          guideId: payload.guideId || '',
+          sectionId: payload.sectionId || '',
+          languages: Array.isArray(payload.languages) ? payload.languages : [],
+          baseUrl: payload.baseUrl || '',
+          username: payload.username || '',
+          voice: Boolean(payload.voice),
+          globalHoldMs: Number(payload.globalHoldMs || 0),
+          videos: Array.isArray(payload.videos) ? payload.videos : [],
+          error: payload.error || '',
+          log: payload.log || '',
+          path: path.relative(__dirname, filePath)
+        }
+      } catch {
+        return null
+      }
+    }))
+
+  return logs
+    .filter(Boolean)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+}
+
+const markdownPathForLanguage = (sectionId, guideId, language, identity = {}) => {
+  const normalizedLanguage = safeSegment(language || 'sv', 'sv')
+  const uuid = identity.uuid || identity.guideUuid || ''
+  const rootDir = normalizedLanguage === 'en'
+    ? docsRoot
+    : path.join(translationsRoot, normalizedLanguage)
+  const existingPath = findMarkdownByIdentity(rootDir, { guideId, uuid })
+
+  if (existingPath) return existingPath
+
+  return normalizedLanguage === 'en'
     ? originPathFor(sectionId, guideId)
     : translationPathFor(sectionId, guideId, language)
-)
+}
 
 const setFrontmatterValue = (markdown, key, value) => {
   const source = String(markdown || '').trim()
@@ -756,6 +900,28 @@ const howToScriptEditorPlugin = () => ({
       }
     })
 
+    server.middlewares.use('/__howto-script-editor/render-logs', async (req, res) => {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const url = new URL(req.url || '', 'http://localhost')
+        const guideId = String(url.searchParams.get('guideId') || '').trim()
+        const language = String(url.searchParams.get('language') || '').trim().toLowerCase()
+        const logs = (await listRenderLogs()).filter(log => {
+          if (guideId && log.guideId !== guideId) return false
+          if (language && !log.languages.includes(language)) return false
+          return true
+        })
+
+        sendJson(res, 200, { logs })
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
     server.middlewares.use('/__howto-script-editor/translation-status', async (req, res) => {
       if (req.method !== 'POST') {
         sendJson(res, 405, { error: 'Method not allowed' })
@@ -764,7 +930,7 @@ const howToScriptEditorPlugin = () => ({
 
       try {
         const body = await readRequestJson(req)
-        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, body.language || 'sv')
+        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, body.language || 'sv', body)
 
         sendJson(res, 200, {
           exists: existsSync(targetPath),
@@ -784,7 +950,7 @@ const howToScriptEditorPlugin = () => ({
 
       try {
         const body = await readRequestJson(req)
-        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, body.language || 'sv')
+        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, body.language || 'sv', body)
 
         if (!existsSync(targetPath)) {
           sendJson(res, 200, {
@@ -817,7 +983,7 @@ const howToScriptEditorPlugin = () => ({
         const markdown = String(body.markdown || '')
         const language = safeSegment(body.language || 'sv', 'sv')
         const sourceLanguage = safeSegment(body.sourceLanguage || 'en', 'en')
-        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, language)
+        const targetPath = markdownPathForLanguage(body.sectionId, body.guideId, language, body)
         const overwrite = Boolean(body.overwrite)
 
         if (!markdown.trim()) {
@@ -906,6 +1072,8 @@ const howToScriptEditorPlugin = () => ({
         return
       }
 
+      let renderRun = null
+
       try {
         const body = await readRequestJson(req)
         const guideId = safeSegment(body.guideId, 'editor-preview')
@@ -934,15 +1102,33 @@ const howToScriptEditorPlugin = () => ({
           throw new Error('Global holdMs must be a non-negative number.')
         }
 
+        renderRun = {
+          id: runId,
+          guideId,
+          sectionId,
+          languages,
+          baseUrl,
+          username,
+          voice: Boolean(body.voice),
+          globalHoldMs,
+          videos: [],
+          log: ''
+        }
+        const appendRenderLog = (text) => {
+          const output = String(text || '')
+          renderRun.log += output
+          writeEvent(res, 'log', { text: output })
+        }
+
         startEventStream(res)
-        writeEvent(res, 'log', { text: `Preparing editor preview for ${guideId} against ${baseUrl}\nLanguages: ${languages.join(', ')}\nGlobal extra holdMs: ${globalHoldMs}\n` })
+        appendRenderLog(`Preparing editor preview for ${guideId} against ${baseUrl}\nLanguages: ${languages.join(', ')}\nGlobal extra holdMs: ${globalHoldMs}\n`)
         await mkdir(docsDir, { recursive: true })
         await mkdir(outputRoot, { recursive: true })
         await mkdir(workRoot, { recursive: true })
-        writeEvent(res, 'log', { text: `Temporary scripts folder: ${docsDir}\n` })
+        appendRenderLog(`Temporary scripts folder: ${docsDir}\n`)
 
         if (username || password) {
-          writeEvent(res, 'log', { text: `Logging in as ${username || '(missing username)'} at ${new URL(baseUrl).origin}\n` })
+          appendRenderLog(`Logging in as ${username || '(missing username)'} at ${new URL(baseUrl).origin}\n`)
         }
 
         const storageState = await createAuthState({
@@ -953,7 +1139,6 @@ const howToScriptEditorPlugin = () => ({
         })
 
         const videos = []
-        let log = ''
         const undoOperation = getUndoOperation(`Render ${languages.join(', ')} preview video`)
 
         for (const language of languages) {
@@ -966,7 +1151,7 @@ const howToScriptEditorPlugin = () => ({
           await mkdir(outputDir, { recursive: true })
           await mkdir(workDir, { recursive: true })
           await writeFile(path.join(docsDir, `${guideId}.md`), languageMarkdown, 'utf8')
-          writeEvent(res, 'log', { text: `\n[${language}] Wrote ${language.toUpperCase()} script to ${path.join(docsDir, `${guideId}.md`)}\n` })
+          appendRenderLog(`\n[${language}] Wrote ${language.toUpperCase()} script to ${path.join(docsDir, `${guideId}.md`)}\n`)
           await backupFileForUndo(undoOperation, outputVideoPath)
           await backupFileForUndo(undoOperation, outputCaptionsPath)
 
@@ -993,29 +1178,46 @@ const howToScriptEditorPlugin = () => ({
             generatorArgs.push('--voice', 'elevenlabs')
           }
 
-          writeEvent(res, 'log', { text: `\n[${language}] Starting video generator: node scripts/generate-howto-video.mjs ${generatorArgs.join(' ')}\n` })
-          const languageLog = await runHowToRender(generatorArgs, text => writeEvent(res, 'log', { text }))
-          log += languageLog
+          appendRenderLog(`\n[${language}] Starting video generator: node scripts/generate-howto-video.mjs ${generatorArgs.join(' ')}\n`)
+          await runHowToRender(generatorArgs, appendRenderLog)
           videos.push({
             language,
             videoUrl: `/howto-videos/editor-preview/${language}/${safeName}.mp4?t=${Date.now()}`,
             captionsUrl: `/howto-videos/editor-preview/${language}/${safeName}.vtt?t=${Date.now()}`
           })
+          renderRun.videos = videos
         }
 
         const currentVideo = videos.at(-1) || {}
         const undo = commitUndoOperation(undoOperation)
+        renderRun.videos = videos
+        const renderLog = await saveRenderLog({
+          ...renderRun,
+          status: 'success'
+        })
 
         writeEvent(res, 'done', {
           videoUrl: currentVideo.videoUrl || '',
           subtitlesUrl: currentVideo.captionsUrl || '',
           language: currentVideo.language || languages.at(-1),
           videos,
-          log,
+          log: renderRun.log,
+          logId: renderLog.id,
+          logPath: renderLog.path,
           undo
         })
         res.end()
       } catch (error) {
+        if (renderRun) {
+          const errorText = `\nERROR: ${error.message}\n`
+          renderRun.log += errorText
+          await saveRenderLog({
+            ...renderRun,
+            status: 'error',
+            error: error.message
+          }).catch(() => {})
+        }
+
         if (res.headersSent) {
           writeEvent(res, 'error', { error: error.message })
           res.end()
@@ -1230,6 +1432,14 @@ export default defineConfig({
     watch: {
       usePolling: true, // Required for Docker on some systems
       interval: 1000,
+      ignored: [
+        '**/src/docs/how-to/**/*.md',
+        '**/src/docs/how-to-translations/**/*.md',
+        '**/public/howto-videos/editor-preview/**',
+        '**/public/howto-videos/prod/**',
+        '**/.howto-script-preview/**',
+        '**/howto-audio-cache/**',
+      ],
     },
   },
 

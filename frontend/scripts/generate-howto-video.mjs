@@ -1404,6 +1404,37 @@ const pageTreeAddChildPoint = async (page, rowText) => page.evaluate(({ targetTe
   return null
 }, { targetText: rowText })
 
+const xpathLiteral = (value = '') => {
+  const text = String(value)
+  if (!text.includes("'")) return `'${text}'`
+  if (!text.includes('"')) return `"${text}"`
+  return `concat(${text.split("'").map(part => `'${part}'`).join(`, "'", `)})`
+}
+
+const looseFieldByLabel = (page, label, exact = false) => {
+  const normalizedLabel = String(label || '').replace(/\s+/g, ' ').trim()
+  const labelExpression = xpathLiteral(normalizedLabel)
+  const labelPredicate = exact
+    ? `normalize-space(.) = ${labelExpression}`
+    : `contains(normalize-space(.), ${labelExpression})`
+  const fieldSelectors = [
+    'following-sibling::input[1]',
+    'following-sibling::select[1]',
+    'following-sibling::textarea[1]',
+    'following-sibling::*[1]//input[1]',
+    'following-sibling::*[1]//select[1]',
+    'following-sibling::*[1]//textarea[1]',
+    'following::input[1]',
+    'following::select[1]',
+    'following::textarea[1]'
+  ]
+  const selector = fieldSelectors
+    .map(fieldSelector => `//label[${labelPredicate}]/${fieldSelector}`)
+    .join(' | ')
+
+  return page.locator(`xpath=${selector}`)
+}
+
 const resolveLocator = (page, action) => {
   if (action.rowText && action.rowActionSelector) {
     const rowLocator = action.rowSelector
@@ -1425,7 +1456,10 @@ const resolveLocator = (page, action) => {
   }
 
   if (action.selector) return page.locator(action.selector)
-  if (action.label) return page.getByLabel(action.label, { exact: Boolean(action.exact) })
+  if (action.label) {
+    const exact = Boolean(action.exact)
+    return page.getByLabel(action.label, { exact }).or(looseFieldByLabel(page, action.label, exact))
+  }
   if (action.placeholder) return page.getByPlaceholder(action.placeholder, { exact: Boolean(action.exact) })
   if (action.role) return page.getByRole(action.role, { name: action.name ? new RegExp(action.name, 'i') : undefined })
   if (!action.text) {

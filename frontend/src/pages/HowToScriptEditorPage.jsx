@@ -66,6 +66,8 @@ const editorSession = {
     previewByKey: {},
     expandedVideoByKey: {},
     closedLogByKey: {},
+    renderLogs: [],
+    selectedRenderLogId: '',
     demoSettings: DEFAULT_DEMO_SETTINGS,
     globalHoldMs: 0
 }
@@ -167,6 +169,15 @@ const getDraftVideoSources = (draft = {}) => Object.entries(draft.videoLinks || 
     .filter(source => source.videoUrl || source.captionsUrl)
 
 const removeCacheBuster = (value = '') => value.split('?')[0] || ''
+
+const formatRenderLogTime = (value = '') => {
+    if (!value) return 'Unknown time'
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    return date.toLocaleString()
+}
 
 const mergeVideosByLanguage = (currentVideos = [], nextVideos = []) => {
     const videosByLanguage = new Map()
@@ -666,6 +677,69 @@ const ProgressLogDock = ({ log, error, isRunning, statusText = 'Running process.
     )
 }
 
+const RenderLogHistory = ({ logs = [], activeGuideId = '', activeLanguage = 'en', selectedLogId = '', onOpenLog, onRefresh }) => {
+    const activeLogs = logs.filter(log => log.guideId === activeGuideId && (!activeLanguage || log.languages.includes(activeLanguage)))
+    const otherLogs = logs.filter(log => !activeLogs.some(activeLog => activeLog.id === log.id))
+    const orderedLogs = [...activeLogs, ...otherLogs]
+
+    return (
+        <section className="rounded border border-gray-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-base font-semibold text-gray-900">Video logs</h2>
+                    <p className="mt-1 text-sm text-gray-500">Previous video render runs saved on disk.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={onRefresh}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    aria-label="Refresh video logs"
+                    title="Refresh video logs"
+                >
+                    <RotateCcw className="h-4 w-4" />
+                </button>
+            </div>
+
+            {orderedLogs.length === 0 ? (
+                <div className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">No video logs yet.</div>
+            ) : (
+                <div className="max-h-72 space-y-2 overflow-auto pr-1">
+                    {orderedLogs.map(log => {
+                        const isSelected = log.id === selectedLogId
+                        const isCurrentGuide = log.guideId === activeGuideId
+                        const statusClass = log.status === 'error'
+                            ? 'bg-red-50 text-red-700 ring-red-100'
+                            : log.status === 'success'
+                            ? 'bg-green-50 text-green-700 ring-green-100'
+                            : 'bg-gray-50 text-gray-700 ring-gray-100'
+
+                        return (
+                            <button
+                                key={log.id}
+                                type="button"
+                                onClick={() => onOpenLog(log)}
+                                className={`w-full rounded border px-3 py-2 text-left text-sm transition ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="font-medium text-gray-900">{formatRenderLogTime(log.createdAt)}</span>
+                                    <span className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ring-1 ${statusClass}`}>
+                                        {log.status || 'unknown'}
+                                    </span>
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-gray-500">
+                                    <span>{log.guideId || 'unknown guide'}</span>
+                                    <span>{(log.languages || []).join(', ') || 'unknown language'}</span>
+                                    {isCurrentGuide && <span className="font-semibold text-blue-700">current</span>}
+                                </div>
+                            </button>
+                        )
+                    })}
+                </div>
+            )}
+        </section>
+    )
+}
+
 const VideoLinksEditor = ({ languages = [], links = {}, onChange, disabled = false }) => (
     <div className="space-y-3">
         {languages.map(language => (
@@ -791,7 +865,11 @@ const QualityPanel = ({
     globalHoldMs,
     onGlobalHoldMsChange,
     isVideoExpanded,
-    onToggleVideoExpanded
+    onToggleVideoExpanded,
+    renderLogs,
+    selectedRenderLogId,
+    onOpenRenderLog,
+    onRefreshRenderLogs
 }) => {
     const script = (draft.script || []).map(normalizeScriptBlock)
     const captions = script.filter(block => block.caption).length
@@ -946,6 +1024,15 @@ const QualityPanel = ({
                 )}
             </section>
 
+            <RenderLogHistory
+                logs={renderLogs}
+                activeGuideId={draft.id}
+                activeLanguage={activeLanguage}
+                selectedLogId={selectedRenderLogId}
+                onOpenLog={onOpenRenderLog}
+                onRefresh={onRefreshRenderLogs}
+            />
+
             <section className="rounded border border-gray-200 bg-white p-4">
                 <h2 className="text-base font-semibold text-gray-900">Publish</h2>
                 <p className="mt-2 text-sm text-gray-600">
@@ -986,6 +1073,8 @@ const HowToScriptEditorPage = () => {
     const [previewById, setPreviewById] = useState(editorSession.previewByKey)
     const [expandedVideoById, setExpandedVideoById] = useState(editorSession.expandedVideoByKey)
     const [closedLogById, setClosedLogById] = useState(editorSession.closedLogByKey)
+    const [renderLogs, setRenderLogs] = useState(editorSession.renderLogs)
+    const [selectedRenderLogId, setSelectedRenderLogId] = useState(editorSession.selectedRenderLogId)
     const [demoSettings, setDemoSettings] = useState(editorSession.demoSettings)
     const [globalHoldMs, setGlobalHoldMs] = useState(editorSession.globalHoldMs)
     const [isPublishing, setIsPublishing] = useState(false)
@@ -1010,6 +1099,7 @@ const HowToScriptEditorPage = () => {
     const markdown = useMemo(() => activeDraft ? createMarkdownFromDraft(activeDraft) : '', [activeDraft])
     const readableSourcePath = getReadableSourcePath(activeDraft?.sourcePath)
     const preview = activeDraft ? previewById[activePreviewKey] : null
+    const selectedRenderLog = renderLogs.find(log => log.id === selectedRenderLogId)
     const languagePreview = preview?.language === activeDraftLanguage ? preview : null
     const storedVideoLink = activeDraft?.videoLinks?.[activeDraftLanguage] || {}
     const storedPreview = storedVideoLink.videoUrl ? {
@@ -1039,35 +1129,48 @@ const HowToScriptEditorPage = () => {
     const isVideoLogOpen = activeDraft ? isRendering || (Boolean(preview?.log || preview?.error) && !closedLogById[activePreviewKey]) : false
     const isCodexLogOpen = isGeneratingDoc || isGeneratingBlock || (Boolean(codexRun.log || codexRun.error) && !isCodexLogClosed)
     const isTranslationLogOpen = isTranslating || (Boolean(translationRun.log || translationRun.error) && !isTranslationLogClosed)
+    const isRenderHistoryLogOpen = processLogSource === 'video-history' && Boolean(selectedRenderLog)
     const isLogOpen = processLogSource === 'codex'
         ? isCodexLogOpen
         : processLogSource === 'translation'
         ? isTranslationLogOpen
+        : processLogSource === 'video-history'
+        ? isRenderHistoryLogOpen
         : isVideoLogOpen
     const processLog = processLogSource === 'codex'
         ? codexRun.log
         : processLogSource === 'translation'
         ? translationRun.log
+        : processLogSource === 'video-history'
+        ? selectedRenderLog?.log || ''
         : preview?.log || ''
     const processError = processLogSource === 'codex'
         ? codexRun.error
         : processLogSource === 'translation'
         ? translationRun.error
+        : processLogSource === 'video-history'
+        ? selectedRenderLog?.error || ''
         : preview?.error || ''
     const isProcessRunning = processLogSource === 'codex'
         ? isGeneratingDoc || isGeneratingBlock
         : processLogSource === 'translation'
         ? isTranslating
+        : processLogSource === 'video-history'
+        ? false
         : isRendering
     const processStatusText = processLogSource === 'codex'
         ? isGeneratingBlock ? 'Codex is writing a script block...' : 'Codex is writing a help document...'
         : processLogSource === 'translation'
         ? 'Translating markdown with Haiku...'
+        : processLogSource === 'video-history'
+        ? 'Viewing saved video render log'
         : 'Rendering video...'
     const processDoneText = processLogSource === 'codex'
         ? 'Codex finished'
         : processLogSource === 'translation'
         ? 'Translation complete'
+        : processLogSource === 'video-history'
+        ? `${selectedRenderLog?.status === 'error' ? 'Saved failed render' : 'Saved render'} ${selectedRenderLog ? formatRenderLogTime(selectedRenderLog.createdAt) : ''}`
         : 'Render complete'
     const codexBlockInsertLabel = pendingBlockInsert
         ? pendingBlockInsert.insertIndex <= 0
@@ -1078,6 +1181,20 @@ const HowToScriptEditorPage = () => {
         : ''
     const pagePreviewLanguage = activeDraftLanguage
     const renderLanguages = [activeDraftLanguage]
+
+    const loadRenderLogs = async () => {
+        const response = await fetch('/__howto-script-editor/render-logs')
+        const data = await response.json()
+
+        if (!response.ok) throw new Error(data.error || 'Could not load video render logs')
+
+        setRenderLogs(Array.isArray(data.logs) ? data.logs : [])
+    }
+
+    const openRenderLog = (log) => {
+        setSelectedRenderLogId(log.id)
+        setProcessLogSource('video-history')
+    }
 
     useEffect(() => {
         if (!firstGuide) return
@@ -1122,6 +1239,18 @@ const HowToScriptEditorPage = () => {
     useEffect(() => {
         editorSession.closedLogByKey = closedLogById
     }, [closedLogById])
+
+    useEffect(() => {
+        editorSession.renderLogs = renderLogs
+    }, [renderLogs])
+
+    useEffect(() => {
+        editorSession.selectedRenderLogId = selectedRenderLogId
+    }, [selectedRenderLogId])
+
+    useEffect(() => {
+        loadRenderLogs().catch(() => {})
+    }, [])
 
     useEffect(() => {
         editorSession.demoSettings = demoSettings
@@ -1555,7 +1684,9 @@ const HowToScriptEditorPage = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 guideId: activeDraft.id,
+                uuid: activeDraft.uuid,
                 sectionId: activeDraft.sectionId,
+                sourcePath: activeDraft.sourcePath,
                 language
             })
         })
@@ -1625,7 +1756,9 @@ const HowToScriptEditorPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     guideId: sourceDraft.id,
+                    uuid: sourceDraft.uuid,
                     sectionId: sourceDraft.sectionId,
+                    sourcePath: sourceDraft.sourcePath,
                     language: targetLanguage
                 })
             })
@@ -1649,7 +1782,9 @@ const HowToScriptEditorPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     guideId: sourceDraft.id,
+                    uuid: sourceDraft.uuid,
                     sectionId: sourceDraft.sectionId,
+                    sourcePath: sourceDraft.sourcePath,
                     language: targetLanguage,
                     sourceLanguage,
                     markdown: sourceMarkdown,
@@ -1888,6 +2023,7 @@ const HowToScriptEditorPage = () => {
                     }
                 }))
                 setExpandedVideoById(current => ({ ...current, [renderDraftKey]: true }))
+                loadRenderLogs().catch(() => {})
                 toast.success('Preview video created and saved')
                 return
             }
@@ -1926,6 +2062,7 @@ const HowToScriptEditorPage = () => {
                             }
                         }))
                         setExpandedVideoById(current => ({ ...current, [renderDraftKey]: true }))
+                        loadRenderLogs().catch(() => {})
                         toast.success('Preview video created and saved')
                     } else if (event.type === 'error') {
                         throw new Error(event.error || 'Could not create preview video')
@@ -1948,6 +2085,7 @@ const HowToScriptEditorPage = () => {
                     error: error.message
                 }
             }))
+            loadRenderLogs().catch(() => {})
             toast.error(error.message)
         } finally {
             setIsRendering(false)
@@ -2298,6 +2436,10 @@ const HowToScriptEditorPage = () => {
                     onGlobalHoldMsChange={updateGlobalHoldMs}
                     isVideoExpanded={isVideoExpanded}
                     onToggleVideoExpanded={() => setExpandedVideoById(current => ({ ...current, [activePreviewKey]: !current[activePreviewKey] }))}
+                    renderLogs={renderLogs}
+                    selectedRenderLogId={selectedRenderLogId}
+                    onOpenRenderLog={openRenderLog}
+                    onRefreshRenderLogs={() => loadRenderLogs().catch(error => toast.error(error.message))}
                 />
             </main>
 
@@ -2315,6 +2457,11 @@ const HowToScriptEditorPage = () => {
                     }
                     if (processLogSource === 'translation') {
                         setIsTranslationLogClosed(true)
+                        return
+                    }
+                    if (processLogSource === 'video-history') {
+                        setSelectedRenderLogId('')
+                        setProcessLogSource('video')
                         return
                     }
                     setClosedLogById(current => ({ ...current, [activePreviewKey]: true }))

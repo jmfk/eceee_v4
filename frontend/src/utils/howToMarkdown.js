@@ -7,6 +7,39 @@ export const slugify = (value = '') => value
 
 const VIDEO_LANGUAGE_CODES = ['sv', 'en']
 
+const guideIdentity = (guide = {}) => guide.uuid || guide.guideUuid || guide.id
+
+const guideCompletenessScore = (guide = {}) => [
+    guide.uuid || guide.guideUuid ? 8 : 0,
+    (guide.videoSources || []).length > 0 ? 4 : 0,
+    guide.language ? 2 : 0,
+    guide.sourcePath ? 1 : 0
+].reduce((sum, value) => sum + value, 0)
+
+const upsertGuide = (section, guide) => {
+    const identity = guideIdentity(guide)
+    if (!identity) {
+        section.guides.push(guide)
+        return
+    }
+
+    const existingIndex = section.guides.findIndex(candidate => guideIdentity(candidate) === identity)
+    if (existingIndex === -1) {
+        section.guides.push(guide)
+        return
+    }
+
+    const existing = section.guides[existingIndex]
+    const preferred = guideCompletenessScore(guide) >= guideCompletenessScore(existing)
+        ? guide
+        : existing
+
+    section.guides[existingIndex] = {
+        ...preferred,
+        sourcePath: existing.sourcePath || preferred.sourcePath
+    }
+}
+
 const languageSuffix = (language = '') => {
     const normalized = language.toString().trim().toLowerCase()
     return normalized ? `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}` : ''
@@ -157,6 +190,7 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
             sectionOrder: Number(frontmatter.sectionOrder || 999),
             guide: {
                 id,
+                uuid: frontmatter.uuid || frontmatter.guideUuid || '',
                 title,
                 summary,
                 order: Number(frontmatter.order || 999),
@@ -207,6 +241,7 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
     const guides = guideBlocks.map(guide => {
         const guideBody = guide.lines.join('\n').trim()
         const guideId = extractCommentValue(guideBody, 'id') || `${id}-${slugify(guide.title)}`
+        const uuid = extractCommentValue(guideBody, 'uuid') || extractCommentValue(guideBody, 'guideUuid')
         const youtubeId = extractCommentValue(guideBody, 'youtubeId')
         const youtubeUrl = extractCommentValue(guideBody, 'youtubeUrl')
         const videoUrl = extractCommentValue(guideBody, 'videoUrl')
@@ -236,6 +271,7 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
 
         return {
             id: guideId,
+            uuid,
             title: guide.title,
             summary: parseGuideSummary(guideBody),
             videoUrl,
@@ -297,7 +333,7 @@ export const parseHowToMarkdownCollection = (modules) => {
             section.title = section.title || parsed.sectionTitle
             section.summary = section.summary || parsed.sectionSummary
             section.order = Math.min(section.order, parsed.sectionOrder)
-            section.guides.push(parsed.guide)
+            upsertGuide(section, parsed.guide)
             return
         }
 
@@ -312,7 +348,9 @@ export const parseHowToMarkdownCollection = (modules) => {
         }
 
         const section = sections.get(parsed.id)
-        section.guides.push(...parsed.guides.map(guide => ({ ...guide, sourcePath: path })))
+        parsed.guides
+            .map(guide => ({ ...guide, sourcePath: path }))
+            .forEach(guide => upsertGuide(section, guide))
     })
 
     return [...sections.values()]

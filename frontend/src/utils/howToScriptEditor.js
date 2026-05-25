@@ -93,6 +93,18 @@ const textValue = (value) => {
 }
 
 const trimString = value => textValue(value).trim()
+const stableUuidFromSeed = (seed = '') => {
+    const source = trimString(seed) || 'how-to-guide'
+    let hash = 0x811c9dc5
+
+    for (let index = 0; index < source.length; index += 1) {
+        hash ^= source.charCodeAt(index)
+        hash = Math.imul(hash, 0x01000193)
+    }
+
+    const hex = (hash >>> 0).toString(16).padStart(8, '0')
+    return `${hex}-${hex.slice(0, 4)}-4${hex.slice(5, 8)}-8${hex.slice(1, 4)}-${hex}${hex.slice(0, 4)}`
+}
 const hasActionValue = value => Array.isArray(value)
     ? value.length > 0
     : value !== undefined && value !== null && value !== ''
@@ -316,6 +328,7 @@ export const guideToScriptDraft = (guide, section) => {
 
     return {
         id: guide?.id || '',
+        uuid: guide?.uuid || guide?.guideUuid || stableUuidFromSeed(guide?.id || guide?.title || ''),
         sourcePath: guide?.sourcePath || '',
         title: guide?.title || '',
         summary: guide?.summary || '',
@@ -373,6 +386,7 @@ export const createMarkdownFromDraft = (draft) => {
     const frontmatter = [
         '---',
         frontmatterLine('id', draft.id),
+        frontmatterLine('uuid', draft.uuid || stableUuidFromSeed(draft.id || draft.title || '')),
         frontmatterLine('title', draft.title),
         frontmatterLine('summary', draft.summary),
         frontmatterLine('order', draft.order),

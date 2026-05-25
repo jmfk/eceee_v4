@@ -15,13 +15,15 @@ const translationModules = import.meta.glob('../docs/how-to-translations/**/*.md
 const baseDocs = parseHowToMarkdownCollection(markdownModules)
 const translationDocs = parseHowToMarkdownCollection(translationModules)
 
-const translationsByGuideId = new Map()
+const guideIdentity = (guide = {}) => guide.uuid || guide.guideUuid || guide.id
+const translationsByGuideIdentity = new Map()
 
 translationDocs.forEach(section => {
     section.guides.forEach(guide => {
         const language = guide.language || 'sv'
-        const current = translationsByGuideId.get(guide.id) || {}
-        translationsByGuideId.set(guide.id, {
+        const identity = guideIdentity(guide)
+        const current = translationsByGuideIdentity.get(identity) || {}
+        translationsByGuideIdentity.set(identity, {
             ...current,
             [language]: {
                 ...guide,
@@ -40,7 +42,7 @@ export const howToDocs = baseDocs.map(section => ({
     ...section,
     guides: section.guides.map(guide => ({
         ...guide,
-        translations: translationsByGuideId.get(guide.id) || {}
+        translations: translationsByGuideIdentity.get(guideIdentity(guide)) || {}
     }))
 }))
 
