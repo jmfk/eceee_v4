@@ -352,7 +352,7 @@ const ActionField = ({ field, action, onChange, disabled = false }) => {
     )
 }
 
-const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, onInsert, disabled = false }) => {
+const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, onInsert, blockRef, disabled = false }) => {
     const normalized = normalizeScriptBlock(block)
     const action = normalized.action
     const definition = action ? getActionDefinition(action.type) : null
@@ -371,7 +371,7 @@ const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, on
     }
 
     return (
-        <section className="rounded border border-gray-200 bg-white p-4">
+        <section ref={blockRef} className="rounded border border-gray-200 bg-white p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <div className="text-sm font-semibold text-gray-900">Block {index + 1}</div>
@@ -383,39 +383,21 @@ const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, on
                     <div className="mr-2 flex flex-wrap items-center gap-1 border-r border-gray-200 pr-2">
                         <button
                             type="button"
-                            onClick={() => onInsert('before', null)}
+                            onClick={() => onInsert('before')}
                             disabled={disabled}
                             className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             <Plus className="h-3.5 w-3.5" />
-                            Caption before
+                            Add before
                         </button>
                         <button
                             type="button"
-                            onClick={() => onInsert('before', 'click')}
+                            onClick={() => onInsert('after')}
                             disabled={disabled}
                             className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             <Plus className="h-3.5 w-3.5" />
-                            Action before
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onInsert('after', null)}
-                            disabled={disabled}
-                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                            Caption after
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onInsert('after', 'click')}
-                            disabled={disabled}
-                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                            Action after
+                            Add after
                         </button>
                     </div>
                     <button
@@ -883,6 +865,8 @@ const HowToScriptEditorPage = () => {
 
     const navigate = useNavigate()
     const { guideId: routeGuideIdParam = '', language: routeLanguageParam = '' } = useParams()
+    const scriptBlockRefs = useRef(new Map())
+    const pendingScrollBlockIndex = useRef(null)
     const guideOptions = useMemo(getGuideOptions, [])
     const firstGuide = guideOptions[0]
     const routeGuideId = routeGuideIdParam ? decodeURIComponent(routeGuideIdParam) : ''
@@ -901,6 +885,7 @@ const HowToScriptEditorPage = () => {
     const [globalHoldMs, setGlobalHoldMs] = useState(editorSession.globalHoldMs)
     const [isPublishing, setIsPublishing] = useState(false)
     const [isGeneratingDoc, setIsGeneratingDoc] = useState(false)
+    const [isGeneratingBlock, setIsGeneratingBlock] = useState(false)
     const [codexPrompt, setCodexPrompt] = useState('')
     const [codexSectionId, setCodexSectionId] = useState(firstGuide?.section?.id || '')
     const [codexRun, setCodexRun] = useState({ log: '', error: '', finalMessage: '' })
@@ -945,7 +930,7 @@ const HowToScriptEditorPage = () => {
         : languagePreview
     const isVideoExpanded = activeDraft ? Boolean(expandedVideoById[activePreviewKey]) : false
     const isVideoLogOpen = activeDraft ? isRendering || (Boolean(preview?.log || preview?.error) && !closedLogById[activePreviewKey]) : false
-    const isCodexLogOpen = isGeneratingDoc || (Boolean(codexRun.log || codexRun.error) && !isCodexLogClosed)
+    const isCodexLogOpen = isGeneratingDoc || isGeneratingBlock || (Boolean(codexRun.log || codexRun.error) && !isCodexLogClosed)
     const isTranslationLogOpen = isTranslating || (Boolean(translationRun.log || translationRun.error) && !isTranslationLogClosed)
     const isLogOpen = processLogSource === 'codex'
         ? isCodexLogOpen
@@ -963,12 +948,12 @@ const HowToScriptEditorPage = () => {
         ? translationRun.error
         : preview?.error || ''
     const isProcessRunning = processLogSource === 'codex'
-        ? isGeneratingDoc
+        ? isGeneratingDoc || isGeneratingBlock
         : processLogSource === 'translation'
         ? isTranslating
         : isRendering
     const processStatusText = processLogSource === 'codex'
-        ? 'Codex is writing a help document...'
+        ? isGeneratingBlock ? 'Codex is writing a script block...' : 'Codex is writing a help document...'
         : processLogSource === 'translation'
         ? 'Translating markdown with Haiku...'
         : 'Rendering video...'
@@ -1031,6 +1016,18 @@ const HowToScriptEditorPage = () => {
     useEffect(() => {
         editorSession.globalHoldMs = globalHoldMs
     }, [globalHoldMs])
+
+    useEffect(() => {
+        if (pendingScrollBlockIndex.current === null) return
+
+        const index = pendingScrollBlockIndex.current
+        pendingScrollBlockIndex.current = null
+        requestAnimationFrame(() => {
+            const blockElement = scriptBlockRefs.current.get(index)
+            blockElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            blockElement?.querySelector('textarea')?.focus({ preventScroll: true })
+        })
+    }, [activeDraft?.script])
 
     useEffect(() => {
         if (!activeDraft?.id || !activeDraft.sectionId) return
@@ -1140,6 +1137,109 @@ const HowToScriptEditorPage = () => {
 
     const updateScript = (script) => updateActiveDraft({ script: script.map(normalizeScriptBlock) })
 
+    const requestCodexScriptBlock = async ({ insertIndex }) => {
+        if (isRendering || isGeneratingBlock || isGeneratingDoc) return
+
+        const blockKind = 'block'
+        const userPrompt = window.prompt('What should this new script block do? Codex can create speech, an action, or both.')
+
+        if (!userPrompt?.trim()) return
+
+        const script = (activeDraft.script || []).map(normalizeScriptBlock)
+        const nearbyBlocks = {
+            before: script.slice(Math.max(0, insertIndex - 2), insertIndex),
+            after: script.slice(insertIndex, insertIndex + 2),
+            requestedInsertIndex: insertIndex
+        }
+
+        setProcessLogSource('codex')
+        setIsCodexLogClosed(false)
+        setIsGeneratingBlock(true)
+        setCodexRun({ log: '', error: '', finalMessage: '' })
+
+        try {
+            const appendLog = (text) => {
+                setCodexRun(current => ({
+                    ...current,
+                    log: `${current.log || ''}${text}`
+                }))
+            }
+            const response = await fetch('/__howto-script-editor/generate-block', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: userPrompt,
+                    blockKind,
+                    language: activeDraftLanguage,
+                    draft: {
+                        id: activeDraft.id,
+                        title: activeDraft.title,
+                        summary: activeDraft.summary,
+                        sectionId: activeDraft.sectionId,
+                        sectionTitle: activeDraft.sectionTitle,
+                        language: activeDraftLanguage
+                    },
+                    nearbyBlocks
+                })
+            })
+
+            if (!response.ok || !response.body) {
+                const data = await response.json().catch(() => ({}))
+                throw new Error(data.error || 'Could not generate script block')
+            }
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+            let completed = false
+            let inserted = false
+
+            while (!completed) {
+                const { value, done } = await reader.read()
+                buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+
+                for (const line of lines) {
+                    if (!line.trim()) continue
+                    const event = JSON.parse(line)
+
+                    if (event.type === 'log') {
+                        appendLog(event.text || '')
+                    } else if (event.type === 'done') {
+                        const generatedBlock = normalizeScriptBlock(event.block || createScriptBlock(null))
+                        const nextScript = [...script]
+                        nextScript.splice(insertIndex, 0, generatedBlock)
+                        pendingScrollBlockIndex.current = insertIndex
+                        updateScript(nextScript)
+                        inserted = true
+                        setCodexRun(current => ({
+                            ...current,
+                            finalMessage: 'Inserted generated script block.'
+                        }))
+                        toast.success('Codex added a script block')
+                    } else if (event.type === 'error') {
+                        throw new Error(event.error || 'Could not generate script block')
+                    }
+                }
+
+                completed = done
+            }
+
+            if (buffer.trim()) {
+                const event = JSON.parse(buffer)
+                if (event.type === 'error') throw new Error(event.error || 'Could not generate script block')
+            }
+
+            if (!inserted) throw new Error('Codex did not return a script block')
+        } catch (error) {
+            setCodexRun(current => ({ ...current, error: error.message }))
+            toast.error(error.message)
+        } finally {
+            setIsGeneratingBlock(false)
+        }
+    }
+
     const openGuide = (option) => {
         if (isRendering) return
         const language = activeDraftLanguage || routeLanguage
@@ -1169,17 +1269,14 @@ const HowToScriptEditorPage = () => {
         }
     }
 
-    const addBlock = (type) => {
-        if (isRendering) return
-        updateScript([...(activeDraft.script || []), createScriptBlock(type)])
+    const addBlock = () => {
+        const script = activeDraft.script || []
+        requestCodexScriptBlock({ insertIndex: script.length })
     }
 
-    const insertBlock = (index, position, type) => {
-        if (isRendering) return
-        const script = [...(activeDraft.script || [])]
+    const insertBlock = (index, position) => {
         const insertIndex = position === 'before' ? index : index + 1
-        script.splice(insertIndex, 0, createScriptBlock(type))
-        updateScript(script)
+        requestCodexScriptBlock({ insertIndex })
     }
 
     const moveBlock = (index, offset) => {
@@ -1866,7 +1963,7 @@ const HowToScriptEditorPage = () => {
                         onPromptChange={setCodexPrompt}
                         sectionId={codexSectionId}
                         onSectionChange={setCodexSectionId}
-                        isGenerating={isGeneratingDoc || isRendering}
+                        isGenerating={isGeneratingDoc || isGeneratingBlock || isRendering}
                         finalMessage={codexRun.finalMessage}
                         onGenerate={generateHelpDocument}
                     />
@@ -1979,13 +2076,9 @@ const HowToScriptEditorPage = () => {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-base font-semibold text-gray-900">Sekventiellt filmmanus</h2>
                             <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => addBlock(null)} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                <button type="button" onClick={addBlock} disabled={isRendering || isGeneratingBlock} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
                                     <Plus className="h-4 w-4" />
-                                    Caption block
-                                </button>
-                                <button type="button" onClick={() => addBlock('click')} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
-                                    <Plus className="h-4 w-4" />
-                                    Action block
+                                    Add block with Codex
                                 </button>
                             </div>
                         </div>
@@ -2002,12 +2095,19 @@ const HowToScriptEditorPage = () => {
                                     updateScript(script)
                                 }}
                                 onMove={offset => moveBlock(index, offset)}
-                                onInsert={(position, type) => insertBlock(index, position, type)}
+                                onInsert={position => insertBlock(index, position)}
+                                blockRef={element => {
+                                    if (element) {
+                                        scriptBlockRefs.current.set(index, element)
+                                    } else {
+                                        scriptBlockRefs.current.delete(index)
+                                    }
+                                }}
                                 onRemove={() => {
                                     const script = activeDraft.script.filter((_, candidateIndex) => candidateIndex !== index)
                                     updateScript(script.length ? script : [createScriptBlock(null)])
                                 }}
-                                disabled={isRendering}
+                                disabled={isRendering || isGeneratingBlock}
                             />
                         ))}
                     </section>

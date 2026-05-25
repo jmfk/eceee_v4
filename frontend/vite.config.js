@@ -132,13 +132,13 @@ const runHowToRender = (args, onChunk = () => {}) => new Promise((resolveRun, re
   })
 })
 
-const runCodexAgent = ({ prompt, outputPath }, onChunk = () => {}) => new Promise((resolveRun, rejectRun) => {
+const runCodexAgent = ({ prompt, outputPath, sandbox = 'workspace-write' }, onChunk = () => {}) => new Promise((resolveRun, rejectRun) => {
   const codexCommand = process.env.CODEX_CLI || '/Applications/Codex.app/Contents/Resources/codex'
   const repoRoot = path.resolve(__dirname, '..')
   const child = spawn(codexCommand, [
     'exec',
     '-C', repoRoot,
-    '--sandbox', 'workspace-write',
+    '--sandbox', sandbox,
     '--ask-for-approval', 'never',
     '--color', 'never',
     '--output-last-message', outputPath,
@@ -533,6 +533,79 @@ HELP_DOC_PATH: <relative path>
 GUIDE_ID: <guide id>
 SUMMARY: <one sentence>
 `
+}
+
+const buildScriptBlockAgentPrompt = ({ userPrompt, blockKind, initialActionType, language, draft, nearbyBlocks }) => {
+  const safeBlockKind = blockKind === 'action'
+    ? 'action'
+    : blockKind === 'caption'
+    ? 'caption'
+    : 'script block'
+  const draftContext = JSON.stringify({
+    id: draft?.id,
+    title: draft?.title,
+    summary: draft?.summary,
+    sectionId: draft?.sectionId,
+    sectionTitle: draft?.sectionTitle,
+    language,
+    nearbyBlocks
+  }, null, 2)
+
+  return `You are Codex working in /Users/jmfk/code/eceee_v4.
+
+Create one video-script block for the EASY v4 Video Script Editor.
+
+User request:
+${userPrompt}
+
+Requested block kind: ${safeBlockKind}
+Preferred action type when useful: ${initialActionType || '(choose best action type)'}
+Language: ${language || 'en'}
+Current guide context:
+${draftContext}
+
+Available action types:
+- goto: { "type": "goto", "path": "/pages", "holdMs": 500 }
+- click: { "type": "click", "targetMode": "text", "text": "Save", "holdMs": 500 }
+- fill: { "type": "fill", "targetMode": "label", "label": "Title", "value": "Demo title", "holdMs": 500 }
+- select: { "type": "select", "targetMode": "label", "label": "Status", "value": "Draft", "holdMs": 500 }
+- waitForText: { "type": "waitForText", "text": "Saved", "timeout": 10000, "cutFromVideo": true }
+- caption: { "type": "caption", "ms": 1200 }
+- pause: { "type": "pause", "ms": 1000 }
+- reload: { "type": "reload", "holdMs": 500 }
+
+Rules:
+- Return exactly one JSON object and no Markdown.
+- Shape: { "caption": "...", "action": null | { ... } }
+- For a generic script block, choose caption-only, action-only, or caption plus action based on the request.
+- For caption blocks, set action to null unless the user clearly asks for a visible action.
+- For action blocks, include a useful action and add a short caption only if it helps the viewer.
+- Keep captions short, concrete, and in the requested language.
+- Prefer robust target modes: text, label, placeholder, role, or selector.
+- Do not edit files. Do not include explanations.
+`
+}
+
+const extractJsonObject = (value = '') => {
+  const text = String(value || '').trim()
+
+  if (!text) throw new Error('Codex did not return a script block.')
+
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const candidate = fenced ? fenced[1].trim() : text
+
+  try {
+    return JSON.parse(candidate)
+  } catch {
+    const start = candidate.indexOf('{')
+    const end = candidate.lastIndexOf('}')
+
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error('Codex did not return valid JSON.')
+    }
+
+    return JSON.parse(candidate.slice(start, end + 1))
+  }
 }
 
 const createAuthState = async ({ baseUrl, username, password, outputPath }) => {
@@ -977,6 +1050,62 @@ const howToScriptEditorPlugin = () => ({
         const result = await runCodexAgent({ prompt: agentPrompt, outputPath }, text => writeEvent(res, 'log', { text }))
 
         writeEvent(res, 'done', {
+          log: result.log,
+          finalMessage: result.finalMessage
+        })
+        res.end()
+      } catch (error) {
+        if (res.headersSent) {
+          writeEvent(res, 'error', { error: error.message })
+          res.end()
+          return
+        }
+
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/generate-block', async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const body = await readRequestJson(req)
+        const userPrompt = String(body.prompt || '').trim()
+
+        if (!userPrompt) {
+          throw new Error('Prompt is empty.')
+        }
+
+        const runId = randomUUID().slice(0, 8)
+        const workDir = path.join(__dirname, '.howto-script-preview', 'codex-block', runId)
+        const outputPath = path.join(workDir, 'script-block.json')
+        const agentPrompt = buildScriptBlockAgentPrompt({
+          userPrompt,
+          blockKind: body.blockKind,
+          initialActionType: body.initialActionType,
+          language: body.language,
+          draft: body.draft,
+          nearbyBlocks: body.nearbyBlocks
+        })
+
+        await mkdir(workDir, { recursive: true })
+        startEventStream(res)
+        writeEvent(res, 'log', { text: `Starting Codex script-block agent (${runId})\n` })
+        writeEvent(res, 'log', { text: `Block kind: ${body.blockKind || 'caption'}\n` })
+        writeEvent(res, 'log', { text: `Language: ${body.language || 'en'}\n` })
+
+        const result = await runCodexAgent({
+          prompt: agentPrompt,
+          outputPath,
+          sandbox: 'read-only'
+        }, text => writeEvent(res, 'log', { text }))
+        const block = extractJsonObject(result.finalMessage)
+
+        writeEvent(res, 'done', {
+          block,
           log: result.log,
           finalMessage: result.finalMessage
         })
