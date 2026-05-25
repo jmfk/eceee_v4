@@ -5,6 +5,8 @@ import {
     ArrowUp,
     Bot,
     CheckCircle2,
+    ChevronDown,
+    ChevronRight,
     Copy,
     Download,
     Eye,
@@ -315,6 +317,21 @@ const CheckboxInput = ({ label, checked, onChange, disabled = false }) => (
     </label>
 )
 
+const AccordionHeader = ({ icon, title, isOpen, onToggle }) => (
+    <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-2 rounded px-2 py-2 text-left text-sm font-semibold text-gray-900 hover:bg-gray-50"
+        aria-expanded={isOpen}
+    >
+        <span className="flex min-w-0 items-center gap-2">
+            {icon}
+            <span className="truncate">{title}</span>
+        </span>
+        {isOpen ? <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-500" /> : <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-500" />}
+    </button>
+)
+
 const CodexHelpWriterPanel = ({
     prompt,
     onPromptChange,
@@ -322,19 +339,24 @@ const CodexHelpWriterPanel = ({
     onSectionChange,
     isGenerating,
     finalMessage,
-    onGenerate
+    onGenerate,
+    isOpen,
+    onToggle
 }) => (
-    <section className="rounded border border-gray-200 bg-white p-3">
-        <h2 className="flex items-center gap-2 px-1 text-sm font-semibold text-gray-900">
-            <Bot className="h-4 w-4 text-blue-600" />
-            Codex help writer
-        </h2>
-        <div className="mt-3 space-y-3">
+    <section className="rounded border border-gray-200 bg-white">
+        <AccordionHeader
+            icon={<Bot className="h-4 w-4 text-blue-600" />}
+            title="Codex help writer"
+            isOpen={isOpen}
+            onToggle={onToggle}
+        />
+        {isOpen && (
+        <div className="max-h-[38vh] space-y-2 overflow-y-auto border-t border-gray-100 p-2">
             <TextArea
                 label="Prompt"
                 value={prompt}
                 onChange={onPromptChange}
-                rows={5}
+                rows={3}
                 placeholder="Describe the help document Codex should create."
                 disabled={isGenerating}
             />
@@ -359,6 +381,7 @@ const CodexHelpWriterPanel = ({
                 </div>
             )}
         </div>
+        )}
     </section>
 )
 
@@ -1024,11 +1047,8 @@ const QualityPanel = ({
     preview,
     displayPreview,
     isRendering,
-    isTranslating,
     isPublishing,
     activeLanguage,
-    onLanguageSwitch,
-    onGenerateTranslation,
     withVoice,
     onVoiceChange,
     onRender,
@@ -1049,42 +1069,9 @@ const QualityPanel = ({
     const actions = script.filter(block => block.action).length
     const both = script.filter(block => block.caption && block.action).length
     const hasErrors = issues.some(issue => issue.level === 'error')
-    const translationTargetLanguage = activeLanguage === DEFAULT_EDITOR_LANGUAGE ? 'sv' : DEFAULT_EDITOR_LANGUAGE
-    const translationButtonLabel = activeLanguage === DEFAULT_EDITOR_LANGUAGE
-        ? 'Translate to Swedish'
-        : 'Translate to English'
 
     return (
         <aside className="space-y-4">
-            <section className="rounded border border-gray-200 bg-white p-4">
-                <h2 className="text-base font-semibold text-gray-900">Working language</h2>
-                <p className="mt-2 text-sm text-gray-600">
-                    This controls the editor, sequential script, preview page, video, and voice.
-                </p>
-                <SelectInput
-                    label="Language"
-                    value={activeLanguage}
-                    onChange={onLanguageSwitch}
-                    disabled={isRendering || isTranslating}
-                >
-                    {VIDEO_LANGUAGE_OPTIONS.map(option => (
-                        <option key={option.code} value={option.code}>{option.label}</option>
-                    ))}
-                </SelectInput>
-                <button
-                    type="button"
-                    onClick={() => onGenerateTranslation(translationTargetLanguage)}
-                    disabled={isRendering || isTranslating}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    <Bot className="h-4 w-4" />
-                    {isTranslating ? 'Translating...' : translationButtonLabel}
-                </button>
-                <div className="mt-3 rounded bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                    Preview and voice language: <span className="font-semibold uppercase">{activeLanguage}</span>
-                </div>
-            </section>
-
             <section className="rounded border border-gray-200 bg-white p-4">
                 <h2 className="text-base font-semibold text-gray-900">Review</h2>
                 <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -1277,6 +1264,7 @@ const HowToScriptEditorPage = () => {
     const [undoInfo, setUndoInfo] = useState(null)
     const [processLogSource, setProcessLogSource] = useState('video')
     const [loadGuideId, setLoadGuideId] = useState('')
+    const [openLeftPanels, setOpenLeftPanels] = useState({ codex: false, browser: true })
     const [saveAsState, setSaveAsState] = useState({
         isOpen: false,
         guideId: '',
@@ -1376,6 +1364,10 @@ const HowToScriptEditorPage = () => {
         : ''
     const pagePreviewLanguage = activeDraftLanguage
     const renderLanguages = [activeDraftLanguage]
+    const translationTargetLanguage = activeDraftLanguage === DEFAULT_EDITOR_LANGUAGE ? 'sv' : DEFAULT_EDITOR_LANGUAGE
+    const translationButtonLabel = activeDraftLanguage === DEFAULT_EDITOR_LANGUAGE
+        ? 'Translate to Swedish'
+        : 'Translate to English'
     const browserSections = useMemo(() => sectionOptions.map(section => {
         const docsSection = howToDocs.find(candidate => candidate.id === section.id)
         const guides = [...(docsSection?.guides || [])]
@@ -1398,6 +1390,13 @@ const HowToScriptEditorPage = () => {
             guides: guides.sort((a, b) => Number(a.order || 999) - Number(b.order || 999) || a.title.localeCompare(b.title))
         }
     }), [openDrafts, sectionOptions])
+
+    const toggleLeftPanel = (panel) => {
+        setOpenLeftPanels(current => ({
+            ...current,
+            [panel]: !current[panel]
+        }))
+    }
 
     const loadRenderLogs = async () => {
         const response = await fetch('/__howto-script-editor/render-logs')
@@ -1920,6 +1919,7 @@ const HowToScriptEditorPage = () => {
                 requireExisting: options.requireExisting !== false,
                 useCanonicalPath: options.useCanonicalPath !== false,
                 allowOverwrite: Boolean(options.allowOverwrite),
+                allowMissingSource: Boolean(options.allowMissingSource),
                 appendToUndoId: options.appendToUndoId || '',
                 undoLabel: options.undoLabel || ''
             })
@@ -2007,6 +2007,7 @@ const HowToScriptEditorPage = () => {
             const data = await saveDraftMarkdownToDisk(activeDraft, markdown, {
                 requireExisting: true,
                 allowOverwrite: true,
+                allowMissingSource: true,
                 undoLabel: `Save ${activeDraft.id}`
             })
 
@@ -2584,52 +2585,120 @@ const HowToScriptEditorPage = () => {
                 onClose={closeCodexBlockModal}
             />
 
-            <header className="border-b border-gray-200 bg-white">
-                <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-                    <div>
-                        <Link to={getHelpIndexPath()} className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                            Help guides
-                        </Link>
-                        <h1 className="mt-1 text-2xl font-semibold text-gray-900">Video Script Editor</h1>
+            <div className="sticky top-0 z-40 bg-white shadow-sm">
+                <header className="border-b border-gray-200 bg-white">
+                    <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+                        <div>
+                            <Link to={getHelpIndexPath()} className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                                Help guides
+                            </Link>
+                            <h1 className="mt-1 text-2xl font-semibold text-gray-900">Video Script Editor</h1>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                                to={getHelpGuidePath(activeDraft.id)}
+                                className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                <FileText className="h-4 w-4" />
+                                View guide
+                            </Link>
+                            <button type="button" onClick={revertToSavedVersion} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                <RotateCcw className="h-4 w-4" />
+                                Revert to saved
+                            </button>
+                            <button type="button" onClick={undoLastOverwrite} disabled={!undoInfo || isRendering || isTranslating || isPublishing} title={undoInfo ? `Undo ${undoInfo.label}` : 'Nothing to undo'} className="inline-flex items-center gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50">
+                                <RotateCcw className="h-4 w-4" />
+                                Undo last save
+                            </button>
+                            <button type="button" onClick={saveMarkdownToDisk} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-green-700 px-3 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50">
+                                <Save className="h-4 w-4" />
+                                Save
+                            </button>
+                            <button type="button" onClick={() => openSaveAsModal(activeDraft.id)} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-800 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                <Save className="h-4 w-4" />
+                                Save As
+                            </button>
+                            <button type="button" onClick={copyMarkdown} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                <Copy className="h-4 w-4" />
+                                Copy markdown
+                            </button>
+                            <button type="button" onClick={downloadMarkdown} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
+                                <Download className="h-4 w-4" />
+                                Download
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                            to={getHelpGuidePath(activeDraft.id)}
-                            className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                            <FileText className="h-4 w-4" />
-                            View guide
-                        </Link>
-                        <button type="button" onClick={revertToSavedVersion} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                            <RotateCcw className="h-4 w-4" />
-                            Revert to saved
-                        </button>
-                        <button type="button" onClick={undoLastOverwrite} disabled={!undoInfo || isRendering || isTranslating || isPublishing} title={undoInfo ? `Undo ${undoInfo.label}` : 'Nothing to undo'} className="inline-flex items-center gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50">
-                            <RotateCcw className="h-4 w-4" />
-                            Undo last save
-                        </button>
-                        <button type="button" onClick={saveMarkdownToDisk} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-green-700 px-3 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50">
-                            <Save className="h-4 w-4" />
-                            Save
-                        </button>
-                        <button type="button" onClick={() => openSaveAsModal(activeDraft.id)} disabled={isRendering} className="inline-flex items-center gap-2 rounded border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-800 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50">
-                            <Save className="h-4 w-4" />
-                            Save As
-                        </button>
-                        <button type="button" onClick={copyMarkdown} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                            <Copy className="h-4 w-4" />
-                            Copy markdown
-                        </button>
-                        <button type="button" onClick={downloadMarkdown} disabled={isRendering} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
-                            <Download className="h-4 w-4" />
-                            Download
-                        </button>
+                </header>
+                <div className="border-b border-gray-200 bg-gray-50">
+                    <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-2 sm:px-6 lg:px-8">
+                        <div className="flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-white px-2 py-1.5 text-sm">
+                            <span className="font-semibold text-gray-900">Working language</span>
+                            <select
+                                value={activeDraftLanguage}
+                                onChange={event => switchDraftLanguage(event.target.value)}
+                                disabled={isRendering || isTranslating}
+                                className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                            >
+                                {VIDEO_LANGUAGE_OPTIONS.map(option => (
+                                    <option key={option.code} value={option.code}>{option.label}</option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => generateTranslation(translationTargetLanguage)}
+                                disabled={isRendering || isTranslating}
+                                className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <Bot className="h-3.5 w-3.5" />
+                                {isTranslating ? 'Translating...' : translationButtonLabel}
+                            </button>
+                            <span className="text-xs text-gray-500">
+                                Editor, preview, video, voice: <span className="font-semibold uppercase text-gray-700">{activeDraftLanguage}</span>
+                            </span>
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+                            {openDrafts.map(draft => {
+                                const draftKey = getDraftSessionKey(draft)
+                                const isActiveDraft = activePreviewKey === draftKey
+
+                                return (
+                                    <div
+                                        key={draftKey}
+                                        className={`inline-flex items-stretch overflow-hidden rounded border text-sm font-medium ${isActiveDraft ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700'}`}
+                                    >
+                                        <button
+                                            type="button"
+                                            disabled={isRendering}
+                                            onClick={() => navigate(getScriptEditorPath(draft.id, draft.language || DEFAULT_EDITOR_LANGUAGE))}
+                                            className={`px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60 ${isActiveDraft ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
+                                        >
+                                            {draft.title || draft.id}
+                                            <span className="ml-2 text-xs font-semibold uppercase opacity-70">{draft.language || DEFAULT_EDITOR_LANGUAGE}</span>
+                                        </button>
+                                        {openDrafts.length > 1 && (
+                                            <button
+                                                type="button"
+                                                disabled={isRendering}
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    closeDraft(draftKey)
+                                                }}
+                                                className="border-l border-inherit px-2 text-gray-400 hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                aria-label={`Close ${draft.title || draft.id}`}
+                                            >
+                                                x
+                                            </button>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
                     </div>
                 </div>
-            </header>
+            </div>
 
             <main className="mx-auto grid max-w-[1600px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[280px_minmax(0,1fr)_340px] lg:px-8">
-                <aside className="space-y-4">
+                <aside className="space-y-3 lg:sticky lg:top-40 lg:max-h-[calc(100vh-10rem)] lg:self-start lg:overflow-hidden">
                     <CodexHelpWriterPanel
                         prompt={codexPrompt}
                         onPromptChange={setCodexPrompt}
@@ -2638,92 +2707,65 @@ const HowToScriptEditorPage = () => {
                         isGenerating={isGeneratingDoc || isGeneratingBlock || isRendering}
                         finalMessage={codexRun.finalMessage}
                         onGenerate={generateHelpDocument}
+                        isOpen={openLeftPanels.codex}
+                        onToggle={() => toggleLeftPanel('codex')}
                     />
 
-                    <section className="rounded border border-gray-200 bg-white p-3">
-                        <h2 className="px-1 text-sm font-semibold text-gray-900">Manuscript browser</h2>
-                        <form onSubmit={openGuideByGuideId} className="mt-3 flex gap-2">
-                            <input
-                                value={loadGuideId}
-                                onChange={event => setLoadGuideId(event.target.value)}
-                                placeholder="Load Guide ID"
-                                disabled={isRendering}
-                                className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
-                            />
-                            <button
-                                type="submit"
-                                disabled={isRendering || !normalizeGuideIdInput(loadGuideId)}
-                                className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Open
-                            </button>
-                        </form>
-                        <div className="mt-3 max-h-[calc(100vh-180px)] space-y-3 overflow-y-auto pr-1">
-                            {browserSections.map(section => (
-                                <div key={section.id}>
-                                    <div className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{section.title}</div>
-                                    <div className="mt-1 space-y-1">
-                                        {section.guides.length === 0 && (
-                                            <div className="px-2 py-1 text-xs text-gray-400">No manuscripts yet</div>
-                                        )}
-                                        {section.guides.map(guide => (
-                                            <button
-                                                key={guide.id}
-                                                type="button"
-                                                disabled={isRendering}
-                                                onClick={() => openGuide({ section, guide })}
-                                                className={`block w-full rounded px-2 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${activeDraft.id === guide.id && activeDraftLanguage === routeLanguage ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
-                                            >
-                                                <span className="block font-medium">{guide.title}</span>
-                                                <code className="mt-0.5 block truncate text-xs text-gray-500">{guide.id}</code>
-                                            </button>
-                                        ))}
+                    <section className="rounded border border-gray-200 bg-white">
+                        <AccordionHeader
+                            icon={<FileText className="h-4 w-4 text-blue-600" />}
+                            title="Manuscript browser"
+                            isOpen={openLeftPanels.browser}
+                            onToggle={() => toggleLeftPanel('browser')}
+                        />
+                        {openLeftPanels.browser && (
+                            <div className="border-t border-gray-100 p-2">
+                            <form onSubmit={openGuideByGuideId} className="flex gap-2">
+                                <input
+                                    value={loadGuideId}
+                                    onChange={event => setLoadGuideId(event.target.value)}
+                                    placeholder="Load Guide ID"
+                                    disabled={isRendering}
+                                    className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isRendering || !normalizeGuideIdInput(loadGuideId)}
+                                    className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Open
+                                </button>
+                            </form>
+                            <div className="mt-2 max-h-[calc(100vh-20rem)] space-y-2 overflow-y-auto pr-1">
+                                {browserSections.map(section => (
+                                    <div key={section.id}>
+                                        <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{section.title}</div>
+                                        <div className="mt-1 space-y-0.5">
+                                            {section.guides.length === 0 && (
+                                                <div className="px-2 py-1 text-xs text-gray-400">No manuscripts yet</div>
+                                            )}
+                                            {section.guides.map(guide => (
+                                                <button
+                                                    key={guide.id}
+                                                    type="button"
+                                                    disabled={isRendering}
+                                                    onClick={() => openGuide({ section, guide })}
+                                                    className={`block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${activeDraft.id === guide.id && activeDraftLanguage === routeLanguage ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                                                >
+                                                    <span className="block truncate font-medium">{guide.title}</span>
+                                                    <code className="mt-0.5 block truncate text-[11px] text-gray-500">{guide.id}</code>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                            </div>
+                        )}
                     </section>
                 </aside>
 
                 <div className="space-y-6">
-                    <div className="flex flex-wrap gap-2">
-                        {openDrafts.map(draft => {
-                            const draftKey = getDraftSessionKey(draft)
-                            const isActiveDraft = activePreviewKey === draftKey
-
-                            return (
-                                <div
-                                    key={draftKey}
-                                    className={`inline-flex items-stretch overflow-hidden rounded border text-sm font-medium ${isActiveDraft ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700'}`}
-                                >
-                                    <button
-                                        type="button"
-                                        disabled={isRendering}
-                                        onClick={() => navigate(getScriptEditorPath(draft.id, draft.language || DEFAULT_EDITOR_LANGUAGE))}
-                                        className={`px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60 ${isActiveDraft ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
-                                    >
-                                        {draft.title || draft.id}
-                                        <span className="ml-2 text-xs font-semibold uppercase opacity-70">{draft.language || DEFAULT_EDITOR_LANGUAGE}</span>
-                                    </button>
-                                    {openDrafts.length > 1 && (
-                                        <button
-                                            type="button"
-                                            disabled={isRendering}
-                                            onClick={(event) => {
-                                                event.stopPropagation()
-                                                closeDraft(draftKey)
-                                            }}
-                                            className="border-l border-inherit px-2 text-gray-400 hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                            aria-label={`Close ${draft.title || draft.id}`}
-                                        >
-                                            x
-                                        </button>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-
                     <ExpandedVideoPanel
                         preview={displayPreview}
                         expanded={isVideoExpanded}
@@ -2838,11 +2880,8 @@ const HowToScriptEditorPage = () => {
                     preview={languagePreview}
                     displayPreview={displayPreview}
                     isRendering={isRendering}
-                    isTranslating={isTranslating}
                     isPublishing={isPublishing}
                     activeLanguage={activeDraftLanguage}
-                    onLanguageSwitch={switchDraftLanguage}
-                    onGenerateTranslation={generateTranslation}
                     withVoice={withVoice}
                     onVoiceChange={setWithVoice}
                     onRender={renderPreview}

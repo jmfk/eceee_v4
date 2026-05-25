@@ -209,6 +209,7 @@ const docsRoot = path.join(__dirname, 'src/docs/how-to')
 const translationsRoot = path.join(__dirname, 'src/docs/how-to-translations')
 const publicRoot = path.join(__dirname, 'public')
 const renderLogRoot = path.join(__dirname, '.howto-script-preview', 'render-logs')
+const usePolling = ['1', 'true', 'yes'].includes(String(process.env.VITE_USE_POLLING || '').toLowerCase())
 let lastOverwriteUndo = null
 
 const languageName = (language) => {
@@ -1130,16 +1131,17 @@ const howToScriptEditorPlugin = () => ({
           throw new Error('Guide ID is required before saving markdown.')
         }
 
-        if (body.requireExisting && (!sourcePath || !existsSync(sourcePath))) {
+        if (body.requireExisting && (!sourcePath || !existsSync(sourcePath)) && !body.allowMissingSource) {
           throw new Error(`Refusing to overwrite missing file: ${path.relative(__dirname, sourcePath)}`)
         }
 
+        const writableSourcePath = sourcePath && existsSync(sourcePath) ? sourcePath : ''
         const undoOperation = getUndoOperation(
           body.undoLabel || `Overwrite ${path.basename(targetPath)}`,
           body.appendToUndoId || ''
         )
 
-        await writeMarkdownWithOptionalMove(undoOperation, sourcePath, targetPath, markdown, {
+        await writeMarkdownWithOptionalMove(undoOperation, writableSourcePath, targetPath, markdown, {
           allowOverwrite: Boolean(body.allowOverwrite)
         })
         const undo = commitUndoOperation(undoOperation)
@@ -1521,9 +1523,12 @@ export default defineConfig({
       },
     },
     watch: {
-      usePolling: true, // Required for Docker on some systems
+      usePolling,
       interval: 1000,
       ignored: [
+        '**/coverage/**',
+        '**/dist/**',
+        '**/node_modules/**',
         '**/src/docs/how-to/**/*.md',
         '**/src/docs/how-to-translations/**/*.md',
         '**/public/howto-videos/editor-preview/**',
