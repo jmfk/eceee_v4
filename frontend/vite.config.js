@@ -808,9 +808,14 @@ const howToScriptEditorPlugin = () => ({
         const workRoot = path.join(previewRoot, 'work')
         const storageStatePath = path.join(previewRoot, 'storage-state.json')
         const safeName = `${sectionId}-${guideId}`.replace(/[^a-z0-9_-]+/gi, '-')
+        const globalHoldMs = Number(body.globalHoldMs || 0)
+
+        if (!Number.isFinite(globalHoldMs) || globalHoldMs < 0) {
+          throw new Error('Global holdMs must be a non-negative number.')
+        }
 
         startEventStream(res)
-        writeEvent(res, 'log', { text: `Preparing editor preview for ${guideId} against ${baseUrl}\nLanguages: ${languages.join(', ')}\n` })
+        writeEvent(res, 'log', { text: `Preparing editor preview for ${guideId} against ${baseUrl}\nLanguages: ${languages.join(', ')}\nGlobal extra holdMs: ${globalHoldMs}\n` })
         await mkdir(docsDir, { recursive: true })
         await mkdir(outputRoot, { recursive: true })
         await mkdir(workRoot, { recursive: true })
@@ -856,7 +861,8 @@ const howToScriptEditorPlugin = () => ({
             '--language', language,
             '--allow-passive-guides',
             '--no-context',
-            '--no-translate'
+            '--no-translate',
+            '--global-hold-ms', String(globalHoldMs)
           ]
 
           if (storageState) {

@@ -275,6 +275,7 @@ const HowToHelpPage = () => {
         <Routes>
             <Route index element={<HelpIndexPage language={language} />} />
             <Route path="script-editor" element={<HowToScriptEditorPage />} />
+            <Route path="script-editor/:language/:guideId" element={<HowToScriptEditorPage />} />
             <Route path="how-to" element={<HelpIndexPage language={language} />} />
             <Route path="how-to/section/:sectionId" element={<HelpSectionPage language={language} />} />
             <Route path="how-to/:guideId" element={<HelpGuidePage language={language} />} />

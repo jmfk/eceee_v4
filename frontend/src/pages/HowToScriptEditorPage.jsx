@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
     ArrowDown,
     ArrowUp,
@@ -56,6 +56,44 @@ const DEFAULT_DEMO_SETTINGS = {
     password: 'demo'
 }
 
+const DEFAULT_EDITOR_LANGUAGE = 'en'
+const SUPPORTED_EDITOR_LANGUAGES = VIDEO_LANGUAGE_OPTIONS.map(option => option.code)
+
+const editorSession = {
+    openDrafts: null,
+    draftsByKey: new Map(),
+    activeDraftKey: '',
+    previewByKey: {},
+    expandedVideoByKey: {},
+    closedLogByKey: {},
+    demoSettings: DEFAULT_DEMO_SETTINGS,
+    globalHoldMs: 0
+}
+
+const normalizeEditorLanguage = (language = DEFAULT_EDITOR_LANGUAGE) => {
+    const normalized = language.toString().trim().toLowerCase()
+    return SUPPORTED_EDITOR_LANGUAGES.includes(normalized) ? normalized : DEFAULT_EDITOR_LANGUAGE
+}
+
+const getScriptEditorPath = (guideId, language = DEFAULT_EDITOR_LANGUAGE) => (
+    `/help/script-editor/${normalizeEditorLanguage(language)}/${encodeURIComponent(guideId || '')}`
+)
+
+const getDraftKey = (guideId, language = DEFAULT_EDITOR_LANGUAGE) => `${guideId || ''}::${normalizeEditorLanguage(language)}`
+
+const getDraftSessionKey = (draft = {}) => draft.draftKey || getDraftKey(draft.id, draft.language || DEFAULT_EDITOR_LANGUAGE)
+
+const cloneDraft = (draft) => {
+    if (!draft) return draft
+    if (typeof structuredClone === 'function') return structuredClone(draft)
+    return JSON.parse(JSON.stringify(draft))
+}
+
+const withDraftSessionKey = (draft, guideId = draft?.id, language = draft?.language || DEFAULT_EDITOR_LANGUAGE) => ({
+    ...draft,
+    draftKey: getDraftKey(guideId || draft?.id, language)
+})
+
 const writeClipboardText = async (value) => {
     const textarea = document.createElement('textarea')
     textarea.value = value
@@ -82,10 +120,20 @@ const withWorkingLanguage = (draft = {}, language = 'en') => ({
     }
 })
 
-const loadDraftForGuide = (option) => withWorkingLanguage(
-    guideToScriptDraft(option?.guide, option?.section),
-    option?.guide?.language || 'en'
-)
+const loadDraftForGuide = (option, language = option?.guide?.language || DEFAULT_EDITOR_LANGUAGE) => {
+    const normalizedLanguage = normalizeEditorLanguage(language)
+    const translatedGuide = normalizedLanguage !== DEFAULT_EDITOR_LANGUAGE
+        ? option?.guide?.translations?.[normalizedLanguage]
+        : null
+    const guide = translatedGuide || option?.guide
+    const section = translatedGuide?.section || option?.section
+
+    return withDraftSessionKey(
+        withWorkingLanguage(guideToScriptDraft(guide, section), normalizedLanguage),
+        option?.guide?.id || guide?.id,
+        normalizedLanguage
+    )
+}
 
 const draftFromMarkdown = (source, sourcePath, language = 'en', fallbackId = '') => {
     const parsed = parseHowToMarkdown(source, fallbackId)
@@ -96,14 +144,14 @@ const draftFromMarkdown = (source, sourcePath, language = 'en', fallbackId = '')
         order: parsed.sectionOrder
     }
 
-    return withWorkingLanguage({
+    return withDraftSessionKey(withWorkingLanguage({
         ...guideToScriptDraft({
             ...parsed.guide,
             sourcePath,
             language: parsed.guide?.language || language
         }, section),
         language: parsed.guide?.language || language
-    }, parsed.guide?.language || language)
+    }, parsed.guide?.language || language), fallbackId || parsed.guide?.id, parsed.guide?.language || language)
 }
 
 const getDraftSteps = (draft = {}) => (draft.script || [])
@@ -131,6 +179,32 @@ const mergeVideosByLanguage = (currentVideos = [], nextVideos = []) => {
     })
 
     return [...videosByLanguage.values()]
+}
+
+const getGuideOptionById = (guideOptions, guideId) => guideOptions.find(option => option.guide.id === guideId)
+
+const ensureDraftForRoute = (drafts = [], guideOptions = [], guideId = '', language = DEFAULT_EDITOR_LANGUAGE) => {
+    const option = getGuideOptionById(guideOptions, guideId)
+    if (!option) return drafts
+
+    const draftKey = getDraftKey(option.guide.id, language)
+    if (drafts.some(draft => getDraftSessionKey(draft) === draftKey)) return drafts
+
+    const storedDraft = editorSession.draftsByKey.get(draftKey)
+    const nextDraft = storedDraft
+        ? cloneDraft(storedDraft)
+        : loadDraftForGuide(option, language)
+
+    return [...drafts, nextDraft]
+}
+
+const getInitialOpenDrafts = (guideOptions = [], guideId = '', language = DEFAULT_EDITOR_LANGUAGE) => {
+    const initialDrafts = Array.isArray(editorSession.openDrafts) && editorSession.openDrafts.length > 0
+        ? editorSession.openDrafts.map(cloneDraft)
+        : []
+    const fallbackGuideId = guideId || guideOptions[0]?.guide?.id || ''
+
+    return ensureDraftForRoute(initialDrafts, guideOptions, fallbackGuideId, language)
 }
 
 const FieldLabel = ({ children }) => (
@@ -278,7 +352,7 @@ const ActionField = ({ field, action, onChange, disabled = false }) => {
     )
 }
 
-const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, disabled = false }) => {
+const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, onInsert, disabled = false }) => {
     const normalized = normalizeScriptBlock(block)
     const action = normalized.action
     const definition = action ? getActionDefinition(action.type) : null
@@ -306,6 +380,44 @@ const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, di
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
+                    <div className="mr-2 flex flex-wrap items-center gap-1 border-r border-gray-200 pr-2">
+                        <button
+                            type="button"
+                            onClick={() => onInsert('before', null)}
+                            disabled={disabled}
+                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Caption before
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onInsert('before', 'click')}
+                            disabled={disabled}
+                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Action before
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onInsert('after', null)}
+                            disabled={disabled}
+                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Caption after
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onInsert('after', 'click')}
+                            disabled={disabled}
+                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Action after
+                        </button>
+                    </div>
                     <button
                         type="button"
                         onClick={() => onMove(-1)}
@@ -591,6 +703,8 @@ const QualityPanel = ({
     onPublish,
     demoSettings,
     onDemoSettingsChange,
+    globalHoldMs,
+    onGlobalHoldMsChange,
     isVideoExpanded,
     onToggleVideoExpanded
 }) => {
@@ -696,6 +810,14 @@ const QualityPanel = ({
                             disabled={isRendering}
                         />
                     </div>
+                    <TextInput
+                        label="Global extra holdMs"
+                        type="number"
+                        value={globalHoldMs}
+                        onChange={onGlobalHoldMsChange}
+                        placeholder="0"
+                        disabled={isRendering}
+                    />
                 </div>
                 <label className={`mt-3 inline-flex items-center gap-2 text-sm ${isRendering ? 'cursor-not-allowed text-gray-400' : 'text-gray-700'}`}>
                     <input
@@ -759,16 +881,24 @@ const QualityPanel = ({
 const HowToScriptEditorPage = () => {
     useDocumentTitle('Video Script Editor')
 
+    const navigate = useNavigate()
+    const { guideId: routeGuideIdParam = '', language: routeLanguageParam = '' } = useParams()
     const guideOptions = useMemo(getGuideOptions, [])
     const firstGuide = guideOptions[0]
-    const [openDrafts, setOpenDrafts] = useState(() => firstGuide ? [loadDraftForGuide(firstGuide)] : [])
-    const [activeDraftId, setActiveDraftId] = useState(firstGuide?.guide?.id || '')
+    const routeGuideId = routeGuideIdParam ? decodeURIComponent(routeGuideIdParam) : ''
+    const routeLanguage = normalizeEditorLanguage(routeLanguageParam || DEFAULT_EDITOR_LANGUAGE)
+    const initialGuideId = routeGuideId || editorSession.activeDraftKey.split('::')[0] || firstGuide?.guide?.id || ''
+    const [openDrafts, setOpenDrafts] = useState(() => getInitialOpenDrafts(guideOptions, initialGuideId, routeLanguage))
+    const [activeDraftKey, setActiveDraftKey] = useState(() => (
+        editorSession.activeDraftKey || getDraftKey(initialGuideId, routeLanguage)
+    ))
     const [withVoice, setWithVoice] = useState(true)
     const [isRendering, setIsRendering] = useState(false)
-    const [previewById, setPreviewById] = useState({})
-    const [expandedVideoById, setExpandedVideoById] = useState({})
-    const [closedLogById, setClosedLogById] = useState({})
-    const [demoSettings, setDemoSettings] = useState(DEFAULT_DEMO_SETTINGS)
+    const [previewById, setPreviewById] = useState(editorSession.previewByKey)
+    const [expandedVideoById, setExpandedVideoById] = useState(editorSession.expandedVideoByKey)
+    const [closedLogById, setClosedLogById] = useState(editorSession.closedLogByKey)
+    const [demoSettings, setDemoSettings] = useState(editorSession.demoSettings)
+    const [globalHoldMs, setGlobalHoldMs] = useState(editorSession.globalHoldMs)
     const [isPublishing, setIsPublishing] = useState(false)
     const [isGeneratingDoc, setIsGeneratingDoc] = useState(false)
     const [codexPrompt, setCodexPrompt] = useState('')
@@ -781,12 +911,13 @@ const HowToScriptEditorPage = () => {
     const [undoInfo, setUndoInfo] = useState(null)
     const [processLogSource, setProcessLogSource] = useState('video')
 
-    const activeDraft = openDrafts.find(draft => draft.id === activeDraftId) || openDrafts[0]
+    const activeDraft = openDrafts.find(draft => getDraftSessionKey(draft) === activeDraftKey) || openDrafts[0]
+    const activePreviewKey = activeDraft ? getDraftSessionKey(activeDraft) : activeDraftKey
     const activeDraftLanguage = activeDraft?.language || 'en'
     const issues = useMemo(() => activeDraft ? validateScriptDraft(activeDraft) : [], [activeDraft])
     const markdown = useMemo(() => activeDraft ? createMarkdownFromDraft(activeDraft) : '', [activeDraft])
     const readableSourcePath = getReadableSourcePath(activeDraft?.sourcePath)
-    const preview = activeDraft ? previewById[activeDraft.id] : null
+    const preview = activeDraft ? previewById[activePreviewKey] : null
     const languagePreview = preview?.language === activeDraftLanguage ? preview : null
     const storedVideoLink = activeDraft?.videoLinks?.[activeDraftLanguage] || {}
     const storedPreview = storedVideoLink.videoUrl ? {
@@ -812,8 +943,8 @@ const HowToScriptEditorPage = () => {
             videos: languagePreview?.videos?.length ? languagePreview.videos : storedPreview.videos
         }
         : languagePreview
-    const isVideoExpanded = activeDraft ? Boolean(expandedVideoById[activeDraft.id]) : false
-    const isVideoLogOpen = activeDraft ? isRendering || (Boolean(preview?.log || preview?.error) && !closedLogById[activeDraft.id]) : false
+    const isVideoExpanded = activeDraft ? Boolean(expandedVideoById[activePreviewKey]) : false
+    const isVideoLogOpen = activeDraft ? isRendering || (Boolean(preview?.log || preview?.error) && !closedLogById[activePreviewKey]) : false
     const isCodexLogOpen = isGeneratingDoc || (Boolean(codexRun.log || codexRun.error) && !isCodexLogClosed)
     const isTranslationLogOpen = isTranslating || (Boolean(translationRun.log || translationRun.error) && !isTranslationLogClosed)
     const isLogOpen = processLogSource === 'codex'
@@ -850,8 +981,56 @@ const HowToScriptEditorPage = () => {
     const renderLanguages = [activeDraftLanguage]
 
     useEffect(() => {
-        if (!activeDraftId && openDrafts[0]) setActiveDraftId(openDrafts[0].id)
-    }, [activeDraftId, openDrafts])
+        if (!firstGuide) return
+
+        if (!routeGuideIdParam) {
+            const [sessionGuideId, sessionLanguage] = editorSession.activeDraftKey.split('::')
+            navigate(
+                getScriptEditorPath(sessionGuideId || firstGuide.guide.id, sessionLanguage || routeLanguage),
+                { replace: true }
+            )
+            return
+        }
+
+        const option = getGuideOptionById(guideOptions, routeGuideId)
+        if (!option) {
+            navigate(getScriptEditorPath(firstGuide.guide.id, routeLanguage), { replace: true })
+            return
+        }
+
+        const nextDraftKey = getDraftKey(option.guide.id, routeLanguage)
+        setOpenDrafts(current => ensureDraftForRoute(current, guideOptions, option.guide.id, routeLanguage))
+        setActiveDraftKey(nextDraftKey)
+    }, [firstGuide, guideOptions, navigate, routeGuideId, routeGuideIdParam, routeLanguage])
+
+    useEffect(() => {
+        const drafts = openDrafts.map(cloneDraft)
+        editorSession.openDrafts = drafts
+        editorSession.activeDraftKey = activeDraftKey
+        drafts.forEach(draft => {
+            editorSession.draftsByKey.set(getDraftSessionKey(draft), cloneDraft(draft))
+        })
+    }, [activeDraftKey, openDrafts])
+
+    useEffect(() => {
+        editorSession.previewByKey = previewById
+    }, [previewById])
+
+    useEffect(() => {
+        editorSession.expandedVideoByKey = expandedVideoById
+    }, [expandedVideoById])
+
+    useEffect(() => {
+        editorSession.closedLogByKey = closedLogById
+    }, [closedLogById])
+
+    useEffect(() => {
+        editorSession.demoSettings = demoSettings
+    }, [demoSettings])
+
+    useEffect(() => {
+        editorSession.globalHoldMs = globalHoldMs
+    }, [globalHoldMs])
 
     useEffect(() => {
         if (!activeDraft?.id || !activeDraft.sectionId) return
@@ -882,8 +1061,8 @@ const HowToScriptEditorPage = () => {
 
                 setPreviewById(current => ({
                     ...current,
-                    [activeDraft.id]: current[activeDraft.id]?.videoUrl && current[activeDraft.id]?.language === activeDraftLanguage ? current[activeDraft.id] : {
-                        ...(current[activeDraft.id] || {}),
+                    [activePreviewKey]: current[activePreviewKey]?.videoUrl && current[activePreviewKey]?.language === activeDraftLanguage ? current[activePreviewKey] : {
+                        ...(current[activePreviewKey] || {}),
                         videoUrl: generatedVideo.videoUrl,
                         subtitlesUrl: generatedVideo.captionsUrl,
                         captionsUrl: generatedVideo.captionsUrl,
@@ -892,7 +1071,7 @@ const HowToScriptEditorPage = () => {
                     }
                 }))
                 setOpenDrafts(current => current.map(draft => (
-                    draft.id === activeDraft.id
+                    getDraftSessionKey(draft) === activePreviewKey
                         ? {
                             ...draft,
                             videoLinks: {
@@ -915,52 +1094,92 @@ const HowToScriptEditorPage = () => {
         return () => {
             cancelled = true
         }
-    }, [activeDraft?.id, activeDraft?.sectionId, activeDraft?.videoLinks, activeDraftLanguage])
+    }, [activeDraft?.id, activeDraft?.sectionId, activeDraft?.videoLinks, activeDraftLanguage, activePreviewKey])
 
     const updateDemoSettings = (settings) => {
         setDemoSettings(settings)
     }
 
+    const updateGlobalHoldMs = (value) => {
+        const numericValue = Number(value)
+        setGlobalHoldMs(Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0)
+    }
+
     const updateActiveDraft = (updates) => {
         if (isRendering) return
         setOpenDrafts(current => current.map(draft => (
-            draft.id === activeDraft.id ? { ...draft, ...updates } : draft
+            getDraftSessionKey(draft) === activePreviewKey ? { ...draft, ...updates } : draft
         )))
     }
 
-    const updateDraftById = (draftId, updates) => {
+    const updateDraftByKey = (draftKey, updates) => {
         setOpenDrafts(current => current.map(draft => (
-            draft.id === draftId ? { ...draft, ...updates } : draft
+            getDraftSessionKey(draft) === draftKey ? { ...draft, ...updates } : draft
         )))
+    }
+
+    const upsertDraft = (nextDraft, options = {}) => {
+        const shouldActivate = options.activate !== false
+        const preparedDraft = withDraftSessionKey(
+            nextDraft,
+            options.guideId || nextDraft.id,
+            nextDraft.language || options.language || DEFAULT_EDITOR_LANGUAGE
+        )
+        const nextDraftKey = getDraftSessionKey(preparedDraft)
+
+        setOpenDrafts(current => (
+            current.some(draft => getDraftSessionKey(draft) === nextDraftKey)
+                ? current.map(draft => getDraftSessionKey(draft) === nextDraftKey ? preparedDraft : draft)
+                : [...current, preparedDraft]
+        ))
+        editorSession.draftsByKey.set(nextDraftKey, cloneDraft(preparedDraft))
+        if (shouldActivate) setActiveDraftKey(nextDraftKey)
+
+        return preparedDraft
     }
 
     const updateScript = (script) => updateActiveDraft({ script: script.map(normalizeScriptBlock) })
 
     const openGuide = (option) => {
         if (isRendering) return
-        const existing = openDrafts.find(draft => draft.id === option.guide.id)
-        if (existing) {
-            setActiveDraftId(existing.id)
-            return
+        const language = activeDraftLanguage || routeLanguage
+        const nextDraftKey = getDraftKey(option.guide.id, language)
+
+        if (!openDrafts.some(draft => getDraftSessionKey(draft) === nextDraftKey)) {
+            const draft = editorSession.draftsByKey.get(nextDraftKey)
+                ? cloneDraft(editorSession.draftsByKey.get(nextDraftKey))
+                : loadDraftForGuide(option, language)
+            upsertDraft(draft, { activate: false, guideId: option.guide.id, language })
         }
 
-        const draft = loadDraftForGuide(option)
-        setOpenDrafts(current => [...current, draft])
-        setActiveDraftId(draft.id)
+        navigate(getScriptEditorPath(option.guide.id, language))
     }
 
-    const closeDraft = (draftId) => {
+    const closeDraft = (draftKey) => {
         if (isRendering) return
-        setOpenDrafts(current => {
-            const next = current.filter(draft => draft.id !== draftId)
-            if (activeDraftId === draftId) setActiveDraftId(next[0]?.id || '')
-            return next
-        })
+        const next = openDrafts.filter(draft => getDraftSessionKey(draft) !== draftKey)
+        setOpenDrafts(next)
+        if (activePreviewKey === draftKey) {
+            const nextDraft = next[0]
+            if (nextDraft) {
+                navigate(getScriptEditorPath(nextDraft.id, nextDraft.language || DEFAULT_EDITOR_LANGUAGE))
+            } else if (firstGuide) {
+                navigate(getScriptEditorPath(firstGuide.guide.id, routeLanguage), { replace: true })
+            }
+        }
     }
 
     const addBlock = (type) => {
         if (isRendering) return
         updateScript([...(activeDraft.script || []), createScriptBlock(type)])
+    }
+
+    const insertBlock = (index, position, type) => {
+        if (isRendering) return
+        const script = [...(activeDraft.script || [])]
+        const insertIndex = position === 'before' ? index : index + 1
+        script.splice(insertIndex, 0, createScriptBlock(type))
+        updateScript(script)
     }
 
     const moveBlock = (index, offset) => {
@@ -977,8 +1196,8 @@ const HowToScriptEditorPage = () => {
         if (isRendering) return
         const option = guideOptions.find(candidate => candidate.guide.id === activeDraft.id)
         if (!option) return
-        const next = guideToScriptDraft(option.guide, option.section)
-        setOpenDrafts(current => current.map(draft => draft.id === activeDraft.id ? next : draft))
+        const next = loadDraftForGuide(option, activeDraftLanguage)
+        upsertDraft(next, { guideId: activeDraft.id, language: activeDraftLanguage })
         toast.success('Utkast återställt')
     }
 
@@ -1057,7 +1276,7 @@ const HowToScriptEditorPage = () => {
         replaceActiveDraft(withWorkingLanguage(nextDraft, nextDraft.language || activeDraftLanguage))
         setPreviewById(current => {
             const next = { ...current }
-            delete next[activeDraft.id]
+            delete next[activePreviewKey]
             return next
         })
     }
@@ -1085,13 +1304,14 @@ const HowToScriptEditorPage = () => {
 
     const getOriginalDraft = (draft = activeDraft) => {
         const option = guideOptions.find(candidate => candidate.guide.id === draft?.id)
-        return option ? loadDraftForGuide(option) : draft
+        return option ? loadDraftForGuide(option, DEFAULT_EDITOR_LANGUAGE) : draft
     }
 
     const replaceActiveDraft = (nextDraft) => {
-        setOpenDrafts(current => current.map(draft => (
-            draft.id === activeDraft.id ? nextDraft : draft
-        )))
+        return upsertDraft(nextDraft, {
+            guideId: activeDraft.id,
+            language: nextDraft.language || activeDraftLanguage
+        })
     }
 
     const loadTranslatedDraft = async (language = 'sv') => {
@@ -1113,25 +1333,38 @@ const HowToScriptEditorPage = () => {
     }
 
     const switchDraftLanguage = async (language) => {
-        if (!activeDraft || isRendering || isTranslating || language === activeDraftLanguage) return
+        const nextLanguage = normalizeEditorLanguage(language)
+        if (!activeDraft || isRendering || isTranslating || nextLanguage === activeDraftLanguage) return
 
         try {
-            if (language === 'en') {
+            const targetKey = getDraftKey(activeDraft.id, nextLanguage)
+            const existingDraft = openDrafts.find(draft => getDraftSessionKey(draft) === targetKey)
+                || editorSession.draftsByKey.get(targetKey)
+
+            if (existingDraft) {
+                upsertDraft(cloneDraft(existingDraft), { guideId: activeDraft.id, language: nextLanguage })
+                navigate(getScriptEditorPath(activeDraft.id, nextLanguage))
+                return
+            }
+
+            if (nextLanguage === DEFAULT_EDITOR_LANGUAGE) {
                 const originalDraft = getOriginalDraft(activeDraft)
-                replaceActiveDraft(withWorkingLanguage(originalDraft, 'en'))
+                replaceActiveDraft(withWorkingLanguage(originalDraft, DEFAULT_EDITOR_LANGUAGE))
+                navigate(getScriptEditorPath(activeDraft.id, DEFAULT_EDITOR_LANGUAGE))
                 toast.success('Switched to English origin')
                 return
             }
 
-            const translatedDraft = await loadTranslatedDraft(language)
+            const translatedDraft = await loadTranslatedDraft(nextLanguage)
 
             if (!translatedDraft) {
-                await generateTranslation(language, { force: false })
+                await generateTranslation(nextLanguage, { force: false, activate: true })
                 return
             }
 
-            replaceActiveDraft(withWorkingLanguage(translatedDraft, language))
-            toast.success(`Opened ${language.toUpperCase()} markdown`)
+            replaceActiveDraft(withWorkingLanguage(translatedDraft, nextLanguage))
+            navigate(getScriptEditorPath(activeDraft.id, nextLanguage))
+            toast.success(`Opened ${nextLanguage.toUpperCase()} markdown`)
         } catch (error) {
             toast.error(error.message)
         }
@@ -1211,6 +1444,7 @@ const HowToScriptEditorPage = () => {
                     } else if (event.type === 'done') {
                         const translatedDraft = draftFromMarkdown(event.markdown, event.sourcePath, language, originalDraft.id)
                         replaceActiveDraft(withWorkingLanguage(translatedDraft, language))
+                        if (options.activate !== false) navigate(getScriptEditorPath(originalDraft.id, language))
                         if (event.undo) setUndoInfo(event.undo)
                         toast.success(`Saved ${language.toUpperCase()} translation`)
                     } else if (event.type === 'error') {
@@ -1292,7 +1526,7 @@ const HowToScriptEditorPage = () => {
 
     const renderPreview = async () => {
         const renderDraft = activeDraft
-        const renderDraftId = renderDraft.id
+        const renderDraftKey = getDraftSessionKey(renderDraft)
         const renderMarkdowns = {}
 
         try {
@@ -1323,12 +1557,12 @@ const HowToScriptEditorPage = () => {
 
         setProcessLogSource('video')
         setIsRendering(true)
-        setClosedLogById(current => ({ ...current, [renderDraftId]: false }))
-        setExpandedVideoById(current => ({ ...current, [renderDraftId]: false }))
+        setClosedLogById(current => ({ ...current, [renderDraftKey]: false }))
+        setExpandedVideoById(current => ({ ...current, [renderDraftKey]: false }))
         setPreviewById(current => ({
             ...current,
-            [renderDraftId]: {
-                ...(current[renderDraftId] || {}),
+            [renderDraftKey]: {
+                ...(current[renderDraftKey] || {}),
                 language: renderDraft.language || activeDraftLanguage,
                 videoUrl: '',
                 subtitlesUrl: '',
@@ -1355,7 +1589,7 @@ const HowToScriptEditorPage = () => {
                 }, renderDraft.language || activeDraftLanguage)
                 const nextMarkdown = createMarkdownFromDraft(nextDraft)
 
-                updateDraftById(renderDraftId, {
+                updateDraftByKey(renderDraftKey, {
                     videoLinks,
                     videoLanguage: renderDraft.language || activeDraftLanguage,
                     videoLanguages: [renderDraft.language || activeDraftLanguage]
@@ -1372,9 +1606,9 @@ const HowToScriptEditorPage = () => {
             const appendLog = (text) => {
                 setPreviewById(current => ({
                     ...current,
-                    [renderDraftId]: {
-                        ...(current[renderDraftId] || {}),
-                        log: `${current[renderDraftId]?.log || ''}${text}`
+                    [renderDraftKey]: {
+                        ...(current[renderDraftKey] || {}),
+                        log: `${current[renderDraftKey]?.log || ''}${text}`
                     }
                 }))
             }
@@ -1388,6 +1622,7 @@ const HowToScriptEditorPage = () => {
                     markdowns: renderMarkdowns,
                     voice: withVoice,
                     languages: renderLanguages,
+                    globalHoldMs,
                     baseUrl: demoSettings.baseUrl || DEFAULT_DEMO_SETTINGS.baseUrl,
                     username: demoSettings.username || DEFAULT_DEMO_SETTINGS.username,
                     password: demoSettings.password ?? DEFAULT_DEMO_SETTINGS.password
@@ -1409,12 +1644,12 @@ const HowToScriptEditorPage = () => {
                 if (data.undo) setUndoInfo(data.undo)
                 setPreviewById(current => ({
                     ...current,
-                    [renderDraftId]: {
+                    [renderDraftKey]: {
                         ...data,
                         videos: nextVideos
                     }
                 }))
-                setExpandedVideoById(current => ({ ...current, [renderDraftId]: true }))
+                setExpandedVideoById(current => ({ ...current, [renderDraftKey]: true }))
                 toast.success('Preview video created and saved')
                 return
             }
@@ -1443,16 +1678,16 @@ const HowToScriptEditorPage = () => {
                         if (event.undo) setUndoInfo(event.undo)
                         setPreviewById(current => ({
                             ...current,
-                            [renderDraftId]: {
-                                ...(current[renderDraftId] || {}),
+                            [renderDraftKey]: {
+                                ...(current[renderDraftKey] || {}),
                                 videoUrl: event.videoUrl,
                                 subtitlesUrl: event.subtitlesUrl,
                                 videos: nextVideos,
                                 language: event.language,
-                                log: current[renderDraftId]?.log || event.log || ''
+                                log: current[renderDraftKey]?.log || event.log || ''
                             }
                         }))
-                        setExpandedVideoById(current => ({ ...current, [renderDraftId]: true }))
+                        setExpandedVideoById(current => ({ ...current, [renderDraftKey]: true }))
                         toast.success('Preview video created and saved')
                     } else if (event.type === 'error') {
                         throw new Error(event.error || 'Could not create preview video')
@@ -1469,8 +1704,8 @@ const HowToScriptEditorPage = () => {
         } catch (error) {
             setPreviewById(current => ({
                 ...current,
-                [renderDraftId]: {
-                    ...(current[renderDraftId] || {}),
+                [renderDraftKey]: {
+                    ...(current[renderDraftKey] || {}),
                     language: renderDraft.language || activeDraftLanguage,
                     error: error.message
                 }
@@ -1649,7 +1884,7 @@ const HowToScriptEditorPage = () => {
                                                 type="button"
                                                 disabled={isRendering}
                                                 onClick={() => openGuide({ section, guide })}
-                                                className={`block w-full rounded px-2 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${activeDraft.id === guide.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+                                                className={`block w-full rounded px-2 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${activeDraft.id === guide.id && activeDraftLanguage === routeLanguage ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
                                             >
                                                 {guide.title}
                                             </button>
@@ -1663,41 +1898,47 @@ const HowToScriptEditorPage = () => {
 
                 <div className="space-y-6">
                     <div className="flex flex-wrap gap-2">
-                        {openDrafts.map(draft => (
-                            <div
-                                key={draft.id}
-                                className={`inline-flex items-stretch overflow-hidden rounded border text-sm font-medium ${activeDraft.id === draft.id ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700'}`}
-                            >
-                                <button
-                                    type="button"
-                                    disabled={isRendering}
-                                    onClick={() => setActiveDraftId(draft.id)}
-                                    className={`px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60 ${activeDraft.id === draft.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
+                        {openDrafts.map(draft => {
+                            const draftKey = getDraftSessionKey(draft)
+                            const isActiveDraft = activePreviewKey === draftKey
+
+                            return (
+                                <div
+                                    key={draftKey}
+                                    className={`inline-flex items-stretch overflow-hidden rounded border text-sm font-medium ${isActiveDraft ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700'}`}
                                 >
-                                    {draft.title || draft.id}
-                                </button>
-                                {openDrafts.length > 1 && (
                                     <button
                                         type="button"
                                         disabled={isRendering}
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            closeDraft(draft.id)
-                                        }}
-                                        className="border-l border-inherit px-2 text-gray-400 hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                        aria-label={`Close ${draft.title || draft.id}`}
+                                        onClick={() => navigate(getScriptEditorPath(draft.id, draft.language || DEFAULT_EDITOR_LANGUAGE))}
+                                        className={`px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60 ${isActiveDraft ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
                                     >
-                                        x
+                                        {draft.title || draft.id}
+                                        <span className="ml-2 text-xs font-semibold uppercase opacity-70">{draft.language || DEFAULT_EDITOR_LANGUAGE}</span>
                                     </button>
-                                )}
-                            </div>
-                        ))}
+                                    {openDrafts.length > 1 && (
+                                        <button
+                                            type="button"
+                                            disabled={isRendering}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                closeDraft(draftKey)
+                                            }}
+                                            className="border-l border-inherit px-2 text-gray-400 hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                            aria-label={`Close ${draft.title || draft.id}`}
+                                        >
+                                            x
+                                        </button>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
 
                     <ExpandedVideoPanel
                         preview={displayPreview}
                         expanded={isVideoExpanded}
-                        onToggleExpanded={() => setExpandedVideoById(current => ({ ...current, [activeDraft.id]: false }))}
+                        onToggleExpanded={() => setExpandedVideoById(current => ({ ...current, [activePreviewKey]: false }))}
                     />
 
                     <FinishedPagePreview
@@ -1761,6 +2002,7 @@ const HowToScriptEditorPage = () => {
                                     updateScript(script)
                                 }}
                                 onMove={offset => moveBlock(index, offset)}
+                                onInsert={(position, type) => insertBlock(index, position, type)}
                                 onRemove={() => {
                                     const script = activeDraft.script.filter((_, candidateIndex) => candidateIndex !== index)
                                     updateScript(script.length ? script : [createScriptBlock(null)])
@@ -1801,8 +2043,10 @@ const HowToScriptEditorPage = () => {
                     onPublish={publishReviewedGuide}
                     demoSettings={demoSettings}
                     onDemoSettingsChange={updateDemoSettings}
+                    globalHoldMs={globalHoldMs}
+                    onGlobalHoldMsChange={updateGlobalHoldMs}
                     isVideoExpanded={isVideoExpanded}
-                    onToggleVideoExpanded={() => setExpandedVideoById(current => ({ ...current, [activeDraft.id]: !current[activeDraft.id] }))}
+                    onToggleVideoExpanded={() => setExpandedVideoById(current => ({ ...current, [activePreviewKey]: !current[activePreviewKey] }))}
                 />
             </main>
 
@@ -1822,7 +2066,7 @@ const HowToScriptEditorPage = () => {
                         setIsTranslationLogClosed(true)
                         return
                     }
-                    setClosedLogById(current => ({ ...current, [activeDraft.id]: true }))
+                    setClosedLogById(current => ({ ...current, [activePreviewKey]: true }))
                 }}
             />
         </div>

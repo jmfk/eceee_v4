@@ -85,6 +85,7 @@ const parseArgs = (argv) => {
     minActionableSteps: Number(process.env.HOWTO_MIN_ACTIONABLE_STEPS || 1),
     narrationActionLeadMs: Number(process.env.HOWTO_NARRATION_ACTION_LEAD_MS || 300),
     postActionHoldMs: Number(process.env.HOWTO_POST_ACTION_HOLD_MS || 250),
+    globalHoldMs: Number(process.env.HOWTO_GLOBAL_HOLD_MS || 0),
     noVoicePreHoldMs: Number(process.env.HOWTO_NO_VOICE_PRE_HOLD_MS || 250),
     noVoiceHoldMs: Number(process.env.HOWTO_NO_VOICE_HOLD_MS || 650),
     cutPageLoad: process.env.HOWTO_CUT_PAGE_LOAD !== '0',
@@ -149,6 +150,7 @@ const parseArgs = (argv) => {
     if (arg === '--min-actionable-steps') args.minActionableSteps = Number(next)
     if (arg === '--narration-action-lead-ms') args.narrationActionLeadMs = Number(next)
     if (arg === '--post-action-hold-ms') args.postActionHoldMs = Number(next)
+    if (arg === '--global-hold-ms') args.globalHoldMs = Number(next)
     if (arg === '--no-voice-pre-hold-ms') args.noVoicePreHoldMs = Number(next)
     if (arg === '--no-voice-hold-ms') args.noVoiceHoldMs = Number(next)
     if (arg === '--cut-page-load') args.cutPageLoad = true
@@ -241,6 +243,7 @@ Options:
                             Delay after voice starts before running the action. Defaults to 300.
   --post-action-hold-ms <ms>
                             Minimum pause after an action when narration timing already covers it. Defaults to 250.
+  --global-hold-ms <ms>     Extra pause added to every block holdMs. Defaults to 0.
   --no-voice-pre-hold-ms <ms>
                             Caption-only delay before running an action. Defaults to 250.
   --no-voice-hold-ms <ms>
@@ -335,6 +338,7 @@ const validateArgs = (args) => {
   for (const [name, value] of [
     ['--narration-action-lead-ms', args.narrationActionLeadMs],
     ['--post-action-hold-ms', args.postActionHoldMs],
+    ['--global-hold-ms', args.globalHoldMs],
     ['--no-voice-pre-hold-ms', args.noVoicePreHoldMs],
     ['--no-voice-hold-ms', args.noVoiceHoldMs]
   ]) {
@@ -2197,9 +2201,11 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     }
 
     const elapsedSegmentMs = Date.now() - startedAt - narrationStart
+    const actionHoldMs = Number.isFinite(Number(action.holdMs)) ? Number(action.holdMs) : null
+    const targetHoldMs = (actionHoldMs ?? (segment.audioPath ? 0 : args.noVoiceHoldMs)) + args.globalHoldMs
     const targetSegmentMs = segment.audioPath
-      ? Math.max(segment.audioDurationMs + 120, action.holdMs || 0)
-      : action.holdMs ?? args.noVoiceHoldMs
+      ? Math.max(segment.audioDurationMs + 120, targetHoldMs)
+      : targetHoldMs
     const remainingSegmentMs = targetSegmentMs - elapsedSegmentMs
     const postActionHoldMs = action.postHoldMs ?? args.postActionHoldMs
 

@@ -12,27 +12,27 @@ sectionSummary: Create, organize, edit, and publish pages in the site tree.
 sectionOrder: 1
 videoLanguage: sv
 videoLanguages: sv
-mp4UrlSv: /howto-videos/prod/sv/pages-pages-add-venue-travel-child.mp4
-captionsUrlSv: /howto-videos/prod/sv/pages-pages-add-venue-travel-child.vtt
+mp4UrlSv: /howto-videos/editor-preview/sv/pages-pages-add-venue-travel-child.mp4
+captionsUrlSv: /howto-videos/editor-preview/sv/pages-pages-add-venue-travel-child.vtt
 ---
 
 # Lägg till en undersida
 
 Skapa en ny underordnad sida under den korrekta överordnade sidan.
 
-1. Börja på skärmen Sidor. Det är här överordnade och underordnade sidor hanteras.
-2. Bekräfta att raden för den överordnade sidan är synlig innan du använder dess radåtgärder.
-3. Klicka på åtgärden för att lägga till underordnad sida på den överordnade raden. Det här är steget som gör den nya sidan till en undersida.
-4. Det nya sidformuläret öppnas från den överordnade sidan, så den underordnade relationen överförs till sidan du är på väg att skapa.
+1. Gå till pages vyn.
+2. Hitta sidan du vill skapa en under sida till.
+3. Klicka på plus-ikonen på sidan rad.
+4. Ett nytt sidformuläret öppnas där du kan fylla i infromation om den nya sidan
 5. Ange en tydlig titel för undersidan.
-6. Kontrollera slugen eftersom den blir en del av URL-sökvägen under Venue and travel.
-7. Klicka på Create Page för att skapa undersidan. Handledningsinspelningar använder demodata, så detta skapar inte verkligt produktionsinnehål.
-8. Innan du publicerar kontrollerar du att sidans sökväg och navigeringsområde matchar den överordnade sida du valde.
+6. Kontrollera slugen eftersom den blir en del av URL:en.
+7. Klicka på Create Page för att skapa undersidan.
+8. Innan du publicerar kontrollerar du att sidans sökväg och navigeringsområde matchar den förälder sida du valde.
 
 ```video-script
 [
   {
-    "caption": "Börja på skärmen Sidor. Det är här överordnade och underordnade sidor hanteras.",
+    "caption": "Gå till pages vyn.",
     "action": {
       "type": "goto",
       "path": "/pages",
@@ -40,7 +40,7 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
     }
   },
   {
-    "caption": "Bekräfta att raden för den överordnade sidan är synlig innan du använder dess radåtgärder.",
+    "caption": "Hitta sidan du vill skapa en under sida till.",
     "action": {
       "type": "waitForText",
       "text": "Venue & travel",
@@ -48,7 +48,7 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
     }
   },
   {
-    "caption": "Klicka på åtgärden för att lägga till underordnad sida på den överordnade raden. Det här är steget som gör den nya sidan till en undersida.",
+    "caption": "Klicka på plus-ikonen på sidan rad.",
     "action": {
       "type": "click",
       "holdMs": 500,
@@ -56,7 +56,7 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
     }
   },
   {
-    "caption": "Det nya sidformuläret öppnas från den överordnade sidan, så den underordnade relationen överförs till sidan du är på väg att skapa.",
+    "caption": "Ett nytt sidformuläret öppnas där du kan fylla i infromation om den nya sidan",
     "action": {
       "type": "waitForText",
       "text": "Create New Page",
@@ -73,7 +73,7 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
     }
   },
   {
-    "caption": "Kontrollera slugen eftersom den blir en del av URL-sökvägen under Venue and travel.",
+    "caption": "Kontrollera slugen eftersom den blir en del av URL:en.",
     "action": {
       "type": "fill",
       "placeholder": "e.g., news, about-us, contact",
@@ -82,7 +82,7 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
     }
   },
   {
-    "caption": "Klicka på Create Page för att skapa undersidan. Handledningsinspelningar använder demodata, så detta skapar inte verkligt produktionsinnehål.",
+    "caption": "Klicka på Create Page för att skapa undersidan.",
     "action": {
       "type": "click",
       "text": "Create Page",
@@ -92,7 +92,7 @@ Skapa en ny underordnad sida under den korrekta överordnade sidan.
     }
   },
   {
-    "caption": "Innan du publicerar kontrollerar du att sidans sökväg och navigeringsområde matchar den överordnade sida du valde.",
+    "caption": "Innan du publicerar kontrollerar du att sidans sökväg och navigeringsområde matchar den förälder sida du valde.",
     "action": {
       "type": "caption",
       "ms": 1200
