@@ -1943,6 +1943,7 @@ const PageEditor = () => {
                                     return (
                                         <button
                                             key={tabItem.id}
+                                            data-testid={`page-editor-tab-${tabItem.id}`}
                                             onClick={() => navigate(tabPath, { state: { previousView } })}
                                             className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive
                                                 ? 'bg-blue-100 text-blue-700'
@@ -1991,6 +1992,7 @@ const PageEditor = () => {
                                                 return (
                                                     <button
                                                         key={tabItem.id}
+                                                        data-testid={`page-editor-tab-${tabItem.id}`}
                                                         onClick={() => {
                                                             navigate(tabPath, { state: { previousView } })
                                                             setIsMoreMenuOpen(false)

@@ -1,0 +1,37 @@
+WEBVTT
+
+1
+00:00:03.972 --> 00:00:06.405
+In this walkthrough, we replace logos used in a sidebar and check that they fit before saving.
+
+2
+00:00:06.405 --> 00:00:08.715
+This matters because oversized logos make sidebars look uneven and force editors to fix layout problems after upload. Preparing the right dimensions first makes the sidebar much easier to maintain.
+
+3
+00:00:08.715 --> 00:00:10.516
+Open a page editor that contains the Sidebar widget and its logo content.
+
+4
+00:00:10.516 --> 00:00:13.051
+Expand the Sidebar slot to reveal the logo-related widget rows.
+
+5
+00:00:13.051 --> 00:00:15.162
+Use the plus icon on Sidebar to add or replace a logo/image widget in the correct slot.
+
+6
+00:00:15.162 --> 00:00:17.405
+Choose Image widget for a logo file. Prepare logos around 480 px wide so they display sharply at about 240 px.
+
+7
+00:00:17.405 --> 00:00:20.603
+Click the settings icon on the Image widget row.
+
+8
+00:00:20.603 --> 00:00:24.483
+Use the widget settings to name and replace the sidebar logo content before saving.
+
+9
+00:00:24.483 --> 00:00:26.815
+After this walkthrough, you should know where sidebar logos are edited, what size to prepare, and how to preview the result.

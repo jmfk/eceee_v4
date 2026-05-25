@@ -350,6 +350,7 @@ const SettingsManager = () => {
 
                             return (
                                 <button
+                                    data-testid={`publishing-tab-${tab.id}`}
                                     key={tab.id}
                                     onClick={() => {
                                         const newSearchParams = new URLSearchParams(searchParams)

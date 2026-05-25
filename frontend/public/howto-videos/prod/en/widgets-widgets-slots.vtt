@@ -1,0 +1,13 @@
+WEBVTT
+
+1
+00:00:02.746 --> 00:00:10.131
+Open a page with a section or container widget.
+
+2
+00:00:10.131 --> 00:00:15.836
+Container slots can hold their own child widgets.
+
+3
+00:00:15.836 --> 00:00:23.823
+Use the slot toolbar to add, copy, paste, or clear nested widgets.

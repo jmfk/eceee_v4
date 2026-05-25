@@ -212,6 +212,16 @@ const PageTreeNode = memo(({
     const isRootPageCheck = isRootPage(sanitizedPage)
     const hasHostnames = sanitizedPage.hostnames && sanitizedPage.hostnames.length > 0
     const needsHostnameWarning = isRootPageCheck && !hasHostnames
+    const pageTestId = useMemo(() => {
+        const source = page.slug || page.title || String(page.id)
+        const normalized = source
+            .toString()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+
+        return normalized || String(page.id)
+    }, [page.id, page.slug, page.title])
 
     // Helper function to highlight search terms
     const highlightSearchTerm = (text, searchTerm) => {
@@ -658,6 +668,7 @@ const PageTreeNode = memo(({
         <div className="select-none">
             {/* Main node */}
             <div
+                data-testid={`page-tree-node-${pageTestId}`}
                 className={`
                     flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
                     ${isCut && isSelected ? 'opacity-70 bg-orange-100 border-l-4 border-blue-500 ring-2 ring-orange-300' : ''}
@@ -680,6 +691,7 @@ const PageTreeNode = memo(({
             >
                 {/* Expand/collapse button */}
                 <button
+                    data-testid={`page-tree-expand-${pageTestId}`}
                     onClick={(e) => {
                         e.stopPropagation()
                         handleToggleExpand()
@@ -857,6 +869,7 @@ const PageTreeNode = memo(({
                 <div className="flex items-center gap-1">
                     <Tooltip text="Edit" position="top">
                         <button
+                            data-testid={`page-tree-edit-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleEdit()
@@ -869,6 +882,7 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Move up" position="top">
                         <button
+                            data-testid={`page-tree-move-up-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleMoveUp()
@@ -882,6 +896,7 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Move down" position="top">
                         <button
+                            data-testid={`page-tree-move-down-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleMoveDown()
@@ -907,6 +922,7 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Add child page" position="top">
                         <button
+                            data-testid={`page-tree-add-child-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleAddPageBelow()

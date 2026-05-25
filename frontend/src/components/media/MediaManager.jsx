@@ -128,6 +128,7 @@ const MediaManager = ({
 
                         return (
                             <button
+                                data-testid={`media-tab-${tab.id}`}
                                 key={tab.id}
                                 onClick={() => handleTabChange(tab.id)}
                                 className={`

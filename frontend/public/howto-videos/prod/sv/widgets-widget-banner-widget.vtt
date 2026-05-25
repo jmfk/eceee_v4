@@ -1,0 +1,37 @@
+WEBVTT
+
+1
+00:00:02.669 --> 00:00:05.083
+In this walkthrough, we add the Banner widget to a page slot and open its settings.
+
+2
+00:00:05.083 --> 00:00:07.389
+This matters because each widget type has its own purpose, and choosing the right widget keeps the page easier to maintain.
+
+3
+00:00:07.389 --> 00:00:08.941
+Start in All Slots on a page editor so you can add the Banner widget in context.
+
+4
+00:00:08.941 --> 00:00:11.069
+Expand the Main Content slot so its widget controls are visible.
+
+5
+00:00:11.069 --> 00:00:13.060
+Click the plus icon on the Main Content slot.
+
+6
+00:00:13.060 --> 00:00:15.080
+Choose Banner widget from the widget picker.
+
+7
+00:00:15.080 --> 00:00:17.094
+Open the settings panel for the new Banner widget.
+
+8
+00:00:17.094 --> 00:00:18.806
+Configure the fields, then save and preview the page before publishing.
+
+9
+00:00:18.806 --> 00:00:21.117
+After this walkthrough, you should know where to add the Banner widget and where to continue configuring it.

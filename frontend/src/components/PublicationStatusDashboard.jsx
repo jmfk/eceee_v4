@@ -107,6 +107,7 @@ const PublicationStatusDashboard = () => {
                     <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">Error Loading Dashboard</div>
                     <div className="text-gray-600 mb-4">{error}</div>
                     <button
+                        data-testid="publishing-refresh-button"
                         onClick={fetchPublicationStatus}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                     >
@@ -247,4 +248,4 @@ const PublicationStatusDashboard = () => {
     );
 };
 
-export default PublicationStatusDashboard; 
+export default PublicationStatusDashboard;

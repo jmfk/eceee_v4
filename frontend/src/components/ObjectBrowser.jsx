@@ -233,9 +233,17 @@ const ObjectBrowser = () => {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {objectTypes.map((objectType) => (
+                                {objectTypes.map((objectType) => {
+                                    const objectTypeTestId = (objectType.name || objectType.label || 'object-type')
+                                        .toString()
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9]+/g, '-')
+                                        .replace(/^-+|-+$/g, '') || 'object-type'
+
+                                    return (
                                     <div
                                         key={objectType.id}
+                                        data-testid={`object-type-card-${objectTypeTestId}`}
                                         onClick={() => handleObjectTypeSelect(objectType)}
                                         className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
                                     >
@@ -266,7 +274,8 @@ const ObjectBrowser = () => {
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
 
@@ -335,6 +344,7 @@ const ObjectBrowser = () => {
                                     </div>
                                 </div>
                                 <button
+                                    data-testid="objects-new-button"
                                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
                                     onClick={handleCreateNew}
                                 >
@@ -348,6 +358,7 @@ const ObjectBrowser = () => {
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                                     <input
+                                        data-testid="objects-search-input"
                                         type="text"
                                         placeholder={`Search ${selectedObjectType.pluralLabel?.toLowerCase()}...`}
                                         value={searchTerm}

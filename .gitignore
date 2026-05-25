@@ -74,6 +74,8 @@ backend/.pytest_cache/
 frontend/howto-audio-cache/
 frontend/howto-translation-cache/
 frontend/howto-video-output/
+frontend/.howto-script-preview/
+frontend/public/howto-videos/editor-preview/
 
 # IDE
 .vscode/

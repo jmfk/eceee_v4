@@ -118,6 +118,12 @@ const PageWidgetSelectionModal = ({
         onClose();
     };
 
+    const getWidgetTestId = (widget) => (widget.type || widget.name || 'widget')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'widget';
+
     if (!isOpen) return null;
 
     return (
@@ -210,6 +216,7 @@ const PageWidgetSelectionModal = ({
                             {filteredWidgets.map(widget => (
                                 <div
                                     key={widget.type}
+                                    data-testid={`page-widget-option-${getWidgetTestId(widget)}`}
                                     onClick={() => handleWidgetSelect(widget.type)}
                                     className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
                                 >

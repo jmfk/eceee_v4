@@ -1,0 +1,49 @@
+WEBVTT
+
+1
+00:00:01.864 --> 00:00:12.573
+In this walkthrough, we create a subpage from a parent row in the page tree. The example parent is Venue and travel, but the same pattern works for any parent page.
+
+2
+00:00:12.573 --> 00:00:20.036
+This is useful because it shows the path through the admin interface before you need to do the same task on real content.
+
+3
+00:00:20.036 --> 00:00:26.013
+Start on the Pages screen. This is where parent and child pages are managed.
+
+4
+00:00:26.013 --> 00:00:31.940
+Search for the parent page first, so the row you need is visible even in a large page tree.
+
+5
+00:00:31.940 --> 00:00:37.170
+Confirm that the parent page row is visible before you use its row actions.
+
+6
+00:00:37.170 --> 00:00:44.819
+Click the add child page action on that parent row. This is the step that makes the new page a subpage.
+
+7
+00:00:44.819 --> 00:00:51.677
+The new page form opens from that parent, so the child relationship is carried into the page you are about to create.
+
+8
+00:00:51.677 --> 00:00:55.191
+Enter a clear title for the subpage.
+
+9
+00:00:55.191 --> 00:01:00.097
+Check the slug because it becomes part of the URL path below Venue and travel.
+
+10
+00:01:00.097 --> 00:01:08.027
+Click Create Page to create the subpage. Tutorial recordings use demo data, so this does not create real production content.
+
+11
+00:01:08.027 --> 00:01:13.629
+Before publishing, check that the page path and navigation area match the parent you selected.
+
+12
+00:01:13.629 --> 00:01:24.153
+After this walkthrough, you should know how to find the parent page, create the child page, and confirm that the new page belongs under the right parent before publishing.

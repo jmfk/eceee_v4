@@ -1,0 +1,49 @@
+WEBVTT
+
+1
+00:00:01.968 --> 00:00:14.398
+I denna genomgång skapar vi en undersida från en överordnad rad i sidträdet. Exemplet på överordnad sida är Venue and travel, men samma mönster fungerar för alla överordnade sidor.
+
+2
+00:00:14.398 --> 00:00:22.707
+Det här är användbart eftersom det visar vägen genom administrationsgränssnittet innan du behöver utföra samma uppgift på verkligt innehål.
+
+3
+00:00:22.707 --> 00:00:28.222
+Börja på skärmen Sidor. Det är här överordnade och underordnade sidor hanteras.
+
+4
+00:00:28.224 --> 00:00:34.661
+Sök efter den överordnade sidan först, så att raden du behöver visas även i ett stort sidträd.
+
+5
+00:00:34.662 --> 00:00:39.942
+Bekräfta att den överordnade sidans rad är synlig innan du använder dess radåtgärder.
+
+6
+00:00:39.942 --> 00:00:47.960
+Klicka på åtgärden lägg till underordnad sida på den överordnade raden. Det här är steget som gör den nya sidan till en undersida.
+
+7
+00:00:47.960 --> 00:00:55.932
+Det nya sidformuläret öppnas från den överordnade sidan, så den underordnade relationen överförs till sidan som du är på väg att skapa.
+
+8
+00:00:55.932 --> 00:00:59.469
+Ange en tydlig titel för undersidan.
+
+9
+00:00:59.469 --> 00:01:04.608
+Kontrollera slug eftersom det blir en del av URL-sökvägen under Venue och travel.
+
+10
+00:01:04.611 --> 00:01:14.581
+Klicka på Skapa sida för att skapa undersidan. Självstudieinspelningar använder demodata, så detta skapar inte verkligt produktionsinnehål.
+
+11
+00:01:14.581 --> 00:01:22.881
+Innan du publicerar bör du kontrollera att sidans sökväg och navigeringsarea stämmer överens med den överordnade sidan du valde.
+
+12
+00:01:22.881 --> 00:01:35.028
+Efter den här genomgången bör du veta hur du hittar den överordnade sidan, skapar den underordnade sidan och bekräftar att den nya sidan tillhör rätt överordnad innan du publicerar.

@@ -1,37 +1,49 @@
 WEBVTT
 
 1
-00:00:05.469 --> 00:00:10.990
-Open the Pages workspace and wait for the page tree to load.
+00:00:01.823 --> 00:00:09.301
+I denna genomgång skapar vi en ny sida från arbetsytan Sidor och tittar på obligatoriska fält innan du sparar.
 
 2
-00:00:10.990 --> 00:00:14.339
-Click the add root page button to start a new site tree.
+00:00:09.301 --> 00:00:20.803
+Detta är användbart eftersom nästan varje innehållsuppgift börjar med att hitta rätt plats i sidträdet och förstå om sidan ska stanna som utkast eller publiceras.
 
 3
-00:00:14.339 --> 00:00:16.155
-The root page form asks for the key fields before anything is saved.
+00:00:20.804 --> 00:00:24.827
+Öppna Pages-arbetsytan och vänta på att sidträdet läses in.
 
 4
-00:00:16.155 --> 00:00:20.432
-Type a clear page title. The title helps editors recognize the new site tree.
+00:00:24.827 --> 00:00:30.210
+Klicka på knappen för att lägga till rotsida för att starta ett nytt webbträd.
 
 5
-00:00:20.432 --> 00:00:24.867
-Enter the hostname where the root page should answer.
+00:00:30.210 --> 00:00:33.956
+Rotsidans formulär frågar efter nyckelfelten innan något sparas.
 
 6
-00:00:24.867 --> 00:00:28.192
-Keep the page unpublished while you are still preparing content.
+00:00:33.956 --> 00:00:40.533
+Skriv en tydlig sidtitel. Titeln hjälper redaktörer att känna igen det nya webbträdet.
 
 7
-00:00:28.192 --> 00:00:31.757
-For this walkthrough we cancel instead of creating demo content on the server.
+00:00:40.533 --> 00:00:43.781
+Ange värdnamnet där rotsidan ska svara.
 
 8
-00:00:31.757 --> 00:00:36.368
-Use search to find existing pages before editing or adding more content.
+00:00:43.781 --> 00:00:48.640
+Behåll sidan opublicerad medan du fortfarande förbereder innehål.
 
 9
-00:00:36.368 --> 00:00:40.326
-Refresh the page tree after changes or when collaborating with other editors.
+00:00:48.640 --> 00:00:53.406
+För denna genomgång avbryter vi istället för att skapa demoinnehåll på servern.
+
+10
+00:00:53.408 --> 00:00:59.435
+Använd sökning för att hitta befintliga sidor innan du redigerar eller lägger till mer innehål.
+
+11
+00:00:59.435 --> 00:01:04.222
+Uppdatera sidträdet efter ändringar eller när du samarbetar med andra redigerare.
+
+12
+00:01:04.222 --> 00:01:16.933
+Efter den här genomgången bör du veta var du startar en ny sida, vilka fält som är viktiga först, och varför det är säkrare att hålla nytt arbete opublicerat tills innehållet är klart.

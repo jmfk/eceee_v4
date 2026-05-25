@@ -148,6 +148,7 @@ const ObjectTypeManager = () => {
                             <ContextualHelpLink topicId="settings-data" label="Open Object types help" className="ml-2" />
                         </div>
                         <button
+                            data-testid="object-types-new-button"
                             onClick={handleCreateNew}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
                         >
@@ -160,6 +161,7 @@ const ObjectTypeManager = () => {
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <input
+                            data-testid="object-types-search-input"
                             type="text"
                             placeholder="Search object types..."
                             value={searchTerm}

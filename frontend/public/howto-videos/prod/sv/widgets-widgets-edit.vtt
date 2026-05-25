@@ -1,0 +1,41 @@
+WEBVTT
+
+1
+00:00:07.331 --> 00:00:09.792
+In this walkthrough, we are going to add and edit widgets. Add a widget to a slot and open its configuration.
+
+2
+00:00:09.792 --> 00:00:12.099
+This is useful because it shows the path through the admin interface before you need to do the same task on real content.
+
+3
+00:00:12.099 --> 00:00:13.814
+Start in All Slots on the page editor, because widgets are added inside page slots.
+
+4
+00:00:13.814 --> 00:00:14.465
+Confirm that the editor has opened the page you want to change.
+
+5
+00:00:14.465 --> 00:00:16.990
+Expand the Main Content slot so its widget controls are visible.
+
+6
+00:00:16.990 --> 00:00:19.850
+Click the plus icon on the Main Content slot where the new widget should appear.
+
+7
+00:00:19.850 --> 00:00:23.928
+Choose Image widget from the widget picker.
+
+8
+00:00:23.928 --> 00:00:27.303
+Click the settings icon on the new widget row to open its configuration panel.
+
+9
+00:00:27.303 --> 00:00:29.033
+The right panel is where you configure the widget before saving the page.
+
+10
+00:00:29.033 --> 00:00:31.356
+By the end, you should know where to start, what to click, and what to check before you save or publish your work.

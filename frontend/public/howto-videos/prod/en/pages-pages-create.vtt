@@ -1,0 +1,49 @@
+WEBVTT
+
+1
+00:00:02.262 --> 00:00:12.836
+In this walkthrough, we create a new page from the Pages workspace and look at the required fields before saving.
+
+2
+00:00:12.836 --> 00:00:26.283
+This is useful because almost every content task starts by finding the right place in the page tree and understanding whether the page should stay as a draft or be published.
+
+3
+00:00:26.283 --> 00:00:35.174
+Open the Pages workspace and wait for the page tree to load.
+
+4
+00:00:35.174 --> 00:00:40.906
+Click the add root page button to start a new site tree.
+
+5
+00:00:40.906 --> 00:00:45.942
+The root page form asks for the key fields before anything is saved.
+
+6
+00:00:45.942 --> 00:00:55.195
+Type a clear page title. The title helps editors recognize the new site tree.
+
+7
+00:00:55.195 --> 00:01:01.969
+Enter the hostname where the root page should answer.
+
+8
+00:01:01.969 --> 00:01:08.277
+Keep the page unpublished while you are still preparing content.
+
+9
+00:01:08.277 --> 00:01:15.888
+For this walkthrough we cancel instead of creating demo content on the server.
+
+10
+00:01:15.888 --> 00:01:24.745
+Use search to find existing pages before editing or adding more content.
+
+11
+00:01:24.745 --> 00:01:32.489
+Refresh the page tree after changes or when collaborating with other editors.
+
+12
+00:01:32.490 --> 00:01:45.543
+After this walkthrough, you should know where to start a new page, which fields matter first, and why it is safer to keep new work unpublished until the content is ready.

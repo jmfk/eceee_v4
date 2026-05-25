@@ -139,9 +139,15 @@ const LayoutEditor = ({
 // Layout Card Component
 const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
     const slotCount = layout.slotConfiguration?.slots?.length || 0
+    const layoutTestId = (layout.name || 'layout')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'layout'
 
     return (
         <div
+            data-testid={`layout-card-${layoutTestId}`}
             className={`layout-card border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md ${isSelected
                 ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
                 : 'border-gray-200 hover:border-gray-300'
@@ -160,6 +166,7 @@ const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
                 </div>
                 {onPreview && (
                     <button
+                        data-testid={`layout-preview-${layoutTestId}`}
                         onClick={(e) => {
                             e.stopPropagation()
                             onPreview()
