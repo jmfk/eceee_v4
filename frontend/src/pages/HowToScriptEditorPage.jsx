@@ -8,6 +8,7 @@ import {
     Copy,
     Download,
     Eye,
+    ExternalLink,
     FileText,
     Film,
     Maximize2,
@@ -55,6 +56,35 @@ const DEFAULT_DEMO_SETTINGS = {
     username: 'demo',
     password: 'demo'
 }
+
+const EXTRA_SECTION_OPTIONS = [{
+    id: 'navigation',
+    title: 'Navigation',
+    summary: 'Create and maintain navigation menus and navigation-related widgets.',
+    order: 2
+}]
+
+const getSectionOptions = () => {
+    const sections = new Map()
+
+    howToDocs.forEach(section => {
+        sections.set(section.id, {
+            id: section.id,
+            title: section.title || section.id,
+            summary: section.summary || '',
+            order: Number.isFinite(Number(section.order)) ? Number(section.order) : 999
+        })
+    })
+    EXTRA_SECTION_OPTIONS.forEach(section => {
+        if (!sections.has(section.id)) sections.set(section.id, section)
+    })
+
+    return [...sections.values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
+}
+
+const getSectionOption = (sectionOptions = [], sectionId = '') => sectionOptions.find(section => section.id === sectionId)
+    || sectionOptions.find(section => section.id === 'navigation')
+    || sectionOptions[0]
 
 const DEFAULT_EDITOR_LANGUAGE = 'en'
 const SUPPORTED_EDITOR_LANGUAGES = VIDEO_LANGUAGE_OPTIONS.map(option => option.code)
@@ -168,8 +198,6 @@ const getDraftVideoSources = (draft = {}) => Object.entries(draft.videoLinks || 
     }))
     .filter(source => source.videoUrl || source.captionsUrl)
 
-const removeCacheBuster = (value = '') => value.split('?')[0] || ''
-
 const formatRenderLogTime = (value = '') => {
     if (!value) return 'Unknown time'
 
@@ -222,7 +250,7 @@ const FieldLabel = ({ children }) => (
     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">{children}</label>
 )
 
-const TextInput = ({ label, value, onChange, placeholder = '', type = 'text', disabled = false }) => (
+const TextInput = ({ label, value, onChange, placeholder = '', type = 'text', disabled = false, onBlur, onKeyDown }) => (
     <div>
         <FieldLabel>{label}</FieldLabel>
         <input
@@ -231,6 +259,8 @@ const TextInput = ({ label, value, onChange, placeholder = '', type = 'text', di
             placeholder={placeholder}
             disabled={disabled}
             onChange={event => onChange(event.target.value)}
+            onBlur={onBlur}
+            onKeyDown={onKeyDown}
             className="mt-1 w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
         />
     </div>
@@ -302,7 +332,7 @@ const CodexHelpWriterPanel = ({
             />
             <SelectInput label="Section" value={sectionId} onChange={onSectionChange} disabled={isGenerating}>
                 <option value="">Let Codex choose</option>
-                {howToDocs.map(section => (
+                {getSectionOptions().map(section => (
                     <option key={section.id} value={section.id}>{section.title}</option>
                 ))}
             </SelectInput>
@@ -423,6 +453,59 @@ const CodexScriptBlockModal = ({
                     </button>
                 </div>
             </form>
+        </div>
+    )
+}
+
+const MetadataChangeConfirmModal = ({ change, isApplying, onConfirm, onCancel }) => {
+    if (!change) return null
+
+    const isGuideIdChange = change.kind === 'guide-id'
+    const title = isGuideIdChange ? 'Change Guide ID?' : 'Change section?'
+    const description = isGuideIdChange
+        ? 'The markdown file stays UUID-based, but the current preview video link is cleared so the next render creates a video with the new Guide ID.'
+        : 'The markdown file stays UUID-based. The manuscript browser will move this guide because its section frontmatter changes.'
+    const fromValue = isGuideIdChange ? change.previousId : change.previousSectionTitle
+    const toValue = isGuideIdChange ? change.nextId : change.nextSectionTitle
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 px-4 py-6">
+            <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="metadata-change-title"
+                aria-describedby="metadata-change-description"
+                className="w-full max-w-md rounded border border-gray-200 bg-white p-4 shadow-xl"
+            >
+                <h2 id="metadata-change-title" className="text-base font-semibold text-gray-900">
+                    {title}
+                </h2>
+                <p id="metadata-change-description" className="mt-2 text-sm leading-6 text-gray-600">
+                    {description}
+                </p>
+                <div className="mt-3 rounded border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                    <div><span className="font-medium">From:</span> {fromValue || '(empty)'}</div>
+                    <div><span className="font-medium">To:</span> {toValue || '(empty)'}</div>
+                </div>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={isApplying}
+                        className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={isApplying}
+                        className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {isApplying ? 'Applying...' : 'Confirm'}
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }
@@ -766,7 +849,7 @@ const VideoLinksEditor = ({ languages = [], links = {}, onChange, disabled = fal
     </div>
 )
 
-const FinishedPagePreview = ({ draft, language }) => {
+const FinishedPagePreview = ({ draft, language, preview }) => {
     const section = {
         id: draft.sectionId,
         title: draft.sectionTitle,
@@ -783,7 +866,18 @@ const FinishedPagePreview = ({ draft, language }) => {
     const shouldLocalize = language !== draftLanguage
     const localizedSection = shouldLocalize ? localizeSection(section, language) : section
     const localizedGuide = shouldLocalize ? localizeGuide(guide, language) : guide
-    const currentVideo = draft.videoLinks?.[language] || {}
+    const previewVideo = preview?.language === language
+        ? {
+            videoUrl: preview.videoUrl || '',
+            captionsUrl: preview.captionsUrl || preview.subtitlesUrl || ''
+        }
+        : (preview?.videos || []).find(video => video.language === language)
+    const currentVideo = previewVideo?.videoUrl || previewVideo?.captionsUrl
+        ? {
+            videoUrl: previewVideo.videoUrl || '',
+            captionsUrl: previewVideo.captionsUrl || previewVideo.subtitlesUrl || ''
+        }
+        : draft.videoLinks?.[language] || {}
     const text = getHelpText(language)
 
     return (
@@ -1010,14 +1104,25 @@ const QualityPanel = ({
                     </div>
                 )}
                 {displayPreview?.videoUrl && (
-                    <button
-                        type="button"
-                        onClick={onToggleVideoExpanded}
-                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                        {isVideoExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                        {isVideoExpanded ? 'Collapse large preview' : 'Expand large preview'}
-                    </button>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <button
+                            type="button"
+                            onClick={onToggleVideoExpanded}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                            {isVideoExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                            {isVideoExpanded ? 'Collapse preview' : 'Expand preview'}
+                        </button>
+                        <a
+                            href={displayPreview.videoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            Open video
+                        </a>
+                    </div>
                 )}
                 {preview?.error && (
                     <div className="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-800">{preview.error}</div>
@@ -1060,6 +1165,7 @@ const HowToScriptEditorPage = () => {
     const scriptBlockRefs = useRef(new Map())
     const pendingScrollBlockIndex = useRef(null)
     const guideOptions = useMemo(getGuideOptions, [])
+    const sectionOptions = useMemo(getSectionOptions, [])
     const firstGuide = guideOptions[0]
     const routeGuideId = routeGuideIdParam ? decodeURIComponent(routeGuideIdParam) : ''
     const routeLanguage = normalizeEditorLanguage(routeLanguageParam || DEFAULT_EDITOR_LANGUAGE)
@@ -1091,6 +1197,9 @@ const HowToScriptEditorPage = () => {
     const [isTranslationLogClosed, setIsTranslationLogClosed] = useState(false)
     const [undoInfo, setUndoInfo] = useState(null)
     const [processLogSource, setProcessLogSource] = useState('video')
+    const [guideIdInput, setGuideIdInput] = useState('')
+    const [pendingMetadataChange, setPendingMetadataChange] = useState(null)
+    const [isApplyingMetadataChange, setIsApplyingMetadataChange] = useState(false)
 
     const activeDraft = openDrafts.find(draft => getDraftSessionKey(draft) === activeDraftKey) || openDrafts[0]
     const activePreviewKey = activeDraft ? getDraftSessionKey(activeDraft) : activeDraftKey
@@ -1182,6 +1291,10 @@ const HowToScriptEditorPage = () => {
     const pagePreviewLanguage = activeDraftLanguage
     const renderLanguages = [activeDraftLanguage]
 
+    useEffect(() => {
+        setGuideIdInput(activeDraft?.id || '')
+    }, [activeDraft?.id, activePreviewKey])
+
     const loadRenderLogs = async () => {
         const response = await fetch('/__howto-script-editor/render-logs')
         const data = await response.json()
@@ -1209,6 +1322,16 @@ const HowToScriptEditorPage = () => {
         }
 
         const option = getGuideOptionById(guideOptions, routeGuideId)
+        const draftForRoute = openDrafts.find(draft => (
+            draft.id === routeGuideId
+            && normalizeEditorLanguage(draft.language || DEFAULT_EDITOR_LANGUAGE) === routeLanguage
+        ))
+
+        if (!option && draftForRoute) {
+            setActiveDraftKey(getDraftSessionKey(draftForRoute))
+            return
+        }
+
         if (!option) {
             navigate(getScriptEditorPath(firstGuide.guide.id, routeLanguage), { replace: true })
             return
@@ -1217,7 +1340,7 @@ const HowToScriptEditorPage = () => {
         const nextDraftKey = getDraftKey(option.guide.id, routeLanguage)
         setOpenDrafts(current => ensureDraftForRoute(current, guideOptions, option.guide.id, routeLanguage))
         setActiveDraftKey(nextDraftKey)
-    }, [firstGuide, guideOptions, navigate, routeGuideId, routeGuideIdParam, routeLanguage])
+    }, [firstGuide, guideOptions, navigate, openDrafts, routeGuideId, routeGuideIdParam, routeLanguage])
 
     useEffect(() => {
         const drafts = openDrafts.map(cloneDraft)
@@ -1310,20 +1433,6 @@ const HowToScriptEditorPage = () => {
                         videos: [generatedVideo]
                     }
                 }))
-                setOpenDrafts(current => current.map(draft => (
-                    getDraftSessionKey(draft) === activePreviewKey
-                        ? {
-                            ...draft,
-                            videoLinks: {
-                                ...(draft.videoLinks || {}),
-                                [activeDraftLanguage]: {
-                                    videoUrl: generatedVideo.videoUrl,
-                                    captionsUrl: generatedVideo.captionsUrl
-                                }
-                            }
-                        }
-                        : draft
-                )))
             } catch {
                 // Missing generated videos should not interrupt editing.
             }
@@ -1352,10 +1461,95 @@ const HowToScriptEditorPage = () => {
         )))
     }
 
-    const updateDraftByKey = (draftKey, updates) => {
+    const clearCurrentVideoState = () => {
+        setPreviewById(current => {
+            const next = { ...current }
+            delete next[activePreviewKey]
+            return next
+        })
+        setExpandedVideoById(current => ({ ...current, [activePreviewKey]: false }))
+        setClosedLogById(current => ({ ...current, [activePreviewKey]: true }))
+    }
+
+    const requestGuideIdChange = (id) => {
+        if (isRendering || !activeDraft) return
+
+        const nextId = id.trim()
+        const currentId = activeDraft.id || ''
+        if (nextId === currentId) return
+        if (!nextId) {
+            setGuideIdInput(currentId)
+            toast.error('Guide ID cannot be empty.')
+            return
+        }
+
+        const nextVideoLinks = { ...(activeDraft.videoLinks || {}) }
+        delete nextVideoLinks[activeDraftLanguage]
+
+        setPendingMetadataChange({
+            kind: 'guide-id',
+            previousId: currentId,
+            nextId,
+            nextDraft: {
+                ...activeDraft,
+                id: nextId,
+                videoLinks: nextVideoLinks
+            }
+        })
+    }
+
+    const requestSectionChange = (sectionId) => {
+        if (isRendering || !activeDraft) return
+
+        const currentSectionId = activeDraft.sectionId || ''
+        if (sectionId === currentSectionId) return
+
+        const section = getSectionOption(sectionOptions, sectionId)
+        if (!section) return
+
+        const nextVideoLinks = { ...(activeDraft.videoLinks || {}) }
+        delete nextVideoLinks[activeDraftLanguage]
+
+        setPendingMetadataChange({
+            kind: 'section',
+            previousSectionTitle: activeDraft.sectionTitle || currentSectionId,
+            nextSectionTitle: section.title || section.id,
+            nextDraft: {
+                ...activeDraft,
+                sectionId: section.id,
+                sectionTitle: section.title || section.id,
+                sectionSummary: section.summary || '',
+                sectionOrder: section.order ?? 999,
+                videoLinks: nextVideoLinks
+            }
+        })
+    }
+
+    const cancelMetadataChange = () => {
+        setGuideIdInput(activeDraft?.id || '')
+        setPendingMetadataChange(null)
+    }
+
+    const applyMetadataChange = () => {
+        if (!pendingMetadataChange || isRendering) return
+
+        setIsApplyingMetadataChange(true)
+        const nextDraft = withDraftSessionKey(
+            pendingMetadataChange.nextDraft,
+            pendingMetadataChange.nextDraft.id,
+            pendingMetadataChange.nextDraft.language || activeDraftLanguage
+        )
+        const nextDraftKey = getDraftSessionKey(nextDraft)
         setOpenDrafts(current => current.map(draft => (
-            getDraftSessionKey(draft) === draftKey ? { ...draft, ...updates } : draft
+            getDraftSessionKey(draft) === activePreviewKey ? nextDraft : draft
         )))
+        setGuideIdInput(nextDraft.id || '')
+        clearCurrentVideoState()
+        navigate(getScriptEditorPath(nextDraft.id, nextDraft.language || activeDraftLanguage), { replace: true })
+        editorSession.activeDraftKey = nextDraftKey
+        setActiveDraftKey(nextDraftKey)
+        setPendingMetadataChange(null)
+        setIsApplyingMetadataChange(false)
     }
 
     const upsertDraft = (nextDraft, options = {}) => {
@@ -1590,10 +1784,13 @@ const HowToScriptEditorPage = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 guideId: draft.id,
+                uuid: draft.uuid,
                 sectionId: draft.sectionId,
                 sourcePath: draft.sourcePath,
+                language: draft.language || activeDraftLanguage,
                 markdown: markdownText,
                 requireExisting: options.requireExisting !== false,
+                useCanonicalPath: options.useCanonicalPath !== false,
                 appendToUndoId: options.appendToUndoId || '',
                 undoLabel: options.undoLabel || ''
             })
@@ -1855,7 +2052,11 @@ const HowToScriptEditorPage = () => {
         setIsPublishing(true)
 
         try {
-            const videoLinks = getPublishedVideoLinks(activeDraft)
+            const videoLinks = getPublishedVideoLinks({
+                ...activeDraft,
+                videoLanguage: activeDraftLanguage,
+                videoLanguages: languages
+            })
             const publishDraft = {
                 ...activeDraft,
                 videoLanguage: activeDraftLanguage,
@@ -1868,8 +2069,10 @@ const HowToScriptEditorPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     guideId: activeDraft.id,
+                    uuid: activeDraft.uuid,
                     sectionId: activeDraft.sectionId,
                     sourcePath: activeDraft.sourcePath,
+                    language: activeDraftLanguage,
                     languages,
                     videos: displayPreview?.videos || [],
                     markdown: publishMarkdown
@@ -1945,36 +2148,10 @@ const HowToScriptEditorPage = () => {
         }))
 
         try {
-            const saveRenderedVideosToDraft = async (videos = [], renderUndoId = '') => {
+            const collectRenderedPreviewVideos = (videos = []) => {
                 if (!Array.isArray(videos) || videos.length === 0) return []
 
-                const nextVideos = mergeVideosByLanguage(displayPreview?.videos || [], videos)
-                const videoLinks = nextVideos.reduce((links, video) => ({
-                    ...links,
-                    [video.language]: {
-                        videoUrl: removeCacheBuster(video.videoUrl),
-                        captionsUrl: removeCacheBuster(video.captionsUrl)
-                    }
-                }), renderDraft.videoLinks || {})
-                const nextDraft = withWorkingLanguage({
-                    ...renderDraft,
-                    videoLinks
-                }, renderDraft.language || activeDraftLanguage)
-                const nextMarkdown = createMarkdownFromDraft(nextDraft)
-
-                updateDraftByKey(renderDraftKey, {
-                    videoLinks,
-                    videoLanguage: renderDraft.language || activeDraftLanguage,
-                    videoLanguages: [renderDraft.language || activeDraftLanguage]
-                })
-                const saveData = await saveDraftMarkdownToDisk(nextDraft, nextMarkdown, {
-                    requireExisting: true,
-                    appendToUndoId: renderUndoId,
-                    undoLabel: `Render ${renderDraft.language || activeDraftLanguage} preview video and save markdown`
-                })
-                if (saveData.undo) setUndoInfo(saveData.undo)
-
-                return nextVideos
+                return mergeVideosByLanguage(displayPreview?.videos || [], videos)
             }
             const appendLog = (text) => {
                 setPreviewById(current => ({
@@ -2012,7 +2189,7 @@ const HowToScriptEditorPage = () => {
             if (!contentType.includes('application/x-ndjson')) {
                 const data = await response.json()
                 const nextVideos = Array.isArray(data.videos)
-                    ? await saveRenderedVideosToDraft(data.videos, data.undo?.id)
+                    ? collectRenderedPreviewVideos(data.videos)
                     : displayPreview?.videos || []
                 if (data.undo) setUndoInfo(data.undo)
                 setPreviewById(current => ({
@@ -2024,7 +2201,7 @@ const HowToScriptEditorPage = () => {
                 }))
                 setExpandedVideoById(current => ({ ...current, [renderDraftKey]: true }))
                 loadRenderLogs().catch(() => {})
-                toast.success('Preview video created and saved')
+                toast.success('Preview video created')
                 return
             }
 
@@ -2047,7 +2224,7 @@ const HowToScriptEditorPage = () => {
                         appendLog(event.text || '')
                     } else if (event.type === 'done') {
                         const nextVideos = Array.isArray(event.videos)
-                            ? await saveRenderedVideosToDraft(event.videos, event.undo?.id)
+                            ? collectRenderedPreviewVideos(event.videos)
                             : displayPreview?.videos || []
                         if (event.undo) setUndoInfo(event.undo)
                         setPreviewById(current => ({
@@ -2063,7 +2240,7 @@ const HowToScriptEditorPage = () => {
                         }))
                         setExpandedVideoById(current => ({ ...current, [renderDraftKey]: true }))
                         loadRenderLogs().catch(() => {})
-                        toast.success('Preview video created and saved')
+                        toast.success('Preview video created')
                     } else if (event.type === 'error') {
                         throw new Error(event.error || 'Could not create preview video')
                     }
@@ -2330,15 +2507,29 @@ const HowToScriptEditorPage = () => {
                     <FinishedPagePreview
                         draft={activeDraft}
                         language={pagePreviewLanguage}
+                        preview={displayPreview}
                     />
 
                     <section className="rounded border border-gray-200 bg-white p-4">
                         <div className="grid gap-4 md:grid-cols-2">
                             <TextInput label="Title" value={activeDraft.title} onChange={title => updateActiveDraft({ title })} disabled={isRendering} />
-                            <TextInput label="Guide ID" value={activeDraft.id} onChange={id => updateActiveDraft({ id })} disabled={isRendering} />
+                            <TextInput
+                                label="Guide ID"
+                                value={guideIdInput}
+                                onChange={setGuideIdInput}
+                                onBlur={() => requestGuideIdChange(guideIdInput)}
+                                onKeyDown={event => {
+                                    if (event.key === 'Enter') event.currentTarget.blur()
+                                }}
+                                disabled={isRendering || isApplyingMetadataChange}
+                            />
                             <TextInput label="Order" type="number" value={activeDraft.order} onChange={order => updateActiveDraft({ order })} disabled={isRendering} />
                             <TextArea label="Summary" value={activeDraft.summary} onChange={summary => updateActiveDraft({ summary })} rows={2} disabled={isRendering} />
-                            <TextInput label="Section" value={activeDraft.sectionTitle} onChange={sectionTitle => updateActiveDraft({ sectionTitle })} disabled={isRendering} />
+                            <SelectInput label="Section" value={activeDraft.sectionId} onChange={requestSectionChange} disabled={isRendering || isApplyingMetadataChange}>
+                                {sectionOptions.map(section => (
+                                    <option key={section.id} value={section.id}>{section.title}</option>
+                                ))}
+                            </SelectInput>
                         </div>
                         <div className="mt-4">
                             <VideoLinksEditor
@@ -2442,6 +2633,13 @@ const HowToScriptEditorPage = () => {
                     onRefreshRenderLogs={() => loadRenderLogs().catch(error => toast.error(error.message))}
                 />
             </main>
+
+            <MetadataChangeConfirmModal
+                change={pendingMetadataChange}
+                isApplying={isApplyingMetadataChange}
+                onConfirm={applyMetadataChange}
+                onCancel={cancelMetadataChange}
+            />
 
             <ProgressLogDock
                 log={processLog}

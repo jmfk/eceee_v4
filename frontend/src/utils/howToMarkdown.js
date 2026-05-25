@@ -11,6 +11,7 @@ const guideIdentity = (guide = {}) => guide.uuid || guide.guideUuid || guide.id
 
 const guideCompletenessScore = (guide = {}) => [
     guide.uuid || guide.guideUuid ? 8 : 0,
+    guide.sourcePath && guide.uuid && guide.sourcePath.split('/').pop()?.startsWith(`${guide.uuid}.`) ? 8 : 0,
     (guide.videoSources || []).length > 0 ? 4 : 0,
     guide.language ? 2 : 0,
     guide.sourcePath ? 1 : 0
@@ -36,7 +37,7 @@ const upsertGuide = (section, guide) => {
 
     section.guides[existingIndex] = {
         ...preferred,
-        sourcePath: existing.sourcePath || preferred.sourcePath
+        sourcePath: preferred.sourcePath || existing.sourcePath
     }
 }
 
@@ -353,7 +354,31 @@ export const parseHowToMarkdownCollection = (modules) => {
             .forEach(guide => upsertGuide(section, guide))
     })
 
+    const guidesByIdentity = new Map()
+
+    sections.forEach(section => {
+        section.guides.forEach(guide => {
+            const identity = guideIdentity(guide)
+            if (!identity) return
+
+            const current = guidesByIdentity.get(identity)
+            if (!current || guideCompletenessScore(guide) >= guideCompletenessScore(current.guide)) {
+                guidesByIdentity.set(identity, { sectionId: section.id, guide })
+            }
+        })
+    })
+
+    sections.forEach(section => {
+        section.guides = section.guides.filter(guide => {
+            const identity = guideIdentity(guide)
+            if (!identity) return true
+
+            return guidesByIdentity.get(identity)?.sectionId === section.id
+        })
+    })
+
     return [...sections.values()]
+        .filter(section => section.guides.length > 0 || section.markdown)
         .map(section => ({
             ...section,
             guides: [...section.guides].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
