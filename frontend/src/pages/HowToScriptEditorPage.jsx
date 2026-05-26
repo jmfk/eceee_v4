@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     ChevronDown,
     ChevronRight,
+    ClipboardPaste,
     Copy,
     Download,
     Eye,
@@ -15,9 +16,11 @@ import {
     Film,
     Maximize2,
     Minimize2,
+    MousePointerClick,
     Plus,
     RotateCcw,
     Save,
+    Scissors,
     Trash2,
     UploadCloud,
     X
@@ -108,8 +111,13 @@ const editorSession = {
     renderLogs: [],
     selectedRenderLogId: '',
     demoSettings: DEFAULT_DEMO_SETTINGS,
-    globalHoldMs: 0
+    globalHoldMs: 0,
+    videoOverrideByKey: {},
+    scriptBlockClipboard: null,
+    recordingRun: { id: '', log: '', error: '', blocks: [], rawVideoUrl: '', rawVideoPath: '', status: '' }
 }
+
+const SCRIPT_BLOCK_CLIPBOARD_TYPE = 'eceee/howto-script-block'
 
 const normalizeEditorLanguage = (language = DEFAULT_EDITOR_LANGUAGE) => {
     const normalized = language.toString().trim().toLowerCase()
@@ -124,6 +132,8 @@ const getDraftKey = (guideId, language = DEFAULT_EDITOR_LANGUAGE) => `${guideId 
 
 const getDraftSessionKey = (draft = {}) => draft.draftKey || getDraftKey(draft.id, draft.language || DEFAULT_EDITOR_LANGUAGE)
 
+const isOverrideVideoUrl = (value = '') => String(value || '').split('?')[0].includes('/howto-videos/overrides/')
+
 const cloneDraft = (draft) => {
     if (!draft) return draft
     if (typeof structuredClone === 'function') return structuredClone(draft)
@@ -136,6 +146,11 @@ const withDraftSessionKey = (draft, guideId = draft?.id, language = draft?.langu
 })
 
 const writeClipboardText = async (value) => {
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+        return
+    }
+
     const textarea = document.createElement('textarea')
     textarea.value = value
     textarea.setAttribute('readonly', '')
@@ -148,6 +163,44 @@ const writeClipboardText = async (value) => {
     document.body.removeChild(textarea)
 
     if (!didCopy) throw new Error('Clipboard copy failed')
+}
+
+const readClipboardText = async () => {
+    if (navigator.clipboard?.readText) {
+        return navigator.clipboard.readText()
+    }
+
+    throw new Error('Clipboard read is not available')
+}
+
+const serializeScriptBlockForClipboard = (block) => JSON.stringify({
+    type: SCRIPT_BLOCK_CLIPBOARD_TYPE,
+    version: 1,
+    block: normalizeScriptBlock(block)
+}, null, 2)
+
+const parseScriptBlockFromClipboard = (value = '') => {
+    const text = String(value || '').trim()
+
+    if (!text) throw new Error('Clipboard is empty')
+
+    if (!text.startsWith('{') && !text.startsWith('[')) {
+        return normalizeScriptBlock({ caption: text, action: null })
+    }
+
+    const parsed = JSON.parse(text)
+    const candidate = parsed?.type === SCRIPT_BLOCK_CLIPBOARD_TYPE
+        ? parsed.block
+        : Array.isArray(parsed)
+        ? parsed[0]
+        : parsed.block || parsed
+    const block = normalizeScriptBlock(candidate)
+
+    if (!block.caption && !block.action) {
+        throw new Error('Clipboard does not contain a caption or action block')
+    }
+
+    return block
 }
 
 const withWorkingLanguage = (draft = {}, language = 'en') => ({
@@ -651,7 +704,20 @@ const ActionField = ({ field, action, onChange, disabled = false }) => {
     )
 }
 
-const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, onInsert, blockRef, disabled = false }) => {
+const ScriptBlockEditor = ({
+    block,
+    index,
+    total,
+    onChange,
+    onMove,
+    onRemove,
+    onInsert,
+    onCopy,
+    onCut,
+    onPaste,
+    blockRef,
+    disabled = false
+}) => {
     const normalized = normalizeScriptBlock(block)
     const action = normalized.action
     const definition = action ? getActionDefinition(action.type) : null
@@ -697,6 +763,46 @@ const ScriptBlockEditor = ({ block, index, total, onChange, onMove, onRemove, on
                         >
                             <Plus className="h-3.5 w-3.5" />
                             Add after
+                        </button>
+                    </div>
+                    <div className="mr-2 flex flex-wrap items-center gap-1 border-r border-gray-200 pr-2">
+                        <button
+                            type="button"
+                            onClick={onCopy}
+                            disabled={disabled}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label={`Copy block ${index + 1}`}
+                            title="Copy block"
+                        >
+                            <Copy className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onCut}
+                            disabled={disabled}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label={`Cut block ${index + 1}`}
+                            title="Cut block"
+                        >
+                            <Scissors className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onPaste('before')}
+                            disabled={disabled}
+                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <ClipboardPaste className="h-3.5 w-3.5" />
+                            Paste before
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onPaste('after')}
+                            disabled={disabled}
+                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <ClipboardPaste className="h-3.5 w-3.5" />
+                            Paste after
                         </button>
                     </div>
                     <button
@@ -859,6 +965,66 @@ const ProgressLogDock = ({ log, error, isRunning, statusText = 'Running process.
                 {error ? `\n\nERROR: ${error}` : ''}
             </pre>
         </section>
+    )
+}
+
+const RecordingImportDialog = ({ run, onClose, onImport }) => {
+    if (!run?.isOpen) return null
+
+    const blocks = run.blocks || []
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 px-4 py-6">
+            <section className="w-full max-w-2xl rounded border border-gray-200 bg-white shadow-xl">
+                <div className="border-b border-gray-200 px-5 py-4">
+                    <h2 className="text-base font-semibold text-gray-900">Import recorded actions</h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                        {blocks.length} action block{blocks.length === 1 ? '' : 's'} captured from the Playwright recording.
+                    </p>
+                </div>
+                <div className="space-y-4 px-5 py-4">
+                    {run.rawVideoUrl && (
+                        <div className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                            Raw reference video:{' '}
+                            <a href={run.rawVideoUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 hover:text-blue-800">
+                                Open recording
+                            </a>
+                        </div>
+                    )}
+                    <div className="max-h-72 overflow-auto rounded border border-gray-200 bg-gray-50">
+                        {blocks.length ? blocks.map((block, index) => (
+                            <div key={`${block.action?.type || 'caption'}-${index}`} className="border-b border-gray-200 px-3 py-2 last:border-b-0">
+                                <div className="text-xs font-semibold uppercase text-gray-500">Block {index + 1}</div>
+                                <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-gray-700">{JSON.stringify(block.action || null, null, 2)}</pre>
+                            </div>
+                        )) : (
+                            <div className="px-3 py-6 text-center text-sm text-gray-500">No importable actions were captured.</div>
+                        )}
+                    </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 px-5 py-4">
+                    <button type="button" onClick={onClose} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onImport('replace')}
+                        disabled={!blocks.length}
+                        className="rounded border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Replace script
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onImport('append')}
+                        disabled={!blocks.length}
+                        className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Append to script
+                    </button>
+                </div>
+            </section>
+        </div>
     )
 }
 
@@ -1053,6 +1219,10 @@ const QualityPanel = ({
     onVoiceChange,
     onRender,
     onPublish,
+    videoOverride,
+    isUploadingOverride,
+    onUploadOverride,
+    onRemoveOverride,
     demoSettings,
     onDemoSettingsChange,
     globalHoldMs,
@@ -1064,11 +1234,13 @@ const QualityPanel = ({
     onOpenRenderLog,
     onRefreshRenderLogs
 }) => {
+    const overrideInputRef = useRef(null)
     const script = (draft.script || []).map(normalizeScriptBlock)
     const captions = script.filter(block => block.caption).length
     const actions = script.filter(block => block.action).length
     const both = script.filter(block => block.caption && block.action).length
     const hasErrors = issues.some(issue => issue.level === 'error')
+    const hasVideoOverride = Boolean(videoOverride?.exists)
 
     return (
         <aside className="space-y-4">
@@ -1110,6 +1282,17 @@ const QualityPanel = ({
 
             <section className="rounded border border-gray-200 bg-white p-4">
                 <h2 className="text-base font-semibold text-gray-900">Film</h2>
+                <input
+                    ref={overrideInputRef}
+                    type="file"
+                    accept="video/mp4,.mp4"
+                    className="hidden"
+                    onChange={event => {
+                        const file = event.target.files?.[0]
+                        event.target.value = ''
+                        if (file) onUploadOverride(file)
+                    }}
+                />
                 <div className="mt-3 grid gap-3">
                     <TextInput
                         label="Demo base URL"
@@ -1154,17 +1337,66 @@ const QualityPanel = ({
                     />
                     Generate voice track
                 </label>
+                <div className={`mt-3 rounded border px-3 py-3 ${hasVideoOverride ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <div className={`text-sm font-semibold ${hasVideoOverride ? 'text-amber-900' : 'text-gray-900'}`}>
+                                MP4 override
+                            </div>
+                            <div className={`mt-1 text-xs ${hasVideoOverride ? 'text-amber-800' : 'text-gray-500'}`}>
+                                {hasVideoOverride
+                                    ? 'This page is locked to the uploaded MP4. Remove it to enable generation.'
+                                    : 'Upload an MP4 to override generated videos for this page.'}
+                            </div>
+                        </div>
+                        {hasVideoOverride && (
+                            <span className="rounded bg-white px-2 py-1 text-xs font-semibold uppercase text-amber-800 ring-1 ring-amber-200">
+                                Locked
+                            </span>
+                        )}
+                    </div>
+                    {hasVideoOverride && (
+                        <code className="mt-2 block break-all text-xs text-amber-900">
+                            {videoOverride.cleanVideoUrl || videoOverride.videoUrl}
+                        </code>
+                    )}
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <button
+                            type="button"
+                            onClick={() => overrideInputRef.current?.click()}
+                            disabled={isRendering || isUploadingOverride}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <UploadCloud className="h-4 w-4" />
+                            {isUploadingOverride ? 'Uploading...' : hasVideoOverride ? 'Replace MP4' : 'Upload MP4'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onRemoveOverride}
+                            disabled={isRendering || isUploadingOverride || !hasVideoOverride}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Remove override
+                        </button>
+                    </div>
+                </div>
                 <button
                     type="button"
                     onClick={onRender}
-                    disabled={isRendering}
+                    disabled={isRendering || isUploadingOverride || hasVideoOverride}
                     className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    title={hasVideoOverride ? 'Remove the MP4 override before generating a video.' : undefined}
                 >
                     <Film className="h-4 w-4" />
                     {isRendering ? 'Creating video...' : `Create ${activeLanguage.toUpperCase()} preview video`}
                 </button>
                 <VideoPlayer preview={displayPreview} />
-                {!preview?.videoUrl && displayPreview?.videoUrl && (
+                {hasVideoOverride && displayPreview?.videoUrl ? (
+                    <div className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        Showing the uploaded {activeLanguage.toUpperCase()} override video.
+                    </div>
+                ) : !preview?.videoUrl && displayPreview?.videoUrl && (
                     <div className="mt-2 rounded bg-gray-50 px-3 py-2 text-xs text-gray-600">
                         Showing the saved {activeLanguage.toUpperCase()} video from this markdown file.
                     </div>
@@ -1245,10 +1477,12 @@ const HowToScriptEditorPage = () => {
     const [previewById, setPreviewById] = useState(editorSession.previewByKey)
     const [expandedVideoById, setExpandedVideoById] = useState(editorSession.expandedVideoByKey)
     const [closedLogById, setClosedLogById] = useState(editorSession.closedLogByKey)
+    const [videoOverrideById, setVideoOverrideById] = useState(editorSession.videoOverrideByKey)
     const [renderLogs, setRenderLogs] = useState(editorSession.renderLogs)
     const [selectedRenderLogId, setSelectedRenderLogId] = useState(editorSession.selectedRenderLogId)
     const [demoSettings, setDemoSettings] = useState(editorSession.demoSettings)
     const [globalHoldMs, setGlobalHoldMs] = useState(editorSession.globalHoldMs)
+    const [isUploadingOverride, setIsUploadingOverride] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
     const [isGeneratingDoc, setIsGeneratingDoc] = useState(false)
     const [isGeneratingBlock, setIsGeneratingBlock] = useState(false)
@@ -1274,6 +1508,9 @@ const HowToScriptEditorPage = () => {
     })
     const [pendingMetadataChange, setPendingMetadataChange] = useState(null)
     const [isApplyingMetadataChange, setIsApplyingMetadataChange] = useState(false)
+    const [isRecordingActions, setIsRecordingActions] = useState(false)
+    const [recordingRun, setRecordingRun] = useState(editorSession.recordingRun)
+    const [recordingImport, setRecordingImport] = useState({ isOpen: false, blocks: [], rawVideoUrl: '', rawVideoPath: '', id: '' })
 
     const activeDraft = openDrafts.find(draft => getDraftSessionKey(draft) === activeDraftKey) || openDrafts[0]
     const activePreviewKey = activeDraft ? getDraftSessionKey(activeDraft) : activeDraftKey
@@ -1282,10 +1519,26 @@ const HowToScriptEditorPage = () => {
     const markdown = useMemo(() => activeDraft ? createMarkdownFromDraft(activeDraft) : '', [activeDraft])
     const readableSourcePath = getReadableSourcePath(activeDraft?.sourcePath)
     const preview = activeDraft ? previewById[activePreviewKey] : null
+    const videoOverride = activeDraft ? videoOverrideById[activePreviewKey] : null
     const selectedRenderLog = renderLogs.find(log => log.id === selectedRenderLogId)
     const languagePreview = preview?.language === activeDraftLanguage ? preview : null
     const storedVideoLink = activeDraft?.videoLinks?.[activeDraftLanguage] || {}
-    const storedPreview = storedVideoLink.videoUrl ? {
+    const shouldUseStoredVideoLink = storedVideoLink.videoUrl
+        && (!isOverrideVideoUrl(storedVideoLink.videoUrl) || videoOverride?.exists)
+    const overridePreview = videoOverride?.exists ? {
+        videoUrl: videoOverride.videoUrl,
+        subtitlesUrl: '',
+        captionsUrl: '',
+        language: activeDraftLanguage,
+        isOverride: true,
+        videos: [{
+            language: activeDraftLanguage,
+            videoUrl: videoOverride.cleanVideoUrl || videoOverride.videoUrl,
+            captionsUrl: '',
+            isOverride: true
+        }]
+    } : null
+    const storedPreview = shouldUseStoredVideoLink ? {
         videoUrl: storedVideoLink.videoUrl,
         subtitlesUrl: storedVideoLink.captionsUrl || '',
         captionsUrl: storedVideoLink.captionsUrl || '',
@@ -1296,7 +1549,8 @@ const HowToScriptEditorPage = () => {
             captionsUrl: storedVideoLink.captionsUrl || ''
         }]
     } : null
-    const displayPreview = languagePreview?.videoUrl
+    const displayPreview = overridePreview
+        || (languagePreview?.videoUrl
         ? languagePreview
         : storedPreview
         ? {
@@ -1307,16 +1561,19 @@ const HowToScriptEditorPage = () => {
             captionsUrl: languagePreview?.captionsUrl || storedPreview.captionsUrl,
             videos: languagePreview?.videos?.length ? languagePreview.videos : storedPreview.videos
         }
-        : languagePreview
+        : languagePreview)
     const isVideoExpanded = activeDraft ? Boolean(expandedVideoById[activePreviewKey]) : false
     const isVideoLogOpen = activeDraft ? isRendering || (Boolean(preview?.log || preview?.error) && !closedLogById[activePreviewKey]) : false
     const isCodexLogOpen = isGeneratingDoc || isGeneratingBlock || (Boolean(codexRun.log || codexRun.error) && !isCodexLogClosed)
     const isTranslationLogOpen = isTranslating || (Boolean(translationRun.log || translationRun.error) && !isTranslationLogClosed)
     const isRenderHistoryLogOpen = processLogSource === 'video-history' && Boolean(selectedRenderLog)
+    const isRecordingLogOpen = processLogSource === 'recording' && Boolean(isRecordingActions || recordingRun.log || recordingRun.error)
     const isLogOpen = processLogSource === 'codex'
         ? isCodexLogOpen
         : processLogSource === 'translation'
         ? isTranslationLogOpen
+        : processLogSource === 'recording'
+        ? isRecordingLogOpen
         : processLogSource === 'video-history'
         ? isRenderHistoryLogOpen
         : isVideoLogOpen
@@ -1324,6 +1581,8 @@ const HowToScriptEditorPage = () => {
         ? codexRun.log
         : processLogSource === 'translation'
         ? translationRun.log
+        : processLogSource === 'recording'
+        ? recordingRun.log || ''
         : processLogSource === 'video-history'
         ? selectedRenderLog?.log || ''
         : preview?.log || ''
@@ -1331,6 +1590,8 @@ const HowToScriptEditorPage = () => {
         ? codexRun.error
         : processLogSource === 'translation'
         ? translationRun.error
+        : processLogSource === 'recording'
+        ? recordingRun.error
         : processLogSource === 'video-history'
         ? selectedRenderLog?.error || ''
         : preview?.error || ''
@@ -1338,6 +1599,8 @@ const HowToScriptEditorPage = () => {
         ? isGeneratingDoc || isGeneratingBlock
         : processLogSource === 'translation'
         ? isTranslating
+        : processLogSource === 'recording'
+        ? isRecordingActions
         : processLogSource === 'video-history'
         ? false
         : isRendering
@@ -1345,6 +1608,8 @@ const HowToScriptEditorPage = () => {
         ? isGeneratingBlock ? 'Codex is writing a script block...' : 'Codex is writing a help document...'
         : processLogSource === 'translation'
         ? 'Translating markdown with Haiku...'
+        : processLogSource === 'recording'
+        ? 'Recording browser actions...'
         : processLogSource === 'video-history'
         ? 'Viewing saved video render log'
         : 'Rendering video...'
@@ -1352,6 +1617,8 @@ const HowToScriptEditorPage = () => {
         ? 'Codex finished'
         : processLogSource === 'translation'
         ? 'Translation complete'
+        : processLogSource === 'recording'
+        ? 'Action recording complete'
         : processLogSource === 'video-history'
         ? `${selectedRenderLog?.status === 'error' ? 'Saved failed render' : 'Saved render'} ${selectedRenderLog ? formatRenderLogTime(selectedRenderLog.createdAt) : ''}`
         : 'Render complete'
@@ -1467,6 +1734,10 @@ const HowToScriptEditorPage = () => {
     }, [closedLogById])
 
     useEffect(() => {
+        editorSession.videoOverrideByKey = videoOverrideById
+    }, [videoOverrideById])
+
+    useEffect(() => {
         editorSession.renderLogs = renderLogs
     }, [renderLogs])
 
@@ -1487,6 +1758,50 @@ const HowToScriptEditorPage = () => {
     }, [globalHoldMs])
 
     useEffect(() => {
+        editorSession.recordingRun = recordingRun
+    }, [recordingRun])
+
+    useEffect(() => {
+        if (!isRecordingActions || !recordingRun.id) return
+
+        let cancelled = false
+        const pollRecording = async () => {
+            try {
+                const response = await fetch(`/__howto-script-editor/record/${recordingRun.id}/events?baseUrl=${encodeURIComponent(demoSettings.baseUrl)}`)
+                const data = await response.json()
+
+                if (cancelled || !response.ok) return
+
+                setRecordingRun(current => ({
+                    ...current,
+                    ...data,
+                    log: data.log || current.log || ''
+                }))
+
+                if (['closed', 'stopped', 'error'].includes(data.status)) {
+                    setIsRecordingActions(false)
+                    setRecordingImport({
+                        isOpen: true,
+                        id: data.id,
+                        blocks: data.blocks || [],
+                        rawVideoUrl: data.rawVideoUrl || '',
+                        rawVideoPath: data.rawVideoPath || ''
+                    })
+                }
+            } catch {
+                // Polling should not interrupt the recording session.
+            }
+        }
+        const interval = window.setInterval(pollRecording, 1000)
+        pollRecording()
+
+        return () => {
+            cancelled = true
+            window.clearInterval(interval)
+        }
+    }, [demoSettings.baseUrl, isRecordingActions, recordingRun.id])
+
+    useEffect(() => {
         if (pendingScrollBlockIndex.current === null) return
 
         const index = pendingScrollBlockIndex.current
@@ -1500,7 +1815,45 @@ const HowToScriptEditorPage = () => {
 
     useEffect(() => {
         if (!activeDraft?.id || !activeDraft.sectionId) return
-        if (activeDraft.videoLinks?.[activeDraftLanguage]?.videoUrl) return
+
+        let cancelled = false
+
+        const loadVideoOverride = async () => {
+            try {
+                const response = await fetch('/__howto-script-editor/video-override-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        guideId: activeDraft.id,
+                        sectionId: activeDraft.sectionId,
+                        language: activeDraftLanguage
+                    })
+                })
+                const data = await response.json()
+
+                if (cancelled || !response.ok) return
+
+                setVideoOverrideById(current => ({
+                    ...current,
+                    [activePreviewKey]: data
+                }))
+            } catch {
+                // Override state is a convenience for the local editor; missing status should not break editing.
+            }
+        }
+
+        loadVideoOverride()
+
+        return () => {
+            cancelled = true
+        }
+    }, [activeDraft?.id, activeDraft?.sectionId, activeDraftLanguage, activePreviewKey])
+
+    useEffect(() => {
+        if (!activeDraft?.id || !activeDraft.sectionId) return
+        if (videoOverride?.exists) return
+        const activeVideoUrl = activeDraft.videoLinks?.[activeDraftLanguage]?.videoUrl || ''
+        if (activeVideoUrl && !isOverrideVideoUrl(activeVideoUrl)) return
 
         let cancelled = false
 
@@ -1546,7 +1899,7 @@ const HowToScriptEditorPage = () => {
         return () => {
             cancelled = true
         }
-    }, [activeDraft?.id, activeDraft?.sectionId, activeDraft?.videoLinks, activeDraftLanguage, activePreviewKey])
+    }, [activeDraft?.id, activeDraft?.sectionId, activeDraft?.videoLinks, activeDraftLanguage, activePreviewKey, videoOverride?.exists])
 
     const updateDemoSettings = (settings) => {
         setDemoSettings(settings)
@@ -1572,6 +1925,105 @@ const HowToScriptEditorPage = () => {
         })
         setExpandedVideoById(current => ({ ...current, [activePreviewKey]: false }))
         setClosedLogById(current => ({ ...current, [activePreviewKey]: true }))
+    }
+
+    const videoOverrideUrl = (draft = activeDraft, language = activeDraftLanguage) => {
+        const params = new URLSearchParams({
+            guideId: draft?.id || '',
+            sectionId: draft?.sectionId || '',
+            language
+        })
+
+        return `/__howto-script-editor/video-override?${params.toString()}`
+    }
+
+    const applyVideoOverrideState = (data) => {
+        setVideoOverrideById(current => ({
+            ...current,
+            [activePreviewKey]: data
+        }))
+    }
+
+    const uploadVideoOverride = async (file) => {
+        if (!activeDraft || isRendering || isUploadingOverride) return
+        if (!file?.name?.toLowerCase().endsWith('.mp4') && file?.type !== 'video/mp4') {
+            toast.error('Only MP4 files can be uploaded as overrides')
+            return
+        }
+
+        setIsUploadingOverride(true)
+
+        try {
+            const response = await fetch(videoOverrideUrl(), {
+                method: 'POST',
+                headers: { 'Content-Type': file.type || 'video/mp4' },
+                body: file
+            })
+            const data = await response.json()
+
+            if (!response.ok) throw new Error(data.error || 'Could not upload MP4 override')
+
+            applyVideoOverrideState(data)
+            updateActiveDraft({
+                videoLinks: {
+                    ...(activeDraft.videoLinks || {}),
+                    [activeDraftLanguage]: {
+                        videoUrl: data.cleanVideoUrl || data.videoUrl,
+                        captionsUrl: ''
+                    }
+                }
+            })
+            setPreviewById(current => ({
+                ...current,
+                [activePreviewKey]: {
+                    ...(current[activePreviewKey] || {}),
+                    videoUrl: data.videoUrl,
+                    subtitlesUrl: '',
+                    captionsUrl: '',
+                    language: activeDraftLanguage,
+                    videos: [{
+                        language: activeDraftLanguage,
+                        videoUrl: data.cleanVideoUrl || data.videoUrl,
+                        captionsUrl: '',
+                        isOverride: true
+                    }]
+                }
+            }))
+            setExpandedVideoById(current => ({ ...current, [activePreviewKey]: true }))
+            toast.success('MP4 override uploaded')
+        } catch (error) {
+            toast.error(error.message)
+        } finally {
+            setIsUploadingOverride(false)
+        }
+    }
+
+    const removeVideoOverride = async () => {
+        if (!activeDraft || isRendering || isUploadingOverride || !videoOverride?.exists) return
+        if (!window.confirm('Remove the MP4 override and enable generated videos for this page again?')) return
+
+        setIsUploadingOverride(true)
+
+        try {
+            const response = await fetch(videoOverrideUrl(), { method: 'DELETE' })
+            const data = await response.json()
+
+            if (!response.ok) throw new Error(data.error || 'Could not remove MP4 override')
+
+            const nextVideoLinks = { ...(activeDraft.videoLinks || {}) }
+            if (isOverrideVideoUrl(nextVideoLinks[activeDraftLanguage]?.videoUrl)) {
+                delete nextVideoLinks[activeDraftLanguage]
+            }
+
+            applyVideoOverrideState(data)
+            updateActiveDraft({ videoLinks: nextVideoLinks })
+            clearCurrentVideoState()
+            toast.success('MP4 override removed')
+        } catch (error) {
+            toast.error(error.message)
+        } finally {
+            setIsUploadingOverride(false)
+        }
     }
 
     const requestSectionChange = (sectionId) => {
@@ -1856,6 +2308,65 @@ const HowToScriptEditorPage = () => {
         openCodexBlockModal(insertIndex)
     }
 
+    const copyScriptBlock = async (index, { cut = false } = {}) => {
+        if (isRendering || isGeneratingBlock || !activeDraft) return
+
+        const script = activeDraft.script || []
+        const block = normalizeScriptBlock(script[index])
+
+        if (!block.caption && !block.action) {
+            toast.error('Block is empty')
+            return
+        }
+
+        try {
+            editorSession.scriptBlockClipboard = cloneDraft(block)
+            let sessionClipboardOnly = false
+
+            try {
+                await writeClipboardText(serializeScriptBlockForClipboard(block))
+            } catch {
+                sessionClipboardOnly = true
+            }
+
+            if (cut) {
+                const nextScript = script.filter((_, candidateIndex) => candidateIndex !== index)
+                updateScript(nextScript.length ? nextScript : [createScriptBlock(null)])
+                toast.success(sessionClipboardOnly ? 'Block cut for this editor session' : 'Block cut')
+                return
+            }
+
+            toast.success(sessionClipboardOnly ? 'Block copied for this editor session' : 'Block copied')
+        } catch {
+            toast.error(cut ? 'Could not cut block' : 'Could not copy block')
+        }
+    }
+
+    const pasteScriptBlock = async (index, position) => {
+        if (isRendering || isGeneratingBlock || !activeDraft) return
+
+        const insertIndex = position === 'before' ? index : index + 1
+
+        try {
+            let block = null
+
+            try {
+                block = parseScriptBlockFromClipboard(await readClipboardText())
+            } catch (clipboardError) {
+                if (!editorSession.scriptBlockClipboard) throw clipboardError
+                block = normalizeScriptBlock(editorSession.scriptBlockClipboard)
+            }
+
+            const script = [...(activeDraft.script || [])]
+            script.splice(insertIndex, 0, block)
+            pendingScrollBlockIndex.current = insertIndex
+            updateScript(script)
+            toast.success('Block pasted')
+        } catch (error) {
+            toast.error(error.message || 'Could not paste block')
+        }
+    }
+
     const moveBlock = (index, offset) => {
         if (isRendering) return
         const targetIndex = index + offset
@@ -1864,6 +2375,111 @@ const HowToScriptEditorPage = () => {
         const [item] = script.splice(index, 1)
         script.splice(targetIndex, 0, item)
         updateScript(script)
+    }
+
+    const startActionRecording = async () => {
+        if (isRendering || isRecordingActions || isGeneratingBlock || !activeDraft) return
+
+        setProcessLogSource('recording')
+        setRecordingRun({
+            id: '',
+            log: `Starting action recorder against ${demoSettings.baseUrl}\n`,
+            error: '',
+            blocks: [],
+            rawVideoUrl: '',
+            rawVideoPath: '',
+            status: 'starting'
+        })
+        setIsRecordingActions(true)
+
+        try {
+            const response = await fetch('/__howto-script-editor/record/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(demoSettings)
+            })
+            const data = await response.json()
+
+            if (!response.ok) throw new Error(data.error || 'Could not start action recorder')
+
+            setRecordingRun(current => ({
+                ...current,
+                ...data,
+                log: data.log || current.log
+            }))
+            toast.success('Action recorder started')
+        } catch (error) {
+            setIsRecordingActions(false)
+            setRecordingRun(current => ({ ...current, error: error.message, status: 'error' }))
+            toast.error(error.message)
+        }
+    }
+
+    const stopActionRecording = async () => {
+        if (!recordingRun.id) return
+
+        setProcessLogSource('recording')
+        setRecordingRun(current => ({
+            ...current,
+            log: `${current.log || ''}\nStopping action recorder...\n`,
+            status: 'stopping'
+        }))
+
+        try {
+            const response = await fetch('/__howto-script-editor/record/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: recordingRun.id, baseUrl: demoSettings.baseUrl })
+            })
+            const data = await response.json()
+
+            if (!response.ok) throw new Error(data.error || 'Could not stop action recorder')
+
+            setIsRecordingActions(false)
+            setRecordingRun(current => ({
+                ...current,
+                ...data,
+                log: data.log || current.log || '',
+                status: data.status || 'stopped'
+            }))
+            setRecordingImport({
+                isOpen: true,
+                id: data.id,
+                blocks: data.blocks || [],
+                rawVideoUrl: data.rawVideoUrl || '',
+                rawVideoPath: data.rawVideoPath || ''
+            })
+            toast.success(`Captured ${(data.blocks || []).length} action block${(data.blocks || []).length === 1 ? '' : 's'}`)
+        } catch (error) {
+            setIsRecordingActions(false)
+            setRecordingRun(current => ({ ...current, error: error.message, status: 'error' }))
+            toast.error(error.message)
+        }
+    }
+
+    const closeRecordingImport = () => {
+        setRecordingImport({ isOpen: false, blocks: [], rawVideoUrl: '', rawVideoPath: '', id: '' })
+    }
+
+    const importRecordedActions = (mode) => {
+        const recordedBlocks = (recordingImport.blocks || []).map(normalizeScriptBlock)
+        if (!recordedBlocks.length) return
+
+        const currentScript = (activeDraft.script || []).map(normalizeScriptBlock)
+        const hasOnlyEmptyBlock = currentScript.length === 1 && !currentScript[0].caption && !currentScript[0].action
+        const nextScript = mode === 'replace'
+            ? recordedBlocks
+            : [
+                ...(hasOnlyEmptyBlock ? [] : currentScript),
+                ...recordedBlocks
+            ]
+
+        pendingScrollBlockIndex.current = mode === 'replace'
+            ? 0
+            : Math.max(0, nextScript.length - recordedBlocks.length)
+        updateScript(nextScript)
+        closeRecordingImport()
+        toast.success(mode === 'replace' ? 'Replaced script with recording' : 'Appended recorded actions')
     }
 
     const revertToSavedVersion = async () => {
@@ -2245,6 +2861,7 @@ const HowToScriptEditorPage = () => {
 
         const languages = [activeDraftLanguage]
         const reviewedLanguages = new Set((displayPreview?.videos || []).map(video => video.language))
+        if (videoOverride?.exists) reviewedLanguages.add(activeDraftLanguage)
         const missingLanguages = languages.filter(language => !reviewedLanguages.has(language))
 
         if (missingLanguages.length > 0) {
@@ -2260,12 +2877,26 @@ const HowToScriptEditorPage = () => {
                 videoLanguage: activeDraftLanguage,
                 videoLanguages: languages
             })
+            if (videoOverride?.exists) {
+                videoLinks[activeDraftLanguage] = {
+                    videoUrl: videoOverride.cleanVideoUrl || videoOverride.videoUrl,
+                    captionsUrl: ''
+                }
+            }
             const publishDraft = {
                 ...activeDraft,
                 videoLanguage: activeDraftLanguage,
                 videoLanguages: languages,
                 videoLinks
             }
+            const publishVideos = videoOverride?.exists
+                ? [{
+                    language: activeDraftLanguage,
+                    videoUrl: videoOverride.cleanVideoUrl || videoOverride.videoUrl,
+                    captionsUrl: '',
+                    isOverride: true
+                }]
+                : displayPreview?.videos || []
             const publishMarkdown = createMarkdownFromDraft(publishDraft)
             const response = await fetch('/__howto-script-editor/publish', {
                 method: 'POST',
@@ -2277,7 +2908,7 @@ const HowToScriptEditorPage = () => {
                     sourcePath: activeDraft.sourcePath,
                     language: activeDraftLanguage,
                     languages,
-                    videos: displayPreview?.videos || [],
+                    videos: publishVideos,
                     markdown: publishMarkdown
                 })
             })
@@ -2304,6 +2935,11 @@ const HowToScriptEditorPage = () => {
     }
 
     const renderPreview = async () => {
+        if (videoOverride?.exists) {
+            toast.error('Remove the MP4 override before creating a generated video.')
+            return
+        }
+
         const renderDraft = activeDraft
         const renderDraftKey = getDraftSessionKey(renderDraft)
         const renderMarkdowns = {}
@@ -2824,7 +3460,18 @@ const HowToScriptEditorPage = () => {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-base font-semibold text-gray-900">Sequential video script</h2>
                             <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={addBlock} disabled={isRendering || isGeneratingBlock} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
+                                {isRecordingActions ? (
+                                    <button type="button" onClick={stopActionRecording} className="inline-flex items-center gap-2 rounded bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-800">
+                                        <X className="h-4 w-4" />
+                                        Stop recording
+                                    </button>
+                                ) : (
+                                    <button type="button" onClick={startActionRecording} disabled={isRendering || isGeneratingBlock || isGeneratingDoc} className="inline-flex items-center gap-2 rounded border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                        <MousePointerClick className="h-4 w-4" />
+                                        Record actions
+                                    </button>
+                                )}
+                                <button type="button" onClick={addBlock} disabled={isRendering || isGeneratingBlock || isRecordingActions} className="inline-flex items-center gap-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50">
                                     <Plus className="h-4 w-4" />
                                     Add block with Codex
                                 </button>
@@ -2844,6 +3491,9 @@ const HowToScriptEditorPage = () => {
                                 }}
                                 onMove={offset => moveBlock(index, offset)}
                                 onInsert={position => insertBlock(index, position)}
+                                onCopy={() => copyScriptBlock(index)}
+                                onCut={() => copyScriptBlock(index, { cut: true })}
+                                onPaste={position => pasteScriptBlock(index, position)}
                                 blockRef={element => {
                                     if (element) {
                                         scriptBlockRefs.current.set(index, element)
@@ -2886,6 +3536,10 @@ const HowToScriptEditorPage = () => {
                     onVoiceChange={setWithVoice}
                     onRender={renderPreview}
                     onPublish={publishReviewedGuide}
+                    videoOverride={videoOverride}
+                    isUploadingOverride={isUploadingOverride}
+                    onUploadOverride={uploadVideoOverride}
+                    onRemoveOverride={removeVideoOverride}
                     demoSettings={demoSettings}
                     onDemoSettingsChange={updateDemoSettings}
                     globalHoldMs={globalHoldMs}
@@ -2918,6 +3572,12 @@ const HowToScriptEditorPage = () => {
                 onClose={closeSaveAsModal}
             />
 
+            <RecordingImportDialog
+                run={recordingImport}
+                onClose={closeRecordingImport}
+                onImport={importRecordedActions}
+            />
+
             <ProgressLogDock
                 log={processLog}
                 error={processError}
@@ -2936,6 +3596,10 @@ const HowToScriptEditorPage = () => {
                     }
                     if (processLogSource === 'video-history') {
                         setSelectedRenderLogId('')
+                        setProcessLogSource('video')
+                        return
+                    }
+                    if (processLogSource === 'recording') {
                         setProcessLogSource('video')
                         return
                     }

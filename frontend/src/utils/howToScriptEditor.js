@@ -12,6 +12,12 @@ export const ACTION_DEFINITIONS = [
         fields: ['targetMode', 'selector', 'text', 'label', 'placeholder', 'role', 'name', 'exact', 'cutFromVideo', 'holdMs', 'mockOnly']
     },
     {
+        type: 'hoverClick',
+        label: 'Hover then click',
+        hint: 'Hover one element to reveal a menu, then click the revealed item.',
+        fields: ['targetMode', 'selector', 'text', 'label', 'placeholder', 'role', 'name', 'exact', 'clickSelector', 'clickText', 'clickLabel', 'clickRole', 'clickName', 'hoverHoldMs', 'cutFromVideo', 'holdMs', 'mockOnly']
+    },
+    {
         type: 'fill',
         label: 'Fill field',
         hint: 'Use realistic demo text that makes the result obvious.',
@@ -60,7 +66,7 @@ export const TARGET_MODES = [
     { key: 'advanced', label: 'Advanced action' }
 ]
 
-export const ACTIONABLE_ACTION_TYPES = new Set(['click', 'fill', 'select'])
+export const ACTIONABLE_ACTION_TYPES = new Set(['click', 'hoverClick', 'fill', 'select'])
 
 export const VIDEO_LANGUAGE_OPTIONS = [
     { code: 'sv', label: 'Swedish' },
@@ -69,7 +75,7 @@ export const VIDEO_LANGUAGE_OPTIONS = [
 
 export const DEFAULT_VIDEO_LANGUAGES = ['sv']
 
-const NUMBER_FIELDS = new Set(['holdMs', 'ms', 'timeout', 'cursorX', 'cursorY', 'delayMs'])
+const NUMBER_FIELDS = new Set(['holdMs', 'ms', 'timeout', 'cursorX', 'cursorY', 'delayMs', 'hoverHoldMs'])
 const BOOLEAN_FIELDS = new Set(['exact', 'mockOnly', 'cutFromVideo'])
 const TARGET_FIELDS = new Set(['selector', 'text', 'label', 'placeholder', 'role', 'name'])
 const ADVANCED_ACTION_FIELDS = new Set([
@@ -198,12 +204,16 @@ export const inferTargetMode = (action = {}) => {
 export const createAction = (type = 'click') => {
     const action = { type }
 
-    if (['click', 'fill', 'select'].includes(type)) {
+    if (['click', 'hoverClick', 'fill', 'select'].includes(type)) {
         action.targetMode = 'selector'
         action.selector = ''
     }
 
     if (type === 'goto') action.path = '/pages'
+    if (type === 'hoverClick') {
+        action.clickSelector = ''
+        action.hoverHoldMs = 300
+    }
     if (type === 'fill') action.value = ''
     if (type === 'select') action.value = ''
     if (type === 'waitForText') action.text = ''
@@ -465,7 +475,7 @@ export const validateScriptDraft = (draft) => {
             issues.push({ level: 'error', message: `Block ${number}: path is missing.` })
         }
 
-        if (['click', 'fill', 'select'].includes(normalized.type)) {
+        if (['click', 'hoverClick', 'fill', 'select'].includes(normalized.type)) {
             const targetMode = normalized.targetMode || inferTargetMode(normalized)
             const hasTarget = targetMode === 'advanced'
                 ? [...ADVANCED_ACTION_FIELDS].some(field => hasActionValue(normalized[field]))
@@ -474,6 +484,13 @@ export const validateScriptDraft = (draft) => {
                 : trimString(normalized[targetMode])
 
             if (!hasTarget) issues.push({ level: 'error', message: `Block ${number}: target is missing.` })
+        }
+
+        if (normalized.type === 'hoverClick') {
+            const hasClickTarget = ['clickSelector', 'clickText', 'clickLabel'].some(field => trimString(normalized[field]))
+                || (trimString(normalized.clickRole) && trimString(normalized.clickName))
+
+            if (!hasClickTarget) issues.push({ level: 'error', message: `Block ${number}: revealed click target is missing.` })
         }
 
         if (normalized.type === 'fill' && !trimString(normalized.value)) {

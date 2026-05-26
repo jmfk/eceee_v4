@@ -51,6 +51,23 @@ describe('howToScriptEditor', () => {
         })
     })
 
+    it('serializes hover then click actions', () => {
+        expect(serializeAction({
+            type: 'hoverClick',
+            targetMode: 'selector',
+            selector: '[data-testid="widget-row"]',
+            clickSelector: 'button[aria-label="Edit"]',
+            hoverHoldMs: '300',
+            holdMs: '500'
+        })).toEqual({
+            type: 'hoverClick',
+            selector: '[data-testid="widget-row"]',
+            clickSelector: 'button[aria-label="Edit"]',
+            hoverHoldMs: 300,
+            holdMs: 500
+        })
+    })
+
     it('generates markdown that the help parser can read', () => {
         const draft = guideToScriptDraft({
             id: 'pages-demo',

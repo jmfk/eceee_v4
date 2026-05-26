@@ -1468,6 +1468,14 @@ const resolveLocator = (page, action) => {
   return page.getByText(action.text, { exact: Boolean(action.exact) })
 }
 
+const resolveHoverClickLocator = (page, action) => {
+  if (action.clickSelector) return page.locator(action.clickSelector)
+  if (action.clickLabel) return page.getByLabel(action.clickLabel, { exact: Boolean(action.exact) })
+  if (action.clickRole) return page.getByRole(action.clickRole, { name: action.clickName ? new RegExp(action.clickName, 'i') : undefined })
+  if (action.clickText) return page.getByText(action.clickText, { exact: Boolean(action.exact) })
+  throw new Error('hoverClick needs a revealed click target. Add clickSelector, clickText, clickLabel, or clickRole/clickName.')
+}
+
 const resolveActionPath = (path = '') => path.replace(/\$\{([A-Z0-9_]+)\}/g, (match, envName) => {
   const value = process.env[envName]
 
@@ -1922,6 +1930,24 @@ const runAction = async (page, action, baseUrl, args) => {
     return
   }
 
+  if (action.type === 'hoverClick') {
+    const hoverLocator = resolveLocator(page, action)
+    const hoverPoint = await locatorCenter(hoverLocator, actionTimeout)
+
+    await moveTutorialCursor(page, args, hoverPoint.x, hoverPoint.y)
+    await hoverLocator.first().hover()
+    await page.waitForTimeout(action.hoverHoldMs ?? 300)
+
+    const clickLocator = resolveHoverClickLocator(page, action)
+    const clickPoint = await locatorCenter(clickLocator, actionTimeout)
+
+    await moveTutorialCursor(page, args, clickPoint.x, clickPoint.y)
+    await flashClickPulse(page, args, clickPoint.x, clickPoint.y)
+    if (action.mockOnly && !args.mockApi) return
+    await clickLocator.first().click()
+    return
+  }
+
   if (action.type === 'fill') {
     const locator = resolveLocator(page, action)
     const point = await locatorCenter(locator, actionTimeout)
@@ -1970,6 +1996,10 @@ const describeActionTarget = (action = {}) => {
     ['role', action.role ? `${action.role}${action.name ? `:${action.name}` : ''}` : ''],
     ['rowText', action.rowText],
     ['pageTreeAddChildForText', action.pageTreeAddChildForText],
+    ['clickSelector', action.clickSelector],
+    ['clickText', action.clickText],
+    ['clickLabel', action.clickLabel],
+    ['clickRole', action.clickRole ? `${action.clickRole}${action.clickName ? `:${action.clickName}` : ''}` : ''],
     ['path', action.path]
   ].filter(([, value]) => value)
 
@@ -2002,7 +2032,7 @@ const addSfxEventsForAction = (sfxEvents, action, actionStart) => {
     sfxEvents.push({ type: 'navigate', at: actionStart + 250 })
   }
 
-  if (action.type === 'click') {
+  if (action.type === 'click' || action.type === 'hoverClick') {
     sfxEvents.push({ type: 'click', at: actionStart + 250 })
   }
 

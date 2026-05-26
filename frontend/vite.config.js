@@ -2,10 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { execSync, spawn } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, readdirSync } from 'node:fs'
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { convertRecordedEventsToScriptBlocks } from './src/utils/howToRecorder.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -104,6 +105,14 @@ const readRequestJson = (req) => new Promise((resolve, reject) => {
   req.on('error', reject)
 })
 
+const readRequestBuffer = (req) => new Promise((resolve, reject) => {
+  const chunks = []
+
+  req.on('data', chunk => chunks.push(chunk))
+  req.on('end', () => resolve(Buffer.concat(chunks)))
+  req.on('error', reject)
+})
+
 const runHowToRender = (args, onChunk = () => {}) => new Promise((resolveRun, rejectRun) => {
   const child = spawn(process.execPath, ['scripts/generate-howto-video.mjs', ...args], {
     cwd: __dirname,
@@ -129,6 +138,45 @@ const runHowToRender = (args, onChunk = () => {}) => new Promise((resolveRun, re
     }
 
     rejectRun(new Error(text || `Video generator exited with code ${code}`))
+  })
+})
+
+const runHowToRecorder = (args, onChunk = () => {}) => {
+  const child = spawn(process.execPath, ['scripts/record-howto-actions.mjs', ...args], {
+    cwd: __dirname,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+  const output = []
+  const appendOutput = (chunk) => {
+    const text = chunk.toString()
+    output.push(text)
+    onChunk(text)
+  }
+
+  child.stdout.on('data', appendOutput)
+  child.stderr.on('data', appendOutput)
+
+  return {
+    child,
+    getLog: () => output.join('')
+  }
+}
+
+const waitForChildExit = (child, timeoutMs = 10000) => new Promise(resolve => {
+  if (!child || child.exitCode !== null || child.signalCode) {
+    resolve()
+    return
+  }
+
+  const timeout = setTimeout(() => {
+    child.kill('SIGKILL')
+    resolve()
+  }, timeoutMs)
+
+  child.once('exit', () => {
+    clearTimeout(timeout)
+    resolve()
   })
 })
 
@@ -209,8 +257,159 @@ const docsRoot = path.join(__dirname, 'src/docs/how-to')
 const translationsRoot = path.join(__dirname, 'src/docs/how-to-translations')
 const publicRoot = path.join(__dirname, 'public')
 const renderLogRoot = path.join(__dirname, '.howto-script-preview', 'render-logs')
+const recordingRoot = path.join(__dirname, '.howto-script-preview', 'recordings')
+const videoOverrideFolder = 'overrides'
 const usePolling = ['1', 'true', 'yes'].includes(String(process.env.VITE_USE_POLLING || '').toLowerCase())
 let lastOverwriteUndo = null
+const recordingSessions = new Map()
+
+const publicAssetContentType = (filePath) => {
+  const extension = path.extname(filePath).toLowerCase()
+
+  if (extension === '.mp4' || extension === '.m4v') return 'video/mp4'
+  if (extension === '.webm') return 'video/webm'
+  if (extension === '.ogv' || extension === '.ogg') return 'video/ogg'
+  if (extension === '.vtt') return 'text/vtt; charset=utf-8'
+  if (extension === '.json') return 'application/json; charset=utf-8'
+  if (extension === '.txt') return 'text/plain; charset=utf-8'
+  return 'application/octet-stream'
+}
+
+const resolvePublicAssetPath = (mountPath, reqUrl = '/') => {
+  const pathname = new URL(reqUrl, 'http://localhost').pathname
+  const mountedPathname = pathname.startsWith(mountPath)
+    ? pathname.slice(mountPath.length)
+    : pathname
+  const relativeUrlPath = decodeURIComponent(mountedPathname).replace(/^\/+/, '')
+  const rootPath = path.join(publicRoot, mountPath.replace(/^\/+/, ''))
+  const targetPath = path.join(rootPath, relativeUrlPath)
+  const relativePath = path.relative(rootPath, targetPath)
+
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    return null
+  }
+
+  return targetPath
+}
+
+const servePublicAsset = async (req, res, targetPath) => {
+  const fileStat = await stat(targetPath)
+
+  if (!fileStat.isFile()) {
+    return false
+  }
+
+  const contentType = publicAssetContentType(targetPath)
+  const rangeHeader = req.headers.range
+  res.setHeader('Content-Type', contentType)
+  res.setHeader('Accept-Ranges', 'bytes')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Last-Modified', fileStat.mtime.toUTCString())
+
+  if (rangeHeader) {
+    const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader)
+
+    if (!rangeMatch) {
+      res.statusCode = 416
+      res.setHeader('Content-Range', `bytes */${fileStat.size}`)
+      res.end()
+      return true
+    }
+
+    const [, rawStart, rawEnd] = rangeMatch
+    let start = rawStart ? Number(rawStart) : 0
+    let end = rawEnd ? Number(rawEnd) : fileStat.size - 1
+
+    if (!rawStart && rawEnd) {
+      const suffixLength = Number(rawEnd)
+      start = Math.max(fileStat.size - suffixLength, 0)
+      end = fileStat.size - 1
+    }
+
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= fileStat.size) {
+      res.statusCode = 416
+      res.setHeader('Content-Range', `bytes */${fileStat.size}`)
+      res.end()
+      return true
+    }
+
+    end = Math.min(end, fileStat.size - 1)
+    res.statusCode = 206
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${fileStat.size}`)
+    res.setHeader('Content-Length', String(end - start + 1))
+
+    if (req.method === 'HEAD') {
+      res.end()
+      return true
+    }
+
+    createReadStream(targetPath, { start, end }).pipe(res)
+    return true
+  }
+
+  res.statusCode = 200
+  res.setHeader('Content-Length', String(fileStat.size))
+
+  if (req.method === 'HEAD') {
+    res.end()
+    return true
+  }
+
+  createReadStream(targetPath).pipe(res)
+  return true
+}
+
+const safeReadJsonFile = async (filePath, fallback) => {
+  try {
+    if (!existsSync(filePath)) return fallback
+    return JSON.parse(await readFile(filePath, 'utf8'))
+  } catch {
+    return fallback
+  }
+}
+
+const recordingPathsFor = (id) => {
+  const safeId = safeSegment(id, '')
+  if (!safeId) throw new Error('Recording ID is required.')
+
+  const outputDir = path.join(recordingRoot, safeId)
+  const relativePath = path.relative(recordingRoot, outputDir)
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error('Invalid recording ID.')
+  }
+
+  return {
+    id: safeId,
+    outputDir,
+    eventsPath: path.join(outputDir, 'events.json'),
+    metadataPath: path.join(outputDir, 'metadata.json'),
+    storageStatePath: path.join(outputDir, 'storage-state.json')
+  }
+}
+
+const readRecordingSnapshot = async (id, baseUrl = '') => {
+  const paths = recordingPathsFor(id)
+  const session = recordingSessions.get(paths.id)
+  const events = await safeReadJsonFile(paths.eventsPath, [])
+  const metadata = await safeReadJsonFile(paths.metadataPath, {})
+  const rawVideoPath = Array.isArray(metadata.rawVideos) ? metadata.rawVideos[0] || '' : ''
+  const status = session?.status || metadata.status || 'unknown'
+  const log = session?.log || ''
+  const blocks = convertRecordedEventsToScriptBlocks(events, { baseUrl: baseUrl || session?.baseUrl || metadata.baseUrl || '' })
+
+  return {
+    id: paths.id,
+    status,
+    baseUrl: baseUrl || session?.baseUrl || metadata.baseUrl || '',
+    log,
+    events,
+    blocks,
+    eventCount: events.length,
+    rawVideoPath,
+    rawVideoUrl: rawVideoPath ? `/__howto-script-editor/record/${paths.id}/raw-video` : '',
+    error: session?.error || metadata.error || ''
+  }
+}
 
 const languageName = (language) => {
   const normalized = String(language || '').toLowerCase()
@@ -398,7 +597,7 @@ const markdownPathForLanguage = (sectionId, guideId, language, identity = {}) =>
     : translationPathFor(sectionId, guideId, normalizedLanguage)
 }
 
-const canonicalMarkdownPathForLanguage = (sectionId, guideId, language, identity = {}) => {
+const canonicalMarkdownPathForLanguage = (sectionId, guideId, language) => {
   const normalizedLanguage = safeSegment(language || 'en', 'en')
 
   return normalizedLanguage === 'en'
@@ -688,8 +887,53 @@ const resolvePublicUrlPath = (url) => {
   return targetPath
 }
 
+const videoAssetSafeName = (sectionId, guideId) => `${safeSegment(sectionId, 'editor')}-${safeSegment(guideId, 'guide')}`
+
+const videoOverridePathsFor = ({ sectionId, guideId, language }) => {
+  const normalizedLanguage = safeSegment(language || 'en', 'en')
+  const safeName = videoAssetSafeName(sectionId, guideId)
+  const videoPath = path.join(publicRoot, 'howto-videos', videoOverrideFolder, normalizedLanguage, `${safeName}.mp4`)
+
+  return {
+    language: normalizedLanguage,
+    safeName,
+    videoPath,
+    videoUrl: `/howto-videos/${videoOverrideFolder}/${normalizedLanguage}/${safeName}.mp4`
+  }
+}
+
+const getVideoOverride = async ({ sectionId, guideId, language }) => {
+  const paths = videoOverridePathsFor({ sectionId, guideId, language })
+
+  if (!existsSync(paths.videoPath)) {
+    return {
+      exists: false,
+      language: paths.language,
+      videoUrl: paths.videoUrl,
+      sourcePath: path.relative(__dirname, paths.videoPath)
+    }
+  }
+
+  const videoStat = await stat(paths.videoPath)
+
+  return {
+    exists: true,
+    language: paths.language,
+    videoUrl: `${paths.videoUrl}?t=${Math.round(videoStat.mtimeMs)}`,
+    cleanVideoUrl: paths.videoUrl,
+    sourcePath: path.relative(__dirname, paths.videoPath),
+    size: videoStat.size,
+    updatedAt: videoStat.mtime.toISOString()
+  }
+}
+
+const isOverrideVideoSource = (sourcePath, override) => (
+  Boolean(sourcePath && override?.exists)
+  && path.resolve(sourcePath) === path.resolve(resolvePublicUrlPath(override.cleanVideoUrl || override.videoUrl))
+)
+
 const findGeneratedVideo = async ({ sectionId, guideId, language }) => {
-  const safeName = `${safeSegment(sectionId, 'editor')}-${safeSegment(guideId, 'guide')}`
+  const safeName = videoAssetSafeName(sectionId, guideId)
   const candidates = ['editor-preview', 'prod', 'demo'].map(folder => {
     const videoPath = path.join(publicRoot, 'howto-videos', folder, language, `${safeName}.mp4`)
     const captionsPath = path.join(publicRoot, 'howto-videos', folder, language, `${safeName}.vtt`)
@@ -719,7 +963,7 @@ const findGeneratedVideo = async ({ sectionId, guideId, language }) => {
 }
 
 const publishReviewedVideos = async ({ sectionId, guideId, languages, videos, undoOperation }) => {
-  const safeName = `${safeSegment(sectionId, 'editor')}-${safeSegment(guideId, 'guide')}`
+  const safeName = videoAssetSafeName(sectionId, guideId)
   const videoList = Array.isArray(videos) ? videos : []
   const copied = []
   const warnings = []
@@ -727,6 +971,7 @@ const publishReviewedVideos = async ({ sectionId, guideId, languages, videos, un
 
   for (const language of languages) {
     const video = videoList.find(candidate => candidate.language === language) || {}
+    const override = await getVideoOverride({ sectionId, guideId, language })
     const outputDir = path.join(publicRoot, 'howto-videos/prod', language)
     const targetVideoPath = path.join(outputDir, `${safeName}.mp4`)
     const targetCaptionsPath = path.join(outputDir, `${safeName}.vtt`)
@@ -734,6 +979,19 @@ const publishReviewedVideos = async ({ sectionId, guideId, languages, videos, un
     const sourceCaptionsPath = resolvePublicUrlPath(video.captionsUrl || video.subtitlesUrl)
 
     await mkdir(outputDir, { recursive: true })
+
+    if (override.exists) {
+      if (!isOverrideVideoSource(sourceVideoPath, override)) {
+        throw new Error(`${language.toUpperCase()} has an override MP4. Remove the override before publishing a generated video.`)
+      }
+
+      copied.push(override.sourcePath)
+      videoLinks[language] = {
+        videoUrl: override.cleanVideoUrl || override.videoUrl,
+        captionsUrl: ''
+      }
+      continue
+    }
 
     if (sourceVideoPath && existsSync(sourceVideoPath)) {
       if (path.resolve(sourceVideoPath) !== path.resolve(targetVideoPath)) {
@@ -827,6 +1085,7 @@ ${draftContext}
 Available action types:
 - goto: { "type": "goto", "path": "/pages", "holdMs": 500 }
 - click: { "type": "click", "targetMode": "text", "text": "Save", "holdMs": 500 }
+- hoverClick: { "type": "hoverClick", "targetMode": "selector", "selector": ".row", "clickSelector": "button[aria-label='Edit']", "hoverHoldMs": 300, "holdMs": 500 }
 - fill: { "type": "fill", "targetMode": "label", "label": "Title", "value": "Demo title", "holdMs": 500 }
 - select: { "type": "select", "targetMode": "label", "label": "Status", "value": "Draft", "holdMs": 500 }
 - waitForText: { "type": "waitForText", "text": "Saved", "timeout": 10000, "cutFromVideo": true }
@@ -901,6 +1160,30 @@ const createAuthState = async ({ baseUrl, username, password, outputPath }) => {
 const howToScriptEditorPlugin = () => ({
   name: 'howto-script-editor-preview',
   configureServer(server) {
+    server.middlewares.use('/howto-videos', async (req, res, next) => {
+      if (!['GET', 'HEAD'].includes(req.method || '')) {
+        next()
+        return
+      }
+
+      try {
+        const targetPath = resolvePublicAssetPath('/howto-videos', req.url)
+
+        if (!targetPath || !existsSync(targetPath)) {
+          next()
+          return
+        }
+
+        const served = await servePublicAsset(req, res, targetPath)
+
+        if (!served) {
+          next()
+        }
+      } catch (error) {
+        next(error)
+      }
+    })
+
     server.middlewares.use('/__howto-script-editor/undo-overwrite', async (req, res) => {
       if (req.method !== 'POST') {
         sendJson(res, 405, { error: 'Method not allowed' })
@@ -935,6 +1218,212 @@ const howToScriptEditorPlugin = () => ({
           absolutePath: targetPath,
           markdown: await readFile(targetPath, 'utf8')
         })
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/video-override-status', async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const body = await readRequestJson(req)
+        sendJson(res, 200, await getVideoOverride({
+          sectionId: body.sectionId,
+          guideId: body.guideId,
+          language: body.language || 'en'
+        }))
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/video-override', async (req, res) => {
+      if (!['POST', 'DELETE'].includes(req.method || '')) {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const url = new URL(req.url || '', 'http://localhost')
+        const identity = {
+          sectionId: url.searchParams.get('sectionId') || '',
+          guideId: url.searchParams.get('guideId') || '',
+          language: url.searchParams.get('language') || 'en'
+        }
+        const overridePaths = videoOverridePathsFor(identity)
+
+        if (!safeSegment(identity.guideId, '')) {
+          throw new Error('Guide ID is required for video overrides.')
+        }
+
+        if (req.method === 'DELETE') {
+          await rm(overridePaths.videoPath, { force: true })
+          sendJson(res, 200, {
+            deleted: true,
+            ...(await getVideoOverride(identity))
+          })
+          return
+        }
+
+        const contentType = String(req.headers['content-type'] || '').toLowerCase()
+        if (!contentType.includes('video/mp4') && !contentType.includes('application/octet-stream')) {
+          throw new Error('Only MP4 uploads are supported.')
+        }
+
+        const fileBuffer = await readRequestBuffer(req)
+        if (!fileBuffer.length) {
+          throw new Error('Uploaded MP4 is empty.')
+        }
+
+        await mkdir(path.dirname(overridePaths.videoPath), { recursive: true })
+        await writeFile(overridePaths.videoPath, fileBuffer)
+        sendJson(res, 200, {
+          uploaded: true,
+          ...(await getVideoOverride(identity))
+        })
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/record/start', async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const body = await readRequestJson(req)
+        const id = randomUUID().slice(0, 8)
+        const paths = recordingPathsFor(id)
+        const baseUrl = String(body.baseUrl || 'http://localhost:3000').trim()
+        const username = String(body.username || '').trim()
+        const password = String(body.password || '')
+
+        await mkdir(paths.outputDir, { recursive: true })
+        const storageState = await createAuthState({
+          baseUrl,
+          username,
+          password,
+          outputPath: paths.storageStatePath
+        })
+        const session = {
+          id,
+          baseUrl,
+          outputDir: paths.outputDir,
+          log: `Starting action recorder against ${baseUrl}\n`,
+          status: 'starting',
+          error: '',
+          child: null
+        }
+        const recorder = runHowToRecorder([
+          '--session-id', id,
+          '--base-url', baseUrl,
+          '--output-dir', paths.outputDir,
+          ...(storageState ? ['--storage-state', storageState] : [])
+        ], text => {
+          session.log += text
+        })
+
+        session.child = recorder.child
+        recordingSessions.set(id, session)
+        recorder.child.once('spawn', () => {
+          session.status = 'running'
+        })
+        recorder.child.once('error', error => {
+          session.status = 'error'
+          session.error = error.message
+          session.log += `\nERROR: ${error.message}\n`
+        })
+        recorder.child.once('exit', code => {
+          if (session.status !== 'stopping' && session.status !== 'stopped') {
+            session.status = code === 0 ? 'closed' : 'error'
+          }
+          if (code !== 0 && session.status === 'error' && !session.error) {
+            session.error = `Recorder exited with code ${code}`
+          }
+        })
+
+        sendJson(res, 200, {
+          id,
+          status: session.status,
+          log: session.log
+        })
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/record/stop', async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const body = await readRequestJson(req)
+        const id = safeSegment(body.id, '')
+        const session = recordingSessions.get(id)
+
+        if (session?.child && session.child.exitCode === null && !session.child.signalCode) {
+          session.status = 'stopping'
+          session.log += '\nStopping action recorder...\n'
+          session.child.kill('SIGINT')
+          await waitForChildExit(session.child)
+        }
+
+        if (session) session.status = 'stopped'
+        sendJson(res, 200, await readRecordingSnapshot(id, session?.baseUrl || body.baseUrl || ''))
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/record', async (req, res, next) => {
+      const url = new URL(req.url || '', 'http://localhost')
+      const parts = url.pathname.split('/').filter(Boolean)
+      const recordIndex = parts.indexOf('record')
+      const id = recordIndex >= 0 ? parts[recordIndex + 1] || '' : parts[0] || ''
+      const action = recordIndex >= 0 ? parts[recordIndex + 2] || '' : parts[1] || ''
+
+      if (!id || !['events', 'raw-video'].includes(action)) {
+        next()
+        return
+      }
+
+      try {
+        if (action === 'events') {
+          if (req.method !== 'GET') {
+            sendJson(res, 405, { error: 'Method not allowed' })
+            return
+          }
+
+          sendJson(res, 200, await readRecordingSnapshot(id, url.searchParams.get('baseUrl') || ''))
+          return
+        }
+
+        if (!['GET', 'HEAD'].includes(req.method || '')) {
+          sendJson(res, 405, { error: 'Method not allowed' })
+          return
+        }
+
+        const snapshot = await readRecordingSnapshot(id, url.searchParams.get('baseUrl') || '')
+        if (!snapshot.rawVideoPath || !existsSync(snapshot.rawVideoPath)) {
+          sendJson(res, 404, { error: 'Raw recording video not found.' })
+          return
+        }
+
+        const outputDir = recordingPathsFor(id).outputDir
+        const relativePath = path.relative(outputDir, snapshot.rawVideoPath)
+        if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+          throw new Error('Invalid raw recording video path.')
+        }
+
+        await servePublicAsset(req, res, snapshot.rawVideoPath)
       } catch (error) {
         sendJson(res, 500, { error: error.message })
       }
@@ -1177,6 +1666,14 @@ const howToScriptEditorPlugin = () => ({
 
         if (!markdown.trim()) {
           throw new Error('Markdown is empty.')
+        }
+
+        const lockedOverrides = (await Promise.all(languages.map(language => (
+          getVideoOverride({ sectionId, guideId, language })
+        )))).filter(override => override.exists)
+
+        if (lockedOverrides.length > 0) {
+          throw new Error(`Video generation is locked by override MP4 for: ${lockedOverrides.map(override => override.language.toUpperCase()).join(', ')}. Remove the override first.`)
         }
 
         const runId = randomUUID().slice(0, 8)
