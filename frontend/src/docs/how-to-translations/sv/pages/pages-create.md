@@ -1,36 +1,31 @@
 ---
 id: pages-create
-title: Create a page
-summary: Start a new page and place it in the page tree.
+title: Skapa en sida
+summary: Starta en ny sida och placera den i sidträdet.
 order: 1
 language: sv
 sectionId: pages
-sectionTitle: Pages
-sectionSummary: Create, organize, edit, and publish pages in the site tree.
+sectionTitle: Sidor
+sectionSummary: Skapa, organisera, redigera och publicera sidor i sidträdet.
 sectionOrder: 1
 videoLanguage: sv
 videoLanguages: sv
 sourceLanguage: en
 translationOf: english-origin
 ---
-# Create a page
+# Skapa en sida
 
-Start a new page and place it in the page tree.
+Starta en ny sida och placera den i sidträdet.
 
-1. Open the Pages workspace and wait for the page tree to load.
-2. Click the add root page button to start a new site tree.
-3. The root page form asks for the key fields before anything is saved.
-4. Type a clear page title. The title helps editors recognize the new site tree.
-5. Enter the hostname where the root page should answer.
-6. Keep the page unpublished while you are still preparing content.
-7. For this walkthrough we cancel instead of creating demo content on the server.
-8. Use search to find existing pages before editing or adding more content.
-9. Refresh the page tree after changes or when collaborating with other editors.
+1. Öppna Sidor från huvudnavigeringen.
+2. Välj åtgärden för att lägga till en vanlig sida, eller skapa en rotsida när du startar ett nytt sidträd.
+3. Fyll i sidtitel, slug, layout och innehållsdetaljer.
+4. Spara sidan som utkast och publicera den först när den är klar.
 
 ```video-script
 [
   {
-    "caption": "Öppna Pages-arbetsytan och vänta tills sidträdet läses in.",
+    "caption": "Öppna Sidor från huvudnavigeringen.",
     "action": {
       "type": "goto",
       "path": "/pages",
@@ -72,7 +67,7 @@ Start a new page and place it in the page tree.
     }
   },
   {
-    "caption": "Håll sidan opublicerad medan du fortfarande förbereder innehål.",
+    "caption": "Håll sidan opublicerad medan du fortfarande förbereder innehållet.",
     "action": {
       "type": "select",
       "selector": "#root-publication-status",
@@ -81,7 +76,7 @@ Start a new page and place it in the page tree.
     }
   },
   {
-    "caption": "För denna genomgång avbryter vi istället för att skapa demoinnehål på servern.",
+    "caption": "För denna genomgång avbryter vi istället för att skapa demoinnehåll på servern.",
     "action": {
       "type": "click",
       "text": "Cancel",
@@ -90,7 +85,7 @@ Start a new page and place it in the page tree.
     }
   },
   {
-    "caption": "Använd sökning för att hitta befintliga sidor innan du redigerar eller lägger till mer innehål.",
+    "caption": "Använd sökning för att hitta befintliga sidor innan du redigerar eller lägger till mer innehåll.",
     "action": {
       "type": "fill",
       "placeholder": "Search pages...",
