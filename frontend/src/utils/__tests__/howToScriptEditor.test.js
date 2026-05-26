@@ -207,4 +207,84 @@ describe('howToScriptEditor', () => {
             action: null
         })
     })
+
+    it('preserves recorded audio metadata in markdown scripts', () => {
+        const draft = guideToScriptDraft({
+            id: 'audio-demo',
+            title: 'Audio demo',
+            summary: 'Record a click with audio.',
+            script: [{
+                caption: '',
+                action: { type: 'click', text: 'Save' },
+                audio: {
+                    source: 'recorded',
+                    url: '/__howto-script-editor/record/abc/audio/block-001.webm',
+                    fullUrl: '/__howto-script-editor/record/abc/audio/full',
+                    startMs: 100,
+                    endMs: 1800,
+                    trimStartMs: 50,
+                    trimEndMs: 25
+                }
+            }]
+        }, { id: 'pages', title: 'Pages' })
+        const parsed = parseHowToMarkdown(createMarkdownFromDraft(draft))
+
+        expect(parsed.guide.script[0].audio).toMatchObject({
+            source: 'recorded',
+            url: '/__howto-script-editor/record/abc/audio/block-001.webm',
+            trimStartMs: 50,
+            trimEndMs: 25
+        })
+        expect(parsed.guide.actions[0].audio).toMatchObject({
+            source: 'recorded',
+            url: '/__howto-script-editor/record/abc/audio/block-001.webm',
+            clips: {
+                recorded: {
+                    url: '/__howto-script-editor/record/abc/audio/block-001.webm'
+                }
+            }
+        })
+    })
+
+    it('preserves recorded and elevenlabs block audio alternatives', () => {
+        const draft = guideToScriptDraft({
+            id: 'audio-demo',
+            title: 'Audio demo',
+            summary: 'Choose a block audio source.',
+            script: [{
+                caption: 'Click save.',
+                action: { type: 'click', text: 'Save' },
+                audio: {
+                    source: 'elevenlabs',
+                    url: '/__howto-script-editor/block-audio/elevenlabs/audio-demo-en-block-001.mp3',
+                    clips: {
+                        recorded: {
+                            source: 'recorded',
+                            url: '/__howto-script-editor/block-audio/recorded/audio-demo-en-block-001.webm',
+                            startMs: 0,
+                            endMs: 1400
+                        },
+                        elevenlabs: {
+                            source: 'elevenlabs',
+                            url: '/__howto-script-editor/block-audio/elevenlabs/audio-demo-en-block-001.mp3'
+                        }
+                    }
+                }
+            }]
+        }, { id: 'pages', title: 'Pages' })
+        const parsed = parseHowToMarkdown(createMarkdownFromDraft(draft))
+
+        expect(parsed.guide.script[0].audio).toMatchObject({
+            source: 'elevenlabs',
+            url: '/__howto-script-editor/block-audio/elevenlabs/audio-demo-en-block-001.mp3',
+            clips: {
+                recorded: {
+                    url: '/__howto-script-editor/block-audio/recorded/audio-demo-en-block-001.webm'
+                },
+                elevenlabs: {
+                    url: '/__howto-script-editor/block-audio/elevenlabs/audio-demo-en-block-001.mp3'
+                }
+            }
+        })
+    })
 })

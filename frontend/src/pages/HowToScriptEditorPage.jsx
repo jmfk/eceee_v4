@@ -704,6 +704,239 @@ const ActionField = ({ field, action, onChange, disabled = false }) => {
     )
 }
 
+const blobToBase64 = blob => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result || '').split(',')[1] || '')
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+})
+
+const normalizeAudioClips = audio => {
+    if (!audio || typeof audio !== 'object') return {}
+    const clips = { ...(audio.clips || {}) }
+    if (audio.url && audio.source && !clips[audio.source]) clips[audio.source] = audio
+    return clips
+}
+
+const audioLabel = source => source === 'elevenlabs' ? 'ElevenLabs' : source === 'recorded' ? 'Recorded' : 'Audio'
+
+const BlockAudioEditor = ({
+    audio,
+    caption,
+    index,
+    onChange,
+    onSaveRecording,
+    onGenerateElevenLabs,
+    disabled = false
+}) => {
+    const [isRecording, setIsRecording] = useState(false)
+    const [isGenerating, setIsGenerating] = useState(false)
+    const mediaRecorderRef = useRef(null)
+    const streamRef = useRef(null)
+    const chunksRef = useRef([])
+    const startedAtRef = useRef(0)
+    const clips = normalizeAudioClips(audio)
+    const activeSource = audio?.source || (clips.recorded ? 'recorded' : clips.elevenlabs ? 'elevenlabs' : '')
+    const activeClip = activeSource ? clips[activeSource] : null
+    const recordedClip = clips.recorded
+    const elevenLabsClip = clips.elevenlabs
+
+    const setClip = (source, clip) => {
+        const nextClips = {
+            ...clips,
+            [source]: {
+                ...clip,
+                source
+            }
+        }
+        const nextActiveSource = source === 'recorded' || !nextClips.recorded ? source : activeSource || 'recorded'
+        const nextActiveClip = nextClips[nextActiveSource] || nextClips.recorded || nextClips.elevenlabs
+        onChange({
+            ...nextActiveClip,
+            source: nextActiveClip.source || nextActiveSource,
+            clips: nextClips
+        })
+    }
+
+    const useClip = source => {
+        if (!clips[source]) return
+        onChange({
+            ...clips[source],
+            source,
+            clips
+        })
+    }
+
+    const clearClip = source => {
+        const nextClips = { ...clips }
+        delete nextClips[source]
+        const nextSource = source === activeSource
+            ? nextClips.recorded ? 'recorded' : nextClips.elevenlabs ? 'elevenlabs' : ''
+            : activeSource
+
+        if (!nextSource || !nextClips[nextSource]) {
+            onChange(null)
+            return
+        }
+
+        onChange({
+            ...nextClips[nextSource],
+            source: nextSource,
+            clips: nextClips
+        })
+    }
+
+    const updateActiveClip = updates => {
+        if (!activeSource || !activeClip) return
+        setClip(activeSource, { ...activeClip, ...updates })
+    }
+
+    const startRecording = async () => {
+        if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+            toast.error('Microphone recording is not available in this browser.')
+            return
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const mimeType = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+                'audio/ogg;codecs=opus'
+            ].find(candidate => MediaRecorder.isTypeSupported(candidate)) || ''
+            const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+            streamRef.current = stream
+            chunksRef.current = []
+            startedAtRef.current = Date.now()
+            mediaRecorderRef.current = recorder
+
+            recorder.addEventListener('dataavailable', event => {
+                if (event.data?.size) chunksRef.current.push(event.data)
+            })
+            recorder.addEventListener('stop', async () => {
+                const durationMs = Math.max(0, Date.now() - startedAtRef.current)
+                const blob = new Blob(chunksRef.current, { type: mimeType })
+                stream.getTracks().forEach(track => track.stop())
+                setIsRecording(false)
+
+                try {
+                    const clip = await onSaveRecording({ blob, mimeType, durationMs, index })
+                    setClip('recorded', clip)
+                    toast.success('Recorded audio saved for this block')
+                } catch (error) {
+                    toast.error(error.message)
+                }
+            }, { once: true })
+
+            recorder.start()
+            setIsRecording(true)
+        } catch (error) {
+            toast.error(error.message)
+        }
+    }
+
+    const stopRecording = () => {
+        const recorder = mediaRecorderRef.current
+        if (recorder && recorder.state !== 'inactive') {
+            recorder.stop()
+        }
+        streamRef.current?.getTracks().forEach(track => track.stop())
+    }
+
+    const generateElevenLabs = async () => {
+        try {
+            setIsGenerating(true)
+            const clip = await onGenerateElevenLabs({ caption, index })
+            setClip('elevenlabs', clip)
+            toast.success('ElevenLabs audio generated')
+        } catch (error) {
+            toast.error(error.message)
+        } finally {
+            setIsGenerating(false)
+        }
+    }
+
+    const durationSeconds = activeClip
+        ? Math.max(0, Math.round((Number(activeClip.endMs || 0) - Number(activeClip.startMs || 0)) / 1000 * 10) / 10)
+        : 0
+
+    return (
+        <div className="rounded border border-blue-100 bg-blue-50 p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <div className="text-xs font-semibold uppercase text-blue-900">Block audio</div>
+                    <div className="text-xs text-blue-700">
+                        {activeClip ? `${audioLabel(activeSource)}${durationSeconds ? `, ${durationSeconds}s clip` : ''}` : 'No block audio. Render can still use ElevenLabs from the caption.'}
+                    </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                    {recordedClip && (
+                        <button type="button" onClick={() => useClip('recorded')} disabled={disabled || activeSource === 'recorded'} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                            Use recorded
+                        </button>
+                    )}
+                    {elevenLabsClip && (
+                        <button type="button" onClick={() => useClip('elevenlabs')} disabled={disabled || activeSource === 'elevenlabs'} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                            Use ElevenLabs
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {activeClip?.url && <audio controls src={activeClip.url} className="w-full" />}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+                {isRecording ? (
+                    <button type="button" onClick={stopRecording} className="rounded bg-red-700 px-2 py-1 text-xs font-medium text-white hover:bg-red-800">
+                        Stop block recording
+                    </button>
+                ) : (
+                    <button type="button" onClick={startRecording} disabled={disabled || isGenerating} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        Record new audio
+                    </button>
+                )}
+                <button type="button" onClick={generateElevenLabs} disabled={disabled || isRecording || isGenerating || !caption.trim()} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                    {isGenerating ? 'Generating...' : elevenLabsClip ? 'Regenerate ElevenLabs' : 'Generate ElevenLabs'}
+                </button>
+                {recordedClip && (
+                    <button type="button" onClick={() => clearClip('recorded')} disabled={disabled || isRecording || isGenerating} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        Remove recorded
+                    </button>
+                )}
+                {elevenLabsClip && (
+                    <button type="button" onClick={() => clearClip('elevenlabs')} disabled={disabled || isRecording || isGenerating} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        Remove ElevenLabs
+                    </button>
+                )}
+            </div>
+
+            {activeClip?.url && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <TextInput
+                        type="number"
+                        label="Trim start ms"
+                        value={activeClip.trimStartMs ?? 0}
+                        onChange={value => updateActiveClip({ trimStartMs: Math.max(0, Number(value || 0)) })}
+                        disabled={disabled || isRecording}
+                    />
+                    <TextInput
+                        type="number"
+                        label="Trim end ms"
+                        value={activeClip.trimEndMs ?? 0}
+                        onChange={value => updateActiveClip({ trimEndMs: Math.max(0, Number(value || 0)) })}
+                        disabled={disabled || isRecording}
+                    />
+                </div>
+            )}
+
+            <div className="mt-2 text-xs text-blue-700">
+                Recorded clips are selected automatically when available. ElevenLabs is used when selected or when no recorded clip exists.
+            </div>
+        </div>
+    )
+}
+
 const ScriptBlockEditor = ({
     block,
     index,
@@ -715,6 +948,8 @@ const ScriptBlockEditor = ({
     onCopy,
     onCut,
     onPaste,
+    onSaveRecording,
+    onGenerateElevenLabs,
     blockRef,
     disabled = false
 }) => {
@@ -836,14 +1071,25 @@ const ScriptBlockEditor = ({
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-                <TextArea
-                    label="Caption"
-                    value={normalized.caption}
-                    onChange={caption => onChange({ ...normalized, caption })}
-                    rows={4}
-                    placeholder="What should the video say here?"
-                    disabled={disabled}
-                />
+                <div className="space-y-3">
+                    <TextArea
+                        label="Caption"
+                        value={normalized.caption}
+                        onChange={caption => onChange({ ...normalized, caption })}
+                        rows={4}
+                        placeholder="What should the video say here?"
+                        disabled={disabled}
+                    />
+                    <BlockAudioEditor
+                        audio={normalized.audio}
+                        caption={normalized.caption}
+                        index={index}
+                        onChange={audio => onChange({ ...normalized, audio })}
+                        onSaveRecording={onSaveRecording}
+                        onGenerateElevenLabs={onGenerateElevenLabs}
+                        disabled={disabled}
+                    />
+                </div>
                 <div className="rounded border border-gray-100 bg-gray-50 p-3">
                     <div className="mb-3 flex items-center justify-between gap-3">
                         <FieldLabel>Action</FieldLabel>
@@ -972,6 +1218,7 @@ const RecordingImportDialog = ({ run, onClose, onImport }) => {
     if (!run?.isOpen) return null
 
     const blocks = run.blocks || []
+    const audioBlockCount = blocks.filter(block => block.audio?.url).length
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 px-4 py-6">
@@ -980,6 +1227,7 @@ const RecordingImportDialog = ({ run, onClose, onImport }) => {
                     <h2 className="text-base font-semibold text-gray-900">Import recorded actions</h2>
                     <p className="mt-1 text-sm text-gray-500">
                         {blocks.length} action block{blocks.length === 1 ? '' : 's'} captured from the Playwright recording.
+                        {audioBlockCount > 0 ? ` ${audioBlockCount} block${audioBlockCount === 1 ? '' : 's'} include recorded audio.` : ''}
                     </p>
                 </div>
                 <div className="space-y-4 px-5 py-4">
@@ -995,6 +1243,7 @@ const RecordingImportDialog = ({ run, onClose, onImport }) => {
                         {blocks.length ? blocks.map((block, index) => (
                             <div key={`${block.action?.type || 'caption'}-${index}`} className="border-b border-gray-200 px-3 py-2 last:border-b-0">
                                 <div className="text-xs font-semibold uppercase text-gray-500">Block {index + 1}</div>
+                                {block.audio?.url && <div className="mt-1 text-xs font-medium text-blue-700">Recorded audio clip attached</div>}
                                 <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-gray-700">{JSON.stringify(block.action || null, null, 2)}</pre>
                             </div>
                         )) : (
@@ -2225,6 +2474,41 @@ const HowToScriptEditorPage = () => {
         setPendingBlockInsert(null)
         setCodexBlockPrompt('')
         requestCodexScriptBlock({ insertIndex, userPrompt: trimmedPrompt })
+    }
+
+    const saveRecordedBlockAudio = async ({ blob, mimeType, durationMs, index }) => {
+        const base64 = await blobToBase64(blob)
+        const response = await fetch('/__howto-script-editor/block-audio/recorded', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                base64,
+                mimeType,
+                durationMs,
+                guideId: activeDraft?.id || 'guide',
+                language: activeDraftLanguage,
+                blockIndex: index
+            })
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Could not save recorded audio')
+        return data.audio
+    }
+
+    const generateBlockElevenLabsAudio = async ({ caption, index }) => {
+        const response = await fetch('/__howto-script-editor/block-audio/elevenlabs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: caption,
+                guideId: activeDraft?.id || 'guide',
+                language: activeDraftLanguage,
+                blockIndex: index
+            })
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Could not generate ElevenLabs audio')
+        return data.audio
     }
 
     const openGuide = (option) => {
@@ -3494,6 +3778,8 @@ const HowToScriptEditorPage = () => {
                                 onCopy={() => copyScriptBlock(index)}
                                 onCut={() => copyScriptBlock(index, { cut: true })}
                                 onPaste={position => pasteScriptBlock(index, position)}
+                                onSaveRecording={saveRecordedBlockAudio}
+                                onGenerateElevenLabs={generateBlockElevenLabsAudio}
                                 blockRef={element => {
                                     if (element) {
                                         scriptBlockRefs.current.set(index, element)
