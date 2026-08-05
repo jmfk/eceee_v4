@@ -5,9 +5,9 @@
  * complex backend/frontend protocol. Simple, flexible, and maintainable.
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Layout } from 'lucide-react';
-import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from '../../layouts';
+import { getLayoutComponent, getLayoutMetadata, LAYOUT_REGISTRY } from '../../layouts';
 import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
@@ -52,7 +52,7 @@ const ReactLayoutRenderer = forwardRef(({
 }, ref) => {
 
     // Get UDC context (but use shared componentId from PageEditor)
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
+    const { useExternalChanges, publishUpdate } = useUnifiedData();
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
@@ -63,16 +63,14 @@ const ReactLayoutRenderer = forwardRef(({
     const contextType = 'page';
 
     // Subscribe to UDC state changes from external sources only
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, () => {
         // External changes will be handled by PageEditor
         // ReactLayoutRenderer will get updates via props (widgets)
     })
 
     // Use shared widget hook
     const {
-        addWidget,
-        updateWidget,
-        deleteWidget
+        addWidget
     } = useWidgets(widgets);
 
     // Widget modal state
@@ -211,6 +209,8 @@ const ReactLayoutRenderer = forwardRef(({
                         config: newWidget.config,
                         slot: slotName,
                         contextType: contextType,
+                        pageId: context?.pageId || webpageData?.id,
+                        versionId,
                         order: widgetOrder
                     });
                 }
@@ -252,7 +252,9 @@ const ReactLayoutRenderer = forwardRef(({
                 // Publish to Unified Data Context
                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                     id: widget.id,
-                    contextType: contextType
+                    contextType: contextType,
+                    pageId: context?.pageId || webpageData?.id,
+                    versionId
                 });
 
                 break;
@@ -280,6 +282,7 @@ const ReactLayoutRenderer = forwardRef(({
                         slot: slotName,
                         contextType: contextType,
                         pageId: context?.pageId || webpageData?.id,
+                        versionId,
                         widgets: updatedWidgetsUp
                     });
                 }
@@ -308,6 +311,7 @@ const ReactLayoutRenderer = forwardRef(({
                         slot: slotName,
                         contextType: contextType,
                         pageId: context?.pageId || webpageData?.id,
+                        versionId,
                         widgets: updatedWidgetsDown
                     });
                 }
@@ -320,12 +324,10 @@ const ReactLayoutRenderer = forwardRef(({
                 const insertAfterIndex = args[0];
                 const insertPosition = insertAfterIndex + 1;
                 const clipboardMetadata = args[1]; // Optional: { operation, metadata } from clipboard
+                const currentPageId = context?.pageId || webpageData?.id;
 
                 // Start with current widgets state
                 let updatedWidgets = { ...widgets };
-
-                // Store pasted widget ID to ensure we don't accidentally delete it
-                const pastedWidgetId = pastedWidget.id;
 
                 // Add the pasted widget FIRST to ensure correct insert position
                 // Filter valid widgets first to remove any undefined entries
@@ -340,7 +342,7 @@ const ReactLayoutRenderer = forwardRef(({
 
                     // Check if this is a cross-page cut/paste operation
                     const sourcePageId = cutMetadata.pageId;
-                    const currentPageId = context?.pageId || webpageData?.id;
+                    const sourceVersionId = cutMetadata.versionId;
                     const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
 
                     if (!isCrossPage) {
@@ -366,8 +368,7 @@ const ReactLayoutRenderer = forwardRef(({
                                             w => {
                                                 const widgetIdStr = String(w.id);
                                                 const parsedIdStr = String(parsed.widgetId);
-                                                const pastedIdStr = String(pastedWidgetId);
-                                                return widgetIdStr !== parsedIdStr && widgetIdStr !== pastedIdStr;
+                                                return widgetIdStr !== parsedIdStr;
                                             }
                                         );
 
@@ -378,7 +379,9 @@ const ReactLayoutRenderer = forwardRef(({
                                             // Publish UDC operation
                                             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                                 id: parsed.widgetId,
-                                                contextType: contextType
+                                                contextType: contextType,
+                                                pageId: currentPageId,
+                                                versionId
                                             });
                                         }
                                     }
@@ -411,6 +414,8 @@ const ReactLayoutRenderer = forwardRef(({
                                                     id: parsed.containerId,
                                                     slotName: parsed.slotName,
                                                     contextType: contextType,
+                                                    pageId: currentPageId,
+                                                    versionId,
                                                     config: containerWidget.config
                                                 });
                                             }
@@ -436,8 +441,7 @@ const ReactLayoutRenderer = forwardRef(({
                                                 w => {
                                                     if (!w) return false;
                                                     const widgetIdStr = String(w.id);
-                                                    const pastedIdStr = String(pastedWidgetId);
-                                                    return !widgetIds.map(String).includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
+                                                    return !widgetIds.map(String).includes(widgetIdStr);
                                                 }
                                             );
 
@@ -455,6 +459,8 @@ const ReactLayoutRenderer = forwardRef(({
                                                     id: containerId,
                                                     slotName: slotName,
                                                     contextType: contextType,
+                                                    pageId: currentPageId,
+                                                    versionId,
                                                     config: containerWidget.config
                                                 });
                                             }
@@ -474,9 +480,8 @@ const ReactLayoutRenderer = forwardRef(({
                                         updatedWidgets[slotName] = validWidgets.filter(
                                             widget => {
                                                 const widgetIdStr = String(widget.id);
-                                                const pastedIdStr = String(pastedWidgetId);
                                                 const widgetIdsStr = widgetIds.map(String);
-                                                return !widgetIdsStr.includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
+                                                return !widgetIdsStr.includes(widgetIdStr);
                                             }
                                         );
 
@@ -486,7 +491,9 @@ const ReactLayoutRenderer = forwardRef(({
                                             for (const widgetId of widgetIds) {
                                                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                                     id: widgetId,
-                                                    contextType: contextType
+                                                    contextType: contextType,
+                                                    pageId: currentPageId,
+                                                    versionId
                                                 });
                                             }
                                         }
@@ -510,6 +517,7 @@ const ReactLayoutRenderer = forwardRef(({
                                     id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
                                     contextType: contextType,
                                     pageId: sourcePageId,
+                                    versionId: sourceVersionId,
                                 });
                             }
                         } else if (cutMetadata.widgets) {
@@ -519,6 +527,7 @@ const ReactLayoutRenderer = forwardRef(({
                                         id: widgetId,
                                         contextType: contextType,
                                         pageId: sourcePageId,
+                                        versionId: sourceVersionId,
                                     });
                                 }
                             }
@@ -552,6 +561,8 @@ const ReactLayoutRenderer = forwardRef(({
                         config: pastedWidget.config,
                         slot: slotName,
                         contextType: contextType,
+                        pageId: currentPageId,
+                        versionId,
                         order: insertPosition
                     });
                 }
@@ -580,6 +591,8 @@ const ReactLayoutRenderer = forwardRef(({
                     id: widget.id,
                     slotName,
                     contextType: contextType,
+                    pageId: context?.pageId || webpageData?.id,
+                    versionId,
                     config: newConfig
                 });
                 break;
@@ -718,7 +731,12 @@ const ReactLayoutRenderer = forwardRef(({
         // Publish removals to Unified Data Context for all widgets in this slot
         const existingWidgetsInSlot = widgets[slotName] || [];
         for (const w of existingWidgetsInSlot) {
-            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id });
+            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                id: w.id,
+                contextType: contextType,
+                pageId: context?.pageId || webpageData?.id,
+                versionId
+            });
         }
     }, [widgets, onWidgetChange, publishUpdate, componentId, versionId, isPublished]);
 
@@ -753,6 +771,8 @@ const ReactLayoutRenderer = forwardRef(({
                 config: widget.config,
                 slot: importSlotName,
                 contextType: contextType,
+                pageId: context?.pageId || webpageData?.id,
+                versionId,
                 order: currentSlotWidgets.length + importedWidgets.indexOf(widget)
             });
         }
@@ -790,6 +810,7 @@ const ReactLayoutRenderer = forwardRef(({
         // Build metadata for cut operation (track which widgets to delete using widget paths)
         const cutMetadata = {
             pageId: context?.pageId || webpageData?.id, // Store source pageId for cross-page cut/paste
+            versionId,
             widgetPaths: selected.map(item => item.widgetPath),
             widgets: {} // Keep backward compatibility: { slotName: [widgetIds] }
         };
@@ -832,6 +853,7 @@ const ReactLayoutRenderer = forwardRef(({
 
         // Check if this is a cross-page cut/paste operation
         const sourcePageId = cutMetadata.pageId;
+        const sourceVersionId = cutMetadata.versionId;
         const currentPageId = context?.pageId || webpageData?.id;
         const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
 
@@ -849,6 +871,7 @@ const ReactLayoutRenderer = forwardRef(({
                         id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
                         contextType: contextType,
                         pageId: sourcePageId, // Specify source page
+                        versionId: sourceVersionId,
                     });
                 }
             } else if (cutMetadata.widgets) {
@@ -859,6 +882,7 @@ const ReactLayoutRenderer = forwardRef(({
                             id: widgetId,
                             contextType: contextType,
                             pageId: sourcePageId, // Specify source page
+                            versionId: sourceVersionId,
                         });
                     }
                 }
@@ -890,7 +914,9 @@ const ReactLayoutRenderer = forwardRef(({
                             hasChanges = true;
                             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                 id: parsed.widgetId,
-                                contextType: contextType
+                                contextType: contextType,
+                                pageId: currentPageId,
+                                versionId
                             });
                         }
                     }
@@ -923,6 +949,8 @@ const ReactLayoutRenderer = forwardRef(({
                                     id: parsed.containerId,
                                     slotName: parsed.slotName,
                                     contextType: contextType,
+                                    pageId: currentPageId,
+                                    versionId,
                                     config: containerWidget.config
                                 });
                             }
@@ -965,6 +993,8 @@ const ReactLayoutRenderer = forwardRef(({
                                     id: containerId,
                                     slotName: slotName,
                                     contextType: contextType,
+                                    pageId: currentPageId,
+                                    versionId,
                                     config: containerWidget.config
                                 });
                             }
@@ -986,7 +1016,9 @@ const ReactLayoutRenderer = forwardRef(({
                             for (const widgetId of widgetIds) {
                                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                     id: widgetId,
-                                    contextType: contextType
+                                    contextType: contextType,
+                                    pageId: currentPageId,
+                                    versionId
                                 });
                             }
                         }
@@ -1165,6 +1197,8 @@ const ReactLayoutRenderer = forwardRef(({
                 id: firstAncestor.widget.id,
                 slotName: topSlotName,
                 contextType: contextType,
+                pageId: context?.pageId || webpageData?.id,
+                versionId,
                 config: updatedChild.config
             });
         } else {
@@ -1192,6 +1226,8 @@ const ReactLayoutRenderer = forwardRef(({
                     config: widget.config,
                     slot: slotName,
                     contextType: contextType,
+                    pageId: context?.pageId || webpageData?.id,
+                    versionId,
                     order: position + i
                 });
             }
@@ -1296,7 +1332,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Render the layout component
     // Make this div act like an iframe - break out of parent constraints and use full viewport width
     return (
-        <div className="react-layout-renderer w-full h-full relative cms-content">
+        <div className="react-layout-renderer w-full h-full relative cms-content" data-testid="page-editor-surface">
             {/* Bulk Action Toolbar - Floating */}
             {selectedCount > 0 && (
                 <>

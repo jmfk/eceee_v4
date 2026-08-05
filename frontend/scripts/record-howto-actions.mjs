@@ -1,6 +1,6 @@
 import { chromium } from 'playwright'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -10,6 +10,7 @@ const frontendRoot = resolve(__dirname, '..')
 const parseArgs = (argv) => {
   const args = {
     baseUrl: process.env.HOWTO_BASE_URL || 'http://localhost:3000',
+    startUrl: process.env.HOWTO_START_URL || '',
     outputDir: '',
     storageState: '',
     width: Number(process.env.HOWTO_VIDEO_WIDTH || 1440),
@@ -22,6 +23,7 @@ const parseArgs = (argv) => {
     const next = argv[index + 1]
 
     if (arg === '--base-url') args.baseUrl = next
+    if (arg === '--start-url') args.startUrl = next
     if (arg === '--output-dir') args.outputDir = next
     if (arg === '--storage-state') args.storageState = next
     if (arg === '--width') args.width = Number(next)
@@ -34,6 +36,17 @@ const parseArgs = (argv) => {
   }
 
   return args
+}
+
+const resolveStartUrl = (baseUrl, startUrl = '') => {
+  const value = String(startUrl || '').trim()
+  if (!value) return baseUrl
+
+  try {
+    return new URL(value, baseUrl).toString()
+  } catch {
+    return baseUrl
+  }
 }
 
 const recorderInitScript = () => {
@@ -200,7 +213,9 @@ const main = async () => {
   let context = null
   let micContext = null
   let micPage = null
+  let hasLoadedInitialPage = false
   let stopped = false
+  const startUrl = resolveStartUrl(args.baseUrl, args.startUrl)
 
   const writeEvents = () => {
     writeFileSync(eventsPath, JSON.stringify(events, null, 2), 'utf8')
@@ -209,6 +224,7 @@ const main = async () => {
     writeFileSync(metadataPath, JSON.stringify({
       sessionId: args.sessionId,
       baseUrl: args.baseUrl,
+      startUrl,
       status: metadata.status || 'running',
       rawVideos: metadata.rawVideos || [],
       microphonePath: metadata.microphonePath || (microphoneChunks.length ? microphonePath : ''),
@@ -298,6 +314,13 @@ const main = async () => {
       if (videoPath) rawVideos.push(videoPath)
     }
 
+    if (rawVideos.length === 0) {
+      const fallbackVideos = readdirSync(rawVideoDir)
+        .filter(fileName => fileName.endsWith('.webm'))
+        .map(fileName => join(rawVideoDir, fileName))
+      rawVideos.push(...fallbackVideos)
+    }
+
     await micContext?.close().catch(() => {})
     await browser?.close().catch(() => {})
 
@@ -338,7 +361,7 @@ const main = async () => {
     writeMetadata({ status: 'running' })
   })
   micPage = await micContext.newPage()
-  await micPage.goto(args.baseUrl, { waitUntil: 'domcontentloaded' }).catch(() => {})
+  await micPage.goto(startUrl, { waitUntil: 'domcontentloaded' }).catch(() => {})
   await startMicrophoneRecorder(micPage)
 
   context = await browser.newContext({
@@ -354,6 +377,7 @@ const main = async () => {
   await context.addInitScript(recorderInitScript)
   const page = await context.newPage()
   page.on('framenavigated', frame => {
+    if (!hasLoadedInitialPage) return
     if (frame === page.mainFrame()) {
       record({ kind: 'navigation', url: frame.url(), timestamp: Date.now() })
     }
@@ -365,8 +389,10 @@ const main = async () => {
   })
 
   console.log(`Recording browser actions against ${args.baseUrl}`)
+  console.log(`Start URL: ${startUrl}`)
   console.log('Use the opened browser window to perform the demo, then stop recording from the editor.')
-  await page.goto(args.baseUrl, { waitUntil: 'domcontentloaded' })
+  await page.goto(startUrl, { waitUntil: 'domcontentloaded' })
+  hasLoadedInitialPage = true
   await page.bringToFront().catch(() => {})
   writeMetadata({ status: 'running' })
   console.log(`READY ${args.sessionId}`)

@@ -345,7 +345,9 @@ export const normalizeScriptBlock = (block = {}, fallbackCaption = '') => {
 
     const normalized = {
         caption,
-        action: actionSource?.type ? normalizeAction(actionWithoutCaption(actionSource)) : null
+        action: actionSource?.type ? normalizeAction(actionWithoutCaption(actionSource)) : null,
+        transcript: textValue(block.transcript ?? actionSource?.transcript ?? ''),
+        vttText: textValue(block.vttText ?? actionSource?.vttText ?? '')
     }
 
     const audio = normalizeBlockAudio(block.audio ?? actionSource?.audio)
@@ -384,6 +386,7 @@ export const guideToScriptDraft = (guide, section) => {
         sourcePath: guide?.sourcePath || '',
         title: guide?.title || '',
         summary: guide?.summary || '',
+        startUrl: guide?.startUrl || guide?.recordingStartUrl || '',
         order: Number.isFinite(Number(guide?.order)) ? Number(guide.order) : 999,
         language: guide?.language || 'en',
         sourceLanguage: guide?.sourceLanguage || '',
@@ -441,6 +444,7 @@ export const createMarkdownFromDraft = (draft) => {
         frontmatterLine('uuid', draft.uuid || stableUuidFromSeed(draft.id || draft.title || '')),
         frontmatterLine('title', draft.title),
         frontmatterLine('summary', draft.summary),
+        frontmatterLine('startUrl', draft.startUrl),
         frontmatterLine('order', draft.order),
         frontmatterLine('language', draft.language || 'en'),
         frontmatterLine('sourceLanguage', draft.sourceLanguage),
@@ -472,10 +476,12 @@ export const createMarkdownFromDraft = (draft) => {
                 caption: trimString(block.caption),
                 action: block.action ? serializeAction(block.action) : null
             }
+            if (trimString(block.transcript)) serialized.transcript = trimString(block.transcript)
+            if (trimString(block.vttText)) serialized.vttText = trimString(block.vttText)
             if (block.audio) serialized.audio = normalizeBlockAudio(block.audio)
             return serialized
         })
-        .filter(block => block.caption || block.action || block.audio), null, 2)
+        .filter(block => block.caption || block.action || block.audio || block.transcript || block.vttText), null, 2)
 
     return [
         frontmatter.join('\n'),

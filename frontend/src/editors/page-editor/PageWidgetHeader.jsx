@@ -42,6 +42,7 @@ const PageWidgetHeader = ({
     // Cut props
     onCut = null,
     pageId = null,
+    versionId = null,
     widgetPath = null,
     // Selection props
     slotName = null,
@@ -84,19 +85,22 @@ const PageWidgetHeader = ({
         }
     };
 
-    const handleCopy = async () => {
+    const handleCopy = async (event) => {
+        event?.stopPropagation()
         if (widget) {
             await copyWidgetsToClipboard([widget]);
             await refreshClipboard();
         }
     };
 
-    const handleCut = async () => {
+    const handleCut = async (event) => {
+        event?.stopPropagation()
         if (!widget || !slotName) return;
         
         // Build metadata for cut operation
         const cutMetadata = {
             pageId: pageId,
+            versionId: versionId,
             widgetPaths: widgetPath ? [widgetPath] : [`${slotName}/${widget.id}`],
             widgets: {
                 [slotName]: [widget.id]
@@ -112,7 +116,8 @@ const PageWidgetHeader = ({
         }
     };
 
-    const handlePaste = async () => {
+    const handlePaste = async (event) => {
+        event?.stopPropagation()
         if (!onPaste) {
             return;
         }
