@@ -12,6 +12,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:state": "vitest run src/contexts/unified-data src/components/form-fields/__tests__/ItemsListField.test.jsx src/components/__tests__/PageEditor.dirty.test.js",
+    "test:page-editor": "vitest run src/contexts/unified-data/core/DataManager.test.ts && playwright test --config playwright.config.js e2e/page-editor.regression.spec.js",
     "test:e2e": "npm run test:e2e:public && npm run test:e2e:admin",
     "test:e2e:admin": "playwright test --config playwright.config.js",
     "test:e2e:public": "playwright test --config playwright.public.config.js",

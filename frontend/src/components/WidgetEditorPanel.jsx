@@ -31,7 +31,9 @@ const WidgetEditorPanel = forwardRef(({
     context = {},
     webpageData = null,
     pageVersionData = null,
-    onSpecialEditorStateChange = null
+    onSpecialEditorStateChange = null,
+    onSave = null,
+    onRealTimeUpdate = null
 }, ref) => {
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
@@ -51,6 +53,7 @@ const WidgetEditorPanel = forwardRef(({
 
     const panelRef = useRef(null)
     const resizeRef = useRef(null)
+    const formRendererRef = useRef(null)
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
     const isResizingRef = useRef(false)
@@ -313,15 +316,27 @@ const WidgetEditorPanel = forwardRef(({
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
         getCurrentConfig: () => {
-            // This will be handled by the isolated form
-            return widgetData?.config || {}
+            return formRendererRef.current?.getCurrentWidgetData?.()?.config || widgetData?.config || {}
+        },
+        saveCurrentWidget: async () => {
+            const currentWidget = formRendererRef.current?.getCurrentWidgetData?.() || widgetData
+            if (currentWidget) {
+                await onSave?.(currentWidget)
+                setHasChanges(false)
+            }
+            return currentWidget
         },
         hasUnsavedChanges: () => hasChanges,
         resetToOriginal: () => {
             setHasChanges(false)
         },
         isSpecialEditorOpen: () => showSpecialEditor
-    }), [hasChanges, widgetData, showSpecialEditor])
+    }), [hasChanges, widgetData, showSpecialEditor, onSave])
+
+    const handleFormWidgetChange = useCallback((updatedWidget) => {
+        setHasChanges(true)
+        onRealTimeUpdate?.(updatedWidget)
+    }, [onRealTimeUpdate])
 
     // Handle close - revert changes if not saved
     const handleClose = async () => {
@@ -544,6 +559,7 @@ const WidgetEditorPanel = forwardRef(({
                         ) : widgetData ? (
                             <>
                                 <IsolatedFormRenderer
+                                    ref={formRendererRef}
                                     initWidgetData={widgetData}
                                     initschema={fetchedSchema || schema}
                                     namespace={namespace}
@@ -552,6 +568,8 @@ const WidgetEditorPanel = forwardRef(({
                                     slotName={widgetData?.slotName || widgetData?.slot}
                                     context={memoizedContext}
                                     onDirtyChange={setHasChanges}
+                                    onWidgetChange={handleFormWidgetChange}
+                                    publishChanges={false}
                                 />
                                 <WidgetPublishingInheritanceFields
                                     widgetData={widgetData}
