@@ -10,7 +10,6 @@ import { User, ImagePlus } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
-import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
@@ -134,7 +133,7 @@ const BioWidget = memo(({
     slotConfig = null,
     context = {}
 }) => {
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
+    const { useExternalChanges, getState } = useUnifiedData()
     const configRef = useRef(config)
     const [, forceRerender] = useState({})
     const setConfig = (newConfig) => {
@@ -178,37 +177,17 @@ const BioWidget = memo(({
                 bioText: newContent
             }
             setConfig(updatedConfig)
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: updatedConfig,
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType,
-                ...(nestedParentWidgetId && {
-                    parentWidgetId: nestedParentWidgetId,
-                    parentSlotName: nestedParentSlotName
-                })
-            })
+            onConfigChange?.(updatedConfig)
         }
-    }, [componentId, widgetId, slotName, contextType, publishUpdate, widgetPath, nestedParentWidgetId, nestedParentSlotName])
+    }, [onConfigChange])
 
     // Image change handler for quick edit
     const handleImageChange = useCallback((fieldName, newImage) => {
         const updatedConfig = { ...configRef.current, [fieldName]: newImage }
         setConfig(updatedConfig)
         forceRerender({})
-        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            config: updatedConfig,
-            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-            slotName: slotName,
-            contextType: contextType,
-            ...(nestedParentWidgetId && {
-                parentWidgetId: nestedParentWidgetId,
-                parentSlotName: nestedParentSlotName
-            })
-        })
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, nestedParentWidgetId, nestedParentSlotName])
+        onConfigChange?.(updatedConfig)
+    }, [onConfigChange])
 
     const image = configRef.current.image
     const bioText = configRef.current.bioText || ''
@@ -357,4 +336,3 @@ BioWidget.metadata = {
 }
 
 export default BioWidget
-

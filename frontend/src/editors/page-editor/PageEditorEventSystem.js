@@ -1,5 +1,10 @@
 /**
  * PageEditor Event System
+ *
+ * LEGACY/QUARANTINED: The active React page editor routes widget state through
+ * pageEditorPropAdapter, PageEditor local state, and UnifiedDataContext.
+ * Keep this module importable for older experiments, but do not reconnect new
+ * active editor behavior through this event layer.
  * 
  * Event system specifically designed for PageEditor with support for
  * version management, publishing workflows, and layout-based rendering.

@@ -4,7 +4,6 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
-import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
 
@@ -40,7 +39,7 @@ const HeroWidget = ({
     const [editingField, setEditingField] = useState(null)
 
     // UDC Integration
-    const { publishUpdate, getState, useExternalChanges } = useUnifiedData()
+    const { getState, useExternalChanges } = useUnifiedData()
     const contextType = useEditorContext()
     const componentId = useMemo(() => `herowidget-${widgetId || 'preview'}`, [widgetId])
 
@@ -144,69 +143,41 @@ const HeroWidget = ({
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, header: newContent }
             setConfig(updatedConfig)
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: updatedConfig,
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [widgetId, slotName, onConfigChange])
 
     const handleBeforeTextChange = useCallback((newContent) => {
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, beforeText: newContent }
             setConfig(updatedConfig)
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: updatedConfig,
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [widgetId, slotName, onConfigChange])
 
     const handleAfterTextChange = useCallback((newContent) => {
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, afterText: newContent }
             setConfig(updatedConfig)
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: updatedConfig,
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [widgetId, slotName, onConfigChange])
 
     // Image change handler for quick edit
     const handleImageChange = useCallback((fieldName, newImage) => {
         const updatedConfig = { ...configRef.current, [fieldName]: newImage }
         setConfig(updatedConfig)
         forceRerender({})
-        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            config: updatedConfig,
-            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-            slotName: slotName,
-            contextType: contextType
-        })
         if (onConfigChange) {
             onConfigChange(updatedConfig)
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [onConfigChange])
 
     // Initialize editors in editor mode (only once)
     useEffect(() => {

@@ -16,14 +16,5 @@ export { WidgetSlot } from '../../layouts'
 
 // Test components removed after refactoring completion
 
-// Export PageEditor event system
-export {
-    PAGE_EDITOR_EVENTS,
-    PAGE_EDITOR_CHANGE_TYPES,
-    PageEditorEventEmitter,
-    PageEditorEventListener,
-    createPageEditorEventSystem
-} from './PageEditorEventSystem'
-
 // Re-export shared widgets for convenience
 export * from '../../widgets'

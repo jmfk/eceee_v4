@@ -1,5 +1,9 @@
 /**
  * ContentEditor - Visual page editor using custom layout renderer
+ *
+ * LEGACY/QUARANTINED: The active page editor uses
+ * PageContentEditor -> ReactLayoutRenderer. Keep this component importable for
+ * older callers, but do not wire new React page-editor behavior through it.
  * 
  * Provides a visual interface for editing page content with slot-based widget management.
  * Uses LayoutRenderer for direct DOM manipulation instead of React's virtual DOM.

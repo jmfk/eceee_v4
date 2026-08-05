@@ -13,6 +13,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { analyzeChanges } from '../../utils/smartSaveUtils'
+import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 
 // ---------------------------------------------------------------------------
 // 1. analyzeChanges — widget change detection
@@ -162,5 +163,159 @@ describe('PageEditor UDC source handling', () => {
 
     it('continues normal handling for contentcardwidget- sources', () => {
         expect(shouldSyncVersionBeforeReturning('contentcardwidget-abc')).toBe(false)
+    })
+})
+
+describe('PageEditor widget state convergence', () => {
+    it('applies panel-shaped and inline-shaped widget edits to the same canonical widget state', () => {
+        const widgets = {
+            main: [
+                { id: 'content-intro', type: 'easy_widgets.ContentWidget', config: { content: '<p>Initial</p>', isActive: true } },
+                { id: 'content-sidebar', type: 'easy_widgets.ContentWidget', config: { content: '<p>Sidebar</p>', isActive: true } }
+            ]
+        }
+
+        const panelUpdatedWidgets = applyWidgetUpdateToWidgetMap(widgets, {
+            id: 'content-intro',
+            type: 'easy_widgets.ContentWidget',
+            slotName: 'main',
+            context: { slotName: 'main' },
+            config: { content: '<p>Edited from panel</p>' }
+        })
+
+        const inlineUpdatedWidgets = applyWidgetUpdateToWidgetMap(widgets, {
+            id: 'content-intro',
+            type: 'easy_widgets.ContentWidget',
+            slot: 'main',
+            config: { content: '<p>Edited from panel</p>' }
+        })
+
+        expect(panelUpdatedWidgets).toEqual(inlineUpdatedWidgets)
+        expect(panelUpdatedWidgets.main[0].config).toEqual({
+            content: '<p>Edited from panel</p>',
+            isActive: true
+        })
+        expect(panelUpdatedWidgets.main[1]).toBe(widgets.main[1])
+    })
+
+    it('applies panel widget metadata without storing the transport wrapper', () => {
+        const widgets = {
+            main: [
+                { id: 'content-intro', type: 'easy_widgets.ContentWidget', config: { content: '<p>Initial</p>' } }
+            ]
+        }
+
+        const updatedWidgets = applyWidgetUpdateToWidgetMap(widgets, {
+            id: 'content-intro',
+            slotName: 'main',
+            config: { content: '<p>Panel edit</p>' },
+            widgetUpdates: { activeVariants: ['rich'] }
+        })
+
+        expect(updatedWidgets.main[0].activeVariants).toEqual(['rich'])
+        expect(updatedWidgets.main[0]).not.toHaveProperty('widgetUpdates')
+    })
+
+    it('applies nested widget prop edits without stale sibling overwrites', () => {
+        const widgets = {
+            main: [
+                {
+                    id: 'container-1',
+                    type: 'easy_widgets.TwoColumnsWidget',
+                    config: {
+                        title: 'Container',
+                        slots: {
+                            left: [
+                                {
+                                    id: 'nested-content',
+                                    type: 'easy_widgets.ContentWidget',
+                                    config: { content: '<p>Nested initial</p>', isActive: true }
+                                },
+                                {
+                                    id: 'nested-sibling',
+                                    type: 'easy_widgets.ContentWidget',
+                                    config: { content: '<p>Sibling stays put</p>', isActive: true }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    id: 'headline-main',
+                    type: 'easy_widgets.HeadlineWidget',
+                    config: { content: 'Sibling headline' }
+                }
+            ]
+        }
+
+        const updatedWidgets = applyWidgetUpdateToWidgetMap(widgets, {
+            id: 'nested-content',
+            slotName: 'left',
+            widgetPath: ['main', 'container-1', 'left', 'nested-content'],
+            config: { content: '<p>Nested final</p>' }
+        })
+
+        expect(updatedWidgets.main[0].config.slots.left[0].config).toEqual({
+            content: '<p>Nested final</p>',
+            isActive: true
+        })
+        expect(updatedWidgets.main[0].config.slots.left[1]).toBe(widgets.main[0].config.slots.left[1])
+        expect(updatedWidgets.main[1]).toBe(widgets.main[1])
+    })
+
+    it('preserves final canonical save payload after rapid mixed inline, panel, and nested edits', () => {
+        const initialWidgets = {
+            main: [
+                {
+                    id: 'content-intro',
+                    type: 'easy_widgets.ContentWidget',
+                    config: { content: '<p>Initial</p>', isActive: true }
+                },
+                {
+                    id: 'container-1',
+                    type: 'easy_widgets.TwoColumnsWidget',
+                    config: {
+                        slots: {
+                            left: [
+                                {
+                                    id: 'nested-content',
+                                    type: 'easy_widgets.ContentWidget',
+                                    config: { content: '<p>Nested initial</p>', isActive: true }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+
+        const afterInline = applyWidgetUpdateToWidgetMap(initialWidgets, {
+            id: 'content-intro',
+            slotName: 'main',
+            config: { content: '<p>Inline draft</p>' }
+        })
+        const afterPanel = applyWidgetUpdateToWidgetMap(afterInline, {
+            id: 'content-intro',
+            slotName: 'main',
+            config: { content: '<p>Panel final</p>' }
+        })
+        const finalWidgets = applyWidgetUpdateToWidgetMap(afterPanel, {
+            id: 'nested-content',
+            slotName: 'left',
+            context: { widgetPath: ['main', 'container-1', 'left', 'nested-content'] },
+            config: { content: '<p>Nested final</p>' }
+        })
+
+        const savePayload = { widgets: finalWidgets }
+
+        expect(savePayload.widgets.main[0].config).toEqual({
+            content: '<p>Panel final</p>',
+            isActive: true
+        })
+        expect(savePayload.widgets.main[1].config.slots.left[0].config).toEqual({
+            content: '<p>Nested final</p>',
+            isActive: true
+        })
+        expect(savePayload.widgets.main).toHaveLength(2)
     })
 })

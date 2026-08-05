@@ -8,7 +8,6 @@ import { renderMustache, prepareComponentContext } from '../../utils/mustacheRen
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
-import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
 
@@ -39,7 +38,7 @@ const BannerWidget = ({
     }
 
     // UDC Integration
-    const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
+    const { useExternalChanges, getState } = useUnifiedData()
     const componentId = useMemo(() => `bannerwidget-${widgetId || 'preview'}`, [widgetId])
     const headerFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-headerContent`, [widgetId])
     const textFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-textContent`, [widgetId])
@@ -213,22 +212,11 @@ const BannerWidget = ({
             const updatedConfig = { ...configRef.current, [fieldName]: newContent }
             setConfig(updatedConfig)
 
-            // Publish to field-level path for form field sync
-            const fieldComponentId = bannerMode === 'header' ? headerFieldComponentId : textFieldComponentId
-            const fieldSourceId = `${componentId}-field-${fieldName}`
-            publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: { [fieldName]: newContent }, // Only publish the changed field
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
-
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [bannerMode, componentId, headerFieldComponentId, textFieldComponentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [bannerMode, widgetId, slotName, onConfigChange])
 
     // Mode conversion handler
     const handleModeToggle = useCallback(() => {
@@ -238,36 +226,20 @@ const BannerWidget = ({
         const updatedConfig = { ...configRef.current, bannerMode: newMode }
         setConfig(updatedConfig)
 
-        // Publish mode change to UDC
-        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            config: { bannerMode: newMode },
-            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-            slotName: slotName,
-            contextType: contextType
-        })
-
         if (onConfigChange) {
             onConfigChange(updatedConfig)
         }
-    }, [bannerMode, widgetId, slotName, componentId, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [bannerMode, widgetId, slotName, onConfigChange])
 
     // Image change handler for quick edit
     const handleImageChange = useCallback((fieldName, newImage) => {
         const updatedConfig = { ...configRef.current, [fieldName]: newImage }
         setConfig(updatedConfig)
         forceRerender({})
-        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            config: updatedConfig,
-            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-            slotName: slotName,
-            contextType: contextType
-        })
         if (onConfigChange) {
             onConfigChange(updatedConfig)
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [onConfigChange])
 
     // Initialize editor in editor mode
     useEffect(() => {
@@ -605,4 +577,3 @@ BannerWidget.metadata = {
 }
 
 export default BannerWidget
-

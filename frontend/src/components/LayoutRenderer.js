@@ -1,5 +1,10 @@
 /**
  * LayoutRenderer.js
+ *
+ * LEGACY/QUARANTINED: Direct DOM layout renderer used by ContentEditor.
+ * Active PageEditor code should use ReactLayoutRenderer and must not call this
+ * renderer's imperative widget data APIs.
+ *
  * Renders layout JSON as DOM elements with widget support and UI enhancements
  */
 

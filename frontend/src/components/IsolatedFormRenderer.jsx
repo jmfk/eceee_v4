@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
@@ -6,6 +6,13 @@ import { useFormDataBuffer } from '../hooks/useFormDataBuffer.js'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged, calculateActiveVariants } from '../utils/widgetUtils'
+import {
+    buildWidgetPropUpdate,
+    countConfigChangedFields,
+    createActiveWidgetPropContext,
+    isFieldLevelPropSource,
+    shouldHydrateExternalWidgetProps
+} from '../utils/pageEditorPropAdapter'
 
 /**
  * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
@@ -177,7 +184,7 @@ const IsolatedFieldWrapper = React.memo(({
  * IsolatedFormRenderer - Form container that coordinates isolated fields
  * Each field is completely independent and only re-renders when its own data changes
  */
-const IsolatedFormRenderer = React.memo(({
+const IsolatedFormRenderer = React.memo(forwardRef(({
     initWidgetData,
     initschema,
     namespace = null,
@@ -185,8 +192,10 @@ const IsolatedFormRenderer = React.memo(({
     widgetId = null,
     slotName = null,
     context = {},
-    onDirtyChange = null
-}) => {
+    onDirtyChange = null,
+    onWidgetChange = null,
+    publishChanges = true
+}, ref) => {
     const schemaRef = useRef(null)
     // Use refs for form state to prevent rerenders
     const fieldValidationsRef = useRef({})
@@ -225,6 +234,10 @@ const IsolatedFormRenderer = React.memo(({
         }
         return currentWidgetDataRef.current
     }, [formBuffer, initWidgetData])
+
+    useImperativeHandle(ref, () => ({
+        getCurrentWidgetData
+    }), [getCurrentWidgetData])
 
     // Keep original state for schema and type info (these don't change frequently)
     const [schema] = useState(initschema)
@@ -284,7 +297,7 @@ const IsolatedFormRenderer = React.memo(({
 
         // Skip updates from field-level sources - those are handled by individual fields
         // This prevents form rerenders when fields update via field-level subscriptions
-        if (sourceId.startsWith('field-') || sourceId.includes('-field-')) {
+        if (isFieldLevelPropSource(sourceId)) {
             // Field-level updates are handled by IsolatedFieldWrapper subscriptions
             // Don't update widgetData here to prevent form rerenders
             // Only sync the config ref silently
@@ -299,33 +312,14 @@ const IsolatedFormRenderer = React.memo(({
         // Skip widget-level updates from widgets when they're publishing field-level changes
         // Widgets publish with bannerwidget-*-field-* pattern, which we already skip above
         // But also check for direct widget-level updates that are single-field changes
-        const isWidgetSource = sourceId.startsWith('bannerwidget-') ||
-            sourceId.startsWith('two-columns-widget-') ||
-            sourceId.startsWith('three-columns-widget-') ||
-            sourceId.startsWith('section-widget-') ||
-            sourceId.startsWith('contentcardwidget-') ||
-            sourceId.startsWith('widget-') ||
-            /^[a-z-]+widget-\d+/.test(sourceId)
-
-        if (isWidgetSource && !sourceId.includes('-field-')) {
+        if (!isFieldLevelPropSource(sourceId)) {
             // Widget-level update from a widget - check if it's a single field update
             const widgetPath = context?.widgetPath
             const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
             if (widget && widget.config) {
-                // Check if this is a single field update by comparing with current config
-                const currentConfig = configRef.current
-                const newConfig = widget.config
+                const changedFields = countConfigChangedFields(configRef.current, widget.config)
 
-                // Count how many fields changed
-                const allKeys = new Set([...Object.keys(newConfig), ...Object.keys(currentConfig)])
-                const changedFields = Array.from(allKeys).filter(key => {
-                    const newVal = newConfig[key]
-                    const currentVal = currentConfig[key]
-                    return JSON.stringify(newVal) !== JSON.stringify(currentVal)
-                })
-
-                // If only one field changed, it's a field-level update - skip it
-                if (changedFields.length === 1) {
+                if (!shouldHydrateExternalWidgetProps({ sourceId, changedFields })) {
                     // Only sync the config ref silently
                     configRef.current = widget.config
                     return
@@ -372,22 +366,32 @@ const IsolatedFormRenderer = React.memo(({
         const activeSchema = schemaRef.current || schema;
         const newActiveVariants = calculateActiveVariants(currentData, activeSchema);
 
-        // Extract widgetPath from context for nested widget support
-        const widgetPath = context?.widgetPath
-
-        // Publish with isolated-form componentId prefix for field updates
-        // Use sourceId: isolated-form-${widgetId}-field-${fieldName}
-        // Fields subscribe to field-${widgetId}-${fieldName}, so sourceId !== componentId
-        const fieldSourceId = `${componentId}-field-${fieldName}` // isolated-form-${widgetId}-field-content
-        await publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            slotName: slotName,
-            contextType: contextType,
-            config: { [fieldName]: value }, // Only publish the changed field
-            widgetUpdates: { activeVariants: newActiveVariants }, // Also publish updated variants
-            widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
+        const propContext = createActiveWidgetPropContext({
+            widgetData: currentData,
+            context,
+            widgetId,
+            slotName,
+            contextType,
+            componentId
         })
-    }, [formBuffer, context, componentId, widgetId, slotName, contextType, publishUpdate, schema])
+        const propUpdate = buildWidgetPropUpdate({
+            currentWidgetData: currentData,
+            propContext,
+            fieldName,
+            value,
+            activeVariants: newActiveVariants
+        })
+
+        if (publishChanges) {
+            await publishUpdate(
+                propUpdate.fieldSourceId,
+                OperationTypes.UPDATE_WIDGET_CONFIG,
+                propUpdate.udcPayload
+            )
+        } else {
+            onWidgetChange?.(propUpdate.updatedWidget)
+        }
+    }, [formBuffer, context, componentId, widgetId, slotName, contextType, publishUpdate, schema, onWidgetChange, publishChanges])
 
     const activeSchema = schemaRef.current || schema
 
@@ -447,6 +451,7 @@ const IsolatedFormRenderer = React.memo(({
     if (prevProps.slotName !== nextProps.slotName) return false
     if (prevProps.contextType !== nextProps.contextType) return false
     if (prevProps.namespace !== nextProps.namespace) return false
+    if (prevProps.publishChanges !== nextProps.publishChanges) return false
 
     // Compare schema reference (should be stable)
     if (prevProps.initschema !== nextProps.initschema) return false
@@ -504,6 +509,6 @@ const IsolatedFormRenderer = React.memo(({
 
     // All props are equal, prevent rerender
     return true
-})
+}))
 
 export default IsolatedFormRenderer

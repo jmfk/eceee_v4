@@ -51,7 +51,7 @@ export type PageOperation =
  * Widget operation payloads with explicit TypeScript types
  */
 export type WidgetContext =
-  | { contextType: 'page'; pageId: string }
+  | { contextType: 'page'; pageId: string; versionId?: string }
   | { contextType: 'object'; objectId: string };
 
 export type AddWidgetPayload = WidgetContext & {

@@ -8,7 +8,6 @@ import { renderMustache, prepareComponentContext } from '../../utils/mustacheRen
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
-import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
 
@@ -39,7 +38,7 @@ const ContentCardWidget = ({
     }
 
     // UDC Integration
-    const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
+    const { useExternalChanges, getState } = useUnifiedData()
     const componentId = useMemo(() => `contentcardwidget-${widgetId || 'preview'}`, [widgetId])
     const headerFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-header`, [widgetId])
     const contentFieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-content`, [widgetId])
@@ -140,61 +139,32 @@ const ContentCardWidget = ({
             const updatedConfig = { ...configRef.current, header: newContent }
             setConfig(updatedConfig)
 
-            // Publish to field-level path for form field sync
-            // Use sourceId with widget type prefix: contentcardwidget-${widgetId}-field-header
-            const fieldSourceId = `${componentId}-field-header` // contentcardwidget-${widgetId}-field-header
-            publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: { header: newContent }, // Only publish the changed field
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
-
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [widgetId, slotName, onConfigChange])
 
     const handleContentChange = useCallback((newContent) => {
         if (widgetId && slotName) {
             const updatedConfig = { ...configRef.current, content: newContent }
             setConfig(updatedConfig)
 
-            // Publish to field-level path for form field sync
-            // Use sourceId with widget type prefix: contentcardwidget-${widgetId}-field-content
-            const fieldSourceId = `${componentId}-field-content` // contentcardwidget-${widgetId}-field-content
-            publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: { content: newContent }, // Only publish the changed field
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
-
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [widgetId, slotName, onConfigChange])
 
     // Image change handler for quick edit
     const handleImageChange = useCallback((fieldName, newImage) => {
         const updatedConfig = { ...configRef.current, [fieldName]: newImage }
         setConfig(updatedConfig)
         forceRerender({})
-        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            config: updatedConfig,
-            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-            slotName: slotName,
-            contextType: contextType
-        })
         if (onConfigChange) {
             onConfigChange(updatedConfig)
         }
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [onConfigChange])
 
     // Initialize editors in editor mode (only once)
     useEffect(() => {
@@ -500,4 +470,3 @@ ContentCardWidget.metadata = {
 }
 
 export default ContentCardWidget
-

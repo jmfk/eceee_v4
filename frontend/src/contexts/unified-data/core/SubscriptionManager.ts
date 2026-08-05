@@ -81,12 +81,24 @@ export class SubscriptionManager {
      */
     notifyStateUpdate(state: AppState, operation: Operation): void {
         for (const subscription of this.stateSubscriptions.values()) {
+            const subscriptionId = subscription.id;
+            const operationSnapshot = operation;
+            let newValue = state;
+            if (subscription.selector) {
+                newValue = subscription.selector(state);
+            }
+
             // Defer callback execution to avoid render-phase conflicts
             queueMicrotask(() => {
+                const activeSubscription = this.stateSubscriptions.get(subscriptionId);
+                if (!activeSubscription) {
+                    return;
+                }
+
                 try {
                     // Filter: For field-level subscriptions, only notify if sourceId matches componentId pattern
-                    const subscriptionComponentId = subscription.options.componentId;
-                    const operationSourceId = operation?.sourceId || '';
+                    const subscriptionComponentId = activeSubscription.options.componentId;
+                    const operationSourceId = operationSnapshot?.sourceId || '';
 
                     if (subscriptionComponentId && operationSourceId) {
                         // Check if this is a field-level subscription (starts with "field-")
@@ -111,25 +123,19 @@ export class SubscriptionManager {
                         }
                     }
                     
-                    let newValue = state;
-                    if (subscription.selector) {
-                        newValue = subscription.selector(state);
-                    }
-                    
                     // Skip if value hasn't changed according to equality function
                     if (
-                        subscription.lastValue !== undefined &&
-                        subscription.options.equalityFn?.(subscription.lastValue, newValue)
+                        activeSubscription.lastValue !== undefined &&
+                        activeSubscription.options.equalityFn?.(activeSubscription.lastValue, newValue)
                     ) {
                         return;
                     }
 
-                    const prevValue = subscription.lastValue;
-                    subscription.lastValue = newValue;
-                    subscription.callback(newValue, operation);
+                    activeSubscription.lastValue = newValue;
+                    activeSubscription.callback(newValue, operationSnapshot);
                 } catch (error) {
                     console.error('❌ Error in subscription callback:', error);
-                    subscription.options?.onError?.(error as Error);
+                    activeSubscription.options?.onError?.(error as Error);
                 }
             });
         }

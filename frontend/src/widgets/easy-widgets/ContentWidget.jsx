@@ -5,7 +5,7 @@
  * Widget type: easy_widgets.ContentWidget
  */
 
-import React, { useRef, useEffect, useCallback, memo, useState } from 'react'
+import React, { useRef, useEffect, useLayoutEffect, useCallback, memo, useState } from 'react'
 import { FileText } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
@@ -51,14 +51,63 @@ const cleanHTML = (html) => {
  * Vanilla JS Editor Wrapper Component
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
+const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId, widgetId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
+    const editorElementRef = useRef(null)
     const focusHandlerRef = useRef(null)
     const blurHandlerRef = useRef(null)
+    const listenerSetupTimeoutRef = useRef(null)
 
-    useEffect(() => {
+    const removeEditorListeners = useCallback(() => {
+        const editorElement = editorElementRef.current
+        if (editorElement) {
+            if (focusHandlerRef.current) {
+                editorElement.removeEventListener('focus', focusHandlerRef.current)
+            }
+            if (blurHandlerRef.current) {
+                editorElement.removeEventListener('blur', blurHandlerRef.current)
+            }
+        }
+
+        editorElementRef.current = null
+        focusHandlerRef.current = null
+        blurHandlerRef.current = null
+    }, [])
+
+    const bindEditorListeners = useCallback(() => {
+        const editorElement = containerRef.current?.querySelector('[contenteditable="true"]') ||
+            rendererRef.current?.editorElement
+        if (!editorElement || !rendererRef.current) {
+            return false
+        }
+
+        if (
+            editorElementRef.current === editorElement &&
+            focusHandlerRef.current &&
+            blurHandlerRef.current
+        ) {
+            return true
+        }
+
+        removeEditorListeners()
+
+        focusHandlerRef.current = () => {
+            rendererRef.current?.activate()
+        }
+
+        blurHandlerRef.current = () => {
+            rendererRef.current?.deactivate()
+        }
+
+        editorElement.addEventListener('focus', focusHandlerRef.current)
+        editorElement.addEventListener('blur', blurHandlerRef.current)
+        editorElementRef.current = editorElement
+        return true
+    }, [removeEditorListeners])
+
+    useLayoutEffect(() => {
         if (containerRef.current && !rendererRef.current) {
             // Initialize vanilla JS renderer with detached toolbar mode
             rendererRef.current = new ContentWidgetEditorRenderer(containerRef.current, {
@@ -75,31 +124,25 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
             rendererRef.current.render()
             lastExternalContentRef.current = content
 
-            // Set up focus/blur handlers for activation/deactivation
-            // Wait for the editor element to be created
-            setTimeout(() => {
-                const editorElement = containerRef.current?.querySelector('[contenteditable="true"]')
-                if (editorElement && rendererRef.current) {
-                    // Create handler functions
-                    focusHandlerRef.current = () => {
-                        if (rendererRef.current) {
-                            rendererRef.current.activate()
-                        }
-                    }
-
-                    blurHandlerRef.current = () => {
-                        if (rendererRef.current) {
-                            rendererRef.current.deactivate()
-                        }
-                    }
-
-                    // Add event listeners
-                    editorElement.addEventListener('focus', focusHandlerRef.current)
-                    editorElement.addEventListener('blur', blurHandlerRef.current)
-                }
-            }, 0)
+            if (!bindEditorListeners()) {
+                listenerSetupTimeoutRef.current = setTimeout(bindEditorListeners, 0)
+            }
         }
-    }, [])
+
+        return () => {
+            if (listenerSetupTimeoutRef.current) {
+                clearTimeout(listenerSetupTimeoutRef.current)
+                listenerSetupTimeoutRef.current = null
+            }
+
+            removeEditorListeners()
+
+            if (rendererRef.current) {
+                rendererRef.current.destroy()
+                rendererRef.current = null
+            }
+        }
+    }, [bindEditorListeners, removeEditorListeners])
 
     // Separate effect for content updates - only update if content is externally changed
     useEffect(() => {
@@ -125,31 +168,13 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
                 pageId,
                 siteRootId
             })
-        }
-    }, [onChange, className, namespace, slotDimensions, pageId, siteRootId])
-
-    useEffect(() => {
-        return () => {
-            // Clean up event listeners
-            const editorElement = containerRef.current?.querySelector('[contenteditable="true"]')
-            if (editorElement) {
-                if (focusHandlerRef.current) {
-                    editorElement.removeEventListener('focus', focusHandlerRef.current)
-                }
-                if (blurHandlerRef.current) {
-                    editorElement.removeEventListener('blur', blurHandlerRef.current)
-                }
-            }
-
-            // Destroy renderer
-            if (rendererRef.current) {
-                rendererRef.current.destroy()
-                rendererRef.current = null
+            if (!editorElementRef.current) {
+                bindEditorListeners()
             }
         }
-    }, [])
+    }, [onChange, className, namespace, slotDimensions, pageId, siteRootId, bindEditorListeners])
 
-    return <div ref={containerRef} className="" />
+    return <div ref={containerRef} className="" data-testid={widgetId ? `content-widget-editor-${widgetId}` : undefined} />
 })
 
 /**
@@ -230,6 +255,7 @@ const ContentWidget = memo(({
                 slotDimensions={slotConfig?.dimensions}
                 pageId={context?.pageId}
                 siteRootId={context?.siteRootId}
+                widgetId={widgetId}
             />
         )
     }
@@ -246,7 +272,8 @@ const ContentWidget = memo(({
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&
         prevProps.slotName === nextProps.slotName &&
-        prevProps.widgetType === nextProps.widgetType
+        prevProps.widgetType === nextProps.widgetType &&
+        prevProps.onConfigChange === nextProps.onConfigChange
     );
 })
 

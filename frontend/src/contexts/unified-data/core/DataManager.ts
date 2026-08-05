@@ -55,30 +55,30 @@ export class DataManager {
     private resolveWidgetTargetFromPayload(payload: WidgetContext): WidgetTarget {
         if (payload.contextType === 'page') {
             const pageId = String(payload.pageId);
-            const currentVersionId = this.state.metadata.currentVersionId as any;
-            if (!currentVersionId) {
+            const targetVersionId = (payload as any).versionId || (payload as any).targetVersionId || this.state.metadata.currentVersionId as any;
+            if (!targetVersionId) {
                 throw new StateError(
                     ErrorCodes.INVALID_CONTEXT,
                     'No current page version selected for page widget operation',
                     { pageId }
                 );
             }
-            const version = this.state.versions[currentVersionId];
+            const version = this.state.versions[targetVersionId];
             if (!version) {
                 throw new StateError(
                     ErrorCodes.INVALID_CONTEXT,
-                    `Version ${currentVersionId} not found`,
-                    { currentVersionId }
+                    `Version ${targetVersionId} not found`,
+                    { targetVersionId }
                 );
             }
             if (String(version.pageId) !== pageId) {
                 throw new StateError(
                     ErrorCodes.INVALID_CONTEXT,
-                    `Current version ${currentVersionId} does not belong to provided page ${pageId}`,
-                    { currentVersionId, versionPageId: version.pageId, pageId }
+                    `Target version ${targetVersionId} does not belong to provided page ${pageId}`,
+                    { targetVersionId, versionPageId: version.pageId, pageId }
                 );
             }
-            return { versionId: currentVersionId };
+            return { versionId: targetVersionId };
         }
 
         if (payload.contextType === 'object') {
