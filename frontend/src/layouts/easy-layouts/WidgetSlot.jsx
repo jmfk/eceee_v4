@@ -389,6 +389,7 @@ const WidgetSlot = ({
             <div
                 className={`widget-slot slot-${normalizeForCSS(name)} group relative`}
                 data-slot-name={name}
+                data-testid={`page-editor-slot-${name}`}
                 data-widget-slot={name}
                 data-slot-title={label}
                 data-slot-description={description}
@@ -554,6 +555,7 @@ const WidgetSlot = ({
                                                         <div className="mt-4">
                                                             <button
                                                                 onClick={handleAddWidget}
+                                                                data-testid={`page-editor-add-widget-${name}`}
                                                                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                                                             >
                                                                 <Plus className="h-4 w-4 mr-2" />
