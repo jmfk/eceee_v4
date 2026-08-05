@@ -275,6 +275,17 @@ const normalizeRenderLanguages = (value) => {
   return normalized.length > 0 ? normalized : ['sv']
 }
 
+const resolveStartUrl = (baseUrl, startUrl = '') => {
+  const value = String(startUrl || '').trim()
+  if (!value) return baseUrl
+
+  try {
+    return new URL(value, baseUrl).toString()
+  } catch {
+    return baseUrl
+  }
+}
+
 const docsRoot = path.join(__dirname, 'src/docs/how-to')
 const translationsRoot = path.join(__dirname, 'src/docs/how-to-translations')
 const publicRoot = path.join(__dirname, 'public')
@@ -424,12 +435,15 @@ const readRecordingSnapshot = async (id, baseUrl = '') => {
   const events = await safeReadJsonFile(paths.eventsPath, [])
   const metadata = await safeReadJsonFile(paths.metadataPath, {})
   const rawVideoPath = Array.isArray(metadata.rawVideos) ? metadata.rawVideos[0] || '' : ''
+  const referenceVideoPath = metadata.referenceVideoPath || ''
   const microphonePath = metadata.microphonePath || ''
   const status = session?.status || metadata.status || 'unknown'
   const log = session?.log || ''
   const hasAudioClips = Array.isArray(metadata.audioClips) && metadata.audioClips.length > 0
+  const snapshotBaseUrl = baseUrl || session?.baseUrl || metadata.baseUrl || ''
+  const snapshotStartUrl = session?.startUrl || metadata.startUrl || ''
   const blocks = convertRecordedEventsToScriptBlocks(events, {
-    baseUrl: baseUrl || session?.baseUrl || metadata.baseUrl || '',
+    baseUrl: snapshotBaseUrl,
     audio: microphonePath && hasAudioClips ? {
       startedAt: metadata.microphoneStartedAt || 0,
       durationMs: metadata.microphoneStoppedAt && metadata.microphoneStartedAt ? metadata.microphoneStoppedAt - metadata.microphoneStartedAt : 0,
@@ -441,13 +455,16 @@ const readRecordingSnapshot = async (id, baseUrl = '') => {
   return {
     id: paths.id,
     status,
-    baseUrl: baseUrl || session?.baseUrl || metadata.baseUrl || '',
+    baseUrl: snapshotBaseUrl,
+    startUrl: snapshotStartUrl,
     log,
     events,
     blocks,
     eventCount: events.length,
     rawVideoPath,
     rawVideoUrl: rawVideoPath ? `/__howto-script-editor/record/${paths.id}/raw-video` : '',
+    referenceVideoPath,
+    referenceVideoUrl: referenceVideoPath ? `/__howto-script-editor/record/${paths.id}/reference-video` : '',
     microphonePath,
     microphoneUrl: microphonePath ? `/__howto-script-editor/record/${paths.id}/audio/full` : '',
     error: session?.error || metadata.error || ''
@@ -528,6 +545,76 @@ const ensureRecordingAudioClips = async (id, baseUrl = '', session = null) => {
   return clips
 }
 
+const muxRecordingReferenceVideo = async (id, session = null) => {
+  const paths = recordingPathsFor(id)
+  const metadata = await safeReadJsonFile(paths.metadataPath, {})
+  const rawVideoPath = Array.isArray(metadata.rawVideos) ? metadata.rawVideos[0] || '' : ''
+  const microphonePath = metadata.microphonePath || ''
+  const referenceVideoPath = path.join(paths.outputDir, 'reference-with-audio.webm')
+
+  if (metadata.referenceVideoPath && existsSync(metadata.referenceVideoPath)) {
+    return metadata.referenceVideoPath
+  }
+  if (!rawVideoPath || !existsSync(rawVideoPath)) {
+    if (session) session.log += '\nNo raw reference video was available to combine with microphone audio.\n'
+    return ''
+  }
+  if (!microphonePath || !existsSync(microphonePath)) {
+    if (session) session.log += '\nNo microphone audio was available to combine with the reference video.\n'
+    return ''
+  }
+
+  if (session) session.log += '\nCombining raw reference video with microphone audio...\n'
+
+  await runProcess(process.env.FFMPEG_PATH || 'ffmpeg', [
+    '-y',
+    '-i', rawVideoPath,
+    '-i', microphonePath,
+    '-map', '0:v:0',
+    '-map', '1:a:0',
+    '-c:v', 'copy',
+    '-c:a', 'libopus',
+    '-shortest',
+    referenceVideoPath
+  ])
+
+  await writeFile(paths.metadataPath, JSON.stringify({
+    ...metadata,
+    referenceVideoPath,
+    referenceVideoWithAudio: true
+  }, null, 2), 'utf8')
+
+  if (session) session.log += `Reference video with audio: ${referenceVideoPath}\n`
+  return referenceVideoPath
+}
+
+const finalizeRecordingAssets = (id, baseUrl = '', session = null, options = {}) => {
+  if (session?.finalizePromise) return session.finalizePromise
+
+  const terminalStatus = options.terminalStatus || session?.terminalStatus || session?.status || 'stopped'
+  const promise = ensureRecordingAudioClips(id, baseUrl, session)
+    .then(() => {
+      const shouldMuxReferenceVideo = Boolean(options.recordReferenceVideoWithAudio || session?.recordReferenceVideoWithAudio)
+      return shouldMuxReferenceVideo ? muxRecordingReferenceVideo(id, session) : null
+    })
+    .catch(error => {
+      if (session) {
+        session.log += `\nRecording finalization failed: ${error.message}\n`
+        session.error = session.error || error.message
+      }
+      return null
+    })
+    .finally(() => {
+      if (session) {
+        session.status = session.error && terminalStatus !== 'stopped' ? 'error' : terminalStatus
+        session.finalizePromise = null
+      }
+    })
+
+  if (session) session.finalizePromise = promise
+  return promise
+}
+
 const blockAudioPathFor = (kind, fileName) => {
   const safeKind = safeSegment(kind, '')
   const safeName = path.basename(fileName || '')
@@ -540,6 +627,89 @@ const blockAudioPathFor = (kind, fileName) => {
   }
 
   return targetPath
+}
+
+const editorAudioPathFromUrl = (audioUrl = '') => {
+  const rawValue = String(audioUrl || '').trim()
+  if (!rawValue) throw new Error('Audio URL is required.')
+
+  if (path.isAbsolute(rawValue)) return rawValue
+
+  let pathname = rawValue
+  try {
+    pathname = new URL(rawValue, 'http://localhost').pathname
+  } catch {
+    pathname = rawValue.split('?')[0]
+  }
+
+  const parts = pathname.split('/').filter(Boolean)
+  const blockAudioIndex = parts.indexOf('block-audio')
+  if (blockAudioIndex >= 0) {
+    return blockAudioPathFor(parts[blockAudioIndex + 1] || '', parts[blockAudioIndex + 2] || '')
+  }
+
+  const recordIndex = parts.indexOf('record')
+  if (recordIndex >= 0) {
+    const id = parts[recordIndex + 1] || ''
+    const action = parts[recordIndex + 2] || ''
+    const audioName = parts[recordIndex + 3] || ''
+    if (action !== 'audio') throw new Error('Unsupported recording asset URL.')
+    const paths = recordingPathsFor(id)
+    return audioName === 'full'
+      ? path.join(paths.outputDir, 'microphone.webm')
+      : path.join(paths.outputDir, 'audio-clips', path.basename(audioName))
+  }
+
+  throw new Error('Unsupported audio URL.')
+}
+
+const transcribeAudioClip = async ({ audioUrl = '', language = 'en' } = {}) => {
+  const audioPath = editorAudioPathFromUrl(audioUrl)
+  if (!existsSync(audioPath)) throw new Error('Audio clip not found on disk.')
+
+  const normalizedLanguage = safeSegment(language, 'en')
+  const transcriptPath = `${audioPath}.${normalizedLanguage}.transcript.json`
+  if (existsSync(transcriptPath)) {
+    const cached = JSON.parse(await readFile(transcriptPath, 'utf8'))
+    if (cached.text) return cached
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is required to transcribe audio clips.')
+  }
+
+  const buffer = await readFile(audioPath)
+  const form = new FormData()
+  form.append('model', process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe')
+  form.append('response_format', 'json')
+  if (normalizedLanguage) form.append('language', normalizedLanguage)
+  form.append('file', new Blob([buffer], { type: publicAssetContentType(audioPath) }), path.basename(audioPath))
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: form
+  })
+
+  const responseText = await response.text()
+  if (!response.ok) {
+    throw new Error(`Audio transcription failed: ${response.status} ${responseText}`)
+  }
+
+  const data = JSON.parse(responseText)
+  const payload = {
+    source: 'openai',
+    model: process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
+    language: normalizedLanguage,
+    text: data.text || '',
+    audioPath,
+    createdAt: new Date().toISOString()
+  }
+
+  await writeFile(transcriptPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+  return payload
 }
 
 const getEnvVoiceIdForLanguage = (language = '') => {
@@ -1534,8 +1704,10 @@ const howToScriptEditorPlugin = () => ({
         const id = randomUUID().slice(0, 8)
         const paths = recordingPathsFor(id)
         const baseUrl = String(body.baseUrl || 'http://localhost:3000').trim()
+        const startUrl = resolveStartUrl(baseUrl, body.startUrl || body.recordingStartUrl || '')
         const username = String(body.username || '').trim()
         const password = String(body.password || '')
+        const recordReferenceVideoWithAudio = Boolean(body.recordReferenceVideoWithAudio || body.referenceVideoWithAudio)
 
         await mkdir(paths.outputDir, { recursive: true })
         const storageState = await createAuthState({
@@ -1547,15 +1719,19 @@ const howToScriptEditorPlugin = () => ({
         const session = {
           id,
           baseUrl,
+          startUrl,
           outputDir: paths.outputDir,
-          log: `Starting action recorder against ${baseUrl}\n`,
+          recordReferenceVideoWithAudio,
+          log: `Starting action recorder against ${baseUrl}\nStart URL: ${startUrl}\nReference video with audio: ${recordReferenceVideoWithAudio ? 'on' : 'off'}\n`,
           status: 'starting',
           error: '',
-          child: null
+          child: null,
+          finalizePromise: null
         }
         const recorder = runHowToRecorder([
           '--session-id', id,
           '--base-url', baseUrl,
+          '--start-url', startUrl,
           '--output-dir', paths.outputDir,
           ...(storageState ? ['--storage-state', storageState] : [])
         ], text => {
@@ -1573,15 +1749,15 @@ const howToScriptEditorPlugin = () => ({
           session.log += `\nERROR: ${error.message}\n`
         })
         recorder.child.once('exit', code => {
-          if (session.status !== 'stopping' && session.status !== 'stopped') {
-            session.status = code === 0 ? 'closed' : 'error'
-          }
-          if (code !== 0 && session.status === 'error' && !session.error) {
+          const terminalStatus = code === 0
+            ? (session.status === 'stopping' || session.status === 'stopped' ? 'stopped' : 'closed')
+            : 'error'
+          if (code !== 0 && !session.error) {
             session.error = `Recorder exited with code ${code}`
           }
-          ensureRecordingAudioClips(id, baseUrl, session).catch(error => {
-            session.log += `\nAudio clip extraction failed: ${error.message}\n`
-          })
+          session.terminalStatus = terminalStatus
+          session.status = 'finalizing'
+          finalizeRecordingAssets(id, baseUrl, session, { terminalStatus })
         })
 
         sendJson(res, 200, {
@@ -1613,10 +1789,8 @@ const howToScriptEditorPlugin = () => ({
         }
 
         if (session) session.status = 'stopped'
-        await ensureRecordingAudioClips(id, session?.baseUrl || body.baseUrl || '', session).catch(error => {
-          if (session) {
-            session.log += `\nAudio clip extraction failed: ${error.message}\n`
-          }
+        await finalizeRecordingAssets(id, session?.baseUrl || body.baseUrl || '', session, {
+          recordReferenceVideoWithAudio: Boolean(body.recordReferenceVideoWithAudio || body.referenceVideoWithAudio)
         })
         sendJson(res, 200, await readRecordingSnapshot(id, session?.baseUrl || body.baseUrl || ''))
       } catch (error) {
@@ -1631,7 +1805,7 @@ const howToScriptEditorPlugin = () => ({
       const id = recordIndex >= 0 ? parts[recordIndex + 1] || '' : parts[0] || ''
       const action = recordIndex >= 0 ? parts[recordIndex + 2] || '' : parts[1] || ''
 
-      if (!id || !['events', 'raw-video', 'audio'].includes(action)) {
+      if (!id || !['events', 'raw-video', 'reference-video', 'audio'].includes(action)) {
         next()
         return
       }
@@ -1655,6 +1829,10 @@ const howToScriptEditorPlugin = () => ({
         const snapshot = await readRecordingSnapshot(id, url.searchParams.get('baseUrl') || '')
         let assetPath = snapshot.rawVideoPath
 
+        if (action === 'reference-video') {
+          assetPath = snapshot.referenceVideoPath
+        }
+
         if (action === 'audio') {
           const audioName = parts[recordIndex >= 0 ? recordIndex + 3 : 2] || ''
           assetPath = audioName === 'full'
@@ -1663,7 +1841,12 @@ const howToScriptEditorPlugin = () => ({
         }
 
         if (!assetPath || !existsSync(assetPath)) {
-          sendJson(res, 404, { error: action === 'audio' ? 'Recorded audio not found.' : 'Raw recording video not found.' })
+          const missingMessage = action === 'audio'
+            ? 'Recorded audio not found.'
+            : action === 'reference-video'
+              ? 'Reference video with audio not found.'
+              : 'Raw recording video not found.'
+          sendJson(res, 404, { error: missingMessage })
           return
         }
 
@@ -1679,9 +1862,9 @@ const howToScriptEditorPlugin = () => ({
       }
     })
 
-    server.middlewares.use('/__howto-script-editor/block-audio/recorded', async (req, res) => {
+    server.middlewares.use('/__howto-script-editor/block-audio/recorded', async (req, res, next) => {
       if (req.method !== 'POST') {
-        sendJson(res, 405, { error: 'Method not allowed' })
+        next()
         return
       }
 
@@ -1707,6 +1890,20 @@ const howToScriptEditorPlugin = () => ({
       }
 
       next()
+    })
+
+    server.middlewares.use('/__howto-script-editor/block-audio/transcribe', async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const body = await readRequestJson(req)
+        sendJson(res, 200, { transcript: await transcribeAudioClip(body) })
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
     })
 
     server.middlewares.use('/__howto-script-editor/block-audio', async (req, res, next) => {

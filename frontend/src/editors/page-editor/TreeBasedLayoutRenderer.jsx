@@ -1,5 +1,8 @@
 /**
  * Tree-Based Layout Renderer
+ *
+ * LEGACY/QUARANTINED: Not used by the active PageEditor route. The active
+ * editor renders PageContentEditor -> ReactLayoutRenderer.
  * 
  * Simplified layout renderer using inheritance tree structure.
  * This replaces the complex merge logic with simple tree queries.

@@ -73,10 +73,16 @@ describe('howToScriptEditor', () => {
             id: 'pages-demo',
             title: 'Create demo content',
             summary: 'Create one safe demo page.',
+            startUrl: '/pages',
             order: 4,
             script: [
                 { caption: 'Open Pages.', action: { type: 'goto', path: '/pages' } },
-                { caption: 'Use a clear title.', action: { type: 'fill', selector: '#title', value: 'Demo page' } },
+                {
+                    caption: 'Use a clear title.',
+                    vttText: 'Use a clear title in the title field.',
+                    transcript: 'Use a clear title in the title field.',
+                    action: { type: 'fill', selector: '#title', value: 'Demo page' }
+                },
                 { caption: 'This part is voiceover only.', action: null }
             ]
         }, {
@@ -94,11 +100,19 @@ describe('howToScriptEditor', () => {
             id: 'pages-demo',
             title: 'Create demo content',
             summary: 'Create one safe demo page.',
+            startUrl: '/pages',
             steps: ['Open Pages.', 'Use a clear title.', 'This part is voiceover only.']
         })
         expect(parsed.guide.actions).toEqual([
             { type: 'goto', path: '/pages', caption: 'Open Pages.' },
-            { type: 'fill', selector: '#title', value: 'Demo page', caption: 'Use a clear title.' },
+            {
+                type: 'fill',
+                selector: '#title',
+                value: 'Demo page',
+                caption: 'Use a clear title.',
+                vttText: 'Use a clear title in the title field.',
+                transcript: 'Use a clear title in the title field.'
+            },
             { type: 'caption', caption: 'This part is voiceover only.' }
         ])
     })

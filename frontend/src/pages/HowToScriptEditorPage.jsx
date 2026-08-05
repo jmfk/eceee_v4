@@ -66,7 +66,8 @@ const getReadableSourcePath = (sourcePath = '') => sourcePath
 const DEFAULT_DEMO_SETTINGS = {
     baseUrl: 'http://localhost:3000',
     username: 'demo',
-    password: 'demo'
+    password: 'demo',
+    recordReferenceVideoWithAudio: false
 }
 
 const EXTRA_SECTION_OPTIONS = [{
@@ -114,7 +115,7 @@ const editorSession = {
     globalHoldMs: 0,
     videoOverrideByKey: {},
     scriptBlockClipboard: null,
-    recordingRun: { id: '', log: '', error: '', blocks: [], rawVideoUrl: '', rawVideoPath: '', status: '' }
+    recordingRun: { id: '', log: '', error: '', blocks: [], rawVideoUrl: '', rawVideoPath: '', referenceVideoUrl: '', referenceVideoPath: '', status: '' }
 }
 
 const SCRIPT_BLOCK_CLIPBOARD_TYPE = 'eceee/howto-script-block'
@@ -723,14 +724,20 @@ const audioLabel = source => source === 'elevenlabs' ? 'ElevenLabs' : source ===
 const BlockAudioEditor = ({
     audio,
     caption,
+    transcript,
+    vttText,
     index,
     onChange,
+    onTranscriptChange,
+    onVttTextChange,
     onSaveRecording,
     onGenerateElevenLabs,
+    onTranscribeAudio,
     disabled = false
 }) => {
     const [isRecording, setIsRecording] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [isTranscribing, setIsTranscribing] = useState(false)
     const mediaRecorderRef = useRef(null)
     const streamRef = useRef(null)
     const chunksRef = useRef([])
@@ -857,6 +864,22 @@ const BlockAudioEditor = ({
         }
     }
 
+    const transcribeActiveClip = async () => {
+        if (!activeClip?.url) return
+
+        try {
+            setIsTranscribing(true)
+            const text = await onTranscribeAudio({ audioUrl: activeClip.url, index })
+            onTranscriptChange(text)
+            if (!String(vttText || '').trim()) onVttTextChange(text)
+            toast.success('Audio transcribed')
+        } catch (error) {
+            toast.error(error.message)
+        } finally {
+            setIsTranscribing(false)
+        }
+    }
+
     const durationSeconds = activeClip
         ? Math.max(0, Math.round((Number(activeClip.endMs || 0) - Number(activeClip.startMs || 0)) / 1000 * 10) / 10)
         : 0
@@ -899,6 +922,9 @@ const BlockAudioEditor = ({
                 <button type="button" onClick={generateElevenLabs} disabled={disabled || isRecording || isGenerating || !caption.trim()} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
                     {isGenerating ? 'Generating...' : elevenLabsClip ? 'Regenerate ElevenLabs' : 'Generate ElevenLabs'}
                 </button>
+                <button type="button" onClick={transcribeActiveClip} disabled={disabled || isRecording || isGenerating || isTranscribing || !activeClip?.url} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                    {isTranscribing ? 'Transcribing...' : 'Transcribe audio'}
+                </button>
                 {recordedClip && (
                     <button type="button" onClick={() => clearClip('recorded')} disabled={disabled || isRecording || isGenerating} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
                         Remove recorded
@@ -930,6 +956,35 @@ const BlockAudioEditor = ({
                 </div>
             )}
 
+            <div className="mt-3 grid gap-3">
+                <TextArea
+                    label="Audio transcript"
+                    value={transcript || ''}
+                    onChange={onTranscriptChange}
+                    rows={2}
+                    placeholder="Quick transcription of the active audio clip."
+                    disabled={disabled || isRecording}
+                />
+                <TextArea
+                    label="VTT text"
+                    value={vttText || ''}
+                    onChange={onVttTextChange}
+                    rows={2}
+                    placeholder="Optional subtitle text. If empty, the caption is used."
+                    disabled={disabled || isRecording}
+                />
+                {transcript && (
+                    <button
+                        type="button"
+                        onClick={() => onVttTextChange(transcript)}
+                        disabled={disabled || isRecording}
+                        className="justify-self-start rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Use transcript as VTT text
+                    </button>
+                )}
+            </div>
+
             <div className="mt-2 text-xs text-blue-700">
                 Recorded clips are selected automatically when available. ElevenLabs is used when selected or when no recorded clip exists.
             </div>
@@ -950,6 +1005,7 @@ const ScriptBlockEditor = ({
     onPaste,
     onSaveRecording,
     onGenerateElevenLabs,
+    onTranscribeAudio,
     blockRef,
     disabled = false
 }) => {
@@ -1083,10 +1139,15 @@ const ScriptBlockEditor = ({
                     <BlockAudioEditor
                         audio={normalized.audio}
                         caption={normalized.caption}
+                        transcript={normalized.transcript}
+                        vttText={normalized.vttText}
                         index={index}
                         onChange={audio => onChange({ ...normalized, audio })}
+                        onTranscriptChange={transcript => onChange({ ...normalized, transcript })}
+                        onVttTextChange={vttText => onChange({ ...normalized, vttText })}
                         onSaveRecording={onSaveRecording}
                         onGenerateElevenLabs={onGenerateElevenLabs}
+                        onTranscribeAudio={onTranscribeAudio}
                         disabled={disabled}
                     />
                 </div>
@@ -1219,6 +1280,8 @@ const RecordingImportDialog = ({ run, onClose, onImport }) => {
 
     const blocks = run.blocks || []
     const audioBlockCount = blocks.filter(block => block.audio?.url).length
+    const referenceVideoUrl = run.referenceVideoUrl || run.rawVideoUrl
+    const referenceVideoLabel = run.referenceVideoUrl ? 'Reference video with audio' : 'Raw reference video'
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 px-4 py-6">
@@ -1231,10 +1294,10 @@ const RecordingImportDialog = ({ run, onClose, onImport }) => {
                     </p>
                 </div>
                 <div className="space-y-4 px-5 py-4">
-                    {run.rawVideoUrl && (
+                    {referenceVideoUrl && (
                         <div className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-                            Raw reference video:{' '}
-                            <a href={run.rawVideoUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 hover:text-blue-800">
+                            {referenceVideoLabel}:{' '}
+                            <a href={referenceVideoUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 hover:text-blue-800">
                                 Open recording
                             </a>
                         </div>
@@ -1456,6 +1519,71 @@ const FinishedPagePreview = ({ draft, language, preview }) => {
     )
 }
 
+const RecordingOptionsDialog = ({
+    isOpen,
+    baseUrl,
+    startUrl,
+    withVoice,
+    recordReferenceVideoWithAudio,
+    onVoiceChange,
+    onReferenceVideoChange,
+    onClose,
+    onStart
+}) => {
+    if (!isOpen) return null
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 px-4 py-6">
+            <section className="w-full max-w-md rounded border border-gray-200 bg-white shadow-xl">
+                <div className="border-b border-gray-200 px-5 py-4">
+                    <h2 className="text-base font-semibold text-gray-900">Record actions</h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                        The recorder will open a visible browser window.
+                    </p>
+                </div>
+                <div className="space-y-4 px-5 py-4">
+                    <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                        <div><span className="font-semibold text-gray-800">Base URL:</span> {baseUrl}</div>
+                        <div className="mt-1"><span className="font-semibold text-gray-800">Start URL:</span> {startUrl || baseUrl}</div>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                            type="checkbox"
+                            checked={withVoice}
+                            onChange={event => onVoiceChange(event.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Generate voice track
+                    </label>
+                    <label className="flex items-start gap-2 text-sm text-gray-700">
+                        <input
+                            type="checkbox"
+                            checked={recordReferenceVideoWithAudio}
+                            onChange={event => onReferenceVideoChange(event.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>
+                            <span className="block font-medium text-gray-800">Record reference video with microphone audio</span>
+                            <span className="block text-xs text-gray-500">
+                                Creates a separate raw recording for review; it is not published as the tutorial video.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-4">
+                    <button type="button" onClick={onClose} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={onStart} className="inline-flex items-center gap-2 rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800">
+                        <MousePointerClick className="h-4 w-4" />
+                        Start recording
+                    </button>
+                </div>
+            </section>
+        </div>
+    )
+}
+
 const QualityPanel = ({
     draft,
     issues,
@@ -1464,8 +1592,6 @@ const QualityPanel = ({
     isRendering,
     isPublishing,
     activeLanguage,
-    withVoice,
-    onVoiceChange,
     onRender,
     onPublish,
     videoOverride,
@@ -1576,16 +1702,6 @@ const QualityPanel = ({
                         disabled={isRendering}
                     />
                 </div>
-                <label className={`mt-3 inline-flex items-center gap-2 text-sm ${isRendering ? 'cursor-not-allowed text-gray-400' : 'text-gray-700'}`}>
-                    <input
-                        type="checkbox"
-                        checked={withVoice}
-                        disabled={isRendering}
-                        onChange={event => onVoiceChange(event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    Generate voice track
-                </label>
                 <div className={`mt-3 rounded border px-3 py-3 ${hasVideoOverride ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
@@ -1758,8 +1874,9 @@ const HowToScriptEditorPage = () => {
     const [pendingMetadataChange, setPendingMetadataChange] = useState(null)
     const [isApplyingMetadataChange, setIsApplyingMetadataChange] = useState(false)
     const [isRecordingActions, setIsRecordingActions] = useState(false)
+    const [isRecordingOptionsOpen, setIsRecordingOptionsOpen] = useState(false)
     const [recordingRun, setRecordingRun] = useState(editorSession.recordingRun)
-    const [recordingImport, setRecordingImport] = useState({ isOpen: false, blocks: [], rawVideoUrl: '', rawVideoPath: '', id: '' })
+    const [recordingImport, setRecordingImport] = useState({ isOpen: false, blocks: [], rawVideoUrl: '', rawVideoPath: '', referenceVideoUrl: '', referenceVideoPath: '', id: '' })
 
     const activeDraft = openDrafts.find(draft => getDraftSessionKey(draft) === activeDraftKey) || openDrafts[0]
     const activePreviewKey = activeDraft ? getDraftSessionKey(activeDraft) : activeDraftKey
@@ -2034,7 +2151,9 @@ const HowToScriptEditorPage = () => {
                         id: data.id,
                         blocks: data.blocks || [],
                         rawVideoUrl: data.rawVideoUrl || '',
-                        rawVideoPath: data.rawVideoPath || ''
+                        rawVideoPath: data.rawVideoPath || '',
+                        referenceVideoUrl: data.referenceVideoUrl || '',
+                        referenceVideoPath: data.referenceVideoPath || ''
                     })
                 }
             } catch {
@@ -2152,6 +2271,13 @@ const HowToScriptEditorPage = () => {
 
     const updateDemoSettings = (settings) => {
         setDemoSettings(settings)
+    }
+
+    const updateRecordReferenceVideoWithAudio = (recordReferenceVideoWithAudio) => {
+        setDemoSettings(current => ({
+            ...current,
+            recordReferenceVideoWithAudio
+        }))
     }
 
     const updateGlobalHoldMs = (value) => {
@@ -2511,6 +2637,20 @@ const HowToScriptEditorPage = () => {
         return data.audio
     }
 
+    const transcribeBlockAudio = async ({ audioUrl }) => {
+        const response = await fetch('/__howto-script-editor/block-audio/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                audioUrl,
+                language: activeDraftLanguage
+            })
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Could not transcribe audio')
+        return data.transcript?.text || ''
+    }
+
     const openGuide = (option) => {
         if (isRendering) return
         const language = activeDraftLanguage || routeLanguage
@@ -2664,14 +2804,17 @@ const HowToScriptEditorPage = () => {
     const startActionRecording = async () => {
         if (isRendering || isRecordingActions || isGeneratingBlock || !activeDraft) return
 
+        setIsRecordingOptionsOpen(false)
         setProcessLogSource('recording')
         setRecordingRun({
             id: '',
-            log: `Starting action recorder against ${demoSettings.baseUrl}\n`,
+            log: `Starting action recorder against ${demoSettings.baseUrl}\nStart URL: ${activeDraft.startUrl || demoSettings.baseUrl}\nReference video with audio: ${demoSettings.recordReferenceVideoWithAudio ? 'on' : 'off'}\n`,
             error: '',
             blocks: [],
             rawVideoUrl: '',
             rawVideoPath: '',
+            referenceVideoUrl: '',
+            referenceVideoPath: '',
             status: 'starting'
         })
         setIsRecordingActions(true)
@@ -2680,7 +2823,10 @@ const HowToScriptEditorPage = () => {
             const response = await fetch('/__howto-script-editor/record/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(demoSettings)
+                body: JSON.stringify({
+                    ...demoSettings,
+                    startUrl: activeDraft.startUrl || ''
+                })
             })
             const data = await response.json()
 
@@ -2713,7 +2859,11 @@ const HowToScriptEditorPage = () => {
             const response = await fetch('/__howto-script-editor/record/stop', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: recordingRun.id, baseUrl: demoSettings.baseUrl })
+                body: JSON.stringify({
+                    id: recordingRun.id,
+                    baseUrl: demoSettings.baseUrl,
+                    recordReferenceVideoWithAudio: Boolean(demoSettings.recordReferenceVideoWithAudio)
+                })
             })
             const data = await response.json()
 
@@ -2731,7 +2881,9 @@ const HowToScriptEditorPage = () => {
                 id: data.id,
                 blocks: data.blocks || [],
                 rawVideoUrl: data.rawVideoUrl || '',
-                rawVideoPath: data.rawVideoPath || ''
+                rawVideoPath: data.rawVideoPath || '',
+                referenceVideoUrl: data.referenceVideoUrl || '',
+                referenceVideoPath: data.referenceVideoPath || ''
             })
             toast.success(`Captured ${(data.blocks || []).length} action block${(data.blocks || []).length === 1 ? '' : 's'}`)
         } catch (error) {
@@ -2742,7 +2894,7 @@ const HowToScriptEditorPage = () => {
     }
 
     const closeRecordingImport = () => {
-        setRecordingImport({ isOpen: false, blocks: [], rawVideoUrl: '', rawVideoPath: '', id: '' })
+        setRecordingImport({ isOpen: false, blocks: [], rawVideoUrl: '', rawVideoPath: '', referenceVideoUrl: '', referenceVideoPath: '', id: '' })
     }
 
     const importRecordedActions = (mode) => {
@@ -3711,6 +3863,13 @@ const HowToScriptEditorPage = () => {
                             <div className="-mt-3 text-xs text-gray-500 md:col-start-2">
                                 Use Save As to create a manuscript with a different Guide ID.
                             </div>
+                            <TextInput
+                                label="Recording start URL"
+                                value={activeDraft.startUrl || ''}
+                                onChange={startUrl => updateActiveDraft({ startUrl })}
+                                placeholder="/pages"
+                                disabled={isRendering}
+                            />
                             <TextInput label="Order" type="number" value={activeDraft.order} onChange={order => updateActiveDraft({ order })} disabled={isRendering} />
                             <TextArea label="Summary" value={activeDraft.summary} onChange={summary => updateActiveDraft({ summary })} rows={2} disabled={isRendering} />
                             <SelectInput label="Section" value={activeDraft.sectionId} onChange={requestSectionChange} disabled={isRendering || isApplyingMetadataChange}>
@@ -3750,7 +3909,7 @@ const HowToScriptEditorPage = () => {
                                         Stop recording
                                     </button>
                                 ) : (
-                                    <button type="button" onClick={startActionRecording} disabled={isRendering || isGeneratingBlock || isGeneratingDoc} className="inline-flex items-center gap-2 rounded border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                    <button type="button" onClick={() => setIsRecordingOptionsOpen(true)} disabled={isRendering || isGeneratingBlock || isGeneratingDoc} className="inline-flex items-center gap-2 rounded border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
                                         <MousePointerClick className="h-4 w-4" />
                                         Record actions
                                     </button>
@@ -3780,6 +3939,7 @@ const HowToScriptEditorPage = () => {
                                 onPaste={position => pasteScriptBlock(index, position)}
                                 onSaveRecording={saveRecordedBlockAudio}
                                 onGenerateElevenLabs={generateBlockElevenLabsAudio}
+                                onTranscribeAudio={transcribeBlockAudio}
                                 blockRef={element => {
                                     if (element) {
                                         scriptBlockRefs.current.set(index, element)
@@ -3818,8 +3978,6 @@ const HowToScriptEditorPage = () => {
                     isRendering={isRendering}
                     isPublishing={isPublishing}
                     activeLanguage={activeDraftLanguage}
-                    withVoice={withVoice}
-                    onVoiceChange={setWithVoice}
                     onRender={renderPreview}
                     onPublish={publishReviewedGuide}
                     videoOverride={videoOverride}
@@ -3856,6 +4014,18 @@ const HowToScriptEditorPage = () => {
                 onOverwriteChange={overwrite => setSaveAsState(current => ({ ...current, overwrite }))}
                 onSubmit={saveMarkdownAs}
                 onClose={closeSaveAsModal}
+            />
+
+            <RecordingOptionsDialog
+                isOpen={isRecordingOptionsOpen}
+                baseUrl={demoSettings.baseUrl || DEFAULT_DEMO_SETTINGS.baseUrl}
+                startUrl={activeDraft.startUrl || demoSettings.baseUrl || DEFAULT_DEMO_SETTINGS.baseUrl}
+                withVoice={withVoice}
+                recordReferenceVideoWithAudio={Boolean(demoSettings.recordReferenceVideoWithAudio)}
+                onVoiceChange={setWithVoice}
+                onReferenceVideoChange={updateRecordReferenceVideoWithAudio}
+                onClose={() => setIsRecordingOptionsOpen(false)}
+                onStart={startActionRecording}
             />
 
             <RecordingImportDialog

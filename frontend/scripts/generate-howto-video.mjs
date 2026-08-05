@@ -717,6 +717,12 @@ const getActionCaption = (action, guide, language) => {
     || guide.title
 }
 
+const getActionSubtitleText = (action, caption, language) => (
+  getLocalizedValue(action, 'vttText', language)
+    || getLocalizedValue(action, 'subtitle', language)
+    || caption
+)
+
 const buildNarrationText = (guide, cues, language) => {
   const guideNarration = getLocalizedValue(guide, 'narration', language)
   if (guideNarration) return guideNarration
@@ -2233,9 +2239,14 @@ const prepareActionSegments = async (args, guide, actions, safeName) => {
   for (const [index, action] of actions.entries()) {
     const sourceCaption = getActionCaption(action, guide, args.language)
     const caption = await translateText(sourceCaption, args)
+    const sourceSubtitleText = getActionSubtitleText(action, sourceCaption, args.language)
+    const subtitleText = sourceSubtitleText === sourceCaption
+      ? caption
+      : await translateText(sourceSubtitleText, args)
     const segment = {
       action,
       caption,
+      subtitleText,
       audioPath: '',
       audioDurationMs: 0,
       cached: false,
@@ -2360,7 +2371,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   }
 
   for (const segment of segments) {
-    const { action, caption } = segment
+    const { action, caption, subtitleText } = segment
     const narrationStart = Date.now() - startedAt
 
     if (caption) {
@@ -2420,7 +2431,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
       cues.push({
         start: narrationStart,
         end: Date.now() - startedAt,
-        text: caption
+        text: subtitleText || caption
       })
     }
   }

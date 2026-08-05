@@ -26,6 +26,30 @@ Configure a navigation bar with primary and secondary menu items.
     "caption": "",
     "action": {
       "type": "goto",
+      "path": "/",
+      "holdMs": 450
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "goto",
+      "path": "/pages",
+      "holdMs": 450
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "[data-testid=\"page-tree-node-summerstudy\"]",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "goto",
       "path": "/pages/1/edit/content",
       "holdMs": 450
     }
@@ -34,8 +58,8 @@ Configure a navigation bar with primary and secondary menu items.
     "caption": "",
     "action": {
       "type": "hoverClick",
-      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1)",
-      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > button",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div",
+      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(1) > button",
       "hoverHoldMs": 300,
       "holdMs": 500
     }
@@ -43,10 +67,104 @@ Configure a navigation bar with primary and secondary menu items.
   {
     "caption": "",
     "action": {
-      "type": "hoverClick",
-      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > div > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
-      "clickSelector": "[data-testid=\"page-widget-edit-easy-widgets-navbarwidget\"]",
-      "hoverHoldMs": 300,
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(2) > h1",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1)",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(2) > h1",
       "holdMs": 500
     }
   },
@@ -54,18 +172,8 @@ Configure a navigation bar with primary and secondary menu items.
     "caption": "",
     "action": {
       "type": "hoverClick",
-      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div:nth-of-type(3) > div:nth-of-type(1) > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2)",
-      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div:nth-of-type(3) > div:nth-of-type(1) > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > button:nth-of-type(1)",
-      "hoverHoldMs": 300,
-      "holdMs": 500
-    }
-  },
-  {
-    "caption": "",
-    "action": {
-      "type": "hoverClick",
-      "selector": "html > body > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(3) > div",
-      "clickSelector": "html > body > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(3) > div > div:nth-of-type(2) > button:nth-of-type(1)",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+      "clickSelector": "[data-testid=\"page-widget-edit-easy-widgets-herowidget\"]",
       "hoverHoldMs": 300,
       "holdMs": 500
     }
@@ -74,16 +182,8 @@ Configure a navigation bar with primary and secondary menu items.
     "caption": "",
     "action": {
       "type": "fill",
-      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div:nth-of-type(3) > div:nth-of-type(1) > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(6) > div > div:nth-of-type(2) > div > div > div:nth-of-type(1) > input",
-      "value": "Test",
-      "holdMs": 500
-    }
-  },
-  {
-    "caption": "",
-    "action": {
-      "type": "click",
-      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div:nth-of-type(3) > div:nth-of-type(1) > div > div:nth-of-type(2)",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > textarea",
+      "value": "text",
       "holdMs": 500
     }
   },
@@ -100,9 +200,81 @@ Configure a navigation bar with primary and secondary menu items.
   {
     "caption": "",
     "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
       "type": "hoverClick",
-      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > nav > div > ul:nth-of-type(1) > li:nth-of-type(6) > span",
-      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > nav > div > ul:nth-of-type(1) > li:nth-of-type(6) > span > a",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(5) > div",
+      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(5) > div > div:nth-of-type(3) > div > div > button:nth-of-type(1)",
       "hoverHoldMs": 300,
       "holdMs": 500
     }
@@ -111,8 +283,258 @@ Configure a navigation bar with primary and secondary menu items.
     "caption": "",
     "action": {
       "type": "hoverClick",
-      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div",
-      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > nav > div > ul:nth-of-type(1) > li:nth-of-type(6) > span > div > button:nth-of-type(4)",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(1) > div > div > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(1) > div > div > div:nth-of-type(1) > button",
+      "hoverHoldMs": 300,
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "hoverClick",
+      "selector": "#root > div:nth-of-type(3) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div",
+      "clickSelector": "#root > div:nth-of-type(3) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > button:nth-of-type(2)",
+      "hoverHoldMs": 300,
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "goto",
+      "path": "/pages",
+      "holdMs": 450
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "[data-testid=\"page-tree-node-summerstudy\"]",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "goto",
+      "path": "/pages/1/edit/content",
+      "holdMs": 450
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > div > h1",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > div > h1",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div > div > div > h1",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "hoverClick",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div > div",
+      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(1) > button",
+      "hoverHoldMs": 300,
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(3) > h6",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "click",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > div > div:nth-of-type(1) > h5",
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "hoverClick",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div",
+      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(2) > div > div > div:nth-of-type(2) > div > div > div > button",
+      "hoverHoldMs": 300,
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "hoverClick",
+      "selector": "html > body > div:nth-of-type(3) > div > div:nth-of-type(1)",
+      "clickSelector": "html > body > div:nth-of-type(3) > div > div:nth-of-type(1) > button",
+      "hoverHoldMs": 300,
+      "holdMs": 500
+    }
+  },
+  {
+    "caption": "",
+    "action": {
+      "type": "hoverClick",
+      "selector": "#root > div:nth-of-type(1) > div:nth-of-type(5) > div",
+      "clickSelector": "#root > div:nth-of-type(1) > div:nth-of-type(5) > div > div:nth-of-type(3) > div > div > button:nth-of-type(1)",
       "hoverHoldMs": 300,
       "holdMs": 500
     }
