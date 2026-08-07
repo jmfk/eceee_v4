@@ -5,7 +5,7 @@ from celery import shared_task
 from django.db.models import Count
 from django.utils import timezone
 
-from statistics.models import EventRaw, PageStats, ConversionStats, Experiment, Assignment, ExperimentMetric
+from site_statistics.models import EventRaw, PageStats, ConversionStats, Experiment, Assignment, ExperimentMetric
 from core.models import Tenant
 
 logger = logging.getLogger(__name__)
