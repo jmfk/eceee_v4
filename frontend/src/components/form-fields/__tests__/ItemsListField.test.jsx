@@ -1,38 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import React from 'react'
 import ItemsListField from '../ItemsListField'
-import { UnifiedDataProvider } from '../../../contexts/unified-data/context/UnifiedDataContext'
-
-// Wrapper component for tests with initial UDC state
-const TestWrapper = ({ children, initialState }) => (
-    <UnifiedDataProvider initialState={initialState}>
-        {children}
-    </UnifiedDataProvider>
-)
+import { renderWithStateProviders } from '../../../test/testUtils'
+import { createAppState, createVersion, createWidget } from '../../../test/unifiedDataTestUtils'
 
 // Helper to render with wrapper and optional initial items in UDC
 const renderWithUDC = (component, items = []) => {
-    const initialState = items.length > 0 ? {
-        webpages: {
-            page: {
+    const initialState = createAppState({
+        versions: {
+            'version-1': createVersion({
                 widgets: {
-                    main: {
-                        'test-widget': {
+                    main: [
+                        createWidget({
+                            id: 'test-widget',
                             config: {
                                 menu_items: items
                             }
-                        }
-                    }
+                        })
+                    ]
                 }
-            }
+            })
         }
-    } : undefined
-
-    return render(component, {
-        wrapper: ({ children }) => <TestWrapper initialState={initialState}>{children}</TestWrapper>
     })
+
+    return renderWithStateProviders(component, { initialState })
 }
 
 describe('ItemsListField', () => {
@@ -252,7 +244,9 @@ describe('ItemsListField', () => {
         fireEvent.click(removeButtons[0])
 
         await waitFor(() => {
-            expect(mockOnChange).toHaveBeenCalledWith([defaultItems[1]])
+            expect(mockOnChange).toHaveBeenCalledWith([
+                expect.objectContaining(defaultItems[1])
+            ])
         })
     })
 

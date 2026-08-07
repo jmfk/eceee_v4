@@ -18,8 +18,15 @@ class PublishedPageMixinTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_public_user", email="public@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Public Tenant", identifier="public", created_by=self.user
         )
 
         self.now = timezone.now()
@@ -36,6 +43,7 @@ class PublishedPageMixinTestCase(TestCase):
             description="This page should be visible",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         published_version = self.published_page.create_version(
@@ -51,6 +59,7 @@ class PublishedPageMixinTestCase(TestCase):
             description="This page should not be visible",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         draft_version = self.draft_page.create_version(self.user, "Draft version")
@@ -63,6 +72,7 @@ class PublishedPageMixinTestCase(TestCase):
             description="This page should not be visible yet",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         scheduled_version = self.scheduled_page.create_version(
@@ -78,6 +88,7 @@ class PublishedPageMixinTestCase(TestCase):
             description="This page should no longer be visible",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         expired_version = self.expired_page.create_version(self.user, "Expired version")
@@ -87,6 +98,9 @@ class PublishedPageMixinTestCase(TestCase):
 
     def test_published_page_mixin_filtering(self):
         """Test that PublishedPageMixin correctly filters published content"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
 
         class TestMixin(PublishedPageMixin):
             pass
@@ -104,6 +118,9 @@ class PublishedPageMixinTestCase(TestCase):
 
     def test_individual_page_publication_status(self):
         """Test individual page publication status"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         pages = [
             self.published_page,
             self.draft_page,
@@ -123,6 +140,9 @@ class PublishedPageMixinTestCase(TestCase):
 
     def test_current_published_version_logic(self):
         """Test current published version logic"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Test published page
         current_version = self.published_page.get_current_published_version()
         self.assertIsNotNone(current_version)
@@ -143,6 +163,9 @@ class PublishedPageMixinTestCase(TestCase):
 
     def test_query_performance(self):
         """Test that queryset doesn't produce excessive database queries"""
+        from django.db import connection as db_connection
+        if db_connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
 
         class TestMixin(PublishedPageMixin):
             pass
@@ -165,8 +188,15 @@ class TimeBasedVersionSelectionTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_time_user", email="time@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Time Tenant", identifier="time", created_by=self.user
         )
 
         self.now = timezone.now()
@@ -178,10 +208,14 @@ class TimeBasedVersionSelectionTestCase(TestCase):
             description="Testing time-based logic",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
     def test_multiple_versions_current_selection(self):
         """Test that the correct version is selected when multiple versions exist"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Version 1: Effective in past, no expiry
         v1 = self.time_test_page.create_version(self.user, "Version 1")
         v1.effective_date = self.now - timedelta(days=3)
@@ -216,6 +250,9 @@ class TimeBasedVersionSelectionTestCase(TestCase):
 
     def test_version_ordering_by_effective_date(self):
         """Test that versions are properly ordered by effective date for current selection"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create versions in reverse chronological order to test ordering
         v_future = self.time_test_page.create_version(self.user, "Future version")
         v_future.effective_date = self.now + timedelta(days=1)
@@ -235,6 +272,9 @@ class TimeBasedVersionSelectionTestCase(TestCase):
 
     def test_expired_version_not_current(self):
         """Test that expired versions are not considered current"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Current version (not expired)
         current_version = self.time_test_page.create_version(self.user, "Current")
         current_version.effective_date = self.now - timedelta(hours=2)
@@ -257,18 +297,29 @@ class PageAccessibilityTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_access_user", email="access@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Access Tenant", identifier="access", created_by=self.user
         )
 
     def test_published_page_accessible(self):
         """Test that published pages are accessible"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage.objects.create(
             title="Accessible Page",
             slug="accessible-page",
             description="This page should be accessible",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         version = page.create_version(self.user, "Published version")
@@ -279,12 +330,16 @@ class PageAccessibilityTestCase(TestCase):
 
     def test_draft_page_not_accessible(self):
         """Test that draft pages are not accessible"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage.objects.create(
             title="Draft Page",
             slug="draft-page",
             description="This page should not be accessible",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         version = page.create_version(self.user, "Draft version")
@@ -294,12 +349,16 @@ class PageAccessibilityTestCase(TestCase):
 
     def test_scheduled_page_not_accessible(self):
         """Test that scheduled pages are not accessible"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage.objects.create(
             title="Scheduled Page",
             slug="scheduled-page",
             description="This page should not be accessible yet",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         version = page.create_version(self.user, "Scheduled version")
@@ -310,12 +369,16 @@ class PageAccessibilityTestCase(TestCase):
 
     def test_expired_page_not_accessible(self):
         """Test that expired pages are not accessible"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage.objects.create(
             title="Expired Page",
             slug="expired-page",
             description="This page should no longer be accessible",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         version = page.create_version(self.user, "Expired version")

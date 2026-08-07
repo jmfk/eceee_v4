@@ -30,15 +30,10 @@ def assign_objects_to_default_tenant(apps, schema_editor):
     # Get tenant UUID as string
     tenant_uuid = str(default_tenant.id) if isinstance(default_tenant.id, uuid.UUID) else default_tenant.id
     
-    # Assign all object instances without a tenant to the default tenant using raw SQL
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "UPDATE object_storage_objectinstance SET tenant_id = %s::uuid WHERE tenant_id IS NULL",
-            [tenant_uuid]
-        )
-        objects_count = cursor.rowcount
+    # Assign all object instances without a tenant to the default tenant
+    ObjectInstance.objects.filter(tenant__isnull=True).update(tenant=default_tenant)
     
-    print(f"Assigned {objects_count} object instances to default tenant")
+    print("Assigned object instances to default tenant")
 
 
 def reverse_migration(apps, schema_editor):

@@ -1,15 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import TreePageManager from '../TreePageManager'
 import * as pagesApi from '../../api/pages'
+import { api } from '../../api/client.js'
 import { NotificationProvider } from '../NotificationManager'
 import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
+
+const pageApiMocks = vi.hoisted(() => ({
+    getRootPages: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
+    getPageChildren: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
+    movePage: vi.fn(),
+    deletePage: vi.fn(),
+    searchAllPages: vi.fn(() => Promise.resolve({ results: [] })),
+    list: vi.fn(() => Promise.resolve({ results: [] })),
+    create: vi.fn(() => Promise.resolve({})),
+    update: vi.fn(() => Promise.resolve({})),
+    get: vi.fn(() => Promise.resolve({})),
+    duplicate: vi.fn(() => Promise.resolve({ id: 99 })),
+    bulkPublish: vi.fn(() => Promise.resolve({})),
+    bulkUnpublish: vi.fn(() => Promise.resolve({})),
+    bulkDelete: vi.fn(() => Promise.resolve({})),
+}))
 
 // Mock the API client to avoid browser dependencies
 vi.mock('../../api/client.js', () => ({
     api: {
-        get: vi.fn(),
+        get: vi.fn(() => Promise.resolve({ data: [] })),
         post: vi.fn(),
         patch: vi.fn(),
         delete: vi.fn()
@@ -19,11 +37,26 @@ vi.mock('../../api/client.js', () => ({
 
 // Mock the pages API
 vi.mock('../../api/pages', () => ({
-    getRootPages: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
-    getPageChildren: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
-    movePage: vi.fn(),
-    deletePage: vi.fn(),
-    searchAllPages: vi.fn(() => Promise.resolve({ results: [] })),
+    getRootPages: pageApiMocks.getRootPages,
+    getPageChildren: pageApiMocks.getPageChildren,
+    movePage: pageApiMocks.movePage,
+    deletePage: pageApiMocks.deletePage,
+    searchAllPages: pageApiMocks.searchAllPages,
+    pagesApi: {
+        getRootPages: pageApiMocks.getRootPages,
+        getPageChildren: pageApiMocks.getPageChildren,
+        move: pageApiMocks.movePage,
+        delete: pageApiMocks.deletePage,
+        searchAllPages: pageApiMocks.searchAllPages,
+        list: pageApiMocks.list,
+        create: pageApiMocks.create,
+        update: pageApiMocks.update,
+        get: pageApiMocks.get,
+        duplicate: pageApiMocks.duplicate,
+        bulkPublish: pageApiMocks.bulkPublish,
+        bulkUnpublish: pageApiMocks.bulkUnpublish,
+        bulkDelete: pageApiMocks.bulkDelete,
+    },
     pageTreeUtils: {
         hasChildren: vi.fn((page) => page.childrenCount > 0),
         formatPageForTree: vi.fn((page) => ({
@@ -120,13 +153,15 @@ const renderWithProviders = (component) => {
     const queryClient = createTestQueryClient()
 
     return render(
-        <QueryClientProvider client={queryClient}>
-            <GlobalNotificationProvider>
-                <NotificationProvider>
-                    {component}
-                </NotificationProvider>
-            </GlobalNotificationProvider>
-        </QueryClientProvider>
+        <MemoryRouter>
+            <QueryClientProvider client={queryClient}>
+                <GlobalNotificationProvider>
+                    <NotificationProvider>
+                        {component}
+                    </NotificationProvider>
+                </GlobalNotificationProvider>
+            </QueryClientProvider>
+        </MemoryRouter>
     )
 }
 
@@ -136,12 +171,14 @@ describe('TreePageManager', () => {
         // Mock successful API response
         pagesApi.getRootPages.mockResolvedValue(mockPages)
         pagesApi.searchAllPages.mockResolvedValue({ results: [] })
+        api.get.mockResolvedValue({ data: [] })
+        localStorage.clear()
     })
 
     it('renders without crashing', async () => {
         renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
 
-        expect(screen.getByText('Page Tree Manager')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Pages' })).toBeInTheDocument()
         expect(screen.getByPlaceholderText('Search pages...')).toBeInTheDocument()
     })
 
@@ -192,6 +229,115 @@ describe('TreePageManager', () => {
 
         const addRootPageButton = screen.getByTestId('add-root-page-button')
         expect(addRootPageButton).toBeInTheDocument()
+    })
+
+    it('opens site package ZIP import from root toolbar', async () => {
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        const importButton = screen.getByTestId('import-site-package-button')
+        fireEvent.click(importButton)
+
+        expect(screen.getByText('Import Root Site')).toBeInTheDocument()
+        expect(screen.getByText('Creates a new root page tree from a site package ZIP.')).toBeInTheDocument()
+    })
+
+    it('shows root site package export actions for root pages', async () => {
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        expect(screen.getByRole('button', { name: 'Export root site package for Home Page' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Export root site package for About Page' })).toBeInTheDocument()
+    })
+
+    it('opens root export options from root page action', async () => {
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Export root site package for Home Page' }))
+
+        expect(screen.getByText('Export Root Site')).toBeInTheDocument()
+        expect(screen.getByText('Include referenced media files')).toBeInTheDocument()
+        expect(screen.getByText('Include referenced themes and theme assets')).toBeInTheDocument()
+    })
+
+    it('restores queued site package exports after reload', async () => {
+        const queuedJob = {
+            id: '11111111-1111-4111-8111-111111111111',
+            kind: 'export',
+            status: 'pending',
+            rootPageTitle: 'Home Page',
+            createdAt: '2026-05-23T10:00:00Z'
+        }
+
+        api.get.mockImplementation((url) => {
+            const endpoint = String(url)
+            if (endpoint.endsWith('/site-packages/exports/')) {
+                return Promise.resolve({ data: [queuedJob] })
+            }
+            if (endpoint.includes(`/site-packages/exports/${queuedJob.id}/`)) {
+                return Promise.resolve({ data: queuedJob })
+            }
+            return Promise.resolve({ data: [] })
+        })
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Export Home Page')).toBeInTheDocument()
+            expect(screen.getByText('Queued')).toBeInTheDocument()
+        })
+    })
+
+    it('does not restore dismissed completed site package exports after download URL recovery', async () => {
+        const completedJob = {
+            id: '22222222-2222-4222-8222-222222222222',
+            kind: 'export',
+            status: 'completed',
+            rootPageTitle: 'Home Page',
+            downloadAvailable: true,
+            createdAt: '2026-05-23T10:00:00Z'
+        }
+        let resolveDownload
+        const downloadPromise = new Promise(resolve => {
+            resolveDownload = resolve
+        })
+
+        api.get.mockImplementation((url) => {
+            const endpoint = String(url)
+            if (endpoint.endsWith('/site-packages/exports/')) {
+                return Promise.resolve({ data: [completedJob] })
+            }
+            if (endpoint.includes(`/site-packages/exports/${completedJob.id}/download/`)) {
+                return downloadPromise
+            }
+            return Promise.resolve({ data: [] })
+        })
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Export Home Page')).toBeInTheDocument()
+            expect(screen.getByText('Completed')).toBeInTheDocument()
+        })
+        await waitFor(() => {
+            expect(api.get).toHaveBeenCalledWith(expect.stringContaining(`/site-packages/exports/${completedJob.id}/download/`))
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss site package job' }))
+        expect(screen.queryByText('Export Home Page')).not.toBeInTheDocument()
+
+        resolveDownload({ data: { downloadUrl: 'https://example.test/export.zip' } })
+
+        await waitFor(() => {
+            expect(screen.queryByText('Export Home Page')).not.toBeInTheDocument()
+            expect(screen.queryByText('Ready to download')).not.toBeInTheDocument()
+        })
     })
 
     it('handles error state gracefully', async () => {
@@ -317,4 +463,4 @@ describe('TreePageManager', () => {
     })
 
 
-}) 
+})

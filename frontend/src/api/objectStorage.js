@@ -7,7 +7,7 @@
 
 import { api } from './client.js'
 
-const BASE_URL = '/api/v1/objects/api'
+const BASE_URL = '/api/v1/objects'
 
 /**
  * Object Type Definition API

@@ -1,0 +1,94 @@
+# Caddyfile for ECEEE v4 Production - Multi-Site Architecture
+# Caddy automatically handles HTTPS/TLS certificates via Let's Encrypt
+# Domain is configured via DOMAIN env var (e.g. eceee.org)
+
+{
+    email {$EMAIL:noreply@eceee.org}
+}
+
+# Public Content Sites - Django backend serving public pages
+summerstudy.{$DOMAIN}, industry.{$DOMAIN} {
+    encode gzip
+
+    handle /admin* {
+        redir https://admin.{$DOMAIN}{uri} permanent
+    }
+
+    handle /static/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /media/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /* {
+        reverse_proxy backend:8000
+    }
+}
+
+# Django Admin Site
+admin.{$DOMAIN} {
+    encode gzip
+    reverse_proxy backend:8000
+}
+
+# React CMS Editor - Frontend application for content editing
+app.{$DOMAIN} {
+    encode gzip
+
+    # WebSocket connections to Django Channels
+    handle /ws/* {
+        reverse_proxy backend:8000
+    }
+
+    # CSRF token endpoint
+    handle /csrf-token* {
+        reverse_proxy backend:8000
+    }
+
+    # API calls go to backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Same-origin imgproxy URLs emitted by backend-generated theme CSS
+    handle /imgproxy/* {
+        reverse_proxy backend:8000
+    }
+
+    # Static files from backend
+    handle /static/* {
+        reverse_proxy backend:8000
+    }
+
+    # Media files from backend
+    handle /media/* {
+        reverse_proxy backend:8000
+    }
+
+    # Health check
+    handle /health/* {
+        reverse_proxy backend:8000
+    }
+
+    # Metrics
+    handle /metrics/* {
+        reverse_proxy backend:8000
+    }
+
+    # Everything else goes to React app
+    handle /* {
+        reverse_proxy frontend:80
+    }
+}
+
+# imgproxy - Image processing service
+imgproxy.{$DOMAIN} {
+    encode gzip
+    reverse_proxy imgproxy:8080
+}

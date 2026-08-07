@@ -66,7 +66,7 @@ const NamespaceManager = () => {
     })
 
     const updateNamespaceMutation = useMutation({
-        mutationFn: ({ id, ...data }) => namespacesApi.update(id, data),
+        mutationFn: async ({ id, ...data }) => await namespacesApi.update(id, data),
         onSuccess: () => {
             addNotification('Namespace updated successfully', 'success', 'namespace-update')
             handleCloseEditModal()
@@ -443,6 +443,7 @@ const NamespaceManager = () => {
 }
 
 const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }) => {
+    const { addNotification } = useGlobalNotifications()
     const [formData, setFormData] = useState({
         name: namespace?.name || '',
         slug: namespace?.slug || '',
@@ -589,6 +590,17 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
 
 const ContentSummaryModal = ({ data, onClose }) => {
     const { namespace, contentSummary } = data
+
+    const getContentIcon = (type) => {
+        switch (type) {
+            case 'pages': return <FileText className="w-5 h-5 text-blue-500" />
+            case 'objects': return <Database className="w-5 h-5 text-purple-500" />
+            case 'media': return <FolderOpen className="w-5 h-5 text-amber-500" />
+            case 'users': return <Users className="w-5 h-5 text-green-500" />
+            case 'tags': return <Tag className="w-5 h-5 text-rose-500" />
+            default: return <FileText className="w-5 h-5 text-gray-500" />
+        }
+    }
 
     return (
         <div className="fixed inset-0 bg-gray-600/10 overflow-y-auto h-full w-full z-50">

@@ -95,8 +95,8 @@ const BulkOperations = ({
 
             try {
                 const [tagsResult, collectionsResult] = await Promise.all([
-                    mediaTagsApi.list({ namespace })(),
-                    mediaCollectionsApi.list({ namespace })()
+                    await await await await await await await await await await mediaTagsApi.list({ namespace })(),
+                    await await await await await await await await await await mediaCollectionsApi.list({ namespace })()
                 ]);
 
                 setAvailableTags(Array.isArray(tagsResult.results) ? tagsResult.results : Array.isArray(tagsResult) ? tagsResult : []);
@@ -206,7 +206,7 @@ const BulkOperations = ({
         // Ensure tagIds are strings (UUIDs should be strings)
         const normalizedTagIds = tagIds.map(id => String(id));
 
-        const newCollection = await mediaCollectionsApi.create({
+        const newCollection = await await await await await await await await await await await mediaCollectionsApi.create({
             title: name.trim(),
             namespace: namespace,
             tagIds: normalizedTagIds

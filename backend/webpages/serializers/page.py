@@ -61,7 +61,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     scheduled_version_id = serializers.SerializerMethodField()
     scheduled_version_number = serializers.SerializerMethodField()
     scheduled_effective_date = serializers.SerializerMethodField()
-    
+
     # Short title from page_data
     short_title = serializers.SerializerMethodField()
 
@@ -75,7 +75,6 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "parent_id",
             "sort_order",
             "hostnames",
-            "site_icon",
             "path_pattern_key",
             "cached_path",
             "cached_root_id",
@@ -156,6 +155,15 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
     def get_is_published(self, obj):
         return obj.is_published()
+
+    def get_current_published_version(self, obj):
+        published_version = obj.get_current_published_version()
+        if not published_version:
+            return None
+
+        from .version import PageVersionSerializer
+
+        return PageVersionSerializer(published_version, context=self.context).data
 
     def get_breadcrumbs(self, obj):
         breadcrumbs = obj.get_breadcrumbs()
@@ -428,7 +436,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         if not current_version:
             # Fall back to latest version for editor
             current_version = obj.get_latest_version()
-        
+
         if current_version and current_version.page_data:
             # Check both camelCase and snake_case
             short_title = current_version.page_data.get("shortTitle") or current_version.page_data.get("short_title")
@@ -436,7 +444,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
                 # Guard against responsive breakpoint objects - only return if it's a string
                 if isinstance(short_title, str):
                     return short_title
-        
+
         return None
 
     # Scheduled version methods
@@ -477,25 +485,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         return scheduled
 
     def validate(self, attrs):
-        """Validate WebPage data including site_icon restrictions"""
-        # Validate site_icon is only used for root pages
-        if "site_icon" in attrs and attrs["site_icon"]:
-            # Check if this is an update or create
-            parent_id = attrs.get("parent_id")
-            if parent_id is not None:  # Has a parent, not a root page
-                raise serializers.ValidationError(
-                    {
-                        "site_icon": "Only root pages (pages without a parent) can have a site icon."
-                    }
-                )
-            # For updates, check if the instance has a parent
-            if self.instance and self.instance.parent_id is not None:
-                raise serializers.ValidationError(
-                    {
-                        "site_icon": "Only root pages (pages without a parent) can have a site icon."
-                    }
-                )
-
+        """Validate WebPage data"""
         return super().validate(attrs)
 
     def create(self, validated_data):
@@ -565,6 +555,165 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             del self.context["slug_warning"]
 
         return data
+
+
+class WebPageListSerializer(serializers.ModelSerializer):
+    """Lean serializer for page list/tree browser endpoints."""
+
+    parent_id = serializers.IntegerField(read_only=True)
+    created_by = UserSerializer(read_only=True)
+    last_modified_by = UserSerializer(read_only=True)
+    children_count = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
+    code_layout = serializers.SerializerMethodField()
+    published_version_id = serializers.SerializerMethodField()
+    published_version_number = serializers.SerializerMethodField()
+    published_effective_date = serializers.SerializerMethodField()
+    latest_version_number = serializers.SerializerMethodField()
+    latest_draft_version_id = serializers.SerializerMethodField()
+    latest_draft_version_number = serializers.SerializerMethodField()
+    has_unpublished_changes = serializers.SerializerMethodField()
+    scheduled_version_id = serializers.SerializerMethodField()
+    scheduled_version_number = serializers.SerializerMethodField()
+    scheduled_effective_date = serializers.SerializerMethodField()
+    short_title = serializers.SerializerMethodField()
+    is_deleted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WebPage
+        fields = [
+            "id",
+            "slug",
+            "title",
+            "description",
+            "parent_id",
+            "sort_order",
+            "hostnames",
+            "path_pattern_key",
+            "cached_path",
+            "cached_root_id",
+            "cached_root_hostnames",
+            "is_currently_published",
+            "cached_effective_date",
+            "cached_expiry_date",
+            "cache_updated_at",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "last_modified_by",
+            "children_count",
+            "is_deleted",
+            "publication_status",
+            "code_layout",
+            "published_version_id",
+            "published_version_number",
+            "published_effective_date",
+            "latest_version_number",
+            "latest_draft_version_id",
+            "latest_draft_version_number",
+            "has_unpublished_changes",
+            "scheduled_version_id",
+            "scheduled_version_number",
+            "scheduled_effective_date",
+            "short_title",
+        ]
+
+    def _published_version(self, obj):
+        if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
+            return obj._published_versions_list[0]
+        return obj.current_published_version
+
+    def _latest_version(self, obj):
+        if hasattr(obj, "_all_versions_list") and obj._all_versions_list:
+            return obj._all_versions_list[0]
+        return obj.latest_version
+
+    def _scheduled_version(self, obj):
+        if hasattr(obj, "_scheduled_versions_list") and obj._scheduled_versions_list:
+            return obj._scheduled_versions_list[0]
+        return None
+
+    def get_children_count(self, obj):
+        if hasattr(obj, "children_count"):
+            return obj.children_count
+        return obj.children.filter(is_deleted=False).count()
+
+    def get_is_deleted(self, obj):
+        return getattr(obj, "is_deleted", False)
+
+    def get_publication_status(self, obj):
+        published_version = self._published_version(obj)
+        if published_version:
+            return published_version.get_publication_status()
+
+        latest_version = self._latest_version(obj)
+        if latest_version:
+            return latest_version.get_publication_status()
+
+        return "unpublished"
+
+    def get_code_layout(self, obj):
+        published_version = self._published_version(obj)
+        return published_version.code_layout if published_version and published_version.code_layout else ""
+
+    def get_published_version_id(self, obj):
+        published_version = self._published_version(obj)
+        return published_version.id if published_version else None
+
+    def get_published_version_number(self, obj):
+        published_version = self._published_version(obj)
+        return published_version.version_number if published_version else None
+
+    def get_published_effective_date(self, obj):
+        published_version = self._published_version(obj)
+        return published_version.effective_date if published_version else None
+
+    def get_latest_version_number(self, obj):
+        latest_version = self._latest_version(obj)
+        return latest_version.version_number if latest_version else None
+
+    def get_latest_draft_version_id(self, obj):
+        latest_version = self._latest_version(obj)
+        if latest_version and latest_version.get_publication_status() in ["draft", "unpublished"]:
+            return latest_version.id
+        return None
+
+    def get_latest_draft_version_number(self, obj):
+        latest_version = self._latest_version(obj)
+        if latest_version and latest_version.get_publication_status() in ["draft", "unpublished"]:
+            return latest_version.version_number
+        return None
+
+    def get_has_unpublished_changes(self, obj):
+        published_version = self._published_version(obj)
+        latest_version = self._latest_version(obj)
+
+        if not latest_version:
+            return False
+        if not published_version:
+            return True
+
+        return latest_version.version_number > published_version.version_number
+
+    def get_scheduled_version_id(self, obj):
+        scheduled_version = self._scheduled_version(obj)
+        return scheduled_version.id if scheduled_version else None
+
+    def get_scheduled_version_number(self, obj):
+        scheduled_version = self._scheduled_version(obj)
+        return scheduled_version.version_number if scheduled_version else None
+
+    def get_scheduled_effective_date(self, obj):
+        scheduled_version = self._scheduled_version(obj)
+        return scheduled_version.effective_date if scheduled_version else None
+
+    def get_short_title(self, obj):
+        version = self._published_version(obj) or self._latest_version(obj)
+        if not version or not version.page_data:
+            return None
+
+        short_title = version.page_data.get("shortTitle") or version.page_data.get("short_title")
+        return short_title if isinstance(short_title, str) else None
 
 
 class PageHierarchySerializer(serializers.ModelSerializer):
@@ -748,4 +897,3 @@ class DeletedPageSerializer(serializers.ModelSerializer):
                 )
 
         return warnings
-

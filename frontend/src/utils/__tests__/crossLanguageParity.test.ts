@@ -5,7 +5,7 @@
  * they return identical results for the same input data.
  */
 
-import testData from '../../../docs/inheritance-tree-test-data.json'
+import testData from '../../../../docs/inheritance-tree-test-data.json'
 import { InheritanceTreeHelpers } from '../inheritanceTree'
 import { 
     InheritanceTreeNode, 

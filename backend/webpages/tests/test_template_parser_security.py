@@ -5,7 +5,7 @@ Unit tests for template parser security fixes
 import json
 import unittest
 from unittest.mock import patch, mock_open, MagicMock
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.core.cache import cache
 from django.template.loader import get_template
 from django.template import Template
@@ -18,6 +18,9 @@ from webpages.utils.template_parser import (
 )
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class TestSecurityValidation(TestCase):
     """Test security validation functions"""
 
@@ -122,6 +125,9 @@ class TestSecurityValidation(TestCase):
         self.assertNotIn("dangerous_list", sanitized["config"])
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class TestTemplateParserSecurity(TestCase):
     """Test template parser security features"""
 
@@ -267,6 +273,9 @@ class TestTemplateParserSecurity(TestCase):
         self.assertEqual(str(context.exception), "Template parsing failed")
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class TestLayoutSerializerSecurity(TestCase):
     """Test layout serializer security"""
 
@@ -293,6 +302,9 @@ class TestLayoutSerializerSecurity(TestCase):
         self.assertEqual(str(context.exception), "Template parsing failed")
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class TestSecurityRegression(TestCase):
     """Regression tests for security issues"""
 

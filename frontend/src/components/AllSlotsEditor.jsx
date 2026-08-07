@@ -374,6 +374,7 @@ const AllSlotsEditor = ({
                                     onShowWidgetModal={handleShowWidgetModal}
                                     onClearSlot={handleClearSlot}
                                     pageContext={pageContext}
+                                    namespace={namespace}
                                     editable={editable}
                                     inheritedWidgets={inheritedWidgets}
                                     slotInheritanceRules={slotInheritanceRules}
@@ -430,6 +431,7 @@ const SlotAccordionItem = ({
     onShowWidgetModal,
     onClearSlot,
     pageContext,
+    namespace,
     editable,
     inheritedWidgets,
     slotInheritanceRules,
@@ -441,6 +443,11 @@ const SlotAccordionItem = ({
     const slotMetadata = slot.metadata || {};
     const slotTitle = slotMetadata.title || formatSlotName(slot.name);
     const slotDescription = slotMetadata.description || '';
+    const slotTestId = (slot.name || 'slot')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'slot';
     
     // Get width from dimensions (prefer desktop, fallback to tablet, then mobile)
     const dimensions = slotMetadata.dimensions || {};
@@ -458,6 +465,7 @@ const SlotAccordionItem = ({
         <div className="border border-gray-200 rounded-lg overflow-hidden" style={maxWidthStyle}>
             {/* Accordion header */}
             <button
+                data-testid={`page-slot-toggle-${slotTestId}`}
                 onClick={() => onToggle(slot.name)}
                 className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
             >

@@ -1,0 +1,33 @@
+WEBVTT
+
+1
+00:00:08.076 --> 00:00:10.544
+In this walkthrough, we are going to work with slots. Add child widgets to container slots.
+
+2
+00:00:10.544 --> 00:00:12.948
+This is useful because it shows the path through the admin interface before you need to do the same task on real content.
+
+3
+00:00:12.948 --> 00:00:14.792
+Start in All Slots where the layout exposes named slots.
+
+4
+00:00:14.792 --> 00:00:17.478
+Expand the Sidebar slot so the slot toolbar is visible.
+
+5
+00:00:17.478 --> 00:00:20.788
+Click the plus icon on the Sidebar slot to add content exactly there.
+
+6
+00:00:20.788 --> 00:00:23.923
+Choose a widget that belongs in the sidebar slot.
+
+7
+00:00:23.923 --> 00:00:27.370
+Open the new widget settings so the sidebar content can be configured.
+
+8
+00:00:27.370 --> 00:00:29.737
+By the end, you should know where to start, what to click, and what to check before you save or publish your work.

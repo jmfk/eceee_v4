@@ -1,7 +1,6 @@
 import React from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { validateFieldName } from '../utils/schemaValidation'
-import SettingsTabs from '../components/SettingsTabs'
 import LayoutSchemaManager from '../components/LayoutSchemaManager'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -19,8 +18,7 @@ const LayoutSchemaEditorPage = () => {
     }
 
     return (
-        <div className="container mx-auto px-4 py-8 space-y-6">
-            <SettingsTabs />
+        <div className="space-y-6 max-w-7xl mx-auto pb-12">
             <ErrorBoundary>
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="mb-6 flex items-center justify-between">

@@ -17,7 +17,7 @@ const TagManager = () => {
     // Fetch tags with filtering
     const { data: tagsResponse, isLoading, error } = useQuery({
         queryKey: ['tags', searchTerm],
-        queryFn: () => {
+        queryFn: async () => {
             const params = {}
             if (searchTerm) params.search = searchTerm
             return tagsApi.list(params)
@@ -43,7 +43,7 @@ const TagManager = () => {
 
     // Update tag mutation
     const updateTagMutation = useMutation({
-        mutationFn: ({ id, ...data }) => tagsApi.update(id, data),
+        mutationFn: async ({ id, ...data }) => await tagsApi.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['tags'])
             setEditingTag(null)
@@ -161,6 +161,7 @@ const TagManager = () => {
                     <span className="text-sm text-gray-500">{tags.length} tags</span>
                 </div>
                 <button
+                    data-testid="tags-create-button"
                     onClick={() => setShowTagForm(true)}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
                 >
@@ -176,6 +177,7 @@ const TagManager = () => {
                     <div className="flex-1 relative">
                         <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                         <input
+                            data-testid="tags-search-input"
                             type="text"
                             placeholder="Search tags..."
                             value={searchTerm}
@@ -187,6 +189,7 @@ const TagManager = () => {
                     {/* Export/Import */}
                     <div className="flex items-center space-x-2">
                         <button
+                            data-testid="tags-export-button"
                             onClick={exportTags}
                             className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Export tags"
@@ -194,7 +197,7 @@ const TagManager = () => {
                             <Download className="w-5 h-5" />
                         </button>
 
-                        <label className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer" title="Import tags">
+                        <label data-testid="tags-import-button" className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer" title="Import tags">
                             <Upload className="w-5 h-5" />
                             <input
                                 type="file"

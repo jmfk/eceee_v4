@@ -195,6 +195,7 @@ const WidgetSlot = ({
 
     // Legacy: Keep isSlotPreviewMode for backward compatibility
     const isSlotPreviewMode = isPreviewMode;
+    const isHiddenEmptySlot = editable && isSlotPreviewMode && effectiveWidgets.length === 0;
 
     // Handle widget actions
     const handleWidgetAction = (action, widget, ...args) => {
@@ -392,6 +393,7 @@ const WidgetSlot = ({
                 data-slot-title={label}
                 data-slot-description={description}
                 data-slot-max-widgets={finalMaxWidgets}
+                data-hidden-empty-slot={isHiddenEmptySlot ? 'true' : undefined}
             >
                 {/* Slot Header - Only show in edit mode */}
                 {editable && !isSlotPreviewMode && (
@@ -443,7 +445,7 @@ const WidgetSlot = ({
 
 
                 {/* Floating Preview Exit Button - Only show in preview mode, visible on hover */}
-                {isSlotPreviewMode && editable && (
+                {isSlotPreviewMode && editable && !isHiddenEmptySlot && (
                     <div className="absolute top-2 right-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <button
                             onClick={handleSlotPreviewToggle}
@@ -461,6 +463,18 @@ const WidgetSlot = ({
                         // Preview mode: Show merged widgets using effectiveWidgets
                         Array.isArray(effectiveWidgets) && effectiveWidgets.length > 0 ? (
                             effectiveWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))
+                        ) : isHiddenEmptySlot ? (
+                            <button
+                                type="button"
+                                onClick={handleSlotPreviewToggle}
+                                className="hidden-empty-slot-bar w-full min-h-6 px-3 py-1 border border-dashed border-gray-300 bg-gray-50 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-center"
+                                title={`Show ${label || name} slot`}
+                                aria-label={`Show ${label || name} slot`}
+                                data-hidden-empty-slot="true"
+                            >
+                                <EyeOff className="h-3 w-3 mr-1.5" />
+                                {label || name} hidden - show slot
+                            </button>
                         ) : null
                     ) : (
                         // Edit mode: Show widgets in correct inheritance order

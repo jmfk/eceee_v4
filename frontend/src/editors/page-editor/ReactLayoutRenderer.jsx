@@ -1211,23 +1211,6 @@ const ReactLayoutRenderer = forwardRef(({
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
 
-    if (!LayoutComponent) {
-        const availableLayouts = Object.keys(LAYOUT_REGISTRY);
-
-        return (
-            <div className="layout-error bg-red-50 border border-red-200 rounded-lg p-8 max-w-2xl mx-auto mt-8">
-                <Layout className="h-12 w-12 mx-auto mb-4 text-red-400" />
-                <div className="text-lg font-medium text-red-800 mb-2" role="heading" aria-level="3">Layout Not Found</div>
-                <div className="text-red-600 mb-6">Layout "{layoutName}" is not available</div>
-
-                <div className="mt-4 text-sm text-gray-600">
-                    <div className="font-medium mb-1">Available layouts:</div>
-                    <div className="text-gray-500">{availableLayouts.join(', ')}</div>
-                </div>
-            </div>
-        );
-    }
-
     // Expose methods to parent
     useImperativeHandle(ref, () => ({
         saveWidgets: async () => {
@@ -1292,6 +1275,23 @@ const ReactLayoutRenderer = forwardRef(({
             setIsToolbarCollapsed(false);
         }
     }, [selectedCount]);
+
+    if (!LayoutComponent) {
+        const availableLayouts = Object.keys(LAYOUT_REGISTRY);
+
+        return (
+            <div className="layout-error bg-red-50 border border-red-200 rounded-lg p-8 max-w-2xl mx-auto mt-8">
+                <Layout className="h-12 w-12 mx-auto mb-4 text-red-400" />
+                <div className="text-lg font-medium text-red-800 mb-2" role="heading" aria-level="3">Layout Not Found</div>
+                <div className="text-red-600 mb-6">Layout "{layoutName}" is not available</div>
+
+                <div className="mt-4 text-sm text-gray-600">
+                    <div className="font-medium mb-1">Available layouts:</div>
+                    <div className="text-gray-500">{availableLayouts.join(', ')}</div>
+                </div>
+            </div>
+        );
+    }
 
     // Render the layout component
     // Make this div act like an iframe - break out of parent constraints and use full viewport width

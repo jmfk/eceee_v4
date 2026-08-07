@@ -139,30 +139,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
 
     return (
         <div className="h-full flex flex-col relative">
-            {/* Content Header - Styled like PageEditor */}
-            <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3">
-                <div className="flex items-center justify-between">
-                    <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="1">
-                        Object Content & Data
-                        {objectType && (
-                            <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                {objectType.label}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Save Status */}
-                    <div className="flex items-center space-x-3">
-                        {hasUnsavedChanges && (
-                            <span className="text-sm text-amber-600 flex items-center">
-                                <div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div>
-                                Unsaved changes
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
-
             {/* Scrollable Content Area */}
             <div className={`flex-1 min-h-0 overflow-y-auto bg-white transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''}`}>
                 <div className="p-6">

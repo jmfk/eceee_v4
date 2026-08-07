@@ -9,11 +9,13 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.throttling import UserRateThrottle
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import models
-from django.db.models import Q, Exists, OuterRef, F
+from django.db.models import Q, Exists, OuterRef, F, Count
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from ..models import WebPage, PageVersion
 from ..serializers import (
+    WebPageListSerializer,
     WebPageSimpleSerializer,
     PageHierarchySerializer,
 )
@@ -56,7 +58,9 @@ class WebPageViewSet(viewsets.ModelViewSet):
     ]
 
     def get_serializer_class(self):
-        """Use WebPageSimpleSerializer for all actions (includes version data)"""
+        """Use a lean serializer for list views and full page data elsewhere."""
+        if self.action == "list":
+            return WebPageListSerializer
         return WebPageSimpleSerializer
 
     def get_queryset(self):
@@ -87,7 +91,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Using Prefetch to add them as cached attributes
             from django.db.models import Prefetch
 
-            queryset = queryset.prefetch_related(
+            queryset = queryset.annotate(
+                children_count=Count(
+                    "children",
+                    filter=Q(children__is_deleted=False),
+                    distinct=True,
+                )
+            ).prefetch_related(
                 Prefetch(
                     "versions",
                     queryset=PageVersion.objects.filter(effective_date__lte=now)
@@ -186,6 +196,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=False, methods=["get"])
+    def hostnames(self, request):
+        """Get all unique hostnames across all root pages"""
+        hostnames = WebPage.get_all_hostnames()
+        return Response(hostnames)
+
+    @action(detail=False, methods=["get"])
     def tree(self, request):
         """Get page hierarchy as a tree structure"""
         root_pages = self.get_queryset().filter(parent__isnull=True)
@@ -254,7 +270,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
             page.last_modified_by = user
         page.save()
 
-        # Create unpublished version (no effective_date means it's a draft)
+        # Expire any currently published versions, then create a draft version.
+        page.versions.filter(effective_date__lte=now).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+        ).update(expiry_date=now)
         version = page.create_version(user, "Unpublished via API")
 
         serializer = self.get_serializer(page)
@@ -896,6 +915,131 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "message": f"Successfully permanently deleted all {page_count} soft-deleted page(s)",
                 "total_deleted": page_count,
                 "deleted_pages": deleted_page_list,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def _parse_schedule_dates(self, request):
+        effective_date = parse_datetime(request.data.get("effective_date", ""))
+        expiry_value = request.data.get("expiry_date")
+        expiry_date = parse_datetime(expiry_value) if expiry_value else None
+
+        if not effective_date:
+            return None, None, Response(
+                {"error": "effective_date is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if timezone.is_naive(effective_date):
+            effective_date = timezone.make_aware(
+                effective_date, timezone.get_current_timezone()
+            )
+
+        if expiry_date and timezone.is_naive(expiry_date):
+            expiry_date = timezone.make_aware(expiry_date, timezone.get_current_timezone())
+
+        now = timezone.now()
+        if effective_date <= now:
+            return None, None, Response(
+                {"error": "effective_date must be in the future"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if expiry_date and expiry_date <= effective_date:
+            return None, None, Response(
+                {"error": "expiry_date must be after effective_date"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return effective_date, expiry_date, None
+
+    def _schedule_page_version(self, page, effective_date, expiry_date, user):
+        latest_version = page.versions.order_by("-version_number").first()
+        if latest_version is None:
+            latest_version = page.create_version(user, "Scheduled via API")
+
+        latest_version.effective_date = effective_date
+        latest_version.expiry_date = expiry_date
+        latest_version.save(update_fields=["effective_date", "expiry_date"])
+        return latest_version
+
+    @action(detail=True, methods=["post"], url_path="schedule")
+    def schedule(self, request, pk=None):
+        effective_date, expiry_date, error_response = self._parse_schedule_dates(request)
+        if error_response:
+            return error_response
+
+        page = self.get_object()
+        user = request.user if request.user.is_authenticated else None
+        version = self._schedule_page_version(page, effective_date, expiry_date, user)
+
+        return Response(
+            {
+                "message": "Page scheduled successfully",
+                "effective_date": version.effective_date,
+                "expiry_date": version.expiry_date,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-schedule")
+    def bulk_schedule(self, request):
+        page_ids = request.data.get("page_ids", [])
+        if not page_ids:
+            return Response(
+                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        effective_date, expiry_date, error_response = self._parse_schedule_dates(request)
+        if error_response:
+            return error_response
+
+        user = request.user if request.user.is_authenticated else None
+        scheduled_count = 0
+        for page in WebPage.objects.filter(id__in=page_ids):
+            self._schedule_page_version(page, effective_date, expiry_date, user)
+            scheduled_count += 1
+
+        return Response(
+            {
+                "message": f"Successfully scheduled {scheduled_count} page(s)",
+                "scheduled_count": scheduled_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["get"], url_path="publication-status")
+    def publication_status(self, request):
+        now = timezone.now()
+        status_counts = {"published": 0, "scheduled": 0, "draft": 0, "expired": 0}
+        upcoming_scheduled = []
+        recently_expired = []
+
+        for page in WebPage.objects.prefetch_related("versions"):
+            current_version = page.get_current_published_version(now)
+            if current_version:
+                status_counts["published"] += 1
+                continue
+
+            latest_version = page.versions.order_by("-version_number").first()
+            if latest_version and latest_version.effective_date:
+                if latest_version.effective_date > now:
+                    status_counts["scheduled"] += 1
+                    upcoming_scheduled.append(page.id)
+                elif latest_version.expiry_date and latest_version.expiry_date <= now:
+                    status_counts["expired"] += 1
+                    recently_expired.append(page.id)
+                else:
+                    status_counts["draft"] += 1
+            else:
+                status_counts["draft"] += 1
+
+        return Response(
+            {
+                "status_counts": status_counts,
+                "upcoming_scheduled": upcoming_scheduled,
+                "recently_expired": recently_expired,
+                "total_pages": sum(status_counts.values()),
             },
             status=status.HTTP_200_OK,
         )

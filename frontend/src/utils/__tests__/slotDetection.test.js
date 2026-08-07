@@ -98,11 +98,11 @@ describe('HtmlSlot', () => {
 
             expect(config).toEqual({
                 name: 'header',
-                display_name: 'Header Slot',
+                displayName: 'Header Slot',
                 description: 'Main header area',
-                max_widgets: 3,
-                allowed_widget_types: ['Header', 'Navigation'],
-                css_classes: 'header-slot',
+                maxWidgets: 3,
+                allowedWidgetTypes: ['Header', 'Navigation'],
+                cssClasses: 'header-slot',
                 responsive: true,
                 selector: '[data-widget-slot="header"]',
                 element: mockElement,
@@ -364,7 +364,7 @@ describe('Utility Functions', () => {
 
             expect(slots).toHaveLength(2)
             expect(slots[0].name).toBe('header')
-            expect(slots[0].display_name).toBe('Header')
+            expect(slots[0].displayName).toBe('Header')
             expect(slots[1].name).toBe('content')
         })
 
@@ -403,7 +403,7 @@ describe('Utility Functions', () => {
             const config = getSlotConfigFromElement(element)
 
             expect(config.name).toBe('header')
-            expect(config.display_name).toBe('Main Header')
+            expect(config.displayName).toBe('Main Header')
             expect(config.description).toBe('Site header area')
         })
 
@@ -434,4 +434,4 @@ describe('Utility Functions', () => {
             expect(element.className).toBe('header-slot')
         })
     })
-}) 
+})

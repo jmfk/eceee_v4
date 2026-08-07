@@ -20,13 +20,22 @@ class MediaFileSoftDeleteTests(TestCase):
 
     def setUp(self):
         """Set up test data."""
+        from core.models import Tenant
         self.client = APIClient()
         self.user = User.objects.create_user(username="testuser", password="testpass")
         self.staff_user = User.objects.create_user(
             username="staffuser", password="testpass", is_staff=True
         )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-soft",
+            created_by=self.user
+        )
         self.namespace = Namespace.objects.create(
-            name="Test Namespace", slug="test-namespace", created_by=self.user
+            name="Test Namespace",
+            slug="test-namespace",
+            created_by=self.user,
+            tenant=self.tenant
         )
         self.file = MediaFile.objects.create(
             title="Test File",
@@ -37,6 +46,7 @@ class MediaFileSoftDeleteTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -45,7 +55,9 @@ class MediaFileSoftDeleteTests(TestCase):
     def test_soft_delete(self):
         """Test that soft delete works correctly."""
         # Try to delete the file
-        response = self.client.delete(f"/api/v1/media/files/{self.file.id}/")
+        url = f"/api/v1/media/files/{self.file.id}/"
+        url += f"?namespace={self.namespace.slug}"
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, 204)
 
         # Check that the file is soft deleted
@@ -63,7 +75,9 @@ class MediaFileSoftDeleteTests(TestCase):
         self.file.delete(user=self.user)
 
         # Try to restore the file
-        response = self.client.post(f"/api/v1/media/files/{self.file.id}/restore/")
+        url = f"/api/v1/media/files/{self.file.id}/restore/"
+        url += f"?namespace={self.namespace.slug}"
+        response = self.client.post(url)
         self.assertEqual(response.status_code, 200)
 
         # Check that the file is restored
@@ -75,12 +89,14 @@ class MediaFileSoftDeleteTests(TestCase):
     def test_force_delete_staff_only(self):
         """Test that only staff users can force delete files."""
         # Regular user can't force delete
-        response = self.client.post(f"/api/v1/media/files/{self.file.id}/force_delete/")
+        url = f"/api/v1/media/files/{self.file.id}/force_delete/"
+        url += f"?namespace={self.namespace.slug}"
+        response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
 
         # Staff user can force delete
         self.client.force_authenticate(user=self.staff_user)
-        response = self.client.post(f"/api/v1/media/files/{self.file.id}/force_delete/")
+        response = self.client.post(url)
         self.assertEqual(response.status_code, 204)
 
         # File should be completely gone
@@ -94,7 +110,9 @@ class MediaFileSoftDeleteTests(TestCase):
         self.file.add_reference("webpage", str(uuid.uuid4()))
 
         # Try to delete
-        response = self.client.delete(f"/api/v1/media/files/{self.file.id}/")
+        url = f"/api/v1/media/files/{self.file.id}/"
+        url += f"?namespace={self.namespace.slug}"
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, 400)
 
         # File should still exist
@@ -104,7 +122,8 @@ class MediaFileSoftDeleteTests(TestCase):
         """Test that the show_deleted filter works correctly."""
         # Create another file and soft delete it
         deleted_file = MediaFile.objects.create(
-            title="Deleted File",
+            title="Deleted File Unique",
+            slug="deleted-file-unique",
             original_filename="deleted.jpg",
             file_path="test/deleted.jpg",
             file_size=1000,
@@ -112,18 +131,29 @@ class MediaFileSoftDeleteTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
         deleted_file.delete(user=self.user)
 
         # Regular search should not show deleted files
-        response = self.client.get("/api/v1/media/files/")
+        url = "/api/v1/media/files/"
+        url += f"?namespace={self.namespace.slug}"
+        # Set tenant header
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
+        
+        response = self.client.get(url)
         self.assertEqual(len(response.data["results"]), 1)
 
         # Search with show_deleted should show both files for staff
         self.client.force_authenticate(user=self.staff_user)
-        response = self.client.get("/api/v1/media/files/?show_deleted=true")
+        # Ensure staff user has access to the namespace
+        from content.models import Namespace
+        self.namespace.created_by = self.staff_user
+        self.namespace.save()
+        
+        response = self.client.get(url + "&show_deleted=true")
         self.assertEqual(len(response.data["results"]), 2)
 
 
@@ -132,14 +162,21 @@ class AtomicFileHashHandlingTests(TestCase):
 
     def setUp(self):
         """Set up test data."""
-        self.user = User.objects.create_user(username="testuser", password="testpass")
+        from core.models import Tenant
+        self.user = User.objects.create_user(username="testuser_atomic", password="testpass")
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-atomic",
+            created_by=self.user
+        )
         #  Use the default namespace that's created in migrations
-        self.namespace = Namespace.objects.first()
+        self.namespace = Namespace.objects.filter(tenant=self.tenant).first()
         if not self.namespace:
             self.namespace = Namespace.objects.create(
-                name="Test Namespace",
+                name="Test Namespace Atomic",
                 slug="test-namespace-atomic",
                 created_by=self.user,
+                tenant=self.tenant
             )
         self.test_hash = hashlib.sha256(b"test content").hexdigest()
 
@@ -155,6 +192,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -174,6 +212,7 @@ class AtomicFileHashHandlingTests(TestCase):
             content_type="image/jpeg",
             file_type="image",
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -206,6 +245,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -221,6 +261,7 @@ class AtomicFileHashHandlingTests(TestCase):
                 content_type="image/jpeg",
                 file_type="image",
                 namespace=self.namespace,
+                tenant=self.tenant,
                 created_by=self.user,
                 last_modified_by=self.user,
             )
@@ -239,6 +280,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -259,13 +301,14 @@ class AtomicFileHashHandlingTests(TestCase):
                 content_type="image/jpeg",
                 file_type="image",
                 namespace=self.namespace,
+                tenant=self.tenant,
                 created_by=self.user,
                 last_modified_by=self.user,
             )
 
             # Verify S3 delete WAS called for the old file
             # (since there are no other references to it at deletion time)
-            mock_storage.delete_file.assert_called_once_with("test/old_upload.jpg")
+            mock_storage.delete.assert_called_once_with("test/old_upload.jpg")
 
             # Verify new file was created
             self.assertIsNotNone(file2)
@@ -284,6 +327,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -297,6 +341,7 @@ class AtomicFileHashHandlingTests(TestCase):
                 title="New Upload",
                 # Missing required fields to trigger error
                 namespace=self.namespace,
+                tenant=self.tenant,
             )
 
         # Verify old file still exists (rollback happened)
@@ -318,6 +363,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -369,6 +415,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -389,6 +436,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -405,6 +453,7 @@ class AtomicFileHashHandlingTests(TestCase):
             content_type="image/jpeg",
             file_type="image",
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -434,6 +483,7 @@ class AtomicFileHashHandlingTests(TestCase):
             file_type="image",
             file_hash=self.test_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -453,4 +503,4 @@ class AtomicFileHashHandlingTests(TestCase):
             file1_deleted.delete(force=True)
 
             # Since this is the last reference, S3 should be deleted
-            mock_storage.delete_file.assert_called_once_with("test/test.jpg")
+            mock_storage.delete.assert_called_once_with("test/test.jpg")

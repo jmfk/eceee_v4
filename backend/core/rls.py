@@ -17,6 +17,10 @@ def set_tenant_context(tenant_id):
     Args:
         tenant_id: UUID tenant ID to set as current tenant
     """
+    if connection.vendor == 'sqlite':
+        # SQLite doesn't support SET app.current_tenant_id
+        return
+        
     with connection.cursor() as cursor:
         cursor.execute("SET app.current_tenant_id = %s", [str(tenant_id)])
 
@@ -28,6 +32,9 @@ def get_current_tenant_id():
     Returns:
         UUID string or None: Current tenant ID, or None if not set
     """
+    if connection.vendor == 'sqlite':
+        return None
+        
     with connection.cursor() as cursor:
         try:
             cursor.execute("SELECT current_setting('app.current_tenant_id', true)::uuid")
@@ -44,6 +51,9 @@ def clear_tenant_context():
     """
     Clear the tenant context by resetting the session variable.
     """
+    if connection.vendor == 'sqlite':
+        return
+        
     with connection.cursor() as cursor:
         cursor.execute("RESET app.current_tenant_id")
 

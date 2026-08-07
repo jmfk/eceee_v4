@@ -8,13 +8,13 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SelfContainedWidgetForm, WidgetRegistry } from '../SelfContainedWidgetForm.js'
 
 // Mock the API modules
-vi.mock('../../api/widgets.js', () => ({
+vi.mock('../../../api/widgets.js', () => ({
     widgetsApi: {
         update: vi.fn().mockResolvedValue({ success: true })
     }
 }))
 
-vi.mock('../../api/widgetSchemas.js', () => ({
+vi.mock('../../../api/widgetSchemas.js', () => ({
     validateWidgetConfiguration: vi.fn().mockResolvedValue({
         is_valid: true,
         errors: {},

@@ -11,8 +11,21 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:state": "vitest run src/contexts/unified-data src/components/form-fields/__tests__/ItemsListField.test.jsx src/components/__tests__/PageEditor.dirty.test.js",
+    "test:e2e": "npm run test:e2e:public && npm run test:e2e:admin",
+    "test:e2e:admin": "playwright test --config playwright.config.js",
+    "test:e2e:public": "playwright test --config playwright.public.config.js",
+    "test:e2e:headed": "playwright test --config playwright.config.js --headed",
+    "test:e2e:public:headed": "playwright test --config playwright.public.config.js --headed",
+    "test:e2e:ui": "playwright test --config playwright.config.js --ui",
+    "howto:auth": "node scripts/save-howto-auth-state.mjs",
+    "howto:video": "node scripts/generate-howto-video.mjs",
+    "howto:video:voice": "node scripts/generate-howto-video.mjs --format mp4 --voice elevenlabs",
+    "howto:video:all": "node scripts/generate-howto-video.mjs --all --format mp4 --voice elevenlabs",
+    "howto:voices": "node scripts/generate-howto-video.mjs --list-voices --language sv",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky"
   },
   "dependencies": {
     "@codemirror/lang-html": "^6.4.10",
@@ -46,6 +59,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.3",
@@ -62,6 +76,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.2.0",
+    "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.11",

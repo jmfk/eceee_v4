@@ -203,12 +203,16 @@ class PathPatternDecoratorTests(TestCase):
     """Test cases for the @register_path_pattern decorator"""
 
     def setUp(self):
-        """Clean registry before each test"""
+        """Save registry state before each test"""
+        self._original_patterns = path_pattern_registry._patterns.copy()
+        self._original_instances = path_pattern_registry._instances.copy()
         path_pattern_registry.clear()
 
     def tearDown(self):
-        """Clean registry after each test"""
+        """Restore registry state after each test"""
         path_pattern_registry.clear()
+        path_pattern_registry._patterns.update(self._original_patterns)
+        path_pattern_registry._instances.update(self._original_instances)
 
     def test_decorator_registers_pattern(self):
         """Test that the decorator registers a pattern"""

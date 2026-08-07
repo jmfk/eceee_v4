@@ -16,9 +16,9 @@ Add to your `.env` file:
 
 ```bash
 POSTMARK_API_KEY=your-postmark-api-key
-DEFAULT_FROM_EMAIL=noreply@eceee.fred.nu
-SERVER_EMAIL=server@eceee.fred.nu
-ADMIN_EMAIL=admin@eceee.fred.nu
+DEFAULT_FROM_EMAIL=noreply@example.com
+SERVER_EMAIL=server@example.com
+ADMIN_EMAIL=admin@example.com
 ```
 
 ### 3. Configure Django Site
@@ -30,7 +30,7 @@ docker-compose exec backend python manage.py shell
 ```python
 from django.contrib.sites.models import Site
 site = Site.objects.get_current()
-site.domain = 'eceee.fred.nu'
+site.domain = 'example.com'
 site.name = 'ECEEE'
 site.save()
 ```
@@ -78,7 +78,7 @@ email = EmailMessage(
     to=['recipient@example.com'],
     headers={
         'X-PM-Tag': 'registration',  # Postmark tag
-        'Reply-To': 'support@eceee.fred.nu',
+        'Reply-To': 'support@example.com',
     }
 )
 email.send()
@@ -189,7 +189,7 @@ print(f"Domain: {site.domain}")
 print(f"Name: {site.name}")
 ```
 
-Should match your actual domain (e.g., `eceee.fred.nu`).
+Should match your actual domain (e.g., `example.com`).
 
 ## Email Template Locations
 
@@ -203,9 +203,9 @@ Should match your actual domain (e.g., `eceee.fred.nu`).
 | Variable | Purpose | Example |
 |----------|---------|---------|
 | `POSTMARK_API_KEY` | Postmark authentication | `abc123...` |
-| `DEFAULT_FROM_EMAIL` | Default sender address | `noreply@eceee.fred.nu` |
-| `SERVER_EMAIL` | System error emails | `server@eceee.fred.nu` |
-| `ADMIN_EMAIL` | Admin notifications | `admin@eceee.fred.nu` |
+| `DEFAULT_FROM_EMAIL` | Default sender address | `noreply@example.com` |
+| `SERVER_EMAIL` | System error emails | `server@example.com` |
+| `ADMIN_EMAIL` | Admin notifications | `admin@example.com` |
 | `EMAIL_BACKEND` | Override email backend | `postmark.django_backend.EmailBackend` |
 
 ## Useful Commands

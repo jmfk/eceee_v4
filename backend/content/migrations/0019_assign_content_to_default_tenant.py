@@ -32,27 +32,12 @@ def assign_content_to_default_tenant(apps, schema_editor):
     # Get tenant UUID as string
     tenant_uuid = str(default_tenant.id) if isinstance(default_tenant.id, uuid.UUID) else default_tenant.id
     
-    # Assign all content models without a tenant to the default tenant using raw SQL
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "UPDATE content_namespace SET tenant_id = %s::uuid WHERE tenant_id IS NULL",
-            [tenant_uuid]
-        )
-        namespaces_count = cursor.rowcount
-        
-        cursor.execute(
-            "UPDATE content_category SET tenant_id = %s::uuid WHERE tenant_id IS NULL",
-            [tenant_uuid]
-        )
-        categories_count = cursor.rowcount
-        
-        cursor.execute(
-            "UPDATE content_tag SET tenant_id = %s::uuid WHERE tenant_id IS NULL",
-            [tenant_uuid]
-        )
-        tags_count = cursor.rowcount
+    # Assign all content models without a tenant to the default tenant
+    Namespace.objects.filter(tenant__isnull=True).update(tenant=default_tenant)
+    Category.objects.filter(tenant__isnull=True).update(tenant=default_tenant)
+    Tag.objects.filter(tenant__isnull=True).update(tenant=default_tenant)
     
-    print(f"Assigned {namespaces_count} namespaces, {categories_count} categories, and {tags_count} tags to default tenant")
+    print("Assigned content models to default tenant")
 
 
 def reverse_migration(apps, schema_editor):

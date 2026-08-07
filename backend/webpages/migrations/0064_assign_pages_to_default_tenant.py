@@ -28,19 +28,9 @@ def assign_pages_to_default_tenant(apps, schema_editor):
         print(f"Using existing default tenant: {default_tenant.name} (identifier: {default_tenant.identifier})")
     
     # Assign all pages without a tenant to the default tenant
-    # Use raw SQL to ensure UUID is handled correctly
-    with connection.cursor() as cursor:
-        # Get tenant UUID as string
-        tenant_uuid = str(default_tenant.id) if isinstance(default_tenant.id, uuid.UUID) else default_tenant.id
-        
-        # Update pages using raw SQL to ensure UUID type
-        cursor.execute(
-            "UPDATE webpages_webpage SET tenant_id = %s::uuid WHERE tenant_id IS NULL",
-            [tenant_uuid]
-        )
-        count = cursor.rowcount
+    WebPage.objects.filter(tenant__isnull=True).update(tenant=default_tenant)
     
-    print(f"Assigned {count} pages to default tenant")
+    print("Assigned pages to default tenant")
 
 
 def reverse_migration(apps, schema_editor):

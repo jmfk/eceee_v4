@@ -23,16 +23,18 @@ import {
     Save,
     AlignJustify,
     Download,
+    Upload,
     MoreVertical,
     CheckCircle,
     Trash2
 } from 'lucide-react'
-import { pagesApi } from '../api'
+import { pagesApi, sitePackagesApi } from '../api'
 import { deletePage } from '../api/pages'
 import PageTreeNode from './PageTreeNode'
 import TreeImporterModalV2 from './TreeImporterModalV2'
 import BulkActionsToolbar from './BulkActionsToolbar'
 import Tooltip from './Tooltip'
+import ContextualHelpLink from './help/ContextualHelpLink'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import pageTreeUtils from '../utils/pageTreeUtils'
@@ -65,6 +67,36 @@ const useDebounce = (value, delay) => {
     return debouncedValue
 }
 
+const SITE_PACKAGE_POLL_INTERVAL_MS = 2000
+const SITE_PACKAGE_MAX_POLLS = 900
+const SITE_PACKAGE_DISMISSED_JOBS_KEY = 'sitePackageDismissedJobs'
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+const getSitePackageJobList = (response) => {
+    if (Array.isArray(response)) return response
+    if (Array.isArray(response?.results)) return response.results
+    return []
+}
+
+const isActiveSitePackageJob = (job) => job.status === 'pending' || job.status === 'running'
+
+const getDismissedSitePackageJobIds = () => {
+    try {
+        return new Set(JSON.parse(localStorage.getItem(SITE_PACKAGE_DISMISSED_JOBS_KEY) || '[]').map(String))
+    } catch {
+        return new Set()
+    }
+}
+
+const persistDismissedSitePackageJobIds = (jobIds) => {
+    localStorage.setItem(SITE_PACKAGE_DISMISSED_JOBS_KEY, JSON.stringify([...jobIds]))
+}
+
+const isSitePackageJobDismissed = (jobId) => {
+    return getDismissedSitePackageJobIds().has(String(jobId))
+}
+
 const TreePageManager = () => {
     const navigate = useNavigate()
     
@@ -73,6 +105,7 @@ const TreePageManager = () => {
 
     // State management
     const pagesRef = useRef([])
+    const sitePackagePollingJobsRef = useRef(new Set())
     const [, forceUpdate] = useState({})
     const [activeTab, setActiveTab] = useState('active') // 'active' or 'deleted'
     const [searchTerm, setSearchTerm] = useState('')
@@ -82,7 +115,10 @@ const TreePageManager = () => {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showRootPageModal, setShowRootPageModal] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
+    const [showSitePackageImportModal, setShowSitePackageImportModal] = useState(false)
     const [importParentPage, setImportParentPage] = useState(null)
+    const [exportRootPage, setExportRootPage] = useState(null)
+    const [sitePackageJobs, setSitePackageJobs] = useState([])
     const [positioningParams, setPositioningParams] = useState(null)
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
@@ -188,7 +224,7 @@ const TreePageManager = () => {
         refetch
     } = useQuery({
         queryKey: ['pages', 'root', { search: debouncedSearchTerm, status: statusFilter }],
-        queryFn: () => {
+        queryFn: async () => {
             const filters = {}
             if (debouncedSearchTerm) filters.search = debouncedSearchTerm
             if (statusFilter !== 'all') filters.publicationStatus = statusFilter
@@ -206,7 +242,7 @@ const TreePageManager = () => {
         error: searchError
     } = useQuery({
         queryKey: ['pages', 'search', { search: debouncedSearchTerm, status: statusFilter }],
-        queryFn: () => {
+        queryFn: async () => {
             const filters = {}
             if (statusFilter !== 'all') filters.publicationStatus = statusFilter
             return searchAllPages(debouncedSearchTerm, filters)
@@ -262,8 +298,7 @@ const TreePageManager = () => {
 
     // Move page mutation (for cut/paste)
     const movePageMutation = useMutation({
-        mutationFn: ({ pageId, parentId, sortOrder }) =>
-            pagesApi.update(pageId, { parentId: parentId, sortOrder: sortOrder }),
+        mutationFn: async ({ pageId, parentId, sortOrder }) => await pagesApi.update(pageId, { parentId: parentId, sortOrder: sortOrder }),
         onMutate: () => {
             addNotification('Moving page...', 'info', 'page-move')
         },
@@ -374,8 +409,8 @@ const TreePageManager = () => {
         // Update server
         try {
             addNotification('Moving page up...', 'info', 'page-move-up')
-            const updatePromises = newPages.map(page =>
-                pagesApi.update(page.id, { sortOrder: page.sortOrder })
+            const updatePromises = newPages.map(async (page) =>
+                await pagesApi.update(page.id, { sortOrder: page.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})
@@ -414,8 +449,8 @@ const TreePageManager = () => {
         // Update server
         try {
             addNotification('Moving page down...', 'info', 'page-move-down')
-            const updatePromises = newPages.map(page =>
-                pagesApi.update(page.id, { sortOrder: page.sortOrder })
+            const updatePromises = newPages.map(async (page) =>
+                await pagesApi.update(page.id, { sortOrder: page.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})
@@ -549,14 +584,19 @@ const TreePageManager = () => {
         setShowRootPageModal(true)
     }, [addNotification])
 
-    // Handle import tree
+    // Handle legacy external site import. Root ZIP imports use site packages.
     const handleImportTree = useCallback((parentPage = null) => {
+        if (!parentPage) {
+            setShowSitePackageImportModal(true)
+            return
+        }
+
         setImportParentPage(parentPage)
         setShowImportModal(true)
     }, [])
 
     const handleImportSuccess = useCallback(async () => {
-        addNotification('Page tree imported successfully', 'success', 'import-success')
+        addNotification('External site imported successfully', 'success', 'import-success')
         addNotification('Refreshing page tree...', 'info', 'tree-refresh')
 
         // Clear cache and refetch to ensure complete refresh
@@ -567,6 +607,284 @@ const TreePageManager = () => {
 
         addNotification('Page tree refreshed', 'success', 'tree-refresh')
     }, [addNotification, queryClient])
+
+    const decorateSitePackageJob = useCallback((job) => {
+        const rootTitle = job.rootTitle || job.rootPageTitle
+        const label = job.label || (job.kind === 'export'
+            ? `Export ${rootTitle || 'site package'}`
+            : 'Import site package')
+
+        return {
+            ...job,
+            rootTitle,
+            label
+        }
+    }, [])
+
+    const upsertSitePackageJob = useCallback((job) => {
+        if (isSitePackageJobDismissed(job.id)) {
+            return
+        }
+
+        setSitePackageJobs(prev => {
+            const decoratedJob = decorateSitePackageJob(job)
+            const existingIndex = prev.findIndex(existingJob => existingJob.id === job.id)
+            if (existingIndex === -1) {
+                return [decoratedJob, ...prev].slice(0, 5)
+            }
+
+            const next = [...prev]
+            next[existingIndex] = decorateSitePackageJob({ ...next[existingIndex], ...job })
+            return next
+        })
+    }, [decorateSitePackageJob])
+
+    const removeSitePackageJob = useCallback((jobId) => {
+        const dismissedJobIds = getDismissedSitePackageJobIds()
+        dismissedJobIds.add(String(jobId))
+        persistDismissedSitePackageJobIds(dismissedJobIds)
+        sitePackagePollingJobsRef.current.delete(jobId)
+        setSitePackageJobs(prev => prev.filter(job => job.id !== jobId))
+    }, [])
+
+    const pollSitePackageJob = useCallback(async ({ jobId, getJob, onCompleted }) => {
+        for (let i = 0; i < SITE_PACKAGE_MAX_POLLS; i += 1) {
+            if (isSitePackageJobDismissed(jobId)) {
+                return
+            }
+
+            const job = await getJob(jobId)
+            if (isSitePackageJobDismissed(jobId)) {
+                return
+            }
+
+            upsertSitePackageJob(job)
+
+            if (job.status === 'completed') {
+                await onCompleted(job)
+                return
+            }
+
+            if (job.status === 'failed') {
+                const errorMessage = Array.isArray(job.errors) && job.errors.length > 0
+                    ? job.errors[job.errors.length - 1]
+                    : 'Site package job failed'
+                throw new Error(errorMessage)
+            }
+
+            await delay(SITE_PACKAGE_POLL_INTERVAL_MS)
+        }
+
+        upsertSitePackageJob({
+            id: jobId,
+            status: 'running',
+            message: 'Still running. This job will reappear after reload.'
+        })
+    }, [upsertSitePackageJob])
+
+    const completeSitePackageJob = useCallback(async (completedJob) => {
+        if (completedJob.kind === 'export') {
+            const download = await sitePackagesApi.getExportDownload(completedJob.id)
+            if (isSitePackageJobDismissed(completedJob.id)) {
+                return
+            }
+
+            const downloadUrl = download.downloadUrl || download.download_url
+            upsertSitePackageJob({
+                ...completedJob,
+                downloadUrl
+            })
+            addNotification(`Export "${completedJob.rootPageTitle || completedJob.rootTitle || 'site package'}" is ready`, 'success', `site-export-${completedJob.id}`)
+            return
+        }
+
+        upsertSitePackageJob(completedJob)
+        if (isSitePackageJobDismissed(completedJob.id)) {
+            return
+        }
+
+        queryClient.removeQueries({ queryKey: ['pages'] })
+        queryClient.removeQueries({ queryKey: ['page-children'] })
+        await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
+        addNotification('Site package imported as a new root', 'success', `site-import-${completedJob.id}`)
+    }, [addNotification, queryClient, upsertSitePackageJob])
+
+    const resumeSitePackagePolling = useCallback((job) => {
+        if (!isActiveSitePackageJob(job) || sitePackagePollingJobsRef.current.has(job.id)) {
+            return
+        }
+
+        sitePackagePollingJobsRef.current.add(job.id)
+        pollSitePackageJob({
+            jobId: job.id,
+            getJob: job.kind === 'export' ? sitePackagesApi.getExport : sitePackagesApi.getImport,
+            onCompleted: completeSitePackageJob
+        }).catch((error) => {
+            console.error('Failed to poll site package job:', error)
+            upsertSitePackageJob({
+                ...job,
+                status: 'failed',
+                errors: [error.message]
+            })
+        }).finally(() => {
+            sitePackagePollingJobsRef.current.delete(job.id)
+        })
+    }, [completeSitePackageJob, pollSitePackageJob, upsertSitePackageJob])
+
+    useEffect(() => {
+        let isMounted = true
+
+        const loadSitePackageJobs = async () => {
+            try {
+                const [exportResponse, importResponse] = await Promise.all([
+                    sitePackagesApi.listExports(),
+                    sitePackagesApi.listImports()
+                ])
+
+                if (!isMounted) return
+
+                const dismissedJobIds = getDismissedSitePackageJobIds()
+                const jobs = [
+                    ...getSitePackageJobList(exportResponse),
+                    ...getSitePackageJobList(importResponse)
+                ]
+                    .filter(job => isActiveSitePackageJob(job) || !dismissedJobIds.has(String(job.id)))
+                    .sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0))
+
+                jobs.slice(0, 5).forEach((job) => {
+                    upsertSitePackageJob(job)
+                    if (isActiveSitePackageJob(job)) {
+                        resumeSitePackagePolling(job)
+                    } else if (job.kind === 'export' && job.status === 'completed' && job.downloadAvailable) {
+                        sitePackagesApi.getExportDownload(job.id)
+                            .then((download) => {
+                                if (!isMounted) return
+                                upsertSitePackageJob({
+                                    ...job,
+                                    downloadUrl: download.downloadUrl || download.download_url
+                                })
+                            })
+                            .catch((error) => {
+                                console.error('Failed to recover site package download URL:', error)
+                            })
+                    }
+                })
+            } catch (error) {
+                console.error('Failed to load site package jobs:', error)
+            }
+        }
+
+        loadSitePackageJobs()
+
+        return () => {
+            isMounted = false
+        }
+    }, [resumeSitePackagePolling, upsertSitePackageJob])
+
+    const openExportRootPackage = useCallback((rootPage) => {
+        setExportRootPage(rootPage)
+    }, [])
+
+    const handleExportRootPackage = useCallback(async (rootPage, { includeMedia, includeThemes }) => {
+        addNotification(`Starting export for "${rootPage.title}"...`, 'info', `site-export-${rootPage.id}`)
+
+        try {
+            const job = await sitePackagesApi.createExport({
+                rootPageId: rootPage.id,
+                includeMedia,
+                includeThemes
+            })
+            setExportRootPage(null)
+            upsertSitePackageJob({
+                ...job,
+                rootTitle: rootPage.title,
+                label: `Export ${rootPage.title}`
+            })
+
+            pollSitePackageJob({
+                jobId: job.id,
+                getJob: sitePackagesApi.getExport,
+                onCompleted: async (completedJob) => {
+                    const download = await sitePackagesApi.getExportDownload(completedJob.id)
+                    if (isSitePackageJobDismissed(completedJob.id)) {
+                        return
+                    }
+
+                    const downloadUrl = download.downloadUrl || download.download_url
+                    upsertSitePackageJob({
+                        ...completedJob,
+                        rootTitle: rootPage.title,
+                        label: `Export ${rootPage.title}`,
+                        downloadUrl
+                    })
+                    addNotification(`Export for "${rootPage.title}" is ready`, 'success', `site-export-${rootPage.id}`)
+                }
+            }).catch((error) => {
+                console.error('Failed to export root site package:', error)
+                upsertSitePackageJob({
+                    id: job.id,
+                    kind: 'export',
+                    status: 'failed',
+                    rootTitle: rootPage.title,
+                    label: `Export ${rootPage.title}`,
+                    errors: [error.message]
+                })
+                addNotification(`Export failed: ${error.message}`, 'error', `site-export-${rootPage.id}`)
+            })
+        } catch (error) {
+            console.error('Failed to start root site package export:', error)
+            showError(error, 'error')
+            addNotification('Failed to start site export', 'error', `site-export-${rootPage.id}`)
+            throw error
+        }
+    }, [addNotification, pollSitePackageJob, showError, upsertSitePackageJob])
+
+    const handleImportRootPackage = useCallback(async ({ file, preservePublicationStatus }) => {
+        addNotification(`Uploading "${file.name}"...`, 'info', 'site-import')
+
+        try {
+            const job = await sitePackagesApi.createImport({ file, preservePublicationStatus })
+            setShowSitePackageImportModal(false)
+            upsertSitePackageJob({
+                ...job,
+                label: `Import ${file.name}`
+            })
+
+            pollSitePackageJob({
+                jobId: job.id,
+                getJob: sitePackagesApi.getImport,
+                onCompleted: async (completedJob) => {
+                    if (isSitePackageJobDismissed(completedJob.id)) {
+                        return
+                    }
+
+                    upsertSitePackageJob({
+                        ...completedJob,
+                        label: `Import ${file.name}`
+                    })
+                    queryClient.removeQueries({ queryKey: ['pages'] })
+                    queryClient.removeQueries({ queryKey: ['page-children'] })
+                    await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
+                    addNotification('Site package imported as a new root', 'success', 'site-import')
+                }
+            }).catch((error) => {
+                console.error('Failed to import root site package:', error)
+                upsertSitePackageJob({
+                    id: job.id,
+                    kind: 'import',
+                    status: 'failed',
+                    label: `Import ${file.name}`,
+                    errors: [error.message]
+                })
+                addNotification(`Import failed: ${error.message}`, 'error', 'site-import')
+            })
+        } catch (error) {
+            console.error('Failed to start root site package import:', error)
+            showError(error, 'error')
+            addNotification('Failed to start site import', 'error', 'site-import')
+            throw error
+        }
+    }, [addNotification, pollSitePackageJob, queryClient, showError, upsertSitePackageJob])
 
     // Clear clipboard
     const clearClipboard = () => {
@@ -890,6 +1208,7 @@ const TreePageManager = () => {
                                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 transition-all" />
                                 )}
                             </button>
+                            <ContextualHelpLink topicId="pages" label="Open Pages help" className="ml-1" />
                             <button
                                 onClick={() => setActiveTab('deleted')}
                                 className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-all relative whitespace-nowrap ${activeTab === 'deleted'
@@ -934,13 +1253,14 @@ const TreePageManager = () => {
                                             <AlignJustify className="w-4 h-4" />
                                         </button>
                                     </Tooltip>
-                                    <Tooltip text="Import page tree as new root page" position="top">
+                                    <Tooltip text="Import root site package ZIP" position="top">
                                         <button
-                                            data-testid="import-tree-button"
-                                            onClick={() => handleImportTree(null)}
+                                            data-testid="import-site-package-button"
+                                            onClick={() => setShowSitePackageImportModal(true)}
+                                            aria-label="Import root site package ZIP"
                                             className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                         >
-                                            <Download className="w-4 h-4" />
+                                            <Upload className="w-4 h-4" />
                                         </button>
                                     </Tooltip>
                                     <Tooltip text="Add root page" position="top">
@@ -1062,13 +1382,13 @@ const TreePageManager = () => {
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        handleImportTree(null)
+                                                        setShowSitePackageImportModal(true)
                                                         setShowGlobalMenu(false)
                                                     }}
                                                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                                                 >
-                                                    <Download className="w-4 h-4" />
-                                                    <span>Import page tree</span>
+                                                    <Upload className="w-4 h-4" />
+                                                    <span>Import root ZIP</span>
                                                 </button>
                                                 <button
                                                     onClick={() => {
@@ -1166,6 +1486,12 @@ const TreePageManager = () => {
             {/* Scrollable Tree Content or Deleted Pages View */}
             {activeTab === 'active' ? (
                 <>
+                    {sitePackageJobs.length > 0 && (
+                        <SitePackageJobsPanel
+                            jobs={sitePackageJobs}
+                            onDismiss={removeSitePackageJob}
+                        />
+                    )}
                     <div className="flex-1 overflow-auto min-h-0">
                         {(isLoading || searchLoading) ? (
                             <div className="flex items-center justify-center p-8">
@@ -1236,6 +1562,7 @@ const TreePageManager = () => {
                                         onDelete={handleDelete}
                                         onAddPageBelow={handleAddPageBelow}
                                         onImport={handleImportTree}
+                                        onExport={openExportRootPackage}
                                         cutPageIds={cutPageIds}
                                         copyPageIds={copyPageIds}
                                         isSearchMode={!!searchTerm}
@@ -1306,13 +1633,296 @@ const TreePageManager = () => {
                 />
             )}
 
-            {/* Tree Importer Modal */}
+            {/* External Site Importer Modal */}
             <TreeImporterModalV2
                 isOpen={showImportModal}
                 onClose={() => setShowImportModal(false)}
                 parentPage={importParentPage}
                 onSuccess={handleImportSuccess}
             />
+
+            <SitePackageImportModal
+                isOpen={showSitePackageImportModal}
+                onClose={() => setShowSitePackageImportModal(false)}
+                onImport={handleImportRootPackage}
+            />
+
+            <SitePackageExportModal
+                rootPage={exportRootPage}
+                onClose={() => setExportRootPage(null)}
+                onExport={handleExportRootPackage}
+            />
+        </div>
+    )
+}
+
+const SitePackageJobsPanel = ({ jobs, onDismiss }) => {
+    const getStatusText = (job) => {
+        if (job.status === 'completed') return job.downloadUrl ? 'Ready to download' : 'Completed'
+        if (job.status === 'failed') return Array.isArray(job.errors) && job.errors.length > 0 ? job.errors[job.errors.length - 1] : 'Failed'
+        if (job.status === 'running') return 'Running'
+        return 'Queued'
+    }
+
+    return (
+        <div className="flex-shrink-0 border-b border-gray-200 bg-indigo-50 px-2 sm:px-4 py-2 space-y-2">
+            {jobs.map((job) => (
+                <div key={job.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div className="min-w-0 flex items-center gap-2">
+                        {job.status === 'completed' ? (
+                            <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                        ) : job.status === 'failed' ? (
+                            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                        ) : (
+                            <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+                        )}
+                        <span className="font-medium text-gray-900 truncate">
+                            {job.label || `${job.kind === 'import' ? 'Import' : 'Export'} site package`}
+                        </span>
+                        <span className={`truncate ${job.status === 'failed' ? 'text-red-700' : 'text-gray-600'}`}>
+                            {getStatusText(job)}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {job.downloadUrl && (
+                            <a
+                                href={job.downloadUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-700 bg-white border border-indigo-200 rounded hover:bg-indigo-100"
+                            >
+                                <Download className="w-3 h-3" />
+                                Download ZIP
+                            </a>
+                        )}
+                        {(job.status === 'completed' || job.status === 'failed') && (
+                            <button
+                                onClick={() => onDismiss(job.id)}
+                                className="p-1 text-gray-500 hover:text-gray-700 hover:bg-white rounded"
+                                aria-label="Dismiss site package job"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+const SitePackageExportModal = ({ rootPage, onClose, onExport }) => {
+    const [includeMedia, setIncludeMedia] = useState(true)
+    const [includeThemes, setIncludeThemes] = useState(true)
+    const [isExporting, setIsExporting] = useState(false)
+    const [error, setError] = useState('')
+
+    useEffect(() => {
+        if (rootPage) {
+            setIncludeMedia(true)
+            setIncludeThemes(true)
+            setIsExporting(false)
+            setError('')
+        }
+    }, [rootPage])
+
+    if (!rootPage) return null
+
+    const handleSubmit = async (event) => {
+        event.preventDefault()
+        setIsExporting(true)
+        setError('')
+        try {
+            await onExport(rootPage, { includeMedia, includeThemes })
+        } catch (exportError) {
+            setError(exportError.message || 'Failed to start export.')
+            setIsExporting(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+                <form onSubmit={handleSubmit}>
+                    <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-900">Export Root Site</h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Export "{rootPage.title}" as a site package ZIP.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isExporting}
+                            aria-label="Close export root site modal"
+                            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                {error}
+                            </div>
+                        )}
+
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={includeMedia}
+                                onChange={(event) => setIncludeMedia(event.target.checked)}
+                                disabled={isExporting}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>Include referenced media files</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={includeThemes}
+                                onChange={(event) => setIncludeThemes(event.target.checked)}
+                                disabled={isExporting}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>Include referenced themes and theme assets</span>
+                        </label>
+                    </div>
+
+                    <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isExporting}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isExporting}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                            {isExporting ? 'Starting...' : 'Export Root'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )
+}
+
+const SitePackageImportModal = ({ isOpen, onClose, onImport }) => {
+    const [file, setFile] = useState(null)
+    const [preservePublicationStatus, setPreservePublicationStatus] = useState(true)
+    const [isImporting, setIsImporting] = useState(false)
+    const [error, setError] = useState('')
+
+    useEffect(() => {
+        if (isOpen) {
+            setFile(null)
+            setPreservePublicationStatus(true)
+            setIsImporting(false)
+            setError('')
+        }
+    }, [isOpen])
+
+    if (!isOpen) return null
+
+    const handleSubmit = async (event) => {
+        event.preventDefault()
+        if (!file) {
+            setError('Choose a ZIP file to import.')
+            return
+        }
+
+        setIsImporting(true)
+        setError('')
+        try {
+            await onImport({ file, preservePublicationStatus })
+        } catch (importError) {
+            setError(importError.message || 'Failed to start import.')
+            setIsImporting(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+                <form onSubmit={handleSubmit}>
+                    <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-900">Import Root Site</h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Creates a new root page tree from a site package ZIP.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isImporting}
+                            aria-label="Close import root site modal"
+                            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                {error}
+                            </div>
+                        )}
+
+                        <label className="block">
+                            <span className="block text-sm font-medium text-gray-700 mb-1">Site package ZIP</span>
+                            <input
+                                type="file"
+                                accept=".zip,application/zip,application/x-zip-compressed"
+                                onChange={(event) => setFile(event.target.files?.[0] || null)}
+                                disabled={isImporting}
+                                className="block w-full text-sm text-gray-700 file:mr-3 file:px-3 file:py-2 file:border-0 file:rounded file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+                            />
+                        </label>
+
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={preservePublicationStatus}
+                                onChange={(event) => setPreservePublicationStatus(event.target.checked)}
+                                disabled={isImporting}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>Preserve publication status</span>
+                        </label>
+                    </div>
+
+                    <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isImporting}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isImporting || !file}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            {isImporting ? 'Uploading...' : 'Import Root'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     )
 }
@@ -1603,4 +2213,4 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
     )
 }
 
-export default TreePageManager 
+export default TreePageManager

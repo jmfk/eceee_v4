@@ -32,6 +32,14 @@ const TreeBasedLayoutRenderer = forwardRef(({
     // Use tree-based inheritance (much simpler!)
     const { tree, helpers, isLoading } = useInheritanceTree(pageId)
 
+    // Expose methods to parent
+    useImperativeHandle(ref, () => ({
+        updateWidget: (slotName, index, updatedWidget) => {
+            // Implementation for widget updates
+        },
+        getSlotData
+    }))
+
     // Get UDC context
     const { publishUpdate } = useUnifiedData()
 
@@ -173,14 +181,6 @@ const TreeBasedLayoutRenderer = forwardRef(({
             </div>
         )
     }
-
-    // Expose methods to parent
-    useImperativeHandle(ref, () => ({
-        updateWidget: (slotName, index, updatedWidget) => {
-            // Implementation for widget updates
-        },
-        getSlotData
-    }))
 
     // Render layout with tree-based data
     return (

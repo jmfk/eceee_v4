@@ -17,6 +17,6 @@ router.register(r"versions", views.ObjectVersionViewSet, basename="objectversion
 app_name = "object_storage"
 
 urlpatterns = [
-    path("api/", include(router.urls)),
-    path("api/upload-image/", views.upload_image, name="upload_image"),
+    path("", include(router.urls)),
+    path("upload-image/", views.upload_image, name="upload_image"),
 ]

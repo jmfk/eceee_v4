@@ -20,17 +20,17 @@ export function generateCSSFromBreakpoints(cssObj, theme) {
     if (typeof cssObj === 'string') {
         return cssObj;
     }
-    
+
     // Get breakpoints from theme
     const breakpoints = getBreakpoints(theme);
-    
+
     const parts = [];
-    
+
     // Base styles (xs - no media query)
     if (cssObj.xs) {
         parts.push(cssObj.xs);
     }
-    
+
     // Generate media queries for larger breakpoints (mobile-first)
     ['sm', 'md', 'lg', 'xl'].forEach(bp => {
         if (cssObj[bp] && cssObj[bp].trim() && breakpoints[bp]) {
@@ -38,7 +38,7 @@ export function generateCSSFromBreakpoints(cssObj, theme) {
             parts.push(mediaQuery);
         }
     });
-    
+
     return parts.join('\n\n');
 }
 
@@ -52,7 +52,7 @@ export function migrateLegacyCSS(css) {
     if (typeof css === 'object' && css !== null) {
         return css; // Already in new format
     }
-    
+
     return {
         xs: css || ''
     };
@@ -68,7 +68,7 @@ export function cssObjectToString(cssObj) {
     if (typeof cssObj === 'string') {
         return cssObj;
     }
-    
+
     return cssObj.xs || cssObj.sm || '';
 }
 
@@ -82,7 +82,7 @@ export function hasBreakpointStyles(cssObj) {
     if (typeof cssObj === 'string') {
         return false;
     }
-    
+
     return ['xs', 'sm', 'md', 'lg', 'xl'].some(bp => cssObj[bp] && cssObj[bp].trim());
 }
 
@@ -96,11 +96,11 @@ export function hasBreakpointStyles(cssObj) {
  */
 export function copyBreakpointCSS(cssObj, fromBreakpoint, toBreakpoint) {
     const newCssObj = { ...cssObj };
-    
+
     if (cssObj[fromBreakpoint]) {
         newCssObj[toBreakpoint] = cssObj[fromBreakpoint];
     }
-    
+
     return newCssObj;
 }
 
@@ -135,7 +135,7 @@ export function getBreakpointKeys() {
  */
 export function getBreakpointLabel(breakpoint, theme) {
     const breakpoints = getBreakpoints(theme);
-    
+
     const labels = {
         xs: `XS - Base (<${breakpoints.sm}px)`,
         sm: `SM & Up (≥${breakpoints.sm}px)`,
@@ -143,7 +143,7 @@ export function getBreakpointLabel(breakpoint, theme) {
         lg: `LG & Up (≥${breakpoints.lg}px)`,
         xl: `XL & Up (≥${breakpoints.xl}px)`,
     };
-    
+
     return labels[breakpoint] || breakpoint;
 }
 

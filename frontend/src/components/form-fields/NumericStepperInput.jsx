@@ -30,6 +30,7 @@ const NumericStepperInput = ({
     allowDecimal = true,
     formatOnBlur = true,
     showCalculator = false,
+    size = 'md',
     ...props
 }) => {
     const [localValue, setLocalValue] = useState('')

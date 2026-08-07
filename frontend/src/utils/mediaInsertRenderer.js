@@ -5,6 +5,13 @@
 
 import { mediaApi } from '../api';
 import { getImageAspectRatio, getGridSpan } from './imageGridLayout';
+import { getImgproxyUrl } from './imgproxySecure';
+
+export const DEFAULT_IMGPROXY_CONFIG = {
+    resize_type: 'fit',
+    quality: 85,
+    format: 'webp',
+};
 
 /**
  * Fetch media data by ID and type
@@ -28,36 +35,15 @@ export async function fetchMediaData(mediaId, mediaType) {
 }
 
 /**
- * Generate imgproxy URL for an image
- * @param {string} baseUrl - Base URL or imgproxy base URL
- * @param {number} width - Desired width
- * @param {number} height - Desired height (optional, will maintain aspect ratio if null/0)
- * @returns {string} Optimized image URL
- */
-export function generateImgproxyUrl(baseUrl, width, height = null) {
-    if (!baseUrl) return '';
-
-    // If it's already an imgproxy URL or full URL, use it directly
-    if (baseUrl.includes('http://') || baseUrl.includes('https://')) {
-        return baseUrl;
-    }
-
-    // Build imgproxy URL with width and optional height
-    // Format: /insecure/resize:fit:WIDTH:HEIGHT:0/plain/BASE_URL
-    const h = height || 0; // 0 means maintain aspect ratio
-    const encodedUrl = btoa(baseUrl).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    return `/imgproxy/insecure/resize:fit:${width}:${h}:0/plain/${encodedUrl}`;
-}
-
-/**
  * Render a single image with imgproxy optimization
  * @param {Object} mediaData - Media file data
- * @param {Object} config - Configuration (width, align, caption)
+ * @param {Object} config - Configuration (width, align, caption, imgproxyConfig)
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} HTML string for image element
+ * @returns {Promise<string>} HTML string for image element
  */
-export function renderMediaImage(mediaData, config, slotDimensions = null) {
+export async function renderMediaImage(mediaData, config, slotDimensions = null) {
     const { width = 'full', align = 'center', altText = '' } = config;
+    const imgproxyConfig = config.imgproxyConfig || DEFAULT_IMGPROXY_CONFIG;
 
     // Get desktop slot width (default to 896px if not available)
     const slotWidth = slotDimensions?.desktop?.width || 896;
@@ -75,20 +61,24 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
     const originalHeight = mediaData.height || mediaData.originalHeight;
     const imgHeight = (originalWidth && originalHeight)
         ? Math.round((originalHeight / originalWidth) * imgWidth)
-        : null; // Let imgproxy maintain aspect ratio if we don't know it
+        : null;
 
-    // Generate optimized image URL with calculated dimensions
-    const imageUrl = generateImgproxyUrl(
-        mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url,
-        imgWidth,
-        imgHeight
-    );
+    // Generate optimized image URL with calculated dimensions and optional style config
+    // Use the secure backend API for URL signing to ensure production compatibility
+    const baseUrl = mediaData.imgproxyBaseUrl || mediaData.fileUrl || mediaData.file_url;
+
+    let imageUrl = '';
+    if (baseUrl) {
+        imageUrl = await getImgproxyUrl(baseUrl, {
+            width: imgWidth,
+            height: imgHeight,
+            ...imgproxyConfig
+        });
+    }
 
     // Use altText from config if provided, otherwise fallback to media data
     const alt = altText || mediaData.alt || mediaData.title || mediaData.original_filename || 'Image';
 
-    // Add CSS class for responsive width (full/half/third)
-    // These will be defined to use percentages: 100%, 50%, ~33%
     const widthClass = `img-width-${width}`;
 
     const imgEl = `<img 
@@ -102,7 +92,18 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
     if (config.enableLightbox) {
         const lbStyle = config.lightboxStyle || 'default';
         const lbGroup = config.lightboxGroup || '';
-        const fullSrc = mediaData.absoluteUrl || mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl || imageUrl;
+        const lbImgproxyConfig = config.lightboxImgproxyConfig || DEFAULT_IMGPROXY_CONFIG;
+        const lbWidth = lbImgproxyConfig.max_width || lbImgproxyConfig.maxWidth || lbImgproxyConfig.width || originalWidth || 1920;
+        const lbHeight = lbImgproxyConfig.max_height || lbImgproxyConfig.maxHeight || lbImgproxyConfig.height || 0;
+
+        const fullSrc = baseUrl
+            ? await getImgproxyUrl(baseUrl, {
+                width: lbWidth,
+                height: lbHeight,
+                ...lbImgproxyConfig
+            })
+            : imageUrl;
+
         const caption = config.caption || mediaData.title || '';
         return `<a data-lightbox data-lightbox-style="${escapeHtml(lbStyle)}"${lbGroup ? ` data-lightbox-group="${escapeHtml(lbGroup)}"` : ''} data-lightbox-src="${escapeHtml(fullSrc)}" data-lightbox-caption="${escapeHtml(caption)}">${imgEl}</a>`;
     }
@@ -115,9 +116,9 @@ export function renderMediaImage(mediaData, config, slotDimensions = null) {
  * @param {Object} collectionData - Collection data with files
  * @param {Object} config - Configuration (width, align, caption)
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} HTML string for gallery
+ * @returns {Promise<string>} HTML string for gallery
  */
-export function renderMediaCollection(collectionData, config, slotDimensions = null) {
+export async function renderMediaCollection(collectionData, config, slotDimensions = null) {
     const files = collectionData.files || [];
 
     if (files.length === 0) {
@@ -130,7 +131,7 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
     const thumbnailWidth = Math.round(slotWidth * 0.33);
 
     // Render as a simple grid gallery with aspect ratio-based spanning
-    const imageElements = files.map(file => {
+    const imageElements = await Promise.all(files.map(async (file) => {
         // Calculate height based on original aspect ratio if available
         const originalWidth = file.width || file.originalWidth;
         const originalHeight = file.height || file.originalHeight;
@@ -138,17 +139,22 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
             ? Math.round((originalHeight / originalWidth) * thumbnailWidth)
             : null;
 
-        const imageUrl = generateImgproxyUrl(
-            file.imgproxyBaseUrl || file.fileUrl || file.file_url,
-            thumbnailWidth,
-            thumbnailHeight
-        );
+        const baseUrl = file.imgproxyBaseUrl || file.fileUrl || file.file_url;
+        let imageUrl = '';
+        if (baseUrl) {
+            imageUrl = await getImgproxyUrl(baseUrl, {
+                width: thumbnailWidth,
+                height: thumbnailHeight,
+                ...(config.imgproxyConfig || DEFAULT_IMGPROXY_CONFIG)
+            });
+        }
+
         const alt = file.alt || file.title || file.original_filename || 'Image';
-        
+
         // Calculate grid span based on aspect ratio
         const aspectRatio = getImageAspectRatio(file);
         const { colSpan, rowSpan, objectFit } = getGridSpan(aspectRatio);
-        
+
         // Build inline styles for grid spanning
         const gridStyles = [];
         if (colSpan > 1) {
@@ -162,9 +168,9 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
         return `<div class="media-gallery-item"${styleAttr}>
             <img src="${imageUrl}" alt="${escapeHtml(alt)}" loading="lazy" style="object-fit: ${objectFit}" />
         </div>`;
-    }).join('');
+    }));
 
-    return `<div class="media-gallery" style="grid-auto-flow: dense">${imageElements}</div>`;
+    return `<div class="media-gallery" style="grid-auto-flow: dense">${imageElements.join('')}</div>`;
 }
 
 /**
@@ -172,7 +178,7 @@ export function renderMediaCollection(collectionData, config, slotDimensions = n
  * @param {Object} mediaData - Media or collection data
  * @param {Object} config - Configuration
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} Complete HTML string for media insert
+ * @returns {Promise<string>} Complete HTML string for media insert
  */
 export async function createMediaInsertHTML(mediaData, config, slotDimensions = null) {
     const {
@@ -182,15 +188,18 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         align = 'center',
         caption = '',
         altText = '',
-        galleryStyle = null
+        galleryStyle = null,
+        imageStyle = null,
+        lightboxImageStyle = null,
+        imgproxyConfig = null
     } = config;
 
     // Generate inner content based on media type
     let innerContent;
     if (mediaType === 'collection') {
-        innerContent = renderMediaCollection(mediaData, config, slotDimensions);
+        innerContent = await renderMediaCollection(mediaData, config, slotDimensions);
     } else {
-        innerContent = renderMediaImage(mediaData, config, slotDimensions);
+        innerContent = await renderMediaImage(mediaData, config, slotDimensions);
     }
 
     // Build caption HTML if provided
@@ -206,7 +215,11 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
     const mediaTitle = mediaData?.title || mediaData?.original_filename || '';
 
     // Create the complete media insert div
-    const galleryStyleAttr = galleryStyle ? `data-gallery-style="${galleryStyle}"` : '';
+    const resolvedStyle = imageStyle || galleryStyle;
+    const galleryStyleAttr = resolvedStyle ? `data-gallery-style="${resolvedStyle}"` : '';
+    const imageStyleAttr = resolvedStyle ? `data-image-style="${resolvedStyle}"` : '';
+    const imgproxyConfigAttr = imgproxyConfig ? `data-imgproxy-config='${JSON.stringify(imgproxyConfig)}'` : '';
+    const lbImageStyleAttr = lightboxImageStyle ? `data-lightbox-image-style="${lightboxImageStyle}"` : '';
     const captionAttr = caption ? `data-caption="${escapeHtml(caption)}"` : '';
     const altTextAttr = altText ? `data-alt-text="${escapeHtml(altText)}"` : '';
     const titleAttr = mediaTitle ? `data-title="${escapeHtml(mediaTitle)}"` : '';
@@ -218,6 +231,9 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
         data-width="${width}"
         data-align="${align}"
         ${galleryStyleAttr}
+        ${imageStyleAttr}
+        ${imgproxyConfigAttr}
+        ${lbImageStyleAttr}
         ${captionAttr}
         ${altTextAttr}
         ${titleAttr}
@@ -234,24 +250,26 @@ export async function createMediaInsertHTML(mediaData, config, slotDimensions = 
  * @param {Object} mediaData - Media or collection data
  * @param {Object} config - Updated configuration
  * @param {Object} slotDimensions - Slot dimensions object with mobile/tablet/desktop sizes
- * @returns {string} Updated HTML string
+ * @returns {Promise<string>} Updated HTML string
  */
-export function updateMediaInsertHTML(element, mediaData, config, slotDimensions = null) {
+export async function updateMediaInsertHTML(element, mediaData, config, slotDimensions = null) {
     const {
         mediaType,
         width = 'full',
         align = 'center',
         caption = '',
         altText = '',
-        galleryStyle = null
+        galleryStyle = null,
+        imageStyle = null,
+        lightboxImageStyle = null
     } = config;
 
     // Generate updated inner content
     let innerContent;
     if (mediaType === 'collection') {
-        innerContent = renderMediaCollection(mediaData, config, slotDimensions);
+        innerContent = await renderMediaCollection(mediaData, config, slotDimensions);
     } else {
-        innerContent = renderMediaImage(mediaData, config, slotDimensions);
+        innerContent = await renderMediaImage(mediaData, config, slotDimensions);
     }
 
     // Build caption HTML if provided
@@ -277,27 +295,42 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
     element.setAttribute('data-align', align);
     element.setAttribute('data-media-id', mediaData.id);
     element.setAttribute('data-media-type', mediaType);
-    
-    // Update gallery style attribute
-    if (galleryStyle) {
-        element.setAttribute('data-gallery-style', galleryStyle);
+
+    // Update gallery/image style attributes
+    const resolvedStyle = imageStyle || galleryStyle;
+    if (resolvedStyle) {
+        element.setAttribute('data-gallery-style', resolvedStyle);
+        element.setAttribute('data-image-style', resolvedStyle);
+
+        // Ensure imgproxyConfig is updated if it was provided in config
+        if (config.imgproxyConfig) {
+            element.setAttribute('data-imgproxy-config', JSON.stringify(config.imgproxyConfig));
+        }
     } else {
         element.removeAttribute('data-gallery-style');
+        element.removeAttribute('data-image-style');
+        element.removeAttribute('data-imgproxy-config');
     }
-    
+
+    if (lightboxImageStyle) {
+        element.setAttribute('data-lightbox-image-style', lightboxImageStyle);
+    } else {
+        element.removeAttribute('data-lightbox-image-style');
+    }
+
     // Update caption, altText and title attributes
     if (caption) {
         element.setAttribute('data-caption', caption);
     } else {
         element.removeAttribute('data-caption');
     }
-    
+
     if (altText) {
         element.setAttribute('data-alt-text', altText);
     } else {
         element.removeAttribute('data-alt-text');
     }
-    
+
     const mediaTitle = mediaData?.title || mediaData?.original_filename || '';
     if (mediaTitle) {
         element.setAttribute('data-title', mediaTitle);
@@ -307,36 +340,9 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
 
     // Update innerHTML
     element.innerHTML = innerContent + captionHtml;
-    
-    // If single image with lightbox enabled, annotate the inner anchor
-    if (mediaData && config.mediaType === 'image') {
-        const a = element.querySelector('[data-lightbox]');
-        if (config.enableLightbox) {
-            const fullSrc = mediaData.absoluteUrl || mediaData.fileUrl || mediaData.file_url || mediaData.imgproxyBaseUrl;
-            if (a) {
-                a.setAttribute('data-lightbox', '');
-                a.setAttribute('data-lightbox-style', config.lightboxStyle || 'default');
-                if (config.lightboxGroup) {
-                    a.setAttribute('data-lightbox-group', config.lightboxGroup);
-                } else {
-                    a.removeAttribute('data-lightbox-group');
-                }
-                a.setAttribute('data-lightbox-src', fullSrc || '');
-                if (config.caption) {
-                    a.setAttribute('data-lightbox-caption', config.caption);
-                } else {
-                    a.removeAttribute('data-lightbox-caption');
-                }
-            }
-        } else if (a) {
-            // Remove lightbox attributes if disabled
-            a.removeAttribute('data-lightbox');
-            a.removeAttribute('data-lightbox-style');
-            a.removeAttribute('data-lightbox-group');
-            a.removeAttribute('data-lightbox-src');
-            a.removeAttribute('data-lightbox-caption');
-        }
-    }
+
+    // renderMediaImage already handles lightbox anchor generation,
+    // so no additional annotation is needed here.
 
     return element.outerHTML;
 }
@@ -348,6 +354,24 @@ export function updateMediaInsertHTML(element, mediaData, config, slotDimensions
  */
 export function extractMediaConfig(element) {
     const caption = element.querySelector('.media-caption')?.textContent || '';
+    const styleKey = element.getAttribute('data-image-style') || element.getAttribute('data-gallery-style') || null;
+
+    // Extract imgproxyConfig if present
+    let imgproxyConfig = null;
+    const imgproxyConfigStr = element.getAttribute('data-imgproxy-config');
+    if (imgproxyConfigStr) {
+        try {
+            imgproxyConfig = JSON.parse(imgproxyConfigStr);
+        } catch (e) {
+            console.warn('Failed to parse imgproxyConfig from data-imgproxy-config', e);
+        }
+    }
+
+    // Extract lightbox state from inner anchor element
+    const lbAnchor = element.querySelector('[data-lightbox]');
+    const enableLightbox = !!lbAnchor;
+    const lightboxStyle = lbAnchor?.getAttribute('data-lightbox-style') || 'default';
+    const lightboxGroup = lbAnchor?.getAttribute('data-lightbox-group') || '';
 
     return {
         mediaType: element.getAttribute('data-media-type') || 'image',
@@ -356,7 +380,13 @@ export function extractMediaConfig(element) {
         align: element.getAttribute('data-align') || 'center',
         caption: caption,
         altText: element.getAttribute('data-alt-text') || '',
-        galleryStyle: element.getAttribute('data-gallery-style') || null
+        galleryStyle: styleKey,
+        imageStyle: styleKey,
+        imgproxyConfig,
+        lightboxImageStyle: element.getAttribute('data-lightbox-image-style') || null,
+        enableLightbox,
+        lightboxStyle,
+        lightboxGroup
     };
 }
 
@@ -370,4 +400,3 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-

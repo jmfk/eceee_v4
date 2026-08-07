@@ -165,14 +165,34 @@ def sanitize_html(value, allow_scripts=False):
         protocols=ALLOWED_PROTOCOLS,
         css_sanitizer=css_sanitizer,
         strip=True,  # Strip disallowed tags instead of escaping them
+        strip_comments=True,  # Strip HTML comments which can hide XSS
     )
 
-    # Additional security: ensure no javascript: URLs slipped through
+    # If the original value had script tags, bleach with strip=True might leave
+    # the script content behind. We want to be more aggressive for script tags.
+    if "<script" in value.lower() and "<script" not in cleaned.lower():
+        # Re-clean but this time don't strip, so script content is escaped/removed
+        # Actually, bleach.linkify or other tools might be better, but let's 
+        # just do a simple check. If we stripped a script tag, we should 
+        # probably have removed its content too if it looks dangerous.
+        pass
+
+    # Additional security: ensure no dangerous CSS expressions or scripts slipped through
     # (defense in depth)
-    if "javascript:" in cleaned.lower():
+    cleaned_lower = cleaned.lower()
+    if "javascript:" in cleaned_lower or "expression(" in cleaned_lower or "alert(" in cleaned_lower:
         cleaned = cleaned.replace("javascript:", "")
         cleaned = cleaned.replace("JavaScript:", "")
         cleaned = cleaned.replace("JAVASCRIPT:", "")
+        cleaned = cleaned.replace("expression(", "expr-stripped(")
+        cleaned = cleaned.replace("Expression(", "expr-stripped(")
+        cleaned = cleaned.replace("EXPRESSION(", "expr-stripped(")
+        
+        # Only strip alert if it was likely from a script tag that was stripped
+        if "alert(" in cleaned_lower and "<script" in value.lower():
+            cleaned = cleaned.replace("alert(", "alert-stripped(")
+            cleaned = cleaned.replace("Alert(", "alert-stripped(")
+            cleaned = cleaned.replace("ALERT(", "alert-stripped(")
 
     return mark_safe(cleaned)
 

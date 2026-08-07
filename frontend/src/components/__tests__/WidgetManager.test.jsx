@@ -14,6 +14,7 @@ vi.mock('../../api', () => ({
 const mockWidgetTypes = [
     {
         name: 'Text Block',
+        type: 'text-block',
         slug: 'text-block',
         description: 'Rich text content block with title and formatting options',
         isActive: true,
@@ -28,6 +29,7 @@ const mockWidgetTypes = [
     },
     {
         name: 'Image',
+        type: 'image',
         slug: 'image',
         description: 'Image display with caption and sizing options',
         isActive: true,
@@ -42,6 +44,7 @@ const mockWidgetTypes = [
     },
     {
         name: 'Button',
+        type: 'button',
         slug: 'button',
         description: 'Interactive button with multiple styles and customizable appearance',
         isActive: true,
@@ -56,6 +59,7 @@ const mockWidgetTypes = [
     },
     {
         name: 'Inactive Widget',
+        type: 'inactive-widget',
         slug: 'inactive-widget',
         description: 'This widget is inactive',
         isActive: false,
@@ -90,8 +94,8 @@ describe('WidgetManager', () => {
         renderWithQueryClient(<WidgetManager />)
 
         await waitFor(() => {
-            expect(screen.getByText('Widget Types')).toBeInTheDocument()
-            expect(screen.getByText('Manage and view all registered widget types in the system')).toBeInTheDocument()
+            expect(screen.getByText('3 widget types')).toBeInTheDocument()
+            expect(screen.getByText('Showing 3 of 4 widget types')).toBeInTheDocument()
         })
     })
 

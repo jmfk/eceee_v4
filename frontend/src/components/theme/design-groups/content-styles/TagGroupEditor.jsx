@@ -287,7 +287,7 @@ const TagGroupEditor = ({
                                         rows={Math.max(5, Object.keys(styles).length + 2)}
                                         placeholder="property: value;"
                                     />
-                                ))}
+                                )}
                             </div>
                         );
                     })}

@@ -25,7 +25,9 @@ const cleanHTML = (html) => {
     const allowedAttributes = ['href', 'target']
     const mediaInsertAttributes = [
         'class', 'data-media-insert', 'data-media-type', 'data-media-id',
-        'data-width', 'data-align', 'data-gallery-style', 'data-caption', 'data-alt-text', 'data-title',
+        'data-width', 'data-align', 'data-gallery-style', 'data-image-style', 'data-lightbox-image-style', 'data-caption', 'data-alt-text', 'data-title',
+        'data-imgproxy-config',
+        'data-lightbox', 'data-lightbox-style', 'data-lightbox-group', 'data-lightbox-src', 'data-lightbox-caption',
         'contenteditable', 'draggable',
         'src', 'alt', 'width', 'height', 'loading'
     ]
@@ -399,9 +401,6 @@ const injectMediaInsertStyles = () => {
         .media-insert {
             display: block;
             margin: 16px 0;
-            padding: 8px;
-            border: 2px solid transparent;
-            border-radius: 4px;
             transition: border-color 0.2s, box-shadow 0.2s;
             cursor: pointer;
             position: relative;
@@ -409,13 +408,12 @@ const injectMediaInsertStyles = () => {
         }
         
         .media-insert:hover {
-            border-color: #3b82f6;
+            outline: none;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
         
         .media-insert:focus {
             outline: none;
-            border-color: #3b82f6;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
         }
         
@@ -460,19 +458,16 @@ const injectMediaInsertStyles = () => {
             width: 100%;
             height: auto;
             display: block;
-            border-radius: 4px;
         }
         
         /* Media Caption */
         .media-caption {
-            margin-top: 8px;
             padding: 4px 8px;
             font-size: 14px;
             color: #6b7280;
             font-style: italic;
             text-align: center;
             background: #f9fafb;
-            border-radius: 4px;
         }
         
         /* Media Gallery */
@@ -2191,7 +2186,7 @@ class ContentWidgetEditorRenderer {
         const { updateMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js')
 
         try {
-            updateMediaInsertHTML(element, mediaData, config, slotDimensions)
+            await updateMediaInsertHTML(element, mediaData, config, slotDimensions)
 
             // Force content update - get fresh innerHTML after DOM modification
             if (this.editorElement) {
@@ -2532,20 +2527,42 @@ class ContentWidgetEditorRenderer {
             }
 
             // Setup listeners for any media inserts in the content
+            // and refresh their HTML to ensure correct signed URLs
             this.setupExistingMediaInserts();
         }, 0);
     }
 
     /**
      * Setup listeners for existing media inserts in the content
+     * and refresh their HTML to ensure correct signed URLs
      */
-    setupExistingMediaInserts() {
+    async setupExistingMediaInserts() {
+        if (!this.editorElement) return;
+
+        const { extractMediaConfig, fetchMediaData, updateMediaInsertHTML } = await import('@/utils/mediaInsertRenderer.js');
+
+        // Re-check editorElement after async import
         if (!this.editorElement) return;
 
         const mediaInserts = this.editorElement.querySelectorAll('[data-media-insert]');
-        mediaInserts.forEach(element => {
+
+        for (const element of mediaInserts) {
             this.setupMediaInsertListeners(element);
-        });
+
+            // Refresh the HTML to ensure signed imgproxy URLs are used
+            try {
+                const config = extractMediaConfig(element);
+                const mediaData = await fetchMediaData(config.mediaId, config.mediaType);
+                if (mediaData) {
+                    await updateMediaInsertHTML(element, mediaData, config, this.slotDimensions);
+                }
+            } catch (error) {
+                console.warn('Failed to refresh existing media insert:', error);
+            }
+        }
+
+        // Trigger a content change after all inserts are refreshed
+        this.handleContentChange();
     }
 
     /**

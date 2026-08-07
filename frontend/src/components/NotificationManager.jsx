@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import Notification from './Notification'
 import ConfirmDialog from './ConfirmDialog'
 import PromptDialog from './PromptDialog'
+import SaveConfirmDialog from './SaveConfirmDialog'
 import useNotifications from '../hooks/useNotifications'
 
 // Create context for notification management
@@ -27,7 +28,7 @@ export const NotificationProvider = ({ children }) => {
 }
 
 const NotificationManager = () => {
-    const { errors, removeError, confirmDialog, promptDialog } = useNotificationContext()
+    const { errors, removeError, confirmDialog, promptDialog, saveConfirmDialog } = useNotificationContext()
 
     return (
         <>
@@ -54,6 +55,14 @@ const NotificationManager = () => {
                 <PromptDialog
                     isOpen={true}
                     {...promptDialog}
+                />
+            )}
+
+            {/* Save/Discard/Cancel Dialog */}
+            {saveConfirmDialog && (
+                <SaveConfirmDialog
+                    isOpen={true}
+                    {...saveConfirmDialog}
                 />
             )}
         </>

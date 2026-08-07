@@ -1,38 +1,68 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi } from 'vitest'
-import axios from 'axios'
 import WidgetLibrary from '../WidgetLibrary'
+import { clearWidgetTypesCache } from '../../utils/widgetTypeValidation'
+import { apiResponse, mockApiPending, mockAxiosInstance, resetApiMocks } from '../../test/apiMockUtils'
 
-// Mock axios
-vi.mock('axios', () => ({
-    default: {
-        get: vi.fn(),
-        post: vi.fn(),
-        put: vi.fn(),
-        delete: vi.fn(),
-        create: vi.fn(() => ({
-            get: vi.fn(),
-            post: vi.fn(),
-            put: vi.fn(),
-            delete: vi.fn(),
-            interceptors: {
-                request: {
-                    use: vi.fn()
-                },
-                response: {
-                    use: vi.fn()
+const mockWidgetTypes = [
+    {
+        name: "Text Block",
+        type: "easy_widgets.ContentWidget",
+        description: "A simple text content widget",
+        template_name: "webpages/widgets/text_block.html",
+        isActive: true,
+        configurationSchema: {
+            type: "object",
+            properties: {
+                content: { type: "string", description: "Text content" },
+                alignment: {
+                    type: "string",
+                    enum: ["left", "center", "right"],
+                    default: "left"
                 }
-            }
-        }))
+            },
+            required: ["content"]
+        }
+    },
+    {
+        name: "Image",
+        type: "easy_widgets.ImageWidget",
+        description: "Display an image with optional caption",
+        template_name: "webpages/widgets/image.html",
+        isActive: true,
+        configurationSchema: {
+            type: "object",
+            properties: {
+                image_url: { type: "string", description: "Image URL" },
+                alt_text: { type: "string", description: "Alt text" }
+            },
+            required: ["image_url", "alt_text"]
+        }
+    },
+    {
+        name: "Button",
+        type: "easy_widgets.BannerWidget",
+        description: "Interactive button widget",
+        template_name: "webpages/widgets/button.html",
+        isActive: false,
+        configurationSchema: {
+            type: "object",
+            properties: {
+                text: { type: "string", description: "Button text" },
+                url: { type: "string", description: "Target URL" }
+            },
+            required: ["text", "url"]
+        }
     }
-}))
-const mockedAxios = axios
+]
 
 describe('WidgetLibrary', () => {
     let queryClient
 
     beforeEach(() => {
+        clearWidgetTypesCache()
+        resetApiMocks()
         queryClient = new QueryClient({
             defaultOptions: {
                 queries: {
@@ -41,61 +71,12 @@ describe('WidgetLibrary', () => {
             },
         })
 
-        // Setup mock axios responses for new API structure
-        mockedAxios.get.mockResolvedValue({
-            data: [
-                {
-                    name: "Text Block",
-                    description: "A simple text content widget",
-                    template_name: "webpages/widgets/text_block.html",
-                    isActive: true,
-                    configurationSchema: {
-                        type: "object",
-                        properties: {
-                            content: { type: "string", description: "Text content" },
-                            alignment: {
-                                type: "string",
-                                enum: ["left", "center", "right"],
-                                default: "left"
-                            }
-                        },
-                        required: ["content"]
-                    }
-                },
-                {
-                    name: "Image",
-                    description: "Display an image with optional caption",
-                    template_name: "webpages/widgets/image.html",
-                    isActive: true,
-                    configurationSchema: {
-                        type: "object",
-                        properties: {
-                            image_url: { type: "string", description: "Image URL" },
-                            alt_text: { type: "string", description: "Alt text" }
-                        },
-                        required: ["image_url", "alt_text"]
-                    }
-                },
-                {
-                    name: "Button",
-                    description: "Interactive button widget",
-                    template_name: "webpages/widgets/button.html",
-                    isActive: false, // This should be filtered out
-                    configurationSchema: {
-                        type: "object",
-                        properties: {
-                            text: { type: "string", description: "Button text" },
-                            url: { type: "string", description: "Target URL" }
-                        },
-                        required: ["text", "url"]
-                    }
-                }
-            ]
-        })
+        mockAxiosInstance.get.mockResolvedValue(apiResponse(mockWidgetTypes))
     })
 
     afterEach(() => {
         vi.clearAllMocks()
+        clearWidgetTypesCache()
     })
 
     const renderWithQueryClient = (component) => {
@@ -108,7 +89,7 @@ describe('WidgetLibrary', () => {
 
     it('renders loading state initially', async () => {
         // Make the API call hang to test loading state
-        mockedAxios.get.mockImplementation(() => new Promise(() => { }))
+        mockApiPending('get')
 
         renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
@@ -131,7 +112,7 @@ describe('WidgetLibrary', () => {
         renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
-            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/')
+            expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/?include_template_json=true', {})
         })
     })
 
@@ -206,15 +187,18 @@ describe('WidgetLibrary', () => {
         expect(screen.getByText('(Selected)')).toBeInTheDocument()
     })
 
-    it('displays error state when API call fails', async () => {
-        mockedAxios.get.mockRejectedValue(new Error('API Error'))
+    it('shows server-empty state when API call fails', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+        mockAxiosInstance.get.mockRejectedValue(new Error('API Error'))
 
         renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
-            expect(screen.getByText('Error Loading Widget Types')).toBeInTheDocument()
-            expect(screen.getByText('API Error')).toBeInTheDocument()
+            expect(screen.getByText('No widget types found')).toBeInTheDocument()
+            expect(screen.getByText('No widget types are available on the server')).toBeInTheDocument()
         })
+
+        consoleErrorSpy.mockRestore()
     })
 
     it('shows empty state when no widgets match filter', async () => {

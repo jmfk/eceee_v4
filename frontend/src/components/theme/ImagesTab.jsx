@@ -1,10 +1,105 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Trash2, Image as ImageIcon, Loader2, AlertCircle, RefreshCw, X, Check, Grid3x3, List, AlignJustify } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Upload, Trash2, Image as ImageIcon, Loader2, AlertCircle, RefreshCw, X, Check, Grid3x3, List, AlignJustify, Edit3 } from 'lucide-react';
 import { themesApi } from '../../api/themes';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import { useNotificationContext } from '../NotificationManager';
 import BulkImageUpload from './BulkImageUpload';
 import OptimizedImage from '../media/OptimizedImage';
+import { useWidgets } from '../../hooks/useWidgets';
+
+const getThemeDesignGroups = (theme) => theme?.designGroups || theme?.typography || { groups: [] };
+
+const getWidgetLayoutParts = (widgetType) => widgetType?.layoutParts || widgetType?.layout_parts || {};
+
+const imageReferencesFilename = (value, filename) => {
+    if (!value || !filename) return false;
+
+    if (typeof value === 'string') {
+        return value.includes(filename);
+    }
+
+    if (typeof value === 'object') {
+        return value.filename === filename ||
+            value.url?.includes(filename) ||
+            value.fileUrl?.includes(filename) ||
+            value.publicUrl?.includes(filename);
+    }
+
+    return false;
+};
+
+const getImageAssignments = (theme, filename) => {
+    const designGroups = getThemeDesignGroups(theme);
+    const assignments = [];
+
+    (designGroups.groups || []).forEach((group) => {
+        Object.entries(group.layoutProperties || {}).forEach(([part, breakpoints]) => {
+            Object.entries(breakpoints || {}).forEach(([breakpoint, props]) => {
+                Object.entries(props || {}).forEach(([property, value]) => {
+                    if (property === 'images' || !imageReferencesFilename(value, filename)) return;
+
+                    assignments.push({
+                        groupName: group.name || 'Unnamed group',
+                        widgetTypes: group.widgetTypes || (group.widgetType ? [group.widgetType] : []),
+                        part,
+                        breakpoint,
+                        property,
+                    });
+                });
+
+                Object.entries(props?.images || {}).forEach(([property, value]) => {
+                    if (!imageReferencesFilename(value, filename)) return;
+
+                    assignments.push({
+                        groupName: group.name || 'Unnamed group',
+                        widgetTypes: group.widgetTypes || (group.widgetType ? [group.widgetType] : []),
+                        part,
+                        breakpoint,
+                        property,
+                    });
+                });
+            });
+        });
+    });
+
+    return assignments;
+};
+
+const formatWidgetName = (widgetType, widgetTypes) => {
+    return widgetTypes.find(widget => widget.type === widgetType)?.name || widgetType?.split('.').pop() || widgetType || 'Any widget';
+};
+
+const formatPartName = (part, widgetType, widgetTypes) => {
+    const widget = widgetTypes.find(item => item.type === widgetType);
+    return getWidgetLayoutParts(widget)?.[part]?.label || part.replace(/[-_]/g, ' ');
+};
+
+const formatBackendUsageLabel = (usage) => {
+    if (!usage?.startsWith('design_group:')) return usage;
+
+    const [, groupName, part, breakpoint, property] = usage.split(':');
+    return [
+        groupName || 'Unnamed group',
+        part,
+        breakpoint,
+        property,
+    ].filter(Boolean).join(' / ');
+};
+
+const getUsageLabels = (assignments, image, widgetTypes) => {
+    if (assignments.length > 0) {
+        return assignments.map(item => [
+            item.groupName,
+            formatWidgetName(item.widgetTypes[0], widgetTypes),
+            formatPartName(item.part, item.widgetTypes[0], widgetTypes),
+            item.breakpoint,
+            item.property,
+        ].filter(Boolean).join(' / '));
+    }
+
+    return (image.usedIn || []).map(formatBackendUsageLabel);
+};
 
 // Empty state drop zone component
 const EmptyStateDropZone = ({ onUpload, onFilesDropped }) => {
@@ -78,6 +173,8 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
     const replaceInputRefs = useState({})[0];
     const { addNotification } = useGlobalNotifications();
     const { showConfirm } = useNotificationContext();
+    const { widgetTypes } = useWidgets();
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (themeId) {
@@ -495,6 +592,11 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                 <div className={viewMode === 'grid' ? 'grid grid-cols-3 gap-4' : viewMode === 'compact' ? 'space-y-0' : 'space-y-4'}>
                     {images.map((image) => {
                         const isSelected = selectedImages.includes(image.filename);
+                        const imageAssignments = getImageAssignments(theme, image.filename);
+                        const usageLabels = getUsageLabels(imageAssignments, image, widgetTypes);
+                        const usageCount = usageLabels.length;
+                        const visibleUsageLabels = usageLabels.slice(0, viewMode === 'compact' ? 1 : 2);
+                        const hiddenUsageCount = usageLabels.length - visibleUsageLabels.length;
 
                         return (
                             <div
@@ -585,18 +687,37 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                                                         {image.uploadedAt && (
                                                             <span>{new Date(image.uploadedAt).toLocaleDateString()}</span>
                                                         )}
-                                                        {image.usedIn && image.usedIn.length > 0 && (
-                                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full inline-flex items-center gap-1" title={image.usedIn.join(', ')}>
+                                                        {usageCount > 0 && (
+                                                            <span
+                                                                className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full inline-flex items-center gap-1"
+                                                                title={usageLabels.join(', ')}
+                                                            >
                                                                 <AlertCircle className="h-3 w-3" />
-                                                                Used: {image.usedIn.length}
+                                                                Used: {usageCount}
                                                             </span>
                                                         )}
                                                     </div>
+                                                    {usageCount > 0 && (
+                                                        <div className={`${viewMode === 'compact' ? 'mt-1 text-xs' : 'mt-2 text-sm'} text-gray-700`}>
+                                                            <span className="font-medium text-gray-900">Currently used in:</span>{' '}
+                                                            <span className="text-gray-600">
+                                                                {visibleUsageLabels.join('; ')}
+                                                                {hiddenUsageCount > 0 ? `; +${hiddenUsageCount} more` : ''}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             {/* Right side: Action buttons */}
                                             <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => navigate(`/settings/themes/${themeId}/images/${encodeURIComponent(image.filename)}`)}
+                                                    className={`${viewMode === 'compact' ? 'p-1' : 'p-1.5'} text-purple-600 hover:bg-purple-50 transition`}
+                                                    title="Edit image usage"
+                                                >
+                                                    <Edit3 className={viewMode === 'compact' ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                                                </button>
                                                 <button
                                                     onClick={() => handleReplaceImage(image.filename)}
                                                     className={`${viewMode === 'compact' ? 'p-1' : 'p-1.5'} text-blue-600 hover:bg-blue-50 transition`}
@@ -672,11 +793,14 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                                                     <div className="text-xs text-gray-600 mb-1">
                                                         {(image.size / 1024).toFixed(1)} KB
                                                     </div>
-                                                    {image.usedIn && image.usedIn.length > 0 && (
+                                                    {usageCount > 0 && (
                                                         <div className="flex items-center gap-1 flex-wrap mb-2">
-                                                            <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full inline-flex items-center gap-1" title={image.usedIn.join(', ')}>
+                                                            <span
+                                                                className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full inline-flex items-center gap-1"
+                                                                title={usageLabels.join(', ')}
+                                                            >
                                                                 <AlertCircle className="h-3 w-3" />
-                                                                {image.usedIn.length}
+                                                                {usageCount}
                                                             </span>
                                                         </div>
                                                     )}
@@ -685,6 +809,13 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
 
                                             {/* Action buttons - horizontal row */}
                                             <div className="flex items-center gap-1 pt-2 border-t border-gray-100 justify-end">
+                                                <button
+                                                    onClick={() => navigate(`/settings/themes/${themeId}/images/${encodeURIComponent(image.filename)}`)}
+                                                    className="p-1.5 text-purple-600 hover:bg-purple-50 transition"
+                                                    title="Edit image usage"
+                                                >
+                                                    <Edit3 className="h-3 w-3" />
+                                                </button>
                                                 <button
                                                     onClick={() => handleReplaceImage(image.filename)}
                                                     className="p-1.5 text-blue-600 hover:bg-blue-50 transition"
@@ -722,4 +853,3 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
 };
 
 export default ImagesTab;
-

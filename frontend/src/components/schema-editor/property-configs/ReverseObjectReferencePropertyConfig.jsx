@@ -24,7 +24,7 @@ export default function ReverseObjectReferencePropertyConfig({
   // Fetch available object types from API
   const { data: objectTypesResponse, isLoading } = useQuery({
     queryKey: ['objectTypes'],
-    queryFn: () => objectTypesApi.getAll(),
+    queryFn: async () => await objectTypesApi.getAll(),
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
 

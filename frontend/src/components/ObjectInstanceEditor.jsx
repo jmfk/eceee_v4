@@ -65,27 +65,27 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
     // Fetch object instance if editing
     const { data: instanceResponse, isLoading: instanceLoading } = useQuery({
         queryKey: ['objectInstance', instanceId],
-        queryFn: () => objectInstancesApi.get(instanceId),
+        queryFn: async () => await objectInstancesApi.get(instanceId),
         enabled: !!instanceId
     })
 
     // Fetch object type details
     const { data: objectTypeResponse, isLoading: typeLoading } = useQuery({
         queryKey: ['objectType', formData.objectTypeId],
-        queryFn: () => objectTypesApi.get(formData.objectTypeId),
+        queryFn: async () => await objectTypesApi.get(formData.objectTypeId),
         enabled: !!formData.objectTypeId
     })
 
     // Fetch available object types for selection
     const { data: typesResponse } = useQuery({
         queryKey: ['objectTypes'],
-        queryFn: () => objectTypesApi.getActive()
+        queryFn: async () => await objectTypesApi.getActive()
     })
 
     // Fetch potential parent objects
     const { data: potentialParentsResponse } = useQuery({
         queryKey: ['objectInstances', 'forParent', formData.objectTypeId],
-        queryFn: () => objectInstancesApi.list({ objectType: formData.objectTypeId }),
+        queryFn: async () => await objectInstancesApi.list({ objectType: formData.objectTypeId }),
         enabled: !!formData.objectTypeId
     })
 
@@ -112,11 +112,11 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
 
     // Create/Update mutation
     const saveMutation = useMutation({
-        mutationFn: (data) => {
+        mutationFn: async (data) => {
             if (instanceId) {
-                return objectInstancesApi.update(instanceId, data)
+                return await objectInstancesApi.update(instanceId, data)
             } else {
-                return objectInstancesApi.create(data)
+                return await objectInstancesApi.create(data)
             }
         },
         onSuccess: (response) => {

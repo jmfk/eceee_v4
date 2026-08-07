@@ -70,6 +70,7 @@ class NavigationWidget(BaseWidget):
 
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
+    template_name = None
     mustache_template_name = "easy_widgets/widgets/navigation.mustache"
 
     layout_parts = {
@@ -210,9 +211,10 @@ class NavigationWidget(BaseWidget):
             "path": webpage_data.get("path") or webpage_data.get("cached_path"),
         }
 
-        # Get hostname for filtering
+        # Get hostname for filtering. Stored root hostnames are normalized
+        # without ports, so normalize request hosts the same way for dev ports.
         request = context.get("request")
-        hostname = request.get_host().lower() if request else None
+        hostname = WebPage.normalize_hostname(request.get_host()) if request else None
 
         # Query current page children
         current_children = []
@@ -377,9 +379,10 @@ class NavigationWidget(BaseWidget):
         if not current_page_id:
             return []
 
-        # Get hostname for filtering
+        # Get hostname for filtering. Stored root hostnames are normalized
+        # without ports, so normalize request hosts the same way for dev ports.
         request = context.get("request") if context else None
-        hostname = request.get_host().lower() if request else None
+        hostname = WebPage.normalize_hostname(request.get_host()) if request else None
 
         # Query child pages with their latest versions to get page_data
         child_pages = (
@@ -434,9 +437,10 @@ class NavigationWidget(BaseWidget):
         if not menu_items:
             return []
 
-        # Get request for hostname
+        # Get request hostname for filtering. Stored root hostnames are normalized
+        # without ports, so normalize request hosts the same way for dev ports.
         request = context.get("request") if context else None
-        hostname = request.get_host().lower() if request else None
+        hostname = WebPage.normalize_hostname(request.get_host()) if request else None
 
         # Process each item
         processed_items = []

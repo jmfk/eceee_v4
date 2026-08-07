@@ -222,11 +222,12 @@ class DjangoTemplateRenderer {
                         txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase()
                     );
 
-                case 'length':
+                case 'length': {
                     const val = value || '';
                     return String(Array.isArray(val) ? val.length : String(val).length);
+                }
 
-                case 'yesno':
+                case 'yesno': {
                     // Django yesno filter: returns "yes", "no", or custom values based on truthiness
                     // Usage: {{ value|yesno:"yes,no,maybe" }} or {{ value|yesno }}
                     const yesnoMapping = filterArg ? filterArg.split(',') : ['yes', 'no'];
@@ -240,6 +241,7 @@ class DjangoTemplateRenderer {
                     } else {
                         return yesnoMapping[1] || 'no'; // "no" value
                     }
+                }
 
                 default:
                     if (this.debug) {
@@ -269,15 +271,6 @@ class DjangoTemplateRenderer {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    }
-
-    /**
-     * Enable or disable debug mode for additional logging
-     * 
-     * @param {boolean} enabled - Whether to enable debug mode
-     */
-    setDebugMode(enabled) {
-        this.debug = Boolean(enabled);
     }
 
     /**
@@ -848,7 +841,7 @@ class DjangoTemplateRenderer {
                 case 'template_text':
                     return this.createSafeTextFallback(structure, config, error);
 
-                case 'text':
+                case 'text': {
                     const textError = document.createElement('span');
                     textError.className = 'template-error-text';
                     textError.style.color = '#dc2626';
@@ -857,8 +850,9 @@ class DjangoTemplateRenderer {
                     textError.style.borderRadius = '2px';
                     textError.textContent = `[Text Error: ${error.message}] Content: "${structure.content || 'undefined'}"`;
                     return textError;
+                }
 
-                default:
+                default: {
                     const unknownError = document.createElement('span');
                     unknownError.className = 'template-error-unknown';
                     unknownError.style.color = '#dc2626';
@@ -868,6 +862,7 @@ class DjangoTemplateRenderer {
                     unknownError.style.borderRadius = '2px';
                     unknownError.textContent = `[${structure?.type || 'Unknown'} Error: ${error.message}]`;
                     return unknownError;
+                }
             }
 
         } catch (fallbackError) {
@@ -1204,6 +1199,7 @@ class DjangoTemplateRenderer {
                     name: error?.name
                 });
                 if (window.TEMPLATE_DEBUG_VERBOSE) {
+                    // Verbose logging disabled
                 }
                 console.groupEnd();
             });
@@ -1234,6 +1230,7 @@ class DjangoTemplateRenderer {
         if (typeof window !== 'undefined') {
             window.TEMPLATE_DEBUG_MODE = enabled;
             if (window.TEMPLATE_DEBUG_VERBOSE) {
+                // Verbose logging disabled
             }
         }
     }
@@ -1288,13 +1285,14 @@ class DjangoTemplateRenderer {
                     return this.processTemplateText(structure, config);
 
                 case 'conditionalBlock':
-                case 'conditional_block':
+                case 'conditional_block': {
                     // Special type for conditional blocks (support both camelCase and snake_case)
                     const shouldRender = this.evaluateCondition(structure.condition, config);
                     if (shouldRender && structure.content) {
                         return this.processTemplateStructureWithLogic(structure.content, config, templateTags);
                     }
                     return document.createTextNode('');
+                }
 
                 default:
                     // Fall back to regular processing

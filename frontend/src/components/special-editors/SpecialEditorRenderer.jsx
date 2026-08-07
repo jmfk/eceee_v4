@@ -76,15 +76,7 @@ const SpecialEditorRenderer = ({
     context = {}
 }) => {
 
-    if (!widgetData?.type || !hasSpecialEditor(widgetData.type)) {
-        return null
-    }
-
-    const SpecialEditorComponent = getSpecialEditor(widgetData.type)
-
-    if (!SpecialEditorComponent) {
-        return null
-    }
+    const SpecialEditorComponent = getSpecialEditor(widgetData?.type)
 
     // Pure ODC integration
     const { publishUpdate, useExternalChanges, getState } = useUnifiedData()
@@ -134,6 +126,14 @@ const SpecialEditorRenderer = ({
             widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
         })
     }, [publishUpdate, componentId, widgetData?.id, widgetData?.slotName, widgetData?.context?.widgetPath, widgetData?.widgetPath, slotName, contextType])
+
+    if (!widgetData?.type || !hasSpecialEditor(widgetData.type)) {
+        return null
+    }
+
+    if (!SpecialEditorComponent) {
+        return null
+    }
 
 
 

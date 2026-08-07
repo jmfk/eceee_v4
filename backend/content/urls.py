@@ -18,5 +18,5 @@ app_name = "content"
 
 urlpatterns = [
     # API endpoints
-    path("api/", include(router.urls)),
+    path("", include(router.urls)),
 ]

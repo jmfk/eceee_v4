@@ -35,9 +35,11 @@ import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
+import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useUnifiedData } from '../contexts/unified-data'
+import ContextualHelpLink from './help/ContextualHelpLink'
+import { useUnifiedData, defaultEqualityFn } from '../contexts/unified-data'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import { useClipboard } from '../contexts/ClipboardContext'
@@ -176,7 +178,7 @@ const PageEditor = () => {
     const location = useLocation()
 
     // Use global isDirty from UnifiedDataContext
-    const { useExternalChanges, setIsDirty, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
 
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
@@ -227,6 +229,7 @@ const PageEditor = () => {
 
     // Local widget state for fast UI operations
     const [localWidgets, setLocalWidgets] = useState({})
+    const [editorResetKey, setEditorResetKey] = useState(0)
 
     // Path pattern state for dynamic URL path simulation
     const [simulatedPath, setSimulatedPath] = useState('')
@@ -241,42 +244,125 @@ const PageEditor = () => {
 
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
-    useExternalChanges(componentId, (state, metadata) => {
-        const sourceId = metadata?.sourceId || '';
+    const isDirtyRef = useRef(false);
 
-        // Check if update came from isolated components FIRST, before any state updates
-        const isFromIsolatedComponent =
-            sourceId.startsWith('isolated-form-') ||
-            sourceId.startsWith('special-editor-') ||
-            sourceId.startsWith('field-') ||
-            sourceId.includes('-field-') || // Field-level updates (bannerwidget-*-field-*)
-            sourceId.startsWith('bannerwidget-') ||
-            sourceId.startsWith('two-columns-widget-') ||
-            sourceId.startsWith('three-columns-widget-') ||
-            sourceId.startsWith('section-widget-') ||
-            sourceId.startsWith('contentcardwidget-') ||
-            sourceId.startsWith('widget-') ||
-            /^[a-z-]+widget-\d+/.test(sourceId);
-
-        if (isFromIsolatedComponent) {
-            // Isolated components handle their own state and UDC subscriptions
-            // Don't update any state to prevent unnecessary rerenders
+    // Local dirty state derived from semantic diff (original vs current data).
+    // PageEditor is the single owner of dirty for the page editor UI.
+    const setIsDirty = useCallback((value) => {
+        if (isDirtyRef.current === value) {
             return;
         }
 
-        // Only update state for non-isolated sources
-        setIsDirtyState(state.metadata.isDirty);
+        isDirtyRef.current = value;
+        setIsDirtyState(value);
+    }, []);
+
+    // Helper to recompute dirty state based on semantic comparison.
+    // This is the single source of truth for the local isDirty value used by
+    // the editor UI. We derive it from a semantic diff between the original
+    // load snapshot and the current editor state so that load-time
+    // normalization, widget hydration, or other UDC operations cannot mark
+    // the page dirty without a real user-visible change. The UDC global
+    // metadata.isDirty is updated as well so other consumers stay in sync.
+    const recomputeDirtyState = useCallback(() => {
+        if (!originalWebpageData || !originalPageVersionData) return;
+
+        const changes = analyzeChanges(
+            originalWebpageData,
+            webpageData,
+            originalPageVersionData,
+            pageVersionData
+        );
+
+        const hasChanges = changes.hasPageChanges || changes.hasVersionChanges;
+        setIsDirty(hasChanges);
+    }, [originalWebpageData, webpageData, originalPageVersionData, pageVersionData, setIsDirty]);
+
+    useExternalChanges(componentId, (state, metadata) => {
+        const sourceId = metadata?.sourceId || '';
+        const operationType = metadata?.type;
+
+        const isFormBufferSource =
+            sourceId.startsWith('isolated-form-') ||
+            sourceId.startsWith('special-editor-') ||
+            sourceId.startsWith('field-') ||
+            sourceId.includes('-field-');
+
+        const externalPageId = String(webpageData?.id || pageId || state.metadata?.currentPageId || '');
+        const externalVersionId = String(versionId || state.metadata?.currentVersionId || '');
+        const externalPage = externalPageId ? state.pages?.[externalPageId] : null;
+        const externalVersion = externalVersionId ? state.versions?.[externalVersionId] : null;
+
+        const syncExternalPage = () => {
+            if (externalPage && !defaultEqualityFn(webpageData || {}, externalPage)) {
+                setWebpageData(externalPage);
+            }
+        };
+
+        const syncExternalVersion = () => {
+            if (externalVersion && !defaultEqualityFn(pageVersionData || {}, externalVersion)) {
+                setPageVersionData(externalVersion);
+            }
+        };
+
+        // Field buffers and special editors update canonical UDC state directly.
+        // Mirror that canonical snapshot into PageEditor so the semantic dirty
+        // check can enable/disable save without forcing every field to rerender.
+        if (isFormBufferSource) {
+            syncExternalVersion();
+            return;
+        }
+
+        // Note: do NOT mirror state.metadata.isDirty here. The local
+        // isDirty value is derived from a semantic diff via
+        // recomputeDirtyState() so that load-time normalization or
+        // hydration cannot force the editor into a dirty state.
+
+        const shouldSyncPage = [
+            OperationTypes.UPDATE_WEBPAGE_DATA,
+            OperationTypes.INIT_PAGE,
+        ].includes(operationType);
+
+        if (shouldSyncPage) {
+            syncExternalPage();
+        }
+
+        const shouldSyncVersion = [
+            OperationTypes.ADD_WIDGET,
+            OperationTypes.UPDATE_WIDGET_CONFIG,
+            OperationTypes.MOVE_WIDGET,
+            OperationTypes.REMOVE_WIDGET,
+            OperationTypes.INIT_VERSION,
+            OperationTypes.SWITCH_VERSION,
+            OperationTypes.UPDATE_PAGE_VERSION_DATA,
+        ].includes(operationType);
+
+        if (shouldSyncVersion) {
+            syncExternalVersion();
+        }
+
+        const shouldSyncWidgets = [
+            OperationTypes.ADD_WIDGET,
+            OperationTypes.UPDATE_WIDGET_CONFIG,
+            OperationTypes.MOVE_WIDGET,
+            OperationTypes.REMOVE_WIDGET,
+            OperationTypes.INIT_VERSION,
+            OperationTypes.SWITCH_VERSION,
+            OperationTypes.UPDATE_PAGE_VERSION_DATA,
+        ].includes(operationType);
+
+        if (!shouldSyncWidgets || !externalVersion?.widgets) {
+            return;
+        }
 
         // Update local widgets from external UDC changes (other components/users)
-        if (versionId && state.versions[versionId]?.widgets) {
-            const externalWidgets = state.versions[versionId].widgets;
-            setLocalWidgets(externalWidgets);
+        if (versionId) {
+            const externalWidgets = externalVersion.widgets;
+            if (defaultEqualityFn(localWidgets || {}, externalWidgets)) {
+                return;
+            }
 
-            // Normal update for non-isolated sources (other users, other components, etc.)
-            setPageVersionData(prev => ({
-                ...prev,
-                widgets: externalWidgets
-            }));
+            setLocalWidgets(externalWidgets);
         }
     });
 
@@ -331,9 +417,8 @@ const PageEditor = () => {
             ...(options.codeLayout && { codeLayout: options.codeLayout })
         }));
 
-        // 3. Mark as dirty for save indication
-        setIsDirty(true);
-    }, [componentId, setIsDirty]);
+        // 3. Dirty state will be recomputed by the effect
+    }, [componentId]);
 
     // UDC widget operation publisher (for external sync)
     const publishWidgetOperation = useCallback(async (operation, data) => {
@@ -434,10 +519,10 @@ const PageEditor = () => {
                         }
 
                         // Check if merged data matches server - if so, mark as clean
-                        const mergedMatchesServer = 
+                        const mergedMatchesServer =
                             JSON.stringify(conflictResult.mergedWebpage) === JSON.stringify(serverWebpage) &&
                             JSON.stringify(conflictResult.mergedVersion) === JSON.stringify(serverVersion);
-                        
+
                         if (mergedMatchesServer) {
                             // No local changes, or local changes exactly match what was saved - mark as clean
                             setIsDirty(false);
@@ -481,7 +566,6 @@ const PageEditor = () => {
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
-    const [isSpecialEditorOpen, setIsSpecialEditorOpen] = useState(false)
     const widgetEditorRef = useRef(null)
 
     // Ref to track current editing widget for callbacks
@@ -500,7 +584,7 @@ const PageEditor = () => {
     const [namespace, setNamespace] = useState(null)
 
     const queryClient = useQueryClient()
-    const { showError, showConfirm } = useNotificationContext()
+    const { showError, showConfirm, showSaveConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
 
     // Load default namespace for media operations
@@ -814,47 +898,33 @@ const PageEditor = () => {
 
     // Handle close with unsaved changes check
     const handleClose = async () => {
-        // Check for widget unsaved changes first
-        if (isDirty && widgetEditorOpen) {
-            const confirmed = await showConfirm({
-                title: 'Unsaved Changes',
-                message: 'You have unsaved changes. What would you like to do?',
-                confirmText: 'Save Changes',
-                cancelText: 'Discard Changes',
-                confirmButtonStyle: 'primary'
-            })
-
-            if (confirmed) {
-                // Save widget changes using the panel's save method
-                if (widgetEditorRef.current) {
-                    const savedWidget = widgetEditorRef.current.saveCurrentWidget()
-                    if (savedWidget) {
-                        await handleSaveWidget(savedWidget)
-                    }
-                }
-            } else {
-                // Discard widget changes
-                handleCloseWidgetEditor()
-            }
-            return // Don't close the page editor yet
+        // If widget editor is open, close it first so the page-level dirty
+        // state is all that remains to check.
+        if (widgetEditorOpen) {
+            handleCloseWidgetEditor()
         }
 
-        // Check for page unsaved changes
-        if (isDirty) {
-            addNotification('Checking for unsaved changes...', 'info', 'editor-close')
-            const confirmed = await showConfirm({
-                title: 'Unsaved Changes',
-                message: 'You have unsaved changes. Are you sure you want to close?',
-                confirmText: 'Close without saving',
-                confirmButtonStyle: 'danger'
-            })
-            if (!confirmed) {
-                addNotification('Close cancelled - staying in editor', 'info', 'editor-close')
-                return
-            }
+        if (!isDirty) {
+            navigate(previousView)
+            return
         }
-        addNotification('Closing page editor...', 'info', 'editor-close')
-        navigate(previousView)
+
+        const decision = await showSaveConfirm({
+            title: 'Unsaved Changes',
+            message: 'You have unsaved changes to this page. What would you like to do?'
+        })
+
+        if (decision === 'save') {
+            try {
+                await handleActualSave({ description: 'Save before leaving' })
+                navigate(previousView)
+            } catch {
+                // handleActualSave already shows an error notification; stay on page
+            }
+        } else if (decision === 'discard') {
+            navigate(previousView)
+        }
+        // 'cancel' → do nothing, stay on page
     }
 
     // Version management functions
@@ -879,7 +949,9 @@ const PageEditor = () => {
                     setCurrentVersion(targetVersion);
                     const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
                     const newPage = response.data || response;
-                    setPageVersionData(processLoadedVersionData(newPage));
+                    const processedDetail = processLoadedVersionData(newPage);
+                    setPageVersionData(processedDetail);
+                    setOriginalPageVersionData(processedDetail);
                     return; // Early return, we're done
                 }
             }
@@ -941,7 +1013,9 @@ const PageEditor = () => {
                 if (!changes.hasPageChanges && !changes.hasVersionChanges) {
                     const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
                     const newPage = response.data || response;
-                    setPageVersionData(processLoadedVersionData(newPage));
+                    const processedDetail = processLoadedVersionData(newPage);
+                    setPageVersionData(processedDetail);
+                    setOriginalPageVersionData(processedDetail);
                 }
             }
         } catch (error) {
@@ -982,12 +1056,16 @@ const PageEditor = () => {
                 // Load the complete version data including widgets using raw API
                 const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, lastSavedVersion.id));
                 const newPage = response.data || response;
-                setPageVersionData(processLoadedVersionData(newPage));
+                const processedDetail = processLoadedVersionData(newPage);
+                setPageVersionData(processedDetail);
+                setOriginalPageVersionData(processedDetail);
             } else if (currentVersion) {
                 // If we have a current version, reload the page data with that version using raw API
                 const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, currentVersion.id));
                 const newPage = response.data || response;
-                setPageVersionData(processLoadedVersionData(newPage));
+                const processedDetail = processLoadedVersionData(newPage);
+                setPageVersionData(processedDetail);
+                setOriginalPageVersionData(processedDetail);
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
@@ -1111,11 +1189,7 @@ const PageEditor = () => {
                 updates: versionUpdates
             });
         }
-        // Mark as dirty if any updates were made
-        if (Object.keys(webpageUpdates).length > 0 || Object.keys(versionUpdates).length > 0) {
-            setIsDirty(true);
-        }
-    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id, setIsDirty])
+    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id])
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback(async (validatedData) => {
@@ -1167,20 +1241,19 @@ const PageEditor = () => {
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
-            // Collect current widget data (from pageVersionData) and any unsaved changes from ContentEditor
+            // Collect current widget data from pageVersionData (always current after fix)
             collectedData.widgets = pageVersionData?.widgets || {};
 
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
-                    const widgetResult = await contentEditorRef.current.saveWidgets({
+                    // Call saveWidgets only to publish SAVED_TO_SERVER to UDC downstream listeners.
+                    // Widget data is already current in pageVersionData.widgets — we do not use the return value.
+                    await contentEditorRef.current.saveWidgets({
                         source: 'smart_save_from_statusbar',
-                        description: 'Smart save triggered from status bar',
-                        collectOnly: true  // Tell ContentEditor to collect data, not save
+                        description: 'Smart save triggered from status bar'
                     });
-                    // Merge any changes from ContentEditor with existing widgets
-                    collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
                 } catch (error) {
-                    console.error('❌ SMART SAVE: Widget data collection failed', error);
+                    console.error('❌ SMART SAVE: saveWidgets notification failed', error);
                 }
             }
 
@@ -1301,11 +1374,6 @@ const PageEditor = () => {
             // Clear To-Do items on success
             setErrorTodoItems([])
 
-            // Mark LayoutRenderer as clean after successful save
-            if (contentEditorRef.current?.layoutRenderer) {
-                contentEditorRef.current.layoutRenderer.markAsClean();
-            }
-
             // Show success notification with smart summary
             const actionDescription = saveResult.strategy === 'page-only' ? 'Page updated' :
                 saveResult.strategy === 'version-only' ? 'New version created' :
@@ -1378,14 +1446,14 @@ const PageEditor = () => {
             collectedData.widgets = pageVersionData?.widgets || {};
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
-                    const widgetResult = await contentEditorRef.current.saveWidgets({
+                    // Call saveWidgets only to publish SAVED_TO_SERVER.
+                    // Widget data is already current in pageVersionData.widgets.
+                    await contentEditorRef.current.saveWidgets({
                         source: 'smart_save_analysis',
-                        description: 'Analyzing changes for save decision',
-                        collectOnly: true
+                        description: 'Analyzing changes for save decision'
                     });
-                    collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
                 } catch (error) {
-                    console.error('❌ Widget data collection failed during analysis', error);
+                    console.error('❌ Widget saveWidgets notification failed during analysis', error);
                 }
             }
             // Collect settings data
@@ -1462,12 +1530,7 @@ const PageEditor = () => {
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {
-        try {
-            await handleActualSave(saveOptions);
-        } catch (error) {
-            // Error handling is already done in handleActualSave
-            throw error;
-        }
+        await handleActualSave(saveOptions);
     }, [handleActualSave]);
 
     // Simple save handlers - no modal confirmation
@@ -1501,6 +1564,49 @@ const PageEditor = () => {
             setIsSaving(false);
         }
     }, [handleActualSave]);
+
+    const handleUndoChanges = useCallback(async () => {
+        if (!originalWebpageData || !originalPageVersionData) return;
+
+        setWebpageData(originalWebpageData);
+        setPageVersionData(originalPageVersionData);
+        if (originalPageVersionData.widgets) {
+            setLocalWidgets(originalPageVersionData.widgets);
+        }
+
+        const initId = `page-editor-${originalWebpageData.id}-undo`;
+        await publishUpdate(initId, OperationTypes.INIT_PAGE, {
+            id: originalWebpageData.id,
+            data: originalWebpageData
+        });
+        await publishUpdate(initId, OperationTypes.INIT_VERSION, {
+            id: originalPageVersionData.id || originalPageVersionData.versionId,
+            data: originalPageVersionData
+        });
+
+        setIsDirty(false);
+        setEditorResetKey(k => k + 1);
+
+        // Recompute dirty state immediately after reset to ensure it's clean
+        setTimeout(() => {
+            recomputeDirtyState();
+        }, 0);
+
+        addNotification('Changes undone', 'success');
+    }, [originalWebpageData, originalPageVersionData, publishUpdate, setIsDirty, addNotification]);
+
+    // Recompute dirty state when data changes
+    useEffect(() => {
+        recomputeDirtyState();
+    }, [recomputeDirtyState]);
+
+    // Warn on browser-level navigation (tab close / refresh) when there are unsaved changes
+    useEffect(() => {
+        if (!isDirty) return;
+        const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [isDirty]);
 
     // Conflict resolution handlers
     const handleConflictResolve = useCallback(async (resolutions) => {
@@ -1795,8 +1901,7 @@ const PageEditor = () => {
                         <div className="flex items-center space-x-4">
                             <button
                                 onClick={handleClose}
-                                disabled={isSpecialEditorOpen}
-                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
                                 Back to {previousView === '/pages' ? 'Pages' :
@@ -1806,8 +1911,11 @@ const PageEditor = () => {
                             <div className="h-6 w-px bg-gray-300"></div>
 
                             <div>
-                                <div className="text-lg font-semibold text-gray-900 truncate" role="heading" aria-level="1">
-                                    {isNewPage ? 'New Page' : (webpageData?.title || 'Untitled Page')}
+                                <div className="flex items-center gap-2">
+                                    <div className="text-lg font-semibold text-gray-900 truncate" role="heading" aria-level="1">
+                                        {isNewPage ? 'New Page' : (webpageData?.title || 'Untitled Page')}
+                                    </div>
+                                    <ContextualHelpLink topicId="pages-create" label="Open Page editor help" />
                                 </div>
                                 {/* Show hostnames for root pages, otherwise show path */}
                                 {!isNewPage && !webpageData?.parent && webpageData?.hostnames && webpageData.hostnames.length > 0 ? (
@@ -1835,6 +1943,7 @@ const PageEditor = () => {
                                     return (
                                         <button
                                             key={tabItem.id}
+                                            data-testid={`page-editor-tab-${tabItem.id}`}
                                             onClick={() => navigate(tabPath, { state: { previousView } })}
                                             className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive
                                                 ? 'bg-blue-100 text-blue-700'
@@ -1883,6 +1992,7 @@ const PageEditor = () => {
                                                 return (
                                                     <button
                                                         key={tabItem.id}
+                                                        data-testid={`page-editor-tab-${tabItem.id}`}
                                                         onClick={() => {
                                                             navigate(tabPath, { state: { previousView } })
                                                             setIsMoreMenuOpen(false)
@@ -1955,7 +2065,7 @@ const PageEditor = () => {
                                         ) : (
                                             <div className="flex-1 h-full">
                                                 <PageContentEditor
-                                                    key={`page-editor-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
+                                                    key={`page-editor-${webpageData?.id}-${pageVersionData?.versionId || 'current'}-${editorResetKey}`}
                                                     ref={contentEditorRef}
                                                     webpageData={webpageData}
                                                     pageVersionData={pageVersionData}
@@ -2027,7 +2137,7 @@ const PageEditor = () => {
                         )}
                         {activeTab === 'settings' && (
                             <SettingsEditor
-                                key={`settings-${pageVersionData?.versionId || 'new'}`}
+                                key={`settings-${pageVersionData?.versionId || 'new'}-${editorResetKey}`}
                                 ref={settingsEditorRef}
                                 componentId={`${componentId}-settings`}
                                 context={{
@@ -2103,7 +2213,6 @@ const PageEditor = () => {
                         namespace={namespace}
                         webpageData={webpageData}
                         pageVersionData={pageVersionData}
-                        onSpecialEditorStateChange={setIsSpecialEditorOpen}
                         context={{
                             pageId: webpageData?.id,
                             versionId: pageVersionData?.versionId,
@@ -2122,6 +2231,7 @@ const PageEditor = () => {
                 onVersionChange={switchToVersion}
                 onSaveClick={handleSave}
                 onSaveNewClick={handleSaveNew}
+                onUndoChanges={handleUndoChanges}
                 isSaving={isSaving}
                 isNewPage={isNewPage}
                 webpageData={webpageData}

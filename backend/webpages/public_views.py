@@ -743,11 +743,14 @@ class HostnamePageView(View):
         """Add layout, theme, widgets, hostname info, and object content to context"""
         context = super().get_context_data(**kwargs)
         page = self.object
-        hostname = self.request.get_host().lower()
+        full_host = self.request.get_host().lower()
+        hostname = WebPage.normalize_hostname(full_host)
 
         # Add hostname and multi-site context
         context["current_hostname"] = hostname
+        context["full_hostname"] = full_host
         context["is_root_page"] = page.is_root_page()
+        context["site_root_page"] = self._get_site_root_page(page)
         context["site_root_page"] = self._get_site_root_page(page)
 
         # Get effective layout and theme
@@ -807,7 +810,8 @@ class HostnamePageView(View):
         """
 
         page = self.object
-        hostname = self.request.get_host().lower()
+        full_host = self.request.get_host().lower()
+        hostname = WebPage.normalize_hostname(full_host)
         template_names = []
 
         # Try hostname + layout specific template
@@ -843,14 +847,18 @@ def custom_404_handler(request, exception=None):
     """
     import re
 
+    from django.views.defaults import page_not_found
+    from django.core.exceptions import DisallowedHost
+
     # Get hostname from request
-    hostname = request.get_host().lower()
+    try:
+        hostname = request.get_host().lower()
+    except DisallowedHost:
+        return page_not_found(request, exception)
 
     # Validate hostname format
     if not re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) or ".." in hostname:
         # Invalid hostname, use default 404
-        from django.views.defaults import page_not_found
-
         return page_not_found(request, exception)
 
     # Find the root page for this hostname

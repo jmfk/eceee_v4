@@ -90,7 +90,7 @@ const MediaSelectModal = ({
         const loadCollections = async () => {
             setLoadingCollections(true);
             try {
-                const response = await mediaCollectionsApi.list({ namespace })();
+                const response = await await await await await await await await await await await mediaCollectionsApi.list({ namespace })();
                 const collectionsData = response.results || response || [];
                 setCollections(Array.isArray(collectionsData) ? collectionsData : []);
             } catch (error) {

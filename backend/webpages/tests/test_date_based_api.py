@@ -17,8 +17,15 @@ class PageVersionSerializerTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_api_user", email="api@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant", identifier="test", created_by=self.user
         )
 
         self.test_page = WebPage.objects.create(
@@ -27,12 +34,16 @@ class PageVersionSerializerTestCase(TestCase):
             description="Testing API serialization",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         self.now = timezone.now()
 
     def test_draft_version_serialization(self):
         """Test serialization of draft version (no effective date)"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         draft_version = self.test_page.create_version(self.user, "Draft version")
 
         serializer = PageVersionSerializer(draft_version)
@@ -46,6 +57,9 @@ class PageVersionSerializerTestCase(TestCase):
 
     def test_published_version_serialization(self):
         """Test serialization of published version"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         published_version = self.test_page.create_version(
             self.user, "Published version"
         )
@@ -63,6 +77,9 @@ class PageVersionSerializerTestCase(TestCase):
 
     def test_scheduled_version_serialization(self):
         """Test serialization of scheduled version"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         scheduled_version = self.test_page.create_version(
             self.user, "Scheduled version"
         )
@@ -81,6 +98,9 @@ class PageVersionSerializerTestCase(TestCase):
 
     def test_expired_version_serialization(self):
         """Test serialization of expired version"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         expired_version = self.test_page.create_version(self.user, "Expired version")
         expired_version.effective_date = self.now - timedelta(days=2)
         expired_version.expiry_date = self.now - timedelta(hours=1)
@@ -97,6 +117,9 @@ class PageVersionSerializerTestCase(TestCase):
 
     def test_serializer_model_consistency(self):
         """Test that serialized data matches model methods exactly"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create various version types
         versions = []
 
@@ -151,8 +174,15 @@ class WebPageDetailSerializerTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_page_api_user", email="pageapi@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Test Page Tenant", identifier="test-page", created_by=self.user
         )
 
         self.test_page = WebPage.objects.create(
@@ -161,10 +191,14 @@ class WebPageDetailSerializerTestCase(TestCase):
             description="Testing page API serialization",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
     def test_page_with_published_version(self):
         """Test page serialization when it has a published version"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         published_version = self.test_page.create_version(
             self.user, "Published version"
         )
@@ -186,6 +220,9 @@ class WebPageDetailSerializerTestCase(TestCase):
 
     def test_page_without_published_version(self):
         """Test page serialization when it has no published version"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create only a draft version
         draft_version = self.test_page.create_version(self.user, "Draft version")
 
@@ -197,6 +234,9 @@ class WebPageDetailSerializerTestCase(TestCase):
 
     def test_page_with_multiple_versions(self):
         """Test page serialization with multiple versions of different types"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         now = timezone.now()
 
         # Create multiple versions
@@ -231,6 +271,9 @@ class WebPageDetailSerializerTestCase(TestCase):
 
     def test_page_serializer_model_consistency(self):
         """Test that page serializer data matches model methods"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create a published version
         published_version = self.test_page.create_version(self.user, "Published")
         published_version.effective_date = timezone.now() - timedelta(hours=1)
@@ -264,8 +307,15 @@ class PublicationStatusLogicTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="test_status_user", email="status@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Status Tenant", identifier="status", created_by=self.user
         )
 
         self.test_page = WebPage.objects.create(
@@ -274,12 +324,16 @@ class PublicationStatusLogicTestCase(TestCase):
             description="Testing status logic",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         self.now = timezone.now()
 
     def test_publication_status_cases(self):
         """Test all publication status cases"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         test_cases = [
             {
                 "name": "Draft",

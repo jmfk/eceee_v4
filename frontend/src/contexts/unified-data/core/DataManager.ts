@@ -248,7 +248,11 @@ export class DataManager {
         
         // Only mark as dirty if data changed AND it's not an initialization operation
         if (hasDataChanged && !operation.type.startsWith('INIT_')) {
-            this.state.metadata.isDirty = true;
+            // Check if skipDirty flag is set in payload
+            const shouldMarkDirty = (operation.payload as any)?.skipDirty !== true;
+            if (shouldMarkDirty) {
+                this.state.metadata.isDirty = true;
+            }
         }
         
         this.selectorCache.clear();

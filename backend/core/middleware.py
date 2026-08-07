@@ -24,27 +24,29 @@ class TenantContextMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
     
+    EXEMPT_PATHS = ("/health/",)
+
     def __call__(self, request):
+        if any(request.path.startswith(p) for p in self.EXEMPT_PATHS):
+            request.tenant = None
+            return self.get_response(request)
+
         tenant = self.get_tenant(request)
-        
+
         if tenant is None:
-            # No tenant found - check if we should allow or deny
             default_tenant_id = getattr(settings, 'DEFAULT_TENANT_ID', None)
-            require_tenant = getattr(settings, 'REQUIRE_TENANT', not settings.DEBUG)
-            
-            if require_tenant:
-                return HttpResponseForbidden(
-                    "Tenant is required. Provide X-Tenant-ID header or configure DEFAULT_TENANT_ID."
-                )
-            elif default_tenant_id:
+            if default_tenant_id:
                 try:
                     tenant = Tenant.objects.get(id=default_tenant_id)
                 except Tenant.DoesNotExist:
-                    # Default tenant doesn't exist - try to get first active tenant
                     tenant = Tenant.objects.filter(is_active=True).first()
             else:
-                # No default tenant configured - try to get first active tenant
                 tenant = Tenant.objects.filter(is_active=True).first()
+
+            if tenant is None and getattr(settings, 'REQUIRE_TENANT', not settings.DEBUG):
+                return HttpResponseForbidden(
+                    "No active tenant found. Create a tenant or configure DEFAULT_TENANT_ID."
+                )
         
         # Set tenant context for RLS
         if tenant:

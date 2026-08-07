@@ -223,9 +223,9 @@ export function hasInheritedContent(inheritedWidgets = []) {
 export function slotAllowsInheritance(slotRules = {}) {
     // Support new allowMerge field (preferred) and fallback to old naming
     const allowMerge = slotRules.allowMerge ??
-        !slotRules.allowsReplacementOnly ??
-        !slotRules.requiresLocal ??
-        true
+        (!slotRules.allowsReplacementOnly ||
+        !slotRules.requiresLocal ||
+        true)
 
     if (!allowMerge) {
         return false
@@ -245,9 +245,9 @@ export function slotAllowsInheritance(slotRules = {}) {
 export function getSlotInheritanceSummary(slotName, localWidgets = [], inheritedWidgets = [], slotRules = {}) {
     // Support new allowMerge field (preferred) and fallback to old naming
     const allowMerge = slotRules.allowMerge ??
-        !slotRules.allowsReplacementOnly ??
-        !slotRules.requiresLocal ??
-        true
+        (!slotRules.allowsReplacementOnly ||
+        !slotRules.requiresLocal ||
+        true)
     const replacementOnly = !allowMerge
 
     return {
@@ -290,9 +290,9 @@ export function transformInheritanceData(inheritanceData) {
 
         // Extract slot rules with new allowMerge field (preferred) and fallback to old naming
         const allowMerge = slotData.allowMerge ??
-            !slotData.allowsReplacementOnly ??
-            !slotData.requiresLocal ??
-            true
+            (!slotData.allowsReplacementOnly ||
+            !slotData.requiresLocal ||
+            true)
         const replacementOnly = !allowMerge
 
         slotInheritanceRules[slotName] = {

@@ -48,6 +48,11 @@ const PageSlotIconMenu = ({
 
     const canAddWidget = widgets.length < maxWidgets;
     const hasWidgets = widgets.length > 0;
+    const slotTestId = (slotName || 'slot')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'slot';
 
     return (
         <>
@@ -55,6 +60,7 @@ const PageSlotIconMenu = ({
                 {/* Import Content Button */}
                 {onImportContent && (
                     <button
+                        data-testid={`page-slot-import-${slotTestId}`}
                         onClick={handleImportContentClick}
                         className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors rounded"
                         title="Import content from web"
@@ -66,6 +72,7 @@ const PageSlotIconMenu = ({
                 {/* Add Widget Button */}
                 {canAddWidget && (
                     <button
+                        data-testid={`page-slot-add-${slotTestId}`}
                         onClick={handleAddWidgetClick}
                         className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 transition-colors rounded"
                         title="Add widget to slot"
@@ -77,6 +84,7 @@ const PageSlotIconMenu = ({
                 {/* Clear Slot Button */}
                 {hasWidgets && (
                     <button
+                        data-testid={`page-slot-clear-${slotTestId}`}
                         onClick={handleClearSlotClick}
                         className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 transition-colors rounded"
                         title="Clear all widgets from slot"

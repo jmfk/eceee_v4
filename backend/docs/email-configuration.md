@@ -19,9 +19,9 @@ The following environment variables need to be configured:
 POSTMARK_API_KEY=your-postmark-server-api-token
 
 # Email addresses
-DEFAULT_FROM_EMAIL=noreply@eceee.fred.nu
-SERVER_EMAIL=server@eceee.fred.nu
-ADMIN_EMAIL=admin@eceee.fred.nu
+DEFAULT_FROM_EMAIL=noreply@example.com
+SERVER_EMAIL=server@example.com
+ADMIN_EMAIL=admin@example.com
 ```
 
 ### Development vs Production
@@ -47,7 +47,7 @@ EMAIL_BACKEND=postmark.django_backend.EmailBackend
 Before sending emails, you must verify your sender domain in Postmark:
 
 1. In Postmark dashboard, go to **Sender Signatures**
-2. Add your domain (`eceee.fred.nu`)
+2. Add your domain (`example.com`)
 3. Add the provided DNS records to your domain:
    - DKIM record (for authentication)
    - Return-Path record (for bounce handling)
@@ -137,7 +137,7 @@ Django will automatically send error emails to the addresses listed in the `ADMI
    ```python
    from django.contrib.sites.models import Site
    site = Site.objects.get_current()
-   site.domain = 'eceee.fred.nu'
+   site.domain = 'example.com'
    site.name = 'ECEEE'
    site.save()
    ```
@@ -168,7 +168,7 @@ from django.core.mail import EmailMessage
 email = EmailMessage(
     subject='Subject',
     body='Body',
-    from_email='sender@eceee.fred.nu',
+    from_email='sender@example.com',
     to=['recipient@example.com'],
     headers={
         'X-PM-Tag': 'registration',  # Postmark tag for filtering
@@ -203,7 +203,7 @@ This separation ensures better deliverability for both types of emails.
 
 ## Best Practices
 
-1. **Never use no-reply addresses** - Use `noreply@eceee.fred.nu` but make sure it can receive emails
+1. **Never use no-reply addresses** - Use `noreply@example.com` but make sure it can receive emails
 2. **Monitor bounce rates** - High bounce rates hurt sender reputation
 3. **Use plain text + HTML** - Provide both formats for better compatibility
 4. **Test before deploying** - Always test email changes in development first

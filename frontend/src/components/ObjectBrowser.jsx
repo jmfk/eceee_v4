@@ -6,6 +6,8 @@ import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import ContextualHelpLink from './help/ContextualHelpLink'
+import OptimizedImage from './media/OptimizedImage'
 
 const ObjectBrowser = () => {
     // Set document title
@@ -65,7 +67,7 @@ const ObjectBrowser = () => {
 
     // Delete mutation
     const deleteMutation = useMutation({
-        mutationFn: (instanceId) => objectInstancesApi.delete(instanceId),
+        mutationFn: async (instanceId) => await objectInstancesApi.delete(instanceId),
         onSuccess: () => {
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance'])
@@ -83,14 +85,14 @@ const ObjectBrowser = () => {
     // Fetch object types for grid view
     const { data: objectTypesResponse, isLoading: typesLoading, error: typesError } = useQuery({
         queryKey: ['objectTypes', 'mainBrowser'],
-        queryFn: () => objectTypesApi.getMainBrowserTypes(),
+        queryFn: async () => await objectTypesApi.getMainBrowserTypes(),
         enabled: currentView === 'grid'
     })
 
     // Fetch filtered instances for list view
     const { data: instancesResponse, isLoading: instancesLoading, error: instancesError } = useQuery({
         queryKey: ['objectInstances', 'filtered', selectedObjectType?.id, searchTerm, statusFilter],
-        queryFn: () => {
+        queryFn: async () => {
             const params = {}
             if (selectedObjectType) params.type = selectedObjectType.name
             if (searchTerm) params.search = searchTerm
@@ -219,6 +221,7 @@ const ObjectBrowser = () => {
                                     <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
                                         <FolderOpen className="h-6 w-6 mr-3" />
                                         Objects Publisher
+                                        <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
                                     </div>
                                 </div>
                             </div>
@@ -230,24 +233,36 @@ const ObjectBrowser = () => {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {objectTypes.map((objectType) => (
+                                {objectTypes.map((objectType) => {
+                                    const objectTypeTestId = (objectType.name || objectType.label || 'object-type')
+                                        .toString()
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9]+/g, '-')
+                                        .replace(/^-+|-+$/g, '') || 'object-type'
+
+                                    return (
                                     <div
                                         key={objectType.id}
+                                        data-testid={`object-type-card-${objectTypeTestId}`}
                                         onClick={() => handleObjectTypeSelect(objectType)}
                                         className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
                                     >
                                         <div className="flex flex-col items-center text-center">
-                                            {objectType.iconImage ? (
-                                                <img
-                                                    src={objectType.iconImage}
-                                                    alt={objectType.label}
-                                                    className="w-16 h-16 object-cover rounded-lg mb-3"
-                                                />
-                                            ) : (
-                                                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                                                    <Image className="h-8 w-8 text-gray-400" />
-                                                </div>
-                                            )}
+                                            <div className="w-16 h-16 flex-shrink-0 mb-3">
+                                                {objectType.iconImage ? (
+                                                    <OptimizedImage
+                                                        src={objectType.iconImage}
+                                                        alt={objectType.label}
+                                                        width={64}
+                                                        height={64}
+                                                        className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                                                        <Image className="h-8 w-8 text-gray-400" />
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="text-lg font-medium text-gray-900 mb-1" role="heading" aria-level="3">
                                                 {objectType.label}
                                             </div>
@@ -259,7 +274,8 @@ const ObjectBrowser = () => {
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
 
@@ -303,18 +319,23 @@ const ObjectBrowser = () => {
                                                 <ArrowLeft className="h-4 w-4" />
                                             </button>
                                             <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
-                                                {selectedObjectType.iconImage ? (
-                                                    <img
-                                                        src={selectedObjectType.iconImage}
-                                                        alt={selectedObjectType.label}
-                                                        className="w-8 h-8 object-cover rounded mr-3"
-                                                    />
-                                                ) : (
-                                                    <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center mr-3">
-                                                        <Image className="h-5 w-5 text-gray-400" />
-                                                    </div>
-                                                )}
+                                                <div className="w-8 h-8 flex-shrink-0 mr-3">
+                                                    {selectedObjectType.iconImage ? (
+                                                        <OptimizedImage
+                                                            src={selectedObjectType.iconImage}
+                                                            alt={selectedObjectType.label}
+                                                            width={32}
+                                                            height={32}
+                                                            className="w-full h-full object-cover rounded shadow-sm border border-gray-100"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center">
+                                                            <Image className="h-5 w-5 text-gray-400" />
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 {selectedObjectType.pluralLabel}
+                                                <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
                                             </div>
                                         </div>
                                         <div className="text-gray-600 ml-9">
@@ -323,6 +344,7 @@ const ObjectBrowser = () => {
                                     </div>
                                 </div>
                                 <button
+                                    data-testid="objects-new-button"
                                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
                                     onClick={handleCreateNew}
                                 >
@@ -336,6 +358,7 @@ const ObjectBrowser = () => {
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                                     <input
+                                        data-testid="objects-search-input"
                                         type="text"
                                         placeholder={`Search ${selectedObjectType.pluralLabel?.toLowerCase()}...`}
                                         value={searchTerm}
@@ -437,17 +460,21 @@ const ObjectBrowser = () => {
                                         className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
                                     >
                                         <div className="flex flex-col items-center text-center">
-                                            {objectType.iconImage ? (
-                                                <img
-                                                    src={objectType.iconImage}
-                                                    alt={objectType.label}
-                                                    className="w-16 h-16 object-cover rounded-lg mb-3"
-                                                />
-                                            ) : (
-                                                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                                                    <Image className="h-8 w-8 text-gray-400" />
-                                                </div>
-                                            )}
+                                            <div className="w-16 h-16 flex-shrink-0 mb-3">
+                                                {objectType.iconImage ? (
+                                                    <OptimizedImage
+                                                        src={objectType.iconImage}
+                                                        alt={objectType.label}
+                                                        width={64}
+                                                        height={64}
+                                                        className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                                                        <Image className="h-8 w-8 text-gray-400" />
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="text-lg font-medium text-gray-900 mb-1" role="heading" aria-level="3">
                                                 {objectType.label}
                                             </div>
@@ -481,15 +508,19 @@ const ObjectBrowser = () => {
                                     </button>
                                     <div>
                                         <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
-                                            {selectedObjectType?.iconImage ? (
-                                                <img
-                                                    src={selectedObjectType.iconImage}
-                                                    alt={selectedObjectType.label}
-                                                    className="w-8 h-8 object-cover rounded mr-3"
-                                                />
-                                            ) : (
-                                                <FolderOpen className="h-8 w-8 mr-3 text-gray-400" />
-                                            )}
+                                            <div className="w-8 h-8 flex-shrink-0 mr-3">
+                                                {selectedObjectType?.iconImage ? (
+                                                    <OptimizedImage
+                                                        src={selectedObjectType.iconImage}
+                                                        alt={selectedObjectType.label}
+                                                        width={32}
+                                                        height={32}
+                                                        className="w-full h-full object-cover rounded shadow-sm border border-gray-100"
+                                                    />
+                                                ) : (
+                                                    <FolderOpen className="h-8 w-8 text-gray-400" />
+                                                )}
+                                            </div>
                                             {selectedObjectType?.pluralLabel}
                                         </div>
                                         <div className="text-gray-600 mt-1">

@@ -216,14 +216,13 @@ export function UnifiedDataProvider({
 
         await manager.dispatch(operation);
 
-        // Automatically set dirty flag when widget config is updated
-        if (type === OperationTypes.UPDATE_WIDGET_CONFIG) {
-            manager.dispatch({
-                type: OperationTypes.SET_DIRTY,
-                sourceId: undefined,
-                payload: { isDirty: true }
-            });
-        }
+        // NOTE: We intentionally do NOT force SET_DIRTY here for
+        // UPDATE_WIDGET_CONFIG. The DataManager reducer already marks the
+        // global metadata.isDirty when the underlying data actually changes
+        // (see DataManager.setState). Forcing dirty unconditionally caused
+        // load-time hydration / normalization paths (which legitimately
+        // re-emit widget configs without a real user edit) to flip the
+        // editor into a dirty state immediately after opening a page.
     }, [manager]);
 
     // Save to current version using granular smart save API
@@ -350,11 +349,12 @@ export function UnifiedDataProvider({
         // Import themesApi dynamically to avoid circular dependencies
         const { themesApi } = await import('../../../api/themes');
 
-        // Filter out image-related fields (uploaded separately)
-        const { image, imageFile, imagePreview, ...themeDataToSave } = themeData;
-        
         // Normalize theme data before saving (defensive - ensures clean data)
-        const normalizedData = normalizeThemeData(themeDataToSave);
+        const normalizedData = normalizeThemeData(themeData);
+
+        // Strip ImageField values — they are managed via separate PATCH uploads
+        delete normalizedData.image;
+        delete normalizedData.siteIcon;
 
         // Save normalized theme data
         const result = await themesApi.update(currentThemeId, normalizedData);

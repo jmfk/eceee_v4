@@ -15,7 +15,17 @@ from file_manager.templatetags.imgproxy_tags import (
 from unittest.mock import Mock, patch
 
 
-class ImgproxyTagTests(TestCase):
+class ImgproxyUrlAssertions:
+    def assertImgproxyUrl(self, url):
+        self.assertTrue(
+            url.startswith("/imgproxy/")
+            or 'src="/imgproxy/' in url
+            or "imgproxy:8080" in url
+            or "localhost:8080" in url
+        )
+
+
+class ImgproxyTagTests(ImgproxyUrlAssertions, TestCase):
     """Tests for {% imgproxy %} template tag."""
 
     def setUp(self):
@@ -35,7 +45,7 @@ class ImgproxyTagTests(TestCase):
         url = imgproxy(self.image_dict, width=800, height=600)
 
         # Should contain imgproxy URL (either localhost or Docker hostname)
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
         # Should have some length (signature + path)
         self.assertGreater(len(url), 50)
 
@@ -43,7 +53,7 @@ class ImgproxyTagTests(TestCase):
         """Test imgproxy tag with plain URL string."""
         url = imgproxy("http://example.com/image.jpg", width=400, height=300)
 
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
 
     def test_imgproxy_with_settings_dict(self):
         """Test imgproxy tag with settings dictionary."""
@@ -57,7 +67,7 @@ class ImgproxyTagTests(TestCase):
 
         url = imgproxy(self.image_dict, settings=settings)
 
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
         self.assertGreater(len(url), 50)
 
     def test_imgproxy_explicit_params_override_settings(self):
@@ -79,21 +89,19 @@ class ImgproxyTagTests(TestCase):
         """Test imgproxy tag with preset parameter."""
         url = imgproxy(self.image_dict, preset="hero")
 
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
 
     def test_imgproxy_with_gravity(self):
         """Test imgproxy tag with gravity parameter."""
         url = imgproxy(self.image_dict, width=800, height=600, gravity="face")
 
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
 
     def test_imgproxy_with_kwargs(self):
         """Test imgproxy tag with additional kwargs (blur, sharpen, etc.)."""
-        url = imgproxy(
-            self.image_dict, width=800, height=600, blur=5, sharpen=0.3, brightness=10
-        )
+        url = imgproxy(self.image_dict, width=800, height=600, blur=5, sharpen=0.3, brightness=10)
 
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
 
     def test_imgproxy_with_none_image(self):
         """Test imgproxy tag with None image returns empty string."""
@@ -109,16 +117,14 @@ class ImgproxyTagTests(TestCase):
 
     def test_imgproxy_in_template(self):
         """Test imgproxy tag in actual template rendering."""
-        template = Template(
-            "{% load imgproxy_tags %}" "{% imgproxy image width=800 height=600 %}"
-        )
+        template = Template("{% load imgproxy_tags %}" "{% imgproxy image width=800 height=600 %}")
         context = Context({"image": self.image_dict})
         rendered = template.render(context)
 
-        self.assertTrue("imgproxy:8080" in rendered or "localhost:8080" in rendered)
+        self.assertImgproxyUrl(rendered)
 
 
-class ImgproxyImgTagTests(TestCase):
+class ImgproxyImgTagTests(ImgproxyUrlAssertions, TestCase):
     """Tests for {% imgproxy_img %} inclusion tag."""
 
     def setUp(self):
@@ -138,9 +144,7 @@ class ImgproxyImgTagTests(TestCase):
 
         self.assertIn("src", context)
         self.assertIn("alt", context)
-        self.assertTrue(
-            "imgproxy:8080" in context["src"] or "localhost:8080" in context["src"]
-        )
+        self.assertImgproxyUrl(context["src"])
 
     def test_imgproxy_img_auto_alt_text(self):
         """Test imgproxy_img auto-generates alt text from image title."""
@@ -150,17 +154,13 @@ class ImgproxyImgTagTests(TestCase):
 
     def test_imgproxy_img_explicit_alt_text(self):
         """Test imgproxy_img with explicit alt text."""
-        context = imgproxy_img(
-            self.image_dict, width=800, height=600, alt="Custom Alt Text"
-        )
+        context = imgproxy_img(self.image_dict, width=800, height=600, alt="Custom Alt Text")
 
         self.assertEqual(context["alt"], "Custom Alt Text")
 
     def test_imgproxy_img_with_class(self):
         """Test imgproxy_img with CSS class."""
-        context = imgproxy_img(
-            self.image_dict, width=800, height=600, class_name="hero-image"
-        )
+        context = imgproxy_img(self.image_dict, width=800, height=600, class_name="hero-image")
 
         self.assertEqual(context["class"], "hero-image")
 
@@ -175,9 +175,7 @@ class ImgproxyImgTagTests(TestCase):
 
         context = imgproxy_img(self.image_dict, settings=settings)
 
-        self.assertTrue(
-            "imgproxy:8080" in context["src"] or "localhost:8080" in context["src"]
-        )
+        self.assertImgproxyUrl(context["src"])
 
     def test_imgproxy_img_lazy_loading(self):
         """Test imgproxy_img lazy loading flag."""
@@ -192,19 +190,18 @@ class ImgproxyImgTagTests(TestCase):
     def test_imgproxy_img_in_template(self):
         """Test imgproxy_img in actual template rendering."""
         template = Template(
-            "{% load imgproxy_tags %}"
-            "{% imgproxy_img image width=800 height=600 class_name='test' %}"
+            "{% load imgproxy_tags %}" "{% imgproxy_img image width=800 height=600 class_name='test' %}"
         )
         context = Context({"image": self.image_dict})
         rendered = template.render(context)
 
         self.assertIn("<img", rendered)
-        self.assertTrue("imgproxy:8080" in rendered or "localhost:8080" in rendered)
+        self.assertImgproxyUrl(rendered)
         self.assertIn('class="test"', rendered)
         self.assertIn('loading="lazy"', rendered)
 
 
-class ImgproxyUrlFilterTests(TestCase):
+class ImgproxyUrlFilterTests(ImgproxyUrlAssertions, TestCase):
     """Tests for imgproxy_url filter."""
 
     def setUp(self):
@@ -217,30 +214,28 @@ class ImgproxyUrlFilterTests(TestCase):
         """Test imgproxy_url filter without size."""
         url = imgproxy_url(self.image_dict)
 
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
 
     def test_imgproxy_url_filter_with_size(self):
         """Test imgproxy_url filter with size string."""
         url = imgproxy_url(self.image_dict, "800x600")
 
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
 
     def test_imgproxy_url_filter_invalid_size(self):
         """Test imgproxy_url filter with invalid size format."""
         url = imgproxy_url(self.image_dict, "invalid")
 
         # Should still return URL, just without dimensions
-        self.assertTrue("imgproxy:8080" in url or "localhost:8080" in url)
+        self.assertImgproxyUrl(url)
 
     def test_imgproxy_url_filter_in_template(self):
         """Test imgproxy_url filter in template."""
-        template = Template(
-            "{% load imgproxy_tags %}" "{{ image|imgproxy_url:'1920x1080' }}"
-        )
+        template = Template("{% load imgproxy_tags %}" "{{ image|imgproxy_url:'1920x1080' }}")
         context = Context({"image": self.image_dict})
         rendered = template.render(context)
 
-        self.assertTrue("imgproxy:8080" in rendered or "localhost:8080" in rendered)
+        self.assertImgproxyUrl(rendered)
 
 
 class HasImageFilterTests(TestCase):
@@ -266,10 +261,7 @@ class HasImageFilterTests(TestCase):
 
     def test_has_image_in_template(self):
         """Test has_image filter in template conditional."""
-        template = Template(
-            "{% load imgproxy_tags %}"
-            "{% if image|has_image %}HAS_IMAGE{% else %}NO_IMAGE{% endif %}"
-        )
+        template = Template("{% load imgproxy_tags %}" "{% if image|has_image %}HAS_IMAGE{% else %}NO_IMAGE{% endif %}")
 
         # With valid image
         context = Context({"image": {"imgproxy_base_url": "http://test.jpg"}})

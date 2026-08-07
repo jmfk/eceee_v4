@@ -17,8 +17,10 @@ import {
     Scissors
 } from 'lucide-react'
 import ConfirmationModal from '../../components/ConfirmationModal'
+import ContextualHelpLink from '../../components/help/ContextualHelpLink'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
 import { generateNewWidgetIds } from '../../utils/widgetClipboard'
+import { getWidgetHelpTopic } from '../../utils/howToHelp'
 import { useClipboard } from '../../contexts/ClipboardContext'
 
 const PageWidgetHeader = ({
@@ -54,6 +56,12 @@ const PageWidgetHeader = ({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isActive, setIsActive] = useState(widget?.config?.isActive !== false);
     const { refreshClipboard } = useClipboard();
+    const helpTopicId = getWidgetHelpTopic(widget?.type || widgetType);
+    const widgetTestId = (widget?.type || widgetType || 'widget')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'widget';
 
     if (!showControls) {
         return null
@@ -173,6 +181,7 @@ const PageWidgetHeader = ({
                     {!isInherited && widget && (
                         <button
                             onClick={handleToggleActive}
+                            data-testid={`page-widget-active-${widgetTestId}`}
                             className={`text-xs px-2 py-0.5 rounded transition-colors ${
                                 isActive
                                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -231,6 +240,7 @@ const PageWidgetHeader = ({
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2">
                             <button
                                 onClick={onMoveUp}
+                                data-testid={`page-widget-move-up-${widgetTestId}`}
                                 disabled={!canMoveUp}
                                 className={`p-1 rounded transition-colors ${canMoveUp
                                     ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
@@ -242,6 +252,7 @@ const PageWidgetHeader = ({
                             </button>
                             <button
                                 onClick={onMoveDown}
+                                data-testid={`page-widget-move-down-${widgetTestId}`}
                                 disabled={!canMoveDown}
                                 className={`p-1 rounded transition-colors ${canMoveDown
                                     ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
@@ -261,6 +272,7 @@ const PageWidgetHeader = ({
                                 <>
                                     <button
                                         onClick={handleCopy}
+                                        data-testid={`page-widget-copy-${widgetTestId}`}
                                         className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                         title="Copy widget"
                                     >
@@ -269,6 +281,7 @@ const PageWidgetHeader = ({
                                     {(onCut || (widget && slotName)) && (
                                         <button
                                             onClick={handleCut}
+                                            data-testid={`page-widget-cut-${widgetTestId}`}
                                             className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                             title="Cut widget"
                                         >
@@ -280,6 +293,7 @@ const PageWidgetHeader = ({
                             {onPaste && (
                                 <button
                                     onClick={handlePaste}
+                                    data-testid={`page-widget-paste-${widgetTestId}`}
                                     className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                     title="Paste widget after this one"
                                 >
@@ -291,8 +305,14 @@ const PageWidgetHeader = ({
 
                     {/* Quick actions */}
                     <div className="flex items-center space-x-1">
+                        <ContextualHelpLink
+                            topicId={helpTopicId}
+                            label={`Open ${widgetType} widget help`}
+                            size="sm"
+                        />
                         {onEdit && (
                             <button
+                                data-testid={`page-widget-edit-${widgetTestId}`}
                                 onClick={onEdit}
                                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                 title="Edit widget"
@@ -303,6 +323,7 @@ const PageWidgetHeader = ({
                         {onDelete && (
                             <button
                                 onClick={handleDeleteClick}
+                                data-testid={`page-widget-delete-${widgetTestId}`}
                                 className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
                                 title="Delete widget"
                             >

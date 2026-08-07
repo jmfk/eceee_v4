@@ -6,6 +6,7 @@ import { objectInstancesApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import ObjectTypeSelector from '../ObjectTypeSelector'
 import DeleteConfirmationModal from '../DeleteConfirmationModal'
+import OptimizedImage from '../media/OptimizedImage'
 
 const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onCancel, context }) => {
 
@@ -24,7 +25,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
 
     // Delete mutation
     const deleteMutation = useMutation({
-        mutationFn: (instanceId) => objectInstancesApi.delete(instanceId),
+        mutationFn: async (instanceId) => await objectInstancesApi.delete(instanceId),
         onSuccess: () => {
             queryClient.invalidateQueries(['objectInstance', instance?.id, 'children'])
             queryClient.invalidateQueries(['objectInstances'])
@@ -42,7 +43,7 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
     // Fetch child objects if editing an existing instance
     const { data: childrenResponse, isLoading: childrenLoading, error: childrenError } = useQuery({
         queryKey: ['objectInstance', instance?.id, 'children'],
-        queryFn: () => objectInstancesApi.getChildren(instance.id),
+        queryFn: async () => await objectInstancesApi.getChildren(instance.id),
         enabled: !!instance?.id
     })
 
@@ -158,19 +159,23 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
             >
                 <div className="flex items-center justify-between p-4 hover:bg-gray-50 transition-all cursor-pointer">
                     <div className="flex items-center flex-1">
-                        {child.objectTypeIconImage ? (
-                            <img
-                                src={child.objectTypeIconImage}
-                                alt={child.objectTypeLabel}
-                                className="w-8 h-8 object-cover rounded mr-3"
-                            />
-                        ) : (
-                            <div className="w-8 h-8 bg-gray-200 rounded mr-3 flex items-center justify-center">
-                                <span className="text-xs text-gray-500 font-medium">
-                                    {child.objectTypeLabel?.charAt(0)}
-                                </span>
-                            </div>
-                        )}
+                        <div className="w-10 h-10 flex-shrink-0 mr-3">
+                            {child.objectTypeIconImage ? (
+                                <OptimizedImage
+                                    src={child.objectTypeIconImage}
+                                    alt={child.objectTypeLabel}
+                                    width={40}
+                                    height={40}
+                                    className="w-full h-full rounded-lg object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+                                    <span className="text-xs text-gray-500 font-medium">
+                                        {child.objectTypeLabel?.charAt(0)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                         <div className="flex-1">
                             <div className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors" role="heading" aria-level="4">{child.title}</div>
                             <div className="flex items-center space-x-2 text-sm text-gray-500">
@@ -216,19 +221,6 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
     return (
         <>
             <div className="h-full flex flex-col relative">
-                {/* Content Header */}
-                <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3">
-                    <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="1">
-                        <Users className="h-5 w-5 mr-2" />
-                        Sub-objects & Hierarchy
-                        {objectType && (
-                            <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                {objectType.label}
-                            </span>
-                        )}
-                    </div>
-                </div>
-
                 {/* Scrollable Content Area */}
                 <div className="flex-1 min-h-0 overflow-y-auto bg-white">
                     <div className="p-6">
@@ -369,19 +361,23 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
                                                             <div key={group.type} className="space-y-3">
                                                                 {/* Group Header */}
                                                                 <div className="flex items-center space-x-3 pb-2 border-b border-gray-200">
-                                                                    {group.type?.iconImage ? (
-                                                                        <img
-                                                                            src={group.type.iconImage}
-                                                                            alt={group.label}
-                                                                            className="w-6 h-6 object-cover rounded"
-                                                                        />
-                                                                    ) : (
-                                                                        <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                                                                            <span className="text-blue-600 font-medium text-xs">
-                                                                                {group.label.charAt(0)}
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
+                                                                    <div className="w-8 h-8 flex-shrink-0">
+                                                                        {group.type?.iconImage ? (
+                                                                            <OptimizedImage
+                                                                                src={group.type.iconImage}
+                                                                                alt={group.label}
+                                                                                width={32}
+                                                                                height={32}
+                                                                                className="w-full h-full rounded shadow-sm border border-gray-100"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-full h-full bg-blue-100 rounded flex items-center justify-center border border-blue-200">
+                                                                                <span className="text-blue-600 font-medium text-xs">
+                                                                                    {group.label.charAt(0)}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                     <div className="font-medium text-gray-900" role="heading" aria-level="3">{group.label}</div>
                                                                     <span className="text-sm text-gray-500">({group.children.length})</span>
                                                                 </div>

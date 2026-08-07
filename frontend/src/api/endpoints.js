@@ -13,8 +13,6 @@ export const endpoints = {
     // Core paths
     base: BASE_PATH,
     webpages: `${BASE_PATH}/webpages`,
-    content: `${BASE_PATH}/content`,
-    namespaces: `${BASE_PATH}/namespaces`,
     objects: `${BASE_PATH}/objects`,
 
     // Authentication & System
@@ -60,6 +58,14 @@ export const endpoints = {
     links: {
         resolve: `${BASE_PATH}/webpages/links/resolve/`,
         displayInfo: `${BASE_PATH}/webpages/links/display-info/`
+    },
+
+    sitePackages: {
+        exports: `${BASE_PATH}/webpages/site-packages/exports/`,
+        exportDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/`,
+        exportDownload: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/download/`,
+        imports: `${BASE_PATH}/webpages/site-packages/imports/`,
+        importDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/imports/${jobId}/`
     },
 
     // Versions endpoints (CONSISTENT PATH-BASED API)
@@ -142,7 +148,7 @@ export const endpoints = {
     // Namespaces endpoints
     namespaces: {
         base: `${BASE_PATH}/namespaces`,
-        list: `${BASE_PATH}/namespaces/`,
+        list: `${BASE_PATH}/namespaces//`,
         detail: (id) => `${BASE_PATH}/namespaces/${id}/`,
         setDefault: (id) => `${BASE_PATH}/namespaces/${id}/set_as_default/`,
         contentSummary: (id) => `${BASE_PATH}/namespaces/${id}/get_content_summary/`

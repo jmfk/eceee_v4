@@ -281,23 +281,47 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
     ordering = ["-updated_at"]
 
     def get_queryset(self):
-        """Filter collections by user's accessible namespaces."""
+        """Filter collections by user's accessible namespaces.
+
+        For list-style requests we honour the ``namespace`` query param and
+        otherwise default to the system's default namespace, preserving the
+        existing list/browse behaviour.
+
+        For detail-style requests (retrieve, update, destroy, and custom
+        ``@action(detail=True)`` endpoints such as ``files``,
+        ``add_files``, ``remove_files``, ``upload_to_collection``,
+        ``download_zip``) we look the collection up by primary key across all
+        namespaces. The collection ID is already a UUID, so this is safe and
+        avoids surfacing misleading 404s in production whenever the caller
+        omits the ``namespace`` query param for a collection that does not
+        live in the default namespace.
+        """
         from content.models import Namespace
-        from django.shortcuts import get_object_or_404
 
         queryset = MediaCollection.objects.select_related(
             "namespace", "created_by", "last_modified_by"
         ).prefetch_related("tags")
 
-        # Handle namespace filtering by slug only
+        # Detect detail-style requests. ``self.kwargs[self.lookup_field]``
+        # is populated by DRF when the URL includes the collection PK, which
+        # is the case for retrieve/update/destroy and any
+        # ``@action(detail=True)`` endpoint.
+        lookup_value = self.kwargs.get(self.lookup_field) if self.kwargs else None
+
         namespace_slug = self.request.query_params.get("namespace")
         if namespace_slug:
-            queryset = queryset.filter(namespace__slug=namespace_slug)
-        else:
-            # Use default namespace if none specified
-            default_namespace = Namespace.get_default()
-            queryset = queryset.filter(namespace=default_namespace)
-        return queryset
+            return queryset.filter(namespace__slug=namespace_slug)
+
+        if lookup_value:
+            # Detail/action lookup by ID — do not restrict by namespace so
+            # that callers without a ``namespace`` param can still resolve
+            # collections in non-default namespaces.
+            return queryset
+
+        # List-style request without an explicit namespace: fall back to the
+        # default namespace to keep the browse experience scoped.
+        default_namespace = Namespace.get_default()
+        return queryset.filter(namespace=default_namespace)
 
     def create(self, request, *args, **kwargs):
         """Create a new collection with tag validation."""
@@ -376,13 +400,6 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
             # Paginate
             page = self.paginate_queryset(files)
             if page is not None:
-                # #region agent log
-                import json
-                try:
-                    with open('/Users/jmfk/code/eceee_v4/.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps({"location":"collections.py:376","message":"Before serialization","data":{"file_count":len(page)},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"H3"}) + '\n')
-                except: pass
-                # #endregion
                 serializer = MediaFileListSerializer(
                     page, many=True, context={"request": request}
                 )
@@ -632,7 +649,7 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
                         file_path = media_file.file_path
                         
                         # Download file content from storage
-                        file_content = storage.download_file(file_path)
+                        file_content = storage.get_file_content(file_path)
                         
                         # Use original filename in the ZIP
                         # Add file type subdirectory to organize files

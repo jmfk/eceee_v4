@@ -8,8 +8,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from ...services import DuplicateFileHandler
-from ...models import MediaFile, PendingMediaFile
+from file_manager.services import DuplicateFileHandler
+from file_manager.models import MediaFile, PendingMediaFile
 from content.models import Namespace
 
 User = get_user_model()

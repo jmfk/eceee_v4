@@ -28,15 +28,15 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
 
     CACHE_TIMEOUT = 300  # 5 minutes
 
-    @property
-    def CACHE_KEY(self):
+    @classmethod
+    def get_cache_key(cls):
         """
         Generate a secure, unpredictable cache key to prevent cache poisoning attacks.
 
         Uses application SECRET_KEY and a base identifier to create a unique hash
         that's specific to this Django instance and harder to predict.
         """
-        return self._generate_cache_key()
+        return cls._generate_cache_key()
 
     def __init__(self, get_response=None):
         self.get_response = get_response
@@ -125,7 +125,7 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
                 return hostnames
 
             allowed_hosts = cache.get_or_set(
-                self.CACHE_KEY, load_hostnames, self.CACHE_TIMEOUT
+                self.get_cache_key(), load_hostnames, self.CACHE_TIMEOUT
             )
 
             # Normalize host for comparison
@@ -265,7 +265,7 @@ def get_dynamic_allowed_hosts():
     )
 
     # Get database hosts with caching
-    cache_key = DynamicHostValidationMiddleware.CACHE_KEY
+    cache_key = DynamicHostValidationMiddleware.get_cache_key()
     db_hosts = cache.get(cache_key)
 
     if db_hosts is None:

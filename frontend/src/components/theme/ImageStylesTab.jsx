@@ -66,7 +66,9 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
             if (udcState.metadata.currentThemeId !== String(themeId)) {
                 switchTheme(String(themeId));
             }
-        } catch (_) {}
+        } catch (_) {
+            // Ignore errors if UDC is not available
+        }
 
         // Update UDC with new style
         updateThemeField('imageStyles', updatedStyles);

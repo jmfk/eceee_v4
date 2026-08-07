@@ -6,7 +6,7 @@ import pytest
 from rest_framework import status
 from rest_framework.response import Response
 
-from ...services import UploadResponseBuilder, UploadResponseData
+from file_manager.services import UploadResponseBuilder, UploadResponseData
 
 
 class TestUploadResponseBuilder:

@@ -18,6 +18,7 @@ import { useNotificationContext } from './NotificationManager';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext';
 import { normalizeThemeData } from '../utils/themeDataNormalizer';
+import ContextualHelpLink from './help/ContextualHelpLink';
 import {
     Plus, Edit3, Trash2, ArrowLeft, Copy, Star, Palette, Upload, X, RefreshCw, Clipboard, Download, FileUp, Files
 } from 'lucide-react';
@@ -31,6 +32,7 @@ import ImageStylesTab from './theme/ImageStylesTab';
 import TableTemplatesTab from './theme/TableTemplatesTab';
 import BreakpointsTab from './theme/BreakpointsTab';
 import ImagesTab from './theme/ImagesTab';
+import ThemeImageEditView from './theme/ThemeImageEditView';
 import ImageUpload from './theme/ImageUpload';
 import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
 import CopyButton from './theme/CopyButton';
@@ -38,7 +40,7 @@ import CloneThemeDialog from './theme/CloneThemeDialog';
 import PasteThemeDialog from './theme/PasteThemeDialog';
 
 const ThemeEditor = ({ onSave }) => {
-    const { themeId, tab } = useParams();
+    const { themeId, tab, imageFilename } = useParams();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const queryClient = useQueryClient();
@@ -55,7 +57,7 @@ const ThemeEditor = ({ onSave }) => {
     const isCreating = themeId === 'new';
     const isEditing = !!themeId && themeId !== 'new';
     const currentView = themeId ? 'edit' : 'list';
-    const activeTab = tab || 'basic';
+    const activeTab = imageFilename ? 'images' : (tab || 'basic');
 
     // Use UDC for theme data management
     const {
@@ -158,6 +160,7 @@ const ThemeEditor = ({ onSave }) => {
                 imageStyles: normalizedData.imageStyles || {},
                 tableTemplates: normalizedData.tableTemplates || {},
                 image: normalizedData.image || null,
+                siteIcon: normalizedData.siteIcon || null,
                 isActive: normalizedData.isActive ?? true,
                 isDefault: normalizedData.isDefault ?? false,
                 createdAt: normalizedData.createdAt || new Date().toISOString(),
@@ -291,8 +294,8 @@ const ThemeEditor = ({ onSave }) => {
         try {
             if (isCreating) {
                 // For new themes, use direct API since UDC ID is temporary
-                // Filter out imageFile and imagePreview - these are UI-only fields
-                const { imageFile, imagePreview, ...themeDataToSave } = themeData;
+                // Filter out file/preview and ImageField values - these are UI-only or handled via separate upload
+                const { imageFile, imagePreview, siteIconFile, siteIconPreview, image: _img, siteIcon: _si, ...themeDataToSave } = themeData;
                 const result = await themesApi.create(themeDataToSave);
 
                 // Upload image if one was selected
@@ -301,7 +304,15 @@ const ThemeEditor = ({ onSave }) => {
                         await themesApi.updateImage(result.id, imageFile);
                     } catch (imgError) {
                         console.error('Failed to upload image:', imgError);
-                        // Don't fail the whole operation if just image fails
+                    }
+                }
+
+                // Upload site icon if one was selected
+                if (siteIconFile) {
+                    try {
+                        await themesApi.updateSiteIcon(result.id, siteIconFile);
+                    } catch (iconError) {
+                        console.error('Failed to upload site icon:', iconError);
                     }
                 }
 
@@ -528,6 +539,75 @@ const ThemeEditor = ({ onSave }) => {
         }
     };
 
+    // Site Icon upload/remove handlers (same pattern as theme preview image)
+    const [isUploadingSiteIcon, setIsUploadingSiteIcon] = useState(false);
+
+    const handleSiteIconUpload = async (file) => {
+        if (!file) return;
+
+        setIsUploadingSiteIcon(true);
+        try {
+            if (isCreating) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    updateThemeField('siteIconPreview', reader.result);
+                };
+                reader.readAsDataURL(file);
+                updateThemeField('siteIconFile', file);
+                addNotification({
+                    type: 'info',
+                    message: 'Site icon will be uploaded when theme is saved',
+                });
+            } else {
+                const result = await themesApi.updateSiteIcon(themeId, file);
+
+                // Update icon URL in UDC from PATCH response
+                updateThemeField('siteIcon', result.siteIcon);
+                // Clear any local preview
+                updateThemeField('siteIconPreview', null);
+
+                addNotification({
+                    type: 'success',
+                    message: 'Site icon updated successfully',
+                });
+            }
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: extractErrorMessage(error, 'Failed to upload site icon'),
+            });
+        } finally {
+            setIsUploadingSiteIcon(false);
+        }
+    };
+
+    const handleSiteIconRemove = async () => {
+        setIsUploadingSiteIcon(true);
+        try {
+            if (isCreating) {
+                updateThemeField('siteIconPreview', null);
+                updateThemeField('siteIconFile', null);
+            } else {
+                await themesApi.updateSiteIcon(themeId, null);
+
+                updateThemeField('siteIcon', null);
+                updateThemeField('siteIconPreview', null);
+
+                addNotification({
+                    type: 'success',
+                    message: 'Site icon removed',
+                });
+            }
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: extractErrorMessage(error, 'Failed to remove site icon'),
+            });
+        } finally {
+            setIsUploadingSiteIcon(false);
+        }
+    };
+
     const handleImageRemove = async () => {
         setIsUploadingImage(true);
         try {
@@ -537,10 +617,8 @@ const ThemeEditor = ({ onSave }) => {
                 updateThemeField('imageFile', null);
             } else {
                 // For existing themes, send PATCH with image=null
-                const formData = new FormData();
-                formData.append('image', ''); // Empty string to clear
-
-                const result = await themesApi.update(themeId, { image: null });
+                // The backend handles image=null by clearing the field
+                await themesApi.updateImage(themeId, null);
 
                 // Update the image in UDC
                 updateThemeField('image', null);
@@ -581,7 +659,10 @@ const ThemeEditor = ({ onSave }) => {
                     <div className="mb-6">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Theme Management</div>
+                                <div className="flex items-center gap-2">
+                                    <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Theme Management</div>
+                                    <ContextualHelpLink topicId="settings-themes" label="Open Theme help" />
+                                </div>
                                 <div className="text-sm text-gray-600 mt-1">
                                     Create and manage themes with fonts, colors, typography, component styles, and table templates
                                 </div>
@@ -598,6 +679,7 @@ const ThemeEditor = ({ onSave }) => {
                                     />
                                 </label>
                                 <button
+                                    data-testid="themes-create-button"
                                     onClick={handleCreateNew}
                                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                                 >
@@ -609,6 +691,7 @@ const ThemeEditor = ({ onSave }) => {
 
                         {/* Search */}
                         <input
+                            data-testid="themes-search-input"
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -921,13 +1004,70 @@ const ThemeEditor = ({ onSave }) => {
                                 </div>
                             </div>
 
+                            {/* Site Icon (Favicon) */}
+                            <div className="border-t border-gray-200 pt-6">
+                                <div className="text-md font-semibold text-gray-900 mb-4">Site Icon (Favicon)</div>
+                                <div className="space-y-3">
+                                    {(themeData?.siteIconPreview || themeData?.siteIcon) && (
+                                        <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg max-w-md">
+                                            <img
+                                                src={themeData.siteIconPreview || themeData.siteIcon}
+                                                alt="Site icon preview"
+                                                className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                            />
+                                            <div className="flex-1">
+                                                <div className="text-sm font-medium text-gray-900">Current Icon</div>
+                                                <div className="text-xs text-gray-500">Will be resized to multiple sizes automatically</div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleSiteIconRemove}
+                                                disabled={isUploadingSiteIcon}
+                                                className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                                            >
+                                                {isUploadingSiteIcon ? 'Removing...' : 'Remove'}
+                                            </button>
+                                        </div>
+                                    )}
+                                    <div className="max-w-md">
+                                        <input
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0]
+                                                if (file) {
+                                                    handleSiteIconUpload(file)
+                                                }
+                                            }}
+                                            disabled={isUploadingSiteIcon}
+                                            className="block w-full text-sm text-gray-500
+                                                file:mr-4 file:py-2 file:px-4
+                                                file:rounded-md file:border-0
+                                                file:text-sm file:font-semibold
+                                                file:bg-blue-50 file:text-blue-700
+                                                hover:file:bg-blue-100
+                                                cursor-pointer disabled:opacity-50"
+                                        />
+                                        {isUploadingSiteIcon && (
+                                            <div className="text-sm text-blue-600 mt-1">Uploading...</div>
+                                        )}
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            Upload a square image (PNG, JPG, SVG, or WebP). Will be automatically resized to favicon sizes (16x16, 32x32, etc.) and app icons (180x180, 192x192, etc.)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Theme Preview Image */}
-                            <ImageUpload
-                                imageUrl={themeData?.imagePreview || themeData?.image}
-                                onUpload={handleImageUpload}
-                                onRemove={handleImageRemove}
-                                isUploading={isUploadingImage}
-                            />
+                            <div className="border-t border-gray-200 pt-6">
+                                <div className="text-md font-semibold text-gray-900 mb-4">Theme Preview Image</div>
+                                <ImageUpload
+                                    imageUrl={themeData?.imagePreview || themeData?.image}
+                                    onUpload={handleImageUpload}
+                                    onRemove={handleImageRemove}
+                                    isUploading={isUploadingImage}
+                                />
+                            </div>
                         </div>
                     )}
 
@@ -948,15 +1088,25 @@ const ThemeEditor = ({ onSave }) => {
                     )}
 
                     {activeTab === 'images' && (
-                        <ImagesTab
-                            themeId={themeId}
-                            theme={themeData}
-                            onThemeUpdate={() => {
-                                // Reload theme data when images are updated
-                                queryClient.invalidateQueries(['themes', themeId]);
-                                queryClient.invalidateQueries(['themes']);
-                            }}
-                        />
+                        imageFilename ? (
+                            <ThemeImageEditView
+                                themeId={themeId}
+                                imageFilename={imageFilename}
+                                theme={themeData}
+                                onDesignGroupsChange={(designGroups) => updateThemeField('designGroups', designGroups)}
+                                onDirty={() => setThemeDirty(true)}
+                            />
+                        ) : (
+                            <ImagesTab
+                                themeId={themeId}
+                                theme={themeData}
+                                onThemeUpdate={() => {
+                                    // Reload theme data when images are updated
+                                    queryClient.invalidateQueries(['themes', themeId]);
+                                    queryClient.invalidateQueries(['themes']);
+                                }}
+                            />
+                        )
                     )}
 
                     {activeTab === 'breakpoints' && (

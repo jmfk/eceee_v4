@@ -1,71 +1,89 @@
-# Caddyfile for ECEEE v4 Production - Three Site Architecture
+# Caddyfile for ECEEE v4 Production - Multi-Site Architecture
 # Caddy automatically handles HTTPS/TLS certificates via Let's Encrypt
+# Domain is configured via DOMAIN env var (e.g. eceee.org)
 
 {
-    # Global options
-    email {$EMAIL:noreply@eceee.fred.nu}
+    email {$EMAIL:noreply@eceee.org}
 }
 
 # Public Content Site - Django backend serving public pages
-eceee.fred.nu {
+{$DOMAIN} {
     encode gzip
-    
-    # Block admin access on public site (redirect to admin subdomain)
+
     handle /admin* {
-        redir https://admin.eceee.fred.nu{uri} permanent
+        redir https://admin.{$DOMAIN}{uri} permanent
     }
-    
-    # Serve static files
+
     handle /static/* {
         reverse_proxy backend:8000
     }
-    
-    # Serve media files
+
     handle /media/* {
         reverse_proxy backend:8000
     }
-    
-    # API endpoints
+
     handle /api/* {
         reverse_proxy backend:8000
     }
-    
-    # All other requests go to Django backend
+
     handle /* {
         reverse_proxy backend:8000
     }
 }
 
-# Django Admin Site - Admin panel only
-admin.eceee.fred.nu {
+# Django Admin Site
+admin.{$DOMAIN} {
     encode gzip
-    
-    # All requests go to Django admin
     reverse_proxy backend:8000
 }
 
 # React CMS Editor - Frontend application for content editing
-app.eceee.fred.nu {
+app.{$DOMAIN} {
     encode gzip
-    
+
+    # WebSocket connections to Django Channels
+    handle /ws/* {
+        reverse_proxy backend:8000
+    }
+
+    # CSRF token endpoint
+    handle /csrf-token/ {
+        reverse_proxy backend:8000
+    }
+
     # API calls go to backend
     handle /api/* {
         reverse_proxy backend:8000
     }
-    
+
     # Static files from backend
     handle /static/* {
         reverse_proxy backend:8000
     }
-    
+
     # Media files from backend
     handle /media/* {
         reverse_proxy backend:8000
     }
-    
+
+    # Health check
+    handle /health/* {
+        reverse_proxy backend:8000
+    }
+
+    # Metrics
+    handle /metrics/* {
+        reverse_proxy backend:8000
+    }
+
     # Everything else goes to React app
     handle /* {
         reverse_proxy frontend:80
     }
 }
 
+# imgproxy - Image processing service
+imgproxy.{$DOMAIN} {
+    encode gzip
+    reverse_proxy imgproxy:8080
+}

@@ -1,107 +1,196 @@
-# Makefile for eceee_v4_test_1
+# Help for eceee_v4
 
-.PHONY: help install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant
+# Load environment variables from .env if it exists
+-include .env
+export
+
+# Global help request check
+HELP_REQUESTED := $(filter --help -h help,$(MAKECMDGOALS))
+
+# Port validation helper
+define check_port
+	@if [ -n "$(1)" ]; then \
+		if nc -z localhost $(1) 2>/dev/null; then \
+			echo "❌ Error: Port $(1) is already in use."; \
+			exit 1; \
+		fi \
+	fi
+endef
+
+# Help print helper
+define print_help
+	grep -hE '^$(1):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage:\033[0m make %s %s\n", $$1, $$2}'
+endef
+
+# Help check helper
+define check_help
+	@if [ -n "$(HELP_REQUESTED)" ]; then \
+		$(call print_help,$(1)); \
+		exit 0; \
+	fi
+endef
+
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+
+# Dummy targets for help flags
+--help:
+	@:
+-h:
+	@:
 
 # Default target - show help
 .DEFAULT_GOAL := help
 
-help: ## Show this help message
-	@echo "Available make targets:"
-	@echo ""
-	@echo "Development Environment:"
-	@echo "  install           Install backend and frontend dependencies"
-	@echo "  servers           Start database, Redis, MinIO, and ImgProxy services"
-	@echo "  backend           Start Django backend server"
-	@echo "  frontend          Start React frontend dev server"
-	@echo "  playwright-service Start Playwright website rendering service"
-	@echo "  theme-sync        Start theme file sync service"
-	@echo "  shell             Open bash shell in backend container"
-	@echo "  tailwind-build    Build Tailwind CSS for backend templates"
-	@echo "  tailwind-watch    Watch and rebuild Tailwind CSS on changes"
-	@echo ""
-	@echo "Database Management:"
-	@echo "  migrations        Create Django migrations"
-	@echo "  migrate           Run Django migrations"
-	@echo "  requirements      Install backend requirements in container"
-	@echo ""
-	@echo "User Management:"
-	@echo "  createsuperuser   Create Django superuser"
-	@echo "  changepassword    Change admin password"
-	@echo ""
-	@echo "Tenant Management:"
-	@echo "  create-tenant NAME=\"Name\" IDENTIFIER=id  Create a new tenant"
-	@echo "  list-tenants                              List all tenants"
-	@echo "  show-tenant ID=uuid|IDENTIFIER=id         Show tenant details"
-	@echo "  activate-tenant ID=uuid|IDENTIFIER=id     Activate a tenant"
-	@echo "  deactivate-tenant ID=uuid|IDENTIFIER=id   Deactivate a tenant"
-	@echo "  tenant-themes ID=uuid|IDENTIFIER=id       List themes for a tenant"
-	@echo "  delete-tenant ID=uuid|IDENTIFIER=id       Delete a tenant (with confirmation)"
-	@echo ""
-	@echo "API Authentication:"
-	@echo "  create-api-token USER=username [SERVER=url]  Create DRF token for user (long-lived)"
-	@echo "  get-jwt-token USER=username [SERVER=url]    Get JWT token for user (expires in 60min)"
-	@echo "  list-api-tokens [SERVER=url]                List all API tokens"
-	@echo "  test-api-auth TOKEN=token [SERVER=url]      Test API token authentication"
-	@echo "  Note: SERVER defaults to http://localhost:8000"
-	@echo ""
-	@echo "Sample Data:"
-	@echo "  sample-content    Create sample content (10 items)"
-	@echo "  sample-pages      Create sample pages"
-	@echo "  sample-data       Create both sample content and pages"
-	@echo "  sample-clean      Clean and recreate sample data"
-	@echo ""
-	@echo "Data Migration:"
-	@echo "  migrate-to-camelcase-dry  Dry run camelCase migration"
-	@echo "  migrate-to-camelcase      Run camelCase migration with backup"
-	@echo "  migrate-schemas-only      Migrate schemas only"
-	@echo "  migrate-pagedata-only     Migrate page data only"
-	@echo "  migrate-widgets-only      Migrate widgets only"
-	@echo "  migrate-widget-images-dry Dry run widget image migration (preview)"
-	@echo "  migrate-widget-images     Migrate widget images to full MediaFile objects"
-	@echo ""
-	@echo "Object Type Schemas:"
-	@echo "  import-schemas            Import all JSON schemas to ObjectTypes"
-	@echo "  import-schemas-dry        Preview schema import (dry run)"
-	@echo "  import-schemas-force      Import/update schemas without prompts"
-	@echo "  import-schema FILE=x NAME=y  Import single schema file"
-	@echo ""
-	@echo "Testing & Quality:"
-	@echo "  backend-test      Run backend tests"
-	@echo "  playwright-test   Test Playwright service endpoints"
-	@echo "  lint              Lint frontend code"
-	@echo ""
-	@echo "Docker Management:"
-	@echo "  docker-up         Start all services with Docker Compose"
-	@echo "  docker-down       Stop all Docker Compose services"
-	@echo "  restart           Restart all Docker Compose services"
-	@echo "  playwright-down   Stop Playwright service"
-	@echo "  playwright-logs   View Playwright service logs"
-	@echo "  clean             Clean Python, Node, and Docker artifacts"
-	@echo ""
-	@echo "ECEEE Components Sync:"
-	@echo "  sync-to           Sync components FROM eceee_v4 TO eceee-components"
-	@echo ""
-	@echo "Cache Management:"
-	@echo "  clear-layout-cache     Clear layout-related caches to force refresh"
-	@echo "  clear-layout-cache-all Clear ALL caches (nuclear option)"
-	@echo ""
-	@echo "Usage: make <target>"
+help-%: ## Show help for a specific target
+	@$(call print_help,$*)
+
+help: ## Show this help message (use: make help [target])
+	@if [ -n "$(filter-out help,$(MAKECMDGOALS))" ]; then \
+		for target in $(filter-out help,$(MAKECMDGOALS)); do \
+			grep -hE "^$$target:.*?## " $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage for %s:\033[0m make %s %s\n", $$1, $$1, $$2}'; \
+		done; \
+	else \
+		echo "Available make targets:"; \
+		echo ""; \
+		echo "Development Environment:"; \
+		echo "  install           Install backend and frontend dependencies"; \
+		echo "  servers           Start database, Redis, MinIO, and ImgProxy services"; \
+		echo "  backend           Start Django backend server"; \
+		echo "  frontend          Start React frontend dev server"; \
+		echo "  playwright-service Start Playwright website rendering service"; \
+		echo "  theme-sync        Start theme file sync service"; \
+		echo "  shell             Open bash shell in backend container"; \
+		echo "  tailwind-build    Build Tailwind CSS for backend templates"; \
+		echo "  tailwind-watch    Watch and rebuild Tailwind CSS on changes"; \
+		echo ""; \
+		echo "Database Management:"; \
+		echo "  migrations        Create Django migrations"; \
+		echo "  migrate           Run Django migrations"; \
+		echo "  requirements      Install backend requirements in container"; \
+		echo ""; \
+		echo "User Management:"; \
+		echo "  createsuperuser   Create Django superuser"; \
+		echo "  changepassword    Change admin password"; \
+		echo ""; \
+		echo "Tenant Management:"; \
+		echo "  create-tenant NAME=\"Name\" IDENTIFIER=id  Create a new tenant"; \
+		echo "  list-tenants                              List all tenants"; \
+		echo "  show-tenant ID=uuid|IDENTIFIER=id         Show tenant details"; \
+		echo "  activate-tenant ID=uuid|IDENTIFIER=id     Activate a tenant"; \
+		echo "  deactivate-tenant ID=uuid|IDENTIFIER=id   Deactivate a tenant"; \
+		echo "  tenant-themes ID=uuid|IDENTIFIER=id       List themes for a tenant"; \
+		echo "  delete-tenant ID=uuid|IDENTIFIER=id       Delete a tenant (with confirmation)"; \
+		echo ""; \
+		echo "API Authentication:"; \
+		echo "  create-api-token USER=username [SERVER=url]  Create DRF token for user (long-lived)"; \
+		echo "  get-jwt-token USER=username [SERVER=url]    Get JWT token for user (expires in 60min)"; \
+		echo "  list-api-tokens [SERVER=url]                List all API tokens"; \
+		echo "  test-api-auth TOKEN=token [SERVER=url]      Test API token authentication"; \
+		echo "  Note: SERVER defaults to http://localhost:8000"; \
+		echo ""; \
+		echo "Sample Data:"; \
+		echo "  sample-content    Create sample content (10 items)"; \
+		echo "  sample-pages      Create sample pages"; \
+		echo "  sample-data       Create both sample content and pages"; \
+		echo "  sample-clean      Clean and recreate sample data"; \
+		echo "  demo-reset-site   Reset local demo DB from the Summer Study export"; \
+		echo "  demo-site         Reset demo DB and start backend/frontend on localhost"; \
+		echo ""; \
+		echo "Data Migration:"; \
+		echo "  migrate-to-camelcase-dry  Dry run camelCase migration"; \
+		echo "  migrate-to-camelcase      Run camelCase migration with backup"; \
+		echo "  migrate-schemas-only      Migrate schemas only"; \
+		echo "  migrate-pagedata-only     Migrate page data only"; \
+		echo "  migrate-widgets-only      Migrate widgets only"; \
+		echo "  migrate-widget-images-dry Dry run widget image migration (preview)"; \
+		echo "  migrate-widget-images     Migrate widget images to full MediaFile objects"; \
+		echo ""; \
+		echo "Object Type Schemas:"; \
+		echo "  import-schemas            Import all JSON schemas to ObjectTypes"; \
+		echo "  import-schemas-dry        Preview schema import (dry run)"; \
+		echo "  import-schemas-force      Import/update schemas without prompts"; \
+		echo "  import-schema FILE=x NAME=y  Import single schema file"; \
+		echo ""; \
+		echo "Testing & Quality:"; \
+		echo "  backend-test      Run backend tests"; \
+		echo "  frontend-public-e2e-test Run public-site Playwright regression tests"; \
+		echo "  frontend-admin-e2e-test  Run admin Playwright regression tests"; \
+		echo "  frontend-e2e-test        Run public then admin Playwright regression tests"; \
+		echo "  regression-test          Run browser regression tests"; \
+		echo "  playwright-test   Test Playwright service endpoints"; \
+		echo "  lint              Lint frontend code"; \
+		echo ""; \
+		echo "How-To Video Generation:"; \
+		echo "  howto-script-editor  Start the local video script editor"; \
+		echo "  howto-video-demo      Generate one narrated help video against local demo"; \
+		echo "  howto-video-demo-both Generate one local demo help video in Swedish and English"; \
+		echo "  howto-video-demo-all  Generate all narrated help videos against local demo"; \
+		echo "  howto-video-demo-all-both Generate all local demo help videos in Swedish and English"; \
+		echo "  howto-auth-prod       Prompt for prod username/password and save auth state"; \
+		echo "  howto-voices          List Swedish ElevenLabs voice candidates"; \
+		echo "  howto-video-edit      Trim an existing rendered MP4 without recording again"; \
+		echo "  howto-video-prod      Generate one narrated prod help video (GUIDE=id, HOWTO_LANGUAGE=sv|en)"; \
+		echo "  howto-video-prod-both Generate one prod help video in Swedish and English (GUIDE=id)"; \
+		echo "  howto-video-prod-all  Generate narrated prod help videos for all guides (HOWTO_LANGUAGE=sv|en)"; \
+		echo "  howto-video-prod-all-both Generate all prod help videos in Swedish and English"; \
+		echo ""; \
+		echo "Docker Management:"; \
+		echo "  docker-up         Start all services with Docker Compose"; \
+		echo "  docker-down       Stop all Docker Compose services"; \
+		echo "  restart           Restart all Docker Compose services"; \
+		echo "  playwright-down   Stop Playwright service"; \
+		echo "  playwright-logs   View Playwright service logs"; \
+		echo "  clean             Clean Python, Node, and Docker artifacts"; \
+		echo ""; \
+		echo "Production Deployment:"; \
+		echo "  prod-deploy       Check and deploy latest main, or a specific TAG/ref/hash"; \
+		echo "  prod-rollback     Rollback to previous deployment"; \
+		echo "  prod-backup       Run ad-hoc production DB backup"; \
+		echo "  prod-logs         Tail production logs (SERVICE=backend optional)"; \
+		echo "  prod-status       Show production container status"; \
+		echo "  prod-ssh          SSH into production server"; \
+		echo "  prod-shell        Open Django shell in production"; \
+		echo "  prod-fix-image-permissions  Fix permissions on all MinIO assets"; \
+		echo "  prod-explain-image-problem  Debug imgproxy 403 for a URL"; \
+		echo ""; \
+		echo "Environment & Health Checks:"; \
+		echo "  infra-up               Run infrastructure services"; \
+		echo "  infra-down             Stop infrastructure services"; \
+		echo "  infra-restart          Restart infrastructure services"; \
+		echo "  clear-layout-cache     Clear layout-related caches to force refresh"; \
+		echo "  clear-layout-cache-all Clear ALL caches (nuclear option)"; \
+		echo "  check-servers          Check if backend and frontend servers are up"; \
+		echo "  check-conf             Check database and server configuration"; \
+		echo "  use-external-infra     Setup .env to use shared infrastructure"; \
+		echo "  change-ports           Change backend and frontend ports"; \
+		echo "  list-dbs               List all database clones"; \
+		echo "  switch-db DB=name      Switch current database in .env"; \
+		echo "  replicate-db           Clone current DB to branch-specific DB"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make <target>          Run a specific target"; \
+		echo "  make help <target>     Show help for a specific target"; \
+		echo "  make help-<target>     Show help for a specific target"; \
+	fi
 
 # Install backend and frontend dependencies
 install:
 	cd backend && pip install -r requirements.txt
 	cd frontend && npm install
 
-# Run Django backend server
-servers:
-	docker-compose -f docker-compose.dev.yml up db redis minio imgproxy -d
+servers: infra-up
 
+# Run Django backend server
 backend:
-	docker-compose -f docker-compose.dev.yml up backend
+	@BP=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 echo "🚀 Starting Backend on http://localhost:$$BP (internal: 8000)"; \
+	 docker-compose -f docker-compose.dev.yml up backend
 
 # Run React frontend dev server
 frontend:
-	docker-compose -f docker-compose.dev.yml up frontend
+	@FP=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 echo "🚀 Starting Frontend on http://localhost:$$FP (internal: 3000)"; \
+	 VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up frontend
 
 # Run Playwright website rendering service
 playwright-service:
@@ -131,12 +220,57 @@ changepassword:
 
 # API Token Management
 SERVER ?= http://localhost:8000
+HOWTO_PROD_BASE_URL ?= https://app.eceee.org
+HOWTO_DEMO_BASE_URL ?= http://localhost:3000
+HOWTO_AUTH_STATE ?= .auth/eceee-prod-storage-state.json
+HOWTO_LANGUAGE ?= sv
+HOWTO_TRANSLATION_PROVIDER ?=
+HOWTO_USE_SCRIPT_TRANSLATION ?= 0
+HOWTO_TRANSLATION_MODEL ?=
+HOWTO_TRANSLATION_FALLBACK ?= original
+HOWTO_DOCS_DIR ?=
+HOWTO_OUTPUT_BASE_DIR ?= $(CURDIR)/frontend/public/howto-videos/prod
+HOWTO_OUTPUT_DIR ?= $(HOWTO_OUTPUT_BASE_DIR)/$(HOWTO_LANGUAGE)
+HOWTO_DEMO_OUTPUT_BASE_DIR ?= $(CURDIR)/frontend/public/howto-videos/demo
+HOWTO_DEMO_OUTPUT_DIR ?= $(CURDIR)/frontend/public/howto-videos/demo/$(HOWTO_LANGUAGE)
+HOWTO_MD ?= $(MD)
+HOWTO_VIDEO ?= $(VIDEO)
+HOWTO_VIDEO_OUTPUT ?= $(OUTPUT)
+HOWTO_VIDEO_CUTS ?= $(CUTS)
+HOWTO_EXTRA_FLAGS ?=
+HOWTO_SCRIPT_EDITOR_PATH ?= /help/script-editor
+DEMO_EXPORT ?= demo/summerstudy.eceee.org-20260525-181814-871e39ea.zip
+DEMO_DB ?= eceee_demo
+DEMO_BACKEND_PORT ?= 8000
+DEMO_FRONTEND_PORT ?= 3000
+DEMO_HOSTNAMES ?= localhost,127.0.0.1
+DEMO_USER ?= demo
+DEMO_PASSWORD ?= demo
+
+HOWTO_LANGUAGE_ORIGIN := $(origin HOWTO_LANGUAGE)
+HOWTO_OUTPUT_DIR_ORIGIN := $(origin HOWTO_OUTPUT_DIR)
+HOWTO_DEMO_OUTPUT_DIR_ORIGIN := $(origin HOWTO_DEMO_OUTPUT_DIR)
+HOWTO_TRANSLATE_FLAGS := $(if $(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION)),$(if $(strip $(HOWTO_TRANSLATION_PROVIDER)),--translate "$(HOWTO_TRANSLATION_PROVIDER)" --translation-fallback "$(HOWTO_TRANSLATION_FALLBACK)",--no-translate),--no-translate)
+
+demo-reset-site: ## Reset local demo DB from export (use: make demo-reset-site [DEMO_EXPORT=demo/file.zip])
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,demo-reset-site)
+else
+	DEMO_EXPORT="$(DEMO_EXPORT)" DEMO_DB="$(DEMO_DB)" DEMO_BACKEND_PORT="$(DEMO_BACKEND_PORT)" DEMO_FRONTEND_PORT="$(DEMO_FRONTEND_PORT)" DEMO_HOSTNAMES="$(DEMO_HOSTNAMES)" DEMO_USER="$(DEMO_USER)" DEMO_PASSWORD="$(DEMO_PASSWORD)" scripts/reset-demo-site.sh
+endif
+
+demo-site: ## Reset local demo DB and start backend/frontend (use: make demo-site)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,demo-site)
+else
+	DEMO_EXPORT="$(DEMO_EXPORT)" DEMO_DB="$(DEMO_DB)" DEMO_BACKEND_PORT="$(DEMO_BACKEND_PORT)" DEMO_FRONTEND_PORT="$(DEMO_FRONTEND_PORT)" DEMO_HOSTNAMES="$(DEMO_HOSTNAMES)" DEMO_USER="$(DEMO_USER)" DEMO_PASSWORD="$(DEMO_PASSWORD)" START_DEMO_SITE=1 scripts/reset-demo-site.sh
+endif
 
 create-api-token: ## Create DRF token for user (use: make create-api-token USER=username [SERVER=url])
+	$(call check_help,create-api-token)
 	@if [ -z "$(USER)" ]; then \
-		echo "Error: USER is required"; \
-		echo "Usage: make create-api-token USER=username [SERVER=http://localhost:8000]"; \
-		echo "Example: make create-api-token USER=admin SERVER=https://api.example.com"; \
+		echo "❌ Error: USER is required"; \
+		$(call print_help,create-api-token); \
 		exit 1; \
 	fi
 	@if echo "$(SERVER)" | grep -q "^http://localhost\|^http://127.0.0.1"; then \
@@ -169,13 +303,10 @@ create-api-token: ## Create DRF token for user (use: make create-api-token USER=
 	fi
 
 get-jwt-token: ## Get JWT token for user (use: make get-jwt-token USER=username [SERVER=url])
+	$(call check_help,get-jwt-token)
 	@if [ -z "$(USER)" ]; then \
-		echo "Error: USER is required"; \
-		echo "Usage: make get-jwt-token USER=username [SERVER=http://localhost:8000]"; \
-		echo "Example: make get-jwt-token USER=admin SERVER=https://api.example.com"; \
-		echo ""; \
-		echo "You will be prompted for the password."; \
-		echo "Or set PASSWORD env var: make get-jwt-token USER=username PASSWORD=pass SERVER=url"; \
+		echo "❌ Error: USER is required"; \
+		$(call print_help,get-jwt-token); \
 		exit 1; \
 	fi
 	@if [ -z "$(PASSWORD)" ]; then \
@@ -202,9 +333,10 @@ list-api-tokens: ## List all API tokens (use: make list-api-tokens [SERVER=url])
 	fi
 
 create-tenant: ## Create a new tenant (use: make create-tenant NAME="Tenant Name" IDENTIFIER=tenant_id)
+	$(call check_help,create-tenant)
 	@if [ -z "$(NAME)" ] || [ -z "$(IDENTIFIER)" ]; then \
-		echo "Error: NAME and IDENTIFIER are required"; \
-		echo "Usage: make create-tenant NAME=\"Tenant Name\" IDENTIFIER=tenant_id"; \
+		echo "❌ Error: NAME and IDENTIFIER are required"; \
+		$(call print_help,create-tenant); \
 		exit 1; \
 	fi
 	@echo "Creating tenant: $(NAME) with identifier: $(IDENTIFIER)"
@@ -216,42 +348,46 @@ list-tenants: ## List all tenants
 	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; tenants = Tenant.objects.all().order_by('name'); print('\nTenants:'); print('=' * 100); print('UUID                                 | Name                            | Identifier          | Status'); print('-' * 100); [print(f'{str(t.id):36} | {t.name:30} | {t.identifier:20} | {\"Active\" if t.is_active else \"Inactive\"}') for t in tenants]; print('=' * 100); print(f'\nTotal tenants: {Tenant.objects.count()}')" || (echo "Error: Failed to list tenants." && exit 1)
 
 show-tenant: ## Show tenant details (use: make show-tenant ID=uuid or IDENTIFIER=identifier)
+	$(call check_help,show-tenant)
 	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
-		echo "Error: ID or IDENTIFIER is required"; \
-		echo "Usage: make show-tenant ID=uuid or make show-tenant IDENTIFIER=default"; \
+		echo "❌ Error: ID or IDENTIFIER is required"; \
+		$(call print_help,show-tenant); \
 		exit 1; \
 	fi
 	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import json; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nTenant Details:'); print('=' * 80); print(f'ID:          {tenant.id}'); print(f'Name:        {tenant.name}'); print(f'Identifier:  {tenant.identifier}'); print(f'Active:      {tenant.is_active}'); print(f'Created:     {tenant.created_at}'); print(f'Updated:     {tenant.updated_at}'); print(f'Created by:  {tenant.created_by.username if tenant.created_by else \"N/A\"}'); print(f'\nSettings:'); print(json.dumps(tenant.settings, indent=2) if tenant.settings else '  (empty)'); print(f'\nThemes: {tenant.themes.count()}'); [print(f'  - {theme.name} (v{theme.sync_version})') for theme in tenant.themes.all()[:10]]; print(f'  ... and {tenant.themes.count() - 10} more' if tenant.themes.count() > 10 else ''); print('=' * 80)" || (echo "Error: Failed to show tenant." && exit 1)
 
 activate-tenant: ## Activate a tenant (use: make activate-tenant ID=uuid or IDENTIFIER=identifier)
+	$(call check_help,activate-tenant)
 	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
-		echo "Error: ID or IDENTIFIER is required"; \
-		echo "Usage: make activate-tenant ID=uuid or make activate-tenant IDENTIFIER=default"; \
+		echo "❌ Error: ID or IDENTIFIER is required"; \
+		$(call print_help,activate-tenant); \
 		exit 1; \
 	fi
 	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = True; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) activated')" || (echo "Error: Failed to activate tenant." && exit 1)
 
 deactivate-tenant: ## Deactivate a tenant (use: make deactivate-tenant ID=uuid or IDENTIFIER=identifier)
+	$(call check_help,deactivate-tenant)
 	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
-		echo "Error: ID or IDENTIFIER is required"; \
-		echo "Usage: make deactivate-tenant ID=uuid or make deactivate-tenant IDENTIFIER=default"; \
+		echo "❌ Error: ID or IDENTIFIER is required"; \
+		$(call print_help,deactivate-tenant); \
 		exit 1; \
 	fi
 	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = False; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) deactivated')" || (echo "Error: Failed to deactivate tenant." && exit 1)
 
 tenant-themes: ## List themes for a tenant (use: make tenant-themes ID=uuid or IDENTIFIER=identifier)
+	$(call check_help,tenant-themes)
 	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
-		echo "Error: ID or IDENTIFIER is required"; \
-		echo "Usage: make tenant-themes ID=uuid or make tenant-themes IDENTIFIER=default"; \
+		echo "❌ Error: ID or IDENTIFIER is required"; \
+		$(call print_help,tenant-themes); \
 		exit 1; \
 	fi
 	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nThemes for tenant: {tenant.name} (identifier: {tenant.identifier})'); print('=' * 80); themes = tenant.themes.all().order_by('name'); [print(f'{t.id:5} | {t.name:30} | v{t.sync_version:5} | {\"Active\" if t.is_active else \"Inactive\"}{\" (Default)\" if t.is_default else \"\"}') for t in themes] if themes.exists() else print('  (no themes)'); print('=' * 80); print(f'\nTotal themes: {themes.count()}')" || (echo "Error: Failed to list tenant themes." && exit 1)
 
 delete-tenant: ## Delete a tenant (use: make delete-tenant ID=uuid or IDENTIFIER=identifier [FORCE=yes])
+	$(call check_help,delete-tenant)
 	@if [ -z "$(ID)" ] && [ -z "$(IDENTIFIER)" ]; then \
-		echo "Error: ID or IDENTIFIER is required"; \
-		echo "Usage: make delete-tenant ID=uuid or make delete-tenant IDENTIFIER=default"; \
-		echo "Add FORCE=yes to skip confirmation"; \
+		echo "❌ Error: ID or IDENTIFIER is required"; \
+		$(call print_help,delete-tenant); \
 		exit 1; \
 	fi
 	@if [ "$(FORCE)" != "yes" ]; then \
@@ -262,10 +398,10 @@ delete-tenant: ## Delete a tenant (use: make delete-tenant ID=uuid or IDENTIFIER
 	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); theme_count = tenant.themes.count(); tenant_name = tenant.name; tenant_identifier = tenant.identifier; tenant.delete(); print(f'✓ Tenant \"{tenant_name}\" (identifier: {tenant_identifier}) deleted'); print(f'  Deleted {theme_count} associated theme(s)')" || (echo "Error: Failed to delete tenant." && exit 1)
 
 test-api-auth: ## Test API token authentication (use: make test-api-auth TOKEN=token [SERVER=url])
+	$(call check_help,test-api-auth)
 	@if [ -z "$(TOKEN)" ]; then \
-		echo "Error: TOKEN is required"; \
-		echo "Usage: make test-api-auth TOKEN=your-token-here [SERVER=http://localhost:8000]"; \
-		echo "Example: make test-api-auth TOKEN=abc123 SERVER=https://api.example.com"; \
+		echo "❌ Error: TOKEN is required"; \
+		$(call print_help,test-api-auth); \
 		exit 1; \
 	fi
 	@echo "Testing API authentication on $(SERVER)..."
@@ -352,21 +488,100 @@ import-schemas-force: ## Import/update all schemas without confirmation prompts
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas --force
 
 import-schema: ## Import single schema file (use: make import-schema FILE=news.json NAME=news)
+	$(call check_help,import-schema)
 	@if [ -z "$(FILE)" ] || [ -z "$(NAME)" ]; then \
-		echo "Error: Both FILE and NAME are required"; \
-		echo "Usage: make import-schema FILE=news.json NAME=news"; \
+		echo "❌ Error: Both FILE and NAME are required"; \
+		$(call print_help,import-schema); \
 		exit 1; \
 	fi
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas \
 		--file scripts/migration/schemas/$(FILE) \
 		--name $(NAME)
 
+fix-minio-permissions: ## Fix permissions on all MinIO assets (local)
+	docker-compose -f docker-compose.dev.yml exec backend python manage.py fix_minio_permissions
+
+prod-fix-image-permissions: ## Fix permissions on all MinIO assets (production)
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py fix_minio_permissions"
+
+prod-explain-image-problem: ## Debug imgproxy 403 for a URL (use: make prod-explain-image-problem URL="https://...")
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py explain_imgproxy_problem '$(URL)'"
+
 shell:
 	docker-compose -f docker-compose.dev.yml exec backend bash
 
+# Start and validate the local services required by make test.
+prepare-test-infra:
+	@command -v docker-compose >/dev/null 2>&1 || (echo "Error: docker-compose is required to run tests."; exit 1)
+	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
+	DB_NAME=$${DB_NAME:-eceee_v4}; \
+	case "$$DB_NAME" in -*|*[!A-Za-z0-9_-]*|"") echo "Error: Invalid POSTGRES_DB '$$DB_NAME'."; exit 1;; esac; \
+	echo "Starting test infrastructure..."; \
+	docker-compose -f docker-compose.infra.yml up -d db redis minio imgproxy; \
+	echo "Waiting for Postgres..."; \
+	i=0; \
+	until docker-compose -f docker-compose.infra.yml exec -T db pg_isready -U postgres >/dev/null 2>&1; do \
+		i=$$((i + 1)); \
+		if [ $$i -ge 30 ]; then echo "Error: Postgres did not become ready."; exit 1; fi; \
+		sleep 1; \
+	done; \
+	if ! docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$DB_NAME'" | grep -q 1; then \
+		echo "Creating local database '$$DB_NAME'..."; \
+		docker-compose -f docker-compose.infra.yml exec -T db createdb -U postgres "$$DB_NAME"; \
+	fi
+
+# Clear stale local Postgres collation metadata before creating Django test databases.
+refresh-db-collation: prepare-test-infra
+	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
+	DB_NAME=$${DB_NAME:-eceee_v4}; \
+	docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_$$DB_NAME');" >/dev/null
+
 # Run backend tests
-backend-test:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py test
+backend-test: prepare-test-infra refresh-db-collation
+	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
+
+# Run backend tests in parallel once the suite is stable.
+backend-test-parallel: prepare-test-infra refresh-db-collation
+	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
+
+# Run frontend tests
+frontend-test: prepare-test-infra
+	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T frontend npm run test:run -- --bail=1
+
+# Run all tests
+test: backend-test frontend-test
+
+# Rebuild app containers before running all tests.
+test-build: TEST_UP_FLAGS=--build
+test-build: test
+
+# Run the full suite with parallel backend tests.
+test-parallel: backend-test-parallel frontend-test
+
+# Run admin browser regression tests
+frontend-admin-e2e-test:
+	cd frontend && npm run test:e2e:admin
+
+# Run public browser regression tests against the Django public renderer
+frontend-public-e2e-test: prepare-test-infra
+	docker-compose -f docker-compose.dev.yml up -d backend
+	@BP=$${BACKEND_PORT:-8000}; \
+	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
+	i=0; \
+	until curl -fsS "http://127.0.0.1:$$BP/health/" >/dev/null 2>&1; do \
+		i=$$((i + 1)); \
+		if [ $$i -ge 60 ]; then echo "Error: backend did not become ready."; exit 1; fi; \
+		sleep 1; \
+	done; \
+	docker-compose -f docker-compose.dev.yml exec -T backend python manage.py seed_public_regression_site --hostname public-regression.localhost; \
+	cd frontend && PLAYWRIGHT_PUBLIC_BASE_URL="http://public-regression.localhost:$$BP" npm run test:e2e:public
+
+# Run frontend browser regression tests, public side first
+frontend-e2e-test: frontend-public-e2e-test frontend-admin-e2e-test
+
+# Run browser regression tests
+regression-test: frontend-e2e-test
 
 # Test Playwright service endpoints
 playwright-test:
@@ -376,17 +591,334 @@ playwright-test:
 lint:
 	cd frontend && npm run lint
 
+howto-script-editor: ## Start the local video script editor (use: make howto-script-editor [FP=3000])
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-script-editor)
+else
+	@FP="$${FP:-$$(grep "^FRONTEND_PORT=" .env 2>/dev/null | cut -d= -f2 || echo "3000")}"; \
+	if [ -z "$$FP" ]; then FP="3000"; fi; \
+	echo "🎬 Starting video script editor on http://localhost:$$FP$(HOWTO_SCRIPT_EDITOR_PATH)"; \
+	cd frontend && VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) npm run dev -- --host 0.0.0.0 --port "$$FP" --strictPort --open "$(HOWTO_SCRIPT_EDITOR_PATH)"
+endif
+
+howto-auth-prod: ## Prompt for production username/password and save auth state for help videos
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-auth-prod)
+else
+	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
+	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
+	mkdir -p "$$(dirname "$$AUTH_STATE")"; \
+	npm run howto:auth -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE"
+endif
+
+howto-voices: ## List Swedish ElevenLabs voice candidates from repo-root .env
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-voices)
+else
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	npm run howto:voices -- --language "$(HOWTO_LANGUAGE)" $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-demo: ## Generate one narrated help video against local demo (use: make howto-video-demo MD=frontend/src/docs/how-to/pages/create-page.md)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo)
+else
+	@if [ -z "$(GUIDE)" ] && [ -z "$(HOWTO_MD)" ]; then \
+		echo "❌ GUIDE or MD is required."; \
+		echo "   Example: make howto-video-demo MD=frontend/src/docs/how-to/pages/add-subpage-under-venue-travel.md"; \
+		echo "   Legacy:  make howto-video-demo GUIDE=pages-create"; \
+		exit 1; \
+	fi
+	@if [ -n "$(HOWTO_MD)" ] && [ ! -f "$(HOWTO_MD)" ]; then \
+		echo "❌ Markdown file not found: $(HOWTO_MD)"; \
+		exit 1; \
+	fi
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
+	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
+		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
+	fi; \
+	if [ "$$REQUESTED_LANGUAGE" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
+			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $$REQUESTED_LANGUAGE translation."; \
+			exit 1; \
+		fi; \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $$REQUESTED_LANGUAGE translation."; \
+			exit 1; \
+		fi; \
+	fi
+	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
+	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
+		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
+	fi; \
+	VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
+	case "$$REQUESTED_LANGUAGE" in \
+		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
+		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
+	esac; \
+	if [ -z "$$VOICE_ID" ]; then \
+		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$$REQUESTED_LANGUAGE. Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
+		exit 1; \
+	fi
+	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
+	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
+		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
+	fi; \
+	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$$REQUESTED_LANGUAGE" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$$REQUESTED_LANGUAGE" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$$REQUESTED_LANGUAGE: $$DOCS_DIR"; \
+		echo "   Create the translated markdown first, or set HOWTO_DOCS_DIR=frontend/src/docs/how-to"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
+	if [ "$(HOWTO_DEMO_OUTPUT_DIR_ORIGIN)" = "file" ]; then OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/$$REQUESTED_LANGUAGE"; fi; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	GUIDE_ID="$(GUIDE)"; \
+	if [ -n "$(HOWTO_MD)" ]; then \
+		GUIDE_ID=$$(awk -F: '/^id:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
+		if [ -z "$$GUIDE_ID" ]; then \
+			echo "❌ Could not read frontmatter id from $(HOWTO_MD)"; \
+			exit 1; \
+		fi; \
+		echo "🎬 Generating demo video for $$GUIDE_ID from $(HOWTO_MD)"; \
+	else \
+		echo "🎬 Generating demo video for $$GUIDE_ID"; \
+	fi; \
+	echo "📚 Using $$REQUESTED_LANGUAGE markdown from $$DOCS_DIR"; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	cd frontend && \
+	npm run howto:video -- --guide "$$GUIDE_ID" --base-url "$(HOWTO_DEMO_BASE_URL)" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$$REQUESTED_LANGUAGE" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-demo-both: ## Generate one narrated help video against local demo in Swedish and English (use: make howto-video-demo-both MD=frontend/src/docs/how-to/pages/create-page.md)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo-both)
+else
+	@if [ -z "$(GUIDE)" ] && [ -z "$(HOWTO_MD)" ]; then \
+		echo "❌ GUIDE or MD is required."; \
+		echo "   Example: make howto-video-demo-both MD=frontend/src/docs/how-to/pages/add-subpage-under-venue-travel.md"; \
+		exit 1; \
+	fi
+	$(MAKE) howto-video-demo GUIDE="$(GUIDE)" MD="$(HOWTO_MD)" HOWTO_LANGUAGE=en HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/en"
+	$(MAKE) howto-video-demo GUIDE="$(GUIDE)" MD="$(HOWTO_MD)" HOWTO_LANGUAGE=sv HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/sv"
+endif
+
+howto-video-demo-all: ## Generate all narrated help videos against local demo
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo-all)
+else
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$(HOWTO_LANGUAGE)" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	cd frontend && \
+	npm run howto:video:all -- --base-url "$(HOWTO_DEMO_BASE_URL)" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-demo-all-both: ## Generate all narrated help videos against local demo in Swedish and English
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-demo-all-both)
+else
+	$(MAKE) howto-video-demo-all HOWTO_LANGUAGE=en HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/en"
+	$(MAKE) howto-video-demo-all HOWTO_LANGUAGE=sv HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/sv"
+endif
+
+howto-video-edit: ## Trim an existing rendered MP4 (use: make howto-video-edit VIDEO=frontend/public/howto-videos/editor-preview/sv/file.mp4 CUTS=0:10 [OUTPUT=edited.mp4])
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-edit)
+else
+	@if [ -z "$(HOWTO_VIDEO)" ]; then \
+		echo "❌ VIDEO is required. Example: make howto-video-edit VIDEO=frontend/public/howto-videos/editor-preview/sv/pages-pages-create.mp4 CUTS=0:10"; \
+		exit 1; \
+	fi
+	@if [ -z "$(HOWTO_VIDEO_CUTS)" ]; then \
+		echo "❌ CUTS is required. Example: CUTS=0:10 or CUTS=0:10,45.5:48"; \
+		exit 1; \
+	fi
+	@INPUT="$(HOWTO_VIDEO)"; \
+	OUTPUT="$(HOWTO_VIDEO_OUTPUT)"; \
+	case "$$INPUT" in /*) ;; *) INPUT="$(CURDIR)/$$INPUT";; esac; \
+	if [ -n "$$OUTPUT" ]; then case "$$OUTPUT" in /*) ;; *) OUTPUT="$(CURDIR)/$$OUTPUT";; esac; fi; \
+	if [ -n "$$OUTPUT" ]; then \
+		cd frontend && node scripts/edit-howto-video.mjs --input "$$INPUT" --cuts "$(HOWTO_VIDEO_CUTS)" --output "$$OUTPUT"; \
+	else \
+		cd frontend && node scripts/edit-howto-video.mjs --input "$$INPUT" --cuts "$(HOWTO_VIDEO_CUTS)"; \
+	fi
+endif
+
+howto-video-prod: ## Generate one narrated help video from production (use: make howto-video-prod GUIDE=pages-create)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod)
+else
+	@if [ -z "$(GUIDE)" ]; then \
+		echo "❌ GUIDE is required. Example: make howto-video-prod GUIDE=pages-create"; \
+		exit 1; \
+	fi
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@if [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
+			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+	fi
+	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
+	case "$(HOWTO_LANGUAGE)" in \
+		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
+		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
+	esac; \
+	if [ -z "$$VOICE_ID" ]; then \
+		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
+		exit 1; \
+	fi
+	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
+	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
+	if [ ! -f "$$AUTH_STATE" ]; then \
+		echo "❌ Auth state not found: $$AUTH_STATE"; \
+		echo "Run: make howto-auth-prod"; \
+		exit 1; \
+	fi; \
+	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$(HOWTO_LANGUAGE)" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	npm run howto:video -- --guide "$(GUIDE)" --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-prod-both: ## Generate one narrated help video from production in Swedish and English (use: make howto-video-prod-both GUIDE=pages-create)
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod-both)
+else
+	@if [ -z "$(GUIDE)" ]; then \
+		echo "❌ GUIDE is required. Example: make howto-video-prod-both GUIDE=pages-create"; \
+		exit 1; \
+	fi
+	$(MAKE) howto-video-prod GUIDE="$(GUIDE)" HOWTO_LANGUAGE=sv HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/sv"
+	$(MAKE) howto-video-prod GUIDE="$(GUIDE)" HOWTO_LANGUAGE=en HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/en"
+endif
+
+howto-video-prod-all: ## Generate all narrated help videos from production
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod-all)
+else
+	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
+		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
+		exit 1; \
+	fi
+	@if [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
+			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
+			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
+			exit 1; \
+		fi; \
+	fi
+	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
+	case "$(HOWTO_LANGUAGE)" in \
+		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
+		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
+	esac; \
+	if [ -z "$$VOICE_ID" ]; then \
+		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
+		exit 1; \
+	fi
+	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
+	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
+	if [ ! -f "$$AUTH_STATE" ]; then \
+		echo "❌ Auth state not found: $$AUTH_STATE"; \
+		echo "Run: make howto-auth-prod"; \
+		exit 1; \
+	fi; \
+	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
+	if [ -z "$$DOCS_DIR" ]; then \
+		case "$(HOWTO_LANGUAGE)" in \
+			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
+			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
+		esac; \
+	fi; \
+	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
+	if [ ! -d "$$DOCS_DIR" ]; then \
+		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
+		exit 1; \
+	fi; \
+	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
+	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
+	mkdir -p "$$OUTPUT_DIR"; \
+	npm run howto:video:all -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
+endif
+
+howto-video-prod-all-both: ## Generate all narrated help videos from production in Swedish and English
+ifneq ($(HELP_REQUESTED),)
+	@$(call print_help,howto-video-prod-all-both)
+else
+	$(MAKE) howto-video-prod-all HOWTO_LANGUAGE=sv HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/sv"
+	$(MAKE) howto-video-prod-all HOWTO_LANGUAGE=en HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/en"
+endif
+
 # Start all services with Docker Compose
-docker-up:
-	docker-compose -f docker-compose.dev.yml up --build
+docker-up: infra-up
+	VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up --build backend frontend celery-worker
 
 # Stop all Docker Compose services
 docker-down:
 	docker-compose -f docker-compose.dev.yml down
+	docker-compose -f docker-compose.infra.yml down
 
 # Restart all Docker Compose services
 restart:
 	docker-compose -f docker-compose.dev.yml restart
+	docker-compose -f docker-compose.infra.yml restart
 
 # Stop Playwright service
 playwright-down:
@@ -402,6 +934,7 @@ clean:
 	rm -rf backend/*.pyc backend/*.pyo backend/.pytest_cache
 	rm -rf frontend/node_modules frontend/dist
 	docker-compose -f docker-compose.dev.yml down -v
+	docker-compose -f docker-compose.infra.yml down -v
 	cd playwright-service && docker-compose down -v
 
 # ECEEE Components Sync Commands
@@ -413,6 +946,16 @@ clean:
 # 	@echo "🔄 Syncing components FROM eceee_v4 TO eceee-components..."
 # 	@./sync-to-eceee-components.sh
 
+# Environment & Health Checks
+infra-up: ## Run infrastructure services
+	docker-compose -f docker-compose.infra.yml up -d
+
+infra-down: ## Stop infrastructure services
+	docker-compose -f docker-compose.infra.yml down
+
+infra-restart: ## Restart infrastructure services
+	docker-compose -f docker-compose.infra.yml restart
+
 clear-layout-cache: ## Clear layout-related caches to force refresh
 	@echo "🧹 Clearing layout caches..."
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache
@@ -420,6 +963,259 @@ clear-layout-cache: ## Clear layout-related caches to force refresh
 clear-layout-cache-all: ## Clear all caches (nuclear option)
 	@echo "🧹 Clearing ALL caches..."
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache --all
+
+check-servers: ## Check if backend and frontend servers are up
+	@echo "🔍 Checking status of services..."
+	@echo ""
+	@# Load ports from .env if it exists
+	@BP=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 FP=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 check_http() { \
+		name=$$1; url=$$2; \
+		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 $$url 2>/dev/null); \
+		if [ "$$status" = "200" ]; then \
+			printf "%-25s [\033[0;32mUP\033[0m] at $$url\n" "$$name"; \
+		elif [ "$$status" = "000" ] || [ -z "$$status" ]; then \
+			printf "%-25s [\033[0;33mNOT STARTED\033[0m] at $$url\n" "$$name"; \
+		else \
+			printf "%-25s [\033[0;31mBROKEN (HTTP $$status)\033[0m] at $$url\n" "$$name"; \
+		fi; \
+	 }; \
+	 echo "--- Local Apps (this repo) ---"; \
+	 check_http "Backend (Django)" "http://localhost:$$BP/health/"; \
+	 check_http "Frontend (Vite)" "http://localhost:$$FP/"; \
+	 echo ""; \
+	 echo "--- External Infra (main repo) ---"; \
+	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:9000/minio/health/live 2>/dev/null); \
+	 if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "MinIO"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "MinIO"; fi; \
+	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/health 2>/dev/null); \
+	 if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "ImgProxy"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "ImgProxy"; fi; \
+	 if nc -z localhost 6379 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Redis"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Redis"; fi; \
+	 if nc -z localhost 5432 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Postgres"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Postgres"; fi; \
+	 echo ""
+
+use-external-infra: ## Update .env to use the shared infrastructure from the other repo (use: make use-external-infra [BP=8001] [FP=3001])
+	$(call check_help,use-external-infra)
+	@echo "🔄 Preparing .env file..."
+	@if [ ! -f .env ]; then \
+		if [ -f .env.template ]; then \
+			cp .env.template .env; \
+			echo "✅ Created .env from .env.template"; \
+		else \
+			echo "POSTGRES_DB=eceee_v4" > .env; \
+			echo "POSTGRES_HOST=db" >> .env; \
+			echo "DATABASE_URL=postgresql://postgres:postgres@db:5432/eceee_v4" >> .env; \
+			echo "REDIS_URL=redis://redis:6379/0" >> .env; \
+			echo "✅ Created minimal .env"; \
+		fi \
+	fi
+	@# Validate requested ports if provided
+	$(call check_port,$(BP))
+	$(call check_port,$(FP))
+	@echo "🔄 Configuring unique project name and ports for this instance..."
+	@BP_VAL=$${BP:-8001}; \
+	 FP_VAL=$${FP:-3001}; \
+	 if ! grep -q "COMPOSE_PROJECT_NAME" .env; then \
+		DIR_NAME=$$(basename $$(pwd) | tr '[:upper:]' '[:lower:]' | tr '_' '-'); \
+		echo "\n# Multi-instance Configuration" >> .env; \
+		echo "COMPOSE_PROJECT_NAME=eceee-v4-$$DIR_NAME" >> .env; \
+		echo "BACKEND_PORT=$$BP_VAL" >> .env; \
+		echo "FRONTEND_PORT=$$FP_VAL" >> .env; \
+	 else \
+		if [ -n "$(BP)" ]; then sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$(BP)/" .env 2>/dev/null || sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$(BP)/" .env; fi; \
+		if [ -n "$(FP)" ]; then sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$(FP)/" .env 2>/dev/null || sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$(FP)/" .env; fi; \
+	 fi
+	@BP_OLD=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 FP_OLD=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 BP_NEW=$${BP:-$$BP_OLD}; \
+	 FP_NEW=$${FP:-$$FP_OLD}; \
+	 if [ "$$BP_NEW" != "$$BP_OLD" ]; then \
+		echo "🔄 Updating Backend port: $$BP_OLD -> $$BP_NEW"; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+			sed -i '' "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+		else \
+			sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+			sed -i "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+		fi \
+	 fi; \
+	 if [ "$$FP_NEW" != "$$FP_OLD" ]; then \
+		echo "🔄 Updating Frontend port: $$FP_OLD -> $$FP_NEW"; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+			sed -i '' "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+		else \
+			sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+			sed -i "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+		fi \
+	 fi
+	@echo "🔄 Updating .env to use hyphenated shared infrastructure names..."
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sed -i '' 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
+		sed -i '' 's/@db:5432/@eceee-v4-db:5432/' .env; \
+		sed -i '' 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
+		sed -i '' 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
+		sed -i '' 's/eceee_v4_db/eceee-v4-db/g' .env; \
+		sed -i '' 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
+		sed -i '' 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
+		sed -i '' 's/^AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i '' 's/^AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i '' 's/^AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
+	else \
+		sed -i 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
+		sed -i 's/@db:5432/@eceee-v4-db:5432/' .env; \
+		sed -i 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
+		sed -i 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
+		sed -i 's/eceee_v4_db/eceee-v4-db/g' .env; \
+		sed -i 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
+		sed -i 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
+		sed -i 's/^AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i 's/^AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
+		sed -i 's/^AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
+	fi
+	@# Check if summerstudy is in /etc/hosts and update if so
+	@if grep -q "summerstudy" /etc/hosts; then \
+		echo "🔄 Detected 'summerstudy' in hosts, ensuring URLs use it..."; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			sed -i '' 's/localhost:/summerstudy:/g' .env; \
+		else \
+			sed -i 's/localhost:/summerstudy:/g' .env; \
+		fi \
+	fi
+	@echo "✅ .env updated. Checking configuration..."
+	@make check-conf
+	@echo "🔄 Normalizing database hostnames (stripping ports)..."
+	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from webpages.models import WebPage; [p.save() for p in WebPage.objects.filter(parent__isnull=True)]"
+
+change-ports: ## Change backend and frontend ports (use: make change-ports BP=8002 FP=3002)
+	$(call check_help,change-ports)
+	@if [ ! -f .env ]; then echo "❌ Error: .env file not found. Run make use-external-infra first."; exit 1; fi
+	@if [ -z "$(BP)" ] && [ -z "$(FP)" ]; then \
+		echo "❌ Error: Either BP (Backend Port) or FP (Frontend Port) is required."; \
+		$(call print_help,change-ports); \
+		exit 1; \
+	fi
+	$(call check_port,$(BP))
+	$(call check_port,$(FP))
+	@BP_OLD=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	 FP_OLD=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	 BP_NEW=$${BP:-$$BP_OLD}; \
+	 FP_NEW=$${FP:-$$FP_OLD}; \
+	 if [ "$$BP_NEW" = "$$BP_OLD" ] && [ "$$FP_NEW" = "$$FP_OLD" ]; then \
+		echo "ℹ️  No port changes requested."; \
+	 else \
+		echo "🔄 Changing ports in .env..."; \
+		if [ "$$BP_NEW" != "$$BP_OLD" ]; then \
+			echo "  Backend: $$BP_OLD -> $$BP_NEW"; \
+			if [ "$$(uname)" = "Darwin" ]; then \
+				sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+				sed -i '' "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+			else \
+				sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
+				sed -i "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
+			fi \
+		fi; \
+		if [ "$$FP_NEW" != "$$FP_OLD" ]; then \
+			echo "  Frontend: $$FP_OLD -> $$FP_NEW"; \
+			if [ "$$(uname)" = "Darwin" ]; then \
+				sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+				sed -i '' "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+			else \
+				sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
+				sed -i "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
+			fi \
+		fi; \
+		echo "✅ Ports updated. Please restart your containers:"; \
+		echo "   docker-compose -f docker-compose.dev.yml up -d backend frontend"; \
+	 fi
+
+check-conf: ## Check current database and server configuration
+	@echo "🔍 Checking configuration..."
+	@echo ""
+	@echo "--- Database Configuration ---"
+	@if [ -f .env ]; then \
+		DB_ENV=$$(grep '^POSTGRES_DB=' .env | cut -d= -f2); \
+		if [ -n "$$DB_ENV" ]; then \
+			printf "%-25s \033[0;34m$$DB_ENV\033[0m\n" ".env POSTGRES_DB:"; \
+		else \
+			printf "%-25s \033[0;33mDEFAULT (eceee_v4)\033[0m\n" ".env POSTGRES_DB:"; \
+		fi; \
+		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
+		printf "%-25s \033[0;34m$${DB_HOST:-eceee-v4-db}\033[0m\n" "Postgres Host:"; \
+	else \
+		printf "%-25s \033[0;33mNONE (using defaults)\033[0m\n" ".env configuration:"; \
+	fi
+	@printf "%-25s " "Backend actual DB:"
+	@docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py shell -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])" 2>/dev/null || echo "\033[0;31mERROR: Could not query backend\033[0m"
+	@if [ -f .env ]; then \
+		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
+		if [ "$$DB_HOST" = "db" ]; then \
+			echo ""; \
+			echo "\033[0;33m⚠️  Warning: POSTGRES_HOST is still set to 'db' in .env.\033[0m"; \
+			echo "Run \033[0;36mmake use-external-infra\033[0m to fix this."; \
+		fi; \
+	fi
+	@echo ""
+	@echo "--- Service Connectivity (from Backend) ---"
+	@check_conn() { \
+		name=$$1; host=$$2; port=$$3; \
+		if docker-compose -f docker-compose.dev.yml run --rm -T backend python -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('$$host', int('$$port'))); s.close()" >/dev/null 2>&1; then \
+			printf "%-25s [\033[0;32mCONNECTED\033[0m] to $$host:$$port\n" "$$name:"; \
+		else \
+			printf "%-25s [\033[0;31mFAILED\033[0m] to $$host:$$port\n" "$$name:"; \
+		fi; \
+	}; \
+	DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2 || echo "eceee-v4-db"); \
+	REDIS_URL=$$(grep '^REDIS_URL=' .env | cut -d= -f2 || echo "redis://eceee-v4-redis:6379/0"); \
+	REDIS_HOST=$$(echo $$REDIS_URL | sed -e 's/redis:\/\///' -e 's/[:\/].*//'); \
+	REDIS_PORT=$$(echo $$REDIS_URL | sed -e 's/.*://' -e 's/\/.*//' | grep -E '^[0-9]+$$' || echo "6379"); \
+	check_conn "Postgres" "$$DB_HOST" "5432"; \
+	check_conn "Redis" "$$REDIS_HOST" "$$REDIS_PORT"; \
+	check_conn "MinIO" "eceee-v4-minio" "9000"; \
+	check_conn "ImgProxy" "eceee-v4-imgproxy" "8080"; \
+	echo ""
+	@echo "--- Server Network Configuration ---"
+	@if docker network inspect eceee_shared_network >/dev/null 2>&1; then \
+		printf "%-25s [\033[0;32mCONNECTED\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
+	else \
+		printf "%-25s [\033[0;31mMISSING\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
+	fi
+	@echo ""
+
+check-db: check-conf ## Alias for check-conf
+
+replicate-db: ## Clone current DB to branch-specific DB and update .env
+	$(call check_help,replicate-db)
+	@echo "🔄 Replicating database to branch-specific version..."
+	docker-compose -f docker-compose.dev.yml run --rm -e GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD) backend python manage.py replicate_db
+	@echo ""
+	@echo "✅ Database replicated. Please start the backend to apply changes:"
+	@echo "   make backend"
+	@	 echo ""
+
+list-dbs: ## List all database clones
+	$(call check_help,list-dbs)
+	docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py list_dbs
+
+switch-db: ## Switch current database in .env (use: make switch-db DB=dbname)
+	$(call check_help,switch-db)
+	@if [ -z "$(DB)" ]; then \
+		echo "❌ Error: DB name is required"; \
+		$(call print_help,switch-db); \
+		exit 1; \
+	fi
+	@# Check if DB exists first
+	@docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py shell -c "import psycopg2; from django.conf import settings; s=settings.DATABASES['default']; conn=psycopg2.connect(dbname='postgres', user=s['USER'], password=s['PASSWORD'], host=s['HOST'], port=s['PORT']); cur=conn.cursor(); cur.execute('SELECT 1 FROM pg_database WHERE datname = %s', ('$(DB)',)); exists=cur.fetchone(); conn.close(); exit(0 if exists else 1)" >/dev/null 2>&1 || (echo "❌ Error: Database '$(DB)' does not exist."; exit 1)
+	@echo "🔄 Switching database to '$(DB)' in .env..."
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sed -i '' "s/^POSTGRES_DB=.*/POSTGRES_DB=$(DB)/" .env; \
+		sed -i '' "s|DATABASE_URL=\(.*\)/[^/]*$$|DATABASE_URL=\1/$(DB)|" .env; \
+	else \
+		sed -i "s/^POSTGRES_DB=.*/POSTGRES_DB=$(DB)/" .env; \
+		sed -i "s|DATABASE_URL=\(.*\)/[^/]*$$|DATABASE_URL=\1/$(DB)|" .env; \
+	fi
+	@echo "✅ Successfully switched to database '$(DB)'."
+	@echo "Restart your docker containers to apply changes: make restart"
 
 # Tailwind CSS build commands
 tailwind-build: ## Build Tailwind CSS for backend templates
@@ -429,3 +1225,55 @@ tailwind-build: ## Build Tailwind CSS for backend templates
 tailwind-watch: ## Watch and rebuild Tailwind CSS on changes
 	@echo "👀 Watching Tailwind CSS for changes..."
 	cd backend && npx tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --watch
+
+# ============================================================
+# Production Deployment (runs on remote VPS via SSH)
+# Set PROD_HOST in your shell: export PROD_HOST=root@YOUR_VPS_IP
+# ============================================================
+PROD_HOST ?= root@eceee-vps
+PROD_DIR  ?= /srv/eceee_v4
+TAG       ?=
+
+prod-preflight: ## Run checks required before production deploy (use: make prod-preflight [TAG=v0.x.x|hash])
+	bash deploy/scripts/preflight.sh "$(TAG)"
+
+prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TAG=v0.x.x|hash])
+	@DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
+	echo "Resolved deploy ref: $$DEPLOY_REF"; \
+	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
+	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)"; \
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --tags --prune --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $$DEPLOY_REF"
+
+prod-restart: ## Sync deploy/.env and restart production containers
+	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d"
+
+prod-env: ## Securely push local deploy/.env to production
+	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
+
+prod-rollback: ## Rollback to previous deployment
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/rollback.sh"
+
+prod-backup: ## Run ad-hoc production DB backup
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backup.sh"
+
+prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs -f --tail=100 $(SERVICE)"
+
+prod-status: ## Show production container status
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env ps"
+
+prod-logs-caddy: ## Tail production Caddy logs
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs -f --tail=100 caddy"
+
+prod-shell-caddy: ## Open shell in production Caddy container
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec caddy sh"
+
+prod-ssh: ## SSH into production server
+	ssh $(PROD_HOST)
+
+prod-shell: ## Open Django shell in production
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py shell"
+
+prod-bash: ## Open bash shell in production backend container
+	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend bash"

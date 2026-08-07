@@ -19,6 +19,7 @@ This configuration supports:
 """
 
 import os
+import sys
 from pathlib import Path
 from decouple import config
 
@@ -198,6 +199,8 @@ LOCAL_APPS = [
     "easy_widgets",  # Easy widget definitions
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system
+    "data_connections",  # Data connection and transformation system
+    "content_migration",  # Background content migration system
     "utils",  # Utility features like value lists and schema system
     "ai_tracking",  # AI usage and cost tracking
     "statistics",  # Integrated statistics and analytics system
@@ -271,6 +274,29 @@ DATABASES = {
         "PORT": config("POSTGRES_PORT", default="5432"),
     }
 }
+
+# Use SQLite for tests by default to avoid Postgres collation issues in Docker.
+# Set DJANGO_TEST_DATABASE=postgres for suites that need Postgres-specific schema
+# support, such as ArrayField migrations.
+IS_TEST_RUN = (
+    os.environ.get("PYTEST_CURRENT_TEST")
+    or os.environ.get("DJANGO_TESTING")
+    or "test" in sys.argv
+    or "pytest" in sys.modules
+    or any("pytest" in arg for arg in sys.argv)
+)
+
+if IS_TEST_RUN and os.environ.get("DJANGO_TEST_DATABASE", "sqlite").lower() == "sqlite":
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+
+if IS_TEST_RUN:
+    # Speed up tests with faster password hashing
+    PASSWORD_HASHERS = [
+        "django.contrib.auth.hashers.MD5PasswordHasher",
+    ]
 
 # Cache Configuration (Redis)
 CACHES = {
@@ -452,14 +478,17 @@ EMAIL_BACKEND = config(
     ),  # Postmark in production
 )
 POSTMARK_API_KEY = config("POSTMARK_API_KEY", default="")
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@eceee.fred.nu")
-SERVER_EMAIL = config("SERVER_EMAIL", default="server@eceee.fred.nu")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
+SERVER_EMAIL = config("SERVER_EMAIL", default="server@example.com")
 
 # Admin notifications for server errors
 ADMINS = [
-    ("EASY Admin", config("ADMIN_EMAIL", default="admin@eceee.fred.nu")),
+    ("Admin", config("ADMIN_EMAIL", default="admin@example.com")),
 ]
 MANAGERS = ADMINS
+
+POSTMARK_TEST_MODE = config("POSTMARK_TEST_MODE", default=False, cast=bool)
+POSTMARK_TRACK_OPENS = config("POSTMARK_TRACK_OPENS", default=True, cast=bool)
 
 # Development Tools Configuration
 if DEBUG:
@@ -475,6 +504,24 @@ if DEBUG:
 
 
 # Logging Configuration
+_log_handlers = {
+    "console": {
+        "level": "DEBUG" if DEBUG else "INFO",
+        "class": "logging.StreamHandler",
+        "formatter": "verbose" if not DEBUG else "simple",
+    },
+}
+
+if DEBUG:
+    _log_handlers["file"] = {
+        "level": "INFO",
+        "class": "logging.FileHandler",
+        "filename": BASE_DIR / "logs" / "django.log",
+        "formatter": "verbose",
+    }
+
+_default_handlers = ["file", "console"] if DEBUG else ["console"]
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -488,36 +535,24 @@ LOGGING = {
             "style": "{",
         },
     },
-    "handlers": {
-        "file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "django.log",
-            "formatter": "verbose",
-        },
-        "console": {
-            "level": "DEBUG" if DEBUG else "WARNING",
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
-    },
+    "handlers": _log_handlers,
     "root": {
         "handlers": ["console"],
         "level": "INFO" if DEBUG else "WARNING",
     },
     "loggers": {
         "django": {
-            "handlers": ["file", "console"],
+            "handlers": _default_handlers,
             "level": "INFO",
             "propagate": False,
         },
         "django.request": {
-            "handlers": ["file"],
+            "handlers": _default_handlers,
             "level": "ERROR",
             "propagate": False,
         },
         "webpages": {
-            "handlers": ["file", "console"],
+            "handlers": _default_handlers,
             "level": "INFO" if DEBUG else "WARNING",
             "propagate": False,
         },
@@ -539,7 +574,7 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_HSTS_SECONDS = 31536000
-    SECURE_REDIRECT_EXEMPT = []
+    SECURE_REDIRECT_EXEMPT = [r"^health/"]
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -603,8 +638,12 @@ AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID", default="minioadmin")
 AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="minioadmin")
 AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="eceee-media")
 AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default="http://minio:9000")
+AWS_S3_INTERNAL_ENDPOINT_URL = config(
+    "AWS_S3_INTERNAL_ENDPOINT_URL", default=AWS_S3_ENDPOINT_URL
+)
 AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="us-east-1")
 AWS_S3_USE_SSL = config("AWS_S3_USE_SSL", default=False, cast=bool)
+AWS_DEFAULT_ACL = config("AWS_DEFAULT_ACL", default="private")
 
 # S3 Client Configuration (for Linode Object Storage compatibility)
 AWS_S3_SIGNATURE_VERSION = config("AWS_S3_SIGNATURE_VERSION", default="s3v4")
@@ -652,7 +691,7 @@ AI_TRACKING = {
     "PRICE_STALE_DAYS": config("AI_PRICE_STALE_DAYS", default=30, cast=int),
     "ADMIN_EMAIL": config(
         "AI_TRACKING_ADMIN_EMAIL",
-        default=config("DEFAULT_FROM_EMAIL", default="admin@example.com"),
+        default="admin@example.com",
     ),
     "BUDGET_CHECK_ENABLED": config("AI_BUDGET_CHECK_ENABLED", default=True, cast=bool),
 }
@@ -665,21 +704,16 @@ ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default=None)
 
 # imgproxy Configuration
 IMGPROXY_URL = config("IMGPROXY_URL", default="http://imgproxy:8080")
+IMGPROXY_PUBLIC_URL = config("IMGPROXY_PUBLIC_URL", default=None)
+if IMGPROXY_PUBLIC_URL is None:
+    IMGPROXY_PUBLIC_URL = IMGPROXY_URL
 IMGPROXY_KEY = config("IMGPROXY_KEY", default="")
 IMGPROXY_SALT = config("IMGPROXY_SALT", default="")
 IMGPROXY_SIGNATURE_SIZE = config("IMGPROXY_SIGNATURE_SIZE", default=32, cast=int)
 
-FM_SERVER_URL = "https://fms.eceee.org"
-FM_USERNAME = "CWPAccount"
+FM_SERVER_URL = config("FM_SERVER_URL", default="")
+FM_USERNAME = config("FM_USERNAME", default="")
 FM_PASSWORD = config("FM_PASSWORD", default="")
-
-POSTMARK_API_KEY = config("POSTMARK_API_KEY", default="")
-POSTMARK_SENDER = "eceee@eceee.org"
-POSTMARK_TEST_MODE = False
-POSTMARK_TRACK_OPENS = True
-EMAIL_BACKEND = "postmark.django_backend.EmailBackend"
-DEFAULT_FROM_EMAIL = "eceee@eceee.org"
-EMAIL_HOST_USER = "eceee@eceee.org"
 
 # EMAIL_BACKEND = "email_log.backends.EmailBackend"
 # EMAIL_LOG_BACKEND = "postmark.django_backend.EmailBackend"

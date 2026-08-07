@@ -18,6 +18,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from file_manager.storage import system_storage
 from easypublisher.fields import ListField
 from easypublisher.models import AcquisitionMixin
 from eceeebase.fields import GenericCategoriesField, InheritCharField
@@ -309,6 +310,7 @@ class ConferenceLogo(Orderable):
         _("Partner Logo"),
         max_length=200,
         format="Image",
+        storage=system_storage,
         upload_to=upload_to("eceee.Organisations.organisations", "logos"),
         blank=True,
         null=True,

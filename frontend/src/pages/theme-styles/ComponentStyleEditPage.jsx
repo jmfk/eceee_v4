@@ -40,7 +40,7 @@ const ComponentStyleEditPage = () => {
     // Fetch theme data
     const { data: themeData, isLoading } = useQuery({
         queryKey: ['theme', themeId],
-        queryFn: () => themesApi.get(themeId),
+        queryFn: async () => await themesApi.get(themeId),
         enabled: !!themeId,
     });
 
@@ -106,7 +106,7 @@ const ComponentStyleEditPage = () => {
 
     // Update mutation
     const updateMutation = useMutation({
-        mutationFn: ({ updatedStyle, targetKey }) => {
+        mutationFn: async ({ updatedStyle, targetKey }) => {
             const styles = { ...(themeData.componentStyles || {}) };
 
             // If key changed, delete old key

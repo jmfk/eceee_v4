@@ -104,7 +104,55 @@ class LinodeObjectStorage(S3Boto3Storage):
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to set public-read ACL for {name}: {e}")
+            # Check for NotImplemented error (ACLs disabled on bucket)
+            if "NotImplemented" in str(e):
+                logger.warning(f"ACLs not implemented for {name}. Use bucket policy instead.")
+            else:
+                logger.error(f"Failed to set public-read ACL for {name}: {e}")
+            return False
+
+    def set_public_bucket_policy(self, prefix="uploads/"):
+        """
+        Set a bucket policy to make a specific prefix public-read.
+        This is the preferred way for Linode and modern MinIO.
+        """
+        import json
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": ["*"]},
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{self.bucket_name}/{prefix}*"]
+                }
+            ]
+        }
+        
+        try:
+            self.connection.meta.client.put_bucket_policy(
+                Bucket=self.bucket_name,
+                Policy=json.dumps(policy)
+            )
+            logger.info(f"Successfully set public-read bucket policy for {prefix}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set bucket policy: {e}")
+            return False
+
+    def is_publicly_accessible(self, name):
+        """
+        Check if a file is publicly accessible via an anonymous HEAD request.
+        """
+        import requests
+        url = self.get_public_url(name)
+        try:
+            response = requests.head(url, timeout=5)
+            return response.status_code == 200
+        except Exception:
             return False
     
     def listdir(self, path):

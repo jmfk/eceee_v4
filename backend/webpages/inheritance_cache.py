@@ -57,7 +57,7 @@ class InheritanceTreeCache:
                             ).hexdigest(),
                         }
                     )
-                current = current.parent
+                current = current.parent if current.parent_id else None
 
             # Create hash from all version data
             version_string = str(sorted(version_data, key=lambda x: x["page_id"]))

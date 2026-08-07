@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Menu, X, MoreHorizontal } from 'lucide-react'
+import EditorNavLink, { EditorNavItemModal } from './EditorNavLink'
+import { cleanConfigNavItems, isEditorNavMenuContext, processEditableNavItems } from './editorNavLinkUtils'
 
 /**
  * Extract URL from image object
@@ -23,34 +25,7 @@ const getImageUrl = (image) => {
  * Handles both new format (with link_data) and old format (direct fields)
  */
 const processMenuItems = (items) => {
-    if (!items || !Array.isArray(items)) return []
-
-    return items.map((item, index) => {
-        // Check if item has link_data field (new format)
-        if (item.linkData || item.link_data) {
-            const linkData = item.linkData || item.link_data
-            const order = item.order !== undefined ? item.order : index
-
-            return {
-                label: linkData.label,
-                url: linkData.url || '',
-                isActive: linkData.isActive !== false && linkData.is_active !== false,
-                targetBlank: linkData.targetBlank || linkData.target_blank || false,
-                type: linkData.type || 'external',
-                order,
-            }
-        }
-
-        // Old format - direct fields (backwards compatibility)
-        return {
-            label: item.label,
-            url: item.url || '',
-            isActive: item.isActive !== false && item.is_active !== false,
-            targetBlank: item.targetBlank || item.target_blank || false,
-            type: item.type || 'external',
-            order: item.order !== undefined ? item.order : index,
-        }
-    })
+    return processEditableNavItems(items, 'menuItems')
 }
 
 /**
@@ -58,40 +33,12 @@ const processMenuItems = (items) => {
  * Handles both new format (with link_data) and old format (direct fields)
  */
 const processSecondaryMenuItems = (items) => {
-    if (!items || !Array.isArray(items)) return []
-
-    return items.map((item, index) => {
-        // Check if item has link_data field (new format)
-        if (item.linkData || item.link_data) {
-            const linkData = item.linkData || item.link_data
-            const order = item.order !== undefined ? item.order : index
-
-            return {
-                label: linkData.label,
-                url: linkData.url || '',
-                isActive: linkData.isActive !== false && linkData.is_active !== false,
-                targetBlank: linkData.targetBlank || linkData.target_blank || false,
-                type: linkData.type || 'external',
-                backgroundColor: item.backgroundColor || item.background_color,
-                textColor: item.textColor || item.text_color,
-                backgroundImage: item.backgroundImage || item.background_image,
-                order,
-            }
-        }
-
-        // Old format - direct fields (backwards compatibility)
-        return {
-            label: item.label,
-            url: item.url || '',
-            isActive: item.isActive !== false && item.is_active !== false,
-            targetBlank: item.targetBlank || item.target_blank || false,
-            type: item.type || 'external',
-            backgroundColor: item.backgroundColor || item.background_color,
-            textColor: item.textColor || item.text_color,
-            backgroundImage: item.backgroundImage || item.background_image,
-            order: item.order !== undefined ? item.order : index,
-        }
-    })
+    return processEditableNavItems(items, 'secondaryMenuItems').map((item) => ({
+        ...item,
+        backgroundColor: item.backgroundColor || item.background_color,
+        textColor: item.textColor || item.text_color,
+        backgroundImage: item.backgroundImage || item.background_image,
+    }))
 }
 
 /**
@@ -110,7 +57,7 @@ const formatColorValue = (colorValue, themeColors) => {
  * EASY Navbar Widget Component
  * Renders a navigation bar with configurable menu items and responsive overflow
  */
-const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
+const NavbarWidget = ({ config = {}, mode = 'preview', context = {}, onConfigChange }) => {
     const {
         menuItems = [],
         secondaryMenuItems = [],
@@ -127,6 +74,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     // Process menu items to extract link_data (handles both new and old formats)
     const processedMenuItems = processMenuItems(menuItems)
     const processedSecondaryMenuItems = processSecondaryMenuItems(secondaryMenuItems)
+    const shouldUseEditorNavMenus = isEditorNavMenuContext(mode, context)
 
     // Filter active items
     const activeMenuItems = processedMenuItems.filter(item => item.isActive !== false)
@@ -138,6 +86,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     const [overflowItems, setOverflowItems] = useState([])
     const [showHamburger, setShowHamburger] = useState(false)
     const [showSecondaryMenu, setShowSecondaryMenu] = useState(true)
+    const [editingMenuItem, setEditingMenuItem] = useState(null)
 
     const navRef = useRef(null)
     const itemRefs = useRef([])
@@ -179,6 +128,8 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
             if (!navRef.current) return
 
             const navWidth = navRef.current.offsetWidth
+            if (navWidth <= 0) return
+
             const OVERFLOW_BUTTON_WIDTH = 60 // Approximate width for "..." button
             const PADDING = 40 // Left padding
             const RIGHT_PADDING = 20 // Right padding
@@ -290,6 +241,68 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
         }
     }, [isOverflowMenuOpen])
 
+    const updateConfigList = (listKey, updater) => {
+        if (!onConfigChange || !['menuItems', 'secondaryMenuItems'].includes(listKey)) return
+
+        const currentItems = Array.isArray(config[listKey]) ? config[listKey] : []
+        const updatedItems = updater([...currentItems])
+
+        onConfigChange({
+            ...config,
+            [listKey]: cleanConfigNavItems(updatedItems),
+        })
+    }
+
+    const navEditorActions = onConfigChange ? {
+        getListLength: (listKey) => (Array.isArray(config[listKey]) ? config[listKey].length : 0),
+        onEdit: (item) => setEditingMenuItem({ mode: 'edit', item }),
+        onAddAfter: (item) => setEditingMenuItem({ mode: 'add', item }),
+        onDelete: (item) => {
+            updateConfigList(item._navListKey, (items) => items.filter((_, index) => index !== item._navIndex))
+        },
+        onMove: (item, toIndex) => {
+            updateConfigList(item._navListKey, (items) => {
+                const fromIndex = item._navIndex
+                if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) {
+                    return items
+                }
+                const [movedItem] = items.splice(fromIndex, 1)
+                items.splice(toIndex, 0, movedItem)
+                return items
+            })
+        },
+    } : null
+
+    const handleSaveMenuItem = (linkData) => {
+        if (!editingMenuItem) return
+
+        const { item, mode: modalMode } = editingMenuItem
+        updateConfigList(item._navListKey, (items) => {
+            if (modalMode === 'add') {
+                items.splice(item._navIndex + 1, 0, { linkData })
+                return items
+            }
+
+            items[item._navIndex] = {
+                ...items[item._navIndex],
+                linkData,
+            }
+            return items
+        })
+        setEditingMenuItem(null)
+    }
+
+    const editMenuItemModal = (
+        <EditorNavItemModal
+            open={Boolean(editingMenuItem)}
+            item={editingMenuItem?.item}
+            mode={editingMenuItem?.mode}
+            context={context}
+            onClose={() => setEditingMenuItem(null)}
+            onSave={handleSaveMenuItem}
+        />
+    )
+
     const renderMenuItem = (item, index, isInDropdown = false) => {
         const linkClasses = isInDropdown
             ? "navbar-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 no-underline"
@@ -303,18 +316,15 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
         } : {}
 
         return (
-            <a
+            <EditorNavLink
                 key={index}
-                href={mode === 'editor' ? '#' : item.url}
-                data-href={item.url}
-                target={item.targetBlank ? '_blank' : undefined}
-                rel={item.targetBlank ? 'noopener noreferrer' : undefined}
+                item={item}
+                mode={mode}
+                enableEditorMenu={shouldUseEditorNavMenus}
+                editorActions={navEditorActions}
                 className={linkClasses}
                 style={linkStyle}
-                onClick={(e) => {
-                    if (mode === 'editor') {
-                        e.preventDefault()
-                    }
+                onEditorAction={() => {
                     if (isInDropdown) {
                         setIsOverflowMenuOpen(false)
                     }
@@ -324,7 +334,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                 }}
             >
                 {item.label}
-            </a>
+            </EditorNavLink>
         )
     }
 
@@ -364,25 +374,22 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
         }
 
         return (
-            <a
+            <EditorNavLink
                 key={index}
-                href={mode === 'editor' ? '#' : item.url}
-                data-href={item.url}
-                target={item.targetBlank ? '_blank' : undefined}
-                rel={item.targetBlank ? 'noopener noreferrer' : undefined}
+                item={item}
+                mode={mode}
+                enableEditorMenu={shouldUseEditorNavMenus}
+                editorActions={navEditorActions}
                 style={itemStyle}
                 className="navbar-link navbar-secondary-link hover:opacity-80"
-                onClick={(e) => {
-                    if (mode === 'editor') {
-                        e.preventDefault()
-                    }
+                onEditorAction={() => {
                     if (showHamburger) {
                         setIsMobileMenuOpen(false)
                     }
                 }}
             >
                 {item.label}
-            </a>
+            </EditorNavLink>
         )
     }
 
@@ -409,25 +416,29 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
     // Empty state for editor
     if (mode === 'editor' && (!activeMenuItems || activeMenuItems.length === 0)) {
         return (
-            <nav
-                className={`shadow-sm h-[28px] ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
-                style={navStyles}
-            >
-                <div className="flex items-center h-full pl-[20px]">
-                    <span className="text-white text-sm opacity-50">
-                        No active menu items
-                    </span>
-                </div>
-            </nav>
+            <>
+                <nav
+                    className={`widget-type-navbar navbar-widget shadow-sm h-[28px] ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
+                    style={navStyles}
+                >
+                    <div className="flex items-center h-full pl-[20px]">
+                        <span className="text-white text-sm opacity-50">
+                            No active menu items
+                        </span>
+                    </div>
+                </nav>
+                {editMenuItemModal}
+            </>
         )
     }
 
     // Hamburger menu mode (collapsed due to overflow or breakpoint)
     if (showHamburger) {
         return (
+            <>
             <nav
                 ref={navRef}
-                className={`shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
+                className={`widget-type-navbar navbar-widget shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
                 style={navStyles}
             >
                 <div className="flex items-center h-full px-[20px] justify-between">
@@ -465,14 +476,17 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                     </div>
                 )}
             </nav>
+            {editMenuItemModal}
+            </>
         )
     }
 
     // Desktop mode with overflow menu
     return (
+        <>
         <nav
             ref={navRef}
-            className={`shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
+            className={`widget-type-navbar navbar-widget shadow-sm h-[28px] relative ${shouldUseDefaultBg ? 'bg-blue-500' : ''}`}
             style={navStyles}
         >
             <div className="flex justify-between items-center h-full w-full">
@@ -567,20 +581,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                                         }),
                                     }}
                                 >
-                                    <a
-                                        href={mode === 'editor' ? '#' : item.url}
-                                        data-href={item.url}
-                                        target={item.targetBlank ? '_blank' : undefined}
-                                        rel={item.targetBlank ? 'noopener noreferrer' : undefined}
-                                        className="navbar-link navbar-secondary-link hover:opacity-80"
-                                        onClick={(e) => {
-                                            if (mode === 'editor') {
-                                                e.preventDefault()
-                                            }
-                                        }}
-                                    >
-                                        {item.label}
-                                    </a>
+                                    {renderSecondaryMenuItem(item, index, false)}
                                 </li>
                             )
                         })}
@@ -619,6 +620,8 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {} }) => {
                 )}
             </div>
         </nav>
+        {editMenuItemModal}
+        </>
     )
 }
 
@@ -647,4 +650,3 @@ NavbarWidget.metadata = {
 }
 
 export default NavbarWidget
-

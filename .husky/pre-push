@@ -1,0 +1,102 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "Running test suite before pushing..."
+
+TEST_LOG="${TMPDIR:-/tmp}/eceee-pre-push-test.$$.log"
+TEST_STATUS_LOG="${TMPDIR:-/tmp}/eceee-pre-push-status.$$.log"
+AGENT_LOG="${TMPDIR:-/tmp}/eceee-pre-push-agent.$$.log"
+LAST_TEST_STATUS=1
+trap 'rm -f "$TEST_LOG" "$TEST_STATUS_LOG" "$AGENT_LOG"' EXIT HUP INT TERM
+
+find_codex() {
+	if command -v codex >/dev/null 2>&1; then
+		command -v codex
+		return 0
+	fi
+
+	if [ -x "/Applications/Codex.app/Contents/Resources/codex" ]; then
+		printf '%s\n' "/Applications/Codex.app/Contents/Resources/codex"
+		return 0
+	fi
+
+	return 1
+}
+
+run_tests() {
+	rm -f "$TEST_STATUS_LOG"
+	{
+		set +e
+		make test 2>&1
+		status=$?
+		set -e
+		printf '%s\n' "$status" >"$TEST_STATUS_LOG"
+	} | tee "$TEST_LOG"
+
+	LAST_TEST_STATUS="$(cat "$TEST_STATUS_LOG" 2>/dev/null || printf '1')"
+	case "$LAST_TEST_STATUS" in
+		'' | *[!0-9]*) LAST_TEST_STATUS=1 ;;
+	esac
+
+	[ "$LAST_TEST_STATUS" -eq 0 ]
+}
+
+if run_tests; then
+	echo "Test suite passed."
+	exit 0
+else
+	test_status=$LAST_TEST_STATUS
+fi
+
+echo "Pre-push test suite failed."
+
+if [ "${HUSKY_AGENT_FIX:-1}" = "0" ]; then
+	echo "Skipping agent fix attempt because HUSKY_AGENT_FIX=0."
+	exit "$test_status"
+fi
+
+if ! CODEX_BIN="$(find_codex)"; then
+	echo "Codex agent not found. Install Codex or set HUSKY_AGENT_FIX=0 to skip the agent retry."
+	exit "$test_status"
+fi
+
+echo "Trying to fix the pre-push errors with a Codex agent..."
+
+if {
+	cat <<'PROMPT'
+The Husky pre-push hook failed in this repository.
+
+Please inspect the test output below, fix the underlying errors in the working tree, and keep the change scoped to the failing checks.
+
+Important constraints:
+- Do not commit, push, stash, reset, or revert changes.
+- There may be unrelated user edits in the working tree; preserve them.
+- Prefer the repository's existing patterns and run focused verification when useful.
+- When you are done, summarize what changed and what you could not verify.
+PROMPT
+	printf '\n<pre_push_test_output>\n'
+	cat "$TEST_LOG"
+	printf '\n</pre_push_test_output>\n'
+} | "$CODEX_BIN" exec \
+	-c 'approval_policy="never"' \
+	--cd "$(pwd)" \
+	--sandbox "${HUSKY_AGENT_SANDBOX:-workspace-write}" \
+	--ephemeral \
+	--color never \
+	- >"$AGENT_LOG" 2>&1; then
+	echo "Codex agent finished:"
+	cat "$AGENT_LOG"
+	echo "Rerunning test suite before pushing..."
+else
+	echo "Codex agent failed:"
+	cat "$AGENT_LOG"
+	exit "$test_status"
+fi
+
+if run_tests; then
+	echo "Test suite passed after agent fix."
+	exit 0
+fi
+
+echo "Pre-push test suite still fails after the agent fix attempt. See the test output above."
+exit 1

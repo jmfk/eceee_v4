@@ -18,9 +18,11 @@ import {
     Scissors
 } from 'lucide-react'
 import ConfirmationModal from '../../components/ConfirmationModal'
+import ContextualHelpLink from '../../components/help/ContextualHelpLink'
 import PasteConfirmationModal from '../../components/PasteConfirmationModal'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
 import { generateNewWidgetIds } from '../../utils/widgetClipboard'
+import { getWidgetHelpTopic } from '../../utils/howToHelp'
 import { useClipboard } from '../../contexts/ClipboardContext'
 
 const PageWidgetHeaderWithSlots = ({
@@ -65,6 +67,12 @@ const PageWidgetHeaderWithSlots = ({
     const [showPasteConfirm, setShowPasteConfirm] = useState(false)
     const [pendingPasteWidgets, setPendingPasteWidgets] = useState(null)
     const { refreshClipboard } = useClipboard();
+    const helpTopicId = getWidgetHelpTopic(widget?.type || widgetType)
+    const widgetTestId = (widget?.type || widgetType || 'widget')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'widget'
 
     if (!showControls) {
         return null
@@ -260,6 +268,7 @@ const PageWidgetHeaderWithSlots = ({
                             {showAddButton && onAddWidget && (
                                 <button
                                     onClick={onAddWidget}
+                                    data-testid={`page-widget-slot-add-${widgetTestId}`}
                                     disabled={!canAdd}
                                     className={`p-1.5 rounded transition-colors ${canAdd
                                         ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
@@ -273,6 +282,7 @@ const PageWidgetHeaderWithSlots = ({
                             {widgets && Array.isArray(widgets) && widgets.length > 0 && (
                                 <button
                                     onClick={handleCopyAllWidgets}
+                                    data-testid={`page-widget-slot-copy-all-${widgetTestId}`}
                                     className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                     title="Copy all widgets"
                                 >
@@ -282,6 +292,7 @@ const PageWidgetHeaderWithSlots = ({
                             {onPasteToSlot && (
                                 <button
                                     onClick={handlePasteToSlot}
+                                    data-testid={`page-widget-slot-paste-${widgetTestId}`}
                                     className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                     title="Paste widgets to slot"
                                 >
@@ -291,6 +302,7 @@ const PageWidgetHeaderWithSlots = ({
                             {showClearButton && onClearSlot && widgetCount > 0 && (
                                 <button
                                     onClick={onClearSlot}
+                                    data-testid={`page-widget-slot-clear-${widgetTestId}`}
                                     className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                     title="Clear Slot"
                                 >
@@ -305,6 +317,7 @@ const PageWidgetHeaderWithSlots = ({
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2">
                             <button
                                 onClick={onMoveUp}
+                                data-testid={`page-widget-move-up-${widgetTestId}`}
                                 disabled={!canMoveUp}
                                 className={`p-1 rounded transition-colors ${canMoveUp
                                     ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
@@ -316,6 +329,7 @@ const PageWidgetHeaderWithSlots = ({
                             </button>
                             <button
                                 onClick={onMoveDown}
+                                data-testid={`page-widget-move-down-${widgetTestId}`}
                                 disabled={!canMoveDown}
                                 className={`p-1 rounded transition-colors ${canMoveDown
                                     ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
@@ -335,6 +349,7 @@ const PageWidgetHeaderWithSlots = ({
                                 <>
                                     <button
                                         onClick={handleCopyWidget}
+                                        data-testid={`page-widget-copy-${widgetTestId}`}
                                         className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                         title="Copy widget"
                                     >
@@ -343,6 +358,7 @@ const PageWidgetHeaderWithSlots = ({
                                     {(onCut || (widget && slotName)) && (
                                         <button
                                             onClick={handleCutWidget}
+                                            data-testid={`page-widget-cut-${widgetTestId}`}
                                             className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                             title="Cut widget"
                                         >
@@ -354,6 +370,7 @@ const PageWidgetHeaderWithSlots = ({
                             {onPaste && (
                                 <button
                                     onClick={handlePasteWidget}
+                                    data-testid={`page-widget-paste-${widgetTestId}`}
                                     className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                     title="Paste widget after this one"
                                 >
@@ -365,8 +382,14 @@ const PageWidgetHeaderWithSlots = ({
 
                     {/* Widget controls */}
                     <div className="flex items-center space-x-1">
+                        <ContextualHelpLink
+                            topicId={helpTopicId}
+                            label={`Open ${widgetType} widget help`}
+                            size="sm"
+                        />
                         {onEdit && (
                             <button
+                                data-testid={`page-widget-edit-${widgetTestId}`}
                                 onClick={onEdit}
                                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                                 title="Edit widget"
@@ -377,6 +400,7 @@ const PageWidgetHeaderWithSlots = ({
                         {onDelete && (
                             <button
                                 onClick={handleDeleteClick}
+                                data-testid={`page-widget-delete-${widgetTestId}`}
                                 className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
                                 title="Delete widget"
                             >
@@ -413,4 +437,3 @@ const PageWidgetHeaderWithSlots = ({
 }
 
 export default PageWidgetHeaderWithSlots
-

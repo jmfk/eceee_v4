@@ -27,6 +27,7 @@
 
 #### Core System
 - **[System Overview](docs/SYSTEM_OVERVIEW.md)** - ✅ **Updated** - Complete architecture, data flow, and technology stack
+- **[Multi-Repo Development](docs/MULTI_REPO_DEVELOPMENT.md)** - ✅ **New** - Shared infra and branch-based DB replication
 - **[API Data Models](docs/API_DATA_MODELS.md)** - Data structure specifications and model relationships
 - **[Widget System Documentation Index](docs/WIDGET_SYSTEM_DOCUMENTATION_INDEX.md)** - Widget architecture overview
 

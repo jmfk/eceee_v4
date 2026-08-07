@@ -12,6 +12,10 @@ from ..path_pattern_registry import path_pattern_registry
 class CommonPathPatternsTests(TestCase):
     """Test cases for the common path patterns"""
 
+    def setUp(self):
+        from webpages.path_pattern_autodiscovery import autodiscover_path_patterns
+        autodiscover_path_patterns()
+
     def test_news_slug_pattern(self):
         """Test the news_slug pattern"""
         pattern = path_pattern_registry.get_pattern("news_slug")
@@ -19,10 +23,10 @@ class CommonPathPatternsTests(TestCase):
 
         # Test valid matches
         result = pattern.validate_match("my-article/")
-        self.assertEqual(result, {"slug": "my-article"})
+        self.assertEqual(result, {"news_slug": "my-article"})
 
         result = pattern.validate_match("news-2025/")
-        self.assertEqual(result, {"slug": "news-2025"})
+        self.assertEqual(result, {"news_slug": "news-2025"})
 
         # Test invalid matches
         self.assertIsNone(pattern.validate_match("invalid path"))
@@ -34,7 +38,7 @@ class CommonPathPatternsTests(TestCase):
         self.assertIsNotNone(pattern)
 
         result = pattern.validate_match("summer-conference-2025/")
-        self.assertEqual(result, {"slug": "summer-conference-2025"})
+        self.assertEqual(result, {"event_slug": "summer-conference-2025"})
 
     def test_library_slug_pattern(self):
         """Test the library_slug pattern"""
@@ -42,7 +46,7 @@ class CommonPathPatternsTests(TestCase):
         self.assertIsNotNone(pattern)
 
         result = pattern.validate_match("energy-efficiency-report-2025/")
-        self.assertEqual(result, {"slug": "energy-efficiency-report-2025"})
+        self.assertEqual(result, {"library_slug": "energy-efficiency-report-2025"})
 
     def test_member_slug_pattern(self):
         """Test the member_slug pattern"""
@@ -50,7 +54,7 @@ class CommonPathPatternsTests(TestCase):
         self.assertIsNotNone(pattern)
 
         result = pattern.validate_match("john-doe/")
-        self.assertEqual(result, {"slug": "john-doe"})
+        self.assertEqual(result, {"member_slug": "john-doe"})
 
     def test_date_slug_pattern(self):
         """Test the date_slug pattern"""
@@ -64,7 +68,7 @@ class CommonPathPatternsTests(TestCase):
             {
                 "year": "2025",
                 "month": "10",
-                "slug": "my-article",
+                "date_slug": "my-article",
             },
         )
 
@@ -75,7 +79,7 @@ class CommonPathPatternsTests(TestCase):
             {
                 "year": "2024",
                 "month": "01",
-                "slug": "winter-update",
+                "date_slug": "winter-update",
             },
         )
 
@@ -120,7 +124,7 @@ class CommonPathPatternsTests(TestCase):
             result,
             {
                 "category": "technology",
-                "slug": "energy-efficiency",
+                "category_slug": "energy-efficiency",
             },
         )
 

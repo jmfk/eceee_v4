@@ -169,7 +169,7 @@ const MimeTypesInput = ({
         }
 
         // Basic MIME type validation
-        if (!/^[a-z]+\/[a-z0-9\-\+\.]+$/i.test(mimeType)) {
+        if (!/^[a-z]+\/[a-z0-9+-.]+$/i.test(mimeType)) {
             return // Invalid MIME type format
         }
 

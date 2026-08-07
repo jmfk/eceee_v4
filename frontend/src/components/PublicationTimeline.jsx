@@ -51,14 +51,16 @@ const PublicationTimeline = () => {
     const getViewStartDate = () => {
         const date = new Date(currentDate);
         switch (viewMode) {
-            case 'week':
+            case 'week': {
                 const startOfWeek = date.getDate() - date.getDay();
                 return new Date(date.setDate(startOfWeek));
+            }
             case 'month':
                 return new Date(date.getFullYear(), date.getMonth(), 1);
-            case 'quarter':
+            case 'quarter': {
                 const quarter = Math.floor(date.getMonth() / 3);
                 return new Date(date.getFullYear(), quarter * 3, 1);
+            }
             default:
                 return new Date(date.getFullYear(), date.getMonth(), 1);
         }
@@ -67,14 +69,16 @@ const PublicationTimeline = () => {
     const getViewEndDate = () => {
         const date = new Date(currentDate);
         switch (viewMode) {
-            case 'week':
+            case 'week': {
                 const endOfWeek = date.getDate() - date.getDay() + 6;
                 return new Date(date.setDate(endOfWeek));
+            }
             case 'month':
                 return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-            case 'quarter':
+            case 'quarter': {
                 const quarter = Math.floor(date.getMonth() / 3);
                 return new Date(date.getFullYear(), quarter * 3 + 3, 0);
+            }
             default:
                 return new Date(date.getFullYear(), date.getMonth() + 1, 0);
         }

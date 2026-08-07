@@ -12,6 +12,7 @@ import { useNotificationContext } from './NotificationManager';
 import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
 import ImportDialog from './ImportDialog';
 import { useTheme } from '../hooks/useTheme';
+import { createWidgetElement as createSharedWidgetElement } from '../utils/widgetRenderer';
 
 const ContentEditor = forwardRef(({
   layoutJson,
@@ -70,8 +71,6 @@ const ContentEditor = forwardRef(({
 
   // Create a widget DOM element using the shared widget renderer
   const createWidgetElement = useCallback((widget) => {
-    // Import the shared widget renderer utility
-    const { createWidgetElement: createSharedWidgetElement } = require('../utils/widgetRenderer');
     return createSharedWidgetElement(widget);
   }, []);
 

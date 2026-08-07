@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { ChevronDown, X, Check } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { ChevronDown, X, Check, Plus } from 'lucide-react'
 
 /**
  * MultiSelectInput Component
@@ -21,6 +21,8 @@ const MultiSelectInput = ({
     maxSelections,
     searchable = true,
     showSelectAll = true,
+    allowCreate = false,
+    size = 'md', // 'sm' or 'md'
     ...props
 }) => {
     const [isOpen, setIsOpen] = useState(false)
@@ -47,11 +49,18 @@ const MultiSelectInput = ({
     const selectedValues = Array.isArray(value) ? value : []
 
     // Filter options based on search term
-    const filteredOptions = searchTerm
-        ? normalizedOptions.filter(option =>
-            option.label.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        : normalizedOptions
+    const filteredOptions = useMemo(() => {
+        const filtered = searchTerm
+            ? normalizedOptions.filter(option =>
+                option.label.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            : normalizedOptions
+
+        if (allowCreate && searchTerm.trim() && !filtered.some(opt => opt.value === searchTerm.trim())) {
+            return [{ value: searchTerm.trim(), label: `Add "${searchTerm.trim()}"`, isCreate: true }, ...filtered]
+        }
+        return filtered
+    }, [searchTerm, normalizedOptions, allowCreate])
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -96,6 +105,9 @@ const MultiSelectInput = ({
         }
 
         onChange(newValue)
+        if (searchTerm) {
+            setSearchTerm('')
+        }
     }
 
     const handleSelectAll = () => {
@@ -121,7 +133,7 @@ const MultiSelectInput = ({
     const hasError = validation && !validation.isValid
 
     return (
-        <div className="space-y-1">
+        <div className={`space-y-1 ${props.className || ''}`}>
             {label && (
                 <label className="block text-sm font-medium text-gray-700">
                     {label}
@@ -134,23 +146,24 @@ const MultiSelectInput = ({
                 <div
                     onClick={handleToggleDropdown}
                     className={`
-                        w-full min-h-[2.5rem] px-3 py-2 border rounded-md cursor-pointer
-                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                        transition-colors duration-200
+                        w-full border rounded-md cursor-pointer
+                        focus:outline-none focus:ring-2 focus:ring-blue-500/20
+                        transition-all duration-200
+                        ${size === 'sm' ? 'min-h-[2rem] px-2 py-1' : 'min-h-[2.5rem] px-3 py-2'}
                         ${disabled ? 'bg-gray-50 cursor-not-allowed' : 'bg-white hover:border-gray-400'}
                         ${hasError ? 'border-red-300' : 'border-gray-300'}
-                        ${isOpen ? 'ring-2 ring-blue-500 border-blue-500' : ''}
+                        ${isOpen ? 'ring-2 ring-blue-500/50 border-blue-500' : ''}
                     `}
                 >
                     <div className="flex items-center justify-between">
                         <div className="flex-1 flex flex-wrap gap-1">
                             {selectedValues.length === 0 ? (
-                                <span className="text-gray-500">{placeholder}</span>
+                                <span className={`text-gray-500 ${size === 'sm' ? 'text-xs' : 'text-sm'}`}>{placeholder}</span>
                             ) : (
                                 getSelectedLabels().map((label, index) => (
                                     <span
                                         key={selectedValues[index]}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded"
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded ${size === 'sm' ? 'text-[10px]' : 'text-sm'}`}
                                     >
                                         {label}
                                         {!disabled && (
@@ -159,7 +172,7 @@ const MultiSelectInput = ({
                                                 onClick={(e) => handleRemoveOption(selectedValues[index], e)}
                                                 className="hover:bg-blue-200 rounded"
                                             >
-                                                <X className="h-3 w-3" />
+                                                <X className={`${size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
                                             </button>
                                         )}
                                     </span>
@@ -223,9 +236,13 @@ const MultiSelectInput = ({
                                             px-3 py-2 text-sm cursor-pointer flex items-center justify-between
                                             ${isDisabled ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}
                                             ${isSelected ? 'bg-blue-50 text-blue-900' : ''}
+                                            ${option.isCreate ? 'text-blue-600 font-medium' : ''}
                                         `}
                                     >
-                                        <span>{option.label}</span>
+                                        <div className="flex items-center gap-2">
+                                            {option.isCreate && <Plus className="h-3.5 w-3.5" />}
+                                            <span>{option.label}</span>
+                                        </div>
                                         {isSelected && <Check className="h-4 w-4 text-blue-600" />}
                                     </div>
                                 )
@@ -236,7 +253,7 @@ const MultiSelectInput = ({
             </div>
 
             {description && (
-                <div className="text-sm text-gray-500">{description}</div>
+                <div className="text-xs text-gray-500 mt-1">{description}</div>
             )}
 
             {/* Validation Message */}

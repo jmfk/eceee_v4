@@ -19,9 +19,18 @@ class MediaFileCleanupTests(TestCase):
 
     def setUp(self):
         """Set up test data."""
+        from core.models import Tenant
         self.user = User.objects.create_user(username="testuser", password="testpass")
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-cleanup",
+            created_by=self.user
+        )
         self.namespace = Namespace.objects.create(
-            name="Test Namespace", slug="test-namespace", created_by=self.user
+            name="Test Namespace", 
+            slug="test-namespace", 
+            created_by=self.user,
+            tenant=self.tenant
         )
 
         # Create some test files
@@ -32,6 +41,7 @@ class MediaFileCleanupTests(TestCase):
         # Active file
         self.active_file = MediaFile.objects.create(
             title="Active File",
+            slug="active-file",
             original_filename="active.jpg",
             file_path="test/active.jpg",
             file_size=1000,
@@ -39,6 +49,7 @@ class MediaFileCleanupTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -46,6 +57,7 @@ class MediaFileCleanupTests(TestCase):
         # Recently deleted file
         self.recent_deleted = MediaFile.objects.create(
             title="Recent Deleted",
+            slug="recent-deleted",
             original_filename="recent.jpg",
             file_path="test/recent.jpg",
             file_size=1000,
@@ -53,6 +65,7 @@ class MediaFileCleanupTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -61,6 +74,7 @@ class MediaFileCleanupTests(TestCase):
         # Old deleted file
         self.old_deleted = MediaFile.objects.create(
             title="Old Deleted",
+            slug="old-deleted",
             original_filename="old.jpg",
             file_path="test/old.jpg",
             file_size=1000,
@@ -68,17 +82,19 @@ class MediaFileCleanupTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
         self.old_deleted.delete(user=self.user)
         # Manually update deleted_at to be old
         old_date = timezone.now() - timedelta(days=60)
-        MediaFile.objects.filter(id=self.old_deleted.id).update(deleted_at=old_date)
+        MediaFile.objects.with_deleted().filter(id=self.old_deleted.id).update(deleted_at=old_date)
 
         # Old deleted file with references
         self.referenced_deleted = MediaFile.objects.create(
             title="Referenced Deleted",
+            slug="referenced-deleted",
             original_filename="referenced.jpg",
             file_path="test/referenced.jpg",
             file_size=1000,
@@ -86,11 +102,12 @@ class MediaFileCleanupTests(TestCase):
             file_type="image",
             file_hash=str(uuid.uuid4()),
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
         self.referenced_deleted.delete(user=self.user)
-        MediaFile.objects.filter(id=self.referenced_deleted.id).update(
+        MediaFile.objects.with_deleted().filter(id=self.referenced_deleted.id).update(
             deleted_at=old_date,
             reference_count=1,
             referenced_in={"webpage": [str(uuid.uuid4())]},
@@ -140,6 +157,10 @@ class MediaFileCleanupTests(TestCase):
 
     def test_cleanup_command_custom_days(self):
         """Test the cleanup command with custom retention period."""
+        # Update recent_deleted to be 10 days old
+        recent_date = timezone.now() - timedelta(days=10)
+        MediaFile.objects.with_deleted().filter(id=self.recent_deleted.id).update(deleted_at=recent_date)
+
         # Run cleanup with 7 days retention
         call_command("cleanup_deleted_files", days=7)
 
@@ -162,8 +183,8 @@ class MediaFileCleanupTests(TestCase):
     @patch("file_manager.tasks.call_command")
     def test_cleanup_celery_task(self, mock_call_command):
         """Test the Celery task for cleanup."""
-        # Run the Celery task
-        cleanup_deleted_files.delay(days=30, batch_size=100)
+        # Run the task directly to avoid Redis connection issues in tests
+        cleanup_deleted_files(days=30, batch_size=100)
 
         # Check that the management command was called with correct args
         mock_call_command.assert_called_once_with(
@@ -178,6 +199,7 @@ class MediaFileCleanupTests(TestCase):
         for i in range(150):  # Create more than the default batch size
             file = MediaFile.objects.create(
                 title=f"Batch File {i}",
+                slug=f"batch-file-{i}",
                 original_filename=f"batch_{i}.jpg",
                 file_path=f"test/batch_{i}.jpg",
                 file_size=1000,
@@ -185,6 +207,7 @@ class MediaFileCleanupTests(TestCase):
                 file_type="image",
                 file_hash=str(uuid.uuid4()),
                 namespace=self.namespace,
+                tenant=self.tenant,
                 created_by=self.user,
                 last_modified_by=self.user,
             )
@@ -192,7 +215,7 @@ class MediaFileCleanupTests(TestCase):
             batch_files.append(file.id)
 
         # Update all files to be old
-        MediaFile.objects.filter(id__in=batch_files).update(deleted_at=old_date)
+        MediaFile.objects.with_deleted().filter(id__in=batch_files).update(deleted_at=old_date)
 
         # Run cleanup with small batch size
         call_command("cleanup_deleted_files", batch_size=50)

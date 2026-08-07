@@ -404,8 +404,15 @@ class ThemeService:
 
         created_themes = []
         for theme_data in default_themes:
+            # Get the first tenant or a default one since this is for demonstration
+            from core.models import Tenant
+            tenant = Tenant.objects.first()
+            if not tenant:
+                continue
+
             theme, created = PageTheme.objects.get_or_create(
                 name=theme_data["name"],
+                tenant=tenant,
                 defaults={
                     "description": theme_data["description"],
                     "css_variables": theme_data["css_variables"],

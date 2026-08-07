@@ -22,7 +22,7 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
     // Fetch available tags for suggestions
     const { data: availableTagsResponse } = useQuery({
         queryKey: ['tags'],
-        queryFn: () => tagsApi.list(),
+        queryFn: async () => await tagsApi.list(),
         enabled: !disabled
     })
 

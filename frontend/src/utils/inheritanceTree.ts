@@ -23,6 +23,10 @@ export class InheritanceTreeHelpers {
     /**Helper functions for inheritance tree queries*/
     
     constructor(private tree: InheritanceTreeNode) {}
+
+    private isVisibleAtCurrentDepth(widget: TreeWidget): boolean {
+        return widget.inheritanceLevel === -1 || widget.depth <= widget.inheritanceLevel
+    }
     
     // Core Query Functions
     
@@ -46,10 +50,12 @@ export class InheritanceTreeHelpers {
         
         collectFromNode(this.tree)
         
+        const visibleWidgets = widgets.filter(widget => this.isVisibleAtCurrentDepth(widget))
+
         // Sort by depth (current page first)
-        widgets.sort((a, b) => a.depth - b.depth)
+        visibleWidgets.sort((a, b) => a.depth - b.depth)
         
-        return widgets
+        return visibleWidgets
     }
     
     getWidgetsByType(widgetType: string, slotName?: string): TreeWidget[] {
@@ -68,7 +74,7 @@ export class InheritanceTreeHelpers {
             for (const slot of slotsToCheck) {
                 if (slot in node.slots) {
                     for (const widget of node.slots[slot]) {
-                        if (widget.type === widgetType) {
+                        if (widget.type === widgetType && this.isVisibleAtCurrentDepth(widget)) {
                             widgets.push(widget)
                         }
                     }
@@ -82,8 +88,8 @@ export class InheritanceTreeHelpers {
         
         collectFromNode(this.tree)
         
-        // Sort by depth, then by order
-        widgets.sort((a, b) => a.depth - b.depth || a.order - b.order)
+        // Sort by depth (ancestor widgets first), then by order.
+        widgets.sort((a, b) => b.depth - a.depth || a.order - b.order)
         
         return widgets
     }
@@ -127,7 +133,7 @@ export class InheritanceTreeHelpers {
                 const slotsToCheck = slotName ? [slotName] : Object.keys(node.slots)
                 for (const slot of slotsToCheck) {
                     if (slot in node.slots) {
-                        widgets.push(...node.slots[slot])
+                        widgets.push(...node.slots[slot].filter(widget => this.isVisibleAtCurrentDepth(widget)))
                     }
                 }
             }
@@ -175,23 +181,28 @@ export class InheritanceTreeHelpers {
         
         // Group widgets by inheritance behavior
         const overrideWidgets = allWidgets.filter(w => w.inheritanceBehavior === WidgetInheritanceBehavior.OVERRIDE_PARENT)
-        const beforeWidgets = allWidgets.filter(w => w.inheritanceBehavior === WidgetInheritanceBehavior.INSERT_BEFORE_PARENT)
-        const afterWidgets = allWidgets.filter(w => w.inheritanceBehavior === WidgetInheritanceBehavior.INSERT_AFTER_PARENT)
         
         // Apply inheritance behavior logic
         if (overrideWidgets.length > 0) {
-            // Override widgets replace ALL other widgets
-            return overrideWidgets.sort((a, b) => a.depth - b.depth || a.order - b.order)
+            const closestOverrideDepth = Math.min(...overrideWidgets.map(w => w.depth))
+            allWidgets = allWidgets.filter(w => w.depth <= closestOverrideDepth)
         }
+
+        const visibleOverrideWidgets = allWidgets.filter(w => w.inheritanceBehavior === WidgetInheritanceBehavior.OVERRIDE_PARENT)
+        const visibleBeforeWidgets = allWidgets.filter(w => w.inheritanceBehavior === WidgetInheritanceBehavior.INSERT_BEFORE_PARENT)
+        const visibleAfterWidgets = allWidgets.filter(w => w.inheritanceBehavior === WidgetInheritanceBehavior.INSERT_AFTER_PARENT)
         
         // Combine: before + inherited (after) widgets
         const result: TreeWidget[] = []
         
-        // Add before widgets (sorted by depth, then order)
-        result.push(...beforeWidgets.sort((a, b) => a.depth - b.depth || a.order - b.order))
+        // Add before widgets from current page upward.
+        result.push(...visibleBeforeWidgets.sort((a, b) => a.depth - b.depth || a.order - b.order))
+
+        // Add override widgets after local "before" insertions.
+        result.push(...visibleOverrideWidgets.sort((a, b) => a.depth - b.depth || a.order - b.order))
         
-        // Add after widgets (sorted by depth, then order)
-        result.push(...afterWidgets.sort((a, b) => a.depth - b.depth || a.order - b.order))
+        // Add after widgets from ancestors down to the current page.
+        result.push(...visibleAfterWidgets.sort((a, b) => b.depth - a.depth || a.order - b.order))
         
         return result
     }
@@ -212,7 +223,7 @@ export class InheritanceTreeHelpers {
             for (const slot of slotsToCheck) {
                 if (slot in node.slots) {
                     for (const widget of node.slots[slot]) {
-                        if (widget.inheritanceBehavior === behavior) {
+                        if (widget.inheritanceBehavior === behavior && this.isVisibleAtCurrentDepth(widget)) {
                             widgets.push(widget)
                         }
                     }
@@ -342,7 +353,7 @@ export class InheritanceTreeHelpers {
         
         const targetNode = findNodeAtDepth(this.tree)
         if (targetNode && slotName in targetNode.slots) {
-            return targetNode.slots[slotName]
+            return targetNode.slots[slotName].filter(widget => this.isVisibleAtCurrentDepth(widget))
         }
         
         return []

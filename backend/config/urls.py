@@ -27,13 +27,12 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from webpages.public_views import HostnamePageView
 from webpages.views.lightbox import lightbox_item_view, lightbox_group_view
 from file_manager.views.utils import MediaFileProxyView
+from file_manager.views.imgproxy_proxy import ImgProxyProxyView
 
 
 def health_check(request):
     """Simple health check endpoint for container monitoring."""
-    return JsonResponse(
-        {"status": "healthy", "service": "eceee-v4-backend", "version": "1.0.0"}
-    )
+    return JsonResponse({"status": "healthy", "service": "eceee-v4-backend", "version": "1.0.0"})
 
 
 # CSRF token endpoint for React frontend
@@ -42,7 +41,9 @@ def csrf_token_view(request):
     """
     Endpoint to provide CSRF token for React frontend
     """
-    return JsonResponse({"csrfToken": request.META.get("CSRF_COOKIE")})
+    from django.middleware.csrf import get_token
+
+    return JsonResponse({"csrfToken": get_token(request)})
 
 
 urlpatterns = [
@@ -80,9 +81,15 @@ urlpatterns = [
         MediaFileProxyView.as_view(),
         name="media-file-proxy-root",
     ),
+    # Same-origin imgproxy relay for local browsers that block localhost:8080 assets.
+    path(
+        "imgproxy/<path:path>",
+        ImgProxyProxyView.as_view(),
+        name="imgproxy-proxy",
+    ),
     # Multi-site hostname-aware routing - MUST be last for catch-all functionality
     path("", HostnamePageView.as_view(), name="hostname-root"),
-    path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),
+    path("<path:slug_path>", HostnamePageView.as_view(), name="hostname-page-detail"),
 ]
 
 # Development URLs

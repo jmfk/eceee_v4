@@ -3,6 +3,7 @@ Navbar widget implementation.
 """
 
 from typing import Type, List, Optional, Literal
+import logging
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -10,6 +11,8 @@ from webpages.widget_registry import BaseWidget, register_widget_type
 from file_manager.imgproxy import imgproxy_service
 from utils.dict_utils import DictToObj
 from easy_widgets.models import LinkData
+
+logger = logging.getLogger(__name__)
 
 
 class NavbarItem(BaseModel):
@@ -108,6 +111,7 @@ class NavbarWidget(BaseWidget):
 
     name = "Navbar"
     description = "Navigation bar with configurable menu items"
+    template_name = None
     mustache_template_name = "easy_widgets/widgets/navbar.mustache"
 
     layout_parts = {
@@ -230,21 +234,32 @@ class NavbarWidget(BaseWidget):
         """Prepare navbar menu items for Mustache template (styling from design groups)"""
         template_config = super().prepare_template_context(config, context)
 
-        # Process and filter menu items
-        processed_menu_items = self._process_menu_items(
-            config.get("menu_items", []), context
+        menu_items = (
+            config.get("menu_items")
+            if config.get("menu_items") is not None
+            else config.get("menuItems", [])
         )
+        secondary_menu_items = (
+            config.get("secondary_menu_items")
+            if config.get("secondary_menu_items") is not None
+            else config.get("secondaryMenuItems", [])
+        )
+
+        # Process and filter menu items
+        processed_menu_items = self._process_menu_items(menu_items or [], context)
         template_config["menuItems"] = processed_menu_items
 
         # Same for secondary menu items
         processed_secondary = self._process_menu_items(
-            config.get("secondary_menu_items", []), context, is_secondary=True
+            secondary_menu_items or [], context, is_secondary=True
         )
         template_config["secondaryMenuItems"] = processed_secondary
         template_config["hasSecondaryMenuItems"] = len(processed_secondary) > 0
 
         # Add hamburger breakpoint
-        template_config["hamburgerBreakpoint"] = config.get("hamburger_breakpoint", 768)
+        template_config["hamburgerBreakpoint"] = (
+            config.get("hamburger_breakpoint") or config.get("hamburgerBreakpoint") or 768
+        )
 
         # Add widget type CSS class
         template_config["widgetTypeCssClass"] = self.css_class_name
@@ -263,10 +278,6 @@ class NavbarWidget(BaseWidget):
         if not menu_items:
             return []
 
-        # Get hostname from request
-        request = context.get("request") if context else None
-        hostname = request.get_host().lower() if request else None
-
         # Get theme colors for CSS variable conversion
         theme = context.get("theme") if context else None
         theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
@@ -276,7 +287,21 @@ class NavbarWidget(BaseWidget):
         internal_page_ids = {}  # page_id -> [item_indices]
 
         for idx, item in enumerate(menu_items):
-            link_data = LinkData(**item.get("link_data"))
+            link_data_payload = item.get("link_data") or item.get("linkData") or {}
+            if not link_data_payload:
+                continue
+
+            link_data_payload = self._normalize_link_data(link_data_payload)
+
+            try:
+                link_data = LinkData(**link_data_payload)
+            except Exception as exc:
+                logger.warning(
+                    "Skipping invalid navbar menu item at index %s: %s",
+                    idx,
+                    exc,
+                )
+                continue
 
             # Skip inactive items
             if not link_data.is_active:
@@ -298,9 +323,9 @@ class NavbarWidget(BaseWidget):
             if is_secondary:
                 from webpages.utils.color_utils import resolve_color_value
 
-                bg_color = item.get("background_color")
-                txt_color = item.get("text_color")
-                bg_image = item.get("background_image")
+                bg_color = item.get("background_color") or item.get("backgroundColor")
+                txt_color = item.get("text_color") or item.get("textColor")
+                bg_image = item.get("background_image") or item.get("backgroundImage")
 
                 # Extract imgproxy_base_url if background_image is a dict
                 if bg_image and isinstance(bg_image, dict):
@@ -338,13 +363,14 @@ class NavbarWidget(BaseWidget):
                 processed_items.append(processed)
             elif link_data.type == "media":
                 from webpages.services.link_resolver import resolve_link
+
                 # Create a link object for the resolver
                 link_obj = {
                     "type": "media",
                     "mediaId": link_data.media_id,
                     "url": link_data.url,
                     "title": link_data.title,
-                    "mimeType": link_data.mime_type
+                    "mimeType": link_data.mime_type,
                 }
                 processed["url"] = resolve_link(link_obj, context.get("request"))
                 processed_items.append(processed)
@@ -357,40 +383,18 @@ class NavbarWidget(BaseWidget):
                 id__in=internal_page_ids.keys(),
                 is_deleted=False,
                 is_currently_published=True,
-            ).values("id", "cached_path", "cached_root_hostnames")
+            ).values("id", "cached_path")
 
-            # Build lookup with hostname info
-            page_data = {
-                p["id"]: {
-                    "path": p["cached_path"],
-                    "hostnames": p["cached_root_hostnames"],
-                }
-                for p in page_query
-            }
+            page_paths = {p["id"]: p["cached_path"] for p in page_query}
 
             # Update processed items with resolved paths
             for page_id, indices in internal_page_ids.items():
-                data = page_data.get(page_id)
-                if data:
-                    path = data["path"]
-                    target_hostnames = data["hostnames"]
-
-                    # Check if target page is on different hostname
-                    url = path
-                    if target_hostnames and hostname:
-                        target_hostname = target_hostnames[0]
-                        if target_hostname.lower() != hostname.lower():
-                            # Build absolute URL with protocol
-                            if target_hostname.startswith(("localhost", "127.0.0.1")):
-                                protocol = "http"
-                            else:
-                                protocol = "https"
-                            url = f"{protocol}://{target_hostname}{path}"
-
+                path = page_paths.get(page_id)
+                if path is not None:
                     for idx in indices:
                         anchor = processed_items[idx].get("anchor")
                         processed_items[idx]["url"] = (
-                            f"{url}#{anchor}" if anchor else url
+                            f"{path}#{anchor}" if anchor else path
                         )
                         valid_indices.add(idx)
 
@@ -405,3 +409,25 @@ class NavbarWidget(BaseWidget):
         processed_items = sorted(processed_items, key=lambda x: x.get("order", 0))
 
         return processed_items
+
+    def _normalize_link_data(self, link_data):
+        """Fill legacy/camelCase link records enough to render safely."""
+        normalized = dict(link_data)
+
+        if not normalized.get("type"):
+            if normalized.get("page_id") or normalized.get("pageId"):
+                normalized["type"] = "internal"
+            elif normalized.get("address"):
+                normalized["type"] = "email"
+            elif normalized.get("number"):
+                normalized["type"] = "phone"
+            elif normalized.get("anchor"):
+                normalized["type"] = "anchor"
+            else:
+                normalized["type"] = "external"
+                if not normalized.get("url"):
+                    normalized["url"] = (
+                        "/" if normalized.get("label") == "Home" else "#"
+                    )
+
+        return normalized

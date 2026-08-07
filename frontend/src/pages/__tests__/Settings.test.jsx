@@ -1,67 +1,110 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axios from 'axios'
 import Settings from '../SettingsManager'
-import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
-import { NotificationProvider } from '../../components/NotificationManager'
+import { getSettingsHelpTopic } from '../../utils/howToHelp'
+import { renderWithStateProviders } from '../../test/testUtils'
 
-// Mock axios
-vi.mock('axios', () => ({
-    default: {
-        get: vi.fn(),
-        post: vi.fn(),
-        put: vi.fn(),
-        delete: vi.fn(),
-        create: vi.fn(() => ({
-            get: vi.fn(),
-            post: vi.fn(),
-            put: vi.fn(),
-            delete: vi.fn(),
-            interceptors: {
-                request: {
-                    use: vi.fn()
-                },
-                response: {
-                    use: vi.fn()
-                }
-            }
-        }))
-    }
+const routerMocks = vi.hoisted(() => ({
+    pathname: '/settings',
+    searchParams: new URLSearchParams(),
+    navigate: vi.fn(),
+    setSearchParams: vi.fn(),
 }))
-const mockedAxios = axios
 
-// Mock child components
+vi.mock('react-router-dom', async () => {
+    const actual = await vi.importActual('react-router-dom')
+    return {
+        ...actual,
+        useNavigate: () => routerMocks.navigate,
+        useLocation: () => ({
+            pathname: routerMocks.pathname,
+            search: routerMocks.searchParams.toString() ? `?${routerMocks.searchParams.toString()}` : '',
+            hash: '',
+            state: null,
+        }),
+        useSearchParams: () => [routerMocks.searchParams, routerMocks.setSearchParams],
+    }
+})
+
+vi.mock('../../api/client.js', () => ({
+    api: {
+        get: vi.fn(() => Promise.resolve({ data: { results: [], count: 0 } })),
+        post: vi.fn(() => Promise.resolve({ data: {} })),
+        patch: vi.fn(() => Promise.resolve({ data: {} })),
+        delete: vi.fn(() => Promise.resolve({ data: {} })),
+    },
+}))
+
+vi.mock('../../api/layouts', () => ({
+    layoutsApi: {
+        combined: {
+            listAll: vi.fn(() => Promise.resolve({ codeLayouts: [] })),
+        },
+    },
+}))
+
+vi.mock('../../hooks/useDocumentTitle', () => ({
+    useDocumentTitle: vi.fn(),
+}))
+
+vi.mock('../../components/SettingsDashboard', () => ({
+    default: () => <div data-testid="settings-dashboard">Settings Dashboard</div>,
+}))
+
 vi.mock('../../components/LayoutEditor', () => ({
     default: () => <div data-testid="layout-editor">Layout Editor Component</div>,
 }))
 
 vi.mock('../../components/ThemeEditor', () => ({
-    default: () => <div data-testid="theme-editor">Theme Editor Component</div>,
-}))
-
-vi.mock('../../components/SlotManager', () => ({
-    default: ({ pageId, layout }) => (
-        <div data-testid="slot-manager">
-            Slot Manager for page {pageId} with layout {layout?.name || 'None'}
+    default: ({ onSave }) => (
+        <div data-testid="theme-editor">
+            Theme Editor Component
+            <button type="button" onClick={() => onSave(() => Promise.resolve())}>
+                Register Save
+            </button>
         </div>
     ),
+}))
+
+vi.mock('../../components/StatusBar', () => ({
+    default: ({ onSaveClick }) => (
+        <div data-testid="status-bar">
+            Theme status
+            <button type="button" onClick={onSaveClick}>Save Theme</button>
+        </div>
+    ),
+}))
+
+vi.mock('../../components/WidgetManager', () => ({
+    default: () => <div data-testid="widget-manager">Widget Manager</div>,
+}))
+
+vi.mock('../../components/ValueListEditor', () => ({
+    default: () => <div data-testid="value-list-editor">Value List Editor</div>,
+}))
+
+vi.mock('../../components/ObjectTypeManager', () => ({
+    default: () => <div data-testid="object-type-manager">Object Type Manager</div>,
+}))
+
+vi.mock('../../components/NamespaceManager', () => ({
+    default: () => <div data-testid="namespace-manager">Namespace Manager</div>,
+}))
+
+vi.mock('../../components/DataConnectionsManager', () => ({
+    default: () => <div data-testid="data-connections-manager">Data Connections Manager</div>,
+}))
+
+vi.mock('../../components/contentMigration/MigrationManager', () => ({
+    default: () => <div data-testid="migration-manager">Migration Manager</div>,
 }))
 
 vi.mock('../../components/VersionManager', () => ({
     default: ({ pageId, onClose }) => (
         <div data-testid="version-manager">
             Version Manager for page {pageId}
-            <button onClick={onClose}>Close</button>
-        </div>
-    ),
-}))
-
-vi.mock('../../components/ObjectPublisher', () => ({
-    default: ({ pageId, onObjectLinked, onObjectUnlinked }) => (
-        <div data-testid="object-publisher">
-            Object Publisher for page {pageId}
+            <button type="button" onClick={onClose}>Close</button>
         </div>
     ),
 }))
@@ -78,392 +121,169 @@ vi.mock('../../components/BulkPublishingOperations', () => ({
     default: () => <div data-testid="bulk-publishing-operations">Bulk Publishing Operations</div>,
 }))
 
-vi.mock('../../components/TreePageManager', () => ({
-    default: ({ onEditPage }) => (
-        <div data-testid="tree-page-manager">
-            Tree Page Manager
-            <button onClick={() => onEditPage(null)}>Create Page</button>
-        </div>
-    ),
-}))
+const renderSettings = (path = '/settings', search = '') => {
+    routerMocks.pathname = path
+    routerMocks.searchParams = new URLSearchParams(search)
+    routerMocks.setSearchParams = vi.fn((params) => {
+        routerMocks.searchParams = params instanceof URLSearchParams
+            ? params
+            : new URLSearchParams(params)
+    })
 
-// Mock layout utils
-vi.mock('../../api/layouts', () => ({
-    layoutsApi: {
-        combined: {
-            listAll: vi.fn()
-        }
-    }
-}))
+    return renderWithStateProviders(<Settings />)
+}
 
-// Mock react-hot-toast
-vi.mock('react-hot-toast', () => ({
-    default: {
-        success: vi.fn(),
-        error: vi.fn(),
-    },
-}))
-
-describe('Settings', () => {
-    let queryClient
-
+describe('SettingsManager', () => {
     beforeEach(() => {
-        queryClient = new QueryClient({
-            defaultOptions: {
-                queries: { retry: false },
-                mutations: { retry: false },
-            },
-        })
         vi.clearAllMocks()
+        routerMocks.pathname = '/settings'
+        routerMocks.searchParams = new URLSearchParams()
     })
 
-    const renderWithQueryClient = (component) => {
-        return render(
-            <QueryClientProvider client={queryClient}>
-                <GlobalNotificationProvider>
-                    <NotificationProvider>
-                        {component}
-                    </NotificationProvider>
-                </GlobalNotificationProvider>
-            </QueryClientProvider>
-        )
-    }
+    it('renders the dashboard by default', () => {
+        renderSettings('/settings')
 
-    it('renders the main heading correctly', () => {
-        renderWithQueryClient(<Settings />)
-        expect(screen.getByText('Settings')).toBeInTheDocument()
+        expect(screen.getByTestId('settings-dashboard')).toBeInTheDocument()
     })
 
-    it('renders all navigation tabs', () => {
-        renderWithQueryClient(<Settings />)
-        expect(screen.getByText('Page Tree')).toBeInTheDocument()
-        expect(screen.getByText('Pages')).toBeInTheDocument()
-        expect(screen.getByText('Layouts')).toBeInTheDocument()
-        expect(screen.getByText('Themes')).toBeInTheDocument()
-        expect(screen.getByText('Widgets')).toBeInTheDocument()
-        expect(screen.getByText('Versions')).toBeInTheDocument()
-        expect(screen.getByText('Object Publishing')).toBeInTheDocument()
-        expect(screen.getByText('Publishing Workflow')).toBeInTheDocument()
+    it('falls back to the dashboard for unknown settings paths', () => {
+        renderSettings('/settings/unknown')
+
+        expect(screen.getByTestId('settings-dashboard')).toBeInTheDocument()
     })
 
-    it('defaults to tree tab', () => {
-        renderWithQueryClient(<Settings />)
-        expect(screen.getByTestId('tree-page-manager')).toBeInTheDocument()
-    })
+    it('renders layout management from the layouts route', () => {
+        renderSettings('/settings/layouts')
 
-    it('can switch between tabs', async () => {
-        renderWithQueryClient(<Settings />)
-
-        // Click on Pages tab
-        await userEvent.click(screen.getByText('Pages'))
-        expect(screen.getByText('Search pages...')).toBeInTheDocument()
-
-        // Click on Layouts tab
-        await userEvent.click(screen.getByText('Layouts'))
         expect(screen.getByTestId('layout-editor')).toBeInTheDocument()
+    })
 
-        // Click on Themes tab
-        await userEvent.click(screen.getByText('Themes'))
+    it('links settings sections to contextual how-to anchors', async () => {
+        const user = userEvent.setup()
+        renderSettings('/settings/themes')
+
+        await user.click(screen.getByRole('button', { name: /open settings help/i }))
+
+        expect(screen.getByRole('menuitem', { name: /edit themes/i })).toHaveAttribute(
+            'href',
+            '/help/how-to/settings-themes'
+        )
+        expect(screen.getByRole('menuitem', { name: /edit themes/i })).toHaveAttribute('target', '_blank')
+    })
+
+    it('maps active settings tabs to the expected help topics', () => {
+        expect(getSettingsHelpTopic('layouts')).toBe('settings-layouts')
+        expect(getSettingsHelpTopic('themes')).toBe('settings-themes')
+        expect(getSettingsHelpTopic('publishing')).toBe('settings-publishing')
+        expect(getSettingsHelpTopic('widgets')).toBe('widgets-edit')
+        expect(getSettingsHelpTopic('unknown')).toBe('settings')
+    })
+
+    it('renders theme management for theme routes and shows the theme status bar', () => {
+        renderSettings('/settings/themes/1/colors')
+
+        expect(screen.getByTestId('theme-editor')).toBeInTheDocument()
+        expect(screen.getByTestId('status-bar')).toBeInTheDocument()
+    })
+
+    it('wires the theme save callback into the status bar', async () => {
+        const user = userEvent.setup()
+        renderSettings('/settings/themes')
+
+        await user.click(screen.getByRole('button', { name: /register save/i }))
+        await user.click(screen.getByRole('button', { name: /save theme/i }))
+
         expect(screen.getByTestId('theme-editor')).toBeInTheDocument()
     })
 
-    it('shows empty state when no page is selected for widgets tab', async () => {
-        renderWithQueryClient(<Settings />)
+    it('renders widget management from the widgets route', () => {
+        renderSettings('/settings/widgets')
 
-        // Click on Widgets tab
-        await userEvent.click(screen.getByText('Widgets'))
-        expect(screen.getByText('Select a page from the Pages tab to manage its widgets')).toBeInTheDocument()
+        expect(screen.getByTestId('widget-manager')).toBeInTheDocument()
     })
 
-    it('shows empty state when no page is selected for versions tab', async () => {
-        renderWithQueryClient(<Settings />)
+    it('renders value list management from the value-lists route', () => {
+        renderSettings('/settings/value-lists')
 
-        // Click on Versions tab
-        await userEvent.click(screen.getByText('Versions'))
+        expect(screen.getByTestId('value-list-editor')).toBeInTheDocument()
+    })
+
+    it('renders object type management from the object-types route', () => {
+        renderSettings('/settings/object-types')
+
+        expect(screen.getByTestId('object-type-manager')).toBeInTheDocument()
+    })
+
+    it('renders namespace management from the namespaces route', () => {
+        renderSettings('/settings/namespaces')
+
+        expect(screen.getByTestId('namespace-manager')).toBeInTheDocument()
+    })
+
+    it('renders data connection management from nested data-connections routes', () => {
+        renderSettings('/settings/data-connections/new')
+
+        expect(screen.getByTestId('data-connections-manager')).toBeInTheDocument()
+    })
+
+    it('renders content migration from nested content-migration routes', () => {
+        renderSettings('/settings/content-migration/jobs')
+
+        expect(screen.getByTestId('migration-manager')).toBeInTheDocument()
+    })
+
+    it('renders version empty state from the versions route', () => {
+        renderSettings('/settings/versions')
+
         expect(screen.getByText('Select a page from the Pages tab to view its version history')).toBeInTheDocument()
     })
 
-    it('shows empty state when no page is selected for object publishing tab', async () => {
-        renderWithQueryClient(<Settings />)
+    it('renders publishing dashboard by default on the publishing route', () => {
+        renderSettings('/settings/publishing')
 
-        // Click on Object Publishing tab
-        await userEvent.click(screen.getByText('Object Publishing'))
-        expect(screen.getByText('Select a page from the Pages tab to manage object publishing')).toBeInTheDocument()
+        expect(screen.getByTestId('publication-status-dashboard')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /status dashboard/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /publication timeline/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /bulk operations/i })).toBeInTheDocument()
     })
 
-    describe('Pages tab functionality', () => {
-        beforeEach(() => {
-            mockedAxios.get.mockResolvedValue({
-                data: {
-                    results: [
-                        {
-                            id: 1,
-                            title: 'Home Page',
-                            slug: 'home',
-                            description: 'Main homepage',
-                            publication_status: 'published',
-                            layout: { id: 1, name: 'Default Layout' },
-                            theme: { id: 1, name: 'Default Theme' }
-                        },
-                        {
-                            id: 2,
-                            title: 'About Page',
-                            slug: 'about',
-                            description: 'About us page',
-                            publication_status: 'unpublished',
-                            layout: null,
-                            theme: null
-                        }
-                    ]
-                }
-            })
-        })
+    it('renders the publishing timeline from search params', () => {
+        renderSettings('/settings/publishing', 'publishingView=timeline')
 
-        it('loads and displays pages', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab
-            await userEvent.click(screen.getByText('Pages'))
-
-            // Wait for pages to load
-            await waitFor(() => {
-                expect(screen.getByText('Home Page')).toBeInTheDocument()
-                expect(screen.getByText('About Page')).toBeInTheDocument()
-            })
-        })
-
-        it('allows searching pages', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab
-            await userEvent.click(screen.getByText('Pages'))
-
-            // Wait for pages to load
-            await waitFor(() => {
-                expect(screen.getByText('Home Page')).toBeInTheDocument()
-            })
-
-            // Search for "home"
-            const searchInput = screen.getByPlaceholderText('Search pages...')
-            await userEvent.type(searchInput, 'home')
-
-            // Should only show home page
-            expect(screen.getByText('Home Page')).toBeInTheDocument()
-            expect(screen.queryByText('About Page')).not.toBeInTheDocument()
-        })
-
-        it('can select a page and show its details', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab
-            await userEvent.click(screen.getByText('Pages'))
-
-            // Wait for pages to load and click on a page
-            await waitFor(() => {
-                expect(screen.getByText('Home Page')).toBeInTheDocument()
-            })
-
-            await userEvent.click(screen.getByText('Home Page'))
-
-            // Should show page details
-            expect(screen.getByText('Page Details')).toBeInTheDocument()
-        })
-
-        it('shows new page form when create button is clicked', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab
-            await userEvent.click(screen.getByText('Pages'))
-
-            // Click new page button
-            await userEvent.click(screen.getByText('New Page'))
-
-            // Should show create form
-            expect(screen.getByText('Create New Page')).toBeInTheDocument()
-            expect(screen.getByLabelText('Page Title *')).toBeInTheDocument()
-        })
-
-        it('can toggle filters', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab
-            await userEvent.click(screen.getByText('Pages'))
-
-            // Click filters button
-            await userEvent.click(screen.getByText('Filters'))
-
-            // Should show filter dropdowns
-            expect(screen.getByLabelText('Status')).toBeInTheDocument()
-            expect(screen.getByLabelText('Layout')).toBeInTheDocument()
-        })
+        expect(screen.getByTestId('publication-timeline')).toBeInTheDocument()
     })
 
-    describe('Widget management', () => {
-        beforeEach(() => {
-            mockedAxios.get.mockResolvedValue({
-                data: {
-                    results: [
-                        {
-                            id: 1,
-                            title: 'Test Page',
-                            slug: 'test',
-                            layout: { id: 1, name: 'Test Layout' }
-                        }
-                    ]
-                }
-            })
-        })
+    it('renders publishing bulk operations from search params', () => {
+        renderSettings('/settings/publishing', 'publishingView=bulk')
 
-        it('shows slot manager when page with layout is selected', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab and wait for data
-            await userEvent.click(screen.getByText('Pages'))
-            await waitFor(() => {
-                expect(screen.getByText('Test Page')).toBeInTheDocument()
-            })
-
-            // Select the page
-            await userEvent.click(screen.getByText('Test Page'))
-
-            // Switch to widgets tab
-            await userEvent.click(screen.getByText('Widgets'))
-
-            // Should show slot manager
-            expect(screen.getByTestId('slot-manager')).toBeInTheDocument()
-        })
-
-        it('shows no layout message when page has no layout', async () => {
-            // Mock page without layout
-            mockedAxios.get.mockResolvedValue({
-                data: {
-                    results: [
-                        {
-                            id: 1,
-                            title: 'Test Page',
-                            slug: 'test',
-                            layout: null
-                        }
-                    ]
-                }
-            })
-
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab and wait for data
-            await userEvent.click(screen.getByText('Pages'))
-            await waitFor(() => {
-                expect(screen.getByText('Test Page')).toBeInTheDocument()
-            })
-
-            // Select the page
-            await userEvent.click(screen.getByText('Test Page'))
-
-            // Switch to widgets tab
-            await userEvent.click(screen.getByText('Widgets'))
-
-            // Should show no layout message
-            expect(screen.getByText('This page has no layout assigned')).toBeInTheDocument()
-        })
+        expect(screen.getByTestId('bulk-publishing-operations')).toBeInTheDocument()
     })
 
-    describe('Version management', () => {
-        beforeEach(() => {
-            mockedAxios.get.mockResolvedValue({
-                data: {
-                    results: [
-                        {
-                            id: 1,
-                            title: 'Test Page',
-                            slug: 'test'
-                        }
-                    ]
-                }
-            })
-        })
+    it('updates publishing search params when switching publishing tabs', async () => {
+        const user = userEvent.setup()
+        renderSettings('/settings/publishing')
 
-        it('opens version manager modal when button is clicked', async () => {
-            renderWithQueryClient(<Settings />)
+        await user.click(screen.getByRole('button', { name: /publication timeline/i }))
 
-            // Switch to pages tab and wait for data
-            await userEvent.click(screen.getByText('Pages'))
-            await waitFor(() => {
-                expect(screen.getByText('Test Page')).toBeInTheDocument()
-            })
-
-            // Select the page
-            await userEvent.click(screen.getByText('Test Page'))
-
-            // Switch to versions tab
-            await userEvent.click(screen.getByText('Versions'))
-
-            // Click open version manager button
-            await userEvent.click(screen.getByText('Open Version Manager'))
-
-            // Should show version manager modal
-            expect(screen.getByTestId('version-manager')).toBeInTheDocument()
-        })
+        expect(routerMocks.setSearchParams).toHaveBeenCalled()
+        expect(routerMocks.searchParams.get('publishingView')).toBe('timeline')
     })
 
-    describe('Object publishing', () => {
-        beforeEach(() => {
-            mockedAxios.get.mockResolvedValue({
-                data: {
-                    results: [
-                        {
-                            id: 1,
-                            title: 'Test Page',
-                            slug: 'test'
-                        }
-                    ]
-                }
-            })
-        })
+    it('uses exact route matching for widgets so nested widget paths fall back', () => {
+        renderSettings('/settings/widgets/extra')
 
-        it('shows object publisher when page is selected', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to pages tab and wait for data
-            await userEvent.click(screen.getByText('Pages'))
-            await waitFor(() => {
-                expect(screen.getByText('Test Page')).toBeInTheDocument()
-            })
-
-            // Select the page
-            await userEvent.click(screen.getByText('Test Page'))
-
-            // Switch to object publishing tab
-            await userEvent.click(screen.getByText('Object Publishing'))
-
-            // Should show object publisher
-            expect(screen.getByTestId('object-publisher')).toBeInTheDocument()
-        })
+        expect(screen.getByTestId('settings-dashboard')).toBeInTheDocument()
     })
 
-    describe('Publishing workflow', () => {
-        it('shows publication status dashboard by default', async () => {
-            renderWithQueryClient(<Settings />)
+    it('uses exact route matching for versions so nested version paths fall back', () => {
+        renderSettings('/settings/versions/1')
 
-            // Switch to publishing workflow tab
-            await userEvent.click(screen.getByText('Publishing Workflow'))
-
-            // Should show status dashboard
-            expect(screen.getByTestId('publication-status-dashboard')).toBeInTheDocument()
-        })
-
-        it('can switch between publishing workflow sub-tabs', async () => {
-            renderWithQueryClient(<Settings />)
-
-            // Switch to publishing workflow tab
-            await userEvent.click(screen.getByText('Publishing Workflow'))
-
-            // Click on timeline tab
-            await userEvent.click(screen.getByText('Publication Timeline'))
-            expect(screen.getByTestId('publication-timeline')).toBeInTheDocument()
-
-            // Click on bulk operations tab
-            await userEvent.click(screen.getByText('Bulk Operations'))
-            expect(screen.getByTestId('bulk-publishing-operations')).toBeInTheDocument()
-        })
+        expect(screen.getByTestId('settings-dashboard')).toBeInTheDocument()
     })
-}) 
+
+    it('does not show the theme status bar outside theme routes', () => {
+        renderSettings('/settings/layouts')
+
+        expect(screen.queryByTestId('status-bar')).not.toBeInTheDocument()
+    })
+})

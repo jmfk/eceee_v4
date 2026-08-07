@@ -18,8 +18,8 @@ const slugify = (text) => {
         .toLowerCase()
         .trim()
         .replace(/\s+/g, '-')     // Replace spaces with -
-        .replace(/[^\w\-]+/g, '') // Remove all non-word chars
-        .replace(/\-\-+/g, '-')   // Replace multiple - with single -
+        .replace(/[^\w-]+/g, '') // Remove all non-word chars
+        .replace(/--+/g, '-')   // Replace multiple - with single -
         .replace(/^-+/, '')       // Trim - from start of text
         .replace(/-+$/, '')       // Trim - from end of text
 }
@@ -308,94 +308,97 @@ const SchemaFieldRenderer = ({
     // Check if schema specifies a direct component (from Pydantic json_schema_extra)
     const componentName = fieldSchema.component
 
-    if (componentName) {
-        // Filter out JSON Schema metadata and only pass component-relevant props
-        const {
-            // JSON Schema properties to exclude
-            type, format, title, description: schemaDescription,
-            component, category, order, enum: enumValues,
-            anyOf, oneOf, allOf, $ref, $defs, properties, items,
-            minimum, maximum, minLength, maxLength, pattern,
-            const: constValue, default: defaultValue,
-            conditionalOn, // Exclude conditionalOn from being passed to DOM
-            isOverride, // Exclude isOverride from being passed to DOM (Pydantic schema extra)
-            // Include only component-relevant properties
-            ...componentProps
-        } = fieldSchema
+    // Filter out JSON Schema metadata and only pass component-relevant props
+    const {
+        // JSON Schema properties to exclude
+        type: fieldTypeSchema, format, title, description: schemaDescription,
+        component, category, order, enum: enumValues,
+        anyOf, oneOf, allOf, $ref, $defs, properties, items,
+        minimum, maximum, minLength, maxLength, pattern,
+        const: constValue, default: defaultValue,
+        conditionalOn, // Exclude conditionalOn from being passed to DOM
+        isOverride, // Exclude isOverride from being passed to DOM (Pydantic schema extra)
+        // Include only component-relevant properties
+        ...componentProps
+    } = fieldSchema
 
-        // Memoize FieldComponent
-        const FieldComponent = useMemo(() => React.lazy(() => {
+    // Memoize FieldComponent
+    const FieldComponent = useMemo(() => {
+        if (!componentName) return null;
+        return React.lazy(() => {
             // Map ColorInput to ColorSelector for theme palette support
             const actualComponentName = componentName === 'ColorInput' ? 'ColorSelector' : componentName;
-            
+
             if (FIELD_COMPONENTS[actualComponentName]) {
                 return FIELD_COMPONENTS[actualComponentName]()
             }
             console.warn(`Field component '${actualComponentName}' not found, falling back to TextInput`)
             return FIELD_COMPONENTS.TextInput()
-        }), [componentName]) // Only recreate if componentName changes
+        })
+    }, [componentName]) // Only recreate if componentName changes
 
-        // Memoize itemLabelTemplate function at top level (not inside useMemo)
-        const itemLabelTemplateFn = useCallback(
-            (item) => {
-                if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
-                    const propertyName = componentProps.itemLabelTemplate
-                    return item[propertyName] || ''
-                }
-                return ''
-            },
-            [componentProps.itemLabelTemplate]
-        )
-
-        // Memoize fieldProps
-        const fieldProps = useMemo(() => {
-            const baseProps = {
-                label: fieldSchema.title || formatFieldLabel(fieldName),
-                description: fieldSchema.description,
-                required,
-                disabled,
-                placeholder: fieldSchema.placeholder,
-                namespace: namespace,
-                context: context,
-                fieldName: fieldName,
-                ...componentProps
+    // Memoize itemLabelTemplate function at top level (not inside useMemo)
+    const itemLabelTemplateFn = useCallback(
+        (item) => {
+            if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
+                const propertyName = componentProps.itemLabelTemplate
+                return item[propertyName] || ''
             }
+            return ''
+        },
+        [componentProps.itemLabelTemplate]
+    )
 
-            // Special handling for ItemsListField - pass itemSchema
-            if (componentName === 'ItemsListField' && fieldSchema.items) {
-                let itemSchema = fieldSchema.items
-
-                // Resolve $ref if present
-                if (itemSchema.$ref && schema && schema.$defs) {
-                    const refPath = itemSchema.$ref.replace('#/$defs/', '')
-                    itemSchema = schema.$defs[refPath] || itemSchema
-                }
-
-                baseProps.itemSchema = itemSchema
-
-                // Handle itemLabelTemplate function
-                if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
-                    baseProps.itemLabelTemplate = itemLabelTemplateFn
-                }
-            }
-
-            return baseProps
-        }, [
-            fieldSchema.title,
-            fieldSchema.description,
-            fieldSchema.placeholder,
-            fieldSchema.items,
-            fieldName,
+    // Memoize fieldProps
+    const fieldProps = useMemo(() => {
+        const baseProps = {
+            label: fieldSchema.title || formatFieldLabel(fieldName),
+            description: fieldSchema.description,
             required,
             disabled,
-            namespace,
-            context,
-            componentName,
-            componentProps,
-            schema,
-            itemLabelTemplateFn
-        ])
+            placeholder: fieldSchema.placeholder,
+            namespace: namespace,
+            context: context,
+            fieldName: fieldName,
+            ...componentProps
+        }
 
+        // Special handling for ItemsListField - pass itemSchema
+        if (componentName === 'ItemsListField' && fieldSchema.items) {
+            let itemSchema = fieldSchema.items
+
+            // Resolve $ref if present
+            if (itemSchema.$ref && schema && schema.$defs) {
+                const refPath = itemSchema.$ref.replace('#/$defs/', '')
+                itemSchema = schema.$defs[refPath] || itemSchema
+            }
+
+            baseProps.itemSchema = itemSchema
+
+            // Handle itemLabelTemplate function
+            if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
+                baseProps.itemLabelTemplate = itemLabelTemplateFn
+            }
+        }
+
+        return baseProps
+    }, [
+        fieldSchema.title,
+        fieldSchema.description,
+        fieldSchema.placeholder,
+        fieldSchema.items,
+        fieldName,
+        required,
+        disabled,
+        namespace,
+        context,
+        componentName,
+        componentProps,
+        schema,
+        itemLabelTemplateFn
+    ])
+
+    if (componentName) {
         return (
             <Suspense fallback={
                 <FieldPlaceholder
@@ -448,7 +451,7 @@ const SchemaFieldRenderer = ({
     }
 
     // Dynamically load the field component from registry
-    const FieldComponent = React.lazy(() => {
+    const RegistryFieldComponent = React.lazy(() => {
         if (FIELD_COMPONENTS[fieldTypeDef.component]) {
             return FIELD_COMPONENTS[fieldTypeDef.component]()
         }
@@ -458,7 +461,7 @@ const SchemaFieldRenderer = ({
     })
 
     // Prepare props for the field component
-    const fieldProps = {
+    const registryFieldProps = {
         label: fieldSchema.title || formatFieldLabel(fieldName),
         description: fieldSchema.description,
         required,
@@ -552,8 +555,8 @@ const SchemaFieldRenderer = ({
                 key={fieldName}
                 fieldName={fieldName}
                 initialValue={value}
-                FieldComponent={FieldComponent}
-                fieldProps={fieldProps}
+                FieldComponent={RegistryFieldComponent}
+                fieldProps={registryFieldProps}
                 onFieldChange={onChange}
                 onFieldValidation={combinedValidation}
                 debounceMs={200}

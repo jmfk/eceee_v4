@@ -14,7 +14,8 @@ const ComponentStyleRenderer = ({
     context = {},  // Template context data
     css = '',      // Scoped CSS (string or breakpoint object)
     styleId,       // Unique ID for scoping
-    className = ''
+    className = '',
+    onClick
 }) => {
     const styleRef = useRef(null)
 
@@ -70,10 +71,10 @@ const ComponentStyleRenderer = ({
         <div
             className={`component-style-wrapper ${className}`}
             data-style-id={styleId}
+            onClick={onClick}
             dangerouslySetInnerHTML={{ __html: html }}
         />
     )
 }
 
 export default ComponentStyleRenderer
-

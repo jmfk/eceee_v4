@@ -136,7 +136,7 @@ export const tagsApi = {
      */
     bulkDelete: wrapApiCall(async (ids) => {
         // For now, delete each tag individually
-        const results = await Promise.all(ids.map(id => api.delete(`/api/v1/tags/${id}/`)))
+        const results = await Promise.all(ids.map(async (id) => await api.delete(`/api/v1/tags/${id}/`)))
         return { data: { deleted_count: results.length } }
     }, 'tags.bulkDelete')
 }

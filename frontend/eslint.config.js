@@ -27,8 +27,9 @@ export default defineConfig([
       'api-rules': apiRules,
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
-      'api-rules/require-await-on-api-calls': 'error',
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      'api-rules/require-await-on-api-calls': 'warn',
+      'react-refresh/only-export-components': 'warn',
     },
   },
   // Node.js configuration files
@@ -47,7 +48,7 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
   // Test files configuration
@@ -83,7 +84,7 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ])

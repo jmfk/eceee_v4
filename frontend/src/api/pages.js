@@ -313,7 +313,7 @@ export const pagesApi = {
      * @returns {Promise<Object>} Response with published version info
      */
     publishLatestVersion: wrapApiCall(async (pageId) => {
-        return api.post(`${endpoints.pages.detail(pageId)}/publish-latest/`)
+        return api.post(`${endpoints.pages.base}/${pageId}/publish-latest/`)
     }, 'pages.publishLatestVersion'),
 
     /**
@@ -324,7 +324,7 @@ export const pagesApi = {
      * @returns {Promise<Object>} Response with unpublished version info
      */
     unpublishVersion: wrapApiCall(async (pageId, options = { mode: 'current' }) => {
-        return api.post(`${endpoints.pages.detail(pageId)}/unpublish/`, options)
+        return api.post(endpoints.pages.unpublish(pageId), options)
     }, 'pages.unpublishVersion'),
 
     /**

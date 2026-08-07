@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 
 // API
 import { layoutsApi } from '../api/layouts'
+import ContextualHelpLink from './help/ContextualHelpLink'
 
 const LayoutEditor = ({
     onSelect,
@@ -81,53 +82,31 @@ const LayoutEditor = ({
     }
 
     return (
-        <div className={`layout-editor bg-white ${className}`}>
+        <div className={`layout-overview bg-white ${className}`}>
             {/* Header */}
             <div className="border-b border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <div className="text-xl font-semibold text-gray-900 flex items-center" role="heading" aria-level="2">
                             <Grid3X3 className="h-6 w-6 mr-2 text-blue-600" />
-                            Layout Templates
+                            Layout Overview
+                            <ContextualHelpLink topicId="settings-layouts" label="Open Layout help" className="ml-2" />
                         </div>
                         <div className="mt-1 text-sm text-gray-600">
-                            View and manage code-based layout templates
+                            Available page layout templates defined in the system
                         </div>
-                    </div>
-                </div>
-
-                {/* Search */}
-                <div className="mt-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search layouts..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
                     </div>
                 </div>
             </div>
 
             {/* Layouts Grid */}
             <div className="p-6">
-                <div className="mb-4 flex items-center justify-between">
-                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
-                        Code-based Layouts
-                    </div>
-                    <span className="text-sm text-gray-500">
-                        Code-based layout templates
-                    </span>
-                </div>
-
                 {filteredLayouts.length === 0 ? (
                     <div className="text-center py-8">
                         <Grid3X3 className="mx-auto h-12 w-12 text-gray-400" />
                         <div className="mt-2 text-sm font-medium text-gray-900" role="heading" aria-level="3">No layouts found</div>
                         <div className="mt-1 text-sm text-gray-500">
-                            {searchTerm ? 'Try adjusting your search terms.' : 'No layouts have been defined.'}
+                            No layouts have been defined.
                         </div>
                     </div>
                 ) : (
@@ -160,9 +139,15 @@ const LayoutEditor = ({
 // Layout Card Component
 const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
     const slotCount = layout.slotConfiguration?.slots?.length || 0
+    const layoutTestId = (layout.name || 'layout')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'layout'
 
     return (
         <div
+            data-testid={`layout-card-${layoutTestId}`}
             className={`layout-card border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md ${isSelected
                 ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
                 : 'border-gray-200 hover:border-gray-300'
@@ -181,6 +166,7 @@ const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
                 </div>
                 {onPreview && (
                     <button
+                        data-testid={`layout-preview-${layoutTestId}`}
                         onClick={(e) => {
                             e.stopPropagation()
                             onPreview()

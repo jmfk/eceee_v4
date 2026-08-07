@@ -29,7 +29,7 @@ class TableImportTests(TestCase):
         csv_file.name = "test.csv"
 
         response = self.client.post(
-            "/api/file-manager/import-table/", {"file": csv_file}, format="multipart"
+            "/api/v1/media/import-table/", {"file": csv_file}, format="multipart"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -48,7 +48,7 @@ class TableImportTests(TestCase):
         csv_file.name = "test.csv"
 
         response = self.client.post(
-            "/api/file-manager/import-table/", {"file": csv_file}, format="multipart"
+            "/api/v1/media/import-table/", {"file": csv_file}, format="multipart"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -58,7 +58,7 @@ class TableImportTests(TestCase):
 
     def test_import_without_file(self):
         """Test error when no file is provided"""
-        response = self.client.post("/api/file-manager/import-table/")
+        response = self.client.post("/api/v1/media/import-table/")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("error", response.data)
@@ -70,7 +70,7 @@ class TableImportTests(TestCase):
         txt_file.name = "test.txt"
 
         response = self.client.post(
-            "/api/file-manager/import-table/", {"file": txt_file}, format="multipart"
+            "/api/v1/media/import-table/", {"file": txt_file}, format="multipart"
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -86,7 +86,7 @@ class TableImportTests(TestCase):
         csv_file.name = "test.csv"
 
         response = self.client.post(
-            "/api/file-manager/import-table/", {"file": csv_file}, format="multipart"
+            "/api/v1/media/import-table/", {"file": csv_file}, format="multipart"
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -99,8 +99,12 @@ class TableImportTests(TestCase):
         csv_file.name = "test.csv"
 
         response = self.client.post(
-            "/api/file-manager/import-table/", {"file": csv_file}, format="multipart"
+            "/api/v1/media/import-table/", {"file": csv_file}, format="multipart"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["rows"][0]["cells"][0]["content"], "Name")
+        # Strip BOM if it's still there (some pandas versions/configs might keep it)
+        content = response.data["rows"][0]["cells"][0]["content"]
+        if content.startswith('\ufeff'):
+            content = content[1:]
+        self.assertEqual(content, "Name")

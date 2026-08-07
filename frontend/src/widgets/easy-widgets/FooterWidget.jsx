@@ -277,7 +277,7 @@ const FooterWidget = ({
                         }}
                         mediaTypes={['image']}
                         allowCollections={false}
-                        currentSelection={backgroundImage}
+                        currentSelection={config.backgroundImage}
                         namespace={context?.namespace}
                         pageId={context?.pageId}
                         customTitle="Edit Footer Background Image"

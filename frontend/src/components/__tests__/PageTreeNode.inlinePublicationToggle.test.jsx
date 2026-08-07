@@ -167,7 +167,7 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
         await user.click(clickableContainer)
 
         // Should call publish API
-        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/publish/')
+        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/publish-latest/')
     })
 
     it('should unpublish a published page when clicked', async () => {
@@ -186,12 +186,14 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
         await user.click(clickableContainer)
 
         // Should call unpublish API
-        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/2/unpublish/')
+        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/2/unpublish/', { mode: 'current' })
     })
 
     it('should show loading state while publishing', async () => {
         // Mock a slow API response
-        api.post.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)))
+        api.post.mockImplementation(() => new Promise(resolve => setTimeout(() => {
+            resolve({ data: { ...mockUnpublishedPage, publicationStatus: 'published' } })
+        }, 100)))
 
         renderWithProviders(
             <PageTreeNode page={mockUnpublishedPage} level={0} />
@@ -209,7 +211,9 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
 
     it('should show loading state while unpublishing', async () => {
         // Mock a slow API response
-        api.post.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)))
+        api.post.mockImplementation(() => new Promise(resolve => setTimeout(() => {
+            resolve({ data: { ...mockPublishedPage, publicationStatus: 'unpublished' } })
+        }, 100)))
 
         renderWithProviders(
             <PageTreeNode page={mockPublishedPage} level={0} />
@@ -240,7 +244,7 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
         await user.click(clickableContainer)
 
         // Should call publish API
-        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/publish/')
+        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/publish-latest/')
 
         // Wait for error handling
         await waitFor(() => {
@@ -265,7 +269,7 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
         await user.click(clickableContainer)
 
         // Should call unpublish API
-        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/2/unpublish/')
+        expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/2/unpublish/', { mode: 'current' })
 
         // Wait for error handling
         await waitFor(() => {
@@ -298,6 +302,10 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
 
         // Resolve the promise
         resolvePromise({ data: { ...mockUnpublishedPage, publicationStatus: 'published' } })
+
+        await waitFor(() => {
+            expect(document.querySelector('.animate-spin')).not.toBeInTheDocument()
+        })
     })
 
     it('should not be clickable for scheduled pages', async () => {
@@ -357,4 +365,4 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
         expect(statusContainer).toHaveClass('cursor-help')
         expect(statusContainer).not.toHaveClass('cursor-pointer')
     })
-}) 
+})

@@ -1,3 +1,5 @@
+import React from 'react'
+
 /**
  * Comprehensive re-render investigation utilities
  * Use these to identify performance bottlenecks and unnecessary re-renders

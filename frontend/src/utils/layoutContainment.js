@@ -54,6 +54,7 @@ export function containFixedElements(container, options = {}) {
             element.style.maxHeight = '100%';
 
             if (logConversions) {
+                // Logging disabled
             }
         }
     });

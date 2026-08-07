@@ -2,25 +2,37 @@ import { useState, useRef, useEffect } from 'react'
 
 const Tooltip = ({ children, text, position = 'top', delay = 300 }) => {
     const [isVisible, setIsVisible] = useState(false)
-    const [timeoutId, setTimeoutId] = useState(null)
     const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 })
     const triggerRef = useRef(null)
     const tooltipRef = useRef(null)
+    const timeoutRef = useRef(null)
 
     const showTooltip = () => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+        }
         const id = setTimeout(() => {
             setIsVisible(true)
         }, delay)
-        setTimeoutId(id)
+        timeoutRef.current = id
     }
 
     const hideTooltip = () => {
-        if (timeoutId) {
-            clearTimeout(timeoutId)
-            setTimeoutId(null)
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+            timeoutRef.current = null
         }
         setIsVisible(false)
     }
+
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current)
+                timeoutRef.current = null
+            }
+        }
+    }, [])
 
     // Calculate tooltip position when visible
     useEffect(() => {
@@ -111,4 +123,4 @@ const Tooltip = ({ children, text, position = 'top', delay = 300 }) => {
     )
 }
 
-export default Tooltip 
+export default Tooltip

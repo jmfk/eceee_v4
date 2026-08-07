@@ -23,7 +23,7 @@ describe('Inline Conditional Attributes', () => {
             const expectedProcessed = `<a href="{{ config.url }}" data-conditional-attrs="config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;">Click me</a>`;
 
             // We can test this transformation pattern
-            const inlineConditionalPattern = /\{\%\s*if\s+([^%]+?)\s*\%\}([^{]*?)\{\%\s*endif\s*\%\}/;
+            const inlineConditionalPattern = /\{%\s*if\s+([^%]+?)\s*%\}([^{]*?)\{%\s*endif\s*%\}/;
             const match = inlineConditionalPattern.exec(templateSource);
 
             expect(match).toBeTruthy();

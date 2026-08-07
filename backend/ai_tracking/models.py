@@ -124,7 +124,9 @@ class AIUsageLog(models.Model):
 
     # Additional metadata as JSON
     metadata = models.JSONField(
-        default=dict, blank=True, help_text="Additional context data (JSON)"
+        default=dict,
+        blank=True,
+        help_text="Additional context data (JSON)"
     )
 
     # Optional prompt/response storage
@@ -221,7 +223,10 @@ class AIPromptConfig(models.Model):
     last_user = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
-    last_metadata = models.JSONField(default=dict, blank=True)
+    last_metadata = models.JSONField(
+        default=dict,
+        blank=True
+    )
     last_called_at = models.DateTimeField(null=True, blank=True)
     last_duration_ms = models.IntegerField(null=True, blank=True)
 
@@ -317,7 +322,9 @@ class AIBudgetAlert(models.Model):
 
     # Notification settings
     email_recipients = models.JSONField(
-        default=list, help_text="List of email addresses to notify"
+        default=list,
+        blank=True,
+        help_text="List of email addresses to notify"
     )
     threshold_percentage = models.IntegerField(
         default=80, help_text="Alert when spending reaches this percentage of budget"

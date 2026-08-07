@@ -35,12 +35,17 @@ backend/staticfiles/
 backend/media/*
 !backend/media/.gitkeep
 
-# Environment variables
+# Environment variables — never commit real secrets
+# Local dev: repo-root .env (Makefile, docker-compose.dev).
+# Production: deploy/.env (deploy.sh, deploy/docker-compose.prod.yml) — keep only on server.
 .env
+deploy/.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.*.local
 
 # Node.js
 node_modules/
@@ -53,11 +58,24 @@ themes/**/*.conflict
 
 # Testing
 /coverage
+.auth/
 .nyc_output
+.coverage
+.coverage.*
+htmlcov/
+backend/.coverage
+backend/htmlcov/
+.pytest_cache/
+backend/.pytest_cache/
 
 # Production builds
 /build
 /dist
+frontend/howto-audio-cache/
+frontend/howto-translation-cache/
+frontend/howto-video-output/
+frontend/.howto-script-preview/
+frontend/public/howto-videos/editor-preview/
 
 # IDE
 .vscode/
@@ -86,3 +104,6 @@ storage/
 
 # Separate Repositories
 easy3e-serverless/
+
+
+themes

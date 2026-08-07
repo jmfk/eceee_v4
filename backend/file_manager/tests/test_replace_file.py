@@ -16,13 +16,27 @@ from file_manager.models import MediaFile
 
 class MediaFileReplaceFileTests(APITestCase):
     def setUp(self):
+        from core.models import Tenant
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
         )
         self.client.force_authenticate(user=self.user)
         self.client.defaults["HTTP_HOST"] = "localhost"
 
-        self.namespace = Namespace.get_default()
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-replace",
+            created_by=self.user
+        )
+        self.namespace, _ = Namespace.objects.get_or_create(
+            slug="test-namespace",
+            defaults={
+                "name": "Test Namespace",
+                "is_active": True,
+                "created_by": self.user,
+                "tenant": self.tenant,
+            },
+        )
 
         self.media_file = MediaFile.objects.create(
             title="Original",
@@ -34,6 +48,7 @@ class MediaFileReplaceFileTests(APITestCase):
             file_type="image",
             file_hash="0" * 64,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -79,6 +94,7 @@ class MediaFileReplaceFileTests(APITestCase):
             file_type="image",
             file_hash=conflict_hash,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -99,11 +115,26 @@ class MediaFileReplaceFileTests(APITestCase):
 
 class MediaFileReplacementResolutionTests(APITestCase):
     def setUp(self):
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
+            username="testuser_res", email="test@example.com", password="testpass123"
         )
         self.client.defaults["HTTP_HOST"] = "localhost"
-        self.namespace = Namespace.get_default()
+        
+        self.tenant = Tenant.objects.create(
+            name="Test Tenant",
+            identifier="test-tenant-res",
+            created_by=self.user
+        )
+        self.namespace, _ = Namespace.objects.get_or_create(
+            slug="test-namespace",
+            defaults={
+                "name": "Test Namespace",
+                "is_active": True,
+                "created_by": self.user,
+                "tenant": self.tenant,
+            },
+        )
 
         self.replacement = MediaFile.objects.create(
             title="Replacement",
@@ -115,6 +146,7 @@ class MediaFileReplacementResolutionTests(APITestCase):
             file_type="image",
             file_hash="1" * 64,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -129,6 +161,7 @@ class MediaFileReplacementResolutionTests(APITestCase):
             file_type="image",
             file_hash="0" * 64,
             namespace=self.namespace,
+            tenant=self.tenant,
             created_by=self.user,
             last_modified_by=self.user,
             replaced_by=self.replacement,

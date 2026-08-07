@@ -270,6 +270,8 @@ const CascaderInput = ({
         return String(value)
     }
 
+    const hasError = validation && !validation.isValid
+
     return (
         <div className="space-y-1" ref={containerRef}>
             {label && (

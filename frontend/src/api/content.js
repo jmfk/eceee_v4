@@ -6,7 +6,7 @@
 
 import { api } from './client.js'
 import { endpoints } from './endpoints.js'
-import { handleApiError, wrapApiCall, buildQueryParams } from './utils.js'
+import { wrapApiCall, buildQueryParams } from './utils.js'
 
 /**
  * Content API operations

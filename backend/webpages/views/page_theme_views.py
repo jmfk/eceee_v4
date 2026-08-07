@@ -9,6 +9,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
 from django.core.files.base import ContentFile
+from file_manager.storage import system_storage
 import json
 import zipfile
 import io
@@ -375,7 +376,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         Stores in: theme_images/{theme_id}/design_groups/{filename}
         Returns: { "url": "s3://bucket/path", "public_url": "https://...", "width": int, "height": int }
         """
-        from file_manager.storage import S3MediaStorage
         from PIL import Image
         import os
         import uuid
@@ -437,7 +437,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             unique_filename = f"{uuid.uuid4()}{file_extension}"
 
             # Upload to object storage
-            storage = S3MediaStorage()
+            storage = system_storage
             file_path = f"theme_images/{theme.id}/design_groups/{unique_filename}"
 
             # Save the file
@@ -513,7 +513,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         GET: List all images in theme library with metadata
         POST: Upload single or multiple images to library
         """
-        from file_manager.storage import S3MediaStorage
         import os
         import uuid
         import logging
@@ -521,7 +520,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
-        storage = S3MediaStorage()
+        storage = system_storage
 
         if request.method == "GET":
             # List all images in library
@@ -775,12 +774,11 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         """
         Delete a specific image from theme library
         """
-        from file_manager.storage import S3MediaStorage
         import logging
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
-        storage = S3MediaStorage()
+        storage = system_storage
 
         if not filename:
             return Response(
@@ -833,12 +831,11 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         """
         Delete multiple images from theme library
         """
-        from file_manager.storage import S3MediaStorage
         import logging
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
-        storage = S3MediaStorage()
+        storage = system_storage
 
         filenames = request.data.get("filenames", [])
         force = request.data.get("force", False)
@@ -974,17 +971,49 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             # Delete old file
             storage.delete(old_path)
 
-            # Update references in design_groups
+            # Update references in design_groups, including current direct
+            # layoutProperties.backgroundImage objects and legacy images maps.
             if theme.design_groups:
-                updated = False
-                for group in theme.design_groups:
-                    if "image" in group and group["image"]:
-                        if filename in group["image"]:
-                            group["image"] = group["image"].replace(
-                                filename, new_filename
-                            )
-                            updated = True
+                image_reference_keys = {
+                    "backgroundImage",
+                    "fileUrl",
+                    "filename",
+                    "image",
+                    "imgproxyBaseUrl",
+                    "publicUrl",
+                    "url",
+                }
+
+                def replace_filename(value, key=None):
+                    if isinstance(value, str):
+                        if key not in image_reference_keys:
+                            return value, False
+                        replaced = value.replace(filename, new_filename)
+                        return replaced, replaced != value
+
+                    if isinstance(value, list):
+                        changed = False
+                        updated_items = []
+                        for item in value:
+                            updated_item, item_changed = replace_filename(item, key)
+                            updated_items.append(updated_item)
+                            changed = changed or item_changed
+                        return updated_items, changed
+
+                    if isinstance(value, dict):
+                        changed = False
+                        updated_dict = {}
+                        for child_key, item in value.items():
+                            updated_item, item_changed = replace_filename(item, child_key)
+                            updated_dict[child_key] = updated_item
+                            changed = changed or item_changed
+                        return updated_dict, changed
+
+                    return value, False
+
+                updated_design_groups, updated = replace_filename(theme.design_groups)
                 if updated:
+                    theme.design_groups = updated_design_groups
                     theme.save(update_fields=["design_groups"])
 
             # Update theme preview image if it matches
@@ -1206,6 +1235,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "breakpoints": theme.breakpoints,
                 "css_variables": theme.css_variables,
                 "html_elements": theme.html_elements,
+                "site_icon": theme.site_icon.name if theme.site_icon else None,
                 "custom_css": theme.custom_css,
                 "is_active": theme.is_active,
             }
@@ -1359,6 +1389,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
                 # Create theme
                 new_theme = PageTheme.objects.create(
+                    tenant=request.tenant,
                     name=name,
                     description=metadata.get(
                         "description", "Imported from theme package"
@@ -1374,6 +1405,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     breakpoints=theme_data.get("breakpoints", {}),
                     css_variables=theme_data.get("css_variables", {}),
                     html_elements=theme_data.get("html_elements", {}),
+                    site_icon=theme_data.get("site_icon"),
                     custom_css=theme_data.get("custom_css", ""),
                     is_active=theme_data.get("is_active", True),
                     is_default=False,  # Imported themes are never default

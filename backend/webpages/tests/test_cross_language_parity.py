@@ -6,9 +6,11 @@ return identical results for the same input data.
 """
 
 import json
-import os
+from pathlib import Path
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
+from core.models import Tenant
 from webpages.models import WebPage, PageVersion
 from webpages.inheritance_tree import InheritanceTreeBuilder
 from webpages.inheritance_helpers import InheritanceTreeHelpers
@@ -19,16 +21,42 @@ class CrossLanguageParityTest(TestCase):
 
     def setUp(self):
         """Load canonical test data"""
-        test_data_path = os.path.join(
-            os.path.dirname(__file__), "../../../docs/inheritance-tree-test-data.json"
-        )
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        test_data_path = self._find_test_data_path()
 
         with open(test_data_path, "r") as f:
             self.test_data = json.load(f)
 
+        self.user = User.objects.create_user(
+            username="cross_language_user", email="cross-language@example.com"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Cross Language Tenant",
+            identifier="cross-language",
+            created_by=self.user,
+        )
+
         # Create pages from test data
         self.pages = {}
         self.create_test_pages()
+
+    def _find_test_data_path(self):
+        """Resolve the shared fixture both locally and inside Docker."""
+        test_dir = Path(__file__).resolve().parent
+        candidates = [
+            test_dir.parents[1] / "docs" / "inheritance-tree-test-data.json",
+            test_dir.parents[2] / "docs" / "inheritance-tree-test-data.json",
+        ]
+
+        for path in candidates:
+            if path.exists():
+                return path
+
+        raise FileNotFoundError(
+            "Could not find docs/inheritance-tree-test-data.json in expected locations"
+        )
 
     def create_test_pages(self):
         """Create WebPage objects from test data"""
@@ -50,6 +78,9 @@ class CrossLanguageParityTest(TestCase):
                 slug=page_data["slug"],
                 parent=parent,
                 hostnames=["localhost:8000"] if not parent else [],
+                tenant=self.tenant,
+                created_by=self.user,
+                last_modified_by=self.user,
             )
 
             # Create PageVersion with widgets
@@ -58,6 +89,7 @@ class CrossLanguageParityTest(TestCase):
                 version_number=1,
                 effective_date=timezone.now(),
                 widgets=page_data["widgets"],
+                created_by=self.user,
             )
 
             self.pages[page_id] = page
@@ -235,19 +267,18 @@ class CrossLanguageParityTest(TestCase):
 
     def test_error_handling_consistency(self):
         """Test that error handling matches TypeScript behavior"""
+        from types import SimpleNamespace
         from webpages.inheritance_types import (
             InheritanceTreeError,
             InheritanceTreeErrorCode,
         )
 
-        # Test circular reference detection
-        # Create circular reference: Page A -> Page B -> Page A
-        page_a = WebPage.objects.create(title="Page A", slug="page-a")
-        page_b = WebPage.objects.create(title="Page B", slug="page-b", parent=page_a)
-
-        # This would create a circular reference
+        # Test circular reference detection without saving an invalid tree that
+        # would trigger model-level cached-path maintenance.
+        page_a = SimpleNamespace(id=101)
+        page_b = SimpleNamespace(id=102)
         page_a.parent = page_b
-        page_a.save()
+        page_b.parent = page_a
 
         builder = InheritanceTreeBuilder()
 

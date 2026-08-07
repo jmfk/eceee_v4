@@ -2281,7 +2281,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
           />
         );
 
-      case 'font':
+      case 'font': {
         const currentStyles = groups[groupIndex].elements[element] || {};
         return (
           <FontSelector
@@ -2293,6 +2293,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
             className="w-full"
           />
         );
+      }
 
       case 'numeric':
         return (

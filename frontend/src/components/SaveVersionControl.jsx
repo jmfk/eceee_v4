@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Save, CheckCircle, FileText, Clock, AlertCircle, Plus } from 'lucide-react'
+import { ChevronDown, Save, CheckCircle, FileText, Clock, AlertCircle, Plus, Undo2 } from 'lucide-react'
 
 const SaveVersionControl = ({
     currentVersion,
@@ -7,6 +7,7 @@ const SaveVersionControl = ({
     onVersionChange,
     onSaveClick,
     onSaveNewClick,
+    onUndoChanges,
     isSaving = false,
     isNewPage = false,
     validationState = { isValid: true, hasErrors: false },
@@ -112,10 +113,19 @@ const SaveVersionControl = ({
         }
     }
 
-    // Don't render if not dirty
-    if (!isDirty) {
-        return null
+    const handleUndo = () => {
+        setIsOpen(false)
+        if (onUndoChanges) {
+            onUndoChanges()
+        }
     }
+
+    const saveButtonClasses = isDirty
+        ? 'bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-500'
+        : 'bg-green-600 hover:bg-green-700 focus-visible:ring-green-500'
+    const dropdownButtonClasses = isDirty
+        ? (isOpen ? 'bg-blue-700 border-blue-800 focus-visible:ring-blue-500' : 'bg-blue-600 hover:bg-blue-700 border-blue-800 focus-visible:ring-blue-500')
+        : (isOpen ? 'bg-green-700 border-green-800 focus-visible:ring-green-500' : 'bg-green-600 hover:bg-green-700 border-green-800 focus-visible:ring-green-500')
 
     // Simple save button for new pages (no dropdown)
     if (isNewPage) {
@@ -123,7 +133,7 @@ const SaveVersionControl = ({
             <button
                 onClick={onSaveClick}
                 disabled={isSaving}
-                className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 rounded transition-colors flex items-center space-x-1"
+                className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 rounded transition-colors flex items-center space-x-1"
                 title="Create new page"
             >
                 {isSaving ? (
@@ -149,8 +159,14 @@ const SaveVersionControl = ({
                 <button
                     onClick={onSaveClick}
                     disabled={isSaving}
-                    className="h-6 font-medium px-2 py-1 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-l transition-colors flex items-center space-x-1"
-                    title={validationState.hasErrors ? "Save changes (validation errors will be handled)" : "Update current version"}
+                    className={`h-6 font-medium px-2 text-white focus:outline-none focus-visible:ring-2 rounded-l transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${saveButtonClasses}`}
+                    title={
+                        isSaving
+                            ? "Saving..."
+                            : validationState.hasErrors
+                                ? "Save changes (validation errors will be handled)"
+                                : "Update current version"
+                    }
                 >
                     {isSaving ? (
                         <>
@@ -160,20 +176,18 @@ const SaveVersionControl = ({
                     ) : (
                         <>
                             <Save className="w-3 h-3" />
-                            <span className="text-xs">
+                            <span className="text-xs leading-none">
                                 Save {currentVersion ? `v${currentVersion.versionNumber}` : ''}
                             </span>
                         </>
                     )}
                 </button>
 
-                {/* Dropdown button */}
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     disabled={isSaving}
-                    className={`h-6 font-medium px-2 py-1 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-r border-l border-blue-800 transition-colors flex items-center justify-center space-x-1 ${isOpen ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
-                    title="More save options"
+                    className={`h-6 font-medium px-2 text-white disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 rounded-r border-l transition-colors flex items-center justify-center ${dropdownButtonClasses}`}
+                    title="More options (versions, undo, save new)"
                 >
                     <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
                 </button>
@@ -196,6 +210,25 @@ const SaveVersionControl = ({
                                 </div>
                                 <div className="text-xs text-gray-500">
                                     Create a new version
+                                </div>
+                            </div>
+                        </div>
+                    </button>
+
+                    {/* Undo Changes option */}
+                    <button
+                        onClick={handleUndo}
+                        disabled={isSaving || !isDirty}
+                        className="w-full px-3 py-2 text-left hover:bg-red-50 focus:outline-none focus:bg-red-50 border-b border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <div className="flex items-center space-x-3">
+                            <Undo2 className={`w-4 h-4 flex-shrink-0 ${isDirty ? 'text-red-600' : 'text-gray-400'}`} />
+                            <div className="min-w-0 flex-1">
+                                <div className={`text-sm font-medium ${isDirty ? 'text-gray-900' : 'text-gray-400'}`}>
+                                    Undo Changes
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    Restore to last saved state
                                 </div>
                             </div>
                         </div>
@@ -253,4 +286,3 @@ const SaveVersionControl = ({
 }
 
 export default SaveVersionControl
-

@@ -14,6 +14,7 @@ import { Loader2, FolderOpen } from 'lucide-react';
 import { namespacesApi } from '../api';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import MediaManager from '../components/media/MediaManager';
+import ContextualHelpLink from '../components/help/ContextualHelpLink';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const MediaManagerPage = () => {
@@ -79,7 +80,10 @@ const MediaManagerPage = () => {
       <div className="flex-shrink-0 max-w-7xl mx-auto w-full p-6">
         <div className="flex justify-between items-start mb-8">
           <div>
-            <div className="text-3xl font-bold text-gray-900 mb-2" role="heading" aria-level="1">Media Manager</div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="text-3xl font-bold text-gray-900" role="heading" aria-level="1">Media Manager</div>
+              <ContextualHelpLink topicId="media" label="Open Media help" />
+            </div>
             <div className="text-gray-600">Upload, organize, and manage your media files</div>
           </div>
 

@@ -43,7 +43,7 @@ export function usePageInheritance(pageId, options = {}) {
     // Get page data (includes layout + theme inheritance info)
     const pageQuery = useQuery({
         queryKey: ['page', pageId],
-        queryFn: () => pagesApi.get(pageId),
+        queryFn: async () => await pagesApi.get(pageId),
         enabled: enabled && pageId && pageId !== 'new',
         staleTime: staleTime,
         retry: 1

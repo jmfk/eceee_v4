@@ -1,0 +1,37 @@
+WEBVTT
+
+1
+00:00:00.001 --> 00:00:01.616
+Go to the pages view.
+
+2
+00:00:01.616 --> 00:00:04.942
+Find the page you want to create a child page under.
+
+3
+00:00:04.942 --> 00:00:07.339
+Click the plus icon on the page row.
+
+4
+00:00:07.339 --> 00:00:12.337
+A new page form opens where you can fill in information about the new page.
+
+5
+00:00:12.337 --> 00:00:15.906
+Enter a clear title for the child page.
+
+6
+00:00:15.906 --> 00:00:19.410
+Check the slug since it will become part of the URL.
+
+7
+00:00:19.410 --> 00:00:22.782
+Select a layout for the child page before creating it.
+
+8
+00:00:22.782 --> 00:00:25.783
+Click Create Page to create the child page.
+
+9
+00:00:25.783 --> 00:00:32.454
+Before publishing, verify that the page's path and navigation area match the parent page you selected.

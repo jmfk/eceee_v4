@@ -6,7 +6,7 @@
 
 import { api } from './client.js'
 import { endpoints } from './endpoints.js'
-import { handleApiError, wrapApiCall, buildQueryParams } from './utils.js'
+import { wrapApiCall, buildQueryParams } from './utils.js'
 
 /**
  * Theme API operations
@@ -80,12 +80,16 @@ export const themesApi = {
     /**
      * Update only the image field of a theme
      * @param {number} themeId - Theme ID
-     * @param {File} imageFile - Image file to upload
+     * @param {File|null} imageFile - Image file to upload, or null to remove
      * @returns {Promise<Object>} Updated theme
      */
     updateImage: wrapApiCall(async (themeId, imageFile) => {
         const formData = new FormData()
-        formData.append('image', imageFile)
+        if (imageFile) {
+            formData.append('image', imageFile)
+        } else {
+            formData.append('image', '')
+        }
 
         return api.patch(endpoints.themes.detail(themeId), formData, {
             headers: {
@@ -93,6 +97,27 @@ export const themesApi = {
             }
         })
     }, 'themes.updateImage'),
+
+    /**
+     * Update only the site_icon field of a theme
+     * @param {number} themeId - Theme ID
+     * @param {File|null} iconFile - Icon file to upload, or null to remove
+     * @returns {Promise<Object>} Updated theme
+     */
+    updateSiteIcon: wrapApiCall(async (themeId, iconFile) => {
+        const formData = new FormData()
+        if (iconFile) {
+            formData.append('site_icon', iconFile)
+        } else {
+            formData.append('site_icon', '')
+        }
+
+        return api.patch(endpoints.themes.detail(themeId), formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.updateSiteIcon'),
 
     /**
      * Upload a design group image directly to object storage

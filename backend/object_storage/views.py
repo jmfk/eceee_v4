@@ -1714,7 +1714,7 @@ def upload_image(request):
         )
 
         # Get the full URL
-        file_url = default_storage.url(file_path)
+        file_url = request.build_absolute_uri(default_storage.url(file_path))
 
         # If object_type_id was provided, save the image to the object type
         if object_type:

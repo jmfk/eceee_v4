@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TreeImporterModalV2 from '../TreeImporterModalV2'
+import { namespacesApi } from '../../api'
 
 // Mock the API
 vi.mock('../../api', () => ({
@@ -18,15 +19,10 @@ vi.mock('../../api', () => ({
     }
 }))
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-    X: () => null,
-    Download: () => null,
-    AlertCircle: () => null,
-    CheckCircle: () => null,
-    Loader2: () => null,
-    SkipForward: () => null
-}))
+vi.mock('lucide-react', async (importOriginal) => {
+    const actual = await importOriginal()
+    return actual
+})
 
 // Test wrapper component
 const TestWrapper = ({ children }) => {
@@ -47,7 +43,6 @@ const TestWrapper = ({ children }) => {
 
 describe('TreeImporterModalV2 - Slug Warning Display', () => {
     it('should render completed pages without warnings', () => {
-        const { namespacesApi } = require('../../api')
         namespacesApi.list.mockResolvedValue({
             results: [{ name: 'default', slug: 'default' }]
         })
@@ -66,11 +61,10 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
             </TestWrapper>
         )
 
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should display slug warnings in completed page items', () => {
-        const { namespacesApi } = require('../../api')
         namespacesApi.list.mockResolvedValue({
             results: [{ name: 'default', slug: 'default' }]
         })
@@ -89,11 +83,10 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
         )
 
         // Component should render
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should handle pages with multiple warnings', () => {
-        const { namespacesApi } = require('../../api')
         namespacesApi.list.mockResolvedValue({
             results: [{ name: 'default', slug: 'default' }]
         })
@@ -111,11 +104,10 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
             </TestWrapper>
         )
 
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should render warning icon and message for pages with slug modifications', () => {
-        const { namespacesApi } = require('../../api')
         namespacesApi.list.mockResolvedValue({
             results: [{ name: 'default', slug: 'default' }]
         })
@@ -134,11 +126,10 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
         )
 
         // The component should be rendered
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 
     it('should display both skipped reason and slug warnings if both present', () => {
-        const { namespacesApi } = require('../../api')
         namespacesApi.list.mockResolvedValue({
             results: [{ name: 'default', slug: 'default' }]
         })
@@ -156,7 +147,6 @@ describe('TreeImporterModalV2 - Slug Warning Display', () => {
             </TestWrapper>
         )
 
-        expect(screen.getByText(/Import Page Tree/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Import External Site/i })).toBeInTheDocument()
     })
 })
-

@@ -5,6 +5,7 @@ const useNotifications = () => {
     const [notifications, setNotifications] = useState([])
     const [confirmDialog, setConfirmDialog] = useState(null)
     const [promptDialog, setPromptDialog] = useState(null)
+    const [saveConfirmDialog, setSaveConfirmDialog] = useState(null)
 
     const showNotification = useCallback((message, type = 'error') => {
         const id = Date.now() + Math.random()
@@ -84,6 +85,21 @@ const useNotifications = () => {
         setPromptDialog(null)
     }, [])
 
+    const showSaveConfirm = useCallback((options) => {
+        return new Promise((resolve) => {
+            setSaveConfirmDialog({
+                ...options,
+                onSave: () => { setSaveConfirmDialog(null); resolve('save') },
+                onDiscard: () => { setSaveConfirmDialog(null); resolve('discard') },
+                onCancel: () => { setSaveConfirmDialog(null); resolve('cancel') }
+            })
+        })
+    }, [])
+
+    const hideSaveConfirm = useCallback(() => {
+        setSaveConfirmDialog(null)
+    }, [])
+
     return {
         errors: notifications, // Keep as 'errors' for backward compatibility
         notifications,
@@ -99,7 +115,10 @@ const useNotifications = () => {
         hideConfirm,
         hidePrompt,
         confirmDialog,
-        promptDialog
+        promptDialog,
+        showSaveConfirm,
+        hideSaveConfirm,
+        saveConfirmDialog
     }
 }
 

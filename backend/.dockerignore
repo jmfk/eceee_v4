@@ -1,0 +1,13 @@
+# Never bake machine-local env into the image (decouple reads /app/.env at runtime).
+.env
+.env.*
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov
+.git
+venv
+.venv

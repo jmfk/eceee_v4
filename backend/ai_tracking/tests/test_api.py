@@ -20,10 +20,10 @@ class AIModelPriceAPITestCase(TestCase):
         """Set up test data."""
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_api", password="testpass123"
         )
         self.admin = User.objects.create_user(
-            username="admin", password="adminpass123", is_staff=True, is_superuser=True
+            username="admin_api", password="adminpass123", is_staff=True, is_superuser=True
         )
 
         self.price = AIModelPrice.objects.create(
@@ -53,9 +53,11 @@ class AIModelPriceAPITestCase(TestCase):
         """Test creating price as admin."""
         self.client.force_authenticate(user=self.admin)
         url = reverse("api:ai_tracking:price-list")
+        # Use a model name that doesn't exist in seeded data
+        model_name = "claude-3-5-sonnet-test-unique"
         data = {
             "provider": "anthropic",
-            "model_name": "claude-3-5-sonnet-20241022",
+            "model_name": model_name,
             "input_price_per_1k": "0.003000",
             "output_price_per_1k": "0.015000",
             "notes": "Test price",
@@ -65,7 +67,7 @@ class AIModelPriceAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
             AIModelPrice.objects.filter(
-                model_name="claude-3-5-sonnet-20241022"
+                model_name=model_name
             ).count(),
             1,
         )
@@ -92,13 +94,13 @@ class AIUsageLogAPITestCase(TestCase):
         """Set up test data."""
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_usage", password="testpass123"
         )
         self.other_user = User.objects.create_user(
-            username="otheruser", password="otherpass123"
+            username="otheruser_usage", password="otherpass123"
         )
         self.admin = User.objects.create_user(
-            username="admin", password="adminpass123", is_staff=True
+            username="admin_usage", password="adminpass123", is_staff=True
         )
 
         # Create usage logs
@@ -168,10 +170,10 @@ class AnalyticsAPITestCase(TestCase):
         """Set up test data."""
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_analytics", password="testpass123"
         )
         self.admin = User.objects.create_user(
-            username="admin", password="adminpass123", is_staff=True
+            username="admin_analytics", password="adminpass123", is_staff=True
         )
 
         # Create usage logs
@@ -238,7 +240,7 @@ class BudgetAlertAPITestCase(TestCase):
         """Set up test data."""
         self.client = APIClient()
         self.admin = User.objects.create_user(
-            username="admin", password="adminpass123", is_staff=True, is_superuser=True
+            username="admin_budget", password="adminpass123", is_staff=True, is_superuser=True
         )
 
         self.alert = AIBudgetAlert.objects.create(

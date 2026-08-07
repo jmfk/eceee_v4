@@ -99,7 +99,7 @@ export const createWidgetErrorPayload = (widgetId, slotName, error, context = 'u
 
 // Helper to validate event payloads (for development)
 export const validateEventPayload = (eventType, payload) => {
-    if (process.env.NODE_ENV !== 'development') return true
+    if (import.meta.env.MODE !== 'development') return true
 
     const requiredFields = {
         [WIDGET_EVENTS.CHANGED]: ['widgetId', 'slotName', 'widget', 'changeType'],

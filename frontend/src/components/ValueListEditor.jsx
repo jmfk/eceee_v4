@@ -22,6 +22,7 @@ import {
     Check,
     AlertCircle
 } from 'lucide-react'
+import ContextualHelpLink from './help/ContextualHelpLink'
 
 const ValueListEditor = () => {
     const [selectedValueList, setSelectedValueList] = useState(null)
@@ -109,7 +110,7 @@ const ValueListEditor = () => {
     })
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => valueListsApi.update(id, data),
+        mutationFn: async ({ id, data }) => await valueListsApi.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries(['value-lists'])
             addNotification('Value list updated successfully', 'success')
@@ -408,7 +409,10 @@ const ValueListEditor = () => {
             <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Value Lists</div>
+                        <div className="flex items-center gap-2">
+                            <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Value Lists</div>
+                            <ContextualHelpLink topicId="settings-data" label="Open Value lists help" />
+                        </div>
                         <div className="text-gray-600 mt-1">Manage centralized dropdown options for form fields</div>
                     </div>
                     <button

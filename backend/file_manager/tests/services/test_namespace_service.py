@@ -7,7 +7,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 
-from ...services import NamespaceAccessService
+from file_manager.services import NamespaceAccessService
 from content.models import Namespace
 
 User = get_user_model()

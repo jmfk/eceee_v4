@@ -143,7 +143,8 @@ class WidgetTypeViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        widget_data = request.data.get("widget_data", {})
+        # Support both 'widget_data' and 'configuration' keys for backward compatibility
+        widget_data = request.data.get("widget_data") or request.data.get("configuration", {})
 
         try:
             # Use Pydantic model for validation
@@ -201,7 +202,10 @@ class WidgetTypeViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response(widget_type.configuration_model.model_json_schema())
+        return Response({
+            "widget_type": widget_type.name,
+            "schema": widget_type.configuration_model.model_json_schema()
+        })
 
     @action(detail=True, methods=["get"], url_path="config-ui-schema")
     def config_ui_schema(self, request, pk=None):

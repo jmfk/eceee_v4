@@ -18,64 +18,91 @@ class PathPatternModelTests(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from core.models import Tenant
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_path", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Path Tenant", identifier="path", created_by=self.user
         )
 
     def test_path_pattern_field_exists(self):
         """Test that path_pattern_key field exists and has correct properties"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage.objects.create(
             slug="test",
-            path_pattern_key="^(?P<slug>[\\w-]+)/$",
+            path_pattern_key="news_slug",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
-        self.assertEqual(page.path_pattern_key, "^(?P<slug>[\\w-]+)/$")
+        self.assertEqual(page.path_pattern_key, "news_slug")
 
-    def test_valid_regex_pattern(self):
-        """Test that valid regex patterns are accepted"""
+    def test_valid_registered_pattern_key(self):
+        """Test that registered path pattern keys are accepted"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage(
+            title="News",
             slug="news",
-            path_pattern_key="^(?P<news_slug>[\\w-]+)/$",
+            path_pattern_key="news_slug",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
         # Should not raise ValidationError
         page.full_clean()
         page.save()
         self.assertIsNotNone(page.id)
 
-    def test_invalid_regex_pattern(self):
-        """Test that invalid regex patterns are rejected"""
+    def test_invalid_pattern_key(self):
+        """Test that unknown pattern keys are rejected"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         from django.core.exceptions import ValidationError
 
         page = WebPage(
+            title="Invalid",
             slug="invalid",
-            path_pattern_key="^(?P<slug>[\\w-+)/$",  # Invalid - missing closing bracket
+            path_pattern_key="unknown_pattern",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
         with self.assertRaises(ValidationError) as context:
             page.full_clean()
-        self.assertIn("Invalid regex pattern", str(context.exception))
+        self.assertIn("Invalid path pattern key", str(context.exception))
 
     def test_empty_path_pattern_allowed(self):
         """Test that empty path_pattern_key is allowed (backward compatibility)"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage.objects.create(
             slug="normal",
             path_pattern_key="",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
         self.assertEqual(page.path_pattern_key, "")
 
-    def test_complex_regex_pattern(self):
-        """Test that complex regex patterns with multiple captures work"""
+    def test_registered_complex_pattern_key(self):
+        """Test that registered pattern keys with multiple captures work"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         page = WebPage(
+            title="Events",
             slug="events",
-            path_pattern_key="^(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<slug>[\\w-]+)/$",
+            path_pattern_key="date_slug",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
         page.full_clean()
         page.save()
@@ -87,9 +114,16 @@ class PathResolutionTests(TestCase):
 
     def setUp(self):
         """Set up test pages and data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.factory = RequestFactory()
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_res", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Res Tenant", identifier="res", created_by=self.user
         )
 
         # Create root page for hostname
@@ -98,6 +132,7 @@ class PathResolutionTests(TestCase):
             hostnames=["testserver"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Create published version for root page
@@ -109,9 +144,10 @@ class PathResolutionTests(TestCase):
         self.news_page = WebPage.objects.create(
             slug="news",
             parent=self.root_page,
-            path_pattern_key="^(?P<news_slug>[\\w-]+)/$",
+            path_pattern_key="news_slug",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Create published version for news page
@@ -125,6 +161,7 @@ class PathResolutionTests(TestCase):
             parent=self.news_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Create published version for archive page
@@ -134,6 +171,9 @@ class PathResolutionTests(TestCase):
 
     def test_resolve_exact_page_match(self):
         """Test that exact page matches are resolved correctly"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         request = self.factory.get("/news/", HTTP_HOST="testserver")
         view.request = request
@@ -146,6 +186,9 @@ class PathResolutionTests(TestCase):
 
     def test_resolve_with_remaining_path(self):
         """Test resolution when there's a remaining path for pattern matching"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         request = self.factory.get("/news/my-article/", HTTP_HOST="testserver")
         view.request = request
@@ -160,6 +203,9 @@ class PathResolutionTests(TestCase):
 
     def test_explicit_page_takes_precedence(self):
         """Test that explicit child pages take precedence over pattern matching"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         request = self.factory.get("/news/archive/", HTTP_HOST="testserver")
         view.request = request
@@ -174,27 +220,49 @@ class PathResolutionTests(TestCase):
 
     def test_extract_simple_path_variables(self):
         """Test extraction of simple path variables from pattern"""
+        from webpages.path_pattern_registry import path_pattern_registry, BasePathPattern
+        
+        class SimplePattern(BasePathPattern):
+            key = "test_simple"
+            name = "Simple Pattern"
+            description = "Simple test pattern"
+            regex_pattern = "^(?P<news_slug>[\\w-]+)/$"
+            
+        path_pattern_registry.register(SimplePattern)
+        
         view = HostnamePageView()
-        pattern = "^(?P<news_slug>[\\w-]+)/$"
         remaining_path = "my-article/"
 
-        variables = view._extract_path_variables(pattern, remaining_path)
+        variables = view._extract_path_variables("test_simple", remaining_path)
 
         self.assertIsNotNone(variables)
         self.assertEqual(variables["news_slug"], "my-article")
+        
+        path_pattern_registry.unregister("test_simple")
 
     def test_extract_multiple_path_variables(self):
         """Test extraction of multiple path variables"""
+        from webpages.path_pattern_registry import path_pattern_registry, BasePathPattern
+        
+        class MultiPattern(BasePathPattern):
+            key = "test_multi_res"
+            name = "Multi Pattern"
+            description = "Multi test pattern"
+            regex_pattern = "^(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<slug>[\\w-]+)/$"
+            
+        path_pattern_registry.register(MultiPattern)
+        
         view = HostnamePageView()
-        pattern = "^(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<slug>[\\w-]+)/$"
         remaining_path = "2024/12/my-event/"
 
-        variables = view._extract_path_variables(pattern, remaining_path)
+        variables = view._extract_path_variables("test_multi_res", remaining_path)
 
         self.assertIsNotNone(variables)
         self.assertEqual(variables["year"], "2024")
         self.assertEqual(variables["month"], "12")
         self.assertEqual(variables["slug"], "my-event")
+        
+        path_pattern_registry.unregister("test_multi_res")
 
     def test_extract_no_match_returns_none(self):
         """Test that non-matching patterns return None"""
@@ -208,6 +276,9 @@ class PathResolutionTests(TestCase):
 
     def test_nonexistent_path_raises_404(self):
         """Test that completely nonexistent paths raise 404"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         request = self.factory.get("/nonexistent/", HTTP_HOST="testserver")
         view.request = request
@@ -217,12 +288,16 @@ class PathResolutionTests(TestCase):
 
     def test_nonexistent_subpage_without_pattern_raises_404(self):
         """Test that non-existent sub-pages return 404 when parent has no path_pattern_key"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         # Create a page without path_pattern_key
         about_page = WebPage.objects.create(
             slug="about",
             parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
         
         # Create published version for about page
@@ -247,9 +322,16 @@ class PathVariableSecurityTests(TestCase):
 
     def setUp(self):
         """Set up test data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.factory = RequestFactory()
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_sec", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Sec Tenant", identifier="sec", created_by=self.user
         )
 
         # Create root page
@@ -258,10 +340,14 @@ class PathVariableSecurityTests(TestCase):
             hostnames=["testserver"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
     def test_path_variables_are_html_escaped(self):
         """Test that path variables containing HTML are properly escaped"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         from webpages.path_patterns import NewsSlugPattern
         from webpages.path_pattern_registry import path_pattern_registry
 
@@ -283,11 +369,14 @@ class PathVariableSecurityTests(TestCase):
             variables = view._extract_path_variables("news_slug", remaining_path)
             if variables:
                 # Verify variable exists and matches expected
-                self.assertIn("slug", variables)
-                self.assertEqual(variables["slug"], expected_slug)
+                self.assertIn("news_slug", variables)
+                self.assertEqual(variables["news_slug"], expected_slug)
 
     def test_special_characters_are_escaped(self):
         """Test that special HTML characters are escaped in path variables"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
 
         # Create a custom test pattern that allows more characters
@@ -339,6 +428,9 @@ class PathVariableSecurityTests(TestCase):
 
     def test_xss_payload_is_neutralized(self):
         """Test that common XSS payloads are properly escaped"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
 
         # Register permissive test pattern
@@ -394,6 +486,9 @@ class PathVariableSecurityTests(TestCase):
 
     def test_multiple_path_variables_all_escaped(self):
         """Test that all path variables in multi-capture patterns are escaped"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
 
         from webpages.path_pattern_registry import (
@@ -440,9 +535,16 @@ class PathPatternIntegrationTests(TestCase):
 
     def setUp(self):
         """Set up test pages and data"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            return
+        from core.models import Tenant
         self.factory = RequestFactory()
         self.user = User.objects.create_user(
-            username="testuser", password="testpass123"
+            username="testuser_int", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Int Tenant", identifier="int", created_by=self.user
         )
 
         # Create root page
@@ -451,6 +553,7 @@ class PathPatternIntegrationTests(TestCase):
             hostnames=["testserver"],
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Create published version for root
@@ -462,9 +565,10 @@ class PathPatternIntegrationTests(TestCase):
         self.events_page = WebPage.objects.create(
             slug="events",
             parent=self.root_page,
-            path_pattern_key="^(?P<event_slug>[\\w-]+)/$",
+            path_pattern_key="event_slug",
             created_by=self.user,
             last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         # Create published version for events
@@ -474,6 +578,9 @@ class PathPatternIntegrationTests(TestCase):
 
     def test_path_variables_in_context(self):
         """Test that path_variables appear in the rendering context"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         request = self.factory.get("/events/annual-conference/", HTTP_HOST="testserver")
         view.request = request
@@ -490,6 +597,9 @@ class PathPatternIntegrationTests(TestCase):
 
     def test_listing_page_without_variables(self):
         """Test that pages work normally without path variables (listing mode)"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         request = self.factory.get("/events/", HTTP_HOST="testserver")
         view.request = request
@@ -502,6 +612,9 @@ class PathPatternIntegrationTests(TestCase):
 
     def test_invalid_pattern_match_returns_404(self):
         """Test that paths not matching the pattern return 404"""
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
         request = self.factory.get("/events/invalid path/", HTTP_HOST="testserver")
         view.request = request

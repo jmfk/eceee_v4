@@ -160,12 +160,13 @@ class CSSValidator:
 
     def _validate_url(self, url: str) -> bool:
         """Validate individual URLs in CSS"""
-        url = url.strip()
+        url = url.strip().strip('"').strip("'")
 
         # Allow data URLs for images only
         if url.startswith("data:"):
             if not url.startswith("data:image/"):
                 return False
+            return True
 
         # Allow relative URLs
         if url.startswith("/") or url.startswith("./") or url.startswith("../"):
@@ -378,6 +379,11 @@ class CSSInjectionManager:
         if not css_content:
             return True, "", []
 
+        # Check cache first
+        cache_key = self._generate_cache_key(css_content, scope_id, scope_type)
+        if cache_key in self._css_cache:
+            return True, self._css_cache[cache_key], []
+
         # Validate CSS
         is_valid, errors, warnings = self.validator.validate_css(css_content, context)
 
@@ -394,7 +400,6 @@ class CSSInjectionManager:
             scoped_css = sanitized_css
 
         # Cache processed CSS
-        cache_key = self._generate_cache_key(css_content, scope_id, scope_type)
         self._css_cache[cache_key] = scoped_css
 
         return True, scoped_css, warnings

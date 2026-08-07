@@ -51,7 +51,9 @@ const ComponentStylesTab = forwardRef(({ componentStyles, onChange, onDirty, the
             if (udcState.metadata.currentThemeId !== String(themeId)) {
                 switchTheme(String(themeId));
             }
-        } catch (_) {}
+        } catch (_) {
+            // Ignore errors if UDC is not available
+        }
 
         // Update UDC with new style
         updateThemeField('componentStyles', updatedStyles);

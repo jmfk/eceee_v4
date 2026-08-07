@@ -63,6 +63,7 @@ const Navbar = () => {
     if (path.startsWith('/statistics')) return 'Statistics'
     if (path.startsWith('/experiments')) return 'A/B Testing'
     if (path.startsWith('/profile')) return 'Profile'
+    if (path.startsWith('/help/how-to')) return 'How-To Help'
     return ''
   }
 

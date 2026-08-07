@@ -73,13 +73,13 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     // Load existing object types for child type selection
     const { data: existingTypesResponse } = useQuery({
         queryKey: ['objectTypes'],
-        queryFn: () => objectTypesApi.list()
+        queryFn: async () => await objectTypesApi.list()
     })
 
     // Load available namespaces
     const { data: namespacesResponse } = useQuery({
         queryKey: ['namespaces'],
-        queryFn: () => namespacesApi.list()
+        queryFn: async () => await namespacesApi.list()
     })
 
     const existingTypes = existingTypesResponse?.data?.results || existingTypesResponse?.data || []
@@ -1058,7 +1058,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                         </label>
                         {objectType?.id ? (
                             <InlineImageUpload
-                                currentImageUrl={objectType?.iconImage}
+                                currentImageUrl={formData.iconImage || objectType?.iconImage}
+                                onImageChange={(url) => handleInputChange('iconImage', url)}
                                 objectTypeId={objectType?.id}
                                 placeholder="Upload icon image"
                                 disabled={isSubmitting}

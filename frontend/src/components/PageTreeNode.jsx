@@ -20,6 +20,7 @@ import {
     Save,
     Search,
     Download,
+    Upload,
 } from 'lucide-react'
 import { pagesApi } from '../api'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
@@ -149,6 +150,7 @@ const PageTreeNode = memo(({
     onDelete,
     onAddPageBelow,
     onImport,
+    onExport,
     cutPageIds = [],
     copyPageIds = [],
     isSearchMode = false,
@@ -210,6 +212,16 @@ const PageTreeNode = memo(({
     const isRootPageCheck = isRootPage(sanitizedPage)
     const hasHostnames = sanitizedPage.hostnames && sanitizedPage.hostnames.length > 0
     const needsHostnameWarning = isRootPageCheck && !hasHostnames
+    const pageTestId = useMemo(() => {
+        const source = page.slug || page.title || String(page.id)
+        const normalized = source
+            .toString()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+
+        return normalized || String(page.id)
+    }, [page.id, page.slug, page.title])
 
     // Helper function to highlight search terms
     const highlightSearchTerm = (text, searchTerm) => {
@@ -353,6 +365,10 @@ const PageTreeNode = memo(({
         onImport?.(page)
     }
 
+    const handleExport = () => {
+        onExport?.(page)
+    }
+
     const handleMoveUp = async () => {
         if (!canMoveUp) return
         // Animate immediately (optimistic)
@@ -435,8 +451,8 @@ const PageTreeNode = memo(({
 
         try {
             // Update via API - skicka alla ändringar
-            const updatePromises = newChildren.map(child =>
-                pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            const updatePromises = newChildren.map(async (child) =>
+                await pagesApi.update(child.id, { sortOrder: child.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})
@@ -479,8 +495,8 @@ const PageTreeNode = memo(({
         // 2. SEN: Skicka alla uppdaterade sortOrder till backend
         try {
             // Update via API - skicka alla ändringar
-            const updatePromises = newChildren.map(child =>
-                pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            const updatePromises = newChildren.map(async (child) =>
+                await pagesApi.update(child.id, { sortOrder: child.sortOrder })
             )
             await Promise.all(updatePromises)
             forceUpdate({})
@@ -652,6 +668,7 @@ const PageTreeNode = memo(({
         <div className="select-none">
             {/* Main node */}
             <div
+                data-testid={`page-tree-node-${pageTestId}`}
                 className={`
                     flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
                     ${isCut && isSelected ? 'opacity-70 bg-orange-100 border-l-4 border-blue-500 ring-2 ring-orange-300' : ''}
@@ -674,6 +691,7 @@ const PageTreeNode = memo(({
             >
                 {/* Expand/collapse button */}
                 <button
+                    data-testid={`page-tree-expand-${pageTestId}`}
                     onClick={(e) => {
                         e.stopPropagation()
                         handleToggleExpand()
@@ -851,6 +869,7 @@ const PageTreeNode = memo(({
                 <div className="flex items-center gap-1">
                     <Tooltip text="Edit" position="top">
                         <button
+                            data-testid={`page-tree-edit-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleEdit()
@@ -863,6 +882,7 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Move up" position="top">
                         <button
+                            data-testid={`page-tree-move-up-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleMoveUp()
@@ -876,6 +896,7 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Move down" position="top">
                         <button
+                            data-testid={`page-tree-move-down-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleMoveDown()
@@ -901,6 +922,7 @@ const PageTreeNode = memo(({
 
                     <Tooltip text="Add child page" position="top">
                         <button
+                            data-testid={`page-tree-add-child-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleAddPageBelow()
@@ -911,17 +933,33 @@ const PageTreeNode = memo(({
                         </button>
                     </Tooltip>
 
-                    <Tooltip text="Import page tree as subpage of this page" position="top">
+                    <Tooltip text="Import external site as subpage of this page" position="top">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleImport()
                             }}
+                            aria-label={`Import external site under ${page.title}`}
                             className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors"
                         >
-                            <Download className="w-4 h-4" />
+                            <Upload className="w-4 h-4" />
                         </button>
                     </Tooltip>
+
+                    {level === 0 && onExport && (
+                        <Tooltip text="Export root site package" position="top">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport()
+                                }}
+                                aria-label={`Export root site package for ${page.title}`}
+                                className="p-1.5 rounded hover:bg-indigo-100 text-gray-500 hover:text-indigo-600 transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                            </button>
+                        </Tooltip>
+                    )}
 
                     {(cutPageIds.length > 0 || copyPageIds.length > 0) && (
                         <>
@@ -989,6 +1027,7 @@ const PageTreeNode = memo(({
                             onDelete={onDelete}
                             onAddPageBelow={onAddPageBelow}
                             onImport={onImport}
+                            onExport={onExport}
                             cutPageIds={cutPageIds}
                             copyPageIds={copyPageIds}
                             isSearchMode={isSearchMode}
@@ -1148,4 +1187,4 @@ const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {
     )
 }
 
-export default PageTreeNode 
+export default PageTreeNode

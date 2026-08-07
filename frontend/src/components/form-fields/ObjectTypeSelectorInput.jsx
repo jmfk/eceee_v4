@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ChevronDown, X, Check, Database, Loader2, AlertCircle } from 'lucide-react'
 import { endpoints } from '../../api/endpoints'
 
+import OptimizedImage from '../media/OptimizedImage'
+
 /**
  * ObjectTypeSelectorInput Component
  * 
@@ -223,7 +225,15 @@ const ObjectTypeSelectorInput = ({
                                         {ot.isPlaceholder ? (
                                             <Loader2 className="w-3 h-3 animate-spin" />
                                         ) : ot.iconImage ? (
-                                            <img src={ot.iconImage} alt="" className="w-4 h-4" />
+                                            <div className="w-4 h-4 flex-shrink-0">
+                                                <OptimizedImage 
+                                                    src={ot.iconImage} 
+                                                    alt="" 
+                                                    width={16} 
+                                                    height={16} 
+                                                    className="w-full h-full object-cover rounded-sm" 
+                                                />
+                                            </div>
                                         ) : (
                                             <Database className="w-3 h-3" />
                                         )}
@@ -296,7 +306,15 @@ const ObjectTypeSelectorInput = ({
                                         >
                                             <div className="flex-shrink-0 mt-1">
                                                 {ot.iconImage ? (
-                                                    <img src={ot.iconImage} alt="" className="w-6 h-6" />
+                                                    <div className="w-6 h-6 flex-shrink-0">
+                                                        <OptimizedImage 
+                                                            src={ot.iconImage} 
+                                                            alt="" 
+                                                            width={24} 
+                                                            height={24} 
+                                                            className="w-full h-full object-cover rounded-md shadow-sm border border-gray-100" 
+                                                        />
+                                                    </div>
                                                 ) : (
                                                     <Database className="w-6 h-6 text-gray-400" />
                                                 )}

@@ -18,13 +18,13 @@ const ParentObjectSelector = ({
     // Fetch all object types to find which ones allow this object type as child
     const { data: objectTypesResponse } = useQuery({
         queryKey: ['objectTypes', 'all'],
-        queryFn: () => objectTypesApi.getActive()
+        queryFn: async () => await objectTypesApi.getActive()
     })
 
     // Fetch current parent object details if value exists
     const { data: currentParentResponse, isLoading: isLoadingCurrentParent } = useQuery({
         queryKey: ['objectInstance', value],
-        queryFn: () => objectInstancesApi.get(value),
+        queryFn: async () => await objectInstancesApi.get(value),
         enabled: !!value
     })
 
@@ -47,8 +47,8 @@ const ParentObjectSelector = ({
             if (validParentTypes.length === 0) return { data: [] }
 
             // Fetch objects from all valid parent types
-            const promises = validParentTypes.map(type =>
-                objectInstancesApi.getByType(type.name, { search: searchTerm })
+            const promises = validParentTypes.map(async (type) =>
+                await objectInstancesApi.getByType(type.name, { search: searchTerm })
             )
 
             const responses = await Promise.all(promises)

@@ -80,12 +80,12 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
         # Calculate aggregates
         aggregates = queryset.aggregate(
-            total_cost=Sum("total_cost"),
-            total_calls=Count("id"),
-            total_input_tokens=Sum("input_tokens"),
-            total_output_tokens=Sum("output_tokens"),
-            avg_cost_per_call=Avg("total_cost"),
-            avg_duration_ms=Avg("duration_ms"),
+            agg_total_cost=Sum("total_cost"),
+            agg_total_calls=Count("id"),
+            agg_total_input_tokens=Sum("input_tokens"),
+            agg_total_output_tokens=Sum("output_tokens"),
+            agg_avg_cost_per_call=Avg("total_cost"),
+            agg_avg_duration_ms=Avg("duration_ms"),
         )
 
         # Calculate success rate
@@ -96,18 +96,18 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
         success_rate = 100.0
         if total_logs > 0:
-            success_rate = (aggregates["total_calls"] / total_logs) * 100
+            success_rate = (aggregates["agg_total_calls"] / total_logs) * 100
 
         # Build response
         data = {
-            "total_cost": aggregates["total_cost"] or Decimal("0"),
-            "total_calls": aggregates["total_calls"] or 0,
-            "total_input_tokens": aggregates["total_input_tokens"] or 0,
-            "total_output_tokens": aggregates["total_output_tokens"] or 0,
-            "total_tokens": (aggregates["total_input_tokens"] or 0)
-            + (aggregates["total_output_tokens"] or 0),
-            "avg_cost_per_call": aggregates["avg_cost_per_call"] or Decimal("0"),
-            "avg_duration_ms": aggregates["avg_duration_ms"] or 0,
+            "total_cost": aggregates["agg_total_cost"] or Decimal("0"),
+            "total_calls": aggregates["agg_total_calls"] or 0,
+            "total_input_tokens": aggregates["agg_total_input_tokens"] or 0,
+            "total_output_tokens": aggregates["agg_total_output_tokens"] or 0,
+            "total_tokens": (aggregates["agg_total_input_tokens"] or 0)
+            + (aggregates["agg_total_output_tokens"] or 0),
+            "avg_cost_per_call": aggregates["agg_avg_cost_per_call"] or Decimal("0"),
+            "avg_duration_ms": aggregates["agg_avg_duration_ms"] or 0,
             "success_rate": success_rate,
         }
 
@@ -132,12 +132,12 @@ class AnalyticsViewSet(viewsets.ViewSet):
         results = (
             queryset.values("user__username")
             .annotate(
-                total_cost=Sum("total_cost"),
-                total_calls=Count("id"),
-                total_tokens=Sum("input_tokens") + Sum("output_tokens"),
-                avg_cost_per_call=Avg("total_cost"),
+                agg_total_cost=Sum("total_cost"),
+                agg_total_calls=Count("id"),
+                agg_total_tokens=Sum("input_tokens") + Sum("output_tokens"),
+                agg_avg_cost_per_call=Avg("total_cost"),
             )
-            .order_by("-total_cost")[:20]
+            .order_by("-agg_total_cost")[:20]
         )
 
         # Format results
@@ -146,10 +146,10 @@ class AnalyticsViewSet(viewsets.ViewSet):
             data.append(
                 {
                     "group_key": item["user__username"] or "Unknown",
-                    "total_cost": item["total_cost"],
-                    "total_calls": item["total_calls"],
-                    "total_tokens": item["total_tokens"],
-                    "avg_cost_per_call": item["avg_cost_per_call"],
+                    "total_cost": item["agg_total_cost"],
+                    "total_calls": item["agg_total_calls"],
+                    "total_tokens": item["agg_total_tokens"],
+                    "avg_cost_per_call": item["agg_avg_cost_per_call"],
                 }
             )
 
@@ -169,12 +169,12 @@ class AnalyticsViewSet(viewsets.ViewSet):
         results = (
             queryset.values("provider", "model_name")
             .annotate(
-                total_cost=Sum("total_cost"),
-                total_calls=Count("id"),
-                total_tokens=Sum("input_tokens") + Sum("output_tokens"),
-                avg_cost_per_call=Avg("total_cost"),
+                agg_total_cost=Sum("total_cost"),
+                agg_total_calls=Count("id"),
+                agg_total_tokens=Sum("input_tokens") + Sum("output_tokens"),
+                agg_avg_cost_per_call=Avg("total_cost"),
             )
-            .order_by("-total_cost")[:20]
+            .order_by("-agg_total_cost")[:20]
         )
 
         # Format results
@@ -183,10 +183,10 @@ class AnalyticsViewSet(viewsets.ViewSet):
             data.append(
                 {
                     "group_key": f"{item['provider']}/{item['model_name']}",
-                    "total_cost": item["total_cost"],
-                    "total_calls": item["total_calls"],
-                    "total_tokens": item["total_tokens"],
-                    "avg_cost_per_call": item["avg_cost_per_call"],
+                    "total_cost": item["agg_total_cost"],
+                    "total_calls": item["agg_total_calls"],
+                    "total_tokens": item["agg_total_tokens"],
+                    "avg_cost_per_call": item["agg_avg_cost_per_call"],
                 }
             )
 
@@ -204,12 +204,12 @@ class AnalyticsViewSet(viewsets.ViewSet):
         results = (
             queryset.values("provider")
             .annotate(
-                total_cost=Sum("total_cost"),
-                total_calls=Count("id"),
-                total_tokens=Sum("input_tokens") + Sum("output_tokens"),
-                avg_cost_per_call=Avg("total_cost"),
+                agg_total_cost=Sum("total_cost"),
+                agg_total_calls=Count("id"),
+                agg_total_tokens=Sum("input_tokens") + Sum("output_tokens"),
+                agg_avg_cost_per_call=Avg("total_cost"),
             )
-            .order_by("-total_cost")
+            .order_by("-agg_total_cost")
         )
 
         # Format results
@@ -218,10 +218,10 @@ class AnalyticsViewSet(viewsets.ViewSet):
             data.append(
                 {
                     "group_key": item["provider"],
-                    "total_cost": item["total_cost"],
-                    "total_calls": item["total_calls"],
-                    "total_tokens": item["total_tokens"],
-                    "avg_cost_per_call": item["avg_cost_per_call"],
+                    "total_cost": item["agg_total_cost"],
+                    "total_calls": item["agg_total_calls"],
+                    "total_tokens": item["agg_total_tokens"],
+                    "avg_cost_per_call": item["agg_avg_cost_per_call"],
                 }
             )
 
@@ -254,9 +254,9 @@ class AnalyticsViewSet(viewsets.ViewSet):
             queryset.annotate(date=trunc_func("created_at"))
             .values("date")
             .annotate(
-                total_cost=Sum("total_cost"),
-                total_calls=Count("id"),
-                total_tokens=Sum("input_tokens") + Sum("output_tokens"),
+                agg_total_cost=Sum("total_cost"),
+                agg_total_calls=Count("id"),
+                agg_total_tokens=Sum("input_tokens") + Sum("output_tokens"),
             )
             .order_by("date")
         )
@@ -267,9 +267,9 @@ class AnalyticsViewSet(viewsets.ViewSet):
             data.append(
                 {
                     "date": item["date"],
-                    "total_cost": item["total_cost"],
-                    "total_calls": item["total_calls"],
-                    "total_tokens": item["total_tokens"],
+                    "total_cost": item["agg_total_cost"],
+                    "total_calls": item["agg_total_calls"],
+                    "total_tokens": item["agg_total_tokens"],
                 }
             )
 
@@ -287,12 +287,12 @@ class AnalyticsViewSet(viewsets.ViewSet):
         results = (
             queryset.values("task_description")
             .annotate(
-                total_cost=Sum("total_cost"),
-                total_calls=Count("id"),
-                total_tokens=Sum("input_tokens") + Sum("output_tokens"),
-                avg_cost_per_call=Avg("total_cost"),
+                agg_total_cost=Sum("total_cost"),
+                agg_total_calls=Count("id"),
+                agg_total_tokens=Sum("input_tokens") + Sum("output_tokens"),
+                agg_avg_cost_per_call=Avg("total_cost"),
             )
-            .order_by("-total_cost")[:20]
+            .order_by("-agg_total_cost")[:20]
         )
 
         # Format results
@@ -301,10 +301,10 @@ class AnalyticsViewSet(viewsets.ViewSet):
             data.append(
                 {
                     "group_key": item["task_description"],
-                    "total_cost": item["total_cost"],
-                    "total_calls": item["total_calls"],
-                    "total_tokens": item["total_tokens"],
-                    "avg_cost_per_call": item["avg_cost_per_call"],
+                    "total_cost": item["agg_total_cost"],
+                    "total_calls": item["agg_total_calls"],
+                    "total_tokens": item["agg_total_tokens"],
+                    "avg_cost_per_call": item["agg_avg_cost_per_call"],
                 }
             )
 

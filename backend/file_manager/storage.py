@@ -21,6 +21,7 @@ from django.core.files.storage import Storage
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.deconstruct import deconstructible
 from botocore.exceptions import ClientError
+from botocore.config import Config
 from PIL import Image, ExifTags
 import io
 
@@ -38,11 +39,16 @@ class S3MediaStorage(Storage):
         self.access_key = settings.AWS_ACCESS_KEY_ID
         self.secret_key = settings.AWS_SECRET_ACCESS_KEY
         self.endpoint_url = getattr(settings, "AWS_S3_ENDPOINT_URL", None)
+        self.internal_endpoint_url = getattr(
+            settings, "AWS_S3_INTERNAL_ENDPOINT_URL", self.endpoint_url
+        )
         self.custom_domain = getattr(settings, "AWS_S3_CUSTOM_DOMAIN", None)
         self.default_acl = getattr(settings, "AWS_DEFAULT_ACL", "private")
         self.querystring_auth = getattr(settings, "AWS_QUERYSTRING_AUTH", True)
         self.file_overwrite = getattr(settings, "AWS_S3_FILE_OVERWRITE", False)
         self.object_parameters = getattr(settings, "AWS_S3_OBJECT_PARAMETERS", {})
+        self.signature_version = getattr(settings, "AWS_S3_SIGNATURE_VERSION", "s3v4")
+        self.addressing_style = getattr(settings, "AWS_S3_ADDRESSING_STYLE", "path")
         self.max_file_size = getattr(
             settings, "MAX_FILE_SIZE", 100 * 1024 * 1024
         )  # 100MB
@@ -61,14 +67,100 @@ class S3MediaStorage(Storage):
             },
         )
 
-        # Initialize S3 client
-        self.client = boto3.client(
+        # Initialize S3 client with proper config for Linode/AWS compatibility
+        s3_config = Config(
+            signature_version=self.signature_version,
+            s3={"addressing_style": self.addressing_style},
+        )
+
+        self.client = self._create_client(self.internal_endpoint_url, s3_config)
+        if self.endpoint_url and self.endpoint_url != self.internal_endpoint_url:
+            self.presign_client = self._create_client(self.endpoint_url, s3_config)
+        else:
+            self.presign_client = self.client
+
+    def _create_client(self, endpoint_url, s3_config):
+        """Create an S3 client for either internal IO or browser-facing URL signing."""
+        return boto3.client(
             "s3",
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
             region_name=self.region_name,
-            endpoint_url=self.endpoint_url,
+            endpoint_url=endpoint_url,
+            config=s3_config,
         )
+
+    def make_public(self, name):
+        """
+        Set an existing file to public-read ACL.
+
+        Args:
+            name: File name or path
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            name = name.lstrip("/")
+            self.client.put_object_acl(
+                Bucket=self.bucket_name,
+                Key=name,
+                ACL='public-read'
+            )
+            return True
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NotImplemented':
+                # ACLs are likely disabled on this bucket/server
+                # We should use bucket policies instead
+                logger.warning(f"ACLs not implemented for {name}. Use bucket policy instead.")
+            else:
+                logger.error(f"Failed to set public-read ACL for {name}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to set public-read ACL for {name}: {e}")
+            return False
+
+    def set_public_bucket_policy(self, prefix="uploads/"):
+        """
+        Set a bucket policy to make a specific prefix public-read.
+        This is the preferred way for Linode and modern MinIO.
+        """
+        import json
+
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": ["*"]},
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{self.bucket_name}/{prefix}*"]
+                }
+            ]
+        }
+
+        try:
+            self.client.put_bucket_policy(
+                Bucket=self.bucket_name,
+                Policy=json.dumps(policy)
+            )
+            logger.info(f"Successfully set public-read bucket policy for {prefix}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set bucket policy: {e}")
+            return False
+
+    def is_publicly_accessible(self, name):
+        """
+        Check if a file is publicly accessible via an anonymous HEAD request.
+        """
+        import requests
+        url = self.get_public_url(name)
+        try:
+            response = requests.head(url, timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
 
     def listdir(self, path):
         """
@@ -259,13 +351,20 @@ class S3MediaStorage(Storage):
         thumbnail_path = f"{base_path}_thumb.jpg"
 
         try:
+            # Prepare extra args
+            extra_args = self.object_parameters.copy()
+            extra_args["ContentType"] = "image/jpeg"
+
+            # Only set ACL if explicitly configured
+            if self.default_acl and self.default_acl != "None":
+                extra_args["ACL"] = self.default_acl
+
             # Upload thumbnail to S3
             self.client.put_object(
                 Bucket=self.bucket_name,
                 Key=thumbnail_path,
                 Body=thumbnail_bytes,
-                ContentType="image/jpeg",
-                **self.object_parameters,
+                **extra_args,
             )
 
             logger.info(f"Uploaded thumbnail to S3: {thumbnail_path}")
@@ -328,7 +427,8 @@ class S3MediaStorage(Storage):
         if content_type:
             extra_args["ContentType"] = content_type
 
-        if self.default_acl:
+        # Only set ACL if explicitly configured
+        if self.default_acl and self.default_acl != "None":
             extra_args["ACL"] = self.default_acl
 
         try:
@@ -401,28 +501,42 @@ class S3MediaStorage(Storage):
         """
         return self.url(name)
 
-    def generate_signed_url(self, name: str, expires: int = 3600) -> str:
+    def generate_signed_url(
+        self, name: str, expires: int = 3600, response_filename: str = None
+    ) -> str:
         """
         Generate a pre-signed URL for a file.
 
         Args:
             name: File name or path
             expires: URL expiration time in seconds
+            response_filename: Optional filename to suggest through Content-Disposition
 
         Returns:
             Pre-signed URL
         """
         key = self._get_key(name)
+        params = {"Bucket": self.bucket_name, "Key": key}
+        if response_filename:
+            params["ResponseContentDisposition"] = f'attachment; filename="{response_filename}"'
         try:
-            url = self.client.generate_presigned_url(
+            url = self.presign_client.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": self.bucket_name, "Key": key},
+                Params=params,
                 ExpiresIn=expires,
             )
             return url
         except ClientError as e:
             logger.error(f"Failed to generate signed URL for {name}: {e}")
             raise
+
+    def generate_presigned_url(
+        self, name: str, expiration: int = 3600, response_filename: str = None
+    ) -> str:
+        """Backward-compatible alias for generate_signed_url."""
+        return self.generate_signed_url(
+            name, expires=expiration, response_filename=response_filename
+        )
 
     def validate_file_type(self, file: UploadedFile) -> bool:
         """
@@ -468,7 +582,10 @@ class S3MediaStorage(Storage):
         Returns:
             Dictionary of metadata
         """
-        metadata = {}
+        metadata = {
+            "file_size": len(file_content),
+            "content_type": content_type,
+        }
 
         if content_type.startswith("image/"):
             try:
@@ -529,5 +646,18 @@ class S3MediaStorage(Storage):
             raise
 
 
-# Create a singleton instance
+@deconstructible
+class S3SystemStorage(S3MediaStorage):
+    """Storage for system-level images (themes, icons) that are NOT part of media manager."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize S3 system storage with public-read defaults."""
+        super().__init__(*args, **kwargs)
+        # Ensure these are always public-read for direct browser access if needed
+        self.default_acl = "public-read"
+        self.querystring_auth = False
+
+
+# Create singleton instances
 storage = S3MediaStorage()
+system_storage = S3SystemStorage()

@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { FolderOpen } from 'lucide-react';
+import OptimizedImage from './OptimizedImage';
 import { getImageAspectRatio, getGridSpan, getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout';
 
 const CollectionThumbnailGrid = ({ collection, className = '' }) => {
@@ -67,14 +68,16 @@ const CollectionThumbnailGrid = ({ collection, className = '' }) => {
                             className="relative overflow-hidden bg-gray-200"
                             style={gridStyle}
                         >
-                            <img
+                            <OptimizedImage
                                 src={file.imgproxyBaseUrl || file.imgproxy_base_url}
                                 alt=""
+                                width={100}
+                                height={100}
+                                resizeType="fill"
                                 className={`w-full h-full ${objectFitClass}`}
-                                style={{ display: 'block' }}
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                }}
+                                fallback={
+                                    <div className="w-full h-full bg-gray-200" />
+                                }
                             />
                         </div>
                     );

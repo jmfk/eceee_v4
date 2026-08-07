@@ -12,8 +12,16 @@ import {
     ChevronDown,
     MoreHorizontal,
     AlertTriangle,
-    Info
+    Info,
+    Check,
+    Clipboard,
+    Scissors,
+    ClipboardPaste
 } from 'lucide-react'
+import ContextualHelpLink from '../../components/help/ContextualHelpLink'
+import { copyWidgetsToClipboard, cutWidgetsToClipboard, readClipboardWithMetadata } from '../../utils/clipboardService'
+import { getWidgetHelpTopic } from '../../utils/howToHelp'
+import { useClipboard } from '../../contexts/ClipboardContext'
 
 const ObjectWidgetHeader = ({
     widgetType,
@@ -29,10 +37,22 @@ const ObjectWidgetHeader = ({
     isRequired = false,
     maxWidgets = null,
     currentIndex = 0,
-    className = ''
+    className = '',
+    // Selection props
+    isWidgetSelected = false,
+    onToggleWidgetSelection,
+    // Copy/Cut/Paste props
+    widget = null,
+    slotName = null,
+    onPaste = null,
+    instanceId = null,
+    widgetPath = null,
+    isCut = false
 }) => {
     const [showMenu, setShowMenu] = useState(false)
     const menuRef = useRef(null)
+    const { refreshClipboard, pasteModeActive } = useClipboard()
+    const helpTopicId = getWidgetHelpTopic(widget?.type || widgetType)
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -52,16 +72,65 @@ const ObjectWidgetHeader = ({
         setShowMenu(!showMenu)
     }
 
-    if (!showControls) {
-        return null
+    const handleCopy = async () => {
+        if (widget) {
+            await copyWidgetsToClipboard([widget])
+            await refreshClipboard()
+        }
     }
 
-    return (
+    const handleCut = async () => {
+        if (!widget || !slotName) return
+
+        const cutMetadata = {
+            instanceId: instanceId,
+            widgetPaths: widgetPath ? [widgetPath] : [`${slotName}/${widget.id}`],
+            widgets: {
+                [slotName]: [widget.id]
+            }
+        }
+
+        await cutWidgetsToClipboard([widget], cutMetadata)
+        await refreshClipboard()
+    }
+
+    const handlePaste = async () => {
+        if (!onPaste) return
+
+        const clipboardResult = await readClipboardWithMetadata()
+        if (clipboardResult && clipboardResult.data && clipboardResult.data.length > 0) {
+            const pastedWidget = clipboardResult.data[0]
+            // For ObjectEditor, we'll let handlePasteAtPosition handle the ID generation if needed,
+            // or just pass it as is. ReactLayoutRenderer generates new IDs.
+            const metadata = clipboardResult.operation === 'cut' ? {
+                operation: clipboardResult.operation,
+                metadata: clipboardResult.metadata
+            } : undefined
+
+            onPaste(pastedWidget, metadata)
+        }
+    }
+
+    return showControls ? (
         <div className={`widget-header object-editor-header bg-gray-100 border border-gray-200 rounded-t px-3 py-2 flex items-center justify-between ${className}`}>
             {/* Left side - Widget info and constraints */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
+                {/* Selection checkbox */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleWidgetSelection?.()
+                    }}
+                    className={`flex items-center justify-center w-4 h-4 rounded border transition-colors ${isWidgetSelected
+                            ? 'bg-blue-500 border-blue-500 text-white'
+                            : 'bg-white border-gray-300 hover:border-blue-400'
+                        }`}
+                >
+                    {isWidgetSelected && <Check className="h-3 w-3" />}
+                </button>
+
                 <div className="flex items-center space-x-2">
-                    <span className="text-xs font-medium text-gray-700">
+                    <span className={`text-xs font-medium text-gray-700 ${isCut ? 'line-through opacity-50' : ''}`}>
                         {widgetType}
                     </span>
 
@@ -102,7 +171,7 @@ const ObjectWidgetHeader = ({
                                 ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                                 : 'text-gray-400 cursor-not-allowed'
                                 }`}
-                            title="Move up in slot"
+                            title="Move up"
                         >
                             <ChevronUp className="h-3 w-3" />
                         </button>
@@ -113,15 +182,55 @@ const ObjectWidgetHeader = ({
                                 ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                                 : 'text-gray-400 cursor-not-allowed'
                                 }`}
-                            title="Move down in slot"
+                            title="Move down"
                         >
                             <ChevronDown className="h-3 w-3" />
                         </button>
                     </div>
                 )}
 
+                {/* Copy/Cut/Paste controls */}
+                <div className="flex items-center border-r border-gray-300 pr-2 mr-2">
+                    {widget && (
+                        <>
+                            <button
+                                onClick={handleCopy}
+                                className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="Copy widget"
+                            >
+                                <Clipboard className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                onClick={handleCut}
+                                className="p-1 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                                title="Cut widget"
+                            >
+                                <Scissors className="h-3.5 w-3.5" />
+                            </button>
+                        </>
+                    )}
+                    {onPaste && (
+                        <button
+                            onClick={handlePaste}
+                            className={`p-1 rounded transition-colors ${pasteModeActive
+                                    ? 'text-purple-600 hover:text-purple-700 hover:bg-purple-50 animate-pulse'
+                                    : 'text-gray-400 cursor-not-allowed opacity-50'
+                                }`}
+                            disabled={!pasteModeActive}
+                            title="Paste widget after"
+                        >
+                            <ClipboardPaste className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                </div>
+
                 {/* Quick actions */}
                 <div className="flex items-center space-x-1">
+                    <ContextualHelpLink
+                        topicId={helpTopicId}
+                        label={`Open ${widgetType} widget help`}
+                        size="sm"
+                    />
                     {onEdit && (
                         <button
                             onClick={onEdit}
@@ -166,7 +275,7 @@ const ObjectWidgetHeader = ({
                 </div>
             </div>
         </div>
-    )
+    ) : null
 }
 
 export default ObjectWidgetHeader

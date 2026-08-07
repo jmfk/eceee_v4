@@ -57,31 +57,31 @@ ObjectVersion        # Version history and snapshots
 #### API Endpoints
 ```
 Object Type Management:
-GET/POST   /api/v1/objects/api/object-types/
-GET/PUT/DELETE /api/v1/objects/api/object-types/{id}/
-GET        /api/v1/objects/api/object-types/{id}/schema/
-GET        /api/v1/objects/api/object-types/{id}/instances/
-GET        /api/v1/objects/api/object-types/active/
+GET/POST   /api/v1/objects/object-types/
+GET/PUT/DELETE /api/v1/objects/object-types/{id}/
+GET        /api/v1/objects/object-types/{id}/schema/
+GET        /api/v1/objects/object-types/{id}/instances/
+GET        /api/v1/objects/object-types/active/
 
 Object Instance Management:
-GET/POST   /api/v1/objects/api/objects/
-GET/PUT/DELETE /api/v1/objects/api/objects/{id}/
-POST       /api/v1/objects/api/objects/{id}/publish/
-GET        /api/v1/objects/api/objects/{id}/versions/
+GET/POST   /api/v1/objects/objects/
+GET/PUT/DELETE /api/v1/objects/objects/{id}/
+POST       /api/v1/objects/objects/{id}/publish/
+GET        /api/v1/objects/objects/{id}/versions/
 
 Hierarchy Operations:
-GET        /api/v1/objects/api/objects/{id}/children/
-GET        /api/v1/objects/api/objects/{id}/descendants/
-GET        /api/v1/objects/api/objects/{id}/ancestors/
-GET        /api/v1/objects/api/objects/{id}/siblings/
-GET        /api/v1/objects/api/objects/{id}/tree/
-POST       /api/v1/objects/api/objects/{id}/move_to/
+GET        /api/v1/objects/objects/{id}/children/
+GET        /api/v1/objects/objects/{id}/descendants/
+GET        /api/v1/objects/objects/{id}/ancestors/
+GET        /api/v1/objects/objects/{id}/siblings/
+GET        /api/v1/objects/objects/{id}/tree/
+POST       /api/v1/objects/objects/{id}/move_to/
 
 Advanced Operations:
-GET        /api/v1/objects/api/objects/published/
-GET        /api/v1/objects/api/objects/search/
-GET        /api/v1/objects/api/objects/roots/
-POST       /api/v1/objects/api/objects/bulk-operations/
+GET        /api/v1/objects/objects/published/
+GET        /api/v1/objects/objects/search/
+GET        /api/v1/objects/objects/roots/
+POST       /api/v1/objects/objects/bulk-operations/
 ```
 
 #### Display Widgets
@@ -379,7 +379,7 @@ docker-compose exec backend python manage.py create_object_demo_data
 
 **API 404 Errors**:
 - Verify backend is running on port 8000
-- Check API URLs use `/api/v1/objects/api/` prefix
+- Check API URLs use `/api/v1/objects/` prefix
 - Ensure authentication is properly configured
 
 **Widget Loading Errors**:

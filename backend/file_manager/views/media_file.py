@@ -62,7 +62,12 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def restore(self, request, pk=None):
         """Restore a soft-deleted file."""
-        instance = self.get_object()
+        # Use with_deleted() to find the file even if it's soft-deleted
+        # This is necessary because get_object() uses get_queryset() which might filter them out
+        try:
+            instance = MediaFile.objects.with_deleted().get(pk=pk)
+        except MediaFile.DoesNotExist:
+            raise Http404
 
         if not instance.is_deleted:
             return Response(
@@ -87,14 +92,22 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        instance = self.get_object()
+        try:
+            instance = MediaFile.objects.with_deleted().get(pk=pk)
+        except MediaFile.DoesNotExist:
+            raise Http404
+            
         instance.delete(user=request.user, force=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get"])
     def references(self, request, pk=None):
         """Get all references to this file."""
-        instance = self.get_object()
+        try:
+            instance = MediaFile.objects.with_deleted().get(pk=pk)
+        except MediaFile.DoesNotExist:
+            raise Http404
+            
         return Response(
             {
                 "reference_count": instance.reference_count,
@@ -119,14 +132,6 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         user = self.request.user
 
-        # Get base queryset (respecting soft deletes)
-        queryset = MediaFile.objects.all()
-        
-        # Filter by tenant from middleware
-        tenant = getattr(self.request, 'tenant', None)
-        if tenant:
-            queryset = queryset.filter(tenant=tenant)
-
         # Handle soft deletes
         show_deleted = (
             self.request.query_params.get("show_deleted", "").lower() == "true"
@@ -135,10 +140,17 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             queryset = MediaFile.objects.with_deleted()
         elif show_deleted:
             return MediaFile.objects.none()  # Non-staff users can't see deleted files
+        else:
+            queryset = MediaFile.objects.all()
+
+        # Filter by tenant from middleware
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
 
         # Staff users see all files
         if user.is_staff:
-            queryset = MediaFile.objects.select_related(
+            queryset = queryset.select_related(
                 "namespace", "created_by", "last_modified_by"
             ).prefetch_related("tags", "collections")
         else:

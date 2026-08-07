@@ -23,6 +23,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 import json
 from utils.schema_system import validate_schema, get_field_types_for_django_choices
 from content.models import Namespace
+from file_manager.storage import system_storage
 
 
 class ObjectTypeDefinition(models.Model):
@@ -51,16 +52,20 @@ class ObjectTypeDefinition(models.Model):
         blank=True, help_text="Description of what this object type represents"
     )
     icon_image = models.ImageField(
+        storage=system_storage,
         upload_to="object_types/icons/",
         blank=True,
         null=True,
         help_text="Visual representation of this object type",
     )
     schema = models.JSONField(
-        default=dict, help_text="JSON schema defining the fields for this object type"
+        default=dict,
+        blank=True,
+        help_text="JSON schema defining the fields for this object type"
     )
     slot_configuration = models.JSONField(
         default=dict,
+        blank=True,
         help_text="JSON configuration defining widget slots and restrictions",
     )
     allowed_child_types = models.ManyToManyField(
@@ -96,7 +101,9 @@ class ObjectTypeDefinition(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     metadata = models.JSONField(
-        default=dict, help_text="Additional extensible properties for this object type"
+        default=dict,
+        blank=True,
+        help_text="Additional extensible properties for this object type"
     )
 
     class Meta:
@@ -599,7 +606,9 @@ class ObjectInstance(MPTTModel):
     )
     
     metadata = models.JSONField(
-        default=dict, help_text="Additional extensible properties for this object"
+        default=dict,
+        blank=True,
+        help_text="Additional extensible properties for this object"
     )
     relationships = models.JSONField(
         default=list,
@@ -1575,8 +1584,14 @@ class ObjectVersion(models.Model):
         ObjectInstance, on_delete=models.CASCADE, related_name="versions"
     )
     version_number = models.PositiveIntegerField()
-    data = models.JSONField(help_text="Snapshot of object data at this version")
+    data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Snapshot of object data at this version"
+    )
     widgets = models.JSONField(
+        default=dict,
+        blank=True,
         help_text="Snapshot of widget configurations at this version"
     )
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)

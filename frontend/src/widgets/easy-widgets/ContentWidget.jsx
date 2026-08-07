@@ -10,7 +10,6 @@ import { FileText } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
-import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils';
 
 /**
@@ -32,7 +31,7 @@ const cleanHTML = (html) => {
     const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_ELEMENT)
     const elements = []
     let node
-    while (node = walker.nextNode()) {
+    while ((node = walker.nextNode())) {
         elements.push(node)
     }
 
@@ -176,66 +175,55 @@ const ContentWidget = memo(({
     slotConfig = null,
     context = {}
 }) => {
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
-    const configRef = useRef(config);
-    const [, forceRerender] = useState({});
-    const setConfig = (newConfig) => {
-        configRef.current = newConfig;
-    }
+    const { useExternalChanges } = useUnifiedData();
+    const [localConfig, setLocalConfig] = useState(config);
+    const localConfigRef = useRef(localConfig);
+    const onConfigChangeRef = useRef(onConfigChange);
     const componentId = `widget-${widgetId}`;
     const contextType = useEditorContext();
 
-    useEffect(() => {
-        if (!widgetId || !slotName) {
-            return;
-        }
-        const currentState = getState();
-        const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath);
-        const udcConfig = widget?.config;
-        if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
-            setConfig(udcConfig);
-            forceRerender({});
-        }
-    }, []);
+    // Keep refs in sync for stable callback references
+    localConfigRef.current = localConfig;
+    onConfigChangeRef.current = onConfigChange;
 
-    // Subscribe to external changes
+    // Sync from incoming prop changes (e.g. undo, conflict resolution, WidgetEditorPanel save)
+    useEffect(() => {
+        if (hasWidgetContentChanged(localConfigRef.current, config)) {
+            setLocalConfig(config);
+        }
+    }, [config]);
+
+    // Subscribe to external UDC changes (e.g. cross-tab sync, WidgetEditorPanel writing to same widget)
     useExternalChanges(componentId, (state) => {
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath);
         const newConfig = widget?.config;
-        if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
-            setConfig(newConfig);
-            forceRerender({});
+        if (newConfig && hasWidgetContentChanged(localConfigRef.current, newConfig)) {
+            setLocalConfig(newConfig);
         }
     });
 
-    // Enhanced content change handler with stable references
-    const handleContentChange = useCallback(async (newContent) => {
-        if (newContent !== configRef.current.content) {
+    // Route inline edits through onConfigChange so ReactLayoutRenderer -> updateLocalWidgets ->
+    // pageVersionData.widgets is updated synchronously, which lets recomputeDirtyState see
+    // the change and ensures handleActualSave saves the current content.
+    const handleContentChange = useCallback((newContent) => {
+        if (newContent !== localConfigRef.current.content) {
             const updatedConfig = {
-                ...configRef.current,
+                ...localConfigRef.current,
                 content: newContent
             };
-            setConfig(updatedConfig);
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: updatedConfig,
-                // NEW: Path-based approach (supports infinite nesting)
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                // LEGACY: For backward compatibility with old approach
-                slotName: slotName,
-                contextType: contextType,
-                ...(nestedParentWidgetId && {
-                    parentWidgetId: nestedParentWidgetId,
-                    parentSlotName: nestedParentSlotName
-                })
-            });
+            setLocalConfig(updatedConfig);
+            if (onConfigChangeRef.current) {
+                onConfigChangeRef.current(updatedConfig);
+            }
         }
-    }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange])
+    // Intentionally empty deps: uses refs so callback identity stays stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     if (mode === 'editor') {
         return (
             <ContentWidgetEditor
-                content={configRef.current.content}
+                content={localConfig.content}
                 onChange={handleContentChange}
                 className=""
                 namespace={namespace}
@@ -248,11 +236,10 @@ const ContentWidget = memo(({
 
     return (
         <div className="content-widget widget-type-easy-widgets-contentwidget min-h-32">
-            {configRef.current.content && <div dangerouslySetInnerHTML={{ __html: configRef.current.content }} />}
+            {localConfig.content && <div dangerouslySetInnerHTML={{ __html: localConfig.content }} />}
         </div>
     )
 }, (prevProps, nextProps) => {
-    // Custom comparison to prevent re-renders when only object references change
     return (
         prevProps.config?.content === nextProps.config?.content &&
         prevProps.mode === nextProps.mode &&
@@ -260,7 +247,6 @@ const ContentWidget = memo(({
         prevProps.widgetId === nextProps.widgetId &&
         prevProps.slotName === nextProps.slotName &&
         prevProps.widgetType === nextProps.widgetType
-        // Note: onConfigChange is intentionally not compared to allow function updates
     );
 })
 

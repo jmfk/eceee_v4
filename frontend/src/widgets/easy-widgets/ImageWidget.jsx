@@ -121,7 +121,15 @@ const ImageWidget = ({
         const fetchCollectionFiles = async () => {
             setLoadingCollection(true)
             try {
-                const result = await mediaCollectionsApi.getFiles(image.id, { page_size: 100 })()
+                // Backend MediaCollectionViewSet.get_queryset filters to the
+                // default namespace unless an explicit namespace slug is
+                // provided. Forward it from the collection object so files
+                // from non-default namespaces resolve in production.
+                const params = { page_size: 100 }
+                if (image.namespace) {
+                    params.namespace = image.namespace
+                }
+                const result = await mediaCollectionsApi.getFiles(image.id, params)()
                 const files = result.results || result || []
 
                 // Convert collection files to media_items format
@@ -522,10 +530,7 @@ const ImageWidget = ({
                                 (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
                             )
                         ) : (
-                            <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
-                                <Image className="h-8 w-8 mr-2" />
-                                Image placeholder
-                            </div>
+                            null
                         )}
                     </div>
                 </div>
@@ -533,14 +538,7 @@ const ImageWidget = ({
         }
 
         if (items.length === 0) {
-            return (
-                <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]}`}>
-                    <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
-                        <Image className="h-8 w-8 mr-2" />
-                        No media
-                    </div>
-                </div>
-            );
+            return null;
         }
 
         return (

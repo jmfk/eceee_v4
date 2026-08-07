@@ -1,8 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { MoreHorizontal, Plus, Trash2, Download } from 'lucide-react'
+import { MoreHorizontal, Plus, Trash2, Download, Clipboard } from 'lucide-react'
 
 // SlotIconMenu component that replicates the PageEditor three-dot menu
-const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, onAddWidget, onClearSlot, onShowWidgetModal, onImportContent, context }) => {
+const SlotIconMenu = ({
+    slotName,
+    slot,
+    availableWidgetTypes,
+    isFilteringTypes,
+    onAddWidget,
+    onClearSlot,
+    onShowWidgetModal,
+    onImportContent,
+    context,
+    // Paste mode props
+    pasteModeActive = false,
+    onPasteAtPosition
+}) => {
     const menuRef = useRef<HTMLDivElement | null>(null)
     const [isOpen, setIsOpen] = useState(false)
 
@@ -42,20 +55,42 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
         setIsOpen(false)
     }
 
+    const handlePasteClick = () => {
+        if (onPasteAtPosition) {
+            // Paste at the end of the slot by default
+            onPasteAtPosition(slotName, 1000) // Using a large number to ensure it's at the end
+        }
+        setIsOpen(false)
+    }
+
     return (
         <div className="absolute top-2 right-2 z-20 opacity-80 hover:opacity-100 transition-opacity" ref={menuRef}>
             {/* Menu Button (3 dots icon) */}
             <button
                 onClick={handleMenuToggle}
-                className="bg-gray-300 hover:bg-gray-500 text-black hover:text-white p-1 rounded-lg transition-colors"
-                title={`Slot: ${slotName}`}
+                className={`p-1 rounded-lg transition-colors ${pasteModeActive ? 'bg-blue-600 text-white animate-pulse' : 'bg-gray-300 hover:bg-gray-500 text-black hover:text-white'}`}
+                title={`Slot: ${slotName}${pasteModeActive ? ' - Paste Mode Active' : ''}`}
             >
-                <MoreHorizontal className="h-4 w-4" />
+                {pasteModeActive ? <Clipboard className="h-4 w-4" /> : <MoreHorizontal className="h-4 w-4" />}
             </button>
 
             {/* Menu Dropdown */}
             {isOpen && (
                 <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48">
+                    {/* Paste Button - Only shown when paste mode is active */}
+                    {pasteModeActive && (
+                        <>
+                            <button
+                                onClick={handlePasteClick}
+                                className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-blue-50 transition-colors text-blue-700"
+                            >
+                                <Clipboard className="h-4 w-4 mr-3" />
+                                <span>Paste into {slotName}</span>
+                            </button>
+                            <div className="border-t border-gray-200 my-1"></div>
+                        </>
+                    )}
+
                     {/* Add Widget */}
                     {!isFilteringTypes && (
                         <>

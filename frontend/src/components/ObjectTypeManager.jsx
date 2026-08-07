@@ -6,6 +6,7 @@ import { objectTypesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 
 import ConfirmDialog from './ConfirmDialog'
+import ContextualHelpLink from './help/ContextualHelpLink'
 
 const ObjectTypeManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
@@ -19,7 +20,7 @@ const ObjectTypeManager = () => {
     // Fetch object types with filtering
     const { data: typesResponse, isLoading, error } = useQuery({
         queryKey: ['objectTypes', searchTerm],
-        queryFn: () => {
+        queryFn: async () => {
             const params = {}
             if (searchTerm) params.search = searchTerm
             return objectTypesApi.list(params)
@@ -32,7 +33,7 @@ const ObjectTypeManager = () => {
 
     // Delete object type mutation
     const deleteTypeMutation = useMutation({
-        mutationFn: ({ id, forceDelete }) => objectTypesApi.delete(id, forceDelete),
+        mutationFn: async ({ id, forceDelete }) => await objectTypesApi.delete(id, forceDelete),
         onSuccess: (response) => {
             queryClient.invalidateQueries(['objectTypes'])
             setShowDeleteConfirm(null)
@@ -144,8 +145,10 @@ const ObjectTypeManager = () => {
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center">
                             <span className="text-sm text-gray-500">{filteredTypes.length} object types</span>
+                            <ContextualHelpLink topicId="settings-data" label="Open Object types help" className="ml-2" />
                         </div>
                         <button
+                            data-testid="object-types-new-button"
                             onClick={handleCreateNew}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
                         >
@@ -158,6 +161,7 @@ const ObjectTypeManager = () => {
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <input
+                            data-testid="object-types-search-input"
                             type="text"
                             placeholder="Search object types..."
                             value={searchTerm}
@@ -308,6 +312,8 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
     )
 }
 
+import OptimizedImage from './media/OptimizedImage'
+
 // Object Type Card Component
 const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
     const statusColor = objectType.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -320,17 +326,21 @@ const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
             <div className="flex-grow">
                 <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center">
-                        {objectType.iconImage ? (
-                            <img
-                                src={objectType.iconImage}
-                                alt={objectType.label}
-                                className="h-8 w-8 rounded mr-3"
-                            />
-                        ) : (
-                            <div className="h-8 w-8 bg-blue-100 rounded flex items-center justify-center mr-3">
-                                <Hash className="h-4 w-4 text-blue-600" />
-                            </div>
-                        )}
+                        <div className="w-10 h-10 flex-shrink-0 mr-3">
+                            {objectType.iconImage ? (
+                                <OptimizedImage
+                                    src={objectType.iconImage}
+                                    alt={objectType.label}
+                                    width={40}
+                                    height={40}
+                                    className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-blue-100 rounded-lg flex items-center justify-center border border-blue-200">
+                                    <Hash className="h-5 w-5 text-blue-600" />
+                                </div>
+                            )}
+                        </div>
                         <div>
                             <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">{objectType.label}</div>
                             <div className="text-sm text-gray-500">{objectType.name}</div>

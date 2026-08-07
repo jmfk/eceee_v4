@@ -54,10 +54,24 @@ export function normalizeThemeData(themeData) {
     }
 
     // Step 7: Remove deprecated fields (don't send them back to API)
-    delete normalized.galleryStyles;
-    delete normalized.carouselStyles;
+    // IMPORTANT: Do NOT remove 'name' or other required fields!
+    // Only remove fields that are truly deprecated and not in the model anymore.
+    const {
+        galleryStyles: _gs,
+        carouselStyles: _cs,
+        imageFile: _if,
+        imagePreview: _ip,
+        siteIconFile: _sif,
+        siteIconPreview: _sip,
+        ...cleanData
+    } = normalized;
+
+    // Strip siteIcon if it's not a URL string (File objects can't be JSON-serialized)
+    if (cleanData.siteIcon && typeof cleanData.siteIcon !== 'string') {
+        delete cleanData.siteIcon;
+    }
     
-    return normalized;
+    return cleanData;
 }
 
 /**

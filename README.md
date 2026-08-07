@@ -65,6 +65,7 @@ We've achieved **100% frontend test success rate** - transforming from 31 failin
 - **[🏆 Frontend Testing Success](docs/FRONTEND_TESTING_SUCCESS.md)** - Complete transformation story
 - **[🧪 Testing Best Practices](docs/TESTING_BEST_PRACTICES.md)** - Standards for reliable testing
 - **[📝 Publishing Workflow](docs/PHASE_8_PUBLISHING_WORKFLOW_SUMMARY.md)** - Professional CMS features
+- **[🔄 Multi-Repo Development](docs/MULTI_REPO_DEVELOPMENT.md)** - Working with shared infra and branch DBs
 - **[🔧 Frontend Refactoring Guide](docs/FRONTEND_REFACTORING_GUIDE.md)** - Component patterns
 
 **📊 Quality Metrics:**
@@ -400,17 +401,14 @@ This project is optimized for use with Cursor IDE:
 
 ### Production Deployment
 
-The project includes production-ready configurations:
+See **[deploy/README.md](deploy/README.md)** for the full flow. Secrets live in **`deploy/.env`** (gitignored); copy from **`deploy/.env.production.example`**. From the repo root:
 
 ```bash
-# Build production images
-docker-compose -f docker-compose.prod.yml build
-
-# Deploy to production
-docker-compose -f docker-compose.prod.yml up -d
-
-# Note: Use docker-compose.dev.yml for development
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env build
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
 ```
+
+Use `docker-compose.dev.yml` for local development.
 
 ### Environment Configuration
 

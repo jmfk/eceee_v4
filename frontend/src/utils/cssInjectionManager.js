@@ -423,7 +423,7 @@ class CSSInjectionManager {
 const cssInjectionManager = new CSSInjectionManager();
 
 // Enable debug mode in development
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
     cssInjectionManager.enableDebugMode();
 }
 

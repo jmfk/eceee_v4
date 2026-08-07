@@ -4,6 +4,12 @@
 
 set -e
 
+# Use docker compose instead of docker-compose if available
+DOCKER_COMPOSE="docker compose"
+if ! command -v docker compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+fi
+
 # Configuration
 BACKUP_DIR="${1:-./backups}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -26,7 +32,7 @@ mkdir -p "${BACKUP_PATH}"
 
 # 1. Backup PostgreSQL Database
 echo -e "${BLUE}[1/3] Backing up PostgreSQL database...${NC}"
-docker-compose exec -T db pg_dump -U postgres eceee_v4 | gzip > "${BACKUP_PATH}/database.sql.gz"
+$DOCKER_COMPOSE exec -T db pg_dump -U postgres eceee_v4 | gzip > "${BACKUP_PATH}/database.sql.gz"
 echo -e "${GREEN}✓ Database backup complete${NC}"
 echo
 
@@ -48,14 +54,14 @@ Backup Information
 ==================
 Date: $(date)
 Database: eceee_v4
-PostgreSQL Version: $(docker-compose exec -T db psql -U postgres -c "SELECT version();" | head -n 3 | tail -n 1)
+PostgreSQL Version: $($DOCKER_COMPOSE exec -T db psql -U postgres -c "SELECT version();" | head -n 3 | tail -n 1)
 
 File Counts:
-- Database size: $(docker-compose exec -T db psql -U postgres -d eceee_v4 -c "SELECT pg_size_pretty(pg_database_size('eceee_v4'));" | tail -n 2 | head -n 1)
+- Database size: $($DOCKER_COMPOSE exec -T db psql -U postgres -d eceee_v4 -c "SELECT pg_size_pretty(pg_database_size('eceee_v4'));" | tail -n 2 | head -n 1)
 - MinIO storage size: $(du -sh ./storage/minio 2>/dev/null || echo "N/A")
 
 Media Files in Database:
-$(docker-compose exec -T backend python -c "
+$($DOCKER_COMPOSE exec -T backend python -c "
 import django, os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()

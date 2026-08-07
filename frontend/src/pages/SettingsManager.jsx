@@ -31,7 +31,6 @@ import { useNotificationContext } from '../components/NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import LayoutEditor from '../components/LayoutEditor'
-import SettingsTabs from '../components/SettingsTabs'
 import ThemeEditor from '../components/ThemeEditor'
 import StatusBar from '../components/StatusBar'
 
@@ -42,9 +41,14 @@ import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
+import DataConnectionsManager from '../components/DataConnectionsManager'
+import MigrationManager from '../components/contentMigration/MigrationManager'
+import ContextualHelpLink from '../components/help/ContextualHelpLink'
 import WidgetManager from '../components/WidgetManager'
 import ValueListEditor from '../components/ValueListEditor'
+import SettingsDashboard from '../components/SettingsDashboard'
 import { extractErrorMessage } from '../utils/errorHandling.js'
+import { getSettingsHelpTopic } from '../utils/howToHelp'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
@@ -53,7 +57,7 @@ const SettingsManager = () => {
     const location = useLocation()
     const [searchParams, setSearchParams] = useSearchParams()
 
-    // Get tab from URL path, default to 'layouts'
+    // Get tab from URL path, default to 'dashboard'
     const getActiveTabFromPath = () => {
         const path = location.pathname
         if (path.startsWith('/settings/themes')) return 'themes'
@@ -63,21 +67,26 @@ const SettingsManager = () => {
         if (path === '/settings/versions') return 'versions'
         if (path === '/settings/publishing') return 'publishing'
         if (path === '/settings/namespaces') return 'namespaces'
-        return 'layouts' // default for /settings/layouts or fallback
+        if (path.startsWith('/settings/data-connections')) return 'data-connections'
+        if (path.startsWith('/settings/content-migration')) return 'content-migration'
+        if (path.startsWith('/settings/layouts')) return 'layouts'
+        return 'dashboard' // default for /settings or fallback
     }
 
     const activeTab = getActiveTabFromPath()
 
     // Set document title based on active tab
     const tabTitles = {
-        'layouts': 'Settings - Layouts',
+        'layouts': 'Settings - Layout Overview',
         'themes': 'Settings - Themes',
         'widgets': 'Settings - Widgets',
         'value-lists': 'Settings - Value Lists',
         'object-types': 'Settings - Object Types',
         'versions': 'Settings - Versions',
         'publishing': 'Settings - Publishing',
-        'namespaces': 'Settings - Namespaces'
+        'namespaces': 'Settings - Namespaces',
+        'data-connections': 'Settings - Data Connections',
+        'content-migration': 'Settings - Content Migration'
     }
     useDocumentTitle(tabTitles[activeTab] || 'Settings')
     const [selectedPage, setSelectedPage] = useState(null)
@@ -341,6 +350,7 @@ const SettingsManager = () => {
 
                             return (
                                 <button
+                                    data-testid={`publishing-tab-${tab.id}`}
                                     key={tab.id}
                                     onClick={() => {
                                         const newSearchParams = new URLSearchParams(searchParams)
@@ -386,6 +396,8 @@ const SettingsManager = () => {
 
     const renderTabContent = () => {
         switch (activeTab) {
+            case 'dashboard':
+                return <SettingsDashboard />
             case 'layouts':
                 return <LayoutEditor />
             case 'themes':
@@ -404,6 +416,10 @@ const SettingsManager = () => {
                 return renderPublishingWorkflow()
             case 'namespaces':
                 return renderNamespaceManagement()
+            case 'data-connections':
+                return <DataConnectionsManager />
+            case 'content-migration':
+                return <MigrationManager />
             default:
                 return null
         }
@@ -412,12 +428,15 @@ const SettingsManager = () => {
     // Note: Schema management is handled by dedicated routes /schemas/*
 
     return (
-        <div className="space-y-6">
-            {/* Navigation Dropdown */}
-            <SettingsTabs />
-
+        <div className="space-y-6 max-w-7xl mx-auto pb-12">
             {/* Tab Content */}
             <div className="bg-white rounded-lg shadow">
+                <div className="flex justify-end px-4 pt-4">
+                    <ContextualHelpLink
+                        topicId={getSettingsHelpTopic(activeTab)}
+                        label="Open Settings help"
+                    />
+                </div>
                 <div>
                     {renderTabContent()}
                 </div>
@@ -454,6 +473,7 @@ const SettingsManager = () => {
 
 // Add the PageForm component at the end of the file, before the export
 const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
+    const { addNotification } = useGlobalNotifications()
     const [formData, setFormData] = useState({
         title: page?.title || '',
         slug: page?.slug || '',

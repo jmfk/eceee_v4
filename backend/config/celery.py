@@ -5,9 +5,12 @@ This module sets up Celery for background task processing including
 AI agent tasks, scheduled tasks, and other async operations.
 """
 
+import logging
 import os
 from celery import Celery
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 # Set the default Django settings module for the 'celery' program
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -31,6 +34,9 @@ app.conf.task_routes = {
     "file_manager.tasks.analyze_media_file": {"queue": "ai_analysis"},
     "file_manager.tasks.generate_thumbnails": {"queue": "thumbnails"},
     "file_manager.tasks.cleanup_files": {"queue": "maintenance"},
+    # Site package import/export tasks
+    "webpages.tasks.export_site_package": {"queue": "default"},
+    "webpages.tasks.import_site_package": {"queue": "default"},
     # Default queue for other tasks
     "*": {"queue": "default"},
 }

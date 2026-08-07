@@ -61,6 +61,8 @@ class InheritanceTreeBuilder:
 
             return tree
 
+        except InheritanceTreeError:
+            raise
         except Exception as e:
             raise InheritanceTreeError(
                 InheritanceTreeErrorCode.TREE_GENERATION_FAILED,

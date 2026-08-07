@@ -11,7 +11,7 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
     // Fetch version history
     const { data: versionsResponse, isLoading, error } = useQuery({
         queryKey: ['objectVersions', instanceId],
-        queryFn: () => objectInstancesApi.getVersions(instanceId),
+        queryFn: async () => await objectInstancesApi.getVersions(instanceId),
         enabled: !!instanceId && isVisible
     })
 
