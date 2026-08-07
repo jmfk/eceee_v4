@@ -5,6 +5,7 @@ const mergeWidgetUpdate = (widget, updatedWidget) => {
         slotName: _slotName,
         slot: _slot,
         context: _context,
+        widgetPath: _widgetPath,
         widgetUpdates,
         ...canonicalWidget
     } = updatedWidget

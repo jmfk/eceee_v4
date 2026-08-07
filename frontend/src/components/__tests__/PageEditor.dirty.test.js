@@ -216,6 +216,24 @@ describe('PageEditor widget state convergence', () => {
         expect(updatedWidgets.main[0]).not.toHaveProperty('widgetUpdates')
     })
 
+    it('does not store widgetPath routing metadata in canonical widget state', () => {
+        const widgets = {
+            main: [
+                { id: 'content-intro', type: 'easy_widgets.ContentWidget', config: { content: '<p>Initial</p>' } }
+            ]
+        }
+
+        const updatedWidgets = applyWidgetUpdateToWidgetMap(widgets, {
+            id: 'content-intro',
+            slotName: 'main',
+            widgetPath: ['main', 'content-intro'],
+            config: { content: '<p>Panel edit</p>' }
+        })
+
+        expect(updatedWidgets.main[0].config.content).toBe('<p>Panel edit</p>')
+        expect(updatedWidgets.main[0]).not.toHaveProperty('widgetPath')
+    })
+
     it('applies nested widget prop edits without stale sibling overwrites', () => {
         const widgets = {
             main: [

@@ -311,11 +311,13 @@ describe('ContentWidget', () => {
         expect(renderer.editorElement.innerHTML).toBe('<p>External update</p>')
     })
 
-    it('picks up prop-driven content change (e.g. undo)', async () => {
+    it('syncs the editor DOM when undo returns to the original prop content', async () => {
         const onConfigChange = vi.fn()
+        const originalContent = '<p>Original</p>'
+        const editedContent = '<p>User edit</p>'
         const { rerender } = render(
             <ContentWidget
-                config={{ content: '<p>Original</p>' }}
+                config={{ content: originalContent }}
                 mode="editor"
                 widgetId="w1"
                 slotName="main"
@@ -323,11 +325,18 @@ describe('ContentWidget', () => {
             />
         )
 
-        // Simulate undo: parent passes new config prop
+        const renderer = latestRenderer()
+
+        await act(async () => {
+            renderer.emitChange(editedContent)
+        })
+        expect(renderer.editorElement.innerHTML).toBe(editedContent)
+
+        // Parent echoes the user edit, then undo reverts to the original content.
         await act(async () => {
             rerender(
                 <ContentWidget
-                    config={{ content: '<p>Reverted</p>' }}
+                    config={{ content: editedContent }}
                     mode="editor"
                     widgetId="w1"
                     slotName="main"
@@ -336,14 +345,19 @@ describe('ContentWidget', () => {
             )
         })
 
-        // After prop change, a subsequent editor edit should emit the new base content
         await act(async () => {
-            capturedOnChange('<p>New edit after revert</p>')
+            rerender(
+                <ContentWidget
+                    config={{ content: originalContent }}
+                    mode="editor"
+                    widgetId="w1"
+                    slotName="main"
+                    onConfigChange={onConfigChange}
+                />
+            )
         })
 
-        expect(onConfigChange).toHaveBeenCalledWith(
-            expect.objectContaining({ content: '<p>New edit after revert</p>' })
-        )
+        expect(renderer.editorElement.innerHTML).toBe(originalContent)
     })
 
     it('cleans up deferred event listeners and destroys the editor on unmount', async () => {

@@ -83,9 +83,16 @@ export class SubscriptionManager {
         for (const subscription of this.stateSubscriptions.values()) {
             const subscriptionId = subscription.id;
             const operationSnapshot = operation;
-            let newValue = state;
-            if (subscription.selector) {
-                newValue = subscription.selector(state);
+            let newValue: any = state;
+
+            try {
+                if (subscription.selector) {
+                    newValue = subscription.selector(state);
+                }
+            } catch (error) {
+                console.error('❌ Error in subscription callback:', error);
+                subscription.options?.onError?.(error as Error);
+                continue;
             }
 
             // Defer callback execution to avoid render-phase conflicts
