@@ -4,11 +4,12 @@
  */
 
 import { getSessionId } from './sessionId';
+import { getCurrentTenantId } from './tenant';
 
 class Analytics {
   constructor(config = {}) {
     this.tenantId = config.tenantId || null;
-    this.endpoint = config.endpoint || '/api/statistics/ingest/';
+    this.endpoint = config.endpoint || '/api/v1/statistics/ingest/';
     this.batchSize = config.batchSize || 10;
     this.batchInterval = config.batchInterval || 5000; // 5 seconds
     this.queue = [];
@@ -19,7 +20,7 @@ class Analytics {
 
   init(tenantId) {
     if (this.initialized) return;
-    this.tenantId = tenantId;
+    this.tenantId = tenantId || getCurrentTenantId();
     this._setupAutoTrack();
     this._startTimer();
     this.initialized = true;
@@ -139,4 +140,3 @@ class Analytics {
 
 const analytics = new Analytics();
 export default analytics;
-

@@ -51,6 +51,10 @@ services:
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False
       - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
       - IMGPROXY_URL=http://imgproxy:8080
       - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
       - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
