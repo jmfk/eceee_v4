@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.models import Tenant
-from statistics.models import Experiment, PageStats, Variant
+from site_statistics.models import Experiment, PageStats, Variant
 
 
 class StatisticsApiTests(APITestCase):
@@ -89,7 +89,7 @@ class EventIngestionTests(APITestCase):
         self.user = User.objects.create_user("tenant-owner", "owner@example.com", "pass")
         self.tenant = Tenant.objects.create(name="Tenant A", identifier="tenant-a", created_by=self.user)
 
-    @patch("statistics.views.ingestion.RabbitMqDriver")
+    @patch("site_statistics.views.ingestion.RabbitMqDriver")
     def test_ingest_publishes_to_resolved_tenant(self, driver_cls):
         driver = driver_cls.return_value
 
@@ -106,4 +106,3 @@ class EventIngestionTests(APITestCase):
         self.assertEqual(tenant_id, self.tenant.id)
         self.assertEqual(payload["tenant_id"], str(self.tenant.id))
         self.assertEqual(payload["event_type"], "pageview")
-

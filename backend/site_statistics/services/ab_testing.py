@@ -1,5 +1,5 @@
 import hashlib
-from statistics.models import Experiment, Variant, Assignment
+from site_statistics.models import Experiment, Variant, Assignment
 
 class ABTestingService:
     @staticmethod
