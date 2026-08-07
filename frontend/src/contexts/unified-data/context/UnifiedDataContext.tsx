@@ -45,8 +45,8 @@ export function UnifiedDataProvider({
 
         useEffect(() => {
             const unsubscribe = manager.subscribe(
-                () => manager.getState(),
-                (_, operation: Operation) => {
+                state => state,
+                (stateSnapshot, operation: Operation) => {
                     // Trigger callback if:
                     // 1. Operation has no sourceId (system operations like SET_DIRTY)
                     // 2. Operation sourceId is different from this component's ID
@@ -60,7 +60,7 @@ export function UnifiedDataProvider({
                             timestamp: Date.now()
                         };
                         // Use current callback from ref
-                        callbackRef.current(manager.getState(), metadata);
+                        callbackRef.current(stateSnapshot, metadata);
                     }
                 },
                 { equalityFn: defaultEqualityFn, componentId }

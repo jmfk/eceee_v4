@@ -51,7 +51,7 @@ const cleanHTML = (html) => {
  * Vanilla JS Editor Wrapper Component
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId, widgetId }) => {
+const ContentWidgetEditor = memo(({ content, contentUpdateSource = 'external', onChange, className, namespace, slotDimensions, pageId, siteRootId, widgetId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -144,18 +144,16 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
         }
     }, [bindEditorListeners, removeEditorListeners])
 
-    // Separate effect for content updates - only update if content is externally changed
+    // Separate effect for content updates - keep the vanilla renderer aligned with React's canonical prop.
     useEffect(() => {
-        if (rendererRef.current && content !== lastExternalContentRef.current) {
+        if (rendererRef.current) {
             const currentEditorContent = rendererRef.current.content
-            // Only update if the new content differs from what the editor currently has
-            // This prevents the editor from updating itself when it's the source of the change
-            if (content !== currentEditorContent) {
+            if (contentUpdateSource !== 'local' && content !== currentEditorContent) {
                 rendererRef.current.updateConfig({ content })
-                lastExternalContentRef.current = content
             }
+            lastExternalContentRef.current = content
         }
-    }, [content])
+    }, [content, contentUpdateSource])
 
     // Separate effect for onChange, className, namespace, slotDimensions, and pageId updates
     useEffect(() => {
@@ -204,26 +202,62 @@ const ContentWidget = memo(({
     const [localConfig, setLocalConfig] = useState(config);
     const localConfigRef = useRef(localConfig);
     const onConfigChangeRef = useRef(onConfigChange);
+    const contentUpdateSourceRef = useRef('external');
+    const latestLocalContentRef = useRef(config?.content);
+    const pendingLocalContentEchoesRef = useRef(new Set());
     const componentId = `widget-${widgetId}`;
     const contextType = useEditorContext();
+    const ownerComponentId = context?.pageId && context?.versionId
+        ? `page-editor-${context.pageId}-${context.versionId}`
+        : null;
 
     // Keep refs in sync for stable callback references
     localConfigRef.current = localConfig;
     onConfigChangeRef.current = onConfigChange;
 
+    const syncIncomingConfig = useCallback((nextConfig) => {
+        const nextContent = nextConfig?.content;
+        const isPendingLocalEcho = pendingLocalContentEchoesRef.current.has(nextContent);
+
+        if (!hasWidgetContentChanged(localConfigRef.current, nextConfig)) {
+            if (isPendingLocalEcho) {
+                pendingLocalContentEchoesRef.current.delete(nextContent);
+            }
+            return;
+        }
+
+        if (isPendingLocalEcho && nextContent !== latestLocalContentRef.current) {
+            pendingLocalContentEchoesRef.current.delete(nextContent);
+            return;
+        }
+
+        if (isPendingLocalEcho) {
+            pendingLocalContentEchoesRef.current.delete(nextContent);
+            contentUpdateSourceRef.current = 'local';
+        } else {
+            pendingLocalContentEchoesRef.current.clear();
+            contentUpdateSourceRef.current = 'external';
+        }
+
+        localConfigRef.current = nextConfig;
+        setLocalConfig(nextConfig);
+    }, []);
+
     // Sync from incoming prop changes (e.g. undo, conflict resolution, WidgetEditorPanel save)
     useEffect(() => {
-        if (hasWidgetContentChanged(localConfigRef.current, config)) {
-            setLocalConfig(config);
-        }
-    }, [config]);
+        syncIncomingConfig(config);
+    }, [config, syncIncomingConfig]);
 
     // Subscribe to external UDC changes (e.g. cross-tab sync, WidgetEditorPanel writing to same widget)
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, (state, metadata) => {
+        if (ownerComponentId && metadata?.sourceId === ownerComponentId) {
+            return;
+        }
+
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath);
         const newConfig = widget?.config;
-        if (newConfig && hasWidgetContentChanged(localConfigRef.current, newConfig)) {
-            setLocalConfig(newConfig);
+        if (newConfig) {
+            syncIncomingConfig(newConfig);
         }
     });
 
@@ -236,19 +270,22 @@ const ContentWidget = memo(({
                 ...localConfigRef.current,
                 content: newContent
             };
+            latestLocalContentRef.current = newContent;
+            pendingLocalContentEchoesRef.current.add(newContent);
+            contentUpdateSourceRef.current = 'local';
+            localConfigRef.current = updatedConfig;
             setLocalConfig(updatedConfig);
             if (onConfigChangeRef.current) {
                 onConfigChangeRef.current(updatedConfig);
             }
         }
-    // Intentionally empty deps: uses refs so callback identity stays stable
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     if (mode === 'editor') {
         return (
             <ContentWidgetEditor
                 content={localConfig.content}
+                contentUpdateSource={contentUpdateSourceRef.current}
                 onChange={handleContentChange}
                 className=""
                 namespace={namespace}
@@ -273,7 +310,9 @@ const ContentWidget = memo(({
         prevProps.widgetId === nextProps.widgetId &&
         prevProps.slotName === nextProps.slotName &&
         prevProps.widgetType === nextProps.widgetType &&
-        prevProps.onConfigChange === nextProps.onConfigChange
+        prevProps.onConfigChange === nextProps.onConfigChange &&
+        prevProps.context?.pageId === nextProps.context?.pageId &&
+        prevProps.context?.versionId === nextProps.context?.versionId
     );
 })
 

@@ -18,7 +18,7 @@ import MediaSelectModal from '../../components/media/MediaSelectModal'
  * Vanilla JS Editor Wrapper Component for Bio Text
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
+const BioTextEditor = memo(({ content, contentUpdateSource = 'external', onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -65,16 +65,16 @@ const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimen
         }
     }, [])
 
-    // Separate effect for content updates
+    // Separate effect for content updates - keep the vanilla renderer aligned with React's canonical prop.
     useEffect(() => {
-        if (rendererRef.current && content !== lastExternalContentRef.current) {
+        if (rendererRef.current) {
             const currentEditorContent = rendererRef.current.content
-            if (content !== currentEditorContent) {
+            if (contentUpdateSource !== 'local' && content !== currentEditorContent) {
                 rendererRef.current.updateConfig({ content })
-                lastExternalContentRef.current = content
             }
+            lastExternalContentRef.current = content
         }
-    }, [content])
+    }, [content, contentUpdateSource])
 
     // Separate effect for other config updates
     useEffect(() => {
@@ -135,16 +135,54 @@ const BioWidget = memo(({
 }) => {
     const { useExternalChanges, getState } = useUnifiedData()
     const configRef = useRef(config)
+    const bioTextUpdateSourceRef = useRef('external')
+    const latestLocalBioTextRef = useRef(config?.bioText)
+    const pendingLocalBioTextEchoesRef = useRef(new Set())
     const [, forceRerender] = useState({})
     const setConfig = (newConfig) => {
         configRef.current = newConfig
     }
     const componentId = `widget-${widgetId}`
     const contextType = useEditorContext()
+    const ownerComponentId = context?.pageId && context?.versionId
+        ? `page-editor-${context.pageId}-${context.versionId}`
+        : null
 
     // State for image edit modal
     const [showImageModal, setShowImageModal] = useState(false)
     const [editingField, setEditingField] = useState(null)
+
+    const syncIncomingConfig = useCallback((nextConfig) => {
+        const nextBioText = nextConfig?.bioText
+        const isPendingLocalEcho = pendingLocalBioTextEchoesRef.current.has(nextBioText)
+
+        if (!hasWidgetContentChanged(configRef.current, nextConfig)) {
+            if (isPendingLocalEcho) {
+                pendingLocalBioTextEchoesRef.current.delete(nextBioText)
+            }
+            return
+        }
+
+        if (isPendingLocalEcho && nextBioText !== latestLocalBioTextRef.current) {
+            pendingLocalBioTextEchoesRef.current.delete(nextBioText)
+            return
+        }
+
+        if (isPendingLocalEcho) {
+            pendingLocalBioTextEchoesRef.current.delete(nextBioText)
+            bioTextUpdateSourceRef.current = 'local'
+        } else {
+            pendingLocalBioTextEchoesRef.current.clear()
+            bioTextUpdateSourceRef.current = 'external'
+        }
+
+        setConfig(nextConfig)
+        forceRerender({})
+    }, [])
+
+    useEffect(() => {
+        syncIncomingConfig(config)
+    }, [config, syncIncomingConfig])
 
     useEffect(() => {
         if (!widgetId || !slotName) {
@@ -153,19 +191,21 @@ const BioWidget = memo(({
         const currentState = getState()
         const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath)
         const udcConfig = widget?.config
-        if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
-            setConfig(udcConfig)
-            forceRerender({})
+        if (udcConfig) {
+            syncIncomingConfig(udcConfig)
         }
     }, [])
 
     // Subscribe to external changes
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, (state, metadata) => {
+        if (ownerComponentId && metadata?.sourceId === ownerComponentId) {
+            return
+        }
+
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         const newConfig = widget?.config
-        if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
-            setConfig(newConfig)
-            forceRerender({})
+        if (newConfig) {
+            syncIncomingConfig(newConfig)
         }
     })
 
@@ -176,6 +216,9 @@ const BioWidget = memo(({
                 ...configRef.current,
                 bioText: newContent
             }
+            latestLocalBioTextRef.current = newContent
+            pendingLocalBioTextEchoesRef.current.add(newContent)
+            bioTextUpdateSourceRef.current = 'local'
             setConfig(updatedConfig)
             onConfigChange?.(updatedConfig)
         }
@@ -232,6 +275,7 @@ const BioWidget = memo(({
                     )}
                     <BioTextEditor
                         content={bioText}
+                        contentUpdateSource={bioTextUpdateSourceRef.current}
                         onChange={handleBioTextChange}
                         className=""
                         namespace={namespace}
@@ -310,7 +354,10 @@ const BioWidget = memo(({
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&
         prevProps.slotName === nextProps.slotName &&
-        prevProps.widgetType === nextProps.widgetType
+        prevProps.widgetType === nextProps.widgetType &&
+        prevProps.onConfigChange === nextProps.onConfigChange &&
+        prevProps.context?.pageId === nextProps.context?.pageId &&
+        prevProps.context?.versionId === nextProps.context?.versionId
     )
 })
 
