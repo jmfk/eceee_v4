@@ -1,7 +1,8 @@
 import json
-import pika
 import logging
 from abc import ABC, abstractmethod
+
+import pika
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,8 @@ class RabbitMqDriver(QueueDriver):
         self.port = getattr(settings, "RABBITMQ_PORT", 5672)
         self.user = getattr(settings, "RABBITMQ_USER", "guest")
         self.password = getattr(settings, "RABBITMQ_PASSWORD", "guest")
+        self.exchange_name = getattr(settings, "STATISTICS_EXCHANGE", "statistics_events")
+        self.shared_queue_name = getattr(settings, "STATISTICS_SHARED_QUEUE", "statistics_main")
         self._connection = None
         self._channel = None
 
@@ -69,13 +72,16 @@ class RabbitMqDriver(QueueDriver):
         channel = self._get_channel()
         
         # Ensure exchange and queue exist for this tenant
-        exchange_name = "statistics_events"
+        exchange_name = self.exchange_name
         queue_name = f"stats_queue_{tenant_id}"
+        shared_queue_name = self.shared_queue_name
         routing_key = str(tenant_id)
 
         channel.exchange_declare(exchange=exchange_name, exchange_type="direct", durable=True)
         channel.queue_declare(queue=queue_name, durable=True)
+        channel.queue_declare(queue=shared_queue_name, durable=True)
         channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key=routing_key)
+        channel.queue_bind(exchange=exchange_name, queue=shared_queue_name, routing_key=routing_key)
 
         message = json.dumps(payload)
         channel.basic_publish(
@@ -88,25 +94,13 @@ class RabbitMqDriver(QueueDriver):
         )
 
     def consume(self, callback):
-        """
-        This is typically used in a separate worker process.
-        For simplicity in this implementation, we consume from all stats queues.
-        In production, workers might be assigned to specific queues.
-        """
+        """Consume from the shared queue that receives all tenant events."""
         channel = self._get_channel()
-        
-        # We might want a way to discover all tenant queues, 
-        # but for now we'll assume a single main queue or 
-        # discover them via exchange bindings if needed.
-        # For the MVP, we'll use a single queue "statistics_main" that all tenants publish to,
-        # and routing keys will distinguish them if needed. 
-        # But the PRD says: "Varje tenant får en egen kö i RabbitMQ för isolering."
-        
-        # To handle multiple queues dynamically, we might need a more complex worker.
-        # For now, let's implement a version that consumes from a known queue.
-        pass
+        channel.queue_declare(queue=self.shared_queue_name, durable=True)
+        channel.basic_qos(prefetch_count=100)
+        channel.basic_consume(queue=self.shared_queue_name, on_message_callback=callback)
+        channel.start_consuming()
 
     def ack(self, delivery_tag):
         if self._channel:
             self._channel.basic_ack(delivery_tag=delivery_tag)
-

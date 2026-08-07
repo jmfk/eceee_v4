@@ -1,8 +1,8 @@
-from rest_framework import serializers
 from statistics.models import (
     EventRaw, PageStats, ConversionStats, 
     Experiment, Variant, Assignment, ExperimentMetric
 )
+from rest_framework import serializers
 
 class EventRawSerializer(serializers.ModelSerializer):
     class Meta:
@@ -10,11 +10,15 @@ class EventRawSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class PageStatsSerializer(serializers.ModelSerializer):
+    tenant_id = serializers.UUIDField(source="tenant.id", read_only=True)
+
     class Meta:
         model = PageStats
         fields = "__all__"
 
 class ConversionStatsSerializer(serializers.ModelSerializer):
+    tenant_id = serializers.UUIDField(source="tenant.id", read_only=True)
+
     class Meta:
         model = ConversionStats
         fields = "__all__"
@@ -26,6 +30,7 @@ class VariantSerializer(serializers.ModelSerializer):
 
 class ExperimentSerializer(serializers.ModelSerializer):
     variants = VariantSerializer(many=True, required=False)
+    tenant_id = serializers.UUIDField(source="tenant.id", read_only=True)
 
     class Meta:
         model = Experiment
@@ -33,6 +38,7 @@ class ExperimentSerializer(serializers.ModelSerializer):
             "id", "tenant_id", "name", "description", 
             "start_date", "end_date", "status", "goal_metric", "variants"
         ]
+        read_only_fields = ["tenant_id"]
 
     def create(self, validated_data):
         variants_data = validated_data.pop("variants", [])
@@ -50,4 +56,3 @@ class ExperimentMetricSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExperimentMetric
         fields = "__all__"
-

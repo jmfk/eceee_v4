@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { BarChart2, Users, Eye, Clock, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { statisticsApi } from '../../api/statistics';
 
 const StatisticsDashboard = ({ tenantId }) => {
   const [stats, setStats] = useState(null);
@@ -11,34 +11,30 @@ const StatisticsDashboard = ({ tenantId }) => {
   });
 
   useEffect(() => {
-    fetchStats();
-  }, [dateRange]);
-
-  const fetchStats = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get('/api/statistics/page-stats/summary/', {
-        params: {
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const response = await statisticsApi.getSummary({
           start: dateRange.start,
-          end: dateRange.end
-        },
-        headers: {
-          'X-Tenant-ID': tenantId
-        }
-      });
-      setStats(response.data);
-    } catch (error) {
-      console.error('Failed to fetch statistics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+          end: dateRange.end,
+          tenantId,
+        });
+        setStats(response.data);
+      } catch (error) {
+        console.error('Failed to fetch statistics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const StatCard = ({ title, value, icon: Icon, color }) => (
+    fetchStats();
+  }, [dateRange, tenantId]);
+
+  const StatCard = ({ title, value, icon, color }) => (
     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-2 rounded-lg ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
+          {React.createElement(icon, { className: 'w-6 h-6 text-white' })}
         </div>
         <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
           Last 7 days
@@ -53,6 +49,10 @@ const StatisticsDashboard = ({ tenantId }) => {
       </div>
     </div>
   );
+
+  if (loading) {
+    return <div className="p-8 text-slate-500">Loading statistics…</div>;
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -151,4 +151,3 @@ const StatisticsDashboard = ({ tenantId }) => {
 };
 
 export default StatisticsDashboard;
-

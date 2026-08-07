@@ -1,8 +1,10 @@
 import logging
-from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Count, Sum, Avg
+
 from celery import shared_task
+from django.db.models import Count
+from django.utils import timezone
+
 from statistics.models import EventRaw, PageStats, ConversionStats, Experiment, Assignment, ExperimentMetric
 from core.models import Tenant
 
@@ -19,7 +21,7 @@ def aggregate_daily_stats():
     for tenant in tenants:
         # Aggregating page views and unique visitors
         page_events = EventRaw.objects.filter(
-            tenant_id=tenant,
+            tenant=tenant,
             event_time__date=yesterday,
             event_type="pageview"
         ).values("url").annotate(
@@ -30,7 +32,7 @@ def aggregate_daily_stats():
         for entry in page_events:
             PageStats.objects.update_or_create(
                 date=yesterday,
-                tenant_id=tenant,
+                tenant=tenant,
                 url=entry["url"],
                 defaults={
                     "pageviews": entry["pageviews"],
@@ -41,7 +43,7 @@ def aggregate_daily_stats():
 
         # Aggregating conversion goals
         conversion_events = EventRaw.objects.filter(
-            tenant_id=tenant,
+            tenant=tenant,
             event_time__date=yesterday,
             event_type="conversion"
         ).values("metadata__goal_name").annotate(
@@ -52,7 +54,7 @@ def aggregate_daily_stats():
             goal_name = entry.get("metadata__goal_name", "default")
             ConversionStats.objects.update_or_create(
                 date=yesterday,
-                tenant_id=tenant,
+                tenant=tenant,
                 goal_name=goal_name,
                 defaults={
                     "conversions": entry["conversions"],
@@ -78,7 +80,7 @@ def update_experiment_metrics():
             # Count conversions for users in this variant
             # This assumes we track the variant_id in conversion events
             conversions = EventRaw.objects.filter(
-                tenant_id=experiment.tenant_id,
+                tenant=experiment.tenant,
                 event_type="conversion",
                 metadata__experiment_id=str(experiment.id),
                 metadata__variant_id=str(variant.id)
@@ -106,4 +108,3 @@ def update_experiment_metrics():
                 )
 
     logger.info("Experiment metrics updated")
-

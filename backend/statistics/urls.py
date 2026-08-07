@@ -9,6 +9,5 @@ router.register(r"experiments", ExperimentViewSet)
 
 urlpatterns = [
     path("ingest/", EventIngestionView.as_view(), name="event-ingest"),
-    path("api/", include(router.urls)),
+    path("", include(router.urls)),
 ]
-
