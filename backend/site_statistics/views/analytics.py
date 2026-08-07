@@ -3,14 +3,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum, Avg
-from statistics.models import (
+from site_statistics.models import (
     PageStats, ConversionStats, Experiment, Variant
 )
-from statistics.serializers import (
+from site_statistics.serializers import (
     PageStatsSerializer, ConversionStatsSerializer, 
     ExperimentSerializer, VariantSerializer
 )
-from statistics.services.ab_testing import ABTestingService
+from site_statistics.services.ab_testing import ABTestingService
 
 
 class TenantScopedQuerySetMixin:

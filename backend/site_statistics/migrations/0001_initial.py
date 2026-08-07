@@ -130,7 +130,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="variants",
-                        to="statistics.experiment",
+                        to="site_statistics.experiment",
                     ),
                 ),
             ],
@@ -147,7 +147,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="metrics",
-                        to="statistics.variant",
+                        to="site_statistics.variant",
                     ),
                 ),
             ],
@@ -163,11 +163,11 @@ class Migration(migrations.Migration):
                 ("assigned_at", models.DateTimeField(default=timezone.now)),
                 (
                     "experiment",
-                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="statistics.experiment"),
+                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="site_statistics.experiment"),
                 ),
                 (
                     "variant",
-                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="statistics.variant"),
+                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="site_statistics.variant"),
                 ),
             ],
             options={
@@ -176,14 +176,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="eventraw",
-            index=models.Index(fields=["tenant", "event_time"], name="statistics__tenant__fd8f07_idx"),
+            index=models.Index(fields=["tenant", "event_time"], name="site_statis_tenant__07b43b_idx"),
         ),
         migrations.AddIndex(
             model_name="conversionstats",
-            index=models.Index(fields=["tenant", "date"], name="statistics__tenant__fec0d4_idx"),
+            index=models.Index(fields=["tenant", "date"], name="site_statis_tenant__ad8778_idx"),
         ),
         migrations.AddIndex(
             model_name="pagestats",
-            index=models.Index(fields=["tenant", "date"], name="statistics__tenant__a42213_idx"),
+            index=models.Index(fields=["tenant", "date"], name="site_statis_tenant__5fb751_idx"),
         ),
     ]
