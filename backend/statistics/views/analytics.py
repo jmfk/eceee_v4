@@ -1,7 +1,8 @@
-from rest_framework import viewsets, status
+from rest_framework import serializers, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum, Avg, Count
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Sum, Avg
 from statistics.models import (
     PageStats, ConversionStats, Experiment, Variant
 )
@@ -11,7 +12,20 @@ from statistics.serializers import (
 )
 from statistics.services.ab_testing import ABTestingService
 
-class PageStatsViewSet(viewsets.ReadOnlyModelViewSet):
+
+class TenantScopedQuerySetMixin:
+    permission_classes = [IsAuthenticated]
+
+    def get_tenant(self):
+        tenant = getattr(self.request, "tenant", None)
+        if not tenant:
+            raise serializers.ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        return tenant
+
+    def get_queryset(self):
+        return super().get_queryset().filter(tenant=self.get_tenant())
+
+class PageStatsViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = PageStats.objects.all()
     serializer_class = PageStatsSerializer
     filterset_fields = ["url", "date"]
@@ -39,9 +53,12 @@ class PageStatsViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(summary)
 
 
-class ExperimentViewSet(viewsets.ModelViewSet):
+class ExperimentViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = Experiment.objects.all()
     serializer_class = ExperimentSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.get_tenant())
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
@@ -70,13 +87,13 @@ class ExperimentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def assign(self, request, pk=None):
+        experiment = self.get_object()
         user_id = request.data.get("userId")
         if not user_id:
             return Response({"error": "userId required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        variant = ABTestingService.get_variant(pk, user_id)
+        variant = ABTestingService.get_variant(experiment.id, user_id)
         if not variant:
             return Response({"error": "No active experiment or variants"}, status=status.HTTP_404_NOT_FOUND)
             
         return Response(VariantSerializer(variant).data)
-

@@ -14,6 +14,7 @@ class EventIngestionView(APIView):
     Supports both JS-based client tracking and server-side tracking.
     """
     permission_classes = [AllowAny]  # Public endpoint for tracking
+    max_batch_size = 100
 
     def post(self, request, *args, **kwargs):
         tenant_identifier = request.headers.get("X-Tenant-ID") or request.data.get("tenantId")
@@ -33,6 +34,11 @@ class EventIngestionView(APIView):
         events = request.data.get("events", [])
         if not isinstance(events, list):
             events = [request.data]
+        if len(events) > self.max_batch_size:
+            return Response(
+                {"error": f"Too many events; maximum batch size is {self.max_batch_size}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         queue_driver = RabbitMqDriver()
         
@@ -40,7 +46,7 @@ class EventIngestionView(APIView):
             # Prepare event for queue
             payload = {
                 "tenant_id": str(tenant.id),
-                "user_id": event_data.get("userId"),
+                "user_id": event_data.get("userId") or "anonymous",
                 "event_type": event_data.get("eventType", "pageview"),
                 "event_time": event_data.get("eventTime", timezone.now().isoformat()),
                 "url": event_data.get("url"),
@@ -54,4 +60,3 @@ class EventIngestionView(APIView):
             queue_driver.publish(tenant.id, payload)
 
         return Response({"status": "received"}, status=status.HTTP_202_ACCEPTED)
-
