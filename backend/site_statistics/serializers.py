@@ -1,4 +1,4 @@
-from statistics.models import (
+from site_statistics.models import (
     EventRaw, PageStats, ConversionStats, 
     Experiment, Variant, Assignment, ExperimentMetric
 )

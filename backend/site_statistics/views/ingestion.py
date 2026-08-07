@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from statistics.services.queue_driver import RabbitMqDriver
+from site_statistics.services.queue_driver import RabbitMqDriver
 from core.models import Tenant
 
 class EventIngestionView(APIView):
