@@ -288,6 +288,30 @@ describe('DataManager subscriptions', () => {
         expect(snapshots).toEqual([{ isDirty: true }, { isDirty: false }])
     })
 
+    it('routes selector errors through subscription onError without throwing dispatch', () => {
+        const manager = new DataManager(createAppState())
+        const callback = vi.fn()
+        const onError = vi.fn()
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+        manager.subscribe(
+            () => {
+                throw new Error('selector failed')
+            },
+            callback,
+            { onError }
+        )
+
+        expect(() => manager.dispatch({
+            type: OperationTypes.SET_DIRTY,
+            payload: { isDirty: true }
+        })).not.toThrow()
+
+        expect(onError).toHaveBeenCalledWith(expect.any(Error))
+        expect(callback).not.toHaveBeenCalled()
+        consoleErrorSpy.mockRestore()
+    })
+
     it('does not fire queued callbacks after unsubscribe', async () => {
         const manager = new DataManager(createAppState())
         const callback = vi.fn()
