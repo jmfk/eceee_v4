@@ -1,6 +1,6 @@
 import uuid
+
 from django.db import models
-from django.conf import settings
 from django.utils import timezone
 
 
@@ -9,7 +9,7 @@ class EventRaw(models.Model):
     Stores raw events received from clients or server-side logging.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant_id = models.ForeignKey(
+    tenant = models.ForeignKey(
         "core.Tenant", on_delete=models.CASCADE, related_name="raw_events"
     )
     user_id = models.CharField(max_length=255, db_index=True)  # Anonymized hash
@@ -21,7 +21,7 @@ class EventRaw(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["tenant_id", "event_time"]),
+            models.Index(fields=["tenant", "event_time"]),
         ]
         verbose_name_plural = "raw events"
 
@@ -34,7 +34,7 @@ class PageStats(models.Model):
     Aggregated daily statistics per page.
     """
     date = models.DateField(db_index=True)
-    tenant_id = models.ForeignKey(
+    tenant = models.ForeignKey(
         "core.Tenant", on_delete=models.CASCADE, related_name="page_stats"
     )
     url = models.URLField(max_length=2000, db_index=True)
@@ -46,9 +46,9 @@ class PageStats(models.Model):
     exit_rate = models.FloatField(default=0.0)    # Percentage
 
     class Meta:
-        unique_together = ("date", "tenant_id", "url")
+        unique_together = ("date", "tenant", "url")
         indexes = [
-            models.Index(fields=["tenant_id", "date"]),
+            models.Index(fields=["tenant", "date"]),
         ]
         verbose_name_plural = "page stats"
 
@@ -58,7 +58,7 @@ class ConversionStats(models.Model):
     Aggregated daily statistics for conversion goals.
     """
     date = models.DateField(db_index=True)
-    tenant_id = models.ForeignKey(
+    tenant = models.ForeignKey(
         "core.Tenant", on_delete=models.CASCADE, related_name="conversion_stats"
     )
     goal_name = models.CharField(max_length=100, db_index=True)
@@ -67,9 +67,9 @@ class ConversionStats(models.Model):
     conversion_rate = models.FloatField(default=0.0)  # Percentage
 
     class Meta:
-        unique_together = ("date", "tenant_id", "goal_name")
+        unique_together = ("date", "tenant", "goal_name")
         indexes = [
-            models.Index(fields=["tenant_id", "date"]),
+            models.Index(fields=["tenant", "date"]),
         ]
         verbose_name_plural = "conversion stats"
 
@@ -87,7 +87,7 @@ class Experiment(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant_id = models.ForeignKey(
+    tenant = models.ForeignKey(
         "core.Tenant", on_delete=models.CASCADE, related_name="experiments"
     )
     name = models.CharField(max_length=255)
@@ -144,4 +144,3 @@ class ExperimentMetric(models.Model):
 
     class Meta:
         unique_together = ("variant", "metric_name")
-

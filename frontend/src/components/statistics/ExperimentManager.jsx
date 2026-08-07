@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Beaker, Plus, Play, Pause, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Beaker, Plus, Play, Pause } from 'lucide-react';
+import { statisticsApi } from '../../api/statistics';
 
 const ExperimentManager = ({ tenantId }) => {
   const [experiments, setExperiments] = useState([]);
@@ -15,32 +15,25 @@ const ExperimentManager = ({ tenantId }) => {
     ]
   });
 
-  useEffect(() => {
-    fetchExperiments();
-  }, []);
-
-  const fetchExperiments = async () => {
+  const fetchExperiments = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/statistics/experiments/', {
-        headers: { 'X-Tenant-ID': tenantId }
-      });
+      const response = await statisticsApi.getExperiments({ tenantId });
       setExperiments(response.data.results || response.data);
     } catch (error) {
       console.error('Failed to fetch experiments:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenantId]);
+
+  useEffect(() => {
+    fetchExperiments();
+  }, [fetchExperiments]);
 
   const handleCreate = async () => {
     try {
-      await axios.post('/api/statistics/experiments/', {
-        ...newExperiment,
-        tenantId
-      }, {
-        headers: { 'X-Tenant-ID': tenantId }
-      });
+      await statisticsApi.createExperiment(newExperiment, { tenantId });
       setShowCreateModal(false);
       fetchExperiments();
     } catch (error) {
@@ -50,9 +43,7 @@ const ExperimentManager = ({ tenantId }) => {
 
   const handleStatusChange = async (id, status) => {
     try {
-      await axios.patch(`/api/statistics/experiments/${id}/`, { status }, {
-        headers: { 'X-Tenant-ID': tenantId }
-      });
+      await statisticsApi.updateExperiment(id, { status }, { tenantId });
       fetchExperiments();
     } catch (error) {
       console.error('Failed to update status:', error);
@@ -104,7 +95,13 @@ const ExperimentManager = ({ tenantId }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {experiments.map((exp) => (
+            {loading ? (
+              <tr>
+                <td colSpan="5" className="px-6 py-12 text-center text-slate-500">
+                  Loading experiments…
+                </td>
+              </tr>
+            ) : experiments.map((exp) => (
               <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="font-bold text-slate-900">{exp.name}</div>
@@ -152,7 +149,7 @@ const ExperimentManager = ({ tenantId }) => {
                 </td>
               </tr>
             ))}
-            {experiments.length === 0 && (
+            {!loading && experiments.length === 0 && (
               <tr>
                 <td colSpan="5" className="px-6 py-12 text-center text-slate-500 italic">
                   No experiments found. Create one to get started!
@@ -213,4 +210,3 @@ const ExperimentManager = ({ tenantId }) => {
 };
 
 export default ExperimentManager;
-

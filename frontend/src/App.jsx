@@ -40,6 +40,7 @@ import ImageStyleEditPage from '@pages/theme-styles/ImageStyleEditPage'
 import ComponentStyleEditPage from '@pages/theme-styles/ComponentStyleEditPage'
 import StatisticsDashboard from '@components/statistics/StatisticsDashboard'
 import ExperimentManager from '@components/statistics/ExperimentManager'
+import { getCurrentTenantId } from './utils/tenant'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
@@ -172,6 +173,7 @@ const GitHashBadge = () => {
 
 const AppRoutes = () => {
   useAutoPageTitle()
+  const tenantId = getCurrentTenantId()
 
   return (
     <>
@@ -423,7 +425,7 @@ const AppRoutes = () => {
               <Navbar />
               <main className="flex-1 overflow-hidden">
                 <div className="h-full overflow-y-auto">
-                  <StatisticsDashboard tenantId="default" />
+                  <StatisticsDashboard tenantId={tenantId} />
                 </div>
               </main>
               <StatusBar customStatusContent={<span>Statistics - Dashboard</span>} />
@@ -436,7 +438,7 @@ const AppRoutes = () => {
               <Navbar />
               <main className="flex-1 overflow-hidden">
                 <div className="h-full overflow-y-auto">
-                  <ExperimentManager tenantId="default" />
+                  <ExperimentManager tenantId={tenantId} />
                 </div>
               </main>
               <StatusBar customStatusContent={<span>Statistics - A/B Testing</span>} />

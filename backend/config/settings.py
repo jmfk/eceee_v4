@@ -615,6 +615,14 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+# Statistics event queue configuration
+RABBITMQ_HOST = config("RABBITMQ_HOST", default="rabbitmq")
+RABBITMQ_PORT = config("RABBITMQ_PORT", default=5672, cast=int)
+RABBITMQ_USER = config("RABBITMQ_USER", default="guest")
+RABBITMQ_PASSWORD = config("RABBITMQ_PASSWORD", default="guest")
+STATISTICS_EXCHANGE = config("STATISTICS_EXCHANGE", default="statistics_events")
+STATISTICS_SHARED_QUEUE = config("STATISTICS_SHARED_QUEUE", default="statistics_main")
+
 # Rate Limiting
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = "default"

@@ -1,8 +1,9 @@
 import json
 import logging
-import pika
 from django.core.management.base import BaseCommand
-from django.conf import settings
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
 from statistics.models import EventRaw
 from statistics.services.queue_driver import RabbitMqDriver
 from core.models import Tenant
@@ -12,26 +13,26 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = "Consumes events from RabbitMQ and processes them into the database."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--queue",
+            default="statistics_main",
+            help="Queue to consume. Defaults to the shared statistics_main queue.",
+        )
+
     def handle(self, *args, **options):
         self.stdout.write("Starting event processor...")
         driver = RabbitMqDriver()
-        
-        # We need a way to listen to all tenant queues. 
-        # For simplicity in this MVP, we'll use a main exchange and a single queue 
-        # that all tenants feed into, OR we discover queues.
-        # Let's use a single main queue for now to simplify the worker.
-        
+
         connection = driver._get_connection()
         channel = connection.channel()
-        
-        exchange_name = "statistics_events"
-        queue_name = "statistics_main"
-        
+
+        exchange_name = driver.exchange_name
+        queue_name = options["queue"]
+
         channel.exchange_declare(exchange=exchange_name, exchange_type="direct", durable=True)
         channel.queue_declare(queue=queue_name, durable=True)
-        # Bind all existing tenants to this queue for now, or use a wildcard if using topic exchange
-        # For now, let's just use a single queue "statistics_main" for ingestion
-        
+
         def callback(ch, method, properties, body):
             try:
                 data = json.loads(body)
@@ -56,11 +57,17 @@ class Command(BaseCommand):
         tenant_id = data.get("tenant_id")
         try:
             tenant = Tenant.objects.get(id=tenant_id)
+            event_time = data.get("event_time")
+            if isinstance(event_time, str):
+                event_time = parse_datetime(event_time)
+            if event_time is None:
+                event_time = timezone.now()
+
             EventRaw.objects.create(
-                tenant_id=tenant,
-                user_id=data.get("user_id"),
-                event_type=data.get("event_type"),
-                event_time=data.get("event_time"),
+                tenant=tenant,
+                user_id=data.get("user_id") or "anonymous",
+                event_type=data.get("event_type") or "pageview",
+                event_time=event_time,
                 url=data.get("url"),
                 referrer=data.get("referrer"),
                 metadata=data.get("metadata", {})
@@ -69,4 +76,3 @@ class Command(BaseCommand):
             # or rely on a scheduled task for batch aggregation.
         except Tenant.DoesNotExist:
             logger.error(f"Tenant {tenant_id} not found for event.")
-
