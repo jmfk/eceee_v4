@@ -7,7 +7,7 @@ from site_statistics.models import (
     PageStats, ConversionStats, Experiment, Variant
 )
 from site_statistics.serializers import (
-    PageStatsSerializer, ConversionStatsSerializer, 
+    PageStatsSerializer, ConversionStatsSerializer,
     ExperimentSerializer, VariantSerializer
 )
 from site_statistics.services.ab_testing import ABTestingService
@@ -37,19 +37,19 @@ class PageStatsViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
         """
         start_date = request.query_params.get("start")
         end_date = request.query_params.get("end")
-        
+
         queryset = self.get_queryset()
         if start_date:
             queryset = queryset.filter(date__gte=start_date)
         if end_date:
             queryset = queryset.filter(date__lte=end_date)
-            
+
         summary = queryset.aggregate(
             total_views=Sum("pageviews"),
             total_uniques=Sum("unique_visitors"),
             avg_time=Avg("avg_time_on_page")
         )
-        
+
         return Response(summary)
 
 
@@ -91,9 +91,9 @@ class ExperimentViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         user_id = request.data.get("userId")
         if not user_id:
             return Response({"error": "userId required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         variant = ABTestingService.get_variant(experiment.id, user_id)
         if not variant:
             return Response({"error": "No active experiment or variants"}, status=status.HTTP_404_NOT_FOUND)
-            
+
         return Response(VariantSerializer(variant).data)

@@ -12,4 +12,3 @@ export const getCurrentTenantId = () => {
     DEFAULT_TENANT_ID
   )
 }
-

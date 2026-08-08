@@ -70,7 +70,7 @@ class RabbitMqDriver(QueueDriver):
         Uses a direct exchange and routing key based on tenant_id.
         """
         channel = self._get_channel()
-        
+
         # Ensure exchange and queue exist for this tenant
         exchange_name = self.exchange_name
         queue_name = f"stats_queue_{tenant_id}"

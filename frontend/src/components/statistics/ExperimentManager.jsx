@@ -74,7 +74,7 @@ const ExperimentManager = ({ tenantId }) => {
           </h1>
           <p className="text-slate-500">Optimize your site performance with experiments.</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowCreateModal(true)}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors"
         >
@@ -116,8 +116,8 @@ const ExperimentManager = ({ tenantId }) => {
                 <td className="px-6 py-4">
                   <div className="flex -space-x-2">
                     {exp.variants?.map((v, i) => (
-                      <div 
-                        key={i} 
+                      <div
+                        key={i}
                         title={`${v.name}: ${v.allocationPercent}%`}
                         className="w-8 h-8 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-indigo-700"
                       >
@@ -129,7 +129,7 @@ const ExperimentManager = ({ tenantId }) => {
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
                     {exp.status === 'draft' || exp.status === 'paused' ? (
-                      <button 
+                      <button
                         onClick={() => handleStatusChange(exp.id, 'running')}
                         className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                         title="Start"
@@ -137,7 +137,7 @@ const ExperimentManager = ({ tenantId }) => {
                         <Play className="w-5 h-5" />
                       </button>
                     ) : exp.status === 'running' ? (
-                      <button 
+                      <button
                         onClick={() => handleStatusChange(exp.id, 'paused')}
                         className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                         title="Pause"
@@ -167,8 +167,8 @@ const ExperimentManager = ({ tenantId }) => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Experiment Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newExperiment.name}
                   onChange={(e) => setNewExperiment({...newExperiment, name: e.target.value})}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -177,7 +177,7 @@ const ExperimentManager = ({ tenantId }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Goal Metric</label>
-                <select 
+                <select
                   value={newExperiment.goalMetric}
                   onChange={(e) => setNewExperiment({...newExperiment, goalMetric: e.target.value})}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -189,13 +189,13 @@ const ExperimentManager = ({ tenantId }) => {
               </div>
             </div>
             <div className="flex gap-3 mt-8">
-              <button 
+              <button
                 onClick={() => setShowCreateModal(false)}
                 className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleCreate}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
               >

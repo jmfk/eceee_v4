@@ -18,7 +18,7 @@ class EventIngestionView(APIView):
 
     def post(self, request, *args, **kwargs):
         tenant_identifier = request.headers.get("X-Tenant-ID") or request.data.get("tenantId")
-        
+
         if not tenant_identifier:
             return Response({"error": "Tenant ID required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -41,7 +41,7 @@ class EventIngestionView(APIView):
             )
 
         queue_driver = RabbitMqDriver()
-        
+
         for event_data in events:
             # Prepare event for queue
             payload = {
@@ -53,10 +53,10 @@ class EventIngestionView(APIView):
                 "referrer": event_data.get("referrer"),
                 "metadata": event_data.get("metadata", {}),
             }
-            
+
             # Anonymize IP or user_id if needed here
             # For now, we assume userId is already an anonymized hash from the client
-            
+
             queue_driver.publish(tenant.id, payload)
 
         return Response({"status": "received"}, status=status.HTTP_202_ACCEPTED)

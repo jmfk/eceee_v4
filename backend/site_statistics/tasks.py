@@ -76,7 +76,7 @@ def update_experiment_metrics():
         for variant in experiment.variants.all():
             # Calculate conversion rate for this variant
             total_assigned = Assignment.objects.filter(variant=variant).count()
-            
+
             # Count conversions for users in this variant
             # This assumes we track the variant_id in conversion events
             conversions = EventRaw.objects.filter(
@@ -92,7 +92,7 @@ def update_experiment_metrics():
                 metric_name="conversions",
                 defaults={"value": float(conversions)}
             )
-            
+
             ExperimentMetric.objects.update_or_create(
                 variant=variant,
                 metric_name="assignment_count",

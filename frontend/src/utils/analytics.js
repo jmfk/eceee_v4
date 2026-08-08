@@ -96,7 +96,7 @@ class Analytics {
       const scrollPos = window.scrollY + window.innerHeight;
       const totalHeight = document.documentElement.scrollHeight;
       const scrollPercent = Math.round((scrollPos / totalHeight) * 100);
-      
+
       if (scrollPercent > maxScroll) {
         maxScroll = scrollPercent;
         if (maxScroll % 25 === 0) { // Track every 25%
