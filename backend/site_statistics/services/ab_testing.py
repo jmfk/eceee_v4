@@ -32,7 +32,7 @@ class ABTestingService:
 
         current_threshold = 0
         assigned_variant = variants[0] # Default
-        
+
         for variant in variants:
             current_threshold += variant.allocation_percent
             if bucket < current_threshold:
@@ -45,6 +45,5 @@ class ABTestingService:
             variant=assigned_variant,
             user_id=user_id
         )
-        
-        return assigned_variant
 
+        return assigned_variant

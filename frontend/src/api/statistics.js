@@ -33,4 +33,3 @@ export const statisticsApi = {
     { headers: tenantHeaders(tenantId) },
   ),
 }
-

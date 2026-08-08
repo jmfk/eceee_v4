@@ -1,5 +1,5 @@
 from site_statistics.models import (
-    EventRaw, PageStats, ConversionStats, 
+    EventRaw, PageStats, ConversionStats,
     Experiment, Variant, Assignment, ExperimentMetric
 )
 from rest_framework import serializers
@@ -35,7 +35,7 @@ class ExperimentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experiment
         fields = [
-            "id", "tenant_id", "name", "description", 
+            "id", "tenant_id", "name", "description",
             "start_date", "end_date", "status", "goal_metric", "variants"
         ]
         read_only_fields = ["tenant_id"]
