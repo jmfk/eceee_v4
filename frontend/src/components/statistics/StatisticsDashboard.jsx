@@ -62,14 +62,14 @@ const StatisticsDashboard = ({ tenantId }) => {
           <p className="text-slate-500">Real-time insights into your website performance.</p>
         </div>
         <div className="flex gap-4">
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={dateRange.start}
             onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
           />
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={dateRange.end}
             onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
@@ -78,29 +78,29 @@ const StatisticsDashboard = ({ tenantId }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard 
-          title="Total Page Views" 
-          value={stats?.totalViews} 
-          icon={Eye} 
-          color="bg-blue-600" 
+        <StatCard
+          title="Total Page Views"
+          value={stats?.totalViews}
+          icon={Eye}
+          color="bg-blue-600"
         />
-        <StatCard 
-          title="Unique Visitors" 
-          value={stats?.totalUniques} 
-          icon={Users} 
-          color="bg-indigo-600" 
+        <StatCard
+          title="Unique Visitors"
+          value={stats?.totalUniques}
+          icon={Users}
+          color="bg-indigo-600"
         />
-        <StatCard 
-          title="Avg. Time on Page" 
-          value={`${Math.round(stats?.avgTime || 0)}s`} 
-          icon={Clock} 
-          color="bg-emerald-600" 
+        <StatCard
+          title="Avg. Time on Page"
+          value={`${Math.round(stats?.avgTime || 0)}s`}
+          icon={Clock}
+          color="bg-emerald-600"
         />
-        <StatCard 
-          title="Conversion Rate" 
-          value="3.2%" 
-          icon={TrendingUp} 
-          color="bg-amber-600" 
+        <StatCard
+          title="Conversion Rate"
+          value="3.2%"
+          icon={TrendingUp}
+          color="bg-amber-600"
         />
       </div>
 
@@ -114,8 +114,8 @@ const StatisticsDashboard = ({ tenantId }) => {
             {/* Simple CSS placeholder for a chart */}
             {[40, 70, 45, 90, 65, 80, 55].map((h, i) => (
               <div key={i} className="flex-1 group relative">
-                <div 
-                  className="bg-blue-100 group-hover:bg-blue-600 transition-all rounded-t-md" 
+                <div
+                  className="bg-blue-100 group-hover:bg-blue-600 transition-all rounded-t-md"
                   style={{ height: `${h}%` }}
                 ></div>
                 <div className="mt-2 text-[10px] text-slate-400 text-center">Day {i+1}</div>
