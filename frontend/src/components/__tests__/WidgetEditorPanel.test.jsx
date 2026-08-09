@@ -95,4 +95,74 @@ describe('WidgetEditorPanel contract', () => {
         expect(savedWidget).toEqual(panelEditedWidget)
         expect(onSave).toHaveBeenCalledWith(panelEditedWidget)
     })
+
+    it('keeps panel changes pending when parent save reports no persistence yet', async () => {
+        const user = userEvent.setup()
+        const onSave = vi.fn().mockResolvedValue({ saved: false, reason: 'conflict' })
+        const panelRef = React.createRef()
+
+        render(
+            <WidgetEditorPanel
+                ref={panelRef}
+                isOpen
+                onClose={vi.fn()}
+                onSave={onSave}
+                onRealTimeUpdate={vi.fn()}
+                widgetData={{
+                    id: 'content-intro',
+                    name: 'Intro',
+                    type: 'easy_widgets.ContentWidget',
+                    slotName: 'main',
+                    config: { content: '<p>Initial copy</p>' }
+                }}
+                schema={{ properties: { content: { type: 'string' } } }}
+                title="Edit Content"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+            />
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Apply panel edit' }))
+        expect(panelRef.current.hasUnsavedChanges()).toBe(true)
+
+        await act(async () => {
+            await panelRef.current.saveCurrentWidget()
+        })
+
+        expect(onSave).toHaveBeenCalledWith(panelEditedWidget)
+        expect(panelRef.current.hasUnsavedChanges()).toBe(true)
+    })
+
+    it('keeps panel changes pending when parent save rejects', async () => {
+        const user = userEvent.setup()
+        const onSave = vi.fn().mockRejectedValue(new Error('save failed'))
+        const panelRef = React.createRef()
+
+        render(
+            <WidgetEditorPanel
+                ref={panelRef}
+                isOpen
+                onClose={vi.fn()}
+                onSave={onSave}
+                onRealTimeUpdate={vi.fn()}
+                widgetData={{
+                    id: 'content-intro',
+                    name: 'Intro',
+                    type: 'easy_widgets.ContentWidget',
+                    slotName: 'main',
+                    config: { content: '<p>Initial copy</p>' }
+                }}
+                schema={{ properties: { content: { type: 'string' } } }}
+                title="Edit Content"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+            />
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Apply panel edit' }))
+        expect(panelRef.current.hasUnsavedChanges()).toBe(true)
+
+        await expect(panelRef.current.saveCurrentWidget()).rejects.toThrow('save failed')
+
+        expect(onSave).toHaveBeenCalledWith(panelEditedWidget)
+        expect(panelRef.current.hasUnsavedChanges()).toBe(true)
+    })
 })

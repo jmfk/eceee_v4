@@ -35,6 +35,7 @@ import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../utils/pageEditorWidgetState'
+import { saveWidgetEditorChanges } from '../utils/pageEditorWidgetSave'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
@@ -1241,8 +1242,10 @@ const PageEditor = () => {
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
+            const versionDataOverrides = saveOptions.versionDataOverrides || {};
+
             // Collect current widget data from pageVersionData (always current after fix)
-            collectedData.widgets = pageVersionData?.widgets || {};
+            collectedData.widgets = versionDataOverrides.widgets || pageVersionData?.widgets || {};
 
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
@@ -1279,6 +1282,7 @@ const PageEditor = () => {
 
             const currentVersionDataForSave = {
                 ...pageVersionData,
+                ...versionDataOverrides,
                 widgets: collectedData.widgets
             };
 
@@ -1339,7 +1343,7 @@ const PageEditor = () => {
                         saveOptions
                     });
                     setShowConflictModal(true);
-                    return; // Don't proceed with save
+                    return { saved: false, reason: 'conflict', saveResult }; // Don't proceed with save
                 }
             }
 
@@ -1357,7 +1361,7 @@ const PageEditor = () => {
                 updatedVersionData = {
                     ...updatedVersionData,
                     ...saveResult.versionResult,
-                    widgets: collectedData.widgets // Preserve collected widgets
+                    widgets: currentVersionDataForSave.widgets // Preserve collected widgets
                 };
 
                 // Update current version
@@ -1394,6 +1398,8 @@ const PageEditor = () => {
             queryClient.invalidateQueries(['page', webpageData?.id || pageId]);
             queryClient.invalidateQueries(['pages', 'root']);
 
+            return { saved: true, saveResult };
+
         } catch (error) {
             console.error('❌ SMART SAVE: Save failed', error);
             addNotification(
@@ -1410,6 +1416,7 @@ const PageEditor = () => {
                     setErrorTodoItems(prev => mergeTodoItems(prev, items))
                 }
             }
+            throw error;
         }
     }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, currentVersion]); // Removed loadVersionsPreserveCurrent to break circular dependency
 
@@ -1716,20 +1723,21 @@ const PageEditor = () => {
     }, [applyWidgetUpdateToPageState, publishUpdate, componentId, pageId, versionId])
 
     const handleSaveWidget = useCallback(async (updatedWidget) => {
-        // With validation-driven sync, widget data is already in canonical state
-        // Just need to update the visual representation and show success
-
-        applyWidgetUpdateToPageState(updatedWidget)
-
-        addNotification(
-            `Widget "${updatedWidget.name}" saved successfully`,
-            'success'
+        const widgetsForSave = applyWidgetUpdateToWidgetMap(
+            pageVersionData?.widgets || {},
+            updatedWidget
         )
 
-        // Reset dirty state and close editor
-        setIsDirty(false)
-        handleCloseWidgetEditor()
-    }, [addNotification, applyWidgetUpdateToPageState, handleCloseWidgetEditor])
+        return await saveWidgetEditorChanges(updatedWidget, {
+            applyWidgetUpdate: applyWidgetUpdateToPageState,
+            persistChanges: () => handleActualSave({
+                description: `Widget "${updatedWidget.name || updatedWidget.id}" saved`,
+                versionDataOverrides: { widgets: widgetsForSave }
+            }),
+            addNotification,
+            closeWidgetEditor: handleCloseWidgetEditor
+        })
+    }, [addNotification, applyWidgetUpdateToPageState, handleActualSave, handleCloseWidgetEditor, pageVersionData?.widgets])
 
     // Subscribe to widget events using direct subscription
     // Widget events now handled through UnifiedDataContext
@@ -1862,7 +1870,11 @@ const PageEditor = () => {
 
                         // Save the widget changes using the panel's save method
                         if (widgetEditorRef.current) {
-                            await widgetEditorRef.current.saveCurrentWidget()
+                            try {
+                                await widgetEditorRef.current.saveCurrentWidget()
+                            } catch {
+                                // handleActualSave already shows the failure; keep the panel open.
+                            }
                         }
                     } else {
                         // Discard changes and close panel
