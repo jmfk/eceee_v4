@@ -385,9 +385,15 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
                 next[slotName][idx] = updated
                 return next
             })
+            await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                slotName,
+                contextType,
+                config: newConfig
+            })
             if (editingWidget?.id === widgetId) setEditingWidget({ ...updated, slotName })
         }
-    }, [editingWidget])
+    }, [componentId, contextType, editingWidget, publishUpdate])
 
     const handleShowWidgetModal = useCallback((slot) => {
         setSelectedSlotForModal(slot)
