@@ -456,7 +456,9 @@ describe('TreePageManager', () => {
         })
 
         // Verify that getPageChildren was called for the page with children
-        expect(pagesApi.getPageChildren).toHaveBeenCalledWith(1)
+        await waitFor(() => {
+            expect(pagesApi.getPageChildren).toHaveBeenCalledWith(1)
+        })
 
         // Verify that getPageChildren was NOT called for the page without children
         expect(pagesApi.getPageChildren).not.toHaveBeenCalledWith(2)
