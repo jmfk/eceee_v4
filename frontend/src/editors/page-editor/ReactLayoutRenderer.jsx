@@ -24,6 +24,13 @@ const filterValidWidgets = (widgets) => {
         : []
 }
 
+export const isDifferentWidgetSourceContext = ({ sourcePageId, sourceVersionId, currentPageId, currentVersionId }) => {
+    const sourcePageDiffers = sourcePageId && currentPageId && String(sourcePageId) !== String(currentPageId);
+    const sourceVersionDiffers = sourceVersionId && currentVersionId && String(sourceVersionId) !== String(currentVersionId);
+
+    return Boolean(sourcePageDiffers || sourceVersionDiffers);
+}
+
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'main_layout',  // Default to main_layout (available layout)
     widgets = {},
@@ -340,12 +347,17 @@ const ReactLayoutRenderer = forwardRef(({
                 if (clipboardMetadata && clipboardMetadata.operation === 'cut' && clipboardMetadata.metadata) {
                     const cutMetadata = clipboardMetadata.metadata;
 
-                    // Check if this is a cross-page cut/paste operation
+                    // Check if this is a cross-page or cross-version cut/paste operation
                     const sourcePageId = cutMetadata.pageId;
                     const sourceVersionId = cutMetadata.versionId;
-                    const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
+                    const isCrossSourceContext = isDifferentWidgetSourceContext({
+                        sourcePageId,
+                        sourceVersionId,
+                        currentPageId,
+                        currentVersionId: versionId
+                    });
 
-                    if (!isCrossPage) {
+                    if (!isCrossSourceContext) {
                         // For same-page operations, remove widgets from updatedWidgets
                         let widgetsDeleted = false;
 
@@ -507,7 +519,7 @@ const ReactLayoutRenderer = forwardRef(({
                         setCutWidgets(new Set());
                         setSelectedWidgets(new Set());
                     } else {
-                        // For cross-page operations, publish REMOVE_WIDGET operations to UDC for the source page
+                        // For cross-page/cross-version operations, publish REMOVE_WIDGET operations to UDC for the source context
                         if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
                             for (const widgetPath of cutMetadata.widgetPaths) {
                                 const parsed = parseWidgetPath(widgetPath);
@@ -851,26 +863,31 @@ const ReactLayoutRenderer = forwardRef(({
         // Delete widgets that were cut and pasted
         // Supports both new format (widgetPaths) and old format (widgets object)
 
-        // Check if this is a cross-page cut/paste operation
+        // Check if this is a cross-page or cross-version cut/paste operation
         const sourcePageId = cutMetadata.pageId;
         const sourceVersionId = cutMetadata.versionId;
         const currentPageId = context?.pageId || webpageData?.id;
-        const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
+        const isCrossSourceContext = isDifferentWidgetSourceContext({
+            sourcePageId,
+            sourceVersionId,
+            currentPageId,
+            currentVersionId: versionId
+        });
 
-        // For cross-page operations, we need to publish REMOVE_WIDGET operations to UDC
-        // for the source page, not the current page
-        if (isCrossPage) {
-            // Publish REMOVE_WIDGET operations to UDC for the source page
+        // For cross-page/cross-version operations, publish REMOVE_WIDGET operations
+        // to UDC for the source context, not the current editing context.
+        if (isCrossSourceContext) {
+            // Publish REMOVE_WIDGET operations to UDC for the source context
             if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
                 for (const widgetPath of cutMetadata.widgetPaths) {
                     const parsed = parseWidgetPath(widgetPath);
                     if (!parsed) continue;
 
-                    // Publish to UDC for the source page
+                    // Publish to UDC for the source context
                     await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                         id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
                         contextType: contextType,
-                        pageId: sourcePageId, // Specify source page
+                        pageId: sourcePageId,
                         versionId: sourceVersionId,
                     });
                 }
@@ -881,13 +898,13 @@ const ReactLayoutRenderer = forwardRef(({
                         await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                             id: widgetId,
                             contextType: contextType,
-                            pageId: sourcePageId, // Specify source page
+                            pageId: sourcePageId,
                             versionId: sourceVersionId,
                         });
                     }
                 }
             }
-            return; // Don't update local widgets for cross-page operations
+            return; // Don't update local widgets for cross-context operations
         }
 
         // For same-page operations, update local widgets
