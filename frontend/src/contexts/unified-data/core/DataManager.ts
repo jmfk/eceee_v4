@@ -568,6 +568,88 @@ export class DataManager {
     }
 
     /**
+     * Remove a widget at the specified path (supports infinite nesting)
+     *
+     * @param widgets - The top-level widgets object
+     * @param path - Widget path [slot, widgetId, slot, widgetId, ..., targetId]
+     * @returns Updated widgets object
+     */
+    private removeWidgetAtPath(
+        widgets: Record<string, any[]>,
+        path: WidgetPath
+    ): Record<string, any[]> {
+        if (!isValidPath(path) || path.length < 2) {
+            throw new Error(`Invalid widget path: ${formatPath(path)}`);
+        }
+
+        const topSlot = path[0];
+        const slotWidgets = (widgets[topSlot] || []).filter((w: any) => w != null && typeof w === 'object' && w.id != null);
+        const updatedSlot = this.removeNestedWidgetFromSlot(slotWidgets, path.slice(1));
+
+        return {
+            ...widgets,
+            [topSlot]: updatedSlot
+        };
+    }
+
+    /**
+     * Recursively remove a nested widget within a slot
+     *
+     * @param slotWidgets - Array of widgets in current slot
+     * @param pathSegment - Remaining path [widgetId, slot, widgetId, ..., targetId]
+     * @returns Updated slot widgets array
+     */
+    private removeNestedWidgetFromSlot(
+        slotWidgets: any[],
+        pathSegment: string[]
+    ): any[] {
+        if (pathSegment.length < 1) {
+            throw new Error('Invalid path segment');
+        }
+
+        const currentWidgetId = pathSegment[0];
+
+        if (pathSegment.length === 1) {
+            return slotWidgets
+                .filter((w: any) => String(w.id) !== String(currentWidgetId))
+                .map((w: any, idx: number) => ({ ...w, order: idx }));
+        }
+
+        if (pathSegment.length < 3) {
+            throw new Error(`Invalid path: expected slot name after widget ${currentWidgetId}`);
+        }
+
+        const widgetIndex = slotWidgets.findIndex((w: any) => String(w.id) === String(currentWidgetId));
+
+        if (widgetIndex === -1) {
+            throw new Error(`Widget ${currentWidgetId} not found in path: ${pathSegment.join(' → ')}`);
+        }
+
+        const widget = slotWidgets[widgetIndex];
+        const nestedSlotName = pathSegment[1];
+        const nestedSlots = widget.config?.slots || {};
+        const nestedSlotWidgets = (nestedSlots[nestedSlotName] || []).filter((w: any) => w != null && typeof w === 'object' && w.id != null);
+        const updatedNestedSlot = this.removeNestedWidgetFromSlot(
+            nestedSlotWidgets,
+            pathSegment.slice(2)
+        );
+
+        const updatedWidgets = [...slotWidgets];
+        updatedWidgets[widgetIndex] = {
+            ...widget,
+            config: {
+                ...widget.config,
+                slots: {
+                    ...nestedSlots,
+                    [nestedSlotName]: updatedNestedSlot
+                }
+            }
+        };
+
+        return updatedWidgets;
+    }
+
+    /**
      * Process a single operation with rollback support
      */
     private processOperation(operation: Operation): void {
@@ -958,6 +1040,21 @@ export class DataManager {
 
                         if (target.versionId) {
                             const version = state.versions[target.versionId];
+                            if (payload.widgetPath && isValidPath(payload.widgetPath)) {
+                                const updatedWidgets = this.removeWidgetAtPath(
+                                    version.widgets,
+                                    payload.widgetPath
+                                );
+
+                                return {
+                                    versions: {
+                                        ...state.versions,
+                                        [target.versionId]: { ...version, widgets: updatedWidgets }
+                                    },
+                                    metadata: { ...state.metadata, isDirty: true }
+                                };
+                            }
+
                             const widgetsBySlot = { ...version.widgets };
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];

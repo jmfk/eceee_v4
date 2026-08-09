@@ -166,6 +166,65 @@ describe('DataManager state operations', () => {
         expect(manager.getState().metadata.isDirty).toBe(true)
     })
 
+    it('removes nested widgets by widgetPath', () => {
+        const manager = new DataManager(createAppState({
+            versions: {
+                'version-1': createVersion({
+                    widgets: {
+                        main: [
+                            createWidget({
+                                id: 'section-1',
+                                type: 'layout.SectionWidget',
+                                config: {
+                                    slots: {
+                                        content: [
+                                            createWidget({
+                                                id: 'headline-1',
+                                                type: 'content.HeadlineWidget',
+                                                config: { text: 'Remove me' }
+                                            }),
+                                            createWidget({
+                                                id: 'headline-2',
+                                                type: 'content.HeadlineWidget',
+                                                config: { text: 'Keep me' }
+                                            })
+                                        ]
+                                    }
+                                }
+                            }),
+                            createWidget({
+                                id: 'top-level-sibling',
+                                type: 'content.TextWidget',
+                                config: { content: 'Keep top-level sibling' }
+                            })
+                        ]
+                    }
+                })
+            }
+        }))
+
+        manager.dispatch({
+            type: OperationTypes.REMOVE_WIDGET,
+            payload: {
+                id: 'headline-1',
+                contextType: 'page',
+                pageId: 'page-1',
+                widgetPath: ['main', 'section-1', 'content', 'headline-1']
+            }
+        })
+
+        const state = manager.getState()
+        const contentSlot = state.versions['version-1'].widgets.main[0].config.slots.content
+
+        expect(contentSlot.map((widget: any) => widget.id)).toEqual(['headline-2'])
+        expect(contentSlot[0].order).toBe(0)
+        expect(state.versions['version-1'].widgets.main.map((widget: any) => widget.id)).toEqual([
+            'section-1',
+            'top-level-sibling'
+        ])
+        expect(state.metadata.isDirty).toBe(true)
+    })
+
     it('honors explicit page and version targets for cross-page widget operations', () => {
         const pageB = createPage({
             id: 'page-2',

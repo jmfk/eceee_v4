@@ -116,14 +116,15 @@ const ReactLayoutRenderer = forwardRef(({
         const parts = widgetPath.split('/');
         if (parts.length === 2) {
             // Top-level: "slotName/widgetId"
-            return { slotName: parts[0], widgetId: parts[1], isNested: false };
-        } else if (parts.length === 4) {
-            // Nested: "slotName/containerId/nestedSlot/nestedWidgetId"
+            return { slotName: parts[0], widgetId: parts[1], pathParts: parts, isNested: false };
+        } else if (parts.length >= 4 && parts.length % 2 === 0) {
+            // Nested: "slotName/containerId/nestedSlot/nestedWidgetId[/nestedSlot/nestedWidgetId...]"
             return {
                 slotName: parts[0],
                 containerId: parts[1],
                 nestedSlot: parts[2],
-                nestedWidgetId: parts[3],
+                nestedWidgetId: parts[parts.length - 1],
+                pathParts: parts,
                 isNested: true
             };
         }
@@ -530,6 +531,7 @@ const ReactLayoutRenderer = forwardRef(({
                                     contextType: contextType,
                                     pageId: sourcePageId,
                                     versionId: sourceVersionId,
+                                    widgetPath: parsed.pathParts
                                 });
                             }
                         } else if (cutMetadata.widgets) {
@@ -889,6 +891,7 @@ const ReactLayoutRenderer = forwardRef(({
                         contextType: contextType,
                         pageId: sourcePageId,
                         versionId: sourceVersionId,
+                        widgetPath: parsed.pathParts
                     });
                 }
             } else if (cutMetadata.widgets) {
