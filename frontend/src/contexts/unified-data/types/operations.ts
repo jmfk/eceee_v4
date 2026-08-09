@@ -89,6 +89,7 @@ export type MoveWidgetPayload = WidgetContext & {
 
 export type RemoveWidgetPayload = WidgetContext & {
   id: string;
+  widgetPath?: string[]; // Full path for nested widgets: [topSlot, widgetId, slot, widgetId, ..., targetId]
 };
 
 export type AnyWidgetPayload =
