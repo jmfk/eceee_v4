@@ -321,8 +321,10 @@ const WidgetEditorPanel = forwardRef(({
         saveCurrentWidget: async () => {
             const currentWidget = formRendererRef.current?.getCurrentWidgetData?.() || widgetData
             if (currentWidget) {
-                await onSave?.(currentWidget)
-                setHasChanges(false)
+                const saveOutcome = await onSave?.(currentWidget)
+                if (saveOutcome?.saved !== false) {
+                    setHasChanges(false)
+                }
             }
             return currentWidget
         },

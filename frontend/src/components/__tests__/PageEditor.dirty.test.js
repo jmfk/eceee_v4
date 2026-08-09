@@ -11,9 +11,10 @@
  *   2. PageEditor mirrors field-buffer UDC edits into its dirty snapshot
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { analyzeChanges } from '../../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
+import { saveWidgetEditorChanges } from '../../utils/pageEditorWidgetSave'
 
 // ---------------------------------------------------------------------------
 // 1. analyzeChanges — widget change detection
@@ -335,5 +336,54 @@ describe('PageEditor widget state convergence', () => {
             isActive: true
         })
         expect(savePayload.widgets.main).toHaveLength(2)
+    })
+})
+
+describe('PageEditor widget panel save contract', () => {
+    const updatedWidget = {
+        id: 'content-intro',
+        name: 'Intro',
+        type: 'easy_widgets.ContentWidget',
+        slotName: 'main',
+        config: { content: '<p>Panel edit</p>' }
+    }
+
+    it('closes and notifies only after widget edits are persisted', async () => {
+        const applyWidgetUpdate = vi.fn()
+        const persistChanges = vi.fn().mockResolvedValue({ saved: true })
+        const addNotification = vi.fn()
+        const closeWidgetEditor = vi.fn()
+
+        const outcome = await saveWidgetEditorChanges(updatedWidget, {
+            applyWidgetUpdate,
+            persistChanges,
+            addNotification,
+            closeWidgetEditor
+        })
+
+        expect(outcome).toEqual({ saved: true })
+        expect(applyWidgetUpdate).toHaveBeenCalledWith(updatedWidget)
+        expect(persistChanges).toHaveBeenCalledWith(updatedWidget)
+        expect(addNotification).toHaveBeenCalledWith('Widget "Intro" saved successfully', 'success')
+        expect(closeWidgetEditor).toHaveBeenCalledOnce()
+    })
+
+    it('keeps the widget editor open when persistence is deferred by a conflict', async () => {
+        const applyWidgetUpdate = vi.fn()
+        const persistChanges = vi.fn().mockResolvedValue({ saved: false, reason: 'conflict' })
+        const addNotification = vi.fn()
+        const closeWidgetEditor = vi.fn()
+
+        const outcome = await saveWidgetEditorChanges(updatedWidget, {
+            applyWidgetUpdate,
+            persistChanges,
+            addNotification,
+            closeWidgetEditor
+        })
+
+        expect(outcome).toEqual({ saved: false, reason: 'conflict' })
+        expect(applyWidgetUpdate).toHaveBeenCalledWith(updatedWidget)
+        expect(addNotification).not.toHaveBeenCalled()
+        expect(closeWidgetEditor).not.toHaveBeenCalled()
     })
 })
