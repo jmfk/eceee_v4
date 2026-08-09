@@ -310,7 +310,8 @@ const BioWidget = memo(({
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&
         prevProps.slotName === nextProps.slotName &&
-        prevProps.widgetType === nextProps.widgetType
+        prevProps.widgetType === nextProps.widgetType &&
+        prevProps.onConfigChange === nextProps.onConfigChange
     )
 })
 

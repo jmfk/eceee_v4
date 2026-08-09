@@ -384,6 +384,45 @@ describe('canonical widget update ownership', () => {
         expect(publishUpdateMock).not.toHaveBeenCalled()
     })
 
+    it('BioWidget uses the latest parent update handler after parent rerenders', async () => {
+        const staleOnConfigChange = vi.fn()
+        const latestOnConfigChange = vi.fn()
+
+        const { rerender } = render(
+            <BioWidget
+                mode="editor"
+                widgetId="bio-1"
+                slotName="main"
+                config={{ bioText: '<p>Initial bio</p>', textLayout: 'column' }}
+                onConfigChange={staleOnConfigChange}
+                context={{ pageId: '101' }}
+            />
+        )
+
+        await act(async () => {
+            rerender(
+                <BioWidget
+                    mode="editor"
+                    widgetId="bio-1"
+                    slotName="main"
+                    config={{ bioText: '<p>Initial bio</p>', textLayout: 'column' }}
+                    onConfigChange={latestOnConfigChange}
+                    context={{ pageId: '101' }}
+                />
+            )
+        })
+
+        await act(async () => {
+            latestBioRenderer().emitChange('<p>Bio edit after sibling update</p>')
+        })
+
+        expect(staleOnConfigChange).not.toHaveBeenCalled()
+        expect(latestOnConfigChange).toHaveBeenCalledOnce()
+        expect(latestOnConfigChange).toHaveBeenCalledWith(expect.objectContaining({
+            bioText: '<p>Bio edit after sibling update</p>'
+        }))
+    })
+
     it('BioWidget hydrates external UDC updates without echoing user edits', async () => {
         const onConfigChange = vi.fn()
 
